@@ -12,7 +12,7 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
-Never edit `skills/` directly. Correct `authoring/` or the flattening script, then run `just flatten-skills` again
+If working from `skills/<skill-name>/`, treat it as generated output. Make all skill edits in the corresponding `authoring/<category>/<skill-name>/` package, then run `just flatten-skills`. Never edit files under `skills/` directly, regardless of the current directory
 
 Repository-wide scripts live in `scripts/`; the `justfile` exposes routine operations. Scripts belonging to one skill stay in `authoring/<category>/<skill-name>/scripts/` and travel with that skill
 
