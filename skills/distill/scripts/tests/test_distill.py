@@ -22,7 +22,7 @@ def make_executable(path: Path, content: str) -> None:
 def make_fake_claude(bin_dir: Path) -> None:
     make_executable(
         bin_dir / "claude",
-        """#!/usr/bin/env python3
+        """#!/usr/bin/env -S uv run --no-project python
 import json
 print(json.dumps({
     \"result\": \"## Distilled output\",
@@ -35,7 +35,7 @@ print(json.dumps({
 def make_asserting_fake_claude(bin_dir: Path, expected_snippet: str) -> None:
     make_executable(
         bin_dir / "claude",
-        f"""#!/usr/bin/env python3
+        f"""#!/usr/bin/env -S uv run --no-project python
 import json
 import sys
 
@@ -75,7 +75,7 @@ print(json.dumps({{
 def make_fake_opencode(bin_dir: Path) -> None:
     make_executable(
         bin_dir / "opencode",
-        """#!/usr/bin/env python3
+        """#!/usr/bin/env -S uv run --no-project python
 import json
 import sys
 
@@ -110,7 +110,7 @@ raise SystemExit(9)
 def make_asserting_fake_opencode(bin_dir: Path, expected_snippet: str) -> None:
     make_executable(
         bin_dir / "opencode",
-        f"""#!/usr/bin/env python3
+        f"""#!/usr/bin/env -S uv run --no-project python
 import json
 import sys
 
@@ -150,6 +150,8 @@ def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str,
         ["uv", "run", str(SCRIPT_PATH), *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        check=False,
         timeout=30,
         env=env,
     )
@@ -282,9 +284,9 @@ class TestOpenCodeProvider:
         ]
         assert len(run_dirs) == 1
         slug = input_file.stem
-        assert (
-            run_dirs[0] / f"{slug}_follow_along_note.md"
-        ).read_text(encoding="utf-8") == ("## OpenCode output\n")
+        assert (run_dirs[0] / f"{slug}_follow_along_note.md").read_text(
+            encoding="utf-8"
+        ) == ("## OpenCode output\n")
 
     def test_opencode_rejects_effort_flag(self, tmp_path: Path) -> None:
         env = env_with_fake_opencode(tmp_path)
