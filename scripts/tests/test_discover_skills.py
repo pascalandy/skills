@@ -62,6 +62,17 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     verified = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
     assert verified.returncode == 0, verified.stderr
     assert json.loads(verified.stdout)["agents"]["opencode"]["status"] == "verified"
+    shared = home / ".agents/skills/alpha/SKILL.md"
+    binary.write_text(
+        "#!/bin/sh\n/bin/cat <<'EOF'\n"
+        + json.dumps([{"name": "alpha", "location": str(shared)}])
+        + "\nEOF\n",
+        encoding="utf-8",
+    )
+    deduplicated = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert deduplicated.returncode == 0, deduplicated.stderr
     real = home / "actual/alpha"
     real.parent.mkdir()
     entry.parent.rename(real)
