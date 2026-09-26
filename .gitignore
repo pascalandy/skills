@@ -28,3 +28,7 @@ coverage/
 dist/
 build/
 *.tsbuildinfo
+
+# Local skill collections
+/_skills_private/
+/_skills_archived/
