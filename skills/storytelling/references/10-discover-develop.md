@@ -2,10 +2,6 @@
 
 Use this branch when material exists but the story does not yet have a stable form.
 
-Use the [narrative brief](../assets/00-narrative-brief.md) when the work needs a durable
-brief. Use the [story bible](../assets/10-story-bible.md) only when continuity must be
-maintained across a long work.
-
 ## 1. Inventory the living material
 
 Identify what is already present:
