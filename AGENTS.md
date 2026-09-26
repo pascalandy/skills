@@ -14,6 +14,8 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
+`scripts/tests/test_skill_invocation.py` pins the invocation mode of skills whose routing must not drift. Update its lists when you change one of those decisions
+
 If generated output is wrong, fix `authoring/` or the flattening script, then rerun `just flatten-skills`
 
 Repository-wide scripts live in `scripts/`; skill-specific scripts stay in `authoring/<category>/<skill-name>/scripts/` and travel with the skill. The `justfile` exposes routine operations
