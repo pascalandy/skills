@@ -38,7 +38,9 @@ Scripts in `scripts/` are CLIs that agents run, so their output stays small and 
 
 `scripts/_common.py` applies these rules: build the parser, then return `run_script(parser, work)` from `main()`. `work` returns the success line and raises `ScriptError` with one message per problem
 
-Tests live in `scripts/tests/`. `just test` runs them; `just check` adds ruff and pyright
+Tests live in `scripts/tests/`. `just test` runs them; `just check` is exactly what CI runs on every PR and push to `main`. Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools
+
+When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
 ## Commit hooks
 
@@ -46,6 +48,7 @@ Run `lefthook install` once per clone. The pre-commit hook calls `just` recipes,
 
 - `just gitleaks-staged` scans staged changes for secrets on every commit
 - `just check-frontmatter` runs when a `SKILL.md` is staged
+- `just flatten-skills --check` runs when files under `authoring/` or `skills/` are staged
 
 gitleaks uses its built-in rules because the repo has no `.gitleaks.toml`. If you add one for an allowlist, start it with `[extend]` / `useDefault = true`; otherwise the built-in rules are disabled and every scan passes
 

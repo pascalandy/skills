@@ -1,3 +1,8 @@
+ruff_version := "0.16.9"
+pyright_version := "1.1.414"
+pytest_version := "9.1.1"
+actionlint_version := "1.7.12.25"
+
 # Flatten categorized authoring packages into the published skills directory
 flatten-skills *args:
     @uv run scripts/flatten_skills.py {{args}}
@@ -12,14 +17,17 @@ install-skills *args:
 
 # Run the script tests
 test *args:
-    @uvx pytest {{args}}
+    @uvx pytest@{{pytest_version}} {{args}}
 
-# Lint, format-check, type-check, and test the repository scripts
+# Run the same CI-safe verdict as GitHub Actions
 check:
-    @uvx ruff check --quiet scripts
-    @uvx ruff format --quiet --check scripts
-    @uvx --with pytest pyright --pythonversion 3.11 scripts
-    @just test
+    @just check-frontmatter
+    @just flatten-skills --check
+    @uvx ruff@{{ruff_version}} check --quiet scripts
+    @uvx ruff@{{ruff_version}} format --quiet --check scripts
+    @uvx --with pytest=={{pytest_version}} pyright@{{pyright_version}} --pythonversion 3.11 scripts
+    @uvx pytest@{{pytest_version}}
+    @uvx --from actionlint-py@{{actionlint_version}} actionlint
 
 # Scan staged changes for secrets; lefthook runs it on every commit
 gitleaks-staged:

@@ -9,3 +9,6 @@ pre-commit:
     frontmatter:
       glob: "authoring/**/SKILL.md"
       run: just check-frontmatter
+    flattened-skills:
+      glob: "{authoring,skills}/**/*"
+      run: just flatten-skills --check
