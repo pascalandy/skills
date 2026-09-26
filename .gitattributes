@@ -1,0 +1,2 @@
+# Markdown sources use trailing spaces for line breaks and blank templates
+*.md whitespace=-blank-at-eol,-blank-at-eof

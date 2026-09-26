@@ -1,0 +1,6 @@
+interface:
+  display_name: "Matt Mode"
+  short_description: "Prepare implementation with Matt's planning procedures"
+  default_prompt: "Use $matt-mode to clarify this idea and prepare the next useful result."
+policy:
+  allow_implicit_invocation: false
