@@ -21,51 +21,45 @@ ownership away from the author.
 - Let narrative clarify evidence rather than replace it
 - Extract observable craft from artistic references instead of imitating an identity
 
-## 1. Choose the mode
+## 1. Route the request
 
-Choose exactly one starting mode from the user's requested outcome.
+Choose the first row whose request matches. The last column lists what each branch
+can deliver; a request that names one of them receives that artifact and nothing more.
 
-### Style Modeler
+| Request | Mode and branch | Load first | Deliverables |
+| --- | --- | --- | --- |
+| `style modeler`, or a reusable style skill from reference works | Style Modeler | [Style Modeler](references/85-style-modeler.md) | standalone editing skill |
+| Teach, improve, or extend this skill from a source, example, preference, or observed result | Evolve | [evolve the craft](references/80-evolve-craft.md) | analysis, or an authorized skill change |
+| Understand, evaluate, or improve an existing telling, whatever its subject | Practice → Diagnose | shared model, then [diagnose and revise](references/30-diagnose-revise.md) | diagnosis with options; revision only when authorized |
+| Explain a concept, phenomenon, or process through narrative | Practice → Explain | shared model, truth and ethics, then [concept reconstruction](references/46-explain-concept.md) | causal model, then the explanation in its medium |
+| Explain a designed artifact, project, product, or architecture through narrative | Practice → Explain | shared model, truth and ethics, then [artifact reconstruction](references/47-explain-artifact.md) | claim ledger, value analysis, [project narrative brief](assets/20-project-narrative-brief.md), questions for the creator, or the explanation |
+| Find what unstable material could become, or ask for possibilities | Practice → Discover | shared model, then [discover and develop](references/10-discover-develop.md) | premise, directions, synopsis, sequence map, [narrative brief](assets/00-narrative-brief.md), [story bible](assets/10-story-bible.md) |
+| Move a stable story to another medium, length, audience, or telling situation | Practice → Adapt | shared model, then [adapt](references/40-adapt.md) | adaptation plan, map, treatment, or outline |
+| Produce a finished telling from a stable core and trajectory | Practice → Write | shared model, then [write](references/20-write.md) | the finished unit or complete telling in its medium |
 
-Choose **Style Modeler** when the user invokes `style modeler`
-or asks to create a reusable style skill from reference works.
-Read [Style Modeler](references/85-style-modeler.md)
-and follow it to completion.
+Tie-breaks:
 
-### Evolve craft
-
-Choose **Evolve** when the user asks how a source, example, preference, or observed
-result could improve this skill, or asks to update, teach, improve, or extend the skill
-from that evidence. Read
-[evolve the craft](references/80-evolve-craft.md) and follow it to completion.
-
-A reference that should guide only the current deliverable belongs to **Practice**,
-not **Evolve**. If the user requests both durable learning and a new deliverable,
-complete and validate **Evolve** first, then start **Practice** with the revised skill.
-
-Do not load the shared model or an operating branch before the evolution reference
-identifies which existing behavior must be inspected.
-
-### Practice storytelling
-
-Choose **Practice** when the user wants to develop, write, diagnose, revise, adapt, or
-explain through narrative. Continue with Step 2.
+- A reference that guides only the current deliverable belongs to **Practice**, not
+  **Evolve**. When the user requests both durable learning and a deliverable, complete
+  and validate **Evolve** first, then start **Practice** with the revised skill
+- **Style Modeler** and **Evolve** load nothing else until their reference asks for it
+- For a hybrid explain subject, choose the reconstruction by the audience's main
+  learning job and load the other only when a consequential claim needs it. Do not
+  assume a creator, intention, design insight, user, or value bridge for a subject
+  that has none
 
 **Completion criterion**
 
-The requested outcome selects one starting mode. No reference from another mode has
-been loaded speculatively.
+One row is selected from the requested outcome. No reference from another mode or
+branch has been loaded speculatively.
 
 ## 2. Establish the practice contract
 
-Read [the shared narrative model](references/00-narrative-model.md), then establish:
-
-- the assignment and requested deliverable
-- the truth contract
-- the audience and intended audience shift
-- the medium and scale
-- the non-negotiables
-- the intervention contract
+Read [the shared narrative model](references/00-narrative-model.md), then fill the
+Contracts section of the [narrative brief](assets/00-narrative-brief.md). Keep it
+inline for short work. Write the brief as a file only when continuity across sessions
+requires it, and add the [story bible](assets/10-story-bible.md) only for a long work
+whose continuity must be maintained.
 
 For factual, autobiographical, documentary, repository-based, hybrid, source-based,
 or other people's lived experience, also read
@@ -80,48 +74,26 @@ sources as limits instead of treating all possible material as required.
 The contract can be summarized without contradiction, and every consequential
 assumption or source limit is marked.
 
-## 3. Plan the practice branch sequence
+## 3. Plan the branch sequence
 
-Choose the first operation the request requires:
+Load only the starting branch. Enter the next branch after the current one passes its
+completion criteria, carrying the handoff it needs:
 
-1. **Diagnose and revise** when the user first asks to understand, evaluate, or improve
-   an existing telling, regardless of its subject. Read
-   [diagnose and revise](references/30-diagnose-revise.md)
-2. **Explain through story** when primarily nonnarrative technical, expository, or
-   artifact-based sources need narrative reconstruction. Read
-   [explain through story](references/45-explain-through-story.md)
-3. **Discover and develop** when the material lacks a stable core or trajectory, or the
-   user wants possibilities rather than finished narrative. Read
-   [discover and develop](references/10-discover-develop.md)
-4. **Adapt** when a stable story must change medium, length, audience, or telling
-   situation. Read [adapt](references/40-adapt.md)
-5. **Write** when the core and trajectory are stable and the user wants a finished
-   narrative unit or complete telling in the target medium. Read
-   [write](references/20-write.md)
+| Transition | When | Handoff |
+| --- | --- | --- |
+| Discover → Write | the request needs an original finished telling | stable core and trajectory |
+| Discover → Adapt | the source story must first become stable enough to know what to preserve | stable core, promise, and invariants |
+| Diagnose → Adapt | evaluation or surgical revision precedes a change of medium, length, audience, or situation | diagnosis and the selected corrections |
+| Adapt → Write | a finished target telling was requested rather than a plan | the adaptation decisions listed in the adapt gate |
 
-Plan only the branch transitions required by the requested deliverable:
-
-- Start with **Discover and develop**, then enter **Write** when the requested
-  deliverable needs an original finished telling
-- Start with **Discover and develop**, then enter **Adapt** when the source story must
-  first become stable enough to identify what the adaptation should preserve
-- Move from **Diagnose and revise** to **Adapt** when the user requested evaluation or
-  surgical revision before a change of medium, length, audience, or situation
-- Move from **Adapt** to **Write** when the user requested a finished target telling
-  rather than an adaptation plan, map, treatment, or outline
-
-**Explain through story** controls its own reconstruction and delivery references. Do
-not add another branch after it unless the user explicitly requested a separate
-narrative operation.
-
-Load only the starting branch. Load each later branch after the current branch passes
-its completion criteria.
+**Write** is terminal. **Explain** controls its own reconstruction and delivery
+sequence; do not add another branch after it unless the user explicitly requested a
+separate narrative operation.
 
 **Completion criterion**
 
-One starting branch and the smallest branch sequence are selected from the requested
-operations. Every transition has a stated deliverable, and no later branch is loaded
-early.
+The smallest branch sequence is selected from the requested operations. Every
+transition has a stated handoff, and no later branch is loaded early.
 
 ## 4. Load conditional practice guidance at the point of use
 
@@ -149,9 +121,9 @@ Read [voice and style](references/50-voice-style.md) only when the work requires
 preserving an existing voice, defining a style, or using an artistic reference for the
 current deliverable.
 
-Read [narrative lenses](references/70-narrative-lenses.md) when the user requests a
-named lens or the shared model cannot localize a named structural problem. Use only the
-requested or symptom-matched lens, not the whole catalog as a checklist.
+Read [narrative lenses](references/70-narrative-lenses.md) when the user names a lens
+or a diagnosed weakness matches one of its symptom headings. Use only the requested or
+symptom-matched lens, not the whole catalog as a checklist.
 
 **Completion criterion**
 
@@ -165,6 +137,9 @@ planned branch only after the current one passes.
 
 Do not draft while the movement, audience promise, evidence boundary, or truth contract
 required by the current work remains unresolved.
+
+Deliver the requested artifact, then name the remaining limits and open assumptions.
+Include the claim ledger only for factual or source-based work.
 
 Before delivery, verify:
 
