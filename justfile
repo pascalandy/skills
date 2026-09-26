@@ -6,9 +6,8 @@ flatten-skills *args:
 check-frontmatter *args:
     @uv run scripts/check_frontmatter.py {{args}}
 
-# Install skills/ into the agent skill directories; validates the flatten in dry runs
+# Install skills/ into the agent skill directories
 install-skills *args:
-    @case " {{args}} " in *" --help "*|*" -h "*) ;; *" --dry-run "*) uv run scripts/flatten_skills.py --dry-run ;; *) uv run scripts/flatten_skills.py ;; esac
     @uv run scripts/install_skills.py {{args}}
 
 # Run the script tests
@@ -19,7 +18,7 @@ test *args:
 check:
     @uvx ruff check --quiet scripts
     @uvx ruff format --quiet --check scripts
-    @uvx --with pytest pyright scripts
+    @uvx --with pytest pyright --pythonversion 3.11 scripts
     @just test
 
 # Scan staged changes for secrets; lefthook runs it on every commit

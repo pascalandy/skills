@@ -18,10 +18,9 @@ Repository-wide scripts live in `scripts/`; the `justfile` exposes routine opera
 
 ## Install skills
 
-`just install-skills` flattens, then copies `skills/` into every agent skill directory that `just install-skills --help` lists. Those directories feed Pascal's live agents, so run it only when Pascal asks. `just install-skills --dry-run --verbose` previews without writing
+`just install-skills` flattens `authoring/`, including uncommitted and branch-only changes, then copies `skills/` into every agent skill directory that `just install-skills --help` lists. Those directories feed Pascal's live agents, so run it only when Pascal asks. `just install-skills --dry-run --verbose` previews the current `authoring/` source without writing
 
 - A manifest in `~/.local/state/install-skills/` records what the script installed. Skills it did not install are never touched, and it removes only its own skills that left `skills/`
-- It installs whatever `skills/` holds on disk, including uncommitted and branch-only changes
 - When it stops on a copy edited in place, move the edit into `authoring/`, then rerun with `--force`
 
 ## Script conventions

@@ -18,12 +18,14 @@ TIMEOUT = 60  # seconds
 DIRS = len(TARGETS)
 
 
-def run(*args: str, home: Path) -> subprocess.CompletedProcess[str]:
+def run(
+    *args: str, home: Path, script: Path = SCRIPT
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / "state")
     return subprocess.run(
-        ["uv", "run", str(SCRIPT), *args],
+        ["uv", "run", str(script), *args],
         check=False,  # tests assert on returncode themselves
         capture_output=True,
         text=True,
@@ -179,9 +181,22 @@ def test_edited_install_stops_the_run(source: Path, home: Path) -> None:
 
 def test_runtime_artifacts_do_not_count_as_edits(source: Path, home: Path) -> None:
     sync(source, home)
-    package = home / ".claude/skills/alpha/node_modules/left-pad"
-    package.mkdir(parents=True)
-    (package / "index.js").write_text("module.exports = 1\n", encoding="utf-8")
+    installed = home / ".claude/skills/alpha"
+    for name in (
+        "node_modules",
+        ".mypy_cache",
+        ".cache",
+        ".turbo",
+        "venv",
+        "coverage",
+        "dist",
+        "build",
+    ):
+        artifact = installed / name / "result"
+        artifact.parent.mkdir()
+        artifact.write_text("generated\n", encoding="utf-8")
+    for name in (".coverage", ".coverage.123", "app.tsbuildinfo"):
+        (installed / name).write_text("generated\n", encoding="utf-8")
     summary = sync(source, home)
     assert (
         summary
@@ -204,6 +219,31 @@ def test_retired_skill_is_removed_and_other_skills_stay(
     assert (mine / "SKILL.md").is_file()
 
 
+def test_retired_skill_in_shared_target_is_removed_once(
+    source: Path, home: Path
+) -> None:
+    canonical = home / ".agents/skills"
+    canonical.mkdir(parents=True)
+    alias = home / ".config/agents/skills"
+    alias.parent.mkdir(parents=True)
+    alias.symlink_to(canonical, target_is_directory=True)
+
+    sync(source, home)
+    shutil.rmtree(source / "beta")
+
+    summary = sync(source, home)
+    assert (
+        summary
+        == "ok: 1 skills, 4 agent dirs; 0 added, 0 updated, 4 removed, 0 adopted"
+    )
+    assert not (canonical / "beta").exists()
+    manifest = json.loads((home / "state/manifest.json").read_text(encoding="utf-8"))
+    assert (
+        manifest["targets"][".agents/skills"]
+        == manifest["targets"][".config/agents/skills"]
+    )
+
+
 def test_cli_dry_run_reads_home_and_prints_one_line(tmp_path: Path) -> None:
     skill_count = len(list(SOURCE.glob("*/SKILL.md")))
     result = run("--dry-run", home=tmp_path)
@@ -215,11 +255,56 @@ def test_cli_dry_run_reads_home_and_prints_one_line(tmp_path: Path) -> None:
     assert not (tmp_path / ".claude").exists()
 
 
+def test_cli_preview_matches_install_from_current_authoring(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    scripts = repo / "scripts"
+    scripts.mkdir(parents=True)
+    for name in ("_common.py", "flatten_skills.py", "install_skills.py"):
+        shutil.copy2(SCRIPT.parent / name, scripts / name)
+
+    write_skill(repo / "authoring/devtools", "alpha", body="new")
+    generated = write_skill(repo / "skills", "alpha", body="old")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, timeout=10)
+    subprocess.run(
+        ["git", "add", "authoring/devtools/alpha/SKILL.md"],
+        cwd=repo,
+        check=True,
+        timeout=10,
+    )
+    home = tmp_path / "home"
+    installed = home / ".agents/skills/alpha"
+    manifest = home / "state/install-skills/manifest.json"
+    install(generated.parent, home, manifest, dry_run=False, force=False)
+    original_manifest = manifest.read_text(encoding="utf-8")
+
+    result = run("--dry-run", home=home, script=scripts / "install_skills.py")
+
+    assert result.returncode == 0
+    assert result.stdout == (
+        "dry run: 1 skills, 5 agent dirs; 0 to add, 5 to update, "
+        "0 to remove, 0 to adopt\n"
+    )
+    assert (generated / "SKILL.md").read_text(encoding="utf-8") == ("# alpha\n\nold\n")
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == ("# alpha\n\nold\n")
+    assert manifest.read_text(encoding="utf-8") == original_manifest
+
+    applied = run(home=home, script=scripts / "install_skills.py")
+
+    assert applied.returncode == 0
+    assert applied.stdout == (
+        "ok: 1 skills, 5 agent dirs; 0 added, 5 updated, 0 removed, 0 adopted\n"
+    )
+    assert (generated / "SKILL.md").read_text(encoding="utf-8") == ("# alpha\n\nnew\n")
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == ("# alpha\n\nnew\n")
+
+
 def test_cli_unreadable_manifest_reports_error_and_hint(tmp_path: Path) -> None:
     manifest = tmp_path / "state" / "install-skills" / "manifest.json"
     manifest.parent.mkdir(parents=True)
     manifest.write_text("not json", encoding="utf-8")
-    result = run(home=tmp_path)
+    result = run("--dry-run", home=tmp_path)
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.startswith(f"error: cannot read manifest {manifest}: ")

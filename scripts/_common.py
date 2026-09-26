@@ -6,12 +6,25 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
 
 class ScriptError(Exception):
     """Expected failure; each argument is one message that says what to fix."""
+
+
+def swap(fresh: Path, destination: Path, previous: Path) -> None:
+    """Replace a directory and restore the old one if interrupted mid-swap."""
+    try:
+        if destination.exists():
+            destination.rename(previous)
+        fresh.rename(destination)
+    except BaseException:
+        if previous.exists() and not destination.exists():
+            previous.rename(destination)
+        raise
 
 
 def run_script(
