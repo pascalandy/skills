@@ -397,7 +397,7 @@ def test_command_conflict_force_and_owned_removal(
     edited = home / ".claude/commands/review.md"
     edited.write_text("local edit\n", encoding="utf-8")
     preview = run(repo, home, "--dry-run", "--json")
-    assert preview.returncode == 1
+    assert preview.returncode == 0
     assert any(
         a["kind"] == "conflict" and a["source"] == "command"
         for a in report(preview)["actions"]
@@ -422,3 +422,49 @@ def test_command_conflict_force_and_owned_removal(
     assert run(repo, home).returncode == 0
     assert not edited.exists()
     assert foreign.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_om1_preserves_inactive_mac_command_target(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    source = command(repo, "review", "old")
+    assert run(repo, home, "--profile", "mac").returncode == 0
+    source.write_text("new\n", encoding="utf-8")
+    preview = run(repo, home, "--profile", "om1", "--dry-run", "--json")
+    assert preview.returncode == 0
+    assert not any(
+        action["target"] == ".config/agents/commands"
+        for action in report(preview)["actions"]
+    )
+    assert run(repo, home, "--profile", "om1").returncode == 0
+    assert (home / ".config/agents/commands/review.md").read_text() == "old\n"
+    assert ".config/agents/commands" in manifest(home)["commands"]
+    assert (home / ".codex/prompts/review.md").read_text() == "new\n"
+
+
+def test_force_removes_edited_owned_command_with_removed_source(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    source = command(repo, "review", "old")
+    assert run(repo, home).returncode == 0
+    owned = home / ".claude/commands/review.md"
+    owned.write_text("local edit\n", encoding="utf-8")
+    foreign = home / ".claude/commands/foreign.md"
+    foreign.write_text("keep\n", encoding="utf-8")
+    source.unlink()
+    subprocess.run(
+        ["git", "add", "-u", "authoring/commands/review.md"], cwd=repo, check=True
+    )
+    preview = run(repo, home, "--dry-run", "--json")
+    assert preview.returncode == 0
+    assert any(
+        action["kind"] == "conflict" and action["target"] == ".claude/commands"
+        for action in report(preview)["actions"]
+    )
+    assert run(repo, home).returncode == 1
+    assert owned.read_text() == "local edit\n"
+    assert run(repo, home, "--force").returncode == 0
+    assert not owned.exists()
+    assert foreign.read_text() == "keep\n"

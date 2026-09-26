@@ -43,13 +43,21 @@ PROFILES = {
     ),
 }
 EXCLUSIONS = {"mac": frozenset(), "om1": frozenset({"apple-mail"})}
-COMMAND_TARGETS = (
-    ".claude/commands",
-    ".pi/agent/prompts",
-    ".codex/prompts",
-    ".config/opencode/commands",
-    ".config/agents/commands",
-)
+COMMAND_TARGETS = {
+    "mac": (
+        ".claude/commands",
+        ".pi/agent/prompts",
+        ".codex/prompts",
+        ".config/opencode/commands",
+        ".config/agents/commands",
+    ),
+    "om1": (
+        ".claude/commands",
+        ".pi/agent/prompts",
+        ".codex/prompts",
+        ".config/opencode/commands",
+    ),
+}
 RUNTIME_NAMES = frozenset(
     {
         "node_modules",
@@ -95,6 +103,13 @@ class Action:
 Owned = dict[str, dict[str, dict[str, str]]]
 
 
+@dataclass(frozen=True)
+class Manifest:
+    version: int
+    targets: Owned
+    commands: dict[str, dict[str, str]]
+
+
 def is_runtime(name: str) -> bool:
     return (
         name in RUNTIME_NAMES
@@ -138,7 +153,7 @@ def digest_command(path: Path) -> str:
     return digest_files(((Path(path.name), path),))
 
 
-def load_manifest(path: Path) -> Owned:
+def read_manifest(path: Path) -> Manifest:
     if path.is_symlink():
         raise ScriptError(
             f"manifest {path} is a symlink; replace it with a regular file"
@@ -149,7 +164,7 @@ def load_manifest(path: Path) -> Owned:
         if ancestor.exists() and not ancestor.is_dir():
             raise ScriptError(f"manifest parent {ancestor} is a file")
     if not path.exists():
-        return {}
+        return Manifest(2, {}, {})
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -194,7 +209,9 @@ def load_manifest(path: Path) -> Owned:
     if not isinstance(commands, dict):
         raise ScriptError(f"invalid command ownership in {path}")
     for target, records in commands.items():
-        if target not in COMMAND_TARGETS or not isinstance(records, dict):
+        if target not in set().union(
+            *map(set, COMMAND_TARGETS.values())
+        ) or not isinstance(records, dict):
             raise ScriptError(f"invalid command target {target!r} in {path}")
         for name, checksum in records.items():
             if (
@@ -207,14 +224,11 @@ def load_manifest(path: Path) -> Owned:
                 raise ScriptError(
                     f"invalid command ownership for {target}/{name} in {path}"
                 )
-    return owned
+    return Manifest(version, owned, commands)
 
 
-def load_commands(path: Path) -> dict[str, dict[str, str]]:
-    if not path.exists():
-        return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data.get("commands", {}) if data["version"] == 2 else {}
+def load_manifest(path: Path) -> Owned:
+    return read_manifest(path).targets
 
 
 def save_manifest(
@@ -312,12 +326,11 @@ def target_groups(home: Path, targets: Iterable[str]) -> dict[Path, list[str]]:
 
 def plan(
     home: Path,
-    manifest: Path,
+    previous: Owned,
     sources: dict[str, Source],
     profile: str,
     retire: dict[str, str],
 ) -> tuple[list[Action], Owned]:
-    previous = load_manifest(manifest)
     targets = PROFILES[profile]
     for name, checksum in retire.items():
         records = [previous.get(target, {}).get(name) for target in targets]
@@ -426,11 +439,14 @@ def command_sources() -> dict[str, Source]:
 
 
 def plan_commands(
-    home: Path, previous: dict[str, dict[str, str]], sources: dict[str, Source]
+    home: Path,
+    previous: dict[str, dict[str, str]],
+    sources: dict[str, Source],
+    profile: str,
 ) -> tuple[list[Action], dict[str, dict[str, str]]]:
     owned = {target: records.copy() for target, records in previous.items()}
     actions: list[Action] = []
-    for aliases in target_groups(home, COMMAND_TARGETS).values():
+    for aliases in target_groups(home, COMMAND_TARGETS[profile]).values():
         target = aliases[0]
         recorded: dict[str, str] = {}
         for alias in aliases:
@@ -512,6 +528,7 @@ def execute(
     command_owned: dict[str, dict[str, str]],
     previous: Owned,
     previous_commands: dict[str, dict[str, str]],
+    previous_version: int,
 ) -> None:
     for action in actions:
         destination = home / action.target / action.name
@@ -525,14 +542,7 @@ def execute(
                 destination.unlink()
             else:
                 shutil.rmtree(destination)
-    if (
-        owned != previous
-        or command_owned != previous_commands
-        or (
-            manifest.exists()
-            and json.loads(manifest.read_text(encoding="utf-8")).get("version") == 1
-        )
-    ):
+    if owned != previous or command_owned != previous_commands or previous_version == 1:
         save_manifest(manifest, owned, command_owned)
 
 
@@ -575,8 +585,9 @@ def main(argv: list[str] | None = None) -> int:
        ~/.config/opencode/skills, ~/.config/agents/skills
   om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
        ~/.config/opencode/skills (excludes apple-mail)
-  both: ~/.claude/commands, ~/.pi/agent/prompts, ~/.codex/prompts,
-        ~/.config/opencode/commands, ~/.config/agents/commands
+  commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
+        ~/.codex/prompts, ~/.config/opencode/commands
+  commands on mac: ~/.config/agents/commands
 
 examples:
   just install-skills --dry-run --profile mac
@@ -623,7 +634,7 @@ examples:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="replace edited or unowned copies after reviewing conflicts",
+        help="replace or remove edited owned copies and replace unowned copies after reviewing conflicts",
     )
     parser.add_argument(
         "--json", action="store_true", help="print the per-target report as JSON"
@@ -678,10 +689,12 @@ examples:
             if not sources:
                 raise ScriptError("no public skills found; run just flatten-skills")
             commands = command_sources()
-            actions, owned = plan(Path.home(), manifest, sources, args.profile, retire)
-            previous_commands = load_commands(manifest)
+            previous = read_manifest(manifest)
+            actions, owned = plan(
+                Path.home(), previous.targets, sources, args.profile, retire
+            )
             command_actions, command_owned = plan_commands(
-                Path.home(), previous_commands, commands
+                Path.home(), previous.commands, commands, args.profile
             )
             actions.extend(command_actions)
             if args.force:
@@ -704,7 +717,6 @@ examples:
             if any(action.kind == "conflict" for action in actions):
                 print(report)
                 return 1
-            previous = load_manifest(manifest)
             flatten_skills.flatten(dry_run=False)
             execute(
                 Path.home(),
@@ -714,8 +726,9 @@ examples:
                 actions,
                 owned,
                 command_owned,
-                previous,
-                previous_commands,
+                previous.targets,
+                previous.commands,
+                previous.version,
             )
             print(report)
             return 0
