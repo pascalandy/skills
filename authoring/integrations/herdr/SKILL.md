@@ -166,8 +166,8 @@ herdr pane split --current --direction right --cwd "$PWD" --no-focus
 Read the new pane ID from `.result.pane.pane_id`, then run and inspect the command:
 
 ```bash
-herdr pane run <returned-pane-id> "just test"
-herdr pane wait-output <returned-pane-id> --match "test result" --timeout 120000
+herdr pane run <returned-pane-id> "just check --only test"
+herdr pane wait-output <returned-pane-id> --match "ok: 1 passed" --timeout 120000
 herdr pane read <returned-pane-id> --source recent-unwrapped --lines 120
 ```
 
