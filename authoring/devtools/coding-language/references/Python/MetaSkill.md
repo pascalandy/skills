@@ -11,9 +11,25 @@ Everything here must work on Linux and macOS, and should work on Windows.
 
 Needs uv 0.12 or later. Check with `uv --version`; update with `uv self update`, or `brew upgrade uv` for a Homebrew install.
 
-## Scripts (default)
+## Choose the environment
 
-Start with a single-file script that declares its needs in a PEP 723 block:
+Decide which environment owns the dependencies before running, checking, or changing anything. How the code runs decides it, not how many files it has:
+
+- **Project code** belongs to an existing project, a `pyproject.toml` with a `[project]` table. It uses the project's declared dependencies, interpreter, `uv.lock`, tool configuration, and repository recipes. Run it with the repository's recipe, or `uv run path/to/file.py`
+- **An independent script** runs on its own, so it declares its needs in a PEP 723 block, even when it sits inside a project. Run it with `uv run script.py`
+- **A one-off tool** runs with `uvx TOOL`. Project checks use the project's declared tools instead, such as `uv run --locked ruff`
+
+A PEP 723 block makes `uv run script.py` ignore the enclosing project's dependencies. Adding one to project code creates a second dependency owner and cuts the file off from the project's packages, so never add one to fix an import.
+
+### When an import fails
+
+1. Check which interpreter ran: `uv python find` for project code, `uv python find --script script.py` for a script
+2. Check that the owner declares the package: `dependencies` or `[dependency-groups]` in `pyproject.toml`, or the script's block
+3. Declare it with that owner only: `uv add PACKAGE` for project code, `uv add --script script.py PACKAGE` for a script
+
+## Independent scripts
+
+Write new standalone code as a single-file script with a PEP 723 block:
 
 ```python
 #!/usr/bin/env -S uv run --script
@@ -46,11 +62,12 @@ Add a cooldown so a release published in the last week can't reach the script:
 ```
 
 - `exclude-newer` skips releases newer than the cutoff, a cheap guard against freshly compromised packages
-- `uv lock --script script.py` writes `script.py.lock`, which `uv run` then follows; commit it when the script must resolve the same way next month
+- `uv lock --script script.py` writes `script.py.lock`; commit it when the script must resolve the same way next month
+- Verify with `uv run --locked script.py`: it fails on a stale lock and leaves the lock unchanged. Plain `uv run script.py` rewrites a stale lock silently, so a committed lock alone does not enforce freshness
 
 ## Projects
 
-Move to a project when the code spans several modules or ships as a package:
+Create a project when new code spans several modules or ships as a package:
 
 ```bash
 uv init --package my-app && cd my-app  # app with a my-app command; swap in --lib for a library or --no-package for a bare app
@@ -60,7 +77,7 @@ uv run my-app                          # locks, syncs .venv, then runs
 ```
 
 - `uv run` keeps `uv.lock` and `.venv` in sync; never create or activate a venv by hand
-- Commit `uv.lock`; in CI, `uv sync --locked` fails when it is stale
+- Commit `uv.lock`; with `--locked`, `uv run` and `uv sync` fail on a stale lock instead of rewriting it
 - `uv python pin 3.12` writes `.python-version`; uv downloads missing interpreters on its own
 - Releases: `uv version --bump minor`, `uv build`, `uv publish`
 
@@ -75,26 +92,40 @@ uv run --env-file .env script.py  # load env vars without python-dotenv; errors 
 
 ## Checks
 
-Run from the project root so the project's pinned versions apply:
+Verify before repairing. Verification leaves source and lockfiles unchanged, so the original failures stay visible. Existing repository recipes, such as `just check`, take precedence over these commands.
+
+For project code with a committed `uv.lock` and these tools in its dev group:
 
 ```bash
-uv run ruff check --fix .
-uv run ruff format .
-uv run pyright
-uv run pytest
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pyright
+uv run --locked pytest
 ```
 
-A standalone script has no project, so point pyright at the script's own environment; otherwise every third-party import fails to resolve:
+An independent script has no project, so sync its environment and point pyright at it; otherwise every third-party import fails to resolve:
 
 ```bash
 uvx ruff check script.py
-uv sync --script script.py
+uvx ruff format --check script.py
+uv sync --script script.py  # add --locked when script.py.lock is committed
 uvx pyright --pythonpath "$(uv python find --script script.py)" script.py
+```
+
+Sync first: until the script's environment exists, `uv python find --script` returns some other interpreter.
+
+Repair only when asked to fix, or once verification shows findings you mean to repair, then verify again. Keep dependency updates (`uv lock`, `uv add`) a separate step:
+
+```bash
+uv run --locked ruff check --fix .
+uv run --locked ruff format .
 ```
 
 - Type-hint every function signature; pyright does not require annotations, but `ruff check --extend-select ANN` flags missing ones
 - `uv audit` (experimental) scans locked dependencies for known vulnerabilities
-- Details: `references/ruff.md`, `references/pyright.md`, `references/pytest.md`
+- Before changing ruff settings, read [ruff.md → Configuration](references/ruff.md#configuration)
+- When a checker fails, read [ruff.md → Exit codes](references/ruff.md#exit-codes) or [pyright.md → Exit codes](references/pyright.md#exit-codes) to tell a code finding from a broken setup
+- Before silencing a diagnostic, read [pyright.md → Suppressing errors](references/pyright.md#suppressing-errors)
 
 ## Cross-platform
 
@@ -124,39 +155,11 @@ Agents run these scripts, so keep output small and failures obvious:
 
 ## Tests
 
-Keep tests next to the script and run it as a subprocess, the way agents do:
+Keep tests in `scripts/tests/` next to the script. Test CLI behavior through the command line, the way agents run it, and internal computations directly when a subprocess adds nothing.
 
-```
-scripts/
-├── tool.py
-└── tests/
-    └── test_tool.py
-```
-
-```python
-import subprocess
-from pathlib import Path
-
-SCRIPT = Path(__file__).parent.parent / "tool.py"
-
-
-def run(
-    *args: str, env: dict[str, str] | None = None
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["uv", "run", str(SCRIPT), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        env=env,
-    )
-
-
-def test_help_exits_zero() -> None:
-    assert run("--help").returncode == 0
-```
-
-Run with `uv run pytest` inside a project, or `uvx pytest scripts/tests` for a standalone script. See `references/pytest.md` for fixtures and patterns.
+- Before writing or changing tests, read [pytest.md → Test structure](references/pytest.md#test-structure) for the subprocess helper
+- Then read [pytest.md → Proving behavior](references/pytest.md#proving-behavior) for what each test must assert
+- Run them with `uv run --locked pytest` for project code, or `uvx pytest scripts/tests` for an independent script
 
 ## Secrets
 
