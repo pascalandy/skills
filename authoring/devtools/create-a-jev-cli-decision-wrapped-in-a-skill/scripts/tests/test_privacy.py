@@ -6,6 +6,10 @@ Planted secrets are assembled at runtime so no token-shaped literal is committed
 from __future__ import annotations
 
 import json
+import os
+import random
+import shutil
+import string
 from pathlib import Path
 
 from jevtest import FakeTypeSafe, Project, add_sub, kinds, make_project
@@ -93,38 +97,62 @@ def test_payload_filters(project: Project) -> None:
     assert "notes" in project.fake.groups_asked()
 
 
-def test_secret_blocks_before_transport(tmp_path: Path, fake: FakeTypeSafe) -> None:
-    token = "ghp_" + "Ab1" * 12
-    project = make_project(tmp_path / "code", fake)
-    add_sub(project)
-    project.commit(
-        "Read the service token", {"src/settings.py": f'TOKEN = "{token}"\n'}
+def without_gitleaks() -> str:
+    """PATH without any directory that holds gitleaks, so the built-in patterns scan."""
+    folders = os.environ["PATH"].split(os.pathsep)
+    return os.pathsep.join(
+        folder for folder in folders if not (Path(folder) / "gitleaks").exists()
     )
-    result = project.run_merge()
-    assert result.code == 11, result
-    assert set(kinds(result)) == {"secret_in_payload"}
-    assert fake.requests == []
-    record = (project.root / result.json["record"]).read_text()
-    for text in (result.stdout, result.stderr, record):
-        assert token not in text
-    assert "src/settings.py@@1" in result.json["reasons"][0]["message"]
-    preview = project.jev("run", "merge", "--dry-run", "--json", key=False)
-    assert preview.code == 11 and preview.json["payload"] is None
-    assert not (project.root / ".jev" / "runs" / "preview").exists()
 
-    key = "AKIA" + "QW3RTY7UI0PA5SDF"
-    author = make_project(tmp_path / "author", fake)
-    add_sub(author, f"Add sub\n\nStaging deploy uses {key} for now")
-    result = author.run_merge()
-    assert result.code == 11, result
-    assert fake.requests == []
-    assert "author_text" in result.json["reasons"][0]["message"]
-    assert (
-        key
-        not in result.stdout
-        + result.stderr
-        + (author.root / result.json["record"]).read_text()
-    )
+
+def planted(alphabet: str, length: int, seed: int) -> str:
+    return "".join(random.Random(seed).choices(alphabet, k=length))
+
+
+def test_secret_blocks_before_transport(tmp_path: Path, fake: FakeTypeSafe) -> None:
+    token = "ghp_" + planted(string.ascii_letters + string.digits, 36, 1)
+    key = "AKIA" + planted(string.ascii_uppercase + "234567", 16, 2)
+    scanners = {"builtin": without_gitleaks()}
+    if shutil.which("gitleaks"):
+        scanners["gitleaks"] = os.environ["PATH"]
+    for scanner, path in scanners.items():
+        project = make_project(tmp_path / f"code-{scanner}", fake)
+        project.env["PATH"] = f"{project.home / 'bin'}{os.pathsep}{path}"
+        add_sub(project)
+        project.commit(
+            "Read the service token", {"src/settings.py": f'TOKEN = "{token}"\n'}
+        )
+        result = project.run_merge()
+        assert result.code == 11, (scanner, result)
+        assert set(kinds(result)) == {"secret_in_payload"}
+        assert all(
+            f", {scanner}) at " in reason["message"]
+            for reason in result.json["reasons"]
+        )
+        assert fake.requests == []
+        record = (project.root / result.json["record"]).read_text()
+        for text in (result.stdout, result.stderr, record):
+            assert token not in text
+        assert "src/settings.py@@1" in result.json["reasons"][0]["message"]
+        preview = project.jev("run", "merge", "--dry-run", "--json", key=False)
+        assert preview.code == 11 and preview.json["payload"] is None
+        assert not (project.root / ".jev" / "runs" / "preview").exists()
+
+        author = make_project(tmp_path / f"author-{scanner}", fake)
+        author.env["PATH"] = project.env["PATH"]
+        add_sub(author, f"Add sub\n\nStaging deploy uses {key} for now")
+        result = author.run_merge()
+        assert result.code == 11, (scanner, result)
+        assert fake.requests == []
+        assert (
+            "pr.state.author_text.messages[0]" in result.json["reasons"][0]["message"]
+        )
+        assert (
+            key
+            not in result.stdout
+            + result.stderr
+            + (author.root / result.json["record"]).read_text()
+        )
 
 
 def test_existing_test_evidence(project: Project) -> None:

@@ -4,7 +4,7 @@
 # dependencies = ["typesafe-sdk==0.7.1"]
 # ///
 # jevgate-version: 0.1.0
-# jevgate-hash: sha256:fe3c480a47d632600c91ea715d58bebb84982641bb51bf6b45178428f2c9faff
+# jevgate-hash: sha256:d3a3214df820fe1e89498fa18b60eae6936f94d13fc5ff20ed1bad1f35a2bc7a
 """jevgate: advisory Jev decision gates for one project.
 
 Code collects the evidence, Jev answers typed questions about it, and one verdict
@@ -2545,16 +2545,18 @@ def string_leaves(value: Any, path: str, near: str = "") -> Iterator[tuple[str, 
 
 
 def scan_texts(project: Project, texts: dict[str, list[str]]) -> list[dict[str, Any]]:
-    """Scan unique texts with the built-in patterns and gitleaks when present."""
+    """Scan unique texts with the project's gitleaks when present, built-in patterns otherwise."""
     hits: list[dict[str, Any]] = []
-    for text, locations in texts.items():
-        for rule, pattern in SECRET_PATTERNS:
-            if re.search(pattern, text):
-                hits.append(
-                    {"rule": rule, "scanner": "builtin", "location": locations[0]}
-                )
     gitleaks = shutil.which("gitleaks")
-    if gitleaks is None or not texts:
+    if gitleaks is None:
+        for text, locations in texts.items():
+            for rule, pattern in SECRET_PATTERNS:
+                if re.search(pattern, text):
+                    hits.append(
+                        {"rule": rule, "scanner": "builtin", "location": locations[0]}
+                    )
+        return hits
+    if not texts:
         return hits
     ordered = list(texts.items())
     with tempfile.TemporaryDirectory(prefix="jevgate-scan-") as scratch:
@@ -2598,11 +2600,18 @@ def scan_texts(project: Project, texts: dict[str, list[str]]) -> list[dict[str, 
                 "fix gitleaks or remove it from PATH to use the built-in patterns",
             )
         if code == 3:
-            for leak in json.loads(report.read_text(encoding="utf-8") or "[]"):
-                index = int(Path(str(leak.get("File", ""))).stem or 0)
+            leaks = json.loads(report.read_text(encoding="utf-8") or "[]")
+            found = sorted(
+                (
+                    int(Path(str(leak.get("File", ""))).stem or 0),
+                    str(leak.get("RuleID")),
+                )
+                for leak in leaks
+            )
+            for index, rule in dict.fromkeys(found):
                 hits.append(
                     {
-                        "rule": str(leak.get("RuleID", "gitleaks")),
+                        "rule": rule,
                         "scanner": "gitleaks",
                         "location": ordered[index][1][0],
                     }
