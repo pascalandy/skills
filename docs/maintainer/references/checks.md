@@ -14,7 +14,9 @@ date_updated: 2026-09-26
 
 ## Add or change a check
 
-Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. Add a new CI-safe check as its own recipe, then append it to the `check` list in the `justfile`. Script tests follow [[script-conventions]]
+Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. To add a check, add a row to `CHECKS` in `scripts/check.py`. A check for a private package names it in `requires`; machines without the package, including CI, skip that check. Script tests follow [[script-conventions]]
+
+`just check --list` names every check, and `just check --only NAME` reruns one. `just check --list --verbose` prints each check's commands; run a command directly to pass extra flags, such as `-k` to pytest
 
 ## Commit hooks
 

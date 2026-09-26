@@ -26,7 +26,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Checks
 
-- `just check` is exactly what CI runs; a failure names the recipe to rerun
+- `just check` is exactly what CI runs; a failure names the `just check --only NAME` to rerun
 - Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
 - When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
