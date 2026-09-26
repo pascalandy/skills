@@ -40,6 +40,8 @@ Scripts in `scripts/` are CLIs that agents run, so their output stays small and 
 
 Tests live in `scripts/tests/`. `just test` runs them; `just check` adds ruff and pyright
 
+The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just test-jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `just stamp-jevgate`, so vendored copies can detect local edits
+
 ## Commit hooks
 
 Run `lefthook install` once per clone. The pre-commit hook calls `just` recipes, so run the same recipe to reproduce a failure
