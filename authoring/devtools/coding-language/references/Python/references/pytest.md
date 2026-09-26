@@ -53,30 +53,37 @@ Pytest automatically finds tests matching these patterns:
 import subprocess
 from pathlib import Path
 
-# Helper function (run once per file)
-SCRIPT_PATH = Path(__file__).parent.parent / "script.py"
+# Helper function (run once per file), same as in MetaSkill.md
+SCRIPT = Path(__file__).parent.parent / "script.py"
 
-def run_script(*args):
-    """Execute script with uv run and return output."""
-    cmd = ["uv", "run", str(SCRIPT_PATH)] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    return result.stdout, result.stderr, result.returncode
+
+def run(
+    *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+    )
+
 
 # Test class (groups related tests)
 class TestVersion:
     """Test --version flag."""
 
-    def test_version_flag(self):
+    def test_version_flag(self) -> None:
         """--version should output version and exit with 0."""
-        stdout, stderr, code = run_script("--version")
-        assert code == 0
-        assert "version" in stdout.lower()
+        result = run("--version")
+        assert result.returncode == 0
+        assert "version" in result.stdout.lower()
 
-    def test_version_short_flag(self):
-        """--V should be equivalent to --version."""
-        stdout, stderr, code = run_script("-V")
-        assert code == 0
-        assert "version" in stdout.lower()
+    def test_version_short_flag(self) -> None:
+        """-V should be equivalent to --version."""
+        result = run("-V")
+        assert result.returncode == 0
+        assert "version" in result.stdout.lower()
 ```
 
 ## Assertions
@@ -113,20 +120,17 @@ with pytest.raises(ValueError, match="specific message"):
 class TestExitCodes:
     """Test exit code standards."""
 
-    def test_success_returns_zero(self):
+    def test_success_returns_zero(self) -> None:
         """Successful execution returns 0."""
-        stdout, stderr, code = run_script("--help")
-        assert code == 0
+        assert run("--help").returncode == 0
 
-    def test_validation_error_returns_two(self):
+    def test_validation_error_returns_two(self) -> None:
         """Validation errors return 2."""
-        stdout, stderr, code = run_script("--invalid-flag")
-        assert code == 2
+        assert run("--invalid-flag").returncode == 2
 
-    def test_runtime_error_returns_one(self):
+    def test_runtime_error_returns_one(self) -> None:
         """Runtime errors return 1."""
-        stdout, stderr, code = run_script("--api-call")
-        assert code == 1
+        assert run("--api-call").returncode == 1
 ```
 
 ## Fixtures
@@ -136,10 +140,11 @@ Fixtures provide reusable setup/teardown:
 ```python
 import pytest
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 @pytest.fixture
-def temp_file():
+def temp_file() -> Iterator[Path]:
     """Create temporary file for testing."""
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
         temp_path = Path(f.name)
@@ -149,11 +154,10 @@ def temp_file():
     # Cleanup after test
     temp_path.unlink(missing_ok=True)
 
-def test_file_processing(temp_file):
+def test_file_processing(temp_file: Path) -> None:
     """Test processes file correctly."""
-    temp_file.write_text("test content")
-    stdout, stderr, code = run_script("--input", str(temp_file))
-    assert code == 0
+    temp_file.write_text("test content", encoding="utf-8")
+    assert run("--input", str(temp_file)).returncode == 0
 ```
 
 ## Parametrized Tests
@@ -168,10 +172,9 @@ import pytest
     ("512x512", 0),
     ("invalid", 2),
 ])
-def test_size_validation(size, expected):
+def test_size_validation(size: str, expected: int) -> None:
     """Test size parameter validation."""
-    stdout, stderr, code = run_script("--size", size)
-    assert code == expected
+    assert run("--size", size).returncode == expected
 ```
 
 ## Configuration
@@ -218,33 +221,20 @@ E       assert 1 == 0
 
 ## Common Patterns
 
-### Testing CLI Scripts
-
-```python
-def run_script(*args, env=None):
-    """Execute script with optional environment."""
-    cmd = ["uv", "run", str(SCRIPT_PATH)] + list(args)
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        env=env
-    )
-    return result.stdout, result.stderr, result.returncode
-```
-
 ### Testing Environment Variables
+
+`run()` passes `env` to the subprocess; copy `os.environ` so `PATH` still finds `uv`:
 
 ```python
 import os
 
-def test_missing_api_key():
+def test_missing_api_key() -> None:
     """Script fails gracefully without API key."""
     env = os.environ.copy()
     env.pop("API_KEY", None)
-    stdout, stderr, code = run_script(env=env)
-    assert code == 1
-    assert "API_KEY" in stderr
+    result = run(env=env)
+    assert result.returncode == 1
+    assert "API_KEY" in result.stderr
 ```
 
 ### Testing File Operations
@@ -253,14 +243,13 @@ def test_missing_api_key():
 import tempfile
 from pathlib import Path
 
-def test_output_file():
+def test_output_file() -> None:
     """Script creates output file."""
     with tempfile.TemporaryDirectory() as tmpdir:
         output = Path(tmpdir) / "output.txt"
-        stdout, stderr, code = run_script("--output", str(output))
-        assert code == 0
+        assert run("--output", str(output)).returncode == 0
         assert output.exists()
-        assert output.read_text() == "expected content"
+        assert output.read_text(encoding="utf-8") == "expected content"
 ```
 
 ## Test Organization
@@ -297,7 +286,7 @@ my-skill/
 ### Import Errors
 
 - Ensure script dependencies are installed
-- Check `SCRIPT_PATH` points to correct file
+- Check `SCRIPT` points to correct file
 - Verify running from correct directory
 
 ### Assertion Failures

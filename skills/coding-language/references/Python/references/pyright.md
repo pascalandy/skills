@@ -44,12 +44,11 @@ Located in `pyproject.toml`:
 
 ```toml
 [tool.pyright]
-pythonVersion = "3.10"
 typeCheckingMode = "basic"
 
 include = [
-    "skills",
-    "scripts",
+    "src",
+    "tests",
 ]
 
 exclude = [
@@ -187,21 +186,21 @@ def process(items: list[str]) -> dict[str, int]:
 
 ### Handling PEP 723 Scripts
 
-Scripts with inline dependencies may show import errors (expected):
+A script with inline dependencies has its own environment, so point pyright at it instead of silencing `reportMissingImports`:
 
-```toml
-[tool.pyright]
-reportMissingImports = "warning"  # Downgrade to warning
+```bash
+uv sync --script script.py
+uvx pyright --pythonpath "$(uv python find --script script.py)" script.py
 ```
 
 ### Checking Specific Directories
 
-Substitute the actual project-relative path; TOML does not expand `<skill_dir>` placeholders.
+Paths are relative to `pyproject.toml`:
 
 ```toml
 [tool.pyright]
 include = [
-    "dot_config/ai_templates/skills/**/*.py",  # Example: check bundled skill scripts in this repo
+    "scripts",  # Example: a skill's bundled scripts
 ]
 ```
 
