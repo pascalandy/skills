@@ -8,7 +8,7 @@ The [upstream lock](../upstream-lock.json) records the imported Matt revision, s
 
 The initial pin is [Matt Pocock skills, 3cca18b](https://github.com/mattpocock/skills/tree/3cca18b368ae95cdbdebbff572ccafa662551015). Its source bodies were also compared with Pascal's supplied Mac checkout during planning. The lock, rather than this initial-history note, owns the current revision.
 
-The original mode packaging drew on [PStack, f5bdd68](https://github.com/cursor/plugins/tree/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack). Matt's [license](LICENSE) and the retained [PStack attribution](PSTACK-LICENSE) accompany this package.
+The original mode packaging drew on [PStack, f5bdd68](https://github.com/cursor/plugins/tree/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack). Its [MIT license](https://github.com/cursor/plugins/blob/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack/LICENSE) permits redistribution with its copyright and permission notice. Matt's [license](LICENSE) and the [PStack license](PSTACK-LICENSE) accompany this package. `PSTACK-LICENSE` replaces the earlier file, which repeated Matt's license instead of PStack's notice.
 
 ## Planning ownership
 
