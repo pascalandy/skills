@@ -5,15 +5,27 @@ This project manages Pascal's skills. `authoring/` is the source of truth; `skil
 ## Change a skill
 
 1. Edit `authoring/<category>/<skill-name>/`, including its supporting files
-2. Run `just flatten-skills`
+2. Run `just flatten-skills`; if it fails, rerun `just flatten-skills --verbose`
 3. Review and commit the source and generated output together
 
 The flattening script maps each package with a root `SKILL.md` to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names
 
+Never edit `skills/` directly. Correct `authoring/` or the flattening script, then run `just flatten-skills` again
+
 Repository-wide scripts live in `scripts/`; the `justfile` exposes routine operations. Scripts belonging to one skill stay in `authoring/<category>/<skill-name>/scripts/` and travel with that skill
+
+## Script conventions
+
+Scripts in `scripts/` are CLIs that agents run, so their output stays small and failures stay obvious. Skill-local scripts follow the same rules when we write or change them
+
+- `-h, --help` prints usage with examples and changes nothing
+- Quiet by default: one line on stdout on success
+- `-v, --verbose` adds per-item detail and tracebacks on stderr
+- Failures print `error: <what went wrong and how to fix it>` on stderr, then `rerun with --verbose for details`
+- Exit codes: `0` ok, `1` failure, `2` bad usage, `130` interrupted
+- Use only the standard library (`argparse`, `logging`) unless a dependency earns its place
+- `justfile` recipes forward arguments (`recipe *args`) so flags reach the script
 
 ## Python execution
 
 Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts. For dependency-free project scripts, run `uv run --no-project python scripts/<name>.py`; never invoke `python3` or bare `python` directly
-
-Never edit `skills/` directly. Correct `authoring/` or the flattening script, then run `just flatten-skills` again
