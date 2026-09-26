@@ -30,6 +30,14 @@ def skill(root: Path, name: str, body: str = "old") -> Path:
     return package
 
 
+def command(repo: Path, name: str, body: str = "command") -> Path:
+    path = repo / "authoring/commands" / f"{name}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body + "\n", encoding="utf-8")
+    subprocess.run(["git", "add", str(path.relative_to(repo))], cwd=repo, check=True)
+    return path
+
+
 @pytest.fixture
 def sandbox(tmp_path: Path) -> tuple[Path, Path]:
     repo = tmp_path / "repo"
@@ -335,3 +343,82 @@ def test_invalid_manifest_and_help(sandbox: tuple[Path, Path]) -> None:
     assert help_text.returncode == 0
     for option in ("--profile", "--private", "--retire-private", "--check", "--json"):
         assert option in help_text.stdout
+
+
+def test_command_preview_apply_adoption_and_repeat(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    source = command(repo, "review", "shared command")
+    adopted = home / ".claude/commands/review.md"
+    adopted.parent.mkdir(parents=True)
+    shutil.copy2(source, adopted)
+    preview = run(repo, home, "--dry-run", "--json")
+    assert preview.returncode == 0
+    command_actions = [
+        a for a in report(preview)["actions"] if a["source"] == "command"
+    ]
+    assert len(command_actions) == 5
+    assert {a["kind"] for a in command_actions} == {"add", "adopt"}
+    assert run(repo, home, "--check").returncode == 1
+    applied = run(repo, home, "--json")
+    assert applied.returncode == 0
+    assert [
+        (a["target"], a["kind"])
+        for a in report(applied)["actions"]
+        if a["source"] == "command"
+    ] == [(a["target"], a["kind"]) for a in command_actions]
+    for target in (
+        ".claude/commands",
+        ".pi/agent/prompts",
+        ".codex/prompts",
+        ".config/opencode/commands",
+        ".config/agents/commands",
+    ):
+        assert (home / target / "review.md").read_text(
+            encoding="utf-8"
+        ) == "shared command\n"
+        assert "review.md" in manifest(home)["commands"][target]
+    assert run(repo, home, "--check").returncode == 0
+    assert all(
+        a["kind"] == "current" for a in report(run(repo, home, "--json"))["actions"]
+    )
+
+
+def test_command_conflict_force_and_owned_removal(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    source = command(repo, "review", "shared command")
+    foreign = home / ".claude/commands/foreign.md"
+    foreign.parent.mkdir(parents=True)
+    foreign.write_text("keep\n", encoding="utf-8")
+    assert run(repo, home).returncode == 0
+    edited = home / ".claude/commands/review.md"
+    edited.write_text("local edit\n", encoding="utf-8")
+    preview = run(repo, home, "--dry-run", "--json")
+    assert preview.returncode == 1
+    assert any(
+        a["kind"] == "conflict" and a["source"] == "command"
+        for a in report(preview)["actions"]
+    )
+    assert run(repo, home).returncode == 1
+    assert edited.read_text(encoding="utf-8") == "local edit\n"
+    assert run(repo, home, "--force").returncode == 0
+    assert edited.read_text(encoding="utf-8") == "shared command\n"
+    source.unlink()
+    subprocess.run(
+        ["git", "add", "-u", "authoring/commands/review.md"], cwd=repo, check=True
+    )
+    removal = run(repo, home, "--dry-run", "--json")
+    assert removal.returncode == 0
+    assert (
+        sum(
+            a["kind"] == "remove" and a["source"] == "command"
+            for a in report(removal)["actions"]
+        )
+        == 5
+    )
+    assert run(repo, home).returncode == 0
+    assert not edited.exists()
+    assert foreign.read_text(encoding="utf-8") == "keep\n"

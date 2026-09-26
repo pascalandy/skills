@@ -43,6 +43,13 @@ PROFILES = {
     ),
 }
 EXCLUSIONS = {"mac": frozenset(), "om1": frozenset({"apple-mail"})}
+COMMAND_TARGETS = (
+    ".claude/commands",
+    ".pi/agent/prompts",
+    ".codex/prompts",
+    ".config/opencode/commands",
+    ".config/agents/commands",
+)
 RUNTIME_NAMES = frozenset(
     {
         "node_modules",
@@ -127,6 +134,10 @@ def digest(skill: Path) -> str:
     return digest_files(entries)
 
 
+def digest_command(path: Path) -> str:
+    return digest_files(((Path(path.name), path),))
+
+
 def load_manifest(path: Path) -> Owned:
     if path.is_symlink():
         raise ScriptError(
@@ -179,16 +190,47 @@ def load_manifest(path: Path) -> Owned:
                 "source": record["source"],
                 "digest": record["digest"],
             }
+    commands = data.get("commands", {}) if version == 2 else {}
+    if not isinstance(commands, dict):
+        raise ScriptError(f"invalid command ownership in {path}")
+    for target, records in commands.items():
+        if target not in COMMAND_TARGETS or not isinstance(records, dict):
+            raise ScriptError(f"invalid command target {target!r} in {path}")
+        for name, checksum in records.items():
+            if (
+                not isinstance(name, str)
+                or not name.endswith(".md")
+                or not NAME.fullmatch(name)
+                or not isinstance(checksum, str)
+                or not DIGEST.fullmatch(checksum)
+            ):
+                raise ScriptError(
+                    f"invalid command ownership for {target}/{name} in {path}"
+                )
     return owned
 
 
-def save_manifest(path: Path, owned: Owned) -> None:
+def load_commands(path: Path) -> dict[str, dict[str, str]]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get("commands", {}) if data["version"] == 2 else {}
+
+
+def save_manifest(
+    path: Path, owned: Owned, commands: dict[str, dict[str, str]]
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", prefix=".manifest-", dir=path.parent, delete=False
     ) as stream:
         temporary = Path(stream.name)
-        json.dump({"version": 2, "targets": owned}, stream, indent=2, sort_keys=True)
+        json.dump(
+            {"version": 2, "targets": owned, "commands": commands},
+            stream,
+            indent=2,
+            sort_keys=True,
+        )
         stream.write("\n")
     temporary.replace(path)
 
@@ -247,6 +289,27 @@ def private_packages(root: Path, selected: list[str]) -> dict[str, Path]:
     return packages
 
 
+def target_groups(home: Path, targets: Iterable[str]) -> dict[Path, list[str]]:
+    groups: dict[Path, list[str]] = {}
+    for target in targets:
+        directory = home / target
+        for ancestor in (directory, *directory.parents):
+            if ancestor == home.parent:
+                break
+            if ancestor.is_symlink() and not ancestor.exists():
+                raise ScriptError(
+                    f"~/{target} has a broken symlink ancestor: {ancestor}"
+                )
+            if ancestor.exists() and not ancestor.is_dir():
+                raise ScriptError(f"~/{target} has a file ancestor: {ancestor}")
+        if not directory.resolve().is_relative_to(home.resolve()):
+            raise ScriptError(
+                f"~/{target} resolves outside the selected home; fix it and rerun"
+            )
+        groups.setdefault(directory.resolve(), []).append(target)
+    return groups
+
+
 def plan(
     home: Path,
     manifest: Path,
@@ -266,27 +329,7 @@ def plan(
             raise ScriptError(
                 f"private retirement {name!r} lacks matching ownership evidence in selected targets"
             )
-    groups: dict[Path, list[str]] = {}
-    for target in targets:
-        directory = home / target
-        for ancestor in (directory, *directory.parents):
-            if ancestor == home.parent:
-                break
-            if ancestor.is_symlink() and not ancestor.exists():
-                raise ScriptError(
-                    f"~/{target} has a broken symlink ancestor: {ancestor}"
-                )
-            if ancestor.exists() and not ancestor.is_dir():
-                raise ScriptError(f"~/{target} has a file ancestor: {ancestor}")
-        if directory.is_symlink() and not directory.exists():
-            raise ScriptError(f"~/{target} is a broken symlink; fix it and rerun")
-        if directory.exists() and not directory.is_dir():
-            raise ScriptError(f"~/{target} is a file; remove it and rerun")
-        if not directory.resolve().is_relative_to(home.resolve()):
-            raise ScriptError(
-                f"~/{target} resolves outside the selected home; fix it and rerun"
-            )
-        groups.setdefault(directory.resolve(), []).append(target)
+    groups = target_groups(home, targets)
     owned: Owned = {target: records.copy() for target, records in previous.items()}
     actions: list[Action] = []
     for aliases in groups.values():
@@ -368,25 +411,129 @@ def plan(
     return actions, owned
 
 
+def command_sources() -> dict[str, Source]:
+    sources: dict[str, Source] = {}
+    for relative in flatten_skills.git_files("authoring/commands"):
+        if len(relative.parts) != 3 or relative.suffix != ".md":
+            continue
+        path = ROOT / relative
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file():
+            raise ScriptError(f"command source {relative} must be a regular file")
+        sources[path.name] = Source(path, "command", digest_command(path))
+    return sources
+
+
+def plan_commands(
+    home: Path, previous: dict[str, dict[str, str]], sources: dict[str, Source]
+) -> tuple[list[Action], dict[str, dict[str, str]]]:
+    owned = {target: records.copy() for target, records in previous.items()}
+    actions: list[Action] = []
+    for aliases in target_groups(home, COMMAND_TARGETS).values():
+        target = aliases[0]
+        recorded: dict[str, str] = {}
+        for alias in aliases:
+            for name, checksum in previous.get(alias, {}).items():
+                if name in recorded and recorded[name] != checksum:
+                    raise ScriptError(
+                        f"manifest has conflicting command ownership for ~/{target} and ~/{alias}"
+                    )
+                recorded[name] = checksum
+        next_records = recorded.copy()
+        for alias in aliases:
+            owned[alias] = next_records
+        for name in sorted(sources.keys() | recorded.keys()):
+            path = home / target / name
+            source = sources.get(name)
+            wanted = source.digest if source else None
+            had = recorded.get(name)
+            if path.is_symlink() or (path.exists() and not path.is_file()):
+                actions.append(
+                    Action(
+                        target,
+                        name,
+                        "conflict",
+                        "command",
+                        f"~/{target}/{name} is a symlink or directory",
+                    )
+                )
+                continue
+            current = digest_command(path) if path.exists() else None
+            if current is not None and current not in (had, wanted):
+                actions.append(
+                    Action(
+                        target,
+                        name,
+                        "conflict",
+                        "command",
+                        f"~/{target}/{name} was edited or is unowned; resolve it or use --force",
+                    )
+                )
+                continue
+            if source:
+                next_records[name] = wanted
+                kind = (
+                    "adopt"
+                    if current == wanted and had is None
+                    else "current"
+                    if current == wanted
+                    else "add"
+                    if current is None
+                    else "update"
+                )
+            else:
+                next_records.pop(name, None)
+                kind = "remove"
+            actions.append(Action(target, name, kind, "command"))
+    return actions, owned
+
+
+def replace_command(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        prefix=".install-command-", dir=destination.parent, delete=False
+    ) as stream:
+        temporary = Path(stream.name)
+    try:
+        shutil.copy2(source, temporary)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def execute(
     home: Path,
     manifest: Path,
     sources: dict[str, Source],
+    commands: dict[str, Source],
     actions: list[Action],
     owned: Owned,
+    command_owned: dict[str, dict[str, str]],
     previous: Owned,
+    previous_commands: dict[str, dict[str, str]],
 ) -> None:
     for action in actions:
         destination = home / action.target / action.name
         if action.kind in ("add", "update"):
-            replace(sources[action.name].path, destination)
+            if action.source == "command":
+                replace_command(commands[action.name].path, destination)
+            else:
+                replace(sources[action.name].path, destination)
         elif action.kind == "remove" and destination.exists():
-            shutil.rmtree(destination)
-    if owned != previous or (
-        manifest.exists()
-        and json.loads(manifest.read_text(encoding="utf-8")).get("version") == 1
+            if action.source == "command":
+                destination.unlink()
+            else:
+                shutil.rmtree(destination)
+    if (
+        owned != previous
+        or command_owned != previous_commands
+        or (
+            manifest.exists()
+            and json.loads(manifest.read_text(encoding="utf-8")).get("version") == 1
+        )
     ):
-        save_manifest(manifest, owned)
+        save_manifest(manifest, owned, command_owned)
 
 
 def render(
@@ -428,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
        ~/.config/opencode/skills, ~/.config/agents/skills
   om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
        ~/.config/opencode/skills (excludes apple-mail)
+  both: ~/.claude/commands, ~/.pi/agent/prompts, ~/.codex/prompts,
+        ~/.config/opencode/commands, ~/.config/agents/commands
 
 examples:
   just install-skills --dry-run --profile mac
@@ -528,10 +677,16 @@ examples:
                 sources[name] = Source(package, "private", digest(package))
             if not sources:
                 raise ScriptError("no public skills found; run just flatten-skills")
+            commands = command_sources()
             actions, owned = plan(Path.home(), manifest, sources, args.profile, retire)
+            previous_commands = load_commands(manifest)
+            command_actions, command_owned = plan_commands(
+                Path.home(), previous_commands, commands
+            )
+            actions.extend(command_actions)
             if args.force:
-                actions, owned = force_conflicts(
-                    Path.home(), actions, owned, sources, retire
+                actions = force_conflicts(
+                    actions, owned, command_owned, sources, commands
                 )
             report = render(
                 actions,
@@ -551,7 +706,17 @@ examples:
                 return 1
             previous = load_manifest(manifest)
             flatten_skills.flatten(dry_run=False)
-            execute(Path.home(), manifest, sources, actions, owned, previous)
+            execute(
+                Path.home(),
+                manifest,
+                sources,
+                commands,
+                actions,
+                owned,
+                command_owned,
+                previous,
+                previous_commands,
+            )
             print(report)
             return 0
     except KeyboardInterrupt:
@@ -569,16 +734,31 @@ examples:
 
 
 def force_conflicts(
-    home: Path,
     actions: list[Action],
     owned: Owned,
+    command_owned: dict[str, dict[str, str]],
     sources: dict[str, Source],
-    retire: dict[str, str],
-) -> tuple[list[Action], Owned]:
+    commands: dict[str, Source],
+) -> list[Action]:
     forced: list[Action] = []
     for action in actions:
-        if action.kind != "conflict" or "symlink or file" in (action.detail or ""):
+        if action.kind != "conflict" or "symlink or" in (action.detail or ""):
             forced.append(action)
+            continue
+        if action.source == "command":
+            source = commands.get(action.name)
+            forced.append(
+                Action(
+                    action.target,
+                    action.name,
+                    "update" if source else "remove",
+                    "command",
+                )
+            )
+            if source:
+                command_owned[action.target][action.name] = source.digest
+            else:
+                command_owned[action.target].pop(action.name, None)
             continue
         source = sources.get(action.name)
         kind = "update" if source else "remove"
@@ -588,9 +768,9 @@ def force_conflicts(
                 "source": source.kind,
                 "digest": source.digest,
             }
-        elif action.name in retire:
+        else:
             owned[action.target].pop(action.name, None)
-    return forced, owned
+    return forced
 
 
 if __name__ == "__main__":
