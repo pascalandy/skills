@@ -1,6 +1,0 @@
-interface:
-  display_name: "Verify Video Archive"
-  short_description: "Verify the real macOS or Linux video archive command"
-  default_prompt: "Use $verify-video-archive to run isolated real-media checks against this checkout."
-policy:
-  allow_implicit_invocation: true
