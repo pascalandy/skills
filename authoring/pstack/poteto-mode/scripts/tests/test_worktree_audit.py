@@ -74,7 +74,10 @@ class WorktreeAuditTests(unittest.TestCase):
             recent = chats / "new chat with spaces.jsonl"
             recent.write_text(f'{{"file":"{worktree}/file.txt"}}\n')
             after = audit()
-            self.assertEqual(after["LAST_CHAT"], time.strftime("%Y-%m-%d"))
+            self.assertEqual(
+                after["LAST_CHAT"],
+                time.strftime("%Y-%m-%d", time.localtime(recent.stat().st_mtime)),
+            )
             self.assertEqual(after["BUCKET"], "verify-recent-chat")
 
 
