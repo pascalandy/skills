@@ -8,7 +8,7 @@ Each skill is maintained in `authoring/<category>/<skill>/` and published in [`s
 
 - [`concise`](skills/concise/SKILL.md): Use when the user requests to be more concise
 - [`html-mode`](skills/html-mode/SKILL.md): Use when the user requests a standalone HTML artifact or HTML presentation
-- [`technical-writing`](skills/technical-writing/SKILL.md): Use when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages
+- [`commit`](skills/commit/SKILL.md): Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages
 - [`grill-for-unknowns`](skills/grill-for-unknowns/SKILL.md): Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation
 
 ## Install one skill
@@ -31,15 +31,16 @@ This route needs only git and standard shell tools. Set `skill` to the folder yo
 ```sh
 skill=concise
 agent_skills="$HOME/.agents/skills"
-checkout=$(mktemp -d)
-git clone --depth 1 https://github.com/pascalandy/skills.git "$checkout/repo"
 destination="$agent_skills/$skill"
 if [ -e "$destination" ] || [ -L "$destination" ]; then
   echo "Refusing to overwrite $destination" >&2
-  exit 1
+else
+  checkout=$(mktemp -d)
+  git clone --quiet --depth 1 https://github.com/pascalandy/skills.git "$checkout" &&
+    mkdir -p "$agent_skills" &&
+    cp -R "$checkout/skills/$skill" "$destination"
+  rm -rf "$checkout"
 fi
-mkdir -p "$agent_skills"
-cp -R "$checkout/repo/skills/$skill" "$destination"
 ```
 
 To update, repeat with a fresh clone after moving or removing your previous copy yourself. The command above refuses to overwrite it.
@@ -57,4 +58,4 @@ Run `just install-skills --help` for the current targets and ownership rules.
 
 ## Reuse
 
-[`LICENSE`](LICENSE) covers Pascal's original work under MIT. Adapted third-party material keeps its upstream terms; see the notices for [`html-mode`](skills/html-mode/references/attribution.md), [`grill-for-unknowns`](skills/grill-for-unknowns/LICENSE), and [`matt-mode`](skills/matt-mode/references/lineage.md). Upstream terms for the `pstack` packages have not yet been recorded here.
+[`LICENSE`](LICENSE) covers Pascal's original work under MIT. Adapted third-party material keeps its upstream terms; see the notices for [`html-mode`](skills/html-mode/references/attribution.md), [`grill-for-unknowns`](skills/grill-for-unknowns/LICENSE), and [`matt-mode`](skills/matt-mode/references/lineage.md). The skills in [`authoring/pstack/`](authoring/pstack/) are adapted from PStack, whose source the `matt-mode` lineage records; their upstream terms have not yet been recorded here.
