@@ -95,7 +95,7 @@ test-verify-transcript-sk:
     @if test -f _skills_private/integrations/verify-transcript-sk/SKILL.md; then uvx --from pytest@{{pytest_version}} pytest _skills_private/integrations/verify-transcript-sk/scripts/tests/ -q; else echo 'skipped: private verify-transcript-sk is absent'; fi
 
 check-transcript-youtube-transport url='https://www.youtube.com/watch?v=EIEc43CxIvY':
-    @uv run {{ quote(justfile_directory() / "_skills_private/integrations/transcript-sk/scripts/youtube_smoke.py") }} {{ quote(url) }}
+    @test -f {{ quote(justfile_directory() / "_skills_private/integrations/transcript-sk/scripts/youtube_smoke.py") }} || { echo 'error: private transcript-sk transport check is missing from _skills_private/integrations/' >&2; exit 1; }; uv run {{ quote(justfile_directory() / "_skills_private/integrations/transcript-sk/scripts/youtube_smoke.py") }} {{ quote(url) }}
 
 check-html-mode:
     @uv run authoring/content/html-mode/scripts/check_html_mode.py
