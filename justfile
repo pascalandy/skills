@@ -28,8 +28,8 @@ test-jevgate *args:
     set -euo pipefail
     dir=authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts
     sdk=$(grep -om1 'typesafe-sdk==[^"]*' "$dir/jevgate.py")
-    uvx ruff check --quiet "$dir"
-    uvx ruff format --quiet --check "$dir"
+    uvx ruff@0.15.7 check --quiet "$dir"
+    uvx ruff@0.15.7 format --quiet --check "$dir"
     uvx --with "$sdk" --with pytest pyright --pythonversion 3.11 "$dir"
     uv run --no-project --quiet --with "$sdk" --with pytest pytest "$dir/tests" "$@"
 
