@@ -54,7 +54,6 @@ Located in `pyproject.toml` or `ruff.toml`:
 
 ```toml
 [tool.ruff]
-target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
