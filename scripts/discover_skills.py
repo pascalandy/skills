@@ -1,15 +1,35 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Verify local skill discovery through native agent CLIs, without inference."""
 
 import argparse
 import json
+import logging
 import os
 import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import TypedDict
+
+from _common import ScriptError
+
+log = logging.getLogger("skills-discover")
+
+
+class Evidence(TypedDict):
+    status: str
+    expected: list[str]
+    discovered: list[str]
+    missing: list[str]
+    reason: str | None
 
 
 class RPC:
@@ -108,21 +128,6 @@ def discover(agent: str, cwd: Path, timeout: float):
             "--no-extensions",
             "--no-approve",
         ],
-        "claude": [
-            "claude",
-            "--print",
-            "--input-format",
-            "stream-json",
-            "--output-format",
-            "stream-json",
-            "--verbose",
-            "--no-session-persistence",
-            "--strict-mcp-config",
-            "--debug-file",
-            os.devnull,
-            "--settings",
-            '{"disableAllHooks":true}',
-        ],
     }
     rpc = RPC(commands[agent], cwd, timeout)
     try:
@@ -172,39 +177,13 @@ def discover(agent: str, cwd: Path, timeout: float):
                 for item in response["data"]["commands"]
                 if item.get("source") == "skill"
             ]
-        rpc.send(
-            {
-                "type": "control_request",
-                "request_id": "skills-proof",
-                "request": {"subtype": "initialize"},
-            }
-        )
-        response = rpc.receive(
-            lambda item: (
-                item.get("type") == "control_response"
-                and item.get("response", {}).get("request_id") == "skills-proof"
-            )
-        )["response"]
-        if response.get("subtype") != "success":
-            raise RuntimeError("Claude initialization failed")
-        return response["response"]["commands"]
+        raise ValueError(f"unsupported native discovery adapter: {agent}")
     finally:
         rpc.close()
 
 
-# Native discovery is a separate post-install proof. File hashes alone cannot
-# establish that an agent actually loaded a skill.
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", required=True, choices=("mac", "om1"))
-    parser.add_argument(
-        "--agent", action="append", choices=("codex", "pi", "claude", "opencode")
-    )
-    parser.add_argument("--timeout", type=float, default=40)
-    args = parser.parse_args(argv)
-    if args.timeout <= 0:
-        parser.error("--timeout must be positive")
-
+def run(args: argparse.Namespace) -> int:
+    """Check native adapters; report unsupported Claude without masking supported results."""
     from install_skills import PROFILES, load_manifest
 
     home = Path.home()
@@ -217,12 +196,11 @@ def main(argv: list[str] | None = None) -> int:
         "opencode": ".config/opencode/skills",
     }
     agents = args.agent or list(roots)
-    report: dict[str, object] = {"profile": args.profile, "agents": {}}
-    results: dict[str, dict[str, object]] = {}
+    results: dict[str, Evidence] = {}
     for agent in agents:
         root = roots[agent]
         selected = sorted(owned.get(root, {}))
-        evidence: dict[str, object] = {
+        evidence: Evidence = {
             "status": "unverified",
             "expected": selected,
             "discovered": [],
@@ -251,12 +229,12 @@ def main(argv: list[str] | None = None) -> int:
                 "pi": lambda item: item["sourceInfo"]["path"],
                 "opencode": lambda item: item["location"],
             }[agent]
-            paths = {str(key(item)) for item in items}
+            paths = {Path(key(item)).expanduser().resolve() for item in items}
             discovered: list[str] = []
             missing: list[str] = []
             for name in selected:
-                candidate = str(home / root / name / "SKILL.md")
-                if candidate in paths and Path(candidate).is_file():
+                candidate = (home / root / name / "SKILL.md").resolve()
+                if candidate in paths and candidate.is_file():
                     discovered.append(name)
                 else:
                     missing.append(name)
@@ -275,9 +253,76 @@ def main(argv: list[str] | None = None) -> int:
             evidence["reason"] = (
                 f"native adapter changed or failed: {type(error).__name__}: {error}"
             )
-    report["agents"] = results
-    print(json.dumps(report, indent=2, sort_keys=True))
-    return int(any(item["status"] != "verified" for item in results.values()))
+    supported = [agent for agent in agents if agent != "claude"]
+    failed = not supported or any(
+        results[agent]["status"] != "verified" for agent in supported
+    )
+    verdict = (
+        "unverified" if failed else "partial" if "claude" in agents else "verified"
+    )
+    if args.json:
+        print(
+            json.dumps(
+                {"profile": args.profile, "verdict": verdict, "agents": results},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        statuses = ", ".join(f"{agent}={results[agent]['status']}" for agent in agents)
+        print(f"{'ok' if not failed else 'unverified'}: {args.profile}; {statuses}")
+    if args.verbose:
+        for agent, evidence in results.items():
+            if evidence["reason"]:
+                print(f"{agent}: {evidence['reason']}", file=sys.stderr)
+            if evidence["missing"]:
+                print(
+                    f"{agent}: missing {', '.join(evidence['missing'])}",
+                    file=sys.stderr,
+                )
+    return int(failed)
+
+
+# Native discovery is a separate post-install proof. File hashes alone cannot
+# establish that an agent actually loaded a skill.
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog="Codex, Pi, and OpenCode have native adapters. Claude is reported as unverified.\nExamples: just skills-discover --profile mac --json; just skills-discover --profile om1 --agent codex",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--profile", required=True, choices=("mac", "om1"))
+    parser.add_argument(
+        "--agent", action="append", choices=("codex", "pi", "claude", "opencode")
+    )
+    parser.add_argument("--timeout", type=float, default=40)
+    parser.add_argument(
+        "--json", action="store_true", help="print the per-agent report as JSON"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print per-agent reasons and error tracebacks",
+    )
+    args = parser.parse_args(argv)
+    if args.timeout <= 0:
+        parser.error("--timeout must be positive")
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING)
+    try:
+        return run(args)
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return 130
+    except ScriptError as error:
+        for message in error.args:
+            print(f"error: {message}", file=sys.stderr)
+    except Exception as error:
+        log.debug("unexpected failure", exc_info=True)
+        print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
+    if not args.verbose:
+        print("rerun with --verbose for details", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":

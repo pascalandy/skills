@@ -187,8 +187,14 @@ def test_conflicts_and_selected_owned_removal(sandbox: tuple[Path, Path]) -> Non
     repo, home = sandbox
     foreign = skill(home / ".claude/skills", "alpha", "foreign")
     conflict = run(repo, home, "--dry-run", "--json")
-    assert conflict.returncode == 1
+    assert conflict.returncode == 0
     assert any(a["kind"] == "conflict" for a in report(conflict)["actions"])
+    assert run(repo, home, "--check").returncode == 1
+    summary = run(repo, home, "--dry-run")
+    assert len(summary.stdout.splitlines()) == 1
+    assert "conflict=1" in summary.stdout
+    detail = run(repo, home, "--dry-run", "--verbose")
+    assert "conflict: ~/.claude/skills/alpha" in detail.stdout
     assert run(repo, home, "--json").returncode == 1
     assert (
         foreign.joinpath("SKILL.md").read_text(encoding="utf-8")

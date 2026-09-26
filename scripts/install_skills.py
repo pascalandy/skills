@@ -390,7 +390,7 @@ def execute(
 
 
 def render(
-    actions: list[Action], profile: str, dry_run: bool, json_output: bool
+    actions: list[Action], profile: str, dry_run: bool, json_output: bool, verbose: bool
 ) -> str:
     counts = Counter(action.kind for action in actions)
     if json_output:
@@ -410,11 +410,12 @@ def render(
             for kind in ("add", "update", "adopt", "remove", "current", "conflict")
         )
     ]
-    lines.extend(
-        f"{action.kind}: ~/{action.target}/{action.name}"
-        + (f" ({action.detail})" if action.detail else "")
-        for action in actions
-    )
+    if verbose:
+        lines.extend(
+            f"{action.kind}: ~/{action.target}/{action.name}"
+            + (f" ({action.detail})" if action.detail else "")
+            for action in actions
+        )
     return "\n".join(lines)
 
 
@@ -463,12 +464,12 @@ examples:
     mode.add_argument(
         "--dry-run",
         action="store_true",
-        help="preview prospective authoring content without writes",
+        help="preview all actions, including conflicts, without writes; exit 0",
     )
     mode.add_argument(
         "--check",
         action="store_true",
-        help="preview and exit 1 if any selected target is not current",
+        help="preview and exit 1 if any selected target needs work or conflicts",
     )
     parser.add_argument(
         "--force",
@@ -479,7 +480,10 @@ examples:
         "--json", action="store_true", help="print the per-target report as JSON"
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="show errors with tracebacks"
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="show per-item detail and error tracebacks",
     )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING)
@@ -530,17 +534,21 @@ examples:
                     Path.home(), actions, owned, sources, retire
                 )
             report = render(
-                actions, args.profile, args.dry_run or args.check, args.json
+                actions,
+                args.profile,
+                args.dry_run or args.check,
+                args.json,
+                args.verbose,
             )
             if args.check:
                 print(report)
                 return int(any(action.kind not in ("current",) for action in actions))
-            if any(action.kind == "conflict" for action in actions):
-                print(report)
-                return 1
             if args.dry_run:
                 print(report)
                 return 0
+            if any(action.kind == "conflict" for action in actions):
+                print(report)
+                return 1
             previous = load_manifest(manifest)
             flatten_skills.flatten(dry_run=False)
             execute(Path.home(), manifest, sources, actions, owned, previous)
