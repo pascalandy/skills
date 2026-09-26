@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -364,12 +365,11 @@ class Project:
         self.commit(f"Tune {path}")
 
     def privacy(self, *, commit_cases: bool) -> None:
-        path = self.jev_dir / "config.toml"
-        path.write_text(
-            path.read_text()
-            + f"\n[privacy]\ncommit_cases = {str(commit_cases).lower()}\n"
+        self.edit(
+            ".jev/config.toml",
+            "commit_cases = true",
+            f"commit_cases = {str(commit_cases).lower()}",
         )
-        self.commit("Record the case policy")
 
     def clone(self, destination: Path) -> Project:
         self.git(
@@ -395,6 +395,17 @@ class Project:
 
 
 CONFIG_TEMPLATE = (ASSETS / "config.toml").read_text(encoding="utf-8")
+TERMS_NAME = re.search(
+    r'^TERMS_NAME = "([^"]+)"', ENGINE.read_text(encoding="utf-8"), re.M
+).group(1)  # type: ignore[union-attr]
+PLACEHOLDERS = {
+    "{{INTEGRATION_REF}}": "main",
+    "{{SEND_CODE}}": "true",
+    "{{COMMIT_CASES}}": "true",
+    "{{APPROVED_BY}}": "Test Owner",
+    "{{APPROVED_ON}}": "2026-09-26",
+    "{{TERMS}}": TERMS_NAME,
+}
 CHECK_COMMAND = 'echo ran >> \\"$JEVTEST_HOME/check.log\\"; exit $(cat \\"$JEVTEST_HOME/check.exit\\" 2>/dev/null || echo 0)'
 RULES = """schema = "jevgate.pack/v1"
 id = "rules"
@@ -458,11 +469,10 @@ def make_project(tmp: Path, fake: FakeTypeSafe, *, justfile: bool = False) -> Pr
     shutil.copy2(ASSETS / "gates" / "merge.toml", jev / "gates" / "merge.toml")
     shutil.copy2(ASSETS / "packs" / "merge.toml", jev / "packs" / "merge.toml")
     (jev / "packs" / "rules.toml").write_text(RULES)
-    (jev / "config.toml").write_text(
-        CONFIG_TEMPLATE.replace("{{INTEGRATION_REF}}", "main").replace(
-            "{{CHECK_COMMAND}}", CHECK_COMMAND
-        )
-    )
+    config = CONFIG_TEMPLATE.replace("{{CHECK_COMMAND}}", CHECK_COMMAND)
+    for placeholder, value in PLACEHOLDERS.items():
+        config = config.replace(placeholder, value)
+    (jev / "config.toml").write_text(config)
     (jev / ".gitignore").write_text("runs/\ncache/\n")
     if justfile:
         shutil.copy2(ASSETS / "justfile-snippet.just", root / "justfile")

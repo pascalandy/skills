@@ -194,15 +194,13 @@ def test_record_failure(project: Project) -> None:
     )
     fake.answered_model = None
 
-    calls = {"count": 0}
-
-    def second_fails(
+    def groups_fail(
         body: dict[str, Any], response: dict[str, Any]
     ) -> tuple[int, Any, dict[str, str]] | None:
-        calls["count"] += 1
-        return (500, {"error": "boom"}, {}) if calls["count"] == 2 else None
+        failing = "group" in body["state"]
+        return (500, {"error": "boom"}, {"retry-after": "0"}) if failing else None
 
-    fake.hooks[:] = [second_fails]
+    fake.hooks[:] = [groups_fail]
     partial = project.run_merge("--no-cache")
     assert partial.code == 1, partial
     assert partial.json["error"]["kind"] == "service"

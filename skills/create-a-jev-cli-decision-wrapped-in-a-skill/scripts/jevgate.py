@@ -4,7 +4,7 @@
 # dependencies = ["typesafe-sdk==0.7.1"]
 # ///
 # jevgate-version: 0.1.0
-# jevgate-hash: sha256:88f10948a7765b0b605ada8e31441058b0d65d4f38bdc032f7723b444223e018
+# jevgate-hash: sha256:b6cd9d0e6c0826516c7c355573b8a7505e94a738f6ab3f751b8d65c84ff6ead0
 """jevgate: advisory Jev decision gates for one project.
 
 Code collects the evidence, Jev answers typed questions about it, and one verdict
@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 import os
+import platform
 import posixpath
 import re
 import shutil
@@ -46,6 +47,7 @@ GATES_SCHEMA = "jevgate.gates/v1"
 EXPLAIN_SCHEMA = "jevgate.explain/v1"
 VERSION_SCHEMA = "jevgate.version/v1"
 LABEL_SCHEMA = "jevgate.label/v1"
+DOCTOR_SCHEMA = "jevgate.doctor/v1"
 LABELS_SCHEMA = "jevgate.labels/v1"
 GATE_SCHEMA = "jevgate.gate/v1"
 PACK_SCHEMA = "jevgate.pack/v1"
@@ -54,6 +56,20 @@ VERDICT_EXIT = {"pass": 0, "escalate": 10, "block": 11, "insufficient": 12}
 NEXT_ACTION = {"escalate": "review", "block": "fix", "insufficient": "gather"}
 EXIT_ERROR, EXIT_USAGE, EXIT_INTERRUPTED = 1, 2, 130
 
+TERMS_NAME = "typesafe-2026-09-26"
+TERMS_SUMMARY = (
+    "TypeSafe does not train on customer input; it hosts in the US, may keep derived "
+    "telemetry, keeps inputs for no fixed period, and offers zero retention to "
+    "enterprise customers only"
+)
+PRIVACY_KEYS = {"send_code", "commit_cases", "approved_by", "approved_on", "terms"}
+KEYRING_ARGS = ("secret", "keyring", "get", "--service=typesafe_ai", "--user=api_key")
+KEYRING_TIMEOUT_S = 15
+KEYCHAIN_LOCKED_EXIT = 36
+RETRY_MAX = 2
+RETRY_BUDGET_S = 30.0
+HTTP_TIMEOUT_S = 10.0
+MIN_GIT: tuple[int, int] = (2, 38)
 API_REQUEST_TOKENS = 64_000
 API_STATE_TOKENS = 32_000
 PRICE_PER_MILLION_INPUT_USD = 0.042
@@ -300,6 +316,7 @@ questions about it, and one verdict rule in code decides. A verdict never
 grants merge or deploy authority.
 
 commands:
+  doctor [--online]            check runtime, config, collectors, key, permission, engine
   gates [--check]              list gates, questions, and bands; --check lints the packs
   run <gate> [flags]           collect, sanitize, ask, decide, and record
   explain [<run-id>|last]      print a run summary and write its full inputs to a file
@@ -364,6 +381,20 @@ examples:
 )
 
 COMMAND_HELP = {
+    "doctor": """\
+usage: jevgate doctor [--online]
+
+Check the runtime and pinned SDK, the project config and gate packs, the
+collectors (git, ignore rules, secret scanner), which key source works (never
+its value), the [privacy] permission and terms, and the engine version, hash,
+and local-edit status. --online also lists TypeSafe's models, confirms the pin
+is served, and reports when jev-latest no longer matches the pin. Without
+--online it makes no network call.
+
+examples:
+  jevgate doctor
+  jevgate doctor --online
+""",
     "gates": """\
 usage: jevgate gates [--check]
 
@@ -849,6 +880,12 @@ def resolve_settings(project: Project, flags: dict[str, Any]) -> Settings:
     if not isinstance(privacy, dict):
         problems.append("[privacy] must be a table")
         privacy = {}
+    problems += [
+        f"unknown key privacy.{key}" for key in sorted(set(privacy) - PRIVACY_KEYS)
+    ]
+    for key in ("send_code", "commit_cases"):
+        if key in privacy and not isinstance(privacy[key], bool):
+            problems.append(f"privacy.{key} must be true or false")
     if problems:
         raise EngineError(
             "config",
@@ -2689,21 +2726,130 @@ def secret_findings(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # ------------------------------------------------------------------- transport
 
 
-def resolve_key() -> str:
+def key_source() -> tuple[str | None, str, str]:
+    """Find the API key: TYPESAFE_API_KEY, then the chezmoi keyring. Never a flag."""
     key = os.environ.get("TYPESAFE_API_KEY", "").strip()
-    if not key:
+    if key:
+        return key, "TYPESAFE_API_KEY", ""
+    chezmoi = shutil.which("chezmoi")
+    if chezmoi is None:
+        return None, "none", "TYPESAFE_API_KEY is not set and chezmoi is not installed"
+    try:
+        process = subprocess.run(
+            [chezmoi, *KEYRING_ARGS],
+            capture_output=True,
+            text=True,
+            timeout=KEYRING_TIMEOUT_S,
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return (
+            None,
+            "none",
+            f"the chezmoi keyring lookup took longer than {KEYRING_TIMEOUT_S}s",
+        )
+    if process.returncode == KEYCHAIN_LOCKED_EXIT:
+        return (
+            None,
+            "none",
+            "the macOS keychain is locked (chezmoi keyring exit 36); unlock it or set TYPESAFE_API_KEY",
+        )
+    if process.returncode != 0 or not process.stdout.strip():
+        return (
+            None,
+            "none",
+            f"TYPESAFE_API_KEY is not set and the chezmoi keyring has no typesafe_ai api_key (exit {process.returncode})",
+        )
+    return process.stdout.strip(), "chezmoi keyring", ""
+
+
+def resolve_key() -> str:
+    key, _, problem = key_source()
+    if key is None:
         raise EngineError(
             "credentials",
-            "TYPESAFE_API_KEY is not set",
-            "export TYPESAFE_API_KEY before a live run; --dry-run needs no key",
+            problem,
+            "export TYPESAFE_API_KEY, or store it with `chezmoi secret keyring set --service=typesafe_ai --user=api_key`; --dry-run needs no key",
         )
     return key
+
+
+def permission_problems(privacy: dict[str, Any]) -> list[str]:
+    problems: list[str] = []
+    if privacy.get("send_code") is not True:
+        problems.append("[privacy] send_code is not true")
+    if privacy.get("terms") != TERMS_NAME:
+        problems.append(
+            f"[privacy] terms is {privacy.get('terms')!r}, but this engine carries the summary {TERMS_NAME!r}"
+        )
+    if not str(privacy.get("approved_by") or "").strip():
+        problems.append("[privacy] approved_by is missing")
+    if not str(privacy.get("approved_on") or "").strip():
+        problems.append("[privacy] approved_on is missing")
+    return problems
+
+
+def require_permission(settings: Settings) -> None:
+    problems = permission_problems(settings.privacy)
+    if problems:
+        raise EngineError(
+            "permission",
+            f"no permission to send this project's code to TypeSafe: {problems[0]}",
+            f'run `just jev-merge --dry-run`, review the payload and the terms ({TERMS_SUMMARY}), then record send_code, approved_by, approved_on, and terms = "{TERMS_NAME}" under [privacy] in .jev/config.toml; nothing was sent',
+            problems=problems,
+        )
 
 
 def open_client(key: str, model: str) -> Any:
     from typesafe_sdk import RetryPolicy, TypeSafeClient
 
-    return TypeSafeClient(api_key=key, model=model, retry=RetryPolicy(max_retries=0))
+    # The SDK owns retries: bounded attempts and budget, honoring retry-after.
+    policy = RetryPolicy(max_retries=RETRY_MAX, timeout=RETRY_BUDGET_S)
+    return TypeSafeClient(
+        api_key=key, model=model, retry=policy, timeout=HTTP_TIMEOUT_S
+    )
+
+
+def transport_error(error: Exception) -> EngineError:
+    from typesafe_sdk import (
+        TypeSafeAPIConnectionError,
+        TypeSafeAPIError,
+        TypeSafeAPIResponseValidationError,
+        TypeSafeAuthenticationError,
+        TypeSafePermissionDeniedError,
+        TypeSafeUnprocessableEntityError,
+    )
+
+    if isinstance(error, TypeSafeAuthenticationError | TypeSafePermissionDeniedError):
+        return EngineError(
+            "credentials",
+            f"TypeSafe rejected the API key: {error}",
+            "check TYPESAFE_API_KEY or the chezmoi keyring entry; the request was not retried",
+        )
+    if isinstance(error, TypeSafeUnprocessableEntityError):
+        return EngineError(
+            "service",
+            f"TypeSafe refused the request as invalid: {error}",
+            "the request was not retried; check the engine version and the question pack",
+        )
+    if isinstance(error, TypeSafeAPIResponseValidationError):
+        return EngineError(
+            "service", f"TypeSafe returned an invalid response: {error}", "rerun later"
+        )
+    if isinstance(error, TypeSafeAPIError):
+        return EngineError(
+            "service",
+            f"TypeSafe stayed unavailable after at most {RETRY_MAX} retries within {RETRY_BUDGET_S:.0f}s: {error}",
+            "rerun later",
+        )
+    if isinstance(error, TypeSafeAPIConnectionError):
+        return EngineError(
+            "service",
+            f"could not reach TypeSafe: {error}",
+            "check the network and rerun",
+        )
+    return EngineError("service", f"TypeSafe request failed: {error}", "rerun later")
 
 
 def send(client: Any, body: dict[str, Any]) -> tuple[Any, int]:
@@ -2715,11 +2861,7 @@ def send(client: Any, body: dict[str, Any]) -> tuple[Any, int]:
             body["state"], body["questions"], model=body["model"]
         )
     except TypeSafeError as error:
-        raise EngineError(
-            "service",
-            f"TypeSafe request failed: {error}",
-            "check the service and rerun",
-        ) from error
+        raise transport_error(error) from error
     try:
         raw = json.loads(response.raw_http_response.content)
     except ValueError as error:
@@ -3554,6 +3696,10 @@ def base_record(
             if key != "stamped_hash"
         },
         "model": {"requested": settings["model"], "answered": None},
+        "privacy": {
+            key: str(value) if not isinstance(value, bool) else value
+            for key, value in settings.privacy.items()
+        },
         "settings": {
             "values": settings.values,
             "sources": settings.sources,
@@ -3646,6 +3792,7 @@ def cmd_run(args: argparse.Namespace, output: Output) -> int:
     record["evidence"] = stored_evidence(evidence)
     record["plan"] = plan
     responses: dict[str, Any] = {}
+    require_permission(settings)
     if not unchanged(project, revisions):
         record["evidence"]["findings"].append(changed_finding())
     else:
@@ -4312,6 +4459,326 @@ def label_lines(labels: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def sdk_pin() -> str | None:
+    match = re.search(
+        r"typesafe-sdk==([0-9][0-9A-Za-z.]*)",
+        Path(__file__).read_text(encoding="utf-8"),
+    )
+    return match.group(1) if match else None
+
+
+def alias_target(models: list[dict[str, str]], alias: str = "jev-latest") -> str | None:
+    """Work out which versioned model an alias serves from the model listing."""
+    versioned = [model for model in models if VERSIONED_MODEL.match(model["name"])]
+    entry = next((model for model in models if model["name"] == alias), None)
+    if entry is None:
+        return None
+    named = re.findall(r"[a-z][a-z0-9-]*-\d+\.\d+\.\d+", entry.get("description", ""))
+    if named:
+        return named[0]
+    same_day = [
+        model["name"]
+        for model in versioned
+        if model.get("release_date") == entry.get("release_date")
+    ]
+    if len(same_day) == 1:
+        return same_day[0]
+
+    def version(name: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in name.rsplit("-", 1)[1].split("."))
+
+    return max((model["name"] for model in versioned), key=version, default=None)
+
+
+def cmd_doctor(args: argparse.Namespace, output: Output) -> int:
+    checks: list[dict[str, Any]] = []
+
+    def add(
+        name: str, status: str, detail: str, remediation: str = "", kind: str = "config"
+    ) -> None:
+        checks.append(
+            {
+                "name": name,
+                "status": status,
+                "detail": detail,
+                "remediation": remediation,
+                "kind": kind,
+            }
+        )
+
+    add("runtime", "ok", f"python {platform.python_version()} ({sys.executable})")
+    pin = sdk_pin()
+    try:
+        import typesafe_sdk
+
+        installed = getattr(typesafe_sdk, "__version__", "unknown")
+        if installed == pin:
+            add("sdk", "ok", f"typesafe-sdk {installed}, pinned exactly")
+        else:
+            add(
+                "sdk",
+                "fail",
+                f"typesafe-sdk {installed} is installed but the engine pins {pin}",
+                "run the engine through `uv run --script` so the lock file applies",
+                "internal",
+            )
+    except ImportError:
+        add(
+            "sdk",
+            "fail",
+            f"typesafe-sdk {pin} is not importable",
+            "run the engine through `uv run --script` so uv installs the locked SDK",
+            "internal",
+        )
+    identity = engine_identity()
+    if identity["modified"]:
+        add(
+            "engine",
+            "warn",
+            f"jevgate {identity['version']} {identity['hash']} was edited locally (stamped {identity['stamped_hash']})",
+            "keep the edit on purpose, or rerun the create skill to upgrade from the canonical engine",
+        )
+    else:
+        add(
+            "engine",
+            "ok",
+            f"jevgate {identity['version']} {identity['hash']} unmodified",
+        )
+
+    git_path = shutil.which("git")
+    if git_path is None:
+        add("git", "fail", "git is not on PATH", "install git 2.38 or later")
+    else:
+        found = re.search(
+            r"(\d+)\.(\d+)",
+            subprocess.run(
+                [git_path, "--version"], capture_output=True, text=True, check=False
+            ).stdout,
+        )
+        current: tuple[int, int] = (
+            (int(found.group(1)), int(found.group(2))) if found else (0, 0)
+        )
+        if current >= MIN_GIT:
+            add("git", "ok", f"git {current[0]}.{current[1]}")
+        else:
+            add(
+                "git",
+                "fail",
+                f"git {current[0]}.{current[1]} cannot test merges without touching the tree",
+                "install git 2.38 or later",
+            )
+    scanner = shutil.which("gitleaks")
+    add(
+        "secret scan",
+        "ok",
+        f"gitleaks at {scanner}"
+        if scanner
+        else "built-in patterns (gitleaks is not on PATH)",
+    )
+
+    settings: Settings | None = None
+    try:
+        project = find_project()
+    except EngineError:
+        project = None
+        add(
+            "config",
+            "setup",
+            "no .jev/ directory yet; setup generates it",
+            "run create-a-jev-cli-decision-wrapped-in-a-skill in the project",
+        )
+    if project is not None:
+        try:
+            settings = resolve_settings(project, {})
+            missing = [
+                key for key in ("integration_ref", "check.command") if not settings[key]
+            ]
+            if missing:
+                add(
+                    "config",
+                    "fail",
+                    f".jev/config.toml has no {' or '.join(missing)}",
+                    "fill them from the repository interview",
+                )
+            else:
+                add(
+                    "config",
+                    "ok",
+                    f"model {settings['model']}, integration_ref {settings['integration_ref']}, check `{settings['check.command']}`",
+                )
+        except EngineError as error:
+            add("config", "fail", error.message, error.remediation)
+        for name in available_gates(project) or ["(none)"]:
+            try:
+                gate = load_gate(project, name, checklist=True)
+                add(
+                    f"gate {name}",
+                    "ok",
+                    f"{plural(len(gate.questions), 'question')}, {plural(len(gate.rules), 'rule')}, checklist clean",
+                )
+            except EngineError as error:
+                add(
+                    f"gate {name}", "fail", error.message, "run `jevgate gates --check`"
+                )
+        try:
+            require_ignored(project, "runs", "cache")
+            add("ignore rules", "ok", ".jev/runs/ and .jev/cache/ are ignored by git")
+        except EngineError as error:
+            add("ignore rules", "fail", error.message, error.remediation)
+        if settings is not None and settings["integration_ref"]:
+            if rev_parse(project.root, settings["integration_ref"]) is None:
+                add(
+                    "integration ref",
+                    "warn",
+                    f"{settings['integration_ref']} is not available locally",
+                    "fetch it before a run; jevgate never fetches",
+                )
+            else:
+                add(
+                    "integration ref",
+                    "ok",
+                    f"{settings['integration_ref']} resolves locally",
+                )
+
+    key, source, problem = key_source()
+    if key is None:
+        add(
+            "credentials",
+            "fail",
+            problem,
+            "export TYPESAFE_API_KEY or store it in the chezmoi keyring",
+            "credentials",
+        )
+    else:
+        add("credentials", "ok", f"key found in {source} (value not shown)")
+
+    if settings is not None:
+        privacy = settings.privacy
+        problems = permission_problems(privacy)
+        if problems:
+            add(
+                "permission",
+                "fail",
+                "; ".join(problems),
+                f"show the --dry-run payload and the terms ({TERMS_SUMMARY}), then record [privacy]",
+                "permission",
+            )
+        else:
+            add(
+                "permission",
+                "ok",
+                f"send_code approved by {privacy['approved_by']} on {privacy['approved_on']} under terms {TERMS_NAME}",
+            )
+        if not isinstance(privacy.get("commit_cases"), bool):
+            add(
+                "case policy",
+                "warn",
+                "[privacy] commit_cases is not set, so admission is refused",
+                "record whether admitted cases may be committed",
+            )
+        else:
+            add(
+                "case policy",
+                "ok",
+                "cases are committed"
+                if privacy["commit_cases"]
+                else "cases stay local and ignored",
+            )
+
+    if args.online:
+        if key is None:
+            add(
+                "models",
+                "fail",
+                "skipped: no key",
+                "fix the credentials check first",
+                "credentials",
+            )
+        else:
+            model = settings["model"] if settings is not None else DEFAULTS["model"]
+            try:
+                client = open_client(key, model)
+                try:
+                    listing = [
+                        {
+                            "name": item.name,
+                            "description": item.description,
+                            "release_date": item.release_date,
+                        }
+                        for item in client.models.list().models
+                    ]
+                finally:
+                    client.close()
+            except Exception as error:
+                failure = transport_error(error)
+                add(
+                    "models", "fail", failure.message, failure.remediation, failure.kind
+                )
+            else:
+                names = [item["name"] for item in listing]
+                if model not in names:
+                    add(
+                        "models",
+                        "fail",
+                        f"the pin {model} is not served; available: {', '.join(names)}",
+                        "pin a served versioned model after review",
+                        "service",
+                    )
+                else:
+                    add("models", "ok", f"{model} is served")
+                target = alias_target(listing)
+                if target is None:
+                    add(
+                        "alias",
+                        "warn",
+                        "jev-latest is not listed",
+                        "nothing to compare",
+                    )
+                elif target != model:
+                    add(
+                        "alias",
+                        "warn",
+                        f"jev-latest now serves {target}; the pin stays {model}",
+                        "keep the pin until the maintain effort evaluates the new model",
+                    )
+                else:
+                    add("alias", "ok", f"jev-latest still serves the pin {model}")
+
+    failed = [check for check in checks if check["status"] == "fail"]
+    result: dict[str, Any] = {
+        "schema": DOCTOR_SCHEMA,
+        "ok": not failed,
+        "online": args.online,
+        "checks": checks,
+    }
+    lines = [
+        f"{check['status']:<5}  {check['name']:<16} {check['detail']}"
+        + (
+            f"\n       -> {check['remediation']}"
+            if check["status"] != "ok" and check["remediation"]
+            else ""
+        )
+        for check in checks
+    ]
+    if failed:
+        first = failed[0]
+        result["error"] = {
+            "kind": first["kind"],
+            "message": f"{plural(len(failed), 'readiness check')} failed: {', '.join(check['name'] for check in failed)}",
+            "remediation": first["remediation"],
+        }
+        output.emit(result, "\n".join(lines))
+        print(
+            f"error: {result['error']['message']}; {first['remediation']}",
+            file=sys.stderr,
+        )
+        if not output.verbose:
+            print("rerun with --verbose for details", file=sys.stderr)
+        return EXIT_ERROR
+    output.emit(result, "\n".join(lines))
+    return 0
+
+
 def cmd_version(args: argparse.Namespace, output: Output) -> int:
     identity = engine_identity()
     state = (
@@ -4327,6 +4794,7 @@ def cmd_version(args: argparse.Namespace, output: Output) -> int:
 
 
 COMMANDS = {
+    "doctor": cmd_doctor,
     "gates": cmd_gates,
     "run": cmd_run,
     "explain": cmd_explain,
@@ -4430,6 +4898,8 @@ def build_parser() -> Parser:
     parser = Parser(prog="jevgate", add_help=False, parents=[shared])
     commands = parser.add_subparsers(dest="command", parser_class=Parser)
     commands.required = True
+    doctor = commands.add_parser("doctor", add_help=False, parents=[shared])
+    doctor.add_argument("--online", action="store_true")
     gates = commands.add_parser("gates", add_help=False, parents=[shared])
     gates.add_argument("--check", action="store_true")
     run = commands.add_parser("run", add_help=False, parents=[shared])
