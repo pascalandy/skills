@@ -1,0 +1,11 @@
+output:
+  - execution_out
+  - failure
+
+pre-commit:
+  commands:
+    gitleaks:
+      run: just gitleaks-staged
+    frontmatter:
+      glob: "authoring/**/SKILL.md"
+      run: just check-frontmatter

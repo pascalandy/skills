@@ -8,7 +8,9 @@ This project manages Pascal's skills. `authoring/` is the source of truth; `skil
 2. Run `just flatten-skills`; if it fails, rerun `just flatten-skills --verbose`
 3. Review and commit the source and generated output together
 
-The flattening script maps each package with a root `SKILL.md` to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names
+The flattening script maps each package with a root `SKILL.md` to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names or on files outside a package with a `SKILL.md`
+
+`SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
 Never edit `skills/` directly. Correct `authoring/` or the flattening script, then run `just flatten-skills` again
 
@@ -25,6 +27,15 @@ Scripts in `scripts/` are CLIs that agents run, so their output stays small and 
 - Exit codes: `0` ok, `1` failure, `2` bad usage, `130` interrupted
 - Use only the standard library (`argparse`, `logging`) unless a dependency earns its place
 - `justfile` recipes forward arguments (`recipe *args`) so flags reach the script
+
+## Commit hooks
+
+Run `lefthook install` once per clone. The pre-commit hook calls `just` recipes, so run the same recipe to reproduce a failure
+
+- `just gitleaks-staged` scans staged changes for secrets on every commit
+- `just check-frontmatter` runs when a `SKILL.md` is staged
+
+gitleaks uses its built-in rules because the repo has no `.gitleaks.toml`. If you add one for an allowlist, start it with `[extend]` / `useDefault = true`; otherwise the built-in rules are disabled and every scan passes
 
 ## Python execution
 

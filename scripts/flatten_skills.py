@@ -72,6 +72,7 @@ def flatten() -> tuple[int, int]:
         raise FlattenError(f"git ls-files failed: {listed.stderr.decode().strip()}")
 
     file_counts: Counter[str] = Counter()
+    unpackaged: set[str] = set()
     with tempfile.TemporaryDirectory(prefix=".skills-flatten-", dir=ROOT) as temporary:
         staging = Path(temporary) / "skills"
         staging.mkdir()
@@ -79,25 +80,34 @@ def flatten() -> tuple[int, int]:
             if not raw_path:
                 continue
             relative = Path(os.fsdecode(raw_path))
-            if len(relative.parts) < 4:
+            if len(relative.parts) < 3 or relative.parts[1] == "commands":
+                continue
+            source = ROOT / relative
+            if not (source.is_file() or source.is_symlink()):
+                log.debug("skip %s (not a file)", relative)
+                continue
+            if len(relative.parts) == 3:
+                unpackaged.add(relative.as_posix())
                 continue
             _, category, name, *inside = relative.parts
             if packages.get(name) != AUTHORING / category / name:
+                unpackaged.add(f"authoring/{category}/{name}/")
                 continue
 
-            source = ROOT / relative
             if source.is_symlink():
                 raise FlattenError(
                     f"skill source symlink is unsupported: {relative}; replace it with a file"
                 )
-            if not source.is_file():
-                log.debug("skip %s (not a file)", relative)
-                continue
             destination = staging / name / Path(*inside)
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
             file_counts[name] += 1
 
+        if unpackaged:
+            raise FlattenError(
+                f"files outside a skill package: {', '.join(sorted(unpackaged))}; "
+                "add a SKILL.md or move them into a package"
+            )
         for name, package in packages.items():
             if not (staging / name / "SKILL.md").is_file():
                 raise FlattenError(
