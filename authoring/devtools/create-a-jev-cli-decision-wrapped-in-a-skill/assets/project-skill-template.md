@@ -47,3 +47,9 @@ The outcome judges the captured change, not whether Jev agreed. No later fix mea
 ## Improve the questions
 
 Questions and thresholds change only in a requested maintenance session, through `maintain-a-jev-cli-decision-wrapped-in-a-skill` once it exists. Until then, keep labeling.
+
+## Setup and upgrades
+
+The `[privacy]` table in `.jev/config.toml` records whether selected evidence may be sent and admitted cases committed, and who approved it. Preview the evidence with `just jev-merge --dry-run`.
+
+To upgrade, invoke `create-a-jev-cli-decision-wrapped-in-a-skill`.
