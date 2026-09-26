@@ -1,4 +1,4 @@
-"""Shared entry point that applies the Script conventions in AGENTS.md."""
+"""Shared entry point that applies docs/maintainer/references/script-conventions.md."""
 
 from __future__ import annotations
 
