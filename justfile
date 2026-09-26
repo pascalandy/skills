@@ -24,7 +24,7 @@ test *args:
     @uvx pytest@{{pytest_version}} {{args}}
 
 # Run the same CI-safe verdict as GitHub Actions; a failure names the recipe to rerun
-check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit test-verify-video-archive test-storytelling
+check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit test-verify-video-archive test-storytelling test-jevgate
 
 # Lint and format-check the repository scripts
 lint:
@@ -52,8 +52,8 @@ test-jevgate *args:
     sdk=$(grep -om1 'typesafe-sdk==[^"]*' "$dir/jevgate.py")
     uvx ruff@0.15.7 check --quiet "$dir"
     uvx ruff@0.15.7 format --quiet --check "$dir"
-    uvx --with "$sdk" --with pytest pyright --pythonversion 3.11 "$dir"
-    uv run --no-project --quiet --with "$sdk" --with pytest pytest "$dir/tests" "$@"
+    uvx --with "$sdk" --with pytest=={{pytest_version}} pyright@{{pyright_version}} --pythonversion 3.11 "$dir"
+    uv run --no-project --quiet --with "$sdk" --with pytest=={{pytest_version}} pytest "$dir/tests" "$@"
 
 # Record one live synthetic Noul through the real TypeSafe API (needs a key and network)
 proof-jevgate-live:
