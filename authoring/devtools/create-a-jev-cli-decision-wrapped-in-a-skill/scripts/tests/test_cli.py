@@ -259,7 +259,7 @@ def test_help_falls_back_on_invalid_config(project: Project) -> None:
     unknown = project.jev("help", "nonsense", key=False)
     assert unknown.code == 0 and unknown.stdout.startswith("usage: jevgate <command>")
     assert "neither a command nor a gate" in unknown.stderr
-    for command in ("gates", "explain", "replay", "version", "help"):
+    for command in ("gates", "explain", "replay", "label", "version", "help"):
         shown = project.jev(command, "--help", key=False)
         assert shown.code == 0 and shown.stdout.startswith(
             f"usage: jevgate {command}"

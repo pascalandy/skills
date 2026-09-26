@@ -4,7 +4,7 @@
 # dependencies = ["typesafe-sdk==0.7.1"]
 # ///
 # jevgate-version: 0.1.0
-# jevgate-hash: sha256:d3a3214df820fe1e89498fa18b60eae6936f94d13fc5ff20ed1bad1f35a2bc7a
+# jevgate-hash: sha256:88f10948a7765b0b605ada8e31441058b0d65d4f38bdc032f7723b444223e018
 """jevgate: advisory Jev decision gates for one project.
 
 Code collects the evidence, Jev answers typed questions about it, and one verdict
@@ -45,6 +45,8 @@ ERROR_SCHEMA = "jevgate.error/v1"
 GATES_SCHEMA = "jevgate.gates/v1"
 EXPLAIN_SCHEMA = "jevgate.explain/v1"
 VERSION_SCHEMA = "jevgate.version/v1"
+LABEL_SCHEMA = "jevgate.label/v1"
+LABELS_SCHEMA = "jevgate.labels/v1"
 GATE_SCHEMA = "jevgate.gate/v1"
 PACK_SCHEMA = "jevgate.pack/v1"
 
@@ -58,6 +60,24 @@ PRICE_PER_MILLION_INPUT_USD = 0.042
 MAX_CITATION_HUNKS = 254
 VERSIONED_MODEL = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*-\d+\.\d+\.\d+$")
 RUN_ID = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9-]+$")
+LABEL_SCOPE = re.compile(r"^(?:gate|question:([a-z][a-z0-9_]*)(?:@(.+))?)$")
+OUTCOMES = ("good", "bad", "unknown")
+PROVENANCE = ("human", "model", "reproduced")
+LABEL_KEYS = (
+    "id",
+    "scope",
+    "outcome",
+    "by",
+    "assesses",
+    "evidence",
+    "evidence_file",
+    "recorded_at",
+    "supersedes",
+)
+ASSESSES = {
+    "gate": "whether the captured change met the gate's requirements, not whether Jev agreed",
+    "question": "whether the question's condition held for the captured evidence, in its favorable or adverse direction, not whether Jev agreed",
+}
 
 BASE_DENY_GLOBS = (
     ".env",
@@ -284,6 +304,7 @@ commands:
   run <gate> [flags]           collect, sanitize, ask, decide, and record
   explain [<run-id>|last]      print a run summary and write its full inputs to a file
   replay <run-id>              recompute a saved run's verdict offline
+  label <run-id>|last ...      record an outcome; --admit copies the run into .jev/cases/
   version                      print the engine version, source hash, and edit status
   help [<command>|<gate>]      show help for a command or a gate
 
@@ -379,6 +400,28 @@ examples:
   jevgate replay 20260926T204512Z-merge-8dde
   jevgate replay last --policy bands.toml
 """,
+    "label": """\
+usage: jevgate label <run-id>|last --scope gate|question:<id>[@<item>]
+                     --outcome good|bad|unknown --by human|model|reproduced
+                     --evidence TEXT|FILE [--admit]
+
+Record an outcome beside a run. At gate scope the outcome assesses whether the
+captured change met the gate's requirements; at question scope, whether that
+question's condition held, read in its favorable or adverse direction. It never
+records whether Jev agreed. No later fix means unknown, never good, and a later
+fix does not turn the original revision good. A new label for the same scope
+supersedes the earlier one and keeps it.
+
+--by names the provenance, and --evidence holds the review as text or a file.
+--admit re-checks privacy (deny globs, git ignore rules, and the secret scan,
+including label evidence) and copies the run into .jev/cases/<run-id>/ with
+labels.toml. Admitted record bytes never change. Admission needs
+[privacy] commit_cases; when it is false, .jev/cases/ stays ignored by git.
+
+examples:
+  jevgate label last --scope gate --outcome bad --by human --evidence "missed the migration" --admit
+  jevgate label 20260926T204512Z-merge-8dde --scope question:test_weakened@src --outcome good --by reproduced --evidence review.md
+""",
     "version": """\
 usage: jevgate version
 
@@ -402,6 +445,10 @@ examples:
 }
 
 VALUE_FLAGS = {
+    "--scope",
+    "--outcome",
+    "--by",
+    "--evidence",
     "--base",
     "--pr",
     "--ci-status",
@@ -468,14 +515,14 @@ def cost_usd(tokens: int) -> float:
     return round(tokens * PRICE_PER_MILLION_INPUT_USD / 1_000_000, 6)
 
 
-def write_atomic(path: Path, data: str) -> None:
+def write_atomic(path: Path, data: str | bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(
         dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
     )
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(data)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data.encode("utf-8") if isinstance(data, str) else data)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
@@ -3217,12 +3264,68 @@ def resolve_record(project: Project, reference: str) -> tuple[dict[str, Any], Pa
         return read_record(path), path
     if not RUN_ID.match(reference):
         raise UsageError(f"{reference!r} is not a run ID or last")
-    path = runs / f"{reference}.json"
+    for path in (
+        runs / f"{reference}.json",
+        case_dir(project, reference) / "record.json",
+    ):
+        if path.is_file():
+            return read_record(path), path
+    raise EngineError(
+        "config",
+        f"run {reference} was not found in .jev/runs/ or .jev/cases/",
+        "check the run ID",
+    )
+
+
+def case_dir(project: Project, run_id: str) -> Path:
+    return project.jev / "cases" / run_id
+
+
+def labels_path(record_path: Path) -> Path:
+    if record_path.name == "record.json":
+        return record_path.with_name("labels.toml")
+    return record_path.with_name(f"{record_path.stem}.labels.toml")
+
+
+LABEL_READERS = {LABELS_SCHEMA: lambda data: data.get("labels", [])}
+
+
+def read_labels(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
+        return []
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise EngineError(
-            "config", f"run {reference} was not found in .jev/runs/", "check the run ID"
+            "config", f"cannot read {path.name}: {error}", "restore it from git"
+        ) from error
+    reader = LABEL_READERS.get(str(data.get("schema")))
+    if reader is None:
+        raise EngineError(
+            "config",
+            f"{path.name} uses schema {data.get('schema')!r}, which this engine cannot read",
+            "upgrade the engine",
         )
-    return read_record(path), path
+    return reader(data)
+
+
+def toml_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
+
+
+def write_labels(path: Path, run_id: str, labels: list[dict[str, Any]]) -> None:
+    lines = [
+        f"schema = {toml_string(LABELS_SCHEMA)}",
+        f"run_id = {toml_string(run_id)}",
+    ]
+    for label in labels:
+        lines += ["", "[[labels]]"]
+        lines += [
+            f"{key} = {toml_string(str(label[key]))}"
+            for key in LABEL_KEYS
+            if label.get(key) is not None
+        ]
+    write_atomic(path, "\n".join(lines) + "\n")
 
 
 def redact_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
@@ -3835,8 +3938,9 @@ def explain_detail(record: dict[str, Any]) -> dict[str, Any]:
 
 def cmd_explain(args: argparse.Namespace, output: Output) -> int:
     project = find_project()
-    record, _ = resolve_record(project, args.run or "last")
+    record, record_path = resolve_record(project, args.run or "last")
     require_ignored(project, "runs")
+    labels = read_labels(labels_path(record_path))
     detail = explain_detail(record)
     path = project.runs / "explain" / f"{record['run_id']}.json"
     write_json(path, detail)
@@ -3856,6 +3960,7 @@ def cmd_explain(args: argparse.Namespace, output: Output) -> int:
         "unjudged": decision.get("unjudged", []),
         "skipped": decision.get("skipped", []),
         "claims": evidence.get("claims", {}),
+        "labels": labels,
     }
     result = {
         "schema": EXPLAIN_SCHEMA,
@@ -3887,6 +3992,7 @@ def cmd_explain(args: argparse.Namespace, output: Output) -> int:
         f"skipped: {item['scope']} {item['question']} ({item['why']})"
         for item in summary["skipped"]
     ]
+    lines += label_lines(labels)
     lines.append(f"full state, requests, and answers: {project.rel(path)}")
     if args.all:
         lines.append(json.dumps(detail, indent=2, ensure_ascii=False))
@@ -3922,13 +4028,14 @@ def load_policy_overrides(path: str) -> dict[str, Any]:
 
 def cmd_replay(args: argparse.Namespace, output: Output) -> int:
     project = find_project()
-    record, _ = resolve_record(project, args.run)
+    record, record_path = resolve_record(project, args.run)
     if record.get("verdict") is None:
         raise EngineError(
             "config",
             f"run {record['run_id']} ended with an error and has no verdict to replay",
             "rerun the gate",
         )
+    labels = read_labels(labels_path(record_path))
     policy = copy.deepcopy(record["policy"])
     if args.policy:
         apply_band_overrides(
@@ -3946,15 +4053,263 @@ def cmd_replay(args: argparse.Namespace, output: Output) -> int:
         "original_verdict": record["verdict"],
         "policy": args.policy,
         "matches": decision["verdict"] == record["verdict"],
+        "source": project.rel(record_path),
     }
+    result["labels"] = labels
     human = render_run(result, output)
     if not output.quiet:
         human = (
             f"replay of {record['run_id']} (recorded verdict {record['verdict']}{', policy ' + args.policy if args.policy else ''})\n"
             + human
+            + "".join(f"\n{line}" for line in label_lines(labels))
         )
     output.emit(result, human)
     return VERDICT_EXIT[decision["verdict"]]
+
+
+def label_scope(reference: str, record: dict[str, Any]) -> str:
+    match = LABEL_SCOPE.match(reference)
+    if match is None:
+        raise UsageError(
+            f"--scope {reference!r} must be gate or question:<id>[@<item>]"
+        )
+    question, item = match.groups()
+    if question is None:
+        return "gate"
+    known = {entry["id"] for entry in record["policy"]["questions"]}
+    if question not in known:
+        raise UsageError(f"run {record['run_id']} has no question {question!r}")
+    if item is not None:
+        rows = (record.get("decision") or {}).get("answers", [])
+        items = {
+            row["item"] for row in rows if row["question"] == question and row["item"]
+        }
+        items |= {
+            row["scope"].removeprefix("group:")
+            for row in rows
+            if row["question"] == question
+        }
+        if item not in items:
+            raise UsageError(
+                f"question {question!r} has no item {item!r} in run {record['run_id']}; known: {', '.join(sorted(items)) or 'none'}"
+            )
+    return reference
+
+
+def label_evidence(value: str) -> tuple[str, str | None]:
+    candidate = Path(value)
+    try:
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8"), candidate.name
+    except (OSError, UnicodeDecodeError) as error:
+        raise UsageError(
+            f"--evidence file {value!r} cannot be read: {error}"
+        ) from error
+    except ValueError:
+        pass
+    if not value.strip():
+        raise UsageError("--evidence needs the review text or a file that holds it")
+    return value, None
+
+
+def record_paths(record: dict[str, Any]) -> list[tuple[str, str]]:
+    """Every file path the record's outbound payload or evidence names, with where."""
+    found: list[tuple[str, str]] = []
+    for request in (record.get("plan") or {}).get("requests", []):
+        state = request["body"]["state"]
+        for item in state.get("files", []) if isinstance(state, dict) else []:
+            found += [
+                (path, request["id"])
+                for path in (item.get("path"), item.get("old_path"))
+                if path
+            ]
+        for test in state.get("existing_tests", []) if isinstance(state, dict) else []:
+            found.append((test["path"], request["id"]))
+    for group in (record.get("evidence") or {}).get("groups", []):
+        for item in group.get("files", []):
+            found.append(
+                (
+                    item if isinstance(item, str) else item["path"],
+                    f"group:{group['name']}",
+                )
+            )
+    return sorted(set(found))
+
+
+def admission_problems(
+    project: Project,
+    settings: Settings,
+    record: dict[str, Any],
+    labels: list[dict[str, Any]],
+) -> tuple[str, list[str]]:
+    missing: list[str] = []
+    if record.get("verdict") is None:
+        missing.append("the run ended with an error and has no verdict")
+    if (record.get("evidence") or {}).get("redacted"):
+        missing.append(
+            "the record was redacted after a secret hit, so its inputs are gone"
+        )
+    if not record.get("policy"):
+        missing.append("the record holds no policy")
+    responses = record.get("responses") or {}
+    for request in (record.get("plan") or {}).get("requests", []):
+        if request["id"] not in responses:
+            missing.append(f"no stored answers for {request['id']}")
+    if missing:
+        return "config", missing
+    problems: list[str] = []
+    paths = record_paths(record)
+    ignored = ignored_paths(project.root, sorted({path for path, _ in paths}))
+    for path, where in paths:
+        pattern = glob_match(path, settings.deny_globs)
+        if pattern:
+            problems.append(
+                f"{where} holds {path}, which deny glob {pattern} now covers"
+            )
+        elif path in ignored:
+            problems.append(f"{where} holds {path}, which git now ignores")
+    texts: dict[str, list[str]] = {}
+    for request in (record.get("plan") or {}).get("requests", []):
+        for location, text in string_leaves(request["body"], request["id"]):
+            texts.setdefault(text, []).append(location)
+    for request_id, response in responses.items():
+        for location, text in string_leaves(response, f"answers {request_id}"):
+            texts.setdefault(text, []).append(location)
+    for claim_id, text in (record.get("evidence") or {}).get("claims", {}).items():
+        texts.setdefault(text, []).append(f"claims.{claim_id}")
+    for label in labels:
+        texts.setdefault(str(label.get("evidence", "")), []).append(
+            f"label {label.get('id')} evidence"
+        )
+    for hit in scan_texts(project, texts):
+        problems.append(
+            f"possible secret ({hit['rule']}, {hit['scanner']}) at {hit['location']}"
+        )
+    return "permission", problems
+
+
+def ensure_cases_ignored(project: Project) -> None:
+    probe = ".jev/cases/probe"
+    if probe not in ignored_paths(project.root, [probe]):
+        raise EngineError(
+            "config",
+            "[privacy] commit_cases is false but git does not ignore .jev/cases/",
+            "add cases/ to .jev/.gitignore and commit it, then admit again",
+        )
+
+
+def admit(
+    project: Project,
+    record: dict[str, Any],
+    record_path: Path,
+    labels: list[dict[str, Any]],
+) -> str:
+    settings = resolve_settings(project, {})
+    commit_cases = settings.privacy.get("commit_cases")
+    if not isinstance(commit_cases, bool):
+        raise EngineError(
+            "permission",
+            "[privacy] commit_cases is not set in .jev/config.toml",
+            "record whether admitted cases may be committed (true or false), then admit again",
+        )
+    kind, problems = admission_problems(project, settings, record, labels)
+    if problems:
+        raise EngineError(
+            kind,
+            f"cannot admit run {record['run_id']}: {problems[0]}"
+            + (f" (and {len(problems) - 1} more)" if len(problems) > 1 else ""),
+            "nothing was copied into .jev/cases/",
+            problems=problems,
+        )
+    if not commit_cases:
+        ensure_cases_ignored(project)
+    folder = case_dir(project, record["run_id"])
+    target = folder / "record.json"
+    data = record_path.read_bytes()
+    if target.is_file() and target != record_path and target.read_bytes() != data:
+        raise EngineError(
+            "config",
+            f"{project.rel(target)} differs from the run record; admitted cases never change",
+            "restore the case from git",
+        )
+    if not target.is_file():
+        write_atomic(target, data)
+    kept = read_labels(folder / "labels.toml")
+    known = {label.get("id") for label in kept}
+    write_labels(
+        folder / "labels.toml",
+        record["run_id"],
+        kept + [label for label in labels if label.get("id") not in known],
+    )
+    return project.rel(folder)
+
+
+def cmd_label(args: argparse.Namespace, output: Output) -> int:
+    project = find_project()
+    record, record_path = resolve_record(project, args.run)
+    if record.get("verdict") is None:
+        raise EngineError(
+            "config",
+            f"run {record['run_id']} ended with an error and has no verdict to label",
+            "rerun the gate and label that run",
+        )
+    scope = label_scope(args.scope, record)
+    evidence, evidence_file = label_evidence(args.evidence)
+    in_case = record_path.name == "record.json"
+    if not in_case:
+        require_ignored(project, "runs")
+    path = labels_path(record_path)
+    labels = read_labels(path)
+    earlier = [label for label in labels if label.get("scope") == scope]
+    label = {
+        "id": datetime.now(UTC).strftime("L%Y%m%dT%H%M%S%fZ"),
+        "scope": scope,
+        "outcome": args.outcome,
+        "by": args.by,
+        "assesses": ASSESSES["gate" if scope == "gate" else "question"],
+        "evidence": evidence,
+        "evidence_file": evidence_file,
+        "recorded_at": now_iso(),
+        "supersedes": earlier[-1]["id"] if earlier else None,
+    }
+    labels.append(label)
+    hits = scan_texts(project, {evidence: ["--evidence"]})
+    if hits:
+        raise EngineError(
+            "permission",
+            f"the label evidence holds a possible secret ({hits[0]['rule']}); labels can be admitted and committed",
+            "remove the secret from the evidence; nothing was recorded",
+        )
+    if not in_case or not args.admit:
+        write_labels(path, record["run_id"], labels)
+    admitted = admit(project, record, record_path, labels) if args.admit else None
+    result = {
+        "schema": LABEL_SCHEMA,
+        "run_id": record["run_id"],
+        "label": label,
+        "labels": labels,
+        "labels_file": project.rel(path),
+        "admitted": admitted,
+    }
+    lines = [
+        f"labeled {record['run_id']} {scope} {args.outcome} by {args.by}"
+        + (f", superseding {label['supersedes']}" if label["supersedes"] else "")
+    ]
+    if admitted:
+        lines.append(f"admitted {admitted}/ (record.json, labels.toml)")
+    output.emit(result, "\n".join(lines))
+    return 0
+
+
+def label_lines(labels: list[dict[str, Any]]) -> list[str]:
+    lines = []
+    for label in labels:
+        first = str(label.get("evidence", "")).strip().splitlines()
+        tail = f", supersedes {label['supersedes']}" if label.get("supersedes") else ""
+        lines.append(
+            f"label {label.get('id')}: {label.get('scope')} {label.get('outcome')} by {label.get('by')}{tail}: {first[0] if first else ''}"
+        )
+    return lines
 
 
 def cmd_version(args: argparse.Namespace, output: Output) -> int:
@@ -3976,6 +4331,7 @@ COMMANDS = {
     "run": cmd_run,
     "explain": cmd_explain,
     "replay": cmd_replay,
+    "label": cmd_label,
     "version": cmd_version,
 }
 
@@ -4094,6 +4450,13 @@ def build_parser() -> Parser:
     replay = commands.add_parser("replay", add_help=False, parents=[shared])
     replay.add_argument("run")
     replay.add_argument("--policy")
+    label = commands.add_parser("label", add_help=False, parents=[shared])
+    label.add_argument("run")
+    label.add_argument("--scope", required=True)
+    label.add_argument("--outcome", required=True, choices=OUTCOMES)
+    label.add_argument("--by", required=True, choices=PROVENANCE)
+    label.add_argument("--evidence", required=True)
+    label.add_argument("--admit", action="store_true")
     commands.add_parser("version", add_help=False, parents=[shared])
     return parser
 

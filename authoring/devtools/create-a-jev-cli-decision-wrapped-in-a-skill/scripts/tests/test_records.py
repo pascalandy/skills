@@ -80,6 +80,7 @@ def test_replay_uses_saved_policy(tmp_path: Path, project: Project) -> None:
         "original_verdict": "escalate",
         "policy": None,
         "matches": True,
+        "source": f".jev/runs/{run_id}.json",
     }
     assert replayed.json["answers"] == original.json["answers"]
     assert replayed.json["reasons"] == original.json["reasons"]
