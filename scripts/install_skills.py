@@ -341,7 +341,10 @@ def plan(
                 )
                 continue
             if selected:
-                next_records[name] = {"source": selected.kind, "digest": wanted}
+                next_records[name] = {
+                    "source": selected.kind,
+                    "digest": selected.digest,
+                }
                 kind = (
                     "adopt"
                     if current == wanted and old is None

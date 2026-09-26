@@ -22,14 +22,21 @@ class RPC:
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+        reader = self.process.stdout
+        writer = self.process.stdin
+        if reader is None or writer is None:
+            self.process.kill()
+            raise RuntimeError("discovery process has no pipes")
+        self.reader = reader
+        self.writer = writer
         self.selector = selectors.DefaultSelector()
-        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        self.selector.register(self.reader, selectors.EVENT_READ)
         self.buffer = b""
         self.deadline = time.monotonic() + timeout
 
     def send(self, message: dict) -> None:
-        self.process.stdin.write((json.dumps(message) + "\n").encode())
-        self.process.stdin.flush()
+        self.writer.write((json.dumps(message) + "\n").encode())
+        self.writer.flush()
 
     def receive(self, matches) -> dict:
         while time.monotonic() < self.deadline:
@@ -43,7 +50,7 @@ class RPC:
                 continue
             if not self.selector.select(max(0, self.deadline - time.monotonic())):
                 break
-            chunk = os.read(self.process.stdout.fileno(), 65536)
+            chunk = os.read(self.reader.fileno(), 65536)
             if not chunk:
                 raise RuntimeError("discovery process closed stdout")
             self.buffer += chunk
@@ -61,8 +68,8 @@ class RPC:
         except subprocess.TimeoutExpired:
             os.killpg(self.process.pid, signal.SIGKILL)
             self.process.wait(timeout=5)
-        self.process.stdin.close()
-        self.process.stdout.close()
+        self.writer.close()
+        self.reader.close()
 
 
 def discover(agent: str, cwd: Path, timeout: float):
