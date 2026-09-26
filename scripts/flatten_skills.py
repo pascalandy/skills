@@ -118,12 +118,12 @@ def flatten() -> tuple[int, int]:
             )
 
         previous = Path(temporary) / "previous"
-        if OUTPUT.exists():
-            OUTPUT.rename(previous)
         try:
+            if OUTPUT.exists():
+                OUTPUT.rename(previous)
             staging.rename(OUTPUT)
         except BaseException:
-            if previous.exists():
+            if previous.exists() and not OUTPUT.exists():
                 previous.rename(OUTPUT)
             raise
 
