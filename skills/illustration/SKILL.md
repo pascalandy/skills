@@ -96,9 +96,7 @@ This step is complete when every delivered image passes all required QA checks.
 
 Use an explicit user-provided destination first, then the project's asset convention. Resolve that destination before generating images.
 
-For an idea artifact in this chezmoi repository, store its images in an `assets/` subdirectory beside its Markdown file under `docs/ideas/references/`. Link images from that artifact with relative paths such as `./assets/01-topic.png`.
-
-In another workspace with no specified destination or established convention, use:
+With no specified destination or established convention, use:
 
 ```text
 assets/<article-slug>-illustrations/
