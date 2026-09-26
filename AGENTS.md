@@ -57,3 +57,12 @@ gitleaks uses its built-in rules because the repo has no `.gitleaks.toml`. If yo
 ## Python execution
 
 Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts; never invoke `python3` or bare `python` directly. Scripts in `scripts/` start with a PEP 723 block, so run them with `uv run scripts/<name>.py`. The [Python sub-skill](authoring/devtools/coding-language/references/Python/MetaSkill.md) covers the details
+
+## Release
+
+1. Choose `vX.Y.Z` using the 0.x policy in `CHANGELOG.md`
+2. Run `just release-check vX.Y.Z --verbose` to list changed skills
+3. Write that version's `CHANGELOG.md` section and merge it to `main`
+4. On `main`, run `just check && just release-check vX.Y.Z`
+5. Run `git tag vX.Y.Z && git push origin vX.Y.Z`
+6. Never move or delete a pushed tag, or edit or replace a published release
