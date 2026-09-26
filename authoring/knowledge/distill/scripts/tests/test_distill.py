@@ -210,7 +210,7 @@ class TestPromptDrivenCli:
         assert code == 0
         assert "prompt:         follow_along_note" in stdout
         assert "prompt path:" in stdout
-        assert "follow-along-note/prompt.md" in stdout
+        assert "follow-along-note/prompt.md" in "".join(stdout.split())
 
     def test_prompt_flag_accepts_underscore_stem(self, tmp_path: Path) -> None:
         env = env_with_fake_claude(tmp_path)
@@ -228,7 +228,7 @@ class TestPromptDrivenCli:
         assert code == 0
         assert "prompt:         short_summary" in stdout
         assert "prompt path:" in stdout
-        assert "short-summary/prompt.md" in stdout
+        assert "short-summary/prompt.md" in "".join(stdout.split())
 
     def test_real_run_writes_planned_artifacts(self, tmp_path: Path) -> None:
         env = env_with_fake_claude(tmp_path)
