@@ -56,6 +56,10 @@ just install-skills
 
 Run `just install-skills --help` for the current targets and ownership rules.
 
+## Releases
+
+See [`CHANGELOG.md`](CHANGELOG.md) for version notes and [GitHub Releases](https://github.com/pascalandy/skills/releases) for published snapshots.
+
 ## Reuse
 
 [`LICENSE`](LICENSE) covers Pascal's original work under MIT. Adapted third-party material keeps its upstream terms; see the notices for [`html-mode`](skills/html-mode/references/attribution.md), [`grill-for-unknowns`](skills/grill-for-unknowns/LICENSE), and [`matt-mode`](skills/matt-mode/references/lineage.md). The skills in [`authoring/pstack/`](authoring/pstack/) are adapted from PStack, whose source the `matt-mode` lineage records; their upstream terms have not yet been recorded here.

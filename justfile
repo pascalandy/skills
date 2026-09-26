@@ -35,6 +35,10 @@ typecheck:
 lint-workflows:
     @uvx --from actionlint-py@{{actionlint_version}} actionlint -shellcheck= -pyflakes=
 
+# Validate HEAD as a release candidate and optionally extract release notes
+release-check version *args:
+    @uv run scripts/release_check.py {{version}} {{args}}
+
 # Scan staged changes for secrets; lefthook runs it on every commit
 gitleaks-staged:
     @gitleaks git --staged --no-banner --redact --log-level warn --verbose --no-color
