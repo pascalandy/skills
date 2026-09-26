@@ -29,7 +29,7 @@ Load `references/ROUTER.md` to dispatch request to correct sub-skill.
 | Sub-skill | Purpose |
 |-----------|---------|
 | `Bash` | Create and refactor Bash scripts: `set -Eeuo pipefail`, `fct_` naming, proper quoting, `readonly` constants, `local` variables. Shellcheck wrapper and script template included. |
-| `Python` | Modern Python development with `uv` as exclusive package manager. PEP 723 single-file scripts, type hints with pyright, formatting with ruff, testing with pytest. Covers TDD workflow, exit code standards, security. |
+| `Python` | Modern Python development with `uv` as exclusive package manager. PEP 723 single-file scripts, type hints with pyright, formatting with ruff, testing with pytest. Covers uv projects and tools, cross-platform rules, script conventions, secrets. |
 | `TypeScript` | TypeScript and JavaScript-with-types conventions for strict typing, package workflow, tests, framework patterns, libraries, SDKs, CLIs, and monorepos. |
 | `Starlette` | Build, debug, and extend Starlette applications and Starlette-powered internals (including FastAPI). Covers routing, requests/responses, middleware, WebSockets, templates, static files, authentication, sessions, background tasks, configuration, lifespan, testing. |
 
