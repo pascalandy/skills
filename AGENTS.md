@@ -4,6 +4,8 @@
 
 ## Change a skill
 
+Load `writing-great-skills` before creating, changing, or refactoring a skill. It decides how a skill is written, including its trigger and invocation mode; this file decides where the skill lives and how it ships
+
 1. For skill content, edit only `authoring/<category>/<skill-name>/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
 2. Run `just flatten-skills`; if it fails, rerun `just flatten-skills --verbose`
 3. Review and commit the source and generated output together
