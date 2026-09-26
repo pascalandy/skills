@@ -9,4 +9,4 @@ Notes are curated when preparing a release. Ordinary PRs need not edit this file
 
 ### Added
 
-- First tagged snapshot of 96 skills
+- First tagged snapshot of 98 skills
