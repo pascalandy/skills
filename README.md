@@ -13,7 +13,7 @@ Each skill is maintained in `authoring/<category>/<skill>/` and published in [`s
 
 ## Two ways to call a skill
 
-Most skills are model-invoked: the agent loads one when your request matches its `description`. User-invoked skills wait until you name them, as `$name` in Codex or `/name` in Claude Code. They set `disable-model-invocation: true` in `SKILL.md`, plus `policy.allow_implicit_invocation: false` in `agents/openai.yaml` when that file exists.
+Most skills are model-invoked: the agent loads one when your request matches its `description`. User-invoked skills wait until you name them, as `$name` in Codex or `/name` in Claude Code. They set `disable-model-invocation: true` in `SKILL.md` for Claude Code and `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex, which otherwise allows implicit invocation.
 
 ## Install one skill
 
