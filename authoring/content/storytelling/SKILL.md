@@ -1,6 +1,7 @@
 ---
 name: "storytelling"
-description: "Use when the user explicitly mentions `storytelling`."
+description: "Use only when the user names `storytelling`: develop, write, diagnose, adapt, or explain through narrative, or build a standalone style editor with `style modeler`."
+disable-model-invocation: true
 ---
 
 # Storytelling

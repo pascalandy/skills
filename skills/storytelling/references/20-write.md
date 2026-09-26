@@ -106,8 +106,9 @@ Each piece of information arrives when it best serves the intended effect.
 
 ## 5. Realize the telling through the medium
 
-Use the target medium reference already loaded. Load `references/50-voice-style.md`
-only when voice or style requires separate handling.
+Use the target medium reference already loaded. Load
+[voice and style](50-voice-style.md) only when voice or style requires separate
+handling.
 
 Do not compensate for a medium's constraints with lazy explanation.
 
