@@ -88,7 +88,19 @@ class ReleaseCheckTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
-        self.assertIn("error: version must be greater than every other v* tag", stderr)
+        self.assertIn(
+            "error: version must be greater than the latest release tag v0.2.0", stderr
+        )
+
+    def test_stray_v_tags_neither_block_nor_count_as_previous(self) -> None:
+        with self.repository() as root:
+            git(root, "tag", "v9.9.9-rc1")
+            git(root, "tag", "vendor-x")
+            result, stdout, stderr = self.run_check("v0.1.0", "--verbose")
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "ok: v0.1.0: 1 skill total\n")
+        self.assertIn("ignored non-release tags: v9.9.9-rc1, vendor-x\n", stderr)
 
     def test_missing_duplicated_and_empty_changelog_sections(self) -> None:
         cases = {
@@ -122,7 +134,8 @@ class ReleaseCheckTests(unittest.TestCase):
         self.assertEqual(stdout, "")
         self.assertIn("skills (1): alpha\n", stderr)
         self.assertIn(
-            "error: HEAD is not an ancestor of origin/main; run git fetch origin main",
+            "error: HEAD is not an ancestor of origin/main; "
+            "run git fetch --tags origin main",
             stderr,
         )
         self.assertEqual(stderr.count("error:"), 1)
