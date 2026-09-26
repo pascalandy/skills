@@ -75,7 +75,7 @@ Keep scanner-facing metadata boring. Plain or block string scalars invite YAML e
 Use the definitions under [Invocation](GLOSSARY.md#invocation), then apply the supported metadata for the active runtime.
 
 - A **model-invoked** skill keeps a precise trigger description and omits `disable-model-invocation`
-- A **user-invoked** skill sets `disable-model-invocation: true` and keeps a concise description of the explicit trigger for runtimes and catalogs that display it
+- A **user-invoked** skill sets `disable-model-invocation: true` and keeps a concise description of the explicit trigger for runtimes and catalogs that display it. When the package has `agents/openai.yaml`, set `policy.allow_implicit_invocation: false` there so Codex agrees
 - A **router skill** earns its place when several user-invoked skills create too much **cognitive load**
 
 Choose model invocation only when the agent or another skill must reach the skill without the human naming it.
@@ -85,8 +85,10 @@ Choose model invocation only when the agent or another skill must reach the skil
 The `description` tells the agent when to use the skill. Put behavior and capabilities in the body.
 
 - Write triggers using `Use when`, `Use for`, or `Use only when`
+- Describe the user's intent in the words they naturally use, not the skill's internal catalog
 - Keep one trigger per real **branch** and collapse synonyms
-- Draw a precise boundary against neighboring skills
+- Avoid broad phrases such as `help with`, `think about`, or `analyze` unless the skill owns that whole class of requests
+- Draw a precise boundary against neighboring skills. Name an exclusion only when it prevents likely misrouting
 - Include a reach clause only when another workflow must delegate here
 
 Keep the description concise, usually no more than two sentences. Remove explanations, advertising, and body summaries.
