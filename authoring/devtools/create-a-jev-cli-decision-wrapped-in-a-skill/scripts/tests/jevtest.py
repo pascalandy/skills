@@ -57,14 +57,21 @@ class FakeTypeSafe:
         self.overrides: list[Override] = []
         self.hooks: list[Hook] = []
         self.answered_model: str | None = None
+        # GET /v1/models lists only the aliases, as docs.typesafe.ai/models.md shows.
         self.models = [
             {
                 "name": "jev-latest",
-                "description": "alias of jev-1.13.0",
+                "description": "The most recent stable, official release.",
                 "release_date": "2026-09-15",
             },
-            {"name": "jev-1.13.0", "description": "Jev", "release_date": "2026-09-15"},
+            {
+                "name": "jev-preview",
+                "description": "The most recent release, whether or not it is an official one.",
+                "release_date": "2026-09-15",
+            },
         ]
+        # Set to (status, headers) to fail every GET /v1/models.
+        self.models_failure: tuple[int, dict[str, str]] | None = None
         self._server: ThreadingHTTPServer | None = None
 
     @property
@@ -160,7 +167,11 @@ class FakeTypeSafe:
 
             def do_GET(self) -> None:
                 fake.model_requests += 1
-                self.reply(200, {"models": fake.models}, {})
+                if fake.models_failure is not None:
+                    status, headers = fake.models_failure
+                    self.reply(status, {"error": f"status {status}"}, headers)
+                else:
+                    self.reply(200, {"models": fake.models}, {})
 
             def do_POST(self) -> None:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))

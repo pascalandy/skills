@@ -205,7 +205,7 @@ def test_engine_stamp(project: Project) -> None:
     add_sub(project)
     run = project.run_merge()
     assert run.json["engine"] == {
-        "version": "0.1.0",
+        "version": "0.1.1",
         "hash": edited.json["hash"],
         "modified": True,
     }
@@ -216,8 +216,7 @@ def test_engine_stamp(project: Project) -> None:
 def test_doctor_readiness(tmp_path: Path, project: Project) -> None:
     ready = project.jev("doctor", "--json")
     assert ready.code == 0, ready
-    statuses = {check["name"]: check["status"] for check in ready.json["checks"]}
-    assert statuses == {
+    offline = {
         "runtime": "ok",
         "sdk": "ok",
         "engine": "ok",
@@ -231,43 +230,29 @@ def test_doctor_readiness(tmp_path: Path, project: Project) -> None:
         "permission": "ok",
         "case policy": "ok",
     }
+    statuses = {check["name"]: check["status"] for check in ready.json["checks"]}
+    assert statuses == offline
     assert project.fake.model_requests == 0 and project.fake.requests == []
 
+    # A35: the alias-only listing passes without inference, even though the
+    # pin jev-1.13.0 is not among the listed names.
     online = project.jev("doctor", "--online", "--json")
     assert online.code == 0, online
-    assert project.fake.model_requests == 1
-    checks = {check["name"]: check for check in online.json["checks"]}
-    assert (
-        checks["models"]["status"] == "ok"
-        and checks["alias"]["detail"] == "jev-latest still serves the pin jev-1.13.0"
-    )
-    project.fake.models = [
-        {
-            "name": "jev-latest",
-            "description": "alias of jev-1.14.0",
-            "release_date": "2026-10-01",
-        },
-        {"name": "jev-1.13.0", "description": "Jev", "release_date": "2026-09-15"},
-        {"name": "jev-1.14.0", "description": "Jev", "release_date": "2026-10-01"},
-    ]
-    moved = project.jev("doctor", "--online", "--json")
-    assert moved.code == 0
-    alias = next(check for check in moved.json["checks"] if check["name"] == "alias")
-    assert (
-        alias["status"] == "warn"
-        and "jev-latest now serves jev-1.14.0; the pin stays jev-1.13.0"
-        in alias["detail"]
-    )
-    project.fake.models = [
-        {
-            "name": "jev-latest",
-            "description": "alias of jev-1.14.0",
-            "release_date": "2026-10-01",
-        }
-    ]
-    gone = project.jev("doctor", "--online")
-    assert gone.code == 1 and "the pin jev-1.13.0 is not served" in gone.stdout
-    assert gone.stderr.startswith("error: 1 readiness check failed: models")
+    statuses = {check["name"]: check["status"] for check in online.json["checks"]}
+    assert statuses == {**offline, "models": "ok"}
+    models = next(check for check in online.json["checks"] if check["name"] == "models")
+    assert models["detail"] == "authenticated listing: jev-latest, jev-preview"
+    assert project.fake.model_requests == 1 and project.fake.requests == []
+
+    # A rejected key fails as credentials; any other listing failure is service.
+    for status, kind in ((401, "credentials"), (529, "service")):
+        project.fake.models_failure = (status, {"retry-after": "0"})
+        listing = project.jev("doctor", "--online", "--json")
+        assert listing.code == 1 and listing.json["error"]["kind"] == kind, listing
+        names = [c["name"] for c in listing.json["checks"] if c["status"] == "fail"]
+        assert names == ["models"], listing
+    project.fake.models_failure = None
+    assert project.fake.requests == []
 
     project.edit_config("send_code = true", "send_code = false")
     denied = project.jev("doctor", "--json", env={"TYPESAFE_API_KEY": ""})

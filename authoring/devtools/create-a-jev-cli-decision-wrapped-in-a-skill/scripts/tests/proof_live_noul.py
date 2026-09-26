@@ -1,8 +1,9 @@
-"""Proof A33: record one live synthetic Noul within budget.
+"""Proof A33: a live doctor --online, then one live synthetic Noul within budget.
 
 Builds a synthetic repository whose gate asks exactly one Noul about author text,
-then runs the vendored engine against the real TypeSafe API. Needs network access
-to api.typesafe.ai and a key in TYPESAFE_API_KEY or the chezmoi keyring.
+then runs the vendored engine against the real TypeSafe API: first `doctor --online`,
+which must exit 0 on the authenticated model listing, then the gate. Needs network
+access to api.typesafe.ai and a key in TYPESAFE_API_KEY or the chezmoi keyring.
 
     just proof-jevgate-live
 """
@@ -52,9 +53,31 @@ def main() -> int:
             },
         }
         environment.pop("TYPESAFE_BASE_URL", None)
-        command = [
-            sys.executable,
-            str(project.jev_dir / "jevgate.py"),
+
+        def jevgate(*args: str) -> subprocess.CompletedProcess[str]:
+            process = subprocess.run(
+                [sys.executable, str(project.jev_dir / "jevgate.py"), *args],
+                cwd=project.root,
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            print(f"command: jevgate {' '.join(args)}")
+            print(f"exit: {process.returncode}")
+            return process
+
+        doctor = jevgate("doctor", "--online", "--json")
+        checks = {check["name"]: check for check in json.loads(doctor.stdout)["checks"]}
+        print(f"credentials: {checks['credentials']['detail']}")
+        print(f"models: {checks['models']['detail']}")
+        if doctor.returncode != 0:
+            for check in checks.values():
+                if check["status"] == "fail":
+                    print(f"fail: {check['name']}: {check['detail']}", file=sys.stderr)
+            return 1
+
+        process = jevgate(
             "run",
             "merge",
             "--ci-status",
@@ -65,17 +88,7 @@ def main() -> int:
             "1",
             "--no-cache",
             "--json",
-        ]
-        process = subprocess.run(
-            command,
-            cwd=project.root,
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=120,
         )
-        print(f"command: jevgate {' '.join(command[2:])}")
-        print(f"exit: {process.returncode}")
         if process.returncode not in (0, 10):
             print(process.stdout.strip())
             print(process.stderr.strip(), file=sys.stderr)

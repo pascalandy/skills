@@ -105,10 +105,27 @@ Write the `[privacy]` table with `send_code`, `commit_cases`, `approved_by`, `ap
 
 ## 8. Prove it
 
-Finish every generated file first, then commit them as G. Bootstrap dependencies: run `just jev version` once online, and install whatever the project's check command needs. Record each proof ID, command, exit, observed result, and explicit run ID where one applies:
+Finish every generated file first, then commit them as G. Bootstrap dependencies: run `just jev version` once online, and install whatever the project's check command needs. Record each proof ID, command, exit, observed result, and explicit run ID where one applies.
+
+Run every no-network claim (P1, P3, both replays, and the check command with a canary key) inside one harness. It sends TypeSafe traffic to a local recorder and blocks other traffic. The recorder logs outside the project, and the proxy variables are cleared because the SDK would route recorder traffic through an HTTP proxy and fake a zero-request pass:
+
+```bash
+log=$(mktemp)
+uv run --no-project python -m http.server 8799 --bind 127.0.0.1 --directory "$(mktemp -d)" 2>"$log" &
+unset HTTP_PROXY http_proxy https_proxy no_proxy
+export TYPESAFE_BASE_URL=http://127.0.0.1:8799 HTTPS_PROXY=http://127.0.0.1:9 NO_PROXY=127.0.0.1 UV_OFFLINE=1
+```
+
+A no-network proof holds only when all three are true:
+
+- it exits as expected
+- `rg 'HTTP/1' "$log"` finds nothing
+- `git status --porcelain --ignored` changes only by that proof's documented outputs
+
+Use `env -u TYPESAFE_API_KEY` wherever a proof says "no key".
 
 1. **P1 Help:** `just jev` and `just jev-merge --help` exit 0 with no key, network, check run, or engine writes
-2. **P2 Readiness:** `just jev doctor --online` reports usable runtime, config, credentials, permission, and model availability
+2. **P2 Readiness:** `just jev doctor --online` exits 0 and reports usable runtime, config, credentials, permission, and an authenticated model listing. An alias-only listing passes
 3. **P3 Preview:** `just jev-merge --dry-run` exports sanitized payloads with no denied or ignored content, network, check execution, or run record
 4. **P4 Live:** `just jev-merge --no-cache` on G records at least one actual inference response, answered model, usage, cost, verdict, and run ID R. Exits 0 or 10 can complete this proof. Exit 12 documents missing evidence but does not substitute for live inference; obtain the evidence and repeat. Stop at the first live step that cannot execute and report the exact missing input or service failure
 5. **P5 Explain:** `just jev explain R` exposes the actual stored inputs, answers, reasons, and omissions

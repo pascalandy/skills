@@ -117,7 +117,7 @@ An alias moves when a release ships, and the answers behind it move too. Pin the
 Preserve selected cases as portable, sanitized snapshots with their requests, answers, outcome provenance, and versions. Calibration reports must be reproducible from those snapshots in a fresh clone. Measure repeatability near decision boundaries instead of treating a reported demo variance as a guarantee.
 
 - *Sources:* [Models](https://docs.typesafe.ai/models) page; Almeida at 00:42 (robustness); LangChain and Ray Amjad in the [research](https://github.com/pascalandy/skills/issues/16) (reported).
-- *In `jevgate`:* `replay` reads a saved run or an admitted case without inference, and `doctor --online` reports when `jev-latest` moves off the pin. In the next effort, `evaluate` asks changed questions when needed and `evaluate --sweep` reuses answers. None of these commands adds observations to live gate-rate statistics
+- *In `jevgate`:* every run fails as `service` when a model other than the pin answers. `doctor --online` only proves an authenticated model listing, which names aliases and never judges the pin; moving to a newer version is a reviewed change in the maintain effort. `replay` reads a saved run or an admitted case without inference. In the next effort, `evaluate` asks changed questions when needed and `evaluate --sweep` reuses answers. None of these commands adds observations to live gate-rate statistics
 
 ### 15. Measure what you send
 

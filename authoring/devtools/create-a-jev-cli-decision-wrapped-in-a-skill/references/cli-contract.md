@@ -22,7 +22,7 @@ Every command accepts `--json`, `-h`, `-q`, `-v`, and `--no-color`. `NO_COLOR` i
 
 | Command | Does | Network |
 | --- | --- | --- |
-| `doctor` | Checks the runtime, config, collectors, key source, permission and terms, and engine version, hash, and local-edit status. `--online` adds `GET /v1/models` and reports when `jev-latest` no longer matches the pin | Only with `--online` |
+| `doctor` | Checks the runtime, config, collectors, key source, permission and terms, and engine version, hash, and local-edit status. `--online` adds an authenticated `GET /v1/models`. Any successful listing passes and shows the listed names. A rejected key is `credentials`; other failures are `service`. The listing never judges the pin | Only with `--online` |
 | `gates` | Lists gates, questions, and bands. `--check` enforces the mechanical checklist items: every backticked path exists in collector state, every Choice has a no-match option, every Score has 2–10 levels, every question declares a direction and two thresholds | None |
 | `run` | Collects, sanitizes, asks, decides, and records | Yes, unless `--dry-run` |
 | `explain` | Prints a run's summary and writes the full state, requests, and answers to a file it names. `--all` prints everything | None |
