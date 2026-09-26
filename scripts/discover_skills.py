@@ -227,14 +227,21 @@ def run(args: argparse.Namespace) -> int:
             key = {
                 "codex": lambda item: item["path"],
                 "pi": lambda item: item["sourceInfo"]["path"],
-                "opencode": lambda item: item["location"],
-            }[agent]
-            paths = {Path(key(item)).expanduser().resolve() for item in items}
+            }
+            if agent == "opencode":
+                # OpenCode keeps one copy per name and may load it from
+                # ~/.agents or ~/.claude instead, so only the name is stable
+                found = {item["name"] for item in items}
+            else:
+                found = {
+                    Path(key[agent](item)).expanduser().resolve() for item in items
+                }
             discovered: list[str] = []
             missing: list[str] = []
             for name in selected:
-                candidate = (home / root / name / "SKILL.md").resolve()
-                if candidate in paths and candidate.is_file():
+                entry = home / root / name / "SKILL.md"
+                identity = name if agent == "opencode" else entry.resolve()
+                if identity in found and entry.is_file():
                     discovered.append(name)
                 else:
                     missing.append(name)
