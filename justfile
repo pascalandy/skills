@@ -15,6 +15,10 @@ check-frontmatter *args:
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
+# Check native skill discovery after a separately authorized local install
+skills-discover *args:
+    @uv run scripts/discover_skills.py {{args}}
+
 # Run the script tests
 test *args:
     @uvx pytest@{{pytest_version}} {{args}}

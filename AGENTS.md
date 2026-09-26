@@ -18,10 +18,11 @@ Repository-wide scripts live in `scripts/`; skill-specific scripts stay in `auth
 
 ## Install skills
 
-`just install-skills` flattens current `authoring/`, including uncommitted and branch-only changes, then copies `skills/` to the agent directories listed by `just install-skills --help`. These feed Pascal's live agents. Run it only when Pascal asks. Preview without writing via `just install-skills --dry-run --verbose`
+`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected sources into the local profile's agent directories. `--profile mac` is the default; use `--profile om1` on om1. `--private NAME` explicitly includes an ignored package from `_skills_private/`. The prospective public source is the same in preview and apply. These targets feed Pascal's live agents. Run apply only when Pascal asks. Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
 
-- A manifest in `~/.local/state/install-skills/` records installed skills. The script never touches others and removes its own skills only after they leave `skills/`
+- A source-aware manifest in `~/.local/state/install-skills/` records installed skills and migrates the public-only v1 format. Public-only runs retain omitted private ownership and inactive profile targets. Retire a private skill only with `--retire-private NAME:DIGEST` from its manifest record
 - If a copy was edited in place, move the edit to `authoring/`, then rerun with `--force`
+- For a later authorized cutover, stop old installed skill writers first, preserve old manifests and snapshots, record each machine's selected revision/profile/private sources and preview decisions, then verify the post-install report and `just skills-discover --profile PROFILE`. An unavailable native adapter remains unverified
 
 ## Script conventions
 
