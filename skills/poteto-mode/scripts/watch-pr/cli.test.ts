@@ -9,7 +9,7 @@ import type { GitHubReader, WatcherVerdict } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const silentIo = { stdout: () => {}, stderr: () => {} };
-const WATCH_PR = join(import.meta.dir, "executable_watch-pr");
+const WATCH_PR = join(import.meta.dir, "watch-pr");
 
 interface FakeGhOptions {
   readonly authError?: boolean;

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import flatten_skills
+import flatten_skills
 
 
 class FlattenSkillsTests(unittest.TestCase):
@@ -53,7 +53,7 @@ class FlattenSkillsTests(unittest.TestCase):
                 patch.object(Path, "rename", interrupt_after_move),
                 self.assertRaises(KeyboardInterrupt),
             ):
-                flatten_skills.flatten()
+                flatten_skills.flatten(dry_run=False)
 
             self.assertEqual(
                 (output / "existing.txt").read_text(encoding="utf-8"), "keep me\n"

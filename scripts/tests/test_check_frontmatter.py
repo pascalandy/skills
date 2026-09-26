@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import check_frontmatter
+import check_frontmatter
+from _common import ScriptError
 
 
 class CheckFrontmatterTests(unittest.TestCase):
@@ -26,18 +27,18 @@ class CheckFrontmatterTests(unittest.TestCase):
             with (
                 patch.object(check_frontmatter, "ROOT", root),
                 patch.object(check_frontmatter, "AUTHORING", authoring),
+                self.assertRaises(ScriptError) as raised,
             ):
-                count, errors = check_frontmatter.check()
+                check_frontmatter.check()
 
-            self.assertEqual(count, 1)
             self.assertEqual(
-                errors,
-                [
+                raised.exception.args,
+                (
                     (
                         "authoring/devtools/example/SKILL.md:3: invalid "
                         "inline list string items must be double-quoted"
-                    )
-                ],
+                    ),
+                ),
             )
 
 
