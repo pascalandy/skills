@@ -1,401 +1,152 @@
 ---
-name: python
-description: Use when python is needed. Develop Python projects with uv (PEP 723 inline metadata, venv management, script execution). Use when user mentions uv, creates Python scripts, or needs Python environment setup.
+name: "python"
+description: "Use when writing, running, testing, or packaging Python with uv: PEP 723 single-file scripts, uv projects, one-off tools, and ruff, pyright, and pytest checks."
 ---
 
-# Python Development with UV
+# Python with uv
 
-Modern Python development using `uv` for package management, PEP 723 for single-file scripts, and best-in-class tooling.
+`uv` runs everything: scripts, projects, tools, and Python itself. Never call `python`, `python3`, or `pip` directly.
 
-## Quick Start
+Everything here must work on Linux and macOS, and should work on Windows.
 
-### Single-File Scripts (Default)
+## Scripts (default)
 
-By default, create self-contained scripts using PEP 723 format:
+Start with a single-file script that declares its needs in a PEP 723 block:
 
 ```python
-#!/usr/bin/env uv run python3
+#!/usr/bin/env -S uv run --script
 # /// script
-# dependencies = [
-#     "typer",
-#     "rich",
-# ]
+# requires-python = ">=3.12"
+# dependencies = []
 # ///
-"""
-Script description and usage examples.
+"""One-line purpose.
 
 Usage:
-    uv run python3 script.py --help
-    uv run python3 script.py --option value
+    uv run script.py --help
 """
-
-import sys
-# ... rest of script
 ```
 
-**Run with**: `uv run python3 script.py`
+- Run with `uv run script.py`, the one form that reads the block on every OS
+- Never `uv run python script.py`: it ignores the block and fails on the first third-party import
+- The shebang lets Linux and macOS run `./script.py` directly; Windows ignores it
+- `uv init --script script.py --python 3.12` writes the block; `uv add --script script.py httpx` edits it
+- Keep `dependencies = []` when the standard library is enough, which should be most of the time
 
-### Multi-File Projects
-
-For larger projects requiring multiple files:
-
-```bash
-# Pin Python version
-uv python pin 3.12
-
-# Create virtual environment
-uv venv --python 3.12
-
-# Activate environment
-source .venv/bin/activate
-
-# Add dependencies
-uv add package-name
-
-# Run script
-uv run python script.py
-```
-
-## Development Tools
-
-### Testing, Linting, Type Checking
-
-All tooling configuration is centralized in `/tests/pyproject.toml`.
-
-**Run from `/tests` directory:**
-
-```bash
-cd tests
-
-# Run tests
-uv run pytest
-uv run pytest -v  # verbose
-
-# Type checking
-uv run pyright
-uv run pyright --stats
-
-# Linting & formatting
-uv run ruff check ../skills
-uv run ruff check --fix ../skills
-uv run ruff format ../skills
-```
-
-**Tool choices:**
-
-- **Ruff** - Linter/formatter (replaces Black, isort, Flake8)
-- **Pyright** - Type checker (replaces MyPy)
-- **Pytest** - Test runner
-
-For detailed usage, see:
-
-- `references/ruff.md` - Linting and formatting
-- `references/pyright.md` - Static type checking
-- `references/pytest.md` - Testing framework
-
-## Script Development Workflow
-
-### Start Small - Build Incrementally
-
-1. **Basic structure** - Create script with `--help` flag
-2. **Test immediately** - Run with `uv run python3 script.py --help`
-3. **Add `--dry-run`** - Show what would happen without executing
-4. **Test again** - Verify dry-run output
-5. **Add `--verbose`** - Detailed output for debugging
-6. **Test again** - Verify verbose mode
-7. **Continue incrementally** - Add features one at a time, testing each
-
-### Shebang Format
-
-```python
-#!/usr/bin/env uv run python3
-```
-
-### PEP 723 Dependencies
+Pin a script when it must resolve the same way next month:
 
 ```python
 # /// script
-# dependencies = [
-#     "typer",      # Modern CLI framework
-#     "rich",       # Beautiful terminal output
-#     "httpx",      # Modern HTTP client
-# ]
+# requires-python = ">=3.12"
+# dependencies = ["httpx"]
+# [tool.uv]
+# exclude-newer = "1 week"
 # ///
 ```
 
-**Minimize dependencies** - Try using stdlib first.
+- `exclude-newer` skips releases newer than the cutoff, a cheap guard against freshly compromised packages
+- `uv lock --script script.py` writes `script.py.lock` next to the script for exact versions
 
-## UV Commands Reference
+## Projects
 
-### Package Management
-
-```bash
-uv add <package>           # Add package to pyproject.toml
-uv remove <package>        # Remove package
-uv sync                    # Install/sync dependencies
-uv lock                    # Create/update lock file
-```
-
-### Python Version Management
+Move to a project when the code spans several modules or ships as a package:
 
 ```bash
-uv python install <version>  # Install Python version
-uv python list               # List installed versions
-uv python pin <version>      # Set project Python version
+uv init my-app && cd my-app       # packaged app; --lib for a library, --no-package for a bare app
+uv add httpx                      # runtime dependency
+uv add --dev pytest ruff pyright  # dev group in [dependency-groups]
+uv run my-app                     # locks, syncs .venv, then runs
 ```
 
-### Running Scripts
+- `uv run` keeps `uv.lock` and `.venv` in sync; never create or activate a venv by hand
+- Commit `uv.lock`; in CI, `uv sync --locked` fails when it is stale
+- `uv python pin 3.12` writes `.python-version`; uv downloads missing interpreters on its own
+- Releases: `uv version --bump minor`, `uv build`, `uv publish`
+
+## Tools
 
 ```bash
-uv run python script.py      # Run with project environment
-uvx <tool>                   # Run tool in isolated environment
-uv tool install <package>    # Install global tool
+uvx ruff check .                  # one-off tool in a cached, isolated env (alias of `uv tool run`)
+uv tool install ruff              # persistent command on PATH
+uv run --with rich script.py      # extra package for this run only
+uv run --env-file .env script.py  # load env vars without python-dotenv
 ```
 
-## Preferred Libraries
+## Checks
 
-### Core Utilities
+Run from the project root so the project's pinned versions apply:
 
-- **uv** - Package manager (never use pip/python3 directly)
-- **typer** - Modern CLI framework (built on click)
-- **rich** - Beautiful terminal output
-- **python-dotenv** - Environment variables (or Pydantic-Settings)
-
-### Development
-
-- **pytest** - Testing framework
-- **ruff** - Fast linting and formatting
-- **pyright** - Static type checking
-
-### When Needed
-
-- **httpx** - Modern HTTP client (replaces requests)
-- **Pydantic-Settings** - Type-safe configuration with validation
-- **Polars** - Fast DataFrame library (pandas alternative)
-- **DuckDB** - Embedded analytical database
-- **Loguru** - Simple, powerful logging
-
-## Test-Driven Development
-
-### TDD Cycle
-
-1. **Red** - Write failing test for new functionality
-2. **Green** - Write minimal code to pass test
-3. **Refactor** - Improve code while keeping tests green
-
-### When to Use TDD
-
-**General approach**: Code directly as you see fit.
-
-**Use TDD when**: Facing issues or building complex components.
-
-### Development Sequence (When Using TDD)
-
-1. **Stubs** - Define basic structure and interfaces
-2. **Pseudocode** - Plan detailed logic within stubs
-3. **Data Layer** - Implement data persistence and management
-4. **Business Logic** - Implement core application rules
-5. **CLI/Frontend** - Implement user interaction
-
-## Test Structure
-
-See `references/pytest.md` for comprehensive testing guide.
-
-### Directory Structure
-
-```
-<skill>/
-├── SKILL.md
-└── scripts/
-    ├── <script>.py
-    └── tests/
-        └── test_<script>.py
+```bash
+uv run ruff check --fix .
+uv run ruff format .
+uv run pyright
+uv run pytest
 ```
 
-### Helper Function Pattern
+- Type-hint every function signature; pyright enforces it
+- For a standalone script, `uvx ruff check script.py` works without a project
+- `uv audit` (experimental) scans locked dependencies for known vulnerabilities
+- Details: `references/ruff.md`, `references/pyright.md`, `references/pytest.md`
+
+## Cross-platform
+
+- Build paths with `pathlib.Path`, never by joining strings with `/`
+- Pass `encoding="utf-8"` to `open`, `read_text`, and `write_text`; Windows does not default to UTF-8
+- Give `subprocess` a list of arguments, never `shell=True`; locate executables with `shutil.which`
+
+## Script conventions
+
+Agents run these scripts, so keep output small and failures obvious:
+
+- Standard library first (`argparse`, `logging`, `pathlib`, `json`, `subprocess`); add a dependency only when it earns its place
+- When one does: `httpx` for HTTP, `pydantic-settings` for typed config, `polars` or `duckdb` for data
+- `-h, --help` prints usage with examples
+- Quiet by default; `-v, --verbose` adds detail on stderr
+- `--dry-run` for anything that writes or deletes
+- Failures print `error: <what went wrong and how to fix it>` on stderr
+- Build incrementally: write `--help` first and run it, then add one feature at a time and run again
+
+| Code | Meaning              |
+| ---- | -------------------- |
+| 0    | Success              |
+| 1    | Runtime failure      |
+| 2    | Bad usage            |
+| 130  | Interrupted (Ctrl+C) |
+
+## Tests
+
+Keep tests next to the script and run it as a subprocess, the way agents do:
+
+```
+scripts/
+├── tool.py
+└── tests/
+    └── test_tool.py
+```
 
 ```python
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
-SCRIPT_PATH = Path(__file__).parent.parent / "script.py"
+SCRIPT = Path(__file__).parent.parent / "tool.py"
 
-def run_script(*args, env=None):
-    """Execute script with uv run."""
-    cmd = ["uv", "run", str(SCRIPT_PATH)] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-    return result.stdout, result.stderr, result.returncode
+
+def run(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+
+def test_help_exits_zero() -> None:
+    assert run("--help").returncode == 0
 ```
 
-### Test Class Organization
+Run with `uv run pytest` inside a project, or `uvx pytest scripts/tests` for a standalone script. See `references/pytest.md` for fixtures and patterns.
 
-```python
-class TestVersion:
-    """Test --version flag."""
+## Secrets
 
-    def test_version_flag(self):
-        """--version should output version and exit with 0."""
-        stdout, stderr, code = run_script("--version")
-        assert code == 0
-        assert "version" in stdout.lower()
-```
-
-### Exit Code Standards
-
-| Code | Meaning                          |
-| ---- | -------------------------------- |
-| 0    | Success (version, help, dry-run) |
-| 1    | Runtime/API error                |
-| 2    | Validation error                 |
-| 130  | Keyboard interrupt               |
-
-## Type Checking
-
-See `references/pyright.md` for comprehensive type checking guide.
-
-### Basic Type Hints
-
-```python
-def greet(name: str) -> str:
-    return f"Hello, {name}"
-
-def find_user(id: int) -> str | None:
-    return None
-
-def process(items: list[str]) -> dict[str, int]:
-    return {item: len(item) for item in items}
-```
-
-### Docstrings
-
-Use structured docstrings with Args, Returns, and Raises sections:
-
-```python
-def calculate_total(items: list[dict], tax_rate: float = 0.0) -> float:
-    """Calculate the total cost of items including tax.
-
-    Args:
-        items: List of item dictionaries with 'price' keys
-        tax_rate: Tax rate as decimal (e.g., 0.08 for 8%)
-
-    Returns:
-        Total cost including tax
-
-    Raises:
-        ValueError: If items is empty or tax_rate is negative
-    """
-    if not items:
-        raise ValueError("Items list cannot be empty")
-    if tax_rate < 0:
-        raise ValueError("Tax rate cannot be negative")
-    
-    subtotal = sum(item["price"] for item in items)
-    return subtotal * (1 + tax_rate)
-```
-
-## Best Practices
-
-1. **Use uv exclusively** - Never run `python3` or `pip` directly
-2. **Start with PEP 723** - Single-file scripts by default
-3. **Minimize dependencies** - Try stdlib first
-4. **Test incrementally** - Build and test feature by feature
-5. **Use type hints** - Catch errors early with pyright
-6. **Format with ruff** - Consistent code style
-7. **Follow exit codes** - 0 for success, 1 for runtime errors, 2 for validation
-
-## Common Pitfalls
-
-### Mutable Default Arguments
-
-Never use mutable objects (lists, dicts) as default argument values:
-
-```python
-# BAD - The list persists across calls!
-def add_item(item, items=[]):
-    items.append(item)
-    return items
-
-add_item("a")  # ['a']
-add_item("b")  # ['a', 'b'] - Unexpected!
-
-# GOOD - Use None and create inside function
-def add_item(item, items=None):
-    if items is None:
-        items = []
-    items.append(item)
-    return items
-```
-
-### Bare Except Clauses
-
-Never use bare `except:` - always catch specific exceptions:
-
-```python
-# BAD - Catches everything including KeyboardInterrupt
-try:
-    do_something()
-except:
-    pass
-
-# GOOD - Catch specific exceptions
-try:
-    do_something()
-except (ValueError, TypeError) as e:
-    print(f"Error: {e}", file=sys.stderr)
-    sys.exit(1)
-```
-
-### Comparing with None
-
-Use `is` / `is not` for None comparisons:
-
-```python
-# BAD
-if value == None:
-    ...
-
-# GOOD
-if value is None:
-    ...
-```
-
-## Security
-
-### Environment Variables
-
-Store secrets in `.env` files, never in code:
-
-```python
-# Load from .env file
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-api_key = os.getenv("API_KEY")
-
-if not api_key:
-    print("Error: API_KEY not set", file=sys.stderr)
-    sys.exit(1)
-```
-
-### Required Practices
-
-- **Never commit secrets** - Add `.env` to `.gitignore`
-- **Never log secrets** - Don't print API keys, passwords, or tokens
-- **Never hardcode** - Use environment variables for all credentials
-- **Validate early** - Check for required env vars at startup
-
-### .gitignore Entry
-
-```gitignore
-# Environment variables
-.env
-.env.local
-.env.*.local
-```
-
-## Bundled Resources
-
-- `references/ruff.md` - Linting and formatting guide
-- `references/pyright.md` - Type checking guide
-- `references/pytest.md` - Testing framework guide
+- Read secrets from environment variables and fail at startup when one is missing
+- Keep local values in a git-ignored `.env` and load it with `uv run --env-file .env`
+- Never print, log, or hardcode them

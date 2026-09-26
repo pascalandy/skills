@@ -286,17 +286,6 @@ my-skill/
 6. **Use fixtures for setup** - Avoid repetitive setup code
 7. **Clean up resources** - Use fixtures or try/finally
 
-## Integration with Tests Directory
-
-Run from `/tests` directory:
-
-```bash
-cd tests
-uv run pytest                    # Run all tests
-uv run pytest --collect-only     # List all tests
-uv run pytest -v                 # Verbose output
-```
-
 ## Common Issues
 
 ### Tests Not Found

@@ -99,16 +99,6 @@ path/to/file.py:15:1: E302 Expected 2 blank lines, found 1
 
 Format: `file:line:column: CODE Message`
 
-## Integration with Tests
-
-Run from `/tests` directory:
-
-```bash
-cd tests
-uv run ruff check ../skills
-uv run ruff format ../skills
-```
-
 ## Best Practices
 
 1. **Run before commits** - Catch issues early

@@ -153,16 +153,6 @@ reportMissingImports = "none"
 reportAttributeAccessIssue = "warning"
 ```
 
-## Integration with Tests
-
-Run from `/tests` directory:
-
-```bash
-cd tests
-uv run pyright
-uv run pyright --stats
-```
-
 ## Type Hints Quick Reference
 
 ```python
