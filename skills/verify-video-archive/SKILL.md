@@ -162,7 +162,7 @@ checks in the explicit dotfiles checkout. Each platform acceptance gate also
 needs a passing full Drive run on that platform.
 
 ```bash
-just test-verify-video-archive
+just check --only verify-video-archive
 just --justfile "$CHECKOUT/justfile" test-video-archive
 uv run --no-project python "$VERIFY_DIR/scripts/verify_video_archive.py" \
   run --checkout "$CHECKOUT" --feature all

@@ -26,7 +26,9 @@ def uv_dirs() -> dict[str, str]:
 def test_recipe_help_offline(tmp_path: Path, fake: FakeTypeSafe) -> None:
     project = make_project(tmp_path, fake, justfile=True)
     just = shutil.which("just")
-    assert just, "just must be on PATH; run this suite through `just test-jevgate`"
+    assert just, (
+        "just must be on PATH; run this suite through `just check --only jevgate`"
+    )
     online = {**project.base_env(), **uv_dirs()}
     for variable in ("HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"):
         online.pop(variable, None)

@@ -31,11 +31,10 @@ Run these commands from the skills repository checkout. `MATT_SOURCE` points to 
 Use the upstream repository itself, not the enclosing Git repository of an `opensrc` snapshot. If the snapshot has no independent Git history, create a checkout with `git clone https://github.com/mattpocock/skills.git <destination>` and point `MATT_SOURCE` there.
 
 ```sh
-just check-matt-mode --upstream "$MATT_SOURCE"
+uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
 just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
 just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
-just check-matt-mode --upstream "$MATT_SOURCE"
-just check-matt-mode
+uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
 just check
 ```
 
