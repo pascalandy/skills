@@ -1,5 +1,5 @@
-#!/usr/bin/env uv run python3
 # /// script
+# requires-python = ">=3.12"
 # dependencies = [
 #     "rich",
 #     "tiktoken",
@@ -18,8 +18,6 @@ skill, and this tool resolves a named stem to its ``prompt.md`` file.
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
-
 import argparse
 import json
 import os
@@ -28,14 +26,16 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, NoReturn, TypeVar
+from typing import NoReturn
 
 import tiktoken
 from rich.console import Console
 
+__version__ = "1.0.0"
 
 # -------------------------------------------------------------------------
 # Constants
@@ -192,10 +192,7 @@ class ResolvedPlan:
 # -------------------------------------------------------------------------
 
 
-T = TypeVar("T")
-
-
-def retry_request(
+def retry_request[T](
     func: Callable[[], T],
     *,
     max_attempts: int = LLM_MAX_RETRIES,
@@ -295,7 +292,7 @@ class _HelpAction(argparse.Action):
         option_strings: list[str],
         dest: str = argparse.SUPPRESS,
         default: str = argparse.SUPPRESS,
-        help: str | None = None,  # noqa: A002  (argparse API requires 'help')
+        help: str | None = None,
     ) -> None:
         super().__init__(
             option_strings=option_strings,
@@ -427,12 +424,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--effort is not supported with --provider opencode")
 
     # Validate: if not using a discovery command, input is required
-    if not args.list_models and not args.list_prompts:
-        if not args.input:
-            parser.error(
-                "missing positional argument 'input' "
-                "(or use --list-prompts / --list-models)"
-            )
+    if not args.list_models and not args.list_prompts and not args.input:
+        parser.error(
+            "missing positional argument 'input' "
+            "(or use --list-prompts / --list-models)"
+        )
 
     return args
 
@@ -462,8 +458,7 @@ def resolve_input_file(raw: str) -> tuple[Path, str]:
 def normalize_prompt_stem(raw: str) -> str:
     """Normalize a user-facing prompt stem to canonical underscore form."""
     stem = raw.strip().lower()
-    if stem.endswith(".md"):
-        stem = stem[:-3]
+    stem = stem.removesuffix(".md")
     stem = stem.replace("-", "_")
     return stem
 
@@ -540,12 +535,10 @@ def check_context_size(provider: str, input_text: str, prompt_text: str) -> int:
     limit = CONTEXT_LIMITS[provider]
     if total > limit:
         raise LLMCallError(
-            (
-                f"Input too large for {provider}: {total:,} tokens "
-                f"(input {input_tokens:,} + prompt {prompt_tokens:,} "
-                f"+ overhead {overhead_tokens:,}) exceeds safe limit "
-                f"of {limit:,}. Reduce input size or split the file."
-            )
+            f"Input too large for {provider}: {total:,} tokens "
+            f"(input {input_tokens:,} + prompt {prompt_tokens:,} "
+            f"+ overhead {overhead_tokens:,}) exceeds safe limit "
+            f"of {limit:,}. Reduce input size or split the file."
         )
     return input_tokens
 
@@ -564,7 +557,7 @@ def derive_slug(input_path: Path) -> str:
 def make_run_folder_path(
     output_parent: Path, slug: str, prompt_name: str
 ) -> tuple[Path, str]:
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d_%H-%M-%S")
     run_folder_name = f"{slug}_{timestamp}_{prompt_name}"
     return output_parent / run_folder_name, run_folder_name
 
@@ -1051,10 +1044,7 @@ def write_meta(
         f"prompt_file: {plan.prompt_path}",
         f"provider: {plan.provider}",
         f"model: {plan.model}",
-        (
-            f"effort: {plan.effort_canonical} "
-            f"→ {plan.effort_vendor} ({plan.provider})"
-        ),
+        (f"effort: {plan.effort_canonical} → {plan.effort_vendor} ({plan.provider})"),
         f"duration: {duration_seconds:.1f}s",
         f"input_tokens: {plan.input_tokens:,}",
     ]
@@ -1105,9 +1095,7 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
             ) from exc
 
     output_file = run_folder_path / f"{plan.slug}_{plan.prompt_name}.md"
-    copied_input_file = (
-        run_folder_path / f"{plan.slug}_raw{plan.input_path.suffix}"
-    )
+    copied_input_file = run_folder_path / f"{plan.slug}_raw{plan.input_path.suffix}"
     shutil.copy2(plan.input_path, copied_input_file)
 
     if not plan.quiet:
@@ -1117,7 +1105,7 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
             f"({plan.model}, effort={plan.effort_canonical})...[/cyan]"
         )
 
-    started_at = datetime.now()
+    started_at = datetime.now().astimezone()
     t0 = time.monotonic()
     usage = run_llm(plan, output_file)
     duration = time.monotonic() - t0
