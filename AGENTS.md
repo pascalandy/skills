@@ -40,6 +40,8 @@ Scripts in `scripts/` are CLIs that agents run, so their output stays small and 
 
 Tests live in `scripts/tests/`. `just test` runs them; `just check` is exactly what CI runs on every PR and push to `main`. Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools
 
+`just check` is a list of recipes; a failure names the one to rerun. Add a new CI-safe check as its own recipe, then append it to that list
+
 When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
 ## Commit hooks
