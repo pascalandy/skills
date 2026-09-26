@@ -66,3 +66,4 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 4. On `main`, run `just check && just release-check vX.Y.Z`
 5. Run `git tag vX.Y.Z && git push origin vX.Y.Z`
 6. Never move or delete a pushed tag, or edit or replace a published release
+7. If the tag run fails, rerun it once only when the failure was transient; otherwise fix on `main` and release the next patch

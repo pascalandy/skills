@@ -148,21 +148,29 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
     if requested is None:
         errors.append("version must be vMAJOR.MINOR.PATCH without leading zeros")
 
-    tags = git_output("tag", "--list", "v*").splitlines()
-    other_tags = [tag for tag in tags if tag != version]
-    tag_versions = {tag: parse_version(tag) for tag in other_tags}
-    valid_tags = {
-        tag: parsed for tag, parsed in tag_versions.items() if parsed is not None
-    }
-    if requested is not None and (
-        len(valid_tags) != len(other_tags)
-        or any(parsed >= requested for parsed in valid_tags.values())
-    ):
-        errors.append("version must be greater than every other v* tag")
+    releases: dict[str, tuple[int, int, int]] = {}
+    ignored: list[str] = []
+    for tag in git_output("tag", "--list", "v*").splitlines():
+        if tag == version:
+            continue
+        parsed = parse_version(tag)
+        if parsed is None:
+            ignored.append(tag)
+        else:
+            releases[tag] = parsed
 
-    previous = max(valid_tags, key=lambda tag: valid_tags[tag], default=None)
+    previous = max(releases, key=lambda tag: releases[tag], default=None)
+    if (
+        requested is not None
+        and previous is not None
+        and releases[previous] >= requested
+    ):
+        errors.append(f"version must be greater than the latest release tag {previous}")
+
     changes = skill_changes(previous)
     if verbose:
+        if ignored:
+            print(f"ignored non-release tags: {', '.join(ignored)}", file=sys.stderr)
         changes.print_names()
 
     body, changelog_error = changelog_body(version)
@@ -174,7 +182,7 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
         "merge-base", "--is-ancestor", "HEAD", "refs/remotes/origin/main"
     ).returncode:
         errors.append(
-            "HEAD is not an ancestor of origin/main; run git fetch origin main"
+            "HEAD is not an ancestor of origin/main; run git fetch --tags origin main"
         )
 
     if (
