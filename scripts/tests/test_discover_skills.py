@@ -27,6 +27,16 @@ def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess
     )
 
 
+def fake_opencode(binary: Path, location: Path) -> None:
+    binary.write_text(
+        "#!/bin/sh\n/bin/cat <<'EOF'\n"
+        + json.dumps([{"name": "alpha", "location": str(location)}])
+        + "\nEOF\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o755)
+
+
 def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None:
     home = tmp_path / "home"
     entry = home / ".config/opencode/skills/alpha/SKILL.md"
@@ -39,6 +49,9 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
             {
                 "version": 2,
                 "targets": {
+                    ".agents/skills": {
+                        "alpha": {"source": "public", "digest": "a" * 64}
+                    },
                     ".config/opencode/skills": {
                         "alpha": {"source": "public", "digest": "a" * 64}
                     },
@@ -52,26 +65,57 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     )
     binary = tmp_path / "bin/opencode"
     binary.parent.mkdir()
-    binary.write_text(
-        "#!/bin/sh\n/bin/cat <<'EOF'\n"
-        + json.dumps([{"name": "alpha", "location": str(entry)}])
-        + "\nEOF\n",
-        encoding="utf-8",
-    )
-    binary.chmod(0o755)
+    fake_opencode(binary, entry)
     verified = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
     assert verified.returncode == 0, verified.stderr
     assert json.loads(verified.stdout)["agents"]["opencode"]["status"] == "verified"
+    shared = home / ".agents/skills/alpha/SKILL.md"
+    shared.parent.mkdir(parents=True)
+    shared.write_text("# stale alpha\n", encoding="utf-8")
+    fake_opencode(binary, shared)
+    stale = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
+    assert stale.returncode == 1
+    assert json.loads(stale.stdout)["agents"]["opencode"]["missing"] == ["alpha"]
+    shared.write_text("# alpha\n", encoding="utf-8")
+    (entry.parent / "guide.md").write_text("current\n", encoding="utf-8")
+    shared_guide = shared.parent / "guide.md"
+    shared_guide.write_text("stale\n", encoding="utf-8")
+    stale_package = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert stale_package.returncode == 1
+    assert json.loads(stale_package.stdout)["agents"]["opencode"]["missing"] == [
+        "alpha"
+    ]
+    shared.unlink()
+    shared.symlink_to(entry)
+    stale_link = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
+    assert stale_link.returncode == 1
+    assert json.loads(stale_link.stdout)["agents"]["opencode"]["missing"] == ["alpha"]
+    shared.unlink()
+    shared.write_text("# alpha\n", encoding="utf-8")
+    shared_guide.write_text("current\n", encoding="utf-8")
+    deduplicated = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert deduplicated.returncode == 0, deduplicated.stderr
+    unowned = home / ".config/agents/skills/alpha/SKILL.md"
+    unowned.parent.mkdir(parents=True)
+    unowned.write_text("# alpha\n", encoding="utf-8")
+    (unowned.parent / "guide.md").write_text("current\n", encoding="utf-8")
+    fake_opencode(binary, unowned)
+    not_manifest_owned = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert not_manifest_owned.returncode == 1
+    assert json.loads(not_manifest_owned.stdout)["agents"]["opencode"]["missing"] == [
+        "alpha"
+    ]
     real = home / "actual/alpha"
     real.parent.mkdir()
     entry.parent.rename(real)
     entry.parent.symlink_to(real, target_is_directory=True)
-    binary.write_text(
-        "#!/bin/sh\n/bin/cat <<'EOF'\n"
-        + json.dumps([{"name": "alpha", "location": str(real / "SKILL.md")}])
-        + "\nEOF\n",
-        encoding="utf-8",
-    )
+    fake_opencode(binary, real / "SKILL.md")
     linked = run(
         home,
         binary,
