@@ -62,4 +62,4 @@ See [`CHANGELOG.md`](CHANGELOG.md) for version notes and [GitHub Releases](https
 
 ## Reuse
 
-[`LICENSE`](LICENSE) covers Pascal's original work under MIT. Adapted third-party material keeps its upstream terms; see the notices for [`html-mode`](skills/html-mode/references/attribution.md), [`grill-for-unknowns`](skills/grill-for-unknowns/LICENSE), and [`matt-mode`](skills/matt-mode/references/lineage.md). The skills in [`authoring/pstack/`](authoring/pstack/) are adapted from PStack, whose source the `matt-mode` lineage records; their upstream terms have not yet been recorded here.
+[`LICENSE`](LICENSE) covers Pascal's original work under MIT. The PStack, Matt Pocock, `gh-stack`, and `test-audit` packages carry their upstream terms in each skill folder. See the notices for [`html-mode`](skills/html-mode/references/attribution.md) and [`grill-for-unknowns`](skills/grill-for-unknowns/LICENSE), and the [`matt-mode` lineage](skills/matt-mode/references/lineage.md) for its Matt Pocock and PStack sources.
