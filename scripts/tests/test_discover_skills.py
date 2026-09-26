@@ -27,6 +27,16 @@ def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess
     )
 
 
+def fake_opencode(binary: Path, location: Path) -> None:
+    binary.write_text(
+        "#!/bin/sh\n/bin/cat <<'EOF'\n"
+        + json.dumps([{"name": "alpha", "location": str(location)}])
+        + "\nEOF\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o755)
+
+
 def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None:
     home = tmp_path / "home"
     entry = home / ".config/opencode/skills/alpha/SKILL.md"
@@ -52,23 +62,12 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     )
     binary = tmp_path / "bin/opencode"
     binary.parent.mkdir()
-    binary.write_text(
-        "#!/bin/sh\n/bin/cat <<'EOF'\n"
-        + json.dumps([{"name": "alpha", "location": str(entry)}])
-        + "\nEOF\n",
-        encoding="utf-8",
-    )
-    binary.chmod(0o755)
+    fake_opencode(binary, entry)
     verified = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
     assert verified.returncode == 0, verified.stderr
     assert json.loads(verified.stdout)["agents"]["opencode"]["status"] == "verified"
     shared = home / ".agents/skills/alpha/SKILL.md"
-    binary.write_text(
-        "#!/bin/sh\n/bin/cat <<'EOF'\n"
-        + json.dumps([{"name": "alpha", "location": str(shared)}])
-        + "\nEOF\n",
-        encoding="utf-8",
-    )
+    fake_opencode(binary, shared)
     deduplicated = run(
         home, binary, "--profile", "mac", "--agent", "opencode", "--json"
     )
@@ -77,12 +76,7 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     real.parent.mkdir()
     entry.parent.rename(real)
     entry.parent.symlink_to(real, target_is_directory=True)
-    binary.write_text(
-        "#!/bin/sh\n/bin/cat <<'EOF'\n"
-        + json.dumps([{"name": "alpha", "location": str(real / "SKILL.md")}])
-        + "\nEOF\n",
-        encoding="utf-8",
-    )
+    fake_opencode(binary, real / "SKILL.md")
     linked = run(
         home,
         binary,
