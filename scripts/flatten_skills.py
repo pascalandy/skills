@@ -1,4 +1,4 @@
-"""Render categorized authoring packages into a flat skills directory."""
+"""Flatten categorized authoring packages into the published skills directory."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def main() -> None:
     ).stdout
 
     file_count = 0
-    with tempfile.TemporaryDirectory(prefix=".skills-render-", dir=ROOT) as temporary:
+    with tempfile.TemporaryDirectory(prefix=".skills-flatten-", dir=ROOT) as temporary:
         staging = Path(temporary) / "skills"
         staging.mkdir()
         for raw_path in listed.split(b"\0"):
@@ -77,7 +77,7 @@ def main() -> None:
                 previous.rename(OUTPUT)
             raise
 
-    print(f"Rendered {len(packages)} skills ({file_count} files) into skills/")
+    print(f"Flattened {len(packages)} skills ({file_count} files) into skills/")
 
 
 if __name__ == "__main__":

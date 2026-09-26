@@ -1,2 +1,3 @@
-render:
-    @uv run --no-project python tools/render_skills.py
+# Flatten categorized authoring packages into the published skills directory
+flatten-skills:
+    @uv run --no-project python scripts/flatten_skills.py
