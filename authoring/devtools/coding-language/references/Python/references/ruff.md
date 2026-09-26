@@ -1,56 +1,29 @@
 # Ruff - Python Linter & Formatter
 
-Fast Python linter and formatter written in Rust. Replaces Black, isort, and multiple Flake8 plugins.
+Python linter and formatter written in Rust. Replaces Black, isort, and many Flake8 plugins.
 
-## Why Ruff Over Alternatives
-
-- **Ruff > Black**: 10-100x faster, includes linting + formatting
-- **Ruff > isort**: Built-in import sorting with same speed advantage
-- **Ruff > Flake8/Pylint**: Single tool, faster, auto-fixes available
+Run it in the environment that owns the code, as [MetaSkill.md → Choose the environment](../MetaSkill.md#choose-the-environment) explains. [MetaSkill.md → Checks](../MetaSkill.md#checks) has the full verification sequence.
 
 ## Core Commands
 
+Verification changes nothing:
+
 ```bash
-# Lint code (check for issues)
-uv run ruff check .
-
-# Auto-fix issues
-uv run ruff check --fix .
-
-# Format code
-uv run ruff format .
-
-# Lint + format in one go
-uv run ruff check --fix . && uv run ruff format .
+uv run --locked ruff check .                # lint
+uv run --locked ruff format --check .       # list files that need formatting
+uv run --locked ruff check path/to/file.py  # one file
 ```
 
-## Common Workflows
-
-### Check Before Commit
+Repair rewrites files. Run it only when asked to fix, then verify again:
 
 ```bash
-uv run ruff check --fix .
-uv run ruff format .
-```
-
-### CI/CD Integration
-
-```bash
-# Check only (no modifications)
-uv run ruff check .
-uv run ruff format --check .
-```
-
-### Specific Files/Directories
-
-```bash
-uv run ruff check path/to/file.py
-uv run ruff format scripts/
+uv run --locked ruff check --fix .  # apply safe fixes
+uv run --locked ruff format .       # rewrite formatting
 ```
 
 ## Configuration
 
-Located in `pyproject.toml` or `ruff.toml`:
+In `pyproject.toml`, settings live under `[tool.ruff]`. Leave `target-version` unset; ruff reads it from `requires-python`:
 
 ```toml
 [tool.ruff]
@@ -70,6 +43,16 @@ ignore = [
 ]
 ```
 
+In `ruff.toml` or `.ruff.toml`, drop the `tool.ruff` prefix: settings go at the top level and lint rules under `[lint]`. A `ruff.toml` that keeps `[tool.ruff]` fails with exit 2 and `unknown field tool`:
+
+```toml
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+```
+
 ## Rule Categories
 
 Common rule prefixes:
@@ -85,13 +68,19 @@ Common rule prefixes:
 
 ## Exit Codes
 
-- `0` - No issues found
-- `1` - Issues found (or errors during execution)
+| Code | Meaning                                                              |
+| ---- | -------------------------------------------------------------------- |
+| 0    | No findings, or `--fix` fixed them all                               |
+| 1    | Findings: lint violations, or files `format --check` would reformat  |
+| 2    | Ruff failed: invalid configuration, invalid CLI options, or a crash  |
+
+Exit 2 means the checker setup is broken, not the code. Fix the setup before reading any results.
 
 ## Output Interpretation
 
+The default output shows each finding with a code frame. Add `--output-format concise` for one line per finding:
+
 ```bash
-# Example output
 path/to/file.py:10:5: F841 Local variable `x` is assigned but never used
 path/to/file.py:15:1: E302 Expected 2 blank lines, found 1
 ```
@@ -100,11 +89,10 @@ Format: `file:line:column: CODE Message`
 
 ## Best Practices
 
-1. **Run before commits** - Catch issues early
-2. **Use --fix** - Auto-fix most issues automatically
-3. **Format last** - Run `check --fix` before `format`
-4. **Ignore sparingly** - Only ignore rules with good reason
-5. **Project-wide config** - Keep configuration in `pyproject.toml`
+1. **Verify before repairing** - Run `check` and `format --check` first so the original findings stay visible
+2. **Fix, then format** - Run `check --fix` before `format`
+3. **Ignore sparingly** - Only ignore rules with good reason, and write the reason next to the ignore
+4. **Project-wide config** - Keep configuration in `pyproject.toml`
 
 ## Common Issues
 
@@ -118,20 +106,13 @@ Formatter respects `line-length` setting. Default is 88 (Black's default).
 
 ### Ignore Specific Lines
 
-```python
-# ruff: noqa: E501
-very_long_line_that_should_not_be_checked()
+Put `# noqa` at the end of the offending line and name the rule:
 
-# Or specific rule
+```python
 x = 1  # noqa: F841
 ```
 
-## Performance
-
-Ruff is 10-100x faster than alternatives:
-
-- Large codebase (~50k lines): ~0.1s vs 10s+ (Black/Flake8)
-- Incremental checks: Near-instant
+`# ruff: noqa: RULE` on a line of its own exempts the whole file from that rule. For that intent, prefer `per-file-ignores` in the configuration.
 
 ## Resources
 

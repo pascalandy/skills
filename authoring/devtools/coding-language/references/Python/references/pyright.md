@@ -1,28 +1,16 @@
 # Pyright - Python Static Type Checker
 
-Fast static type checker for Python. Catches type errors before runtime.
+Static type checker for Python. Catches type errors before runtime.
 
-## Why Pyright Over MyPy
-
-- **Speed**: 5-10x faster than MyPy (written in TypeScript/Node.js)
-- **Modern**: Better support for recent Python features
-- **IDE Integration**: Powers VS Code's Python extension
-- **Zero Config**: Works out of the box with sensible defaults
+Run it in the environment that owns the code: `uv run --locked pyright` for project code; for an independent script, follow [MetaSkill.md → Checks](../MetaSkill.md#checks).
 
 ## Core Commands
 
 ```bash
-# Check all files
-uv run pyright
-
-# Check specific files
-uv run pyright path/to/file.py
-
-# Show statistics
-uv run pyright --stats
-
-# Watch mode (re-check on file changes)
-uv run pyright --watch
+uv run --locked pyright                  # check the configured files
+uv run --locked pyright path/to/file.py  # check one file
+uv run --locked pyright --stats          # timing and file counts
+uv run --locked pyright --watch          # recheck on every change
 ```
 
 ## Type Checking Modes
@@ -40,7 +28,7 @@ typeCheckingMode = "basic"  # or "standard" or "strict"
 
 ## Configuration
 
-Located in `pyproject.toml`:
+Starter configuration in `pyproject.toml`. It keeps every diagnostic at its default, so an unresolved import still fails the check:
 
 ```toml
 [tool.pyright]
@@ -56,22 +44,20 @@ exclude = [
     "**/.venv",
     "**/node_modules",
 ]
-
-# Downgrade specific diagnostics
-reportAttributeAccessIssue = "warning"  # error -> warning
-reportMissingImports = "none"           # Disable entirely
 ```
+
+Pyright takes the Python version from the environment's interpreter.
 
 ## Common Error Types
 
 ### Import Errors
 
 ```
-ERROR: Import "requests" could not be resolved
+error: Import "requests" could not be resolved (reportMissingImports)
 ```
 
-**Cause**: Package not installed or not in virtual environment
-**Fix**: Install package with `uv add requests`
+**Cause**: The package is missing from the environment pyright checks, or pyright is checking the wrong environment
+**Fix**: Follow [MetaSkill.md → When an import fails](../MetaSkill.md#when-an-import-fails). Never silence `reportMissingImports`; that hides real failures
 
 ### Type Mismatch
 
@@ -102,15 +88,22 @@ ERROR: "read" is not a known attribute of "None"
 
 ## Exit Codes
 
-- `0` - No errors found
-- `1` - Errors found
+| Code | Meaning                                  |
+| ---- | ---------------------------------------- |
+| 0    | No errors                                |
+| 1    | Errors found in the code                 |
+| 2    | Fatal error inside pyright               |
+| 3    | Config file could not be read or parsed  |
+| 4    | Invalid command-line arguments           |
+
+Codes 2 to 4 mean the checker setup is broken, not the code. Fix the setup before reading any results.
 
 ## Output Interpretation
 
 ```bash
 # Example output
 path/to/file.py:10:5 - error: "str" is not assignable to "int" (reportArgumentType)
-path/to/file.py:15:8 - warning: Import "requests" could not be resolved (reportMissingImports)
+path/to/file.py:15:8 - error: Import "requests" could not be resolved (reportMissingImports)
 ```
 
 Format: `file:line:column - level: message (ruleCode)`
@@ -127,51 +120,32 @@ Common diagnostic rules:
 
 ## Suppressing Errors
 
+Fix the cause first. Suppress only a diagnostic you have confirmed is wrong, as narrowly as possible, with the reason next to it.
+
 ### Inline Suppression
 
-```python
-# pyright: ignore[reportArgumentType]
-result = function("string")  # Expects int
+Put the comment at the end of the line that has the error; on a line of its own it does nothing. Always name the rule, since a bare `# pyright: ignore` hides every error on the line:
 
-# Or suppress all errors on line
-result = function("string")  # pyright: ignore
+```python
+result = legacy_call("42")  # pyright: ignore[reportArgumentType]  # accepts str at runtime; stubs say int
 ```
 
 ### File-Level Suppression
 
+One rule for one file, with the reason:
+
 ```python
-# pyright: reportMissingImports=false
-import some_untyped_package
+# pyright: strict, reportPrivateUsage=false
+# Tests exercise private helpers on purpose.
 ```
 
 ### Configuration Suppression
 
+Only for a rule that is wrong for the whole codebase, and never for `reportMissingImports`:
+
 ```toml
 [tool.pyright]
-reportMissingImports = "none"
-reportAttributeAccessIssue = "warning"
-```
-
-## Type Hints Quick Reference
-
-```python
-# Basic types
-def greet(name: str) -> str:
-    return f"Hello, {name}"
-
-# Optional types
-from typing import Optional
-def find_user(id: int) -> Optional[str]:
-    return None
-
-# Lists, dicts
-from typing import List, Dict
-def process(items: List[str]) -> Dict[str, int]:
-    return {item: len(item) for item in items}
-
-# Modern syntax (Python 3.10+)
-def process(items: list[str]) -> dict[str, int]:
-    return {item: len(item) for item in items}
+reportPrivateImportUsage = "warning"  # vendored SDK re-exports names without __all__
 ```
 
 ## Best Practices
@@ -184,14 +158,9 @@ def process(items: list[str]) -> dict[str, int]:
 
 ## Common Patterns
 
-### Handling PEP 723 Scripts
+### Checking an Independent Script
 
-A script with inline dependencies has its own environment, so point pyright at it instead of silencing `reportMissingImports`:
-
-```bash
-uv sync --script script.py
-uvx pyright --pythonpath "$(uv python find --script script.py)" script.py
-```
+Follow [MetaSkill.md → Checks](../MetaSkill.md#checks): sync the script's environment, then pass its interpreter with `--pythonpath`.
 
 ### Checking Specific Directories
 
@@ -203,23 +172,6 @@ include = [
     "scripts",  # Example: a skill's bundled scripts
 ]
 ```
-
-### Excluding Virtual Environments
-
-```toml
-[tool.pyright]
-exclude = [
-    "**/.venv/**",
-    "**/venv/**",
-]
-```
-
-## Performance
-
-Pyright is fast:
-
-- Large codebase (~50k lines): ~1-2s
-- Incremental checks: Near-instant with watch mode
 
 ## Resources
 
