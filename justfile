@@ -24,7 +24,7 @@ test *args:
     @uvx pytest@{{pytest_version}} {{args}}
 
 # Run the same CI-safe verdict as GitHub Actions; a failure names the recipe to rerun
-check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit
+check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit test-verify-video-archive
 
 # Lint and format-check the repository scripts
 lint:
@@ -94,6 +94,12 @@ test-tavily:
 
 test-poteto-worktree-audit:
     @uvx --from pytest@{{pytest_version}} pytest authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py -q
+
+test-verify-video-archive:
+    @uvx ruff@{{ruff_version}} check --quiet authoring/verify/verify-video-archive/scripts
+    @uvx ruff@{{ruff_version}} format --quiet --check authoring/verify/verify-video-archive/scripts
+    @uvx --with pytest=={{pytest_version}} pyright@{{pyright_version}} --pythonversion 3.11 authoring/verify/verify-video-archive/scripts
+    @uvx --from pytest@{{pytest_version}} pytest authoring/verify/verify-video-archive/scripts/tests/ -q
 
 test-transcript:
     @if test -f _skills_private/integrations/transcript-sk/scripts/transcript.py; then uvx --from pytest@{{pytest_version}} --with httpx --with 'yt-dlp==2026.7.4' --with rich pytest _skills_private/integrations/transcript-sk/scripts/tests/ -q; else echo 'skipped: private transcript-sk is absent'; fi
