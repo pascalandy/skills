@@ -12,4 +12,8 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 Repository-wide scripts live in `scripts/`; the `justfile` exposes routine operations. Scripts belonging to one skill stay in `authoring/<category>/<skill-name>/scripts/` and travel with that skill
 
+## Python execution
+
+Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts. For dependency-free project scripts, run `uv run --no-project python scripts/<name>.py`; never invoke `python3` or bare `python` directly
+
 Never edit `skills/` directly. Correct `authoring/` or the flattening script, then run `just flatten-skills` again
