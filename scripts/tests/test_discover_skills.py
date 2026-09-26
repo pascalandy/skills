@@ -49,6 +49,9 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
             {
                 "version": 2,
                 "targets": {
+                    ".agents/skills": {
+                        "alpha": {"source": "public", "digest": "a" * 64}
+                    },
                     ".config/opencode/skills": {
                         "alpha": {"source": "public", "digest": "a" * 64}
                     },
@@ -67,7 +70,13 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     assert verified.returncode == 0, verified.stderr
     assert json.loads(verified.stdout)["agents"]["opencode"]["status"] == "verified"
     shared = home / ".agents/skills/alpha/SKILL.md"
+    shared.parent.mkdir(parents=True)
+    shared.write_text("# stale alpha\n", encoding="utf-8")
     fake_opencode(binary, shared)
+    stale = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
+    assert stale.returncode == 1
+    assert json.loads(stale.stdout)["agents"]["opencode"]["missing"] == ["alpha"]
+    shared.write_text("# alpha\n", encoding="utf-8")
     deduplicated = run(
         home, binary, "--profile", "mac", "--agent", "opencode", "--json"
     )
