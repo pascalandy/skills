@@ -363,6 +363,25 @@ class Project:
         target.write_text(content.replace(old, new))
         self.commit(f"Tune {path}")
 
+    def privacy(self, *, commit_cases: bool) -> None:
+        path = self.jev_dir / "config.toml"
+        path.write_text(
+            path.read_text()
+            + f"\n[privacy]\ncommit_cases = {str(commit_cases).lower()}\n"
+        )
+        self.commit("Record the case policy")
+
+    def clone(self, destination: Path) -> Project:
+        self.git(
+            "clone",
+            "-q",
+            "--branch",
+            self.git("branch", "--show-current"),
+            str(self.root),
+            str(destination),
+        )
+        return Project(destination, self.home, self.fake, dict(self.env))
+
     def records(self) -> list[Path]:
         runs = self.jev_dir / "runs"
         return sorted(runs.glob("*.json")) if runs.is_dir() else []
