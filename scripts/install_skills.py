@@ -198,8 +198,17 @@ def install(
     previous = load_manifest(manifest)
 
     target_groups: dict[Path, list[str]] = {}
+    invalid_targets: list[str] = []
     for target in TARGETS:
-        target_groups.setdefault((home / target).resolve(), []).append(target)
+        directory = home / target
+        if directory.is_symlink() and not directory.exists():
+            invalid_targets.append(f"~/{target} is a broken symlink; fix it and rerun")
+        elif directory.exists() and not directory.is_dir():
+            invalid_targets.append(f"~/{target} is a file; remove it and rerun")
+        else:
+            target_groups.setdefault(directory.resolve(), []).append(target)
+    if invalid_targets:
+        raise ScriptError(*invalid_targets)
 
     owned: Owned = {}
     actions: list[tuple[str, str, str]] = []

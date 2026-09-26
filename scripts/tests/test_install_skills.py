@@ -244,6 +244,24 @@ def test_retired_skill_in_shared_target_is_removed_once(
     )
 
 
+def test_broken_target_symlink_stops_before_any_install(
+    source: Path, home: Path
+) -> None:
+    target = home / ".config/agents/skills"
+    target.parent.mkdir(parents=True)
+    target.symlink_to("../.agents/skills", target_is_directory=True)
+
+    with pytest.raises(ScriptError) as raised:
+        sync(source, home)
+
+    assert str(raised.value) == (
+        "~/.config/agents/skills is a broken symlink; fix it and rerun"
+    )
+    assert not (home / ".agents/skills").exists()
+    assert not (home / ".claude/skills").exists()
+    assert not (home / "state").exists()
+
+
 def test_cli_dry_run_reads_home_and_prints_one_line(tmp_path: Path) -> None:
     skill_count = len(list(SOURCE.glob("*/SKILL.md")))
     result = run("--dry-run", home=tmp_path)
