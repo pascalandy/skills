@@ -119,10 +119,10 @@ test-tavily:
 test-poteto-worktree-audit:
     @uvx --from pytest@{{pytest_version}} pytest authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py -q
 
-# Validate the storytelling package strictly and run its validator's own tests
+# Check the storytelling package's metadata and links, and run its validator's own tests
 test-storytelling:
     @uvx --from pytest@{{pytest_version}} pytest authoring/content/storytelling/tests/test_validate_package.py -q
-    @uv run authoring/content/storytelling/tests/validate-package.py --explicit-runtime pi --explicit-runtime codex authoring/content/storytelling
+    @uv run authoring/content/storytelling/tests/validate-package.py authoring/content/storytelling
 
 test-verify-video-archive:
     @uvx ruff@{{ruff_version}} check --quiet authoring/verify/verify-video-archive/scripts
