@@ -77,10 +77,40 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     assert stale.returncode == 1
     assert json.loads(stale.stdout)["agents"]["opencode"]["missing"] == ["alpha"]
     shared.write_text("# alpha\n", encoding="utf-8")
+    (entry.parent / "guide.md").write_text("current\n", encoding="utf-8")
+    shared_guide = shared.parent / "guide.md"
+    shared_guide.write_text("stale\n", encoding="utf-8")
+    stale_package = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert stale_package.returncode == 1
+    assert json.loads(stale_package.stdout)["agents"]["opencode"]["missing"] == [
+        "alpha"
+    ]
+    shared.unlink()
+    shared.symlink_to(entry)
+    stale_link = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
+    assert stale_link.returncode == 1
+    assert json.loads(stale_link.stdout)["agents"]["opencode"]["missing"] == ["alpha"]
+    shared.unlink()
+    shared.write_text("# alpha\n", encoding="utf-8")
+    shared_guide.write_text("current\n", encoding="utf-8")
     deduplicated = run(
         home, binary, "--profile", "mac", "--agent", "opencode", "--json"
     )
     assert deduplicated.returncode == 0, deduplicated.stderr
+    unowned = home / ".config/agents/skills/alpha/SKILL.md"
+    unowned.parent.mkdir(parents=True)
+    unowned.write_text("# alpha\n", encoding="utf-8")
+    (unowned.parent / "guide.md").write_text("current\n", encoding="utf-8")
+    fake_opencode(binary, unowned)
+    not_manifest_owned = run(
+        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
+    )
+    assert not_manifest_owned.returncode == 1
+    assert json.loads(not_manifest_owned.stdout)["agents"]["opencode"]["missing"] == [
+        "alpha"
+    ]
     real = home / "actual/alpha"
     real.parent.mkdir()
     entry.parent.rename(real)

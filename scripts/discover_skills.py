@@ -184,7 +184,7 @@ def discover(agent: str, cwd: Path, timeout: float):
 
 def run(args: argparse.Namespace) -> int:
     """Check native adapters; report unsupported Claude without masking supported results."""
-    from install_skills import PROFILES, load_manifest
+    from install_skills import PROFILES, digest, load_manifest
 
     home = Path.home()
     state = Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state")
@@ -229,9 +229,14 @@ def run(args: argparse.Namespace) -> int:
                 "pi": lambda item: item["sourceInfo"]["path"],
             }
             if agent == "opencode":
-                # OpenCode keeps one copy per name and may load it from
-                # ~/.agents or ~/.claude instead, so only the name is stable
-                found = {item["name"] for item in items}
+                locations = (
+                    (item["name"], Path(item["location"]).expanduser())
+                    for item in items
+                )
+                found = {
+                    (name, path.parent.resolve() / path.name)
+                    for name, path in locations
+                }
             else:
                 found = {
                     Path(key[agent](item)).expanduser().resolve() for item in items
@@ -240,8 +245,24 @@ def run(args: argparse.Namespace) -> int:
             missing: list[str] = []
             for name in selected:
                 entry = home / root / name / "SKILL.md"
-                identity = name if agent == "opencode" else entry.resolve()
-                if identity in found and entry.is_file():
+                if agent == "opencode":
+                    candidates = (
+                        home / target / name / "SKILL.md"
+                        for target in PROFILES[args.profile]
+                        if target == root or name in owned.get(target, {})
+                    )
+                    matched = entry.is_file() and any(
+                        candidate.is_file()
+                        and (name, candidate.parent.resolve() / candidate.name) in found
+                        and (
+                            candidate.parent.resolve() == entry.parent.resolve()
+                            or digest(candidate.parent) == digest(entry.parent)
+                        )
+                        for candidate in candidates
+                    )
+                else:
+                    matched = entry.is_file() and entry.resolve() in found
+                if matched:
                     discovered.append(name)
                 else:
                     missing.append(name)
