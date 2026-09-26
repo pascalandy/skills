@@ -31,7 +31,7 @@ CLIs in `scripts/` follow these rules. Apply them when writing or changing skill
 
 Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI
 
-The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just check --only jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `just stamp-jevgate`, so vendored copies can detect local edits
+The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just check --only jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
 
 ## Related
 
