@@ -1,0 +1,8 @@
+# Prototype
+
+1. Choose fidelity. A **mockup** is polished and mostly static, for visual hierarchy and product fit. A **prototype** implements a bounded flow, for navigation, input, state changes, feedback, or recovery. Record the user, critical job, scenario, design source, and where the real product would take over. Finish when the mode and modeled boundary are explicit.
+2. List reachable states before building. A simulated asynchronous action needs pending, success, and failure or recovery states; a collection needs its relevant empty state; a gated action needs a visible reason for being disabled. Include domain-specific states from the brief. Finish when each included state has a reachable path and omitted relevant states have a stated boundary.
+3. Build the selected mode with realistic, internally consistent content. In prototype mode, complete navigation and forms within scope, including labels, validation, defaults, and submission feedback. Show simulated outcomes as simulated. In mockup mode, make the static boundary clear and preserve semantic structure. Finish when every control either works within the modeled flow or is clearly outside the static review's scope.
+4. Run shared verification and exercise every state. For dialogs, check accessible names, focus containment, Escape dismissal, and focus restoration. Associate form errors with controls and announce important status changes. Test Tab, Shift+Tab, Enter, Space, and applicable arrow-key behavior. Check long content and disabled actions. Finish when the modeled experience works with keyboard and pointer at both widths, or the handoff names unavailable checks.
+
+Return the fidelity mode, scenario, states implemented, and production behavior deliberately left out.

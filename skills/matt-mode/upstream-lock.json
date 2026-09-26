@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/mattpocock/skills",
+  "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+  "mappings": [
+    {
+      "name": "grill-me",
+      "kind": "internal",
+      "source": "skills/productivity/grill-me",
+      "destination": "matt-mode/playbooks/grill-me",
+      "entry": "grill-me.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "grill-with-docs",
+      "kind": "internal",
+      "source": "skills/engineering/grill-with-docs",
+      "destination": "matt-mode/playbooks/grill-with-docs",
+      "entry": "grill-with-docs.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "domain-modeling",
+      "kind": "internal",
+      "source": "skills/engineering/domain-modeling",
+      "destination": "matt-mode/playbooks/domain-modeling",
+      "entry": "domain-modeling.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "codebase-design",
+      "kind": "internal",
+      "source": "skills/engineering/codebase-design",
+      "destination": "matt-mode/playbooks/codebase-design",
+      "entry": "codebase-design.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "kind": "internal",
+      "source": "skills/engineering/improve-codebase-architecture",
+      "destination": "matt-mode/playbooks/improve-codebase-architecture",
+      "entry": "improve-codebase-architecture.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "wayfinder",
+      "kind": "internal",
+      "source": "skills/engineering/wayfinder",
+      "destination": "matt-mode/playbooks/wayfinder",
+      "entry": "wayfinder.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "to-spec",
+      "kind": "internal",
+      "source": "skills/engineering/to-spec",
+      "destination": "matt-mode/playbooks/to-spec",
+      "entry": "to-spec.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "to-tickets",
+      "kind": "internal",
+      "source": "skills/engineering/to-tickets",
+      "destination": "matt-mode/playbooks/to-tickets",
+      "entry": "to-tickets.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "research",
+      "kind": "shared",
+      "source": "skills/engineering/research",
+      "destination": "research/references/upstream",
+      "entry": "research.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "grilling",
+      "kind": "shared",
+      "source": "skills/productivity/grilling",
+      "destination": "grilling/references/upstream",
+      "entry": "grilling.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    },
+    {
+      "name": "writing-for-agents",
+      "kind": "shared",
+      "source": "skills/productivity/writing-for-agents",
+      "destination": "writing-for-agents/references/upstream",
+      "entry": "writing-for-agents.md",
+      "exclude": [
+        "agents/openai.yaml"
+      ]
+    }
+  ],
+  "handoffs": {
+    "prototype": "poteto-mode"
+  },
+  "files": [
+    {
+      "source": "skills/productivity/grilling/SKILL.md",
+      "destination": "grilling/references/upstream/grilling.md",
+      "source_sha256": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+      "rendered_sha256": "5297b1a3a5a233c4e73ab88cd643aa0634514cc3864c39904a0538702cf42ead"
+    },
+    {
+      "source": "skills/engineering/codebase-design/DEEPENING.md",
+      "destination": "matt-mode/playbooks/codebase-design/DEEPENING.md",
+      "source_sha256": "f3dd099ce99289bd213914d8ee3e2429b78309c3957ca4583f7659551b1d53c1",
+      "rendered_sha256": "42a218a19ad6da870fb5132b341048fef916993be89f1959c729bdfa4097ffd9"
+    },
+    {
+      "source": "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
+      "destination": "matt-mode/playbooks/codebase-design/DESIGN-IT-TWICE.md",
+      "source_sha256": "8e740bf98446dbd4dfdc132ac4346d9a7eedaf93de6a495889171cf7f99f16bd",
+      "rendered_sha256": "72454cb0cf1e1ee6c5fe61e5b25df9c49246ebd935969b790145e0f91b8ac5a9"
+    },
+    {
+      "source": "skills/engineering/codebase-design/SKILL.md",
+      "destination": "matt-mode/playbooks/codebase-design/codebase-design.md",
+      "source_sha256": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2",
+      "rendered_sha256": "bf218e7ecc69d33a682cf2ffe7c3a7bc45de3c5bc1410fb6cb9beb0081d73a03"
+    },
+    {
+      "source": "skills/engineering/domain-modeling/ADR-FORMAT.md",
+      "destination": "matt-mode/playbooks/domain-modeling/ADR-FORMAT.md",
+      "source_sha256": "944c92aa790e8fbdc9199640b170979abb8a34ba8d0fe18c2a01a63bce140ca0",
+      "rendered_sha256": "944c92aa790e8fbdc9199640b170979abb8a34ba8d0fe18c2a01a63bce140ca0"
+    },
+    {
+      "source": "skills/engineering/domain-modeling/CONTEXT-FORMAT.md",
+      "destination": "matt-mode/playbooks/domain-modeling/CONTEXT-FORMAT.md",
+      "source_sha256": "17ab16ce783e4d2801ee52fd9acdf550cbf44de65ae76797a93943bbedf22a13",
+      "rendered_sha256": "17ab16ce783e4d2801ee52fd9acdf550cbf44de65ae76797a93943bbedf22a13"
+    },
+    {
+      "source": "skills/engineering/domain-modeling/SKILL.md",
+      "destination": "matt-mode/playbooks/domain-modeling/domain-modeling.md",
+      "source_sha256": "327a2b50620e2fd70abc6893cd6965e76b20f8d0adb0dc2c8d5eb3845efb643e",
+      "rendered_sha256": "70a61a670fcdba4d91c277379e6e866d42e244e786c6f6ff68951d840b3b484e"
+    },
+    {
+      "source": "skills/productivity/grill-me/SKILL.md",
+      "destination": "matt-mode/playbooks/grill-me/grill-me.md",
+      "source_sha256": "caaf8b8de1684f96e26b28f3c29189db5c89cce4b73e1c93d86164f66ef88637",
+      "rendered_sha256": "dba3de439b31e958dfe3e7ac400899749e3f371bd5abf1e22f2cbd70e5d0d916"
+    },
+    {
+      "source": "skills/engineering/grill-with-docs/SKILL.md",
+      "destination": "matt-mode/playbooks/grill-with-docs/grill-with-docs.md",
+      "source_sha256": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
+      "rendered_sha256": "3718eba313f0e6110be0536ea9947f6b7f554cd2063668a0c329cacbbb3ddfd3"
+    },
+    {
+      "source": "skills/engineering/improve-codebase-architecture/HTML-REPORT.md",
+      "destination": "matt-mode/playbooks/improve-codebase-architecture/HTML-REPORT.md",
+      "source_sha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528",
+      "rendered_sha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528"
+    },
+    {
+      "source": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "destination": "matt-mode/playbooks/improve-codebase-architecture/improve-codebase-architecture.md",
+      "source_sha256": "d1ac25511a936ff4250a48dbcefda363837d6bb9321b3cba73df99fa37270a75",
+      "rendered_sha256": "3ac5b9b9a84841b51efe7db5a7ce96d46d15954717d28543c82130ea8ce9187c"
+    },
+    {
+      "source": "skills/engineering/to-spec/SKILL.md",
+      "destination": "matt-mode/playbooks/to-spec/to-spec.md",
+      "source_sha256": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088",
+      "rendered_sha256": "9bc986bf599128bea79697a60115308c8433715674952c1832408aac7e823044"
+    },
+    {
+      "source": "skills/engineering/to-tickets/SKILL.md",
+      "destination": "matt-mode/playbooks/to-tickets/to-tickets.md",
+      "source_sha256": "5c9fba69845c2519b9b35b9af42ae5142c21f8ca15ac2123dc2722002c8058ae",
+      "rendered_sha256": "46f69979505d9b76f4bab2c8b2a55cedd422ae08719ba9c5a00801e08280c29b"
+    },
+    {
+      "source": "skills/engineering/wayfinder/SKILL.md",
+      "destination": "matt-mode/playbooks/wayfinder/wayfinder.md",
+      "source_sha256": "fee6e1d0c50f0e736b4ef8a599060c959afae904c9a97d82c97f049fcc3aa0f1",
+      "rendered_sha256": "dd4a5254d80a47420ff91af70e5310c6d9ad40dcad26bba90426173874970b1b"
+    },
+    {
+      "source": "LICENSE",
+      "destination": "matt-mode/references/LICENSE",
+      "source_sha256": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+      "rendered_sha256": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5"
+    },
+    {
+      "source": "skills/engineering/research/SKILL.md",
+      "destination": "research/references/upstream/research.md",
+      "source_sha256": "985569f15739c713d6784887c3d186d4ef9ac85bec5ad9c068d25bf0739928e4",
+      "rendered_sha256": "24ad336b28f61d2ac49f31531fadd45047b8682a15b30825cafac886d3543cb9"
+    },
+    {
+      "source": "skills/productivity/writing-for-agents/SKILL-MECHANICS.md",
+      "destination": "writing-for-agents/references/upstream/SKILL-MECHANICS.md",
+      "source_sha256": "c768e6307c7c10728c401c213f2c4ba71c542127eeb7ad2956aabd15a0fa0059",
+      "rendered_sha256": "2d1caa036590965f44bd2e448213bde31bee5053766119994c6fe1f4c39847b3"
+    },
+    {
+      "source": "skills/productivity/writing-for-agents/SKILL.md",
+      "destination": "writing-for-agents/references/upstream/writing-for-agents.md",
+      "source_sha256": "551adca942227b44192edba88acd4e8db911f0121ce58ad16944ccf6a896a74a",
+      "rendered_sha256": "393d286f6500fb39fd69b3102680f3591df85257c3f9faf2818d75bd2d77f565"
+    }
+  ]
+}

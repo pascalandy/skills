@@ -1,13 +1,13 @@
 # Skill management
 
-This project manages Pascal's skills
+This project manages Pascal's skills. `authoring/` is the source of truth; `skills/` is generated output committed for GitHub readers
 
-## Source of truth
+## Change a skill
 
-- Edit skill definitions and their supporting files in `authoring/`
-- Treat `skills/` as generated output rendered from `authoring/` by the project's `justfile`
-- After changing `authoring/`, use the `justfile` render recipe and review the resulting `skills/` output
-- Correct generated content by changing `authoring/` or the render recipe, then render again
-- If the render recipe is unavailable, leave `skills/` untouched and report the missing build step
+1. Edit `authoring/<category>/<skill-name>/`, including its supporting files
+2. Run `just render`
+3. Review and commit the source and generated output together
 
-Never edit files in `skills/` directly
+The renderer maps each package with a root `SKILL.md` to the flat path `skills/<skill-name>/`. It includes the package's supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names
+
+Never edit `skills/` directly. Correct `authoring/` or the renderer and render again

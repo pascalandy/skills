@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HTML presentation</title>
+    <link rel="icon" href="data:," />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/theme/black.css"
+    />
+    <style>
+      :root {
+        --background: #000;
+        --foreground: #fff;
+        --muted: #b7b7b7;
+        --accent: #7dd3fc;
+      }
+
+      html,
+      body,
+      body.reveal-viewport {
+        background: var(--background);
+      }
+
+      .reveal {
+        color: var(--foreground);
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .reveal .slides {
+        text-align: left;
+      }
+
+      .reveal h1,
+      .reveal h2 {
+        color: var(--foreground);
+        letter-spacing: -0.035em;
+        text-transform: none;
+      }
+
+      .reveal p,
+      .reveal li {
+        line-height: 1.45;
+      }
+
+      .reveal .muted {
+        color: var(--muted);
+      }
+
+      .reveal a {
+        color: var(--accent);
+      }
+
+      .reveal a:focus-visible,
+      .reveal button:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 4px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reveal .slides section,
+        .reveal .fragment {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="reveal" aria-label="Slide deck">
+      <div class="slides">
+        <section id="opening">
+          <h1>A small HTML deck</h1>
+          <p class="muted">One file, direct links, and no build step</p>
+        </section>
+
+        <section id="one-job">
+          <h2>One slide, one job</h2>
+          <p>Keep the claim visible and make supporting detail earn its place</p>
+        </section>
+
+        <section id="sequence">
+          <h2>Reveal a sequence deliberately</h2>
+          <ol>
+            <li class="fragment">Name the question</li>
+            <li class="fragment">Show the evidence</li>
+            <li class="fragment">Land the conclusion</li>
+          </ol>
+        </section>
+
+        <section id="linking">
+          <h2>Every slide has a stable address</h2>
+          <p>Share this slide with <code>#/linking</code></p>
+          <p><a href="#/finish">Jump to the final slide</a></p>
+        </section>
+
+        <section id="finish">
+          <h2>Finish on the takeaway</h2>
+          <p><a href="#/opening">Return to the opening</a></p>
+        </section>
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.js"></script>
+    <script>
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      Reveal.initialize({
+        controls: true,
+        controlsTutorial: false,
+        progress: true,
+        slideNumber: "c/t",
+        hash: true,
+        respondToHashChanges: true,
+        fragmentInURL: true,
+        keyboard: true,
+        overview: true,
+        touch: true,
+        loop: false,
+        center: false,
+        transition: reduceMotion ? "none" : "fade",
+        backgroundTransition: reduceMotion ? "none" : "fade",
+        autoAnimate: !reduceMotion,
+        scrollActivationWidth: 700,
+        scrollLayout: "compact",
+        scrollProgress: true,
+      });
+    </script>
+  </body>
+</html>
