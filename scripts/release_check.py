@@ -77,7 +77,9 @@ def git_output(*args: str) -> str:
 
 def parse_version(value: str) -> tuple[int, int, int] | None:
     match = VERSION.fullmatch(value)
-    return tuple(map(int, match.groups())) if match else None
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
 def skill_names(revision: str) -> set[str]:
