@@ -472,7 +472,7 @@ def plan_commands(
                 )
                 continue
             if source:
-                next_records[name] = wanted
+                next_records[name] = source.digest
                 kind = (
                     "adopt"
                     if current == wanted and had is None
