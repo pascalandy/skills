@@ -17,8 +17,8 @@ STAMPS = (b"# jevgate-version:", b"# jevgate-hash:")
 
 EPILOG = """\
 examples:
-  just stamp-jevgate
-  just stamp-jevgate --dry-run
+  uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py
+  uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py --dry-run
 
 exit codes: 0 ok, 1 failure, 2 bad usage, 130 interrupted"""
 
@@ -45,7 +45,6 @@ def stamp(dry_run: bool) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="just stamp-jevgate",
         description="Stamp the canonical jevgate.py with the hash of its source",
         epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,

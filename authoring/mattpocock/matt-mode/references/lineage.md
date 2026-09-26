@@ -32,8 +32,8 @@ Use the upstream repository itself, not the enclosing Git repository of an `open
 
 ```sh
 uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
-just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
-just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
+uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
+uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
 uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
 just check
 ```

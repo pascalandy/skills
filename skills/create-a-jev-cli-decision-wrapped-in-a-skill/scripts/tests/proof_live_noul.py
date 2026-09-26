@@ -5,7 +5,11 @@ then runs the vendored engine against the real TypeSafe API: first `doctor --onl
 which must exit 0 on the authenticated model listing, then the gate. Needs network
 access to api.typesafe.ai and a key in TYPESAFE_API_KEY or the chezmoi keyring.
 
-    just proof-jevgate-live
+Run from the repository root:
+
+    dir=authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts
+    sdk=$(grep -om1 'typesafe-sdk==[^"]*' "$dir/jevgate.py")
+    uv run --no-project --quiet --with "$sdk" python "$dir/tests/proof_live_noul.py"
 """
 
 from __future__ import annotations
