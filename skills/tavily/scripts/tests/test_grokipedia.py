@@ -1109,6 +1109,25 @@ class TestHybridSearch:
         assert json.loads(capsys.readouterr().out)["results"][0]["url"] is None
 
     @respx.mock
+    def test_null_results_does_not_abort_search(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        respx.post(grokipedia.TAVILY_API_URL).mock(
+            return_value=httpx.Response(200, json={"query": "x", "results": None})
+        )
+        respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
+        )
+        with (
+            patch("grokipedia.get_api_key", return_value="fake-key"),
+            patch("sys.argv", ["grokipedia.py", "x", "--json"]),
+        ):
+            code = grokipedia.main()
+
+        assert code == 0
+        assert json.loads(capsys.readouterr().out)["results"] == []
+
+    @respx.mock
     def test_exact_page_injected_when_missing_from_search(self) -> None:
         """If search doesn't return /page/Pattern, extract should inject it."""
         # Search returns results that DON'T include /page/Pattern
