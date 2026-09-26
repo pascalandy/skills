@@ -24,7 +24,7 @@ test *args:
     @uvx pytest@{{pytest_version}} {{args}}
 
 # Run the same CI-safe verdict as GitHub Actions; a failure names the recipe to rerun
-check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk
+check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit
 
 # Lint and format-check the repository scripts
 lint:
@@ -91,6 +91,9 @@ test-distill:
 
 test-tavily:
     @uvx --from pytest@{{pytest_version}} --with httpx --with rich --with respx pytest authoring/web-research/tavily/scripts/tests/ -q
+
+test-poteto-worktree-audit:
+    @uvx --from pytest@{{pytest_version}} pytest authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py -q
 
 test-transcript:
     @if test -f _skills_private/integrations/transcript-sk/scripts/transcript.py; then uvx --from pytest@{{pytest_version}} --with httpx --with 'yt-dlp==2026.7.4' --with rich pytest _skills_private/integrations/transcript-sk/scripts/tests/ -q; else echo 'skipped: private transcript-sk is absent'; fi
