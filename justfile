@@ -19,15 +19,21 @@ install-skills *args:
 test *args:
     @uvx pytest@{{pytest_version}} {{args}}
 
-# Run the same CI-safe verdict as GitHub Actions
-check:
-    @just check-frontmatter
-    @just flatten-skills --check
+# Run the same CI-safe verdict as GitHub Actions; a failure names the recipe to rerun
+check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows
+
+# Lint and format-check the repository scripts
+lint:
     @uvx ruff@{{ruff_version}} check --quiet scripts
     @uvx ruff@{{ruff_version}} format --quiet --check scripts
+
+# Type-check the repository scripts
+typecheck:
     @uvx --with pytest=={{pytest_version}} pyright@{{pyright_version}} --pythonversion 3.11 scripts
-    @uvx pytest@{{pytest_version}}
-    @uvx --from actionlint-py@{{actionlint_version}} actionlint
+
+# Lint GitHub workflows; optional local linters stay off so every machine agrees
+lint-workflows:
+    @uvx --from actionlint-py@{{actionlint_version}} actionlint -shellcheck= -pyflakes=
 
 # Scan staged changes for secrets; lefthook runs it on every commit
 gitleaks-staged:
