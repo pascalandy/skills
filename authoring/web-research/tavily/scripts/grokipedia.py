@@ -379,12 +379,13 @@ def main() -> int:
         # try extracting it directly and prepend it.
         title = normalize_page_title(query)
         canonical_url = f"{GROKIPEDIA_BASE}/{title}"
-        existing_urls = {(r.get("url") or "").lower() for r in data.get("results", [])}
+        results = data["results"] = data.get("results") or []
+        existing_urls = {(r.get("url") or "").lower() for r in results}
 
         if canonical_url.lower() not in existing_urls:
             exact = extract_exact_page(query, api_key=api_key)
             if exact is not None:
-                data.setdefault("results", []).insert(0, exact)
+                results.insert(0, exact)
 
         if args.json_output:
             print(json.dumps(data, indent=2))

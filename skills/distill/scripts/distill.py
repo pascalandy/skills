@@ -557,7 +557,7 @@ def derive_slug(input_path: Path) -> str:
 def make_run_folder_path(
     output_parent: Path, slug: str, prompt_name: str
 ) -> tuple[Path, str]:
-    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_folder_name = f"{slug}_{timestamp}_{prompt_name}"
     return output_parent / run_folder_name, run_folder_name
 
@@ -1044,7 +1044,7 @@ def write_meta(
         f"prompt_file: {plan.prompt_path}",
         f"provider: {plan.provider}",
         f"model: {plan.model}",
-        (f"effort: {plan.effort_canonical} → {plan.effort_vendor} ({plan.provider})"),
+        f"effort: {plan.effort_canonical} → {plan.effort_vendor} ({plan.provider})",
         f"duration: {duration_seconds:.1f}s",
         f"input_tokens: {plan.input_tokens:,}",
     ]
