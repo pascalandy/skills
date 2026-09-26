@@ -1,5 +1,5 @@
-#!/usr/bin/env uv run python3
 # /// script
+# requires-python = ">=3.10"
 # dependencies = [
 #     "pytest>=8.0",
 #     "httpx>=0.27",
@@ -11,7 +11,7 @@
 Red-Green TDD test suite for grokipedia.py.
 
 Run:
-    uv run pytest tests/test_grokipedia.py -v
+    uvx --with-requirements tests/test_grokipedia.py pytest tests/test_grokipedia.py -v
 """
 
 from __future__ import annotations
@@ -43,8 +43,16 @@ import grokipedia  # noqa: E402
 # ---------------------------------------------------------------------------
 def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str, int]:
     """Execute grokipedia.py via subprocess and return (stdout, stderr, exit_code)."""
-    cmd = ["uv", "run", "python3", str(SCRIPT_PATH), *args]
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    cmd = ["uv", "run", str(SCRIPT_PATH), *args]
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        env=env,
+        timeout=60,
+    )
     return result.stdout, result.stderr, result.returncode
 
 
@@ -206,6 +214,14 @@ class TestGetApiKey:
             side_effect=subprocess.CalledProcessError(1, "chezmoi"),
         ):
             with pytest.raises(grokipedia.ApiKeyError, match="keyring"):
+                grokipedia.get_api_key()
+
+    def test_keyring_timeout_reports_actionable_error(self) -> None:
+        with patch(
+            "grokipedia.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="chezmoi", timeout=10),
+        ):
+            with pytest.raises(grokipedia.ApiKeyError, match="timed out"):
                 grokipedia.get_api_key()
 
     def test_empty_key_raises_api_key_error(self) -> None:
@@ -1072,6 +1088,25 @@ class TestExtractExactPage:
 
 class TestHybridSearch:
     """main() must inject exact-page result when search misses it."""
+
+    @respx.mock
+    def test_null_result_url_does_not_abort_search(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        respx.post(grokipedia.TAVILY_API_URL).mock(
+            return_value=httpx.Response(200, json=NULL_FIELDS_RESPONSE)
+        )
+        respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
+        )
+        with (
+            patch("grokipedia.get_api_key", return_value="fake-key"),
+            patch("sys.argv", ["grokipedia.py", "nulls", "--json"]),
+        ):
+            code = grokipedia.main()
+
+        assert code == 0
+        assert json.loads(capsys.readouterr().out)["results"][0]["url"] is None
 
     @respx.mock
     def test_exact_page_injected_when_missing_from_search(self) -> None:

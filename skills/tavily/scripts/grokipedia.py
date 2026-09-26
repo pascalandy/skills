@@ -1,11 +1,10 @@
-#!/usr/bin/env uv run python3
 # /// script
+# requires-python = ">=3.10"
 # dependencies = [
 #     "httpx>=0.27",
 #     "rich>=13.0",
 # ]
 # ///
-# -*- coding: utf-8 -*-
 """
 Search Grokipedia.com using Tavily API.
 
@@ -66,6 +65,7 @@ def get_api_key() -> str:
             capture_output=True,
             text=True,
             check=True,
+            timeout=10,
         )
         key = result.stdout.strip()
         if not key:
@@ -83,6 +83,10 @@ def get_api_key() -> str:
         raise ApiKeyError(
             "Could not retrieve Tavily API key from keyring.\n"
             "  Set it with: chezmoi secret keyring set --service=tavily --user=api_key"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ApiKeyError(
+            "Tavily API key lookup timed out.\n  Check the keyring and retry."
         ) from exc
 
 
@@ -375,7 +379,7 @@ def main() -> int:
         # try extracting it directly and prepend it.
         title = normalize_page_title(query)
         canonical_url = f"{GROKIPEDIA_BASE}/{title}"
-        existing_urls = {r.get("url", "").lower() for r in data.get("results", [])}
+        existing_urls = {(r.get("url") or "").lower() for r in data.get("results", [])}
 
         if canonical_url.lower() not in existing_urls:
             exact = extract_exact_page(query, api_key=api_key)
