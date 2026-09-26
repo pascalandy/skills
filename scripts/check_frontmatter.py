@@ -40,15 +40,36 @@ def is_quoted(value: str) -> bool:
     return len(value) >= 2 and value.startswith('"') and value.endswith('"')
 
 
+def inline_list_items(value: str) -> list[str]:
+    """Split an inline list at commas outside double-quoted strings."""
+    content = value[1:-1]
+    items: list[str] = []
+    start = 0
+    quoted = False
+    escaped = False
+    for index, char in enumerate(content):
+        if escaped:
+            escaped = False
+        elif quoted and char == "\\":
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif char == "," and not quoted:
+            items.append(content[start:index].strip())
+            start = index + 1
+    items.append(content[start:].strip())
+    return items
+
+
 def value_problem(value: str) -> str | None:
     """Return why a frontmatter value breaks the quoting rule, or None when it follows it."""
     value = value.strip()
     if not value or value.startswith("{"):
         return None
     if value.startswith("[") and value.endswith("]"):
-        items = (item.strip() for item in value[1:-1].split(","))
         if any(
-            item and not (is_quoted(item) or is_bare_scalar(item)) for item in items
+            item and not (is_quoted(item) or is_bare_scalar(item))
+            for item in inline_list_items(value)
         ):
             return "inline list string items must be double-quoted"
         return None
