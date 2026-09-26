@@ -17,9 +17,9 @@ If general agent-facing prose guidance would help, resolve the `writing-for-agen
 
 ## Respect repository policy
 
-This skill owns skill-writing doctrine, not repository policy. Before creating or editing managed skills in this chezmoi repository, read the root `AGENTS.md`, especially `Edit skills in dotfiles` and `Work in the task checkout`.
+This skill owns skill-writing doctrine, not repository policy. Before creating or editing managed skills, read the root `AGENTS.md` of the repository that holds their source. Pascal's skills live in `pascalandy/skills`; its `Change a skill` section names the source tree and the build step.
 
-Treat `AGENTS.md` as the source of truth for local paths, source and applied copies, and apply or sync commands. Edit managed source files. Treat rendered installation copies as distribution outputs.
+Treat `AGENTS.md` as the source of truth for local paths, source and generated copies, and build or install commands. Edit managed source files. Treat generated and installed copies as distribution outputs.
 
 ## Assign ownership before editing
 

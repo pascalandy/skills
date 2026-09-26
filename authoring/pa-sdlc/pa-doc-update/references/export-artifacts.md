@@ -25,13 +25,7 @@ Unless a skill says otherwise, resolve the lifecycle artifact export root from t
 3. project instruction file such as `AGENTS.md`
 4. public default: `docs/sdlc`
 
-This dotfiles repository intentionally overrides the public default with:
-
-```text
-docs/ideas/references/
-```
-
-Projects that want the neutral public default can copy `.sdlc-pa-example.yml` to `.sdlc-pa.yml` and adjust it.
+A project overrides the public default in `.sdlc-pa.yml`, for example with `exports.root: docs/ideas/references`.
 
 Each lifecycle item lives in one dated entry folder under the resolved export root. Later artifacts for the same item should be written alongside the original file:
 

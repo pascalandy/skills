@@ -74,7 +74,7 @@ Run `git push` as a separate action only when the user requests it or an existin
 
 Skill updates get their own type.
 
-Prefer `🧰 skill` for changes under `dot_config/ai_templates/skills/**`, including:
+Prefer `🧰 skill` for changes to skill packages, such as `authoring/**` in `pascalandy/skills`, including:
 - `SKILL.md` behavior or instructions
 - skill references, examples, metadata, or helper scripts
 - creating, editing, normalizing, or maintaining skills
