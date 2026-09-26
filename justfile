@@ -24,7 +24,7 @@ test *args:
     @uvx pytest@{{pytest_version}} {{args}}
 
 # Run the same CI-safe verdict as GitHub Actions; a failure names the recipe to rerun
-check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit test-verify-video-archive
+check: check-frontmatter (flatten-skills "--check") lint typecheck test lint-workflows check-html-mode check-matt-mode test-distill test-tavily test-transcript test-verify-transcript-sk test-poteto-worktree-audit test-verify-video-archive test-storytelling
 
 # Lint and format-check the repository scripts
 lint:
@@ -118,6 +118,11 @@ test-tavily:
 
 test-poteto-worktree-audit:
     @uvx --from pytest@{{pytest_version}} pytest authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py -q
+
+# Check the storytelling package's metadata and links, and run its validator's own tests
+test-storytelling:
+    @uvx --from pytest@{{pytest_version}} pytest authoring/content/storytelling/tests/test_validate_package.py -q
+    @uv run authoring/content/storytelling/tests/validate-package.py authoring/content/storytelling
 
 test-verify-video-archive:
     @uvx ruff@{{ruff_version}} check --quiet authoring/verify/verify-video-archive/scripts

@@ -71,6 +71,6 @@ symptom. Do not apply the catalog as a checklist.
 - Trace before-state, friction, insight, artifact behavior, changed work, outcome, and
   value
 - Ask whether the audience can explain why the subject exists and how it creates value
-- For reconstruction, use `references/45-explain-through-story.md` as the authoritative
-  branch. For diagnosis, keep the current branch
+- For reconstruction, use [explain through story](45-explain-through-story.md) as the
+  authoritative branch. For diagnosis, keep the current branch
 - Do not turn a value hypothesis into a founder story or marketing claim

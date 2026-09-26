@@ -36,15 +36,16 @@ the missing update target instead of changing an arbitrary copy.
 
 Read only what can already own the lesson:
 
-- `SKILL.md` for invocation, mode routing, or invariants
-- `references/00-narrative-model.md` for the universal narrative model
-- `references/05-narrative-mechanisms.md` for causal craft
+- [SKILL.md](../SKILL.md) for invocation, mode routing, or invariants
+- [the shared narrative model](00-narrative-model.md) for the universal narrative model
+- [narrative mechanisms](05-narrative-mechanisms.md) for causal craft
 - one relevant operation branch
 - one relevant medium reference
-- `references/50-voice-style.md` for voice or surface realization
-- `references/60-truth-and-ethics.md` for factual or lived material
-- `tests/behavior-tests.md` for the existing practice contract
-- `tests/evolution-tests.md` for evolution routing and admission behavior
+- [voice and style](50-voice-style.md) for voice or surface realization
+- [truth and ethics](60-truth-and-ethics.md) for factual or lived material
+- [behavior tests](../tests/behavior-tests.md) for the existing practice contract
+- [evolution tests](../tests/evolution-tests.md) for evolution routing and admission
+  behavior
 
 Do not load every reference to prove thoroughness. Search first, then read the smallest
 set that can reveal overlap, contradiction, or a missing decision.
@@ -119,15 +120,16 @@ specific failed criterion.
 
 Place the lesson where an agent first needs it:
 
-- invocation, mode selection, or a universal invariant in `SKILL.md`
-- universal ontology in `references/00-narrative-model.md`
-- causal craft in `references/05-narrative-mechanisms.md`
+- invocation, mode selection, or a universal invariant in [SKILL.md](../SKILL.md)
+- universal ontology in [the shared narrative model](00-narrative-model.md)
+- causal craft in [narrative mechanisms](05-narrative-mechanisms.md)
 - operation-specific behavior in the matching branch
 - medium-specific realization in one medium reference
-- voice dimensions in `references/50-voice-style.md`
-- factual limits in `references/60-truth-and-ethics.md`
-- practice protection against regression in `tests/behavior-tests.md`
-- evolution routing or admission behavior in `tests/evolution-tests.md`
+- voice dimensions in [voice and style](50-voice-style.md)
+- factual limits in [truth and ethics](60-truth-and-ethics.md)
+- practice protection against regression in [behavior tests](../tests/behavior-tests.md)
+- evolution routing or admission behavior in
+  [evolution tests](../tests/evolution-tests.md)
 
 Keep one source of truth. Strengthen or replace an existing rule before adding a nearby
 restatement. A new source does not earn a new file, named framework, or mechanism

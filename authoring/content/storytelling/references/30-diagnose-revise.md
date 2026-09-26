@@ -158,7 +158,7 @@ In surgical revision:
 - preserve qualified uncertainty in factual work.
 
 Load the target medium reference from `SKILL.md` only when the diagnosis reaches a
-medium-specific problem. Load `references/50-voice-style.md` only when the
+medium-specific problem. Load [voice and style](50-voice-style.md) only when the
 diagnosis reaches voice or style.
 
 **Completion criterion**

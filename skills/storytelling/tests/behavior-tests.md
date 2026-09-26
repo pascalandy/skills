@@ -7,8 +7,8 @@ Run each positive test from a clean context with the prompt explicitly invoking
 Run negative invocation tests without invoking the skill. Record the branch sequence,
 reference loads, questions, intermediate gates, and delivered result.
 
-The **current-only LoopCache fixture** is `tests/fixtures/loop-cache/` without
-`creator-talk-transcript.md`.
+The **current-only LoopCache fixture** is
+[`fixtures/loop-cache/`](fixtures/loop-cache/) without `creator-talk-transcript.md`.
 
 ## Routing acceptance matrix
 
@@ -34,12 +34,13 @@ Every row must resolve without asking the user which branch to choose.
 
 For every positive Practice routing test:
 
-- `references/00-narrative-model.md` loads after invocation
+- [the shared narrative model](../references/00-narrative-model.md) loads after
+  invocation
 - only the starting branch loads initially
 - each later branch or explanation phase waits for its gate
 - **Write** is terminal
-- `references/05-narrative-mechanisms.md` waits for a branch pointer or a named
-  mechanism
+- [narrative mechanisms](../references/05-narrative-mechanisms.md) waits for a branch
+  pointer or a named mechanism
 - voice, lens, and unrelated medium references remain unloaded
 
 Style Modeler generation and standalone editing are exercised in
@@ -130,7 +131,7 @@ Use `$storytelling` to tell how a neighborhood organized after a flood.
 
 **Fixture**
 
-`tests/fixtures/ending-scene.md`
+[`fixtures/ending-scene.md`](fixtures/ending-scene.md)
 
 **Prompt**
 
@@ -178,7 +179,7 @@ prior choices, and faces changed relationships on each return.
 
 **Fixture**
 
-`tests/fixtures/loop-cache/`
+[`fixtures/loop-cache/`](fixtures/loop-cache/)
 
 **Prompt**
 
@@ -285,7 +286,7 @@ voice: "Door open. Rain in the hall. His coat, gone. No note. Of course no note.
 
 **Fixture**
 
-`tests/fixtures/documentary-packet.md`
+[`fixtures/documentary-packet.md`](fixtures/documentary-packet.md)
 
 **Prompt**
 

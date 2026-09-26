@@ -3,9 +3,9 @@
 Load this reference for factual, autobiographical, documentary, source-based, hybrid,
 or other people's lived experience.
 
-Use the claim ledger from `references/00-narrative-model.md` for every consequential
-claim. The rules below refine what counts as a truthful basis and a proportionate
-claim.
+Use the claim ledger from [the shared narrative model](00-narrative-model.md) for
+every consequential claim. The rules below refine what counts as a truthful basis
+and a proportionate claim.
 
 ## Truth contract
 

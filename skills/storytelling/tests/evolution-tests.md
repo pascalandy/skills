@@ -26,8 +26,9 @@ and an integration decision supported by the available evidence.
 
 For every evolution run:
 
-- `references/80-evolve-craft.md` is the only initial reference
-- Evolve calls shared source inspection and analysis from `references/06-source-analysis.md`
+- [evolve the craft](../references/80-evolve-craft.md) is the only initial reference
+- Evolve calls shared source inspection and analysis from
+  [source analysis](../references/06-source-analysis.md)
 - the shared model, mechanism map, operation, medium, voice, ethics, and test files load
   only after selective inspection identifies a possible owner
 - ordinary narrative contracts and branch planning do not run unless a later Practice

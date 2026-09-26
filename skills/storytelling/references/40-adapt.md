@@ -37,7 +37,7 @@ For the source and target, identify:
 
 Load the target medium reference selected in `SKILL.md`. Also load the source medium
 family when its devices or affordances are not already clear. Load
-`references/50-voice-style.md` only when voice or style must survive the change.
+[voice and style](50-voice-style.md) only when voice or style must survive the change.
 
 **Completion criterion**
 

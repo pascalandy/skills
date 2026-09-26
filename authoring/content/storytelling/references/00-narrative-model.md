@@ -81,8 +81,9 @@ Movement becomes actionable through a mechanism: a craft choice provides a cue, 
 audience performs an operation, and that operation changes its state. The relation is
 causal and conditional, not a label applied after the fact.
 
-The operating branches point to `references/05-narrative-mechanisms.md` when they need
-to select, diagnose, or transfer a mechanism. Do not load the map as a checklist.
+The operating branches point to [narrative mechanisms](05-narrative-mechanisms.md)
+when they need to select, diagnose, or transfer a mechanism. Do not load the map as
+a checklist.
 
 ## Tellability and theme
 
