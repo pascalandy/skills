@@ -45,6 +45,8 @@ Tests live in `scripts/tests/`. `just test` runs them; `just check` is exactly w
 
 When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
+The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just test-jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `just stamp-jevgate`, so vendored copies can detect local edits
+
 ## Commit hooks
 
 Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
