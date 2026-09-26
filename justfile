@@ -55,6 +55,14 @@ test-jevgate *args:
     uvx --with "$sdk" --with pytest pyright --pythonversion 3.11 "$dir"
     uv run --no-project --quiet --with "$sdk" --with pytest pytest "$dir/tests" "$@"
 
+# Record one live synthetic Noul through the real TypeSafe API (needs a key and network)
+proof-jevgate-live:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir=authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts
+    sdk=$(grep -om1 'typesafe-sdk==[^"]*' "$dir/jevgate.py")
+    uv run --no-project --quiet --with "$sdk" python "$dir/tests/proof_live_noul.py"
+
 # Stamp the canonical jevgate engine with its source hash after an edit
 stamp-jevgate *args:
     @uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py {{args}}

@@ -240,7 +240,7 @@ def test_config_precedence(project: Project) -> None:
 def test_version_reports_stamp(project: Project) -> None:
     result = project.jev("version", "--json", key=False)
     assert result.code == 0, result
-    assert result.json["version"] == "0.1.0"
+    assert result.json["version"] == "0.1.1"
     assert (
         result.json["hash"].startswith("sha256:") and result.json["modified"] is False
     )

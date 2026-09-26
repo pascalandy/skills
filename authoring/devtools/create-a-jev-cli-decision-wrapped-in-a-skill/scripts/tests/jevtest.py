@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -56,14 +57,21 @@ class FakeTypeSafe:
         self.overrides: list[Override] = []
         self.hooks: list[Hook] = []
         self.answered_model: str | None = None
+        # GET /v1/models lists only the aliases, as docs.typesafe.ai/models.md shows.
         self.models = [
             {
                 "name": "jev-latest",
-                "description": "alias of jev-1.13.0",
+                "description": "The most recent stable, official release.",
                 "release_date": "2026-09-15",
             },
-            {"name": "jev-1.13.0", "description": "Jev", "release_date": "2026-09-15"},
+            {
+                "name": "jev-preview",
+                "description": "The most recent release, whether or not it is an official one.",
+                "release_date": "2026-09-15",
+            },
         ]
+        # Set to (status, headers) to fail every GET /v1/models.
+        self.models_failure: tuple[int, dict[str, str]] | None = None
         self._server: ThreadingHTTPServer | None = None
 
     @property
@@ -159,7 +167,11 @@ class FakeTypeSafe:
 
             def do_GET(self) -> None:
                 fake.model_requests += 1
-                self.reply(200, {"models": fake.models}, {})
+                if fake.models_failure is not None:
+                    status, headers = fake.models_failure
+                    self.reply(status, {"error": f"status {status}"}, headers)
+                else:
+                    self.reply(200, {"models": fake.models}, {})
 
             def do_POST(self) -> None:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -364,12 +376,11 @@ class Project:
         self.commit(f"Tune {path}")
 
     def privacy(self, *, commit_cases: bool) -> None:
-        path = self.jev_dir / "config.toml"
-        path.write_text(
-            path.read_text()
-            + f"\n[privacy]\ncommit_cases = {str(commit_cases).lower()}\n"
+        self.edit(
+            ".jev/config.toml",
+            "commit_cases = true",
+            f"commit_cases = {str(commit_cases).lower()}",
         )
-        self.commit("Record the case policy")
 
     def clone(self, destination: Path) -> Project:
         self.git(
@@ -395,6 +406,17 @@ class Project:
 
 
 CONFIG_TEMPLATE = (ASSETS / "config.toml").read_text(encoding="utf-8")
+TERMS_NAME = re.search(
+    r'^TERMS_NAME = "([^"]+)"', ENGINE.read_text(encoding="utf-8"), re.M
+).group(1)  # type: ignore[union-attr]
+PLACEHOLDERS = {
+    "{{INTEGRATION_REF}}": "main",
+    "{{SEND_CODE}}": "true",
+    "{{COMMIT_CASES}}": "true",
+    "{{APPROVED_BY}}": "Test Owner",
+    "{{APPROVED_ON}}": "2026-09-26",
+    "{{TERMS}}": TERMS_NAME,
+}
 CHECK_COMMAND = 'echo ran >> \\"$JEVTEST_HOME/check.log\\"; exit $(cat \\"$JEVTEST_HOME/check.exit\\" 2>/dev/null || echo 0)'
 RULES = """schema = "jevgate.pack/v1"
 id = "rules"
@@ -458,11 +480,10 @@ def make_project(tmp: Path, fake: FakeTypeSafe, *, justfile: bool = False) -> Pr
     shutil.copy2(ASSETS / "gates" / "merge.toml", jev / "gates" / "merge.toml")
     shutil.copy2(ASSETS / "packs" / "merge.toml", jev / "packs" / "merge.toml")
     (jev / "packs" / "rules.toml").write_text(RULES)
-    (jev / "config.toml").write_text(
-        CONFIG_TEMPLATE.replace("{{INTEGRATION_REF}}", "main").replace(
-            "{{CHECK_COMMAND}}", CHECK_COMMAND
-        )
-    )
+    config = CONFIG_TEMPLATE.replace("{{CHECK_COMMAND}}", CHECK_COMMAND)
+    for placeholder, value in PLACEHOLDERS.items():
+        config = config.replace(placeholder, value)
+    (jev / "config.toml").write_text(config)
     (jev / ".gitignore").write_text("runs/\ncache/\n")
     if justfile:
         shutil.copy2(ASSETS / "justfile-snippet.just", root / "justfile")

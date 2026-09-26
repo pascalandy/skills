@@ -26,6 +26,18 @@ max_state_tokens = 30000
 max_requests = 100
 existing_test_bytes = 12000
 
+[privacy]
+# No repository gets a default. Setup shows the `just jev-merge --dry-run` payload and
+# the terms summary, then records both explicit answers. Nothing else can grant them.
+# send_code covers diff hunks, claims from PR text or commit messages, and check facts.
+send_code = {{SEND_CODE}}
+# false keeps .jev/cases/ local: setup adds cases/ to .jev/.gitignore.
+commit_cases = {{COMMIT_CASES}}
+approved_by = "{{APPROVED_BY}}"
+approved_on = {{APPROVED_ON}}
+# The approved summary of TypeSafe's terms; `jevgate doctor` names the current one.
+terms = "{{TERMS}}"
+
 # Band overrides keep each question's direction and replace one threshold or both:
 # [bands.test_weakened]
 # adverse = 0.70
