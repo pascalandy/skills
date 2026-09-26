@@ -26,18 +26,17 @@ Read [local adaptations](local-adaptations.md) for differences in authorization,
 
 ## Refresh from an upstream checkout
 
-Run these commands from the dotfiles source checkout. `MATT_SOURCE` points to a local Git checkout of `mattpocock/skills`. Fetch a new revision into that checkout separately, then choose its full commit SHA. The importer reads committed Git objects and ignores dirty source working-tree files.
+Run these commands from the skills repository checkout. `MATT_SOURCE` points to a local Git checkout of `mattpocock/skills`. Fetch a new revision into that checkout separately, then choose its full commit SHA. The importer reads committed Git objects and ignores dirty source working-tree files.
 
 Use the upstream repository itself, not the enclosing Git repository of an `opensrc` snapshot. If the snapshot has no independent Git history, create a checkout with `git clone https://github.com/mattpocock/skills.git <destination>` and point `MATT_SOURCE` there.
 
 ```sh
-uv run tools/update-matt-mode.py check --upstream "$MATT_SOURCE"
-uv run tools/update-matt-mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
-uv run tools/update-matt-mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
-uv run tools/update-matt-mode.py check --upstream "$MATT_SOURCE"
+just check-matt-mode --upstream "$MATT_SOURCE"
+just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
+just update-matt-mode --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
+just check-matt-mode --upstream "$MATT_SOURCE"
 just check-matt-mode
-just docci
-just test-skills-sync
+just check
 ```
 
 Review the preview before updating. Inspect every changed procedure and supporting file, then check whether local adaptations still apply. Newly introduced skill dependencies and entry links that cross installed package boundaries need an explicit routing decision. Update relevant behavioral cases when upstream changes the procedure, even if the text and structural checks pass.
