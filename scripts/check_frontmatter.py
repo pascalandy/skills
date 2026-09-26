@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """Check that SKILL.md frontmatter quotes string values with double quotes."""
 
 from __future__ import annotations
@@ -5,8 +10,9 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-import sys
 from pathlib import Path
+
+from _common import ScriptError, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
@@ -104,16 +110,18 @@ def check_file(path: Path) -> list[str]:
     return errors
 
 
-def check() -> tuple[int, list[str]]:
-    """Check every SKILL.md under authoring/ and return the file count and errors."""
+def check() -> str:
+    """Check every SKILL.md under authoring/ and return the summary line."""
     paths = sorted(AUTHORING.glob("**/SKILL.md"))
     if not paths:
-        return 0, ["no SKILL.md files found under authoring/"]
+        raise ScriptError("no SKILL.md files found under authoring/")
     errors: list[str] = []
     for path in paths:
         log.debug("check %s", path.relative_to(ROOT))
         errors.extend(check_file(path))
-    return len(paths), errors
+    if errors:
+        raise ScriptError(*errors)
+    return f"ok: {len(paths)} SKILL.md files"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -123,35 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="report each checked file on stderr",
-    )
-    args = parser.parse_args(argv)
-    logging.basicConfig(
-        format="%(message)s", level=logging.DEBUG if args.verbose else logging.WARNING
-    )
-
-    try:
-        file_count, errors = check()
-    except KeyboardInterrupt:
-        print("interrupted", file=sys.stderr)
-        return 130
-    except Exception as error:
-        log.debug("unexpected failure", exc_info=True)
-        errors = [f"{type(error).__name__}: {error}"]
-    else:
-        if not errors:
-            print(f"ok: {file_count} SKILL.md files")
-            return 0
-
-    for error in errors:
-        print(f"error: {error}", file=sys.stderr)
-    if not args.verbose:
-        print("rerun with --verbose for details", file=sys.stderr)
-    return 1
+    return run_script(parser, lambda args: check(), argv)
 
 
 if __name__ == "__main__":

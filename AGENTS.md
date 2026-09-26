@@ -16,6 +16,14 @@ Never edit `skills/` directly. Correct `authoring/` or the flattening script, th
 
 Repository-wide scripts live in `scripts/`; the `justfile` exposes routine operations. Scripts belonging to one skill stay in `authoring/<category>/<skill-name>/scripts/` and travel with that skill
 
+## Install skills
+
+`just install-skills` flattens, then copies `skills/` into every agent skill directory that `just install-skills --help` lists. Those directories feed Pascal's live agents, so run it only when Pascal asks. `just install-skills --dry-run --verbose` previews without writing
+
+- A manifest in `~/.local/state/install-skills/` records what the script installed. Skills it did not install are never touched, and it removes only its own skills that left `skills/`
+- It installs whatever `skills/` holds on disk, including uncommitted and branch-only changes
+- When it stops on a copy edited in place, move the edit into `authoring/`, then rerun with `--force`
+
 ## Script conventions
 
 Scripts in `scripts/` are CLIs that agents run, so their output stays small and failures stay obvious. Skill-local scripts follow the same rules when we write or change them
@@ -23,10 +31,15 @@ Scripts in `scripts/` are CLIs that agents run, so their output stays small and 
 - `-h, --help` prints usage with examples and changes nothing
 - Quiet by default: one line on stdout on success
 - `-v, --verbose` adds per-item detail and tracebacks on stderr
+- `--dry-run` previews anything that writes or deletes
 - Failures print `error: <what went wrong and how to fix it>` on stderr, then `rerun with --verbose for details`
 - Exit codes: `0` ok, `1` failure, `2` bad usage, `130` interrupted
 - Use only the standard library (`argparse`, `logging`) unless a dependency earns its place
 - `justfile` recipes forward arguments (`recipe *args`) so flags reach the script
+
+`scripts/_common.py` applies these rules: build the parser, then return `run_script(parser, work)` from `main()`. `work` returns the success line and raises `ScriptError` with one message per problem
+
+Tests live in `scripts/tests/`. `just test` runs them; `just check` adds ruff and pyright
 
 ## Commit hooks
 
@@ -39,4 +52,4 @@ gitleaks uses its built-in rules because the repo has no `.gitleaks.toml`. If yo
 
 ## Python execution
 
-Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts. For dependency-free project scripts, run `uv run --no-project python scripts/<name>.py`; never invoke `python3` or bare `python` directly
+Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts; never invoke `python3` or bare `python` directly. Scripts in `scripts/` start with a PEP 723 block, so run them with `uv run scripts/<name>.py`. The [Python sub-skill](authoring/devtools/coding-language/references/Python/MetaSkill.md) covers the details
