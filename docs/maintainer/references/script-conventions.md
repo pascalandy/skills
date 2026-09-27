@@ -21,7 +21,7 @@ CLIs in `scripts/` follow these rules. Apply them when writing or changing skill
 - Failures print `error: <what went wrong and how to fix it>` on stderr, then `rerun with --verbose for details`
 - Exit codes: `0` success, `1` failure, `2` bad usage, `130` interrupted
 - Use only the standard library (`argparse`, `logging`) unless a dependency earns its place
-- Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool; branching and chaining belong in the script. `scripts/tests/test_justfile.py` enforces it
+- Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool; branching and chaining belong in the script. Bare `just` lists recipes in file order: the `commands` group, most-run first, then the `checks` group; hook-only recipes are `[private]`. `scripts/tests/test_justfile.py` enforces it
 
 ## Shared entry point
 
