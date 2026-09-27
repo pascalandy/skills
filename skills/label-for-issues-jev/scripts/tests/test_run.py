@@ -282,3 +282,12 @@ def test_doctor_online_lists_models(harness: Harness) -> None:
     assert result.code == 0, result.stderr
     online = next(c for c in result.json()["checks"] if c["name"] == "online")
     assert online == {"name": "online", "ok": True, "detail": "models: jev-latest"}
+
+
+def test_runs_in_the_same_second_keep_separate_records(harness: Harness) -> None:
+    harness.issues(issue(1))
+
+    first, second = harness.live(), harness.live()
+
+    assert first.json()["id"] != second.json()["id"]
+    assert harness.run("compare", "last", "--json").json()["run"] == second.json()["id"]
