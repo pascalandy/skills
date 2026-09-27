@@ -21,8 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 EPILOG = """\
 Each check is one row of CHECKS in scripts/check.py; add a row to add a check.
-A failing check does not stop the others. Checks for private packages are
-skipped when the package is absent, so CI needs no private files.
+A failing check does not stop the others.
 
 examples:
   just check
@@ -43,18 +42,11 @@ Command = tuple[str, ...]
 
 
 class Check:
-    """A named step whose commands run from the repository root and stop at the first failure.
+    """A named step whose commands run from the repository root and stop at the first failure."""
 
-    `requires` names a repository path, usually a private package; the check is
-    skipped when that path is absent.
-    """
-
-    def __init__(
-        self, name: str, *commands: Command, requires: str | None = None
-    ) -> None:
+    def __init__(self, name: str, *commands: Command) -> None:
         self.name = name
         self.commands = commands
-        self.requires = requires
 
 
 def uv_run(script: str, *args: str) -> Command:
@@ -97,8 +89,8 @@ def script_pin(script: str, package: str) -> str:
 
 
 VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
-TRANSCRIPT = "_skills_private/integrations/transcript-sk"
-VERIFY_TRANSCRIPT = "_skills_private/integrations/verify-transcript-sk"
+TRANSCRIPT = "authoring/content/transcript-sk"
+VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript-sk"
 JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts"
 JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 
@@ -129,13 +121,8 @@ CHECKS = [
     Check(
         "transcript-sk",
         pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
-        requires=f"{TRANSCRIPT}/scripts/transcript.py",
     ),
-    Check(
-        "verify-transcript-sk",
-        pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests"),
-        requires=f"{VERIFY_TRANSCRIPT}/SKILL.md",
-    ),
+    Check("verify-transcript-sk", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
     Check(
         "poteto-mode",
         pytest("authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py"),
@@ -195,23 +182,16 @@ def run(args: argparse.Namespace) -> str:
                 lines.extend(f"  {shlex.join(command)}" for command in check.commands)
         return "\n".join(lines)
 
-    skipped: list[str] = []
     failed: list[str] = []
     for check in selected:
-        if check.requires and not (ROOT / check.requires).exists():
-            log.info("==> %s: skipped, %s is absent", check.name, check.requires)
-            skipped.append(check.name)
-        elif not passes(check, args.verbose):
+        if not passes(check, args.verbose):
             failed.append(check.name)
 
     if failed:
         raise ScriptError(
             *(f"{name} failed; rerun: just check --only {name}" for name in failed)
         )
-    summary = f"ok: {len(selected) - len(skipped)} passed"
-    if skipped:
-        summary += f", {len(skipped)} skipped (package absent): {', '.join(skipped)}"
-    return summary
+    return f"ok: {len(selected)} passed"
 
 
 def main(argv: list[str] | None = None) -> int:
