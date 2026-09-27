@@ -18,14 +18,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-import sync_private
 from _common import ScriptError, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
-INSTALLER = ROOT / "scripts" / "install_skills.py"
+SCRIPTS = ROOT / "scripts"
 
 
-def pull() -> None:
+def step(*command: str, **env: str) -> None:
+    """Run one step in its own process, printing its own output. A failure ends
+    this run with the step's exit code, as the old recipe's set -e did."""
+    finished = subprocess.run(command, cwd=ROOT, env=os.environ | env, check=False)
+    if finished.returncode:
+        raise SystemExit(finished.returncode)
+
+
+def pull_main() -> None:
     branch = subprocess.run(
         ["git", "symbolic-ref", "--short", "-q", "HEAD"],
         cwd=ROOT,
@@ -39,31 +46,21 @@ def pull() -> None:
             "switch to main, then rerun just sync"
         )
     # Hooks stay off: just sync is this machine only; just sync-fleet reaches the others
-    pulled = subprocess.run(
-        ["git", "pull", "--quiet", "--ff-only"],
-        cwd=ROOT,
-        env={**os.environ, "LEFTHOOK": "0"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if pulled.returncode:
-        raise ScriptError(f"could not pull main: {sync_private.last_line(pulled)}")
+    step("git", "pull", "--quiet", "--ff-only", LEFTHOOK="0")
 
 
 def sync(args: argparse.Namespace) -> str:
-    if args.dry_run:
-        flags = ["--dry-run"]
-    elif args.check:
-        flags = ["--check"]
+    verbose = ["--verbose"] if args.verbose else []
+    if args.dry_run or args.check:
+        flags = ["--dry-run" if args.dry_run else "--check"]
     else:
-        pull()
-        sync_private.sync()
+        pull_main()
+        # Later steps start new processes, so they run the code the pull brought
+        step(sys.executable, str(SCRIPTS / "sync_private.py"), *verbose)
         flags = ["--quiet"]
-    if args.verbose:
-        flags.append("--verbose")
     # The installer is the last step, so its report and exit code are this run's
-    os.execv(sys.executable, [sys.executable, str(INSTALLER), *flags])
+    installer = [sys.executable, str(SCRIPTS / "install_skills.py"), *flags, *verbose]
+    os.execv(sys.executable, installer)
 
 
 def main(argv: list[str] | None = None) -> int:
