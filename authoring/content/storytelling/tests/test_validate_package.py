@@ -1,4 +1,4 @@
-"""Exercise package links and invocation controls through the validator CLI."""
+"""Exercise package links and agent invocation through the validator CLI."""
 
 import subprocess
 import tempfile
@@ -75,70 +75,27 @@ class PackageLinksTest(unittest.TestCase):
                         self.assertIn("PASS sample-style", result.stdout)
 
 
-class ExplicitInvocationTest(unittest.TestCase):
-    def test_multiple_target_runtimes_must_all_pass(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            package = make_package(
-                directory,
-                extra_frontmatter="disable-model-invocation: true\n",
-                codex_policy="policy:\n  allow_implicit_invocation: false\n",
-            )
-            result = run_validator(
-                package,
-                "--explicit-runtime",
-                "pi",
-                "--explicit-runtime",
-                "codex",
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("explicit invocation for pi, codex", result.stdout)
-
-    def test_pi_requires_boolean_true(self) -> None:
+class AgentInvocationTest(unittest.TestCase):
+    def test_rejects_disabled_invocation(self) -> None:
         cases = (
-            ("disable-model-invocation: true\n", 0),
-            ("", 2),
-            ("disable-model-invocation: false\n", 2),
-            ('disable-model-invocation: "true"\n', 2),
-            ("disable-model-invocation: 1\n", 2),
+            ("", None, 0),
+            ("disable-model-invocation: true\n", None, 2),
+            ("", "policy:\n  allow_implicit_invocation: false\n", 2),
         )
-        for metadata, expected_status in cases:
+        for frontmatter, policy, expected_status in cases:
             with (
-                self.subTest(metadata=metadata),
+                self.subTest(frontmatter=frontmatter, policy=policy),
                 tempfile.TemporaryDirectory() as directory,
             ):
-                package = make_package(directory, extra_frontmatter=metadata)
-                result = run_validator(package, "--explicit-runtime", "pi")
-                self.assertEqual(
-                    result.returncode,
-                    expected_status,
-                    result.stdout + result.stderr,
+                package = make_package(
+                    directory,
+                    extra_frontmatter=frontmatter,
+                    codex_policy=policy,
                 )
+                result = run_validator(package)
+                self.assertEqual(result.returncode, expected_status, result.stderr)
                 if expected_status:
-                    self.assertIn("boolean true", result.stderr)
-
-    def test_codex_requires_boolean_false(self) -> None:
-        cases = (
-            ("policy:\n  allow_implicit_invocation: false\n", 0),
-            (None, 2),
-            ("policy: {}\n", 2),
-            ("policy:\n  allow_implicit_invocation: true\n", 2),
-            ('policy:\n  allow_implicit_invocation: "false"\n', 2),
-            ("policy:\n  allow_implicit_invocation: 0\n", 2),
-        )
-        for policy, expected_status in cases:
-            with (
-                self.subTest(policy=policy),
-                tempfile.TemporaryDirectory() as directory,
-            ):
-                package = make_package(directory, codex_policy=policy)
-                result = run_validator(package, "--explicit-runtime", "codex")
-                self.assertEqual(
-                    result.returncode,
-                    expected_status,
-                    result.stdout + result.stderr,
-                )
-                if expected_status:
-                    self.assertIn("boolean false", result.stderr)
+                    self.assertIn("agent invocation must stay enabled", result.stderr)
 
 
 if __name__ == "__main__":

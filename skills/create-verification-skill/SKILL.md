@@ -1,7 +1,6 @@
 ---
 name: "create-verification-skill"
 description: "Use only when the user explicitly invokes `create-verification-skill`."
-disable-model-invocation: true
 ---
 
 # Create a verification skill

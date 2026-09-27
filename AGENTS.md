@@ -4,7 +4,9 @@
 
 ## Change a skill
 
-Load `writing-great-skills` before creating, changing, or refactoring a skill. It decides how a skill is written, including its trigger and invocation mode; this file decides where the skill lives and how it ships
+Load `writing-great-skills` before creating, changing, or refactoring a skill. It decides how a skill is written, including its trigger; this file decides where the skill lives and how it ships
+
+Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow_implicit_invocation: false` in Codex metadata. Agents may invoke skills when relevant
 
 1. For skill content, edit only `authoring/<category>/<skill-name>/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
 2. Run `just flatten-skills`; if it fails, rerun `just flatten-skills --verbose`
@@ -14,7 +16,7 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
-`scripts/tests/test_skill_invocation.py` pins the invocation mode of skills whose routing must not drift. Update its lists when you change one of those decisions
+`scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 
 If generated output is wrong, fix `authoring/` or the flattening script, then rerun `just flatten-skills`
 

@@ -1,7 +1,6 @@
 ---
 name: "reflect"
 description: "Use when the user invokes `reflect`."
-disable-model-invocation: true
 ---
 
 # Reflect

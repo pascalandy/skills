@@ -1,7 +1,6 @@
 ---
 name: "matt-mode"
 description: "Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets."
-disable-model-invocation: true
 ---
 
 # Matt mode

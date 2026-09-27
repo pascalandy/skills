@@ -2,5 +2,3 @@ interface:
   display_name: "Think"
   short_description: "Choose one method for the blocking uncertainty"
   default_prompt: "Use $think to improve the model of this situation before I decide or act."
-policy:
-  allow_implicit_invocation: false

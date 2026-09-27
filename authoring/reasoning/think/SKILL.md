@@ -1,7 +1,6 @@
 ---
 name: "think"
 description: "Use only when the user explicitly invokes `$think` to improve the model of a situation before judging, deciding, or acting."
-disable-model-invocation: true
 ---
 
 # Think

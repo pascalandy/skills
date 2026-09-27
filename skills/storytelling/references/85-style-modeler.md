@@ -122,12 +122,10 @@ references, valid invocation metadata, and no scaffold placeholders.
 From the storytelling directory, validate the emitted package with its target runtime:
 
 ```text
-uv run tests/validate-package.py --explicit-runtime <target-runtime> <package-directory>
+uv run tests/validate-package.py <package-directory>
 ```
 
-Repeat `--explicit-runtime` when the package targets more than one supported runtime.
-The validator currently supports `codex` and `pi`; an unsupported target leaves strict
-invocation validation unavailable and blocks delivery. Inspect the emitted files too.
+The validator checks that agent invocation remains available. Inspect the emitted files too.
 Structure alone does not establish editing behavior.
 
 Use a fresh executor context with only the generated package, an unrelated target,

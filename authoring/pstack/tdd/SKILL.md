@@ -1,7 +1,6 @@
 ---
 name: "tdd"
 description: "Use only when the user explicitly invokes `tdd`."
-disable-model-invocation: true
 ---
 
 # TDD Bug Fix
