@@ -326,12 +326,16 @@ def mirror(machine: Machine, *flags: str) -> subprocess.CompletedProcess[str]:
 
     Sync and --check compare the same attributes, so every difference the check
     reports is one the next sync repairs; a matching size and time is not enough.
+    The receiving rsync starts only if the root is still not a symlink, since one
+    made after INSPECT would redirect the deletions.
     """
+    root = shlex.quote(str(PurePosixPath(machine.path, "_skills_private")))
     return call(
         [
             "rsync",
             "-rlpc",
             *flags,
+            f"--rsync-path=test ! -L {root} && rsync",
             "--delete",
             "--delete-excluded",
             *EXCLUDES,

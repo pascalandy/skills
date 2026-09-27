@@ -142,14 +142,22 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     ahead = machine(homes, "ahead", origin)
     (ahead / "local.txt").write_text("only here\n")
     commit(ahead)
+    # linked has a symlinked private root before the sync; relinked gets one
+    # while the push lands, after the inspection passed.
     linked = machine(homes, "linked", origin)
-    unrelated = homes / "linked/unrelated"
-    unrelated.mkdir()
-    (unrelated / "important.txt").write_text("keep\n")
-    (linked / "_skills_private").symlink_to(unrelated)
+    relinked = machine(homes, "relinked", origin)
+    for name in ("linked", "relinked"):
+        (homes / name / "unrelated").mkdir()
+        (homes / name / "unrelated/important.txt").write_text("keep\n")
+    (linked / "_skills_private").symlink_to(homes / "linked/unrelated")
+    hook = relinked / ".git/hooks/post-receive"
+    hook.write_text('#!/bin/sh\nln -s "$HOME/unrelated" ../_skills_private\n')
+    hook.chmod(0o755)
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
-    register(hub, "behind", "dirty", "editor", "branch", "ahead", "linked", "down")
+    register(
+        hub, "behind", "dirty", "editor", "branch", "ahead", "linked", "relinked", "down"
+    )
 
     result = run(hub, homes, bin_dir, "--json")
 
@@ -165,10 +173,13 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         ("editor", "synced", f"synced at {head[:7]}"),
         ("branch", "needs-you", "checkout is on feature, not main"),
         ("ahead", "needs-you", f"checkout has commits {report['hub']} lacks"),
-        (
-            "linked",
-            "needs-you",
-            "~/projects/skills/_skills_private is a symlink; replace it with a folder",
+        *(
+            (
+                name,
+                "needs-you",
+                "~/projects/skills/_skills_private is a symlink; replace it with a folder",
+            )
+            for name in ("linked", "relinked")
         ),
         (
             "down",
@@ -189,10 +200,12 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         assert not (checkout / "_skills_private").exists()
         assert not (homes / name / "just.log").exists()
     assert git(dirty, "rev-parse", "HEAD") == before
-    assert [path.name for path in unrelated.iterdir()] == ["important.txt"]
-    assert (linked / "_skills_private").is_symlink()
-    assert git(linked, "rev-parse", "HEAD") == before
-    assert not (homes / "linked/just.log").exists()
+    for name, checkout in (("linked", linked), ("relinked", relinked)):
+        unrelated = homes / name / "unrelated"
+        assert [path.name for path in unrelated.iterdir()] == ["important.txt"]
+        assert (checkout / "_skills_private").is_symlink()
+        assert git(checkout, "rev-parse", "HEAD") == before
+        assert not (homes / name / "just.log").exists()
     assert (
         "error: dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
