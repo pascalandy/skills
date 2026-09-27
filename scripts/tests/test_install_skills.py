@@ -314,6 +314,51 @@ def test_private_retirement_allows_unowned_selected_targets(
     assert not private.exists()
 
 
+def test_private_skill_promotes_to_public_with_matching_retirement(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    private = skill(repo / "_skills_private/content", "secret", "private")
+    assert run(repo, home, "--private", "secret").returncode == 0
+    checksum = manifest(home)["targets"][".claude/skills"]["secret"]["digest"]
+    skill(repo / "authoring/content", "secret", "public")
+    subprocess.run(
+        ["git", "add", "authoring/content/secret/SKILL.md"], cwd=repo, check=True
+    )
+
+    missing = run(repo, home)
+    assert missing.returncode == 1
+    assert "source ownership differs" in missing.stderr
+    wrong = run(repo, home, "--retire-private", "secret:" + "0" * 64)
+    assert wrong.returncode == 1
+    assert "lacks matching ownership evidence" in wrong.stderr
+
+    installed = home / ".claude/skills/secret/SKILL.md"
+    installed.write_text("edited\n", encoding="utf-8")
+    edited = run(repo, home, "--retire-private", f"secret:{checksum}", "--json")
+    assert edited.returncode == 1
+    assert edited.stdout, edited.stderr
+    assert any(
+        action["target"] == ".claude/skills"
+        and action["name"] == "secret"
+        and action["kind"] == "conflict"
+        for action in report(edited)["actions"]
+    )
+    assert installed.read_text(encoding="utf-8") == "edited\n"
+
+    shutil.copy2(private / "SKILL.md", installed)
+    promoted = run(repo, home, "--retire-private", f"secret:{checksum}")
+    assert promoted.returncode == 0, promoted.stderr
+    assert all(
+        (home / target / "secret/SKILL.md").read_text(encoding="utf-8")
+        == "# secret\n\npublic\n"
+        for target in MAC
+    )
+    records = manifest(home)["targets"]
+    assert all(records[target]["secret"]["source"] == "public" for target in MAC)
+    assert run(repo, home, "--check").returncode == 0
+
+
 def test_interrupted_swap_restores_previous_copy(tmp_path: Path) -> None:
     source = skill(tmp_path / "source", "alpha", "new")
     destination = skill(tmp_path / "home", "alpha", "old")
