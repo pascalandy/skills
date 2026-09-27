@@ -27,15 +27,16 @@ sync *args:
         echo "error: this checkout is on ${branch:-a detached HEAD}; switch to main, then rerun just sync" >&2
         exit 1
     fi
-    git pull --quiet --ff-only
+    # Hooks stay off: just sync is this machine only; just sync-fleet reaches the others
+    LEFTHOOK=0 git pull --quiet --ff-only
     uv run scripts/sync_private.py ${verbose[@]+"${verbose[@]}"}
     uv run scripts/install_skills.py --quiet "$@"
 
-# From the hub, sync every machine in _skills_private/fleet.toml, or named ones; --check compares them
+# From any machine, sync every machine in _skills_private/fleet.toml, or named ones, to GitHub's main; --check compares them
 sync-fleet *args:
     @uv run scripts/sync_fleet.py {{args}}
 
-# Lefthook runs this after a commit or pull; it acts only in the hub's main checkout
+# Lefthook runs this after a commit or pull and before a push; it acts only in a main checkout with the registry
 sync-hook *args:
     @uv run scripts/sync_fleet.py --hook {{args}}
 

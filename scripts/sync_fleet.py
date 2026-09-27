@@ -3,18 +3,19 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Sync skills from this checkout, the hub, to every machine in its fleet.
+"""Sync skills from GitHub's main to every machine in the fleet, from any of them.
 
-The hub saves and pulls its clone of the private repository, then installs its
-own working tree. Every other machine receives the hub's main commit over SSH,
-fast-forwards its checkout to that commit, saves and pulls its own private
-clone from GitHub, and runs `just install-skills`. A machine whose checkout is
-off main, has uncommitted changes under authoring/, skills/, scripts/, or
-justfile, has commits the hub lacks, or whose _skills_private is not a clone is
-left untouched. A machine that is offline or fails gets one retry.
+The machine running this fetches GitHub's main and saves and pulls its private
+clone. Then every selected machine, itself included, receives that commit over
+SSH, fast-forwards its checkout to it, saves and pulls its own private clone
+from GitHub, and runs `just install-skills`. A machine whose checkout is off
+main, has uncommitted changes under authoring/, skills/, scripts/, or justfile,
+has commits GitHub lacks, or whose _skills_private is not a clone is left
+untouched. A machine that is offline or fails gets one retry, and any later
+sync catches it up.
 
-The registry is fleet.toml in the hub's private clone, which git ignores, so
-hosts stay out of both repositories. Each path is relative to that machine's
+The registry is fleet.toml in the private repository, so every machine has it
+and hosts stay out of this public one. Each path is relative to that machine's
 home:
 
   [machines.mbp]
@@ -51,7 +52,9 @@ STATE = (
     Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
     / "skills-sync"
 )
-HUB_REF = "refs/fleet/hub"
+FLEET_REF = "refs/fleet/hub"
+GITHUB_MAIN = "refs/remotes/origin/main"
+PUSH_WAIT = 180
 SSH = (
     "ssh",
     "-o",
@@ -109,19 +112,21 @@ step() {
     echo "checkout $branch $head $state"
 }
 """
-# Rechecks the checkout, since it may have moved after the inspection. Hooks
-# stay off so the merge cannot start a sync from this machine.
+# Rechecks the checkout, since it may have moved after the inspection; a sync
+# started elsewhere may already have brought it to the same commit. Hooks stay
+# off so the merge cannot start another sync from this machine.
 APPLY = """
 step() {
     enter "$1" || return
-    if [ "$(git symbolic-ref --short -q HEAD)" != main ] ||
-        [ "$(git rev-parse HEAD)" != "$2" ] || edited; then
+    now=$(git rev-parse HEAD)
+    if [ "$(git symbolic-ref --short -q HEAD)" != main ] || edited ||
+        { [ "$now" != "$2" ] && [ "$now" != "$3" ]; }; then
         echo "checkout changed during the sync"
         return 11
     fi
-    if [ "$2" != "$3" ]; then
+    if [ "$now" != "$3" ]; then
         LEFTHOOK=0 git merge --quiet --ff-only "$3" >/dev/null 2>&1 || {
-            echo "main did not fast-forward to the hub's commit"
+            echo "main did not fast-forward to GitHub's commit"
             return 12
         }
     fi
@@ -167,13 +172,17 @@ class Machine:
             self.host,
         }
 
-    def address(self, *parts: str) -> str:
-        return f"{self.ssh}:{PurePosixPath(self.path, *parts)}"
+    def address(self) -> str:
+        """Where git sends the commit: a path here, an SSH address elsewhere."""
+        if self.is_local():
+            return str(Path.home() / self.path)
+        return f"{self.ssh}:{PurePosixPath(self.path)}"
 
 
 @dataclass(frozen=True)
-class Hub:
-    name: str
+class Source:
+    """GitHub's main, and the private repository's main in a check."""
+
     sha: str
     private: str = ""
 
@@ -268,7 +277,13 @@ def reason(lines: list[str], code: int) -> str:
 
 
 def remote(machine: Machine, body: str, *arguments: str) -> tuple[int, list[str]]:
-    command = [*SSH, machine.ssh, 'exec "$SHELL" -l -s -- ' + shlex.join(arguments)]
+    """Run a step in the machine's login shell, locally or over SSH."""
+    if machine.is_local():
+        shell = os.environ.get("SHELL") or "/bin/sh"
+        command = [shell, "-l", "-s", "--", *arguments]
+    else:
+        login = 'exec "$SHELL" -l -s -- ' + shlex.join(arguments)
+        command = [*SSH, machine.ssh, login]
     result = call(command, ENTER + body + '\nstep "$@" </dev/null\n')
     # Login profiles may print before the step, and ssh reports its own
     # failures on stderr.
@@ -322,21 +337,7 @@ def judge(name: str, problems: list[str], output: str) -> Outcome:
     return Outcome(name, status, "; ".join(problems) or status, report["targets"])
 
 
-def sync_local(machine: Machine, hub: Hub, mode: str) -> Outcome:
-    flags = {"preview": ["--dry-run"], "check": ["--check", "--json"]}
-    result = call([sys.executable, str(INSTALLER), *flags.get(mode, ["--quiet"])])
-    if mode == "check":
-        problems = private_problems(*sync_private.state(), hub.private)
-        return judge(machine.name, problems, result.stdout or result.stderr)
-    if result.returncode:
-        lines = (result.stderr + result.stdout).splitlines()
-        return Outcome(machine.name, "failed", reason(lines, result.returncode))
-    if mode == "preview":
-        return Outcome(machine.name, "ready", result.stdout.strip())
-    return Outcome(machine.name, "synced", "installed this checkout")
-
-
-def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
+def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     code, lines = remote(machine, INSPECT, machine.path)
     if code or not lines or not lines[-1].startswith("checkout "):
         return Outcome(machine.name, status_of(code), reason(lines, code))
@@ -347,26 +348,26 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
         problems.append(f"checkout is on {where}, not main")
     if state == "dirty":
         problems.append("checkout has uncommitted skill changes")
-    behind = head != hub.sha and hub.contains(head)
-    if head != hub.sha and not behind:
-        problems.append(f"checkout has commits {hub.name} lacks")
+    behind = head != source.sha and source.contains(head)
+    if head != source.sha and not behind:
+        problems.append("checkout has commits GitHub lacks; push them")
     if mode == "check":
         if behind:
-            problems.append(f"checkout is behind {hub.name} at {head[:7]}")
+            problems.append(f"checkout is behind GitHub at {head[:7]}")
         code, lines = remote(machine, CHECK, machine.path)
         for line in lines:
             if line.startswith("private ") and len(fields := line.split()) == 3:
-                problems.extend(private_problems(fields[1], fields[2], hub.private))
+                problems.extend(private_problems(fields[1], fields[2], source.private))
         return judge(machine.name, problems, "\n".join(lines))
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
-        if head == hub.sha:
+        if head == source.sha:
             return Outcome(machine.name, "ready", f"ready; already at {head[:7]}")
         return Outcome(
-            machine.name, "ready", f"ready to move {head[:7]} to {hub.sha[:7]}"
+            machine.name, "ready", f"ready to move {head[:7]} to {source.sha[:7]}"
         )
-    if head != hub.sha:
+    if head != source.sha:
         pushed = call(
             [
                 "git",
@@ -375,35 +376,33 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
                 "--no-verify",
                 "--force",
                 machine.address(),
-                f"{hub.sha}:{HUB_REF}",
+                f"{source.sha}:{FLEET_REF}",
             ],
             env={**os.environ, "GIT_SSH_COMMAND": shlex.join(SSH)},
         )
         if pushed.returncode:
             detail = reason(pushed.stderr.splitlines(), pushed.returncode)
             return Outcome(machine.name, "failed", f"git push failed: {detail}")
-    code, lines = remote(machine, APPLY, machine.path, head, hub.sha)
+    code, lines = remote(machine, APPLY, machine.path, head, source.sha)
     if code:
         return Outcome(machine.name, status_of(code), reason(lines, code))
-    return Outcome(machine.name, "synced", f"synced at {hub.sha[:7]}")
+    return Outcome(machine.name, "synced", f"synced at {source.sha[:7]}")
 
 
-def sync_machine(machine: Machine, hub: Hub, mode: str) -> Outcome:
-    try:
-        if machine.is_local():
-            return sync_local(machine, hub, mode)
-        return sync_remote(machine, hub, mode)
-    except subprocess.TimeoutExpired:
-        return Outcome(machine.name, "failed", "timed out")
-
-
-def attempt(machine: Machine, hub: Hub, mode: str) -> Outcome:
+def attempt(machine: Machine, source: Source, mode: str) -> Outcome:
     """Every step is safe to repeat, so an offline or failed machine gets a retry."""
-    outcome = sync_machine(machine, hub, mode)
+
+    def once() -> Outcome:
+        try:
+            return sync_machine(machine, source, mode)
+        except subprocess.TimeoutExpired:
+            return Outcome(machine.name, "failed", "timed out")
+
+    outcome = once()
     if outcome.status in ("offline", "failed"):
         log.debug("%s: %s; retrying", machine.name, outcome.detail)
         time.sleep(RETRY_DELAY)
-        outcome = sync_machine(machine, hub, mode)
+        outcome = once()
     log.info("%s: %s: %s", machine.name, outcome.status, outcome.detail)
     return outcome
 
@@ -419,50 +418,59 @@ def advice(outcome: Outcome) -> str:
 
 
 def notify(lines: list[str]) -> None:
-    if lines and shutil.which("notify-send"):
-        subprocess.run(
-            [
-                "notify-send",
-                "--app-name=Skills sync",
-                "Skills sync needs you",
-                "\n".join(lines),
-            ],
-            check=False,
+    title, body = "Skills sync needs you", "\n".join(lines)
+    if not lines:
+        return
+    if shutil.which("notify-send"):
+        command = ["notify-send", "--app-name=Skills sync", title, body]
+    elif shutil.which("osascript"):
+        script = "on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run"
+        command = ["osascript", "-e", script, title, body]
+    else:
+        return
+    subprocess.run(command, check=False, capture_output=True)
+
+
+def github_main() -> Source:
+    """Fetch GitHub's main; when GitHub is unreachable, use the last one fetched."""
+    fetched = call(["git", "fetch", "--quiet", "origin", "main"])
+    if fetched.returncode:
+        log.info(
+            "could not fetch GitHub's main: %s",
+            reason(fetched.stderr.splitlines(), fetched.returncode),
         )
+    sha = git("rev-parse", "-q", "--verify", f"{GITHUB_MAIN}^{{commit}}").stdout.strip()
+    if not sha:
+        raise ScriptError("GitHub's main is unknown here; check the network and rerun")
+    return Source(sha)
 
 
-def hub_commit() -> str:
-    branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
-    if branch != "main":
-        raise ScriptError(
-            f"the hub checkout {ROOT} is on {branch or 'a detached HEAD'}; "
-            "switch it to main, the branch the fleet receives"
-        )
-    return git("rev-parse", "HEAD").stdout.strip()
+def wait_for_push(sha: str) -> None:
+    """Return once GitHub's main is `sha`; give up quietly if the push never lands."""
+    deadline = time.monotonic() + PUSH_WAIT
+    while github_main().sha != sha:
+        if time.monotonic() > deadline:
+            raise ScriptError(
+                f"GitHub's main never reached {sha[:7]}; the push did not land"
+            )
+        time.sleep(RETRY_DELAY)
 
 
-def hook(event: list[str]) -> str:
-    """Install and sync after a commit or a pull that brings commits.
+def pushed_main(lines: list[str]) -> str:
+    """The commit a pre-push hook sends to main, from git's stdin lines."""
+    for line in lines:
+        fields = line.split()
+        if (
+            len(fields) == 4
+            and fields[2] == "refs/heads/main"
+            and set(fields[1]) != {"0"}
+        ):
+            return fields[1]
+    return ""
 
-    Lefthook runs this in every checkout; it acts only in the hub's main
-    checkout, never in a worktree or on another branch. The fleet syncs in the
-    background, so git never waits on a sleeping laptop.
-    """
-    name, *rest = event
-    branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
-    if not REGISTRY.is_file() or branch != "main":
-        return ""
-    in_rebase = any(
-        (ROOT / git("rev-parse", "--git-path", part).stdout.strip()).exists()
-        for part in ("rebase-merge", "rebase-apply")
-    )
-    # A pull that rebases fires post-commit for each replayed commit, then
-    # post-rewrite once at the end; amend already fired post-commit.
-    if (name == "post-commit" and in_rebase) or (
-        name == "post-rewrite" and rest[:1] != ["rebase"]
-    ):
-        return ""
-    installed = call([sys.executable, str(INSTALLER), "--quiet"])
+
+def background(*flags: str) -> None:
+    """Sync the other machines in the background, so git never waits on a sleeping laptop."""
     STATE.mkdir(parents=True, exist_ok=True)
     logfile = STATE / "fleet.log"
     if logfile.exists() and logfile.stat().st_size > 1_000_000:
@@ -475,6 +483,7 @@ def hook(event: list[str]) -> str:
                 "--others",
                 "--notify",
                 "-v",
+                *flags,
             ],
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
@@ -482,6 +491,39 @@ def hook(event: list[str]) -> str:
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+
+
+def hook(event: list[str]) -> str:
+    """Install after a commit or a pull, and sync the fleet once GitHub has it.
+
+    Lefthook runs this in every checkout; it acts only in a main checkout that
+    has the registry, never in a worktree. A pull that brings commits installs
+    here and syncs the other machines. A commit installs here; the other
+    machines sync once a push lands it on GitHub.
+    """
+    name, *rest = event
+    if not REGISTRY.is_file():
+        return ""
+    if name == "pre-push":
+        if sha := pushed_main(sys.stdin.read().splitlines()):
+            background("--after-push", sha)
+        return ""
+    branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    if branch != "main":
+        return ""
+    in_rebase = any(
+        (ROOT / git("rev-parse", "--git-path", part).stdout.strip()).exists()
+        for part in ("rebase-merge", "rebase-apply")
+    )
+    # A pull that rebases fires post-commit for each replayed commit, then
+    # post-rewrite once at the end; amend already fired post-commit.
+    if (name == "post-commit" and in_rebase) or (
+        name == "post-rewrite" and rest[:1] != ["rebase"]
+    ):
+        return ""
+    installed = call([sys.executable, str(INSTALLER), "--quiet"])
+    if name != "post-commit":
+        background()
     if installed.returncode:
         lines = (installed.stderr + installed.stdout).splitlines()
         raise ScriptError(
@@ -508,27 +550,28 @@ def sync(args: argparse.Namespace) -> str:
         machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
     local = next((machine.name for machine in registry if machine.is_local()), None)
-    # Queue behind any other sync, so each run sends the newest commit.
+    if args.after_push:
+        wait_for_push(args.after_push)
+    # Queue behind any other sync from here, so each run sends the newest commit.
     with exclusive(STATE / "fleet.lock"):
-        sha = hub_commit()
-        # The hub pushes its private edits before any machine pulls, even when
-        # the hub itself is not selected.
+        source = github_main()
+        # This machine pushes its private edits before any machine pulls, even
+        # when it is not selected.
         if mode == "apply":
             sync_private.sync()
-        hub = Hub(
-            local or socket.gethostname().split(".")[0],
-            sha,
-            sync_private.github_head() if mode == "check" else "",
-        )
+        if mode == "check":
+            source = Source(source.sha, sync_private.github_head())
+        public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
-            "%s: %s main at %s",
+            "%s: GitHub main at %s with %d public skills, from %s",
             f"{datetime.now().astimezone():%F %T}",
-            hub.name,
-            hub.sha[:7],
+            source.sha[:7],
+            len(public.split()),
+            local or socket.gethostname().split(".")[0],
         )
         with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
             outcomes = list(
-                pool.map(lambda machine: attempt(machine, hub, mode), machines)
+                pool.map(lambda machine: attempt(machine, source, mode), machines)
             )
     problems = [outcome for outcome in outcomes if outcome.status not in FINE]
     if args.notify:
@@ -542,8 +585,8 @@ def sync(args: argparse.Namespace) -> str:
     if args.json:
         report = json.dumps(
             {
-                "hub": hub.name,
-                "sha": hub.sha,
+                "from": local,
+                "sha": source.sha,
                 "mode": mode,
                 "machines": [asdict(outcome) for outcome in outcomes],
             },
@@ -585,8 +628,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="compare each machine's checkout, private tree, and installed "
-        "skills with the hub; exit 1 on any difference",
+        help="compare each machine's checkout and private clone with GitHub and "
+        "its installed skills with its sources; exit 1 on any difference",
     )
     parser.add_argument(
         "--others", action="store_true", help="skip the machine this runs on"
@@ -600,7 +643,12 @@ def main(argv: list[str] | None = None) -> int:
         "--hook",
         nargs="+",
         metavar="EVENT",
-        help="run as the lefthook EVENT hook; acts only in the hub's main checkout",
+        help="run as the lefthook EVENT hook; acts only in a main checkout with the registry",
+    )
+    parser.add_argument(
+        "--after-push",
+        metavar="SHA",
+        help="wait until GitHub's main is SHA before syncing; the pre-push hook passes it",
     )
     parser.add_argument(
         "--json", action="store_true", help="print the per-machine report as JSON"
