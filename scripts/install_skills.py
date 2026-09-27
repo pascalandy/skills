@@ -254,6 +254,10 @@ def command_sources() -> dict[str, Source]:
 
 def published(directory: str) -> list[Path]:
     """List every path git history ever added under `directory`, relative to it."""
+    if flatten_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
+        raise ScriptError(
+            "shallow clone hides retired skills; run git fetch --unshallow and rerun"
+        )
     listed = flatten_skills.git(
         "log",
         "--no-renames",
@@ -266,6 +270,15 @@ def published(directory: str) -> list[Path]:
     )
     paths = (os.fsdecode(path).strip() for path in listed.split(b"\0"))
     return [Path(path).relative_to(directory) for path in paths if path]
+
+
+def owned_skills() -> set[str]:
+    """Names ever committed under skills/, plus uncommitted ones flattened there."""
+    return {path.parts[0] for path in published("skills") if len(path.parts) > 1} | {
+        path.parts[1]
+        for path in flatten_skills.git_files("skills")
+        if len(path.parts) > 2
+    }
 
 
 def target_groups(home: Path, targets: Iterable[str]) -> dict[Path, list[str]]:
@@ -452,11 +465,7 @@ examples:
                     home,
                     PROFILES[args.profile],
                     sources,
-                    {
-                        path.parts[0]
-                        for path in published("skills")
-                        if len(path.parts) > 1
-                    },
+                    owned_skills(),
                 ),
                 *plan(
                     home,

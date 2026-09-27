@@ -152,6 +152,29 @@ def test_removes_only_published_names_and_overwrites_edits(
     assert (synced / "SKILL.md").exists() and (foreign / "SKILL.md").exists()
 
 
+def test_uncommitted_public_skill_is_removed_after_its_source_goes(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    draft = skill(repo / "authoring/content", "draft")
+    assert run(repo, home).returncode == 0
+    shutil.rmtree(draft)
+    assert run(repo, home).returncode == 0
+    assert not any((home / target / "draft").exists() for target in MAC)
+
+
+def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
+    repo, home = sandbox
+    shallow = repo.parent / "shallow"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", f"file://{repo}", str(shallow)],
+        check=True,
+    )
+    refused = run(shallow, home, "--dry-run")
+    assert refused.returncode == 1
+    assert "git fetch --unshallow" in refused.stderr
+
+
 def test_symlink_at_a_target_blocks_apply(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     elsewhere = skill(home / "elsewhere", "alpha")

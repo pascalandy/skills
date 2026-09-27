@@ -21,7 +21,7 @@ date_updated: 2026-09-27
 
 ## Ownership
 
-- The installer keeps no state. It owns every name git history ever added under `skills/` or `authoring/commands/`
+- The installer keeps no state. It owns every name git history ever added under `skills/` or `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
 - A private skill that was never published is not owned. After deleting it from the private tree, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/` or the private tree
