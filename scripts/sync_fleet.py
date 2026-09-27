@@ -72,7 +72,9 @@ SSH = (
     "-o",
     "StrictHostKeyChecking=yes",
 )
-# The mirror skips what the installer skips, plus the hub's registry.
+# The mirror leaves out what the installer skips, plus the hub's registry, and
+# deletes them on the machine, so a retired skill's cache cannot keep its folder
+# alive and no machine but the hub holds a registry.
 EXCLUDES = tuple(
     f"--exclude={pattern}"
     for pattern in (
@@ -319,6 +321,7 @@ def mirror(machine: Machine, *flags: str) -> subprocess.CompletedProcess[str]:
             "rsync",
             *flags,
             "--delete",
+            "--delete-excluded",
             *EXCLUDES,
             "-e",
             shlex.join(SSH),

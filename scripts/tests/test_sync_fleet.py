@@ -125,8 +125,8 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     origin = hub.parent / "origin.git"
     behind = machine(homes, "behind", origin)
     stale = behind / "_skills_private"
-    skill(stale / "content", "retired")
-    (stale / ".cache").mkdir()
+    retired = skill(stale / "content", "retired")
+    (retired / "__pycache__").mkdir()
     dirty = machine(homes, "dirty", origin)
     skill(dirty / "authoring/content", "draft")
     editor = machine(homes, "editor", origin)
@@ -166,9 +166,8 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
     assert git(origin, "rev-parse", "main") == before
     assert (stale / "content/secret/SKILL.md").is_file()
-    assert not (stale / "content/retired").exists()
+    assert not retired.exists()
     assert not (stale / "fleet.toml").exists()
-    assert (stale / ".cache").is_dir()
     assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
     for name, checkout in (("dirty", dirty), ("branch", branch), ("ahead", ahead)):
         assert not (checkout / "_skills_private").exists()
