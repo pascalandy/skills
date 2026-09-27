@@ -276,3 +276,32 @@ def test_om1_preserves_inactive_mac_command_target(
     assert run(repo, home, "--profile", "om1").returncode == 0
     assert (home / ".config/agents/commands/review.md").read_text() == "old\n"
     assert (home / ".codex/prompts/review.md").read_text() == "new\n"
+
+
+def test_quiet_apply_is_silent_and_check_counts_each_target(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    skill(repo / "authoring/content", "beta")
+    command(repo, "hello")
+    commit(repo)
+    applied = run(repo, home, "--quiet")
+    assert (applied.returncode, applied.stdout, applied.stderr) == (0, "", "")
+    shutil.rmtree(home / ".claude/skills/beta")
+
+    checked = run(repo, home, "--check", "--json")
+
+    assert checked.returncode == 1
+    targets = {t["target"]: t for t in json.loads(checked.stdout)["targets"]}
+    assert targets[".claude/skills"] == {
+        "target": ".claude/skills",
+        "expected": 2,
+        "current": 1,
+        "counts": {"add": 1, "current": 1},
+    }
+    assert targets[".claude/commands"] == {
+        "target": ".claude/commands",
+        "expected": 1,
+        "current": 1,
+        "counts": {"current": 1},
+    }

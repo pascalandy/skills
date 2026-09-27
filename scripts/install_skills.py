@@ -368,6 +368,22 @@ def execute(
                 shutil.rmtree(destination)
 
 
+def summarize(actions: list[Action], expected: dict[str, int]) -> list[dict]:
+    """Count each target's actions against the number of names it should hold."""
+    summary: list[dict] = []
+    for target in dict.fromkeys(action.target for action in actions):
+        counts = Counter(action.kind for action in actions if action.target == target)
+        summary.append(
+            {
+                "target": target,
+                "expected": expected[target],
+                "current": counts["current"],
+                "counts": dict(counts),
+            }
+        )
+    return summary
+
+
 def render(
     actions: list[Action],
     profile: str,
@@ -377,17 +393,24 @@ def render(
     verbose: bool,
 ) -> str:
     counts = Counter(action.kind for action in actions)
+    skills, commands = synced
     if json_output:
+        expected = {
+            **dict.fromkeys(PROFILES[profile], skills),
+            **dict.fromkeys(COMMAND_TARGETS[profile], commands),
+        }
         return json.dumps(
             {
                 "profile": profile,
                 "mode": "preview" if dry_run else "apply",
+                "skills": skills,
+                "commands": commands,
                 "counts": dict(counts),
+                "targets": summarize(actions, expected),
                 "actions": [action.__dict__ for action in actions],
             },
             indent=2,
         )
-    skills, commands = synced
     lines = [
         f"{'preview' if dry_run else 'applied'}: {profile}; "
         f"skills={skills}, commands={commands}; "
@@ -449,6 +472,12 @@ examples:
         "--json", action="store_true", help="print the per-target report as JSON"
     )
     parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="print nothing after a successful apply",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -499,7 +528,8 @@ examples:
                 return 1
             flatten_skills.flatten(dry_run=False)
             execute(home, sources, commands, actions)
-            print(report)
+            if args.json or args.verbose or not args.quiet:
+                print(report)
             return 0
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
