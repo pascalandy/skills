@@ -65,6 +65,8 @@ Use the full `status` response when counts or fingerprints matter. The faster `h
 
 Completion criterion: every status-derived condition passes in one response, and the provider check also passes
 
+If `initialized` is false and status recommends an initial full index, follow [initial indexing](references/maintenance.md#initial-indexing). Then restart this gate
+
 ### 3. Refresh when needed
 
 Run one incremental refresh when step 2 fails only on freshness or pending sessions, or when the request concerns recent work such as the current session, a handoff, or today's activity. A passing structural gate does not prove that recent sessions are ingested
@@ -75,7 +77,7 @@ cass index --json --no-progress-events
 
 Never add `--full`, `--force-rebuild`, or `--semantic` here. The command can take minutes on a large archive even when little changed. Monitor the one running process with a time budget informed by prior runs. Do not launch a duplicate because output is quiet
 
-Completion criterion: the command exits successfully with `success=true`, then step 2 passes again. Exit 9 names an incomplete source scan and counts as a failed refresh
+Completion criterion: the command exits successfully with `success=true`, then step 2 passes again. If it fails, inspect the structured error before deciding whether to retry
 
 Do not substitute `search --refresh`. Its refresh failure is non-fatal, so search may continue against an old index
 
@@ -128,7 +130,7 @@ Check every response before using it
 
 - A `maintenance-required` error ends the attempt. Report it and return to the pre-use gate instead of rebuilding
 - `budget.timed_out` true means empty or short results do not prove absence
-- `_meta.index_freshness.fresh` false means the index went stale during the task. Refresh through step 3 before answering
+- A passing structural gate remains authoritative when search reports an age-only `_meta.index_freshness.fresh=false` warning. Continue without refreshing. For newly written sessions, follow step 3
 
 Follow a useful hit with its surrounding conversation. Pass `source_path`, `line_number`, `source_id`, and `conversation_id` from the same hit
 

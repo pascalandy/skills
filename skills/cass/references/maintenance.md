@@ -19,9 +19,19 @@ curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/coding_agent_sess
 
 Re-run `cass --version` and the mandatory pre-use gate, including its functional gate, after installation or upgrade. When the new version differs from the version the skill is verified against, recheck the skill and update its source
 
+## Initial indexing
+
+If `cass status --json` reports `initialized=false` and recommends `cass index --full`, build the initial archive once
+
+```bash
+cass index --full --json --no-progress-events
+```
+
+Require `success=true`, then restart the pre-use gate. Do not use `--full` for later refreshes
+
 ## Connector indexing
 
-The mandatory pre-use gate owns routine refresh. Outside that gate, prefer connector-bounded indexing for diagnosis or maintenance. A full rebuild is a recovery operation, never a routine pre-use step
+The mandatory pre-use gate owns routine refresh. Outside that gate, prefer connector-bounded indexing for diagnosis or maintenance. After initial indexing, a full rebuild is a recovery operation, never a routine pre-use step
 
 Common local roots include
 
@@ -42,7 +52,7 @@ cass index --watch-once /absolute/provider/root --json --no-progress-events
 
 A targeted path can still trigger an archive-wide lexical refresh. Monitor the one process with a time budget. Stop only when it exits, an explicit abort policy fires, or `cass status --json` reports `stalled` with corroborating evidence
 
-When exit 9 names an incomplete scan, CASS keeps the committed work; repeat the idempotent targeted scan once. Exit 7 means another process holds the lock; wait for it instead of starting a second run. Compare provider counts before and after a retry
+When the structured error identifies an incomplete scan, CASS keeps the committed work. Repeat the idempotent targeted scan once. Exit 7 means another process holds the lock. Wait for it before starting another run. Exit 9 is a general error. Inspect `err.kind` before deciding what to do. Compare provider counts before and after a retry
 
 ### Large archives on macOS
 
