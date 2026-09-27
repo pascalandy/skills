@@ -128,7 +128,10 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     skill(stale / "content", "retired")
     (stale / ".cache").mkdir()
     dirty = machine(homes, "dirty", origin)
-    (dirty / "draft.txt").write_text("work in progress\n")
+    skill(dirty / "authoring/content", "draft")
+    editor = machine(homes, "editor", origin)
+    (editor / ".vscode").mkdir()
+    (editor / ".vscode/settings.json").write_text("{}\n")
     branch = machine(homes, "branch", origin)
     git(branch, "switch", "-q", "-c", "feature")
     ahead = machine(homes, "ahead", origin)
@@ -136,7 +139,7 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     commit(ahead)
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
-    register(hub, "behind", "dirty", "branch", "ahead", "down")
+    register(hub, "behind", "dirty", "editor", "branch", "ahead", "down")
 
     result = run(hub, homes, bin_dir, "--json")
 
@@ -148,7 +151,8 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         for entry in report["machines"]
     ] == [
         ("behind", "synced", f"synced at {head[:7]}"),
-        ("dirty", "needs-you", "checkout has uncommitted changes"),
+        ("dirty", "needs-you", "checkout has uncommitted skill changes"),
+        ("editor", "synced", f"synced at {head[:7]}"),
         ("branch", "needs-you", "checkout is on feature, not main"),
         ("ahead", "needs-you", f"checkout has commits {report['hub']} lacks"),
         (
@@ -158,6 +162,8 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         ),
     ]
     assert git(behind, "rev-parse", "HEAD") == head
+    assert git(editor, "rev-parse", "HEAD") == head
+    assert (editor / ".vscode/settings.json").read_text() == "{}\n"
     assert git(origin, "rev-parse", "main") == before
     assert (stale / "content/secret/SKILL.md").is_file()
     assert not (stale / "content/retired").exists()
@@ -169,7 +175,7 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         assert not (homes / name / "just.log").exists()
     assert git(dirty, "rev-parse", "HEAD") == before
     assert (
-        "error: dirty needs-you: checkout has uncommitted changes; "
+        "error: dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
     ) in result.stderr
     assert "error: down offline:" in result.stderr
