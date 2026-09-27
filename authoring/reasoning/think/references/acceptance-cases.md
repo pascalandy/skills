@@ -15,7 +15,6 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Assume this launch failed six months from now" | Recommend `pa-premortem` | Substitute a generic failure lens |
 | "Look up the current mortgage rules and rates" | Recommend `tavily` | Analyze unstable facts from memory |
 | "Research the primary sources and preserve the findings in this repository" | Gather primary sources and save cited findings as Markdown in the repository's existing notes location, delegating if requested | Substitute an unfiled web summary |
-| "Investigate this organization using public sources and perform due diligence" | Recommend `investigation` | Treat ordinary analysis as an investigation |
 | "Teach me the corpus's Law of Proximity" | Recommend `game-theory-corpus` | Present the course concept as canonical game theory |
 | "Grill me with focused questions until this plan's weak point is clear" | Recommend `grilling` | Substitute an essay or silent analysis |
 | "Package this settled direction as a durable decision brief" | Recommend `pa-vision` | Treat artifact authoring as an internal method |
