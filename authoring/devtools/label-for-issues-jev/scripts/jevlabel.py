@@ -973,15 +973,20 @@ def decide(
         if result == "no":
             decision.missing.append(CHECKLIST_NAMES[qid])
         unsure = unsure or result == "uncertain"
+    # A later comment with facts may answer a request or say something else, so
+    # only a request followed by no facts at all counts as clearly unanswered.
     count = item.facts["comments_sent"]
     supplies = [judge("supplies_info", i) for i in range(count)]
+    maybe_answered: list[str] = []
     for index in range(count):
         asked, later = judge("asks_info", index), supplies[index + 1 :]
-        if asked == "no" or "yes" in later:
+        if asked == "no":
             continue
+        url = item.comments[index]["url"]
         if asked == "yes" and all(result == "no" for result in later):
-            decision.missing.append(f"a reply to {item.comments[index]['url']}")
+            decision.missing.append(f"a reply to {url}")
         else:
+            maybe_answered.append(url)
             unsure = True
 
     # State: one condition per state label; code picks at most one.
@@ -1006,6 +1011,10 @@ def decide(
         state_reason = f"conflicting states: {', '.join(holding)}"
     elif unclear:
         state_reason = f"unclear whether {', '.join(unclear)} applies"
+        if NEEDS_INFO in unclear and maybe_answered:
+            state_reason += (
+                f"; check whether {', '.join(maybe_answered)} got its answer"
+            )
     elif holding:
         judged_state = holding[0]
     elif (human := judge("needs_human_impl")) == "uncertain":
@@ -1017,7 +1026,8 @@ def decide(
     reasons.extend(family_problems(labels))
     existing_state = family(STATE_PREFIX)
     if judged_state is None:
-        if not existing_state:
+        # Uncertainty keeps an existing state; a confident conflict never does.
+        if not existing_state or len(holding) > 1:
             reasons.append(state_reason)
     elif judged_state not in existing_state:
         if existing_state:
@@ -1301,6 +1311,7 @@ def live_run(
     client = open_client(key, pack.model)
     entries: list[dict[str, Any]] = []
     error: str | None = None
+    interrupted = False
     tokens = requests = 0
     for item in prepared:
         entry = item.summary()
@@ -1317,6 +1328,11 @@ def live_run(
                 error = failure.problems[0]
                 entry.update(
                     Decision(queue="skip", reasons=[f"not asked: {error}"]).record()
+                )
+            except KeyboardInterrupt:
+                error, interrupted = "interrupted", True
+                entry.update(
+                    Decision(queue="skip", reasons=["not asked: interrupted"]).record()
                 )
             else:
                 requests += 1
@@ -1342,6 +1358,9 @@ def live_run(
     }
     path = runs_dir() / f"{header['id']}.json"
     write_json(path, record)
+    if interrupted:
+        print(f"the partial record is {path}", file=sys.stderr)
+        raise KeyboardInterrupt
     if error is not None:
         raise Failure(error, f"the run stopped; the partial record is {path}")
     line = (

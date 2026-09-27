@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import signal
+import time
+from pathlib import Path
+
 from labeltest import Harness, comment, issue
 
 MISSING_REPRO = {"Crash on start": {"bug_repro": 0.05}}
@@ -88,7 +93,15 @@ def test_an_unanswered_request_for_information_is_missing(harness: Harness) -> N
         "a reply to https://github.com/o/r/issues/1#issuecomment-7"
     ]
     assert harness.entry(record, 1)["add"] == ["2-type:bug", "1-needs-info", "3-pty:p2"]
-    assert harness.entry(record, 2)["missing"] == []
+    # Later facts may answer the request or say something else: a person checks.
+    answered = harness.entry(record, 2)
+    assert (answered["queue"], answered["missing"]) == ("review", [])
+    assert answered["reasons"] == [
+        (
+            "unclear whether 1-needs-info applies; check whether "
+            "https://github.com/o/r/issues/1#issuecomment-7 got its answer"
+        )
+    ]
 
 
 def test_emergencies_steering_and_declines_always_need_review(harness: Harness) -> None:
@@ -301,3 +314,48 @@ def test_duplicate_labels_in_a_family_need_review(harness: Harness) -> None:
 
     assert entry["queue"] == "review"
     assert entry["reasons"] == ["several type labels: 2-type:bug, 2-type:task"]
+
+
+def test_a_confident_conflict_needs_review_even_with_a_state_label(
+    harness: Harness,
+) -> None:
+    harness.issues(issue(1, labels=("2-type:bug", "1-needs-info", "3-pty:p2")))
+    harness.fake.overrides = {
+        "Crash on start": {"bug_repro": 0.05, "open_decision": 0.9}
+    }
+
+    entry = harness.entry(harness.record(harness.live()), 1)
+
+    assert entry["queue"] == "review"
+    assert entry["reasons"] == ["conflicting states: 1-needs-info, 1-needs-triage"]
+
+
+def test_uncertainty_keeps_an_existing_state_label(harness: Harness) -> None:
+    harness.issues(issue(1, labels=("2-type:bug", "1-needs-info", "3-pty:p2")))
+    harness.fake.overrides = {"Crash on start": {"open_decision": 0.5}}
+
+    entry = harness.entry(harness.record(harness.live()), 1)
+
+    assert (entry["queue"], entry["add"], entry["remove"]) == ("routine", [], [])
+
+
+def test_an_interrupted_run_keeps_the_answers_it_paid_for(harness: Harness) -> None:
+    harness.issues(issue(1), issue(2, title="Second"), issue(3, title="Third"))
+    harness.fake.stall_from = 2
+    process = harness.spawn("run", "-R", "o/r", TYPESAFE_API_KEY="k")
+    deadline = time.monotonic() + 60
+    while len(harness.fake.requests) < 2 and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    process.send_signal(signal.SIGINT)
+    _, stderr = process.communicate(timeout=60)
+
+    assert process.returncode == 130
+    assert "the partial record is" in stderr
+    path = Path(stderr.split("the partial record is ", 1)[1].splitlines()[0])
+    record = json.loads(path.read_text())
+    reasons = {e["number"]: e["reasons"] for e in record["issues"]}
+    assert "answers" in record["issues"][0]
+    assert reasons[2] == ["not asked: interrupted"]
+    assert reasons[3] == ["not asked: the run stopped at an earlier error"]
+    assert (record["error"], record["usage"]["requests"]) == ("interrupted", 1)
