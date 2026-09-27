@@ -7,11 +7,13 @@ check-frontmatter *args:
     @uv run scripts/check_frontmatter.py {{args}}
 
 # Install skills/ into the agent skill directories
+[no-exit-message]
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
 # Pull main, save and pull the private clone, then install every skill on this machine; silent on success, previews skip the pulls
 [positional-arguments]
+[no-exit-message]
 sync *args:
     #!/usr/bin/env bash
     set -Eeuo pipefail
@@ -33,10 +35,12 @@ sync *args:
     uv run scripts/install_skills.py --quiet "$@"
 
 # From any machine, sync every machine in _skills_private/fleet.toml, or named ones, to GitHub's main; --check compares them
+[no-exit-message]
 sync-fleet *args:
     @uv run scripts/sync_fleet.py {{args}}
 
 # Lefthook runs this after a commit or pull and before a push; it acts only in a main checkout with the registry
+[no-exit-message]
 sync-hook *args:
     @uv run scripts/sync_fleet.py --hook {{args}}
 
