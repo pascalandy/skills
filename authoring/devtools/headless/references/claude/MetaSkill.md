@@ -7,13 +7,12 @@ Use `claude -p` or `claude --print` from the target repository with ordinary pip
 Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. For a file review without shell execution, restrict available tools:
 
 ```bash
-claude -p --permission-mode dontAsk --permission-prompts none \
-  --tools "Read,Grep,Glob" \
-  "Review src/auth.ts for correctness. Report findings with file and line." \
+claude -p "Review src/auth.ts for correctness. Report findings with file and line." \
+  --permission-mode dontAsk --permission-prompts none --tools "Read,Grep,Glob" \
   < /dev/null > review.md 2> review.stderr.log
 ```
 
-This review cannot run tests or obtain a Git diff through Bash. Supply the diff through stdin, or authorize narrowly scoped shell commands when needed.
+Put the prompt before variadic flags such as `--tools` and `--allowedTools`. This review cannot run tests or obtain a Git diff through Bash. Supply the diff through stdin, or authorize narrowly scoped shell commands when needed.
 
 | Option | Use |
 | --- | --- |
@@ -34,9 +33,9 @@ Permission mode and allow rules still govern calls when prompts are disabled. `-
 ## Input and output
 
 ```bash
-claude -p --permission-mode dontAsk --permission-prompts none \
+claude -p "Review this diff and inspect related files" \
+  --permission-mode dontAsk --permission-prompts none \
   --tools "Read,Grep,Glob" --output-format json \
-  "Review this diff and inspect related files" \
   < diff.patch > result.json 2> review.stderr.log
 ```
 
@@ -49,16 +48,17 @@ claude -p --permission-mode dontAsk --permission-prompts none \
 For streaming output:
 
 ```bash
-claude -p --permission-mode dontAsk --permission-prompts none \
+claude -p "Summarize README.md" \
+  --permission-mode dontAsk --permission-prompts none \
   --tools "Read,Grep,Glob" --output-format stream-json --verbose \
-  "Summarize README.md" < /dev/null > events.jsonl 2> review.stderr.log
+  < /dev/null > events.jsonl 2> review.stderr.log
 ```
 
-Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in `structured_output`, separate from the result envelope.
+Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in the result object's `structured_output` field, not its `result` field.
 
 ## Verify completion
 
-Preserve the process exit status and inspect the final result. Invalid flags fail on stderr; failures during a run can appear on stdout. For JSON output, check `is_error` and `permission_denials` before accepting the report. For streams, consume through the final `result` record; if required plugins or MCP servers are missing or failed in `system/init`, report that limitation even when the process exits 0.
+Preserve the process exit status and inspect the final result. Invalid flags fail on stderr; failures during a run can appear on stdout. Check `is_error` and `permission_denials` in the JSON result or the stream's final `result` record. Use one of these formats when automation must detect denied tools; text has no structured denial record. If required plugins or MCP servers are missing or failed in `system/init`, report that limitation even when the process exits 0.
 
 ## Models, limits, and context
 
@@ -76,7 +76,7 @@ Preserve the process exit status and inspect the final result. Invalid flags fai
 | `--agent <name>`, `--agents <json>` | Select or define an agent |
 | `--worktree <name>` | Use an isolated Git worktree |
 
-Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. Subscription-authenticated runs should keep normal mode and account for loaded hooks, plugins, and MCP configuration. Consult installed help for exact behavior.
+Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. For subscription-authenticated runs, keep normal mode; add `--setting-sources user` when repository settings and `.mcp.json` should not load. To disable all hooks for that run, pass `--settings '{"disableAllHooks":true}'`. Supply required allow rules on the CLI rather than relying on an untrusted project's rules; see [workspace trust](https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder).
 
 ## Sessions
 
