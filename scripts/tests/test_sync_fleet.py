@@ -65,6 +65,12 @@ def machine(homes: Path, name: str, origin: Path) -> Path:
     return checkout
 
 
+def private_clone(checkout: Path, origin: Path) -> Path:
+    tree = checkout / "_skills_private"
+    subprocess.run(["git", "clone", "-q", str(origin), str(tree)], check=True)
+    return tree
+
+
 def register(control: Path, *names: str) -> None:
     registry = control / "_skills_private/fleet.toml"
     registry.parent.mkdir(exist_ok=True)
@@ -76,11 +82,22 @@ def register(control: Path, *names: str) -> None:
     )
 
 
-def publish(control: Path) -> str:
-    (control / "change.txt").write_text("published\n")
+def publish(control: Path, name: str = "change.txt") -> str:
+    (control / name).write_text("published\n")
     commit(control)
     git(control, "push", "-q", "origin", "main")
     return git(control, "rev-parse", "HEAD")
+
+
+def publish_private(private_origin: Path) -> str:
+    publisher = private_origin.parent / "private-publisher"
+    subprocess.run(
+        ["git", "clone", "-q", str(private_origin), str(publisher)], check=True
+    )
+    (publisher / "private.txt").write_text("published\n")
+    commit(publisher)
+    git(publisher, "push", "-q", "origin", "main")
+    return git(publisher, "rev-parse", "HEAD")
 
 
 def run(
@@ -104,15 +121,30 @@ def test_syncs_clean_machines_and_leaves_the_rest_untouched(
 ) -> None:
     control, homes, bin_dir = fleet
     origin = control.parent / "origin.git"
+    private_origin = control.parent / "private.git"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(origin), str(private_origin)], check=True
+    )
     behind = machine(homes, "behind", origin)
+    behind_private = private_clone(behind, private_origin)
     dirty = machine(homes, "dirty", origin)
     (dirty / "draft.txt").write_text("work in progress\n")
+    private_dirty = machine(homes, "private-dirty", origin)
+    (private_clone(private_dirty, private_origin) / "draft.txt").write_text("wip\n")
+    private_ahead = machine(homes, "private-ahead", origin)
+    ahead_tree = private_clone(private_ahead, private_origin)
+    (ahead_tree / "local.txt").write_text("not pushed\n")
+    commit(ahead_tree)
+    stale = git(behind, "rev-parse", "HEAD")
+    private_head = publish_private(private_origin)
     head = publish(control)
     ahead = machine(homes, "ahead", origin)
     (ahead / "local.txt").write_text("not pushed\n")
     commit(ahead)
     unpushed = git(ahead, "rev-parse", "HEAD")
-    register(control, "behind", "dirty", "ahead", "down")
+    register(
+        control, "behind", "dirty", "ahead", "private-dirty", "private-ahead", "down"
+    )
 
     result = run(control, homes, bin_dir, "--json")
 
@@ -129,7 +161,17 @@ def test_syncs_clean_machines_and_leaves_the_rest_untouched(
         {
             "machine": "ahead",
             "status": "skipped",
-            "detail": "main has unpushed commits",
+            "detail": "main has commits that are not on origin/main",
+        },
+        {
+            "machine": "private-dirty",
+            "status": "skipped",
+            "detail": "private tree has uncommitted changes",
+        },
+        {
+            "machine": "private-ahead",
+            "status": "skipped",
+            "detail": "private tree has commits that are not on its upstream",
         },
         {
             "machine": "down",
@@ -138,25 +180,45 @@ def test_syncs_clean_machines_and_leaves_the_rest_untouched(
         },
     ]
     assert git(behind, "rev-parse", "HEAD") == head
+    assert git(behind_private, "rev-parse", "HEAD") == private_head
     assert (homes / "behind/just.log").read_text() == "install-skills\n"
     assert git(ahead, "rev-parse", "HEAD") == unpushed
-    assert not (homes / "dirty/just.log").exists()
-    assert not (homes / "ahead/just.log").exists()
+    # A private tree that fails validation stops the run before main moves.
+    assert git(private_dirty, "rev-parse", "HEAD") == stale
+    assert git(private_ahead, "rev-parse", "HEAD") == stale
+    for name in ("dirty", "ahead", "private-dirty", "private-ahead"):
+        assert not (homes / name / "just.log").exists()
     assert "error: dirty skipped: checkout has uncommitted changes" in result.stderr
 
 
-def test_dry_run_reports_readiness_without_moving_or_installing(
+def test_dry_run_applies_every_check_without_moving_or_installing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     control, homes, bin_dir = fleet
-    behind = machine(homes, "behind", control.parent / "origin.git")
+    origin = control.parent / "origin.git"
+    behind = machine(homes, "behind", origin)
     before = git(behind, "rev-parse", "HEAD")
     head = publish(control)
-    register(control, "behind")
+    ahead = machine(homes, "ahead", origin)
+    (ahead / "local.txt").write_text("not pushed\n")
+    commit(ahead)
+    register(control, "behind", "ahead")
 
-    result = run(control, homes, bin_dir, "--dry-run")
+    result = run(control, homes, bin_dir, "--dry-run", "--json")
 
-    assert result.returncode == 0
-    assert result.stdout == f"1 machine ready for {head[:7]}: behind\n"
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["machines"] == [
+        {
+            "machine": "behind",
+            "status": "ready",
+            "detail": f"ready to move {before[:7]} to {head[:7]}",
+        },
+        {
+            "machine": "ahead",
+            "status": "skipped",
+            "detail": "main has commits that are not on origin/main",
+        },
+    ]
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (homes / "behind/just.log").exists()
+    assert not (homes / "ahead/just.log").exists()

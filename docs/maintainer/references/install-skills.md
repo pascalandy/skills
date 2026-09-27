@@ -21,10 +21,10 @@ date_updated: 2026-09-27
 
 ## Sync machines
 
-- `just sync` updates this machine: it fast-forwards the checkout and, when `_skills_private/` is a git clone, the private tree, then runs the installer with any flags you pass
-- `just sync-fleet` installs published `main` on every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet om1`. It reads `main` from GitHub once, then on each machine fast-forwards the checkout to that commit, pulls the private tree, and runs `just install-skills` in a login shell over SSH
-- It skips a machine whose checkout is not on `main`, has uncommitted changes, or holds unpushed commits, and changes nothing there. Push first; only published `main` reaches other machines
-- `just sync-fleet --dry-run` connects and reports each machine's readiness without fetching or installing
+- `just sync` updates this machine: it fast-forwards the checkout and, when `_skills_private/` is a git clone, the private tree, then runs the installer with any flags you pass. With `--dry-run` or `--check` it skips both pulls and previews the current checkout
+- `just sync-fleet` installs published `main` on every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet om1`. It reads `main` from GitHub once, then on each machine fast-forwards the checkout to that commit, fast-forwards a git private tree to its upstream, and runs `just install-skills` in a login shell over SSH
+- It checks each machine before changing anything there, and skips it when the checkout is off `main`, or when the checkout or a git private tree has uncommitted changes or commits its remote lacks. Push first; only published content reaches other machines. A private tree that is not a git clone is that machine's own and installs as is
+- `just sync-fleet --dry-run` fetches and runs the same checks, then reports each machine as ready or skipped without moving a checkout or installing
 - The registry stays in the private tree so hosts and accounts stay out of this public repository. Each `path` is relative to that machine's home:
 
 ```toml

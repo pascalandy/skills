@@ -10,11 +10,16 @@ check-frontmatter *args:
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
-# Pull main and the private tree, then install every skill on this machine
+# Pull main and the private tree, then install every skill on this machine; previews skip the pulls
 [positional-arguments]
 sync *args:
     #!/usr/bin/env bash
     set -Eeuo pipefail
+    for arg in "$@"; do
+        case "${arg}" in
+            --dry-run | --check | -h | --help) exec uv run scripts/install_skills.py "$@" ;;
+        esac
+    done
     git pull --quiet --ff-only
     if [[ -d _skills_private/.git ]]; then git -C _skills_private pull --quiet --ff-only; fi
     uv run scripts/install_skills.py "$@"
