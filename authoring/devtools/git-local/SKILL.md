@@ -13,26 +13,27 @@ Install or update opensrc on Mac: `PNPM_HOME="$HOME/Library/pnpm" "$HOME/Library
 
 ## Cache Location
 
-Resolve the local `SKILLS_MONO` workspace once at the start of the task, then reuse its absolute path as `OPENSRC_ROOT` in every shell that needs it.
-
-1. If `OPENSRC_ROOT` is non-empty, validate that directory and use it. An explicit path may be outside `$HOME`. If it is invalid, report the problem and ask for the correct path rather than silently choosing another workspace.
-2. Otherwise, search beneath `$HOME` for directories named exactly `SKILLS_MONO`, including hidden and Git-ignored directories. Use `fd` when available, or `find` as a fallback. Do not assume a parent directory or choose a path based on the operating system.
-3. Validate each candidate by checking that its `justfile` exists and that `just --justfile "<candidate>/justfile" --working-directory "<candidate>" --show opensrc-sync` succeeds. This inspects the required recipe without running it. If `just` is unavailable, report the missing prerequisite before continuing.
-4. Resolve candidates to physical absolute paths and deduplicate them. Use the sole valid candidate. If several remain, show their paths and ask which to use. If none remain, ask for the workspace location. Report search errors as incomplete discovery rather than treating them as proof that no other workspace exists.
-
-Finish resolution before any cache operation. Keep the resolved path for the current task; do not create a workspace or persist machine-specific configuration as part of discovery.
-
-GitHub repositories are stored under:
+This configuration is for Pascal's Mac only. Before any cache operation, initialize these variables in that shell, replacing inherited values:
 
 ```bash
-"$OPENSRC_ROOT/opensrc/repos/github.com/<owner>/<repo>"
+export OPENSRC_HOME="/Users/andy16/Documents/github_local/SKILLS_MONO/opensrc"
+OPENSRC_ROOT="${OPENSRC_HOME%/opensrc}"
 ```
 
-Example resolution:
+`OPENSRC_HOME` is the cache itself; `OPENSRC_ROOT` is its parent workspace. The installed CLI uses `OPENSRC_HOME` for storage. Its `--cwd` flag only controls lockfile lookup. Do not use `--cwd` to select the cache, append another `opensrc`, or pass the obsolete `--modify` flag.
+
+Verify that this Mac's cache directory exists, its physical path matches `OPENSRC_HOME`, and the refresh recipe is available:
 
 ```bash
-github.com/anomalyco/opencode -> $OPENSRC_ROOT/opensrc/repos/github.com/anomalyco/opencode
+test "$(uname -s)" = Darwin &&
+  test -d "$OPENSRC_HOME" &&
+  test "$(cd "$OPENSRC_HOME" && pwd -P)" = "$OPENSRC_HOME" &&
+  just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" --show opensrc-sync
 ```
+
+If validation fails or a prerequisite is missing, stop and report it. Do not search for another workspace, create a replacement, or fall back to the current directory, `/Users/andy16/opensrc`, or the CLI's default `~/.opensrc`. Do not change shell profiles or the tool installation to configure the cache.
+
+Read repository locations from `$OPENSRC_HOME/sources.json` or `opensrc list --json`. Match `repos[].name` to `github.com/<owner>/<repo>` and resolve its `path` relative to `OPENSRC_HOME`. Existing snapshots may use `repos/github.com/<owner>/<repo>`; new downloads may add a version directory. Do not guess that last component. Before using a recorded path, verify that it resolves inside `OPENSRC_HOME` and contains source files.
 
 ## Trigger
 
@@ -54,26 +55,21 @@ Use this skill when:
    - `github.com/owner/repo` -> `owner/repo`
    - `owner/repo` stays as-is
    - Strip any trailing `.git` suffix
-2. Resolve `OPENSRC_ROOT` using [Cache Location](#cache-location), then check the expected local path:
-
-```bash
-repo_path="$OPENSRC_ROOT/opensrc/repos/github.com/<owner>/<repo>"
-test -d "$repo_path" && find "$repo_path" -mindepth 1 -maxdepth 1 ! -name .DS_Store | head -1
-```
+2. Initialize and validate the fixed cache using [Cache Location](#cache-location). Look up the recorded repository path and check for files other than `.DS_Store`. If an unregistered directory already exists for that repository, inspect it and load the troubleshooting reference before fetching over it.
 
 3. If the path exists and contains files other than `.DS_Store`, refresh it through the SKILLS_MONO justfile before reading:
 
 ```bash
-just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" opensrc-sync <owner>/<repo>
+OPENSRC_HOME="$OPENSRC_HOME" just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" opensrc-sync <owner>/<repo>
 ```
 
 4. If the path is missing or effectively empty, fetch it with:
 
 ```bash
-opensrc --cwd "$OPENSRC_ROOT" --modify=false <owner>/<repo>
+OPENSRC_HOME="$OPENSRC_HOME" opensrc fetch <owner>/<repo>
 ```
 
-5. After refresh or fetch, verify the expected path exists and contains content before using it.
+5. After a successful refresh or fetch, reread the recorded path into `repo_path`; it may have changed to include a version directory. Verify its physical location is inside `OPENSRC_HOME` and that it contains source files before using it. If the operation fails, report the failure rather than claiming the cache is current or trying another destination.
 6. Optionally open the resolved repository in the local file manager when a graphical session is available:
 
 ```bash
@@ -86,25 +82,9 @@ esac
 7. Use that path for `rg`, file reads, analysis, and references.
 8. Tell the user the local path you used when reporting findings.
 
-`--modify=false` is the default for direct `opensrc` fetches so `opensrc` does not silently update `.gitignore`, `tsconfig.json`, or `AGENTS.md` inside `$OPENSRC_ROOT`. Drop the flag only when the user explicitly opts in.
-
 ## Existing Checkout Rule
 
-Do not run direct `opensrc` just because a repository was mentioned. First check whether this path already exists:
-
-```bash
-"$OPENSRC_ROOT/opensrc/repos/github.com/<owner>/<repo>"
-```
-
-If it exists and is non-empty, refresh it with the SKILLS_MONO justfile:
-
-```bash
-just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" opensrc-sync <owner>/<repo>
-```
-
-Optionally open the resolved repo path using the platform command in step 6.
-
-Use the direct `opensrc --cwd "$OPENSRC_ROOT" --modify=false <owner>/<repo>` fetch path only for missing or empty checkouts.
+Follow the lookup and refresh sequence in [Workflow](#workflow). A repository mention alone does not justify a direct fetch. Use direct fetch only for a missing or empty checkout; preserve existing source when an operation fails.
 
 ## Troubleshooting
 
@@ -112,7 +92,7 @@ When `opensrc` fails, the cache looks inconsistent, or you need to list/remove/c
 
 ## Branches, Tags, and Git History
 
-`opensrc` stores source snapshots for code reading. It may remove `.git` metadata after fetching, so do not assume `git pull` is available in cached repos. Use `just opensrc-sync <owner>/<repo>` from `$OPENSRC_ROOT` to refresh existing cached repos. If the user specifically needs git history, branches, remotes, or a writable checkout, say so and create a separate task-specific clone or worktree outside the shared opensrc cache.
+`opensrc` stores source snapshots for code reading. It may remove `.git` metadata after fetching, so do not assume `git pull` is available in cached repos. Refresh through [Workflow](#workflow), retaining the fixed cache environment. If the user specifically needs git history, branches, remotes, or a writable checkout, say so and create a separate task-specific clone or worktree outside the shared opensrc cache.
 
 For URLs with branch paths, preserve the repository path for cache lookup:
 
@@ -124,7 +104,7 @@ After resolving the local repo root, inspect the requested subdirectory inside i
 
 ## Do Not
 
-- Do not default to cloning GitHub repositories outside `$OPENSRC_ROOT` (no `/tmp`, no current working directory, no `gh repo clone` / `git clone` to a default path)
+- Do not default to cloning GitHub repositories outside `$OPENSRC_HOME` (no `/tmp`, no current working directory, no `gh repo clone` / `git clone` to a default path)
 - Do not edit files inside the shared opensrc cache unless the user explicitly asks to modify that cached source
 - Do not delete or replace cached repositories unless the user asks for a refresh or repair
-- Do not pass `--modify=true` (or omit `--modify=false`) unless the user opts in to letting `opensrc` rewrite `.gitignore`, `tsconfig.json`, or `AGENTS.md` in the workspace
+- Do not modify the workspace's `.gitignore`, `tsconfig.json`, or `AGENTS.md` as part of fetching source
