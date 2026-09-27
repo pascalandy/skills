@@ -107,10 +107,16 @@ edited() {
     [ -n "$(git status --porcelain -- authoring skills scripts justfile)" ]
 }
 """
+# The mirror would follow a symlinked private root and delete files wherever it
+# points, so a link stops the machine before anything is sent.
 INSPECT = """
 step() {
     enter "$1" || return
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
+    if [ -L _skills_private ]; then
+        echo "~/$1/_skills_private is a symlink; replace it with a folder"
+        return 11
+    fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
     head=$(git rev-parse -q --verify HEAD) || head=-
     if edited; then state=dirty; else state=clean; fi
