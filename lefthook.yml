@@ -32,8 +32,10 @@ post-rewrite:
     sync-skills:
       run: just sync-hook post-rewrite {1}
 
+# A script, not a command: lefthook skips a pre-push command whose push only
+# deletes files, and that push must still reach the fleet
 pre-push:
-  commands:
-    sync-skills:
+  scripts:
+    "sync-skills.sh":
+      runner: sh
       use_stdin: true
-      run: just sync-hook pre-push
