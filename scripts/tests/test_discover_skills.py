@@ -18,8 +18,11 @@ def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess
     # The fake agent shadows any real one; git lists the sandbox's skills.
     env["PATH"] = f"{executable.parent}{os.pathsep}{GIT}"
     script = home.parent / "repo/scripts/discover_skills.py"
+    # uv sets UV to its own binary; a version manager's shim would put its own
+    # tool directories, and a real agent, ahead of the fake one.
+    uv = os.environ.get("UV") or shutil.which("uv") or "uv"
     return subprocess.run(
-        [shutil.which("uv") or "uv", "run", str(script), *args],
+        [uv, "run", str(script), *args],
         check=False,
         env=env,
         capture_output=True,
