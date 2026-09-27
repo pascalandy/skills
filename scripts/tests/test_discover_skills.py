@@ -8,17 +8,18 @@ import shutil
 import subprocess
 from pathlib import Path
 
-SCRIPT = Path(__file__).parent.parent / "discover_skills.py"
+GIT = Path(shutil.which("git") or "/usr/bin/git").parent
 
 
 def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
-    env["XDG_STATE_HOME"] = str(home / "state")
     env["UV_CACHE_DIR"] = str(home.parent / "uv-cache")
-    env["PATH"] = str(executable.parent)
+    # The fake agent shadows any real one; git lists the sandbox's skills.
+    env["PATH"] = f"{executable.parent}{os.pathsep}{GIT}"
+    script = home.parent / "repo/scripts/discover_skills.py"
     return subprocess.run(
-        [shutil.which("uv") or "uv", "run", str(SCRIPT), *args],
+        [shutil.which("uv") or "uv", "run", str(script), *args],
         check=False,
         env=env,
         capture_output=True,
@@ -37,32 +38,13 @@ def fake_opencode(binary: Path, location: Path) -> None:
     binary.chmod(0o755)
 
 
-def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None:
-    home = tmp_path / "home"
+def test_native_opencode_discovery_and_unverified_claude(
+    sandbox: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, home = sandbox
     entry = home / ".config/opencode/skills/alpha/SKILL.md"
     entry.parent.mkdir(parents=True)
     entry.write_text("# alpha\n", encoding="utf-8")
-    manifest = home / "state/install-skills/manifest.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "version": 2,
-                "targets": {
-                    ".agents/skills": {
-                        "alpha": {"source": "public", "digest": "a" * 64}
-                    },
-                    ".config/opencode/skills": {
-                        "alpha": {"source": "public", "digest": "a" * 64}
-                    },
-                    ".claude/skills": {
-                        "alpha": {"source": "public", "digest": "a" * 64}
-                    },
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
     binary = tmp_path / "bin/opencode"
     binary.parent.mkdir()
     fake_opencode(binary, entry)
@@ -99,18 +81,6 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
         home, binary, "--profile", "mac", "--agent", "opencode", "--json"
     )
     assert deduplicated.returncode == 0, deduplicated.stderr
-    unowned = home / ".config/agents/skills/alpha/SKILL.md"
-    unowned.parent.mkdir(parents=True)
-    unowned.write_text("# alpha\n", encoding="utf-8")
-    (unowned.parent / "guide.md").write_text("current\n", encoding="utf-8")
-    fake_opencode(binary, unowned)
-    not_manifest_owned = run(
-        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
-    )
-    assert not_manifest_owned.returncode == 1
-    assert json.loads(not_manifest_owned.stdout)["agents"]["opencode"]["missing"] == [
-        "alpha"
-    ]
     real = home / "actual/alpha"
     real.parent.mkdir()
     entry.parent.rename(real)
@@ -139,8 +109,3 @@ def test_native_opencode_discovery_and_unverified_claude(tmp_path: Path) -> None
     unverified = run(home, binary, "--profile", "mac", "--agent", "claude", "--json")
     assert unverified.returncode == 1
     assert json.loads(unverified.stdout)["agents"]["claude"]["status"] == "unverified"
-    manifest.write_text("bad json", encoding="utf-8")
-    malformed = run(home, binary, "--profile", "mac")
-    assert malformed.returncode == 1
-    assert malformed.stdout == ""
-    assert malformed.stderr.startswith("error: cannot read manifest")

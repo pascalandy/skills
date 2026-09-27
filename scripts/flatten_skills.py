@@ -35,29 +35,25 @@ exit codes: 0 ok, 1 flatten failed, 2 bad usage, 130 interrupted"""
 log = logging.getLogger("flatten-skills")
 
 
+def git(*args: str) -> bytes:
+    """Run git in the repository and return its stdout."""
+    executable = shutil.which("git")
+    if executable is None:
+        raise ScriptError("git not found on PATH; install git and rerun")
+    result = subprocess.run(
+        [executable, *args], cwd=ROOT, capture_output=True, check=False
+    )
+    if result.returncode != 0:
+        raise ScriptError(f"git {args[0]} failed: {result.stderr.decode().strip()}")
+    return result.stdout
+
+
 def git_files(directory: str) -> list[Path]:
     """List tracked and non-ignored untracked paths in a repository directory."""
-    git = shutil.which("git")
-    if git is None:
-        raise ScriptError("git not found on PATH; install git and rerun")
-    listed = subprocess.run(
-        [
-            git,
-            "ls-files",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "-z",
-            "--",
-            directory,
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        check=False,
+    listed = git(
+        "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", directory
     )
-    if listed.returncode != 0:
-        raise ScriptError(f"git ls-files failed: {listed.stderr.decode().strip()}")
-    return [Path(os.fsdecode(path)) for path in listed.stdout.split(b"\0") if path]
+    return [Path(os.fsdecode(path)) for path in listed.split(b"\0") if path]
 
 
 def collect() -> dict[str, list[tuple[Path, Path]]]:
