@@ -18,6 +18,7 @@ date_updated: 2026-09-27
 - Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
 - A name that is both public and private stops the run; delete the stale copy it names
 - Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
+- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. Previews and checks do not wait
 
 ## Sync machines
 

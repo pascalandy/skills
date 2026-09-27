@@ -22,7 +22,6 @@ public repository. Each path is relative to that machine's home:
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import logging
 import os
@@ -32,15 +31,13 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 import tomllib
-from _common import ScriptError, run_script
+from _common import ScriptError, exclusive, run_script
 from install_skills import (
     PRIVATE,
     RUNTIME_NAMES,
@@ -451,15 +448,6 @@ def notify(lines: list[str]) -> None:
         )
 
 
-@contextmanager
-def exclusive(path: Path) -> Iterator[None]:
-    """Queue behind any other sync, so each run sends the newest commit."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        yield
-
-
 def hub_commit() -> str:
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
     if branch != "main":
@@ -542,6 +530,7 @@ def sync(args: argparse.Namespace) -> str:
             f"no private skills under {PRIVATE}; refusing to mirror an empty tree"
         )
     local = next((machine.name for machine in registry if machine.is_local()), None)
+    # Queue behind any other sync, so each run sends the newest commit.
     with exclusive(STATE / "fleet.lock"):
         hub = Hub(local or socket.gethostname().split(".")[0], hub_commit())
         log.info(
