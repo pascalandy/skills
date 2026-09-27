@@ -256,7 +256,7 @@ def executable(path: Path) -> None:
 
 
 @pytest.mark.parametrize("edit", [same_size_and_time, executable])
-def test_sync_repairs_every_private_difference_check_reports(
+def test_sync_repairs_the_private_drift_check_reports(
     fleet: tuple[Path, Path, Path], edit: Callable[[Path], None]
 ) -> None:
     hub, homes, bin_dir = fleet
