@@ -598,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
 
 examples:
   just install-skills --dry-run --profile mac
-  just install-skills --profile om1 --private transcript-sk
+  just install-skills --profile om1 --private apple-mail
   just install-skills --check --json""",
     )
     parser.add_argument(

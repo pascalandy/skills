@@ -26,26 +26,16 @@ release-check version *args:
 gitleaks-staged:
     @gitleaks git --staged --no-banner --redact --log-level warn --verbose --no-color
 
-# Private transcript-sk, ignored by Git; these recipes fail when it is absent
-transcript_impl := justfile_directory() / "_skills_private/integrations/transcript-sk/scripts/transcript.py"
+transcript_impl := justfile_directory() / "authoring/content/transcript-sk/scripts/transcript.py"
 
 alias ttr := transcript
 
 # Transcribe one YouTube URL; extra flags go to `transcript.py run youtube`
 [positional-arguments]
 transcript url *args:
-    #!/usr/bin/env bash
-    set -Eeuo pipefail
-    readonly implementation={{ quote(transcript_impl) }}
-    if [[ ! -f "$implementation" ]]; then
-        echo "error: private transcript-sk is missing at $implementation" >&2
-        exit 1
-    fi
-    readonly url="$1"
-    shift
-    uv run "$implementation" run youtube --url "$url" "$@"
+    @uv run {{ quote(transcript_impl) }} run youtube --url "$@"
 
 # Run any transcript-sk command, such as `--help`, `list prompts`, or `doctor --source all`
 [positional-arguments]
 transcript-cli *args:
-    @test -f {{ quote(transcript_impl) }} || { echo 'error: private transcript-sk is missing from _skills_private/integrations/' >&2; exit 1; }; uv run {{ quote(transcript_impl) }} "$@"
+    @uv run {{ quote(transcript_impl) }} "$@"
