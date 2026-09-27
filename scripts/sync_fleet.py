@@ -6,9 +6,10 @@
 """Install the published skills on every machine in the fleet.
 
 Resolves origin/main once, then on each machine fast-forwards its skills
-checkout to that commit, pulls the private tree when it is a git clone, and
-runs `just install-skills`. A machine whose checkout is not on main, has
-uncommitted changes, or holds unpushed commits is skipped untouched.
+checkout to that commit, fast-forwards the private tree when it is a git
+clone, and runs `just install-skills`. A machine is skipped untouched when its
+checkout is off main, or when the checkout or a git private tree has
+uncommitted changes or commits its remote lacks.
 
 The registry is fleet.toml in the private tree, so hosts stay out of this
 public repository. Each path is relative to that machine's home:
@@ -51,11 +52,14 @@ TIMEOUT = 600
 log = logging.getLogger("sync-fleet")
 
 # Runs in the machine's login shell, so `just` and `uv` are on PATH over SSH.
-# The body is one function called with stdin closed: the shell parses it whole
-# before git or just could read the rest of the script from stdin.
+# Every check runs before anything moves, and a preview stops right after them,
+# so preview and apply judge a machine the same way. Fetching only updates
+# remote-tracking refs. The body is one function called with stdin closed: the
+# shell parses it whole before git or just could read the rest from stdin.
 REMOTE = """
 sync_machine() {
     cd "$HOME/$1" 2>/dev/null || { echo "no skills checkout at ~/$1"; return 10; }
+    command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 12; }
     branch=$(git symbolic-ref --short -q HEAD) || branch=""
     if [ "$branch" != main ]; then
         echo "checkout is on ${branch:-a detached HEAD}, not main"
@@ -65,20 +69,44 @@ sync_machine() {
         echo "checkout has uncommitted changes"
         return 11
     fi
-    if [ "$3" = preview ]; then
-        echo "ready at $(git rev-parse --short HEAD)"
-        return 0
-    fi
     git fetch --quiet origin main || { echo "git fetch failed"; return 12; }
-    git merge --quiet --ff-only "$2" >/dev/null 2>&1 || { echo "main diverged from origin/main"; return 11; }
-    if [ "$(git rev-parse HEAD)" != "$2" ]; then
-        echo "main has unpushed commits"
+    if ! git merge-base --is-ancestor HEAD "$2"; then
+        echo "main has commits that are not on origin/main"
         return 11
     fi
-    if [ -d _skills_private/.git ]; then
-        git -C _skills_private pull --quiet --ff-only || { echo "private tree did not fast-forward"; return 12; }
+    private=_skills_private
+    if [ -d "$private/.git" ]; then
+        if [ -n "$(git -C "$private" status --porcelain)" ]; then
+            echo "private tree has uncommitted changes"
+            return 11
+        fi
+        git -C "$private" rev-parse -q --verify '@{u}' >/dev/null || {
+            echo "private tree has no upstream branch"
+            return 11
+        }
+        git -C "$private" fetch --quiet || { echo "private tree fetch failed"; return 12; }
+        if ! git -C "$private" merge-base --is-ancestor HEAD '@{u}'; then
+            echo "private tree has commits that are not on its upstream"
+            return 11
+        fi
+    else
+        private=""
     fi
-    command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 12; }
+    if [ "$3" = preview ]; then
+        if [ "$(git rev-parse HEAD)" = "$2" ]; then
+            echo "ready; already at $(git rev-parse --short HEAD)"
+        else
+            echo "ready to move $(git rev-parse --short HEAD) to $(git rev-parse --short "$2")"
+        fi
+        return 0
+    fi
+    git merge --quiet --ff-only "$2" >/dev/null 2>&1 || { echo "main did not fast-forward"; return 12; }
+    if [ -n "$private" ]; then
+        git -C "$private" merge --quiet --ff-only '@{u}' >/dev/null 2>&1 || {
+            echo "private tree did not fast-forward"
+            return 12
+        }
+    fi
     just install-skills 2>&1
 }
 sync_machine "$@" </dev/null
@@ -240,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="report whether each machine is ready, without fetching or installing",
+        help="fetch and run every check, without moving checkouts or installing",
     )
     parser.add_argument(
         "--json", action="store_true", help="print the per-machine report as JSON"
