@@ -184,13 +184,12 @@ def discover(agent: str, cwd: Path, timeout: float):
 
 def run(args: argparse.Namespace) -> int:
     """Check native adapters; report unsupported Claude without masking supported results."""
-    from install_skills import EXCLUSIONS, PROFILES, digest, skill_sources
+    from install_skills import PROFILES, digest, skill_sources
 
     home = Path.home()
     with tempfile.TemporaryDirectory(prefix=".skills-discover-") as temporary:
         selected = sorted(
-            skill_sources(Path(temporary), args.private_root).keys()
-            - EXCLUSIONS[args.profile]
+            skill_sources(Path(temporary), args.private_root, args.profile)
         )
     roots = {
         "codex": ".codex/skills" if args.profile == "om1" else ".agents/skills",

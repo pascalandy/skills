@@ -206,8 +206,11 @@ def private_packages(root: Path | None) -> dict[str, Path]:
     return packages
 
 
-def skill_sources(stage: Path, private_root: Path | None) -> dict[str, Source]:
-    """Stage public packages under `stage` and add every private package."""
+def skill_sources(
+    stage: Path, private_root: Path | None, profile: str
+) -> dict[str, Source]:
+    """Stage public packages under `stage`, add every private package, and drop
+    the profile's exclusions."""
     sources: dict[str, Source] = {}
     for name, entries in flatten_skills.collect().items():
         package = stage / name
@@ -228,7 +231,11 @@ def skill_sources(stage: Path, private_root: Path | None) -> dict[str, Source]:
         raise ScriptError(*duplicates)
     if not sources:
         raise ScriptError("no public skills found; run just flatten-skills")
-    return sources
+    return {
+        name: source
+        for name, source in sources.items()
+        if name not in EXCLUSIONS[profile]
+    }
 
 
 def command_sources() -> dict[str, Source]:
@@ -438,13 +445,7 @@ examples:
     home = Path.home()
     try:
         with tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary:
-            sources = {
-                name: source
-                for name, source in skill_sources(
-                    Path(temporary), args.private_root
-                ).items()
-                if name not in EXCLUSIONS[args.profile]
-            }
+            sources = skill_sources(Path(temporary), args.private_root, args.profile)
             commands = command_sources()
             actions = [
                 *plan(
