@@ -150,7 +150,7 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
 
     releases: dict[str, tuple[int, int, int]] = {}
     ignored: list[str] = []
-    for tag in git_output("tag", "--list", "v*").splitlines():
+    for tag in git_output("tag", "--list", "--sort=refname", "v*").splitlines():
         if tag == version:
             continue
         parsed = parse_version(tag)
