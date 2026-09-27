@@ -13,8 +13,10 @@ pre-commit:
       glob: "{authoring,skills}/**/*"
       run: just flatten-skills --check
 
-# The hub's main checkout installs, then syncs the fleet in the background.
-# sync-hook exits early everywhere else, including worktrees and other branches
+# In a main checkout with the registry, a commit installs this machine, a pull
+# also syncs the other machines in the background, and a push of main syncs
+# them once GitHub has it. sync-hook exits early everywhere else, including
+# worktrees and other branches
 post-commit:
   commands:
     sync-skills:
@@ -29,3 +31,9 @@ post-rewrite:
   commands:
     sync-skills:
       run: just sync-hook post-rewrite {1}
+
+pre-push:
+  commands:
+    sync-skills:
+      use_stdin: true
+      run: just sync-hook pre-push

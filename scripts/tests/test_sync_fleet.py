@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -105,15 +106,17 @@ def register(hub: Path, *names: str) -> None:
     )
 
 
-def change(hub: Path, name: str = "change.txt") -> str:
-    """Commit on the hub without pushing, so only the hub can deliver it."""
+def change(hub: Path, name: str = "change.txt", push: bool = True) -> str:
+    """Commit on the syncing machine and, unless told not to, push it to GitHub."""
     (hub / name).write_text("new\n")
     commit(hub)
+    if push:
+        git(hub, "push", "-q", "origin", "HEAD:main")
     return git(hub, "rev-parse", "HEAD")
 
 
 def run(
-    hub: Path, homes: Path, bin_dir: Path, *args: str
+    hub: Path, homes: Path, bin_dir: Path, *args: str, stdin: str = ""
 ) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, **GIT_IDENTITY}
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
@@ -126,13 +129,14 @@ def run(
         check=False,
         cwd=hub,
         env=env,
+        input=stdin,
         capture_output=True,
         text=True,
         timeout=120,
     )
 
 
-def test_sends_the_hub_commit_saves_private_edits_and_leaves_the_rest_untouched(
+def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
@@ -159,6 +163,8 @@ def test_sends_the_hub_commit_saves_private_edits_and_leaves_the_rest_untouched(
     (linked / "_skills_private").symlink_to(editor / "_skills_private")
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
+    # A commit GitHub lacks stays on the machine that made it.
+    change(hub, "unpushed.txt", push=False)
     (hub / "_skills_private/content/secret/SKILL.md").write_text("from the hub\n")
     register(
         hub, "behind", "dirty", "editor", "branch", "ahead", "plain", "linked", "down"
@@ -181,7 +187,7 @@ def test_sends_the_hub_commit_saves_private_edits_and_leaves_the_rest_untouched(
         ("dirty", "needs-you", "checkout has uncommitted skill changes"),
         ("editor", "synced", f"synced at {head[:7]}"),
         ("branch", "needs-you", "checkout is on feature, not main"),
-        ("ahead", "needs-you", f"checkout has commits {report['hub']} lacks"),
+        ("ahead", "needs-you", "checkout has commits GitHub lacks; push them"),
         ("plain", "needs-you", not_a_clone),
         ("linked", "needs-you", not_a_clone),
         (
@@ -193,7 +199,8 @@ def test_sends_the_hub_commit_saves_private_edits_and_leaves_the_rest_untouched(
     assert git(behind, "rev-parse", "HEAD") == head
     assert git(editor, "rev-parse", "HEAD") == head
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
-    assert git(origin, "rev-parse", "main") == before
+    assert git(origin, "rev-parse", "main") == head
+    assert not (behind / "unpushed.txt").exists()
     assert git(private, "show", "main:content/secret/SKILL.md") == "from the hub"
     assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
@@ -277,7 +284,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 
-def test_hook_acts_only_in_the_hub_main_checkout(
+def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
@@ -288,20 +295,49 @@ def test_hook_acts_only_in_the_hub_main_checkout(
     fleet_log = home / ".local/state/skills-sync/fleet.log"
 
     git(hub, "switch", "-q", "-c", "feature")
-    change(hub)
+    change(hub, push=False)
     assert run(hub, homes, bin_dir, "--hook", "post-commit").returncode == 0
     git(hub, "switch", "-q", "main")
     assert run(hub, homes, bin_dir, "--hook", "post-rewrite", "amend").returncode == 0
     assert not (home / ".local/state").exists()
     assert not (home / ".claude").exists()
 
-    head = change(hub)
-    result = run(hub, homes, bin_dir, "--hook", "post-commit")
-
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    head = change(hub, push=False)
+    committed = run(hub, homes, bin_dir, "--hook", "post-commit")
+    assert (committed.returncode, committed.stdout, committed.stderr) == (0, "", "")
     assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+    assert not fleet_log.exists()
+
+    refs = f"refs/heads/main {head} refs/heads/main {before}\n"
+    pushing = run(hub, homes, bin_dir, "--hook", "pre-push", stdin=refs)
+    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
+    git(hub, "push", "-q", "origin", "main")
+
     deadline = time.monotonic() + 60
     while "behind: synced" not in (fleet_log.read_text() if fleet_log.exists() else ""):
         assert time.monotonic() < deadline, "background sync did not finish"
         time.sleep(0.2)
     assert git(behind, "rev-parse", "HEAD") == head != before
+
+
+def test_brings_the_machine_it_runs_on_to_github_main(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    here = socket.gethostname().split(".")[0].lower()
+    home = hub.parent / "hub-home"
+    (home / "projects").mkdir(parents=True)
+    (home / "projects/skills").symlink_to(hub)
+    register(hub, here)
+    # Another machine pushed to GitHub; this checkout has not pulled it yet.
+    other = hub.parent / "other"
+    git(hub.parent, "clone", "-q", str(hub.parent / "skills.git"), str(other))
+    github = change(other, "elsewhere.txt")
+    before = git(hub, "rev-parse", "HEAD")
+
+    result = run(hub, homes, bin_dir)
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert git(hub, "rev-parse", "HEAD") == github != before
+    assert (home / "just.log").read_text() == "install-skills --quiet\n"
+    assert (home / ".claude/skills/secret/SKILL.md").is_file()
