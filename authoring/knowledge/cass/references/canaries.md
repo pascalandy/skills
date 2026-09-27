@@ -1,14 +1,11 @@
 # CASS QA canaries
 
-Use only these registered canaries during the mandatory functional gate. They come from the cross-provider ACv4 demo completed with CASS 0.6.25 on 2026-08-21
+Use only this registered canary during the functional gate. It was verified on CASS 0.9.0 on 2026-09-26
 
-| Provider slug | Lexical query | Passing evidence |
-|---|---|---|
-| `codex` | `ACv4` | At least one result tagged `codex` |
-| `pi_agent` | `ACv4` | At least one result tagged `pi_agent` |
-| `opencode` | `Explication projet ACv4` | At least one result tagged `opencode` |
-| `claude` | `ACv4` | At least one result tagged `claude` |
+- Query: `README`
+- Registered providers: `codex`, `pi_agent`, `opencode`, `claude_code`
+- Passing evidence: at least one result tagged with each required provider slug
 
-Use `--mode lexical --limit 3 --fields summary` for each probe. Expand one exact returned hit from any required provider and require non-empty surrounding conversation
+Use `--mode lexical --no-maintenance --limit 3 --fields summary` for each probe. Expand one exact returned hit from any required provider with `--message-index` and require the target message to contain the canary query
 
-If a registered canary returns no result, report `canary drift or provider failure`; do not replace it during the same invocation. Register or replace a canary only after an independently verified provider search proves the new query and this file is updated at the source
+If the canary returns no result for a required provider, report `canary drift or provider failure`; do not replace it during the same invocation. Register a provider or replace the query only after an independently verified provider search proves it and this file is updated at the source
