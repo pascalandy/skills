@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 
 from conftest import SCRIPTS
@@ -13,8 +14,17 @@ OPERATORS = ("&&", "||", ";", "|")
 
 
 def just(*args: str) -> subprocess.CompletedProcess[str]:
+    # The caller's JUST_* settings, such as JUST_COLOR, would change the listing
+    env = {
+        key: value for key, value in os.environ.items() if not key.startswith("JUST_")
+    }
     return subprocess.run(
-        ["just", *args], cwd=ROOT, check=True, capture_output=True, text=True
+        ["just", "--justfile", str(ROOT / "justfile"), *args],
+        cwd=ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
 
