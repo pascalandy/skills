@@ -76,6 +76,8 @@ def sandbox(tmp_path: Path) -> tuple[Path, Path]:
         "flatten_skills.py",
         "install_skills.py",
         "discover_skills.py",
+        "sync.py",
+        "sync_private.py",
     ):
         shutil.copy2(SCRIPTS / name, scripts / name)
     (repo / ".gitignore").write_text("_skills_private/\n__pycache__/\n")

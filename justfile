@@ -12,27 +12,9 @@ install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
 # Pull main, save and pull the private clone, then install every skill on this machine; silent on success, previews skip the pulls
-[positional-arguments]
 [no-exit-message]
 sync *args:
-    #!/usr/bin/env bash
-    set -Eeuo pipefail
-    verbose=()
-    for arg in "$@"; do
-        case "${arg}" in
-            --dry-run | --check | -h | --help) exec uv run scripts/install_skills.py "$@" ;;
-            -v | --verbose) verbose=(--verbose) ;;
-        esac
-    done
-    branch=$(git symbolic-ref --short -q HEAD || true)
-    if [[ "${branch}" != main ]]; then
-        echo "error: this checkout is on ${branch:-a detached HEAD}; switch to main, then rerun just sync" >&2
-        exit 1
-    fi
-    # Hooks stay off: just sync is this machine only; just sync-fleet reaches the others
-    LEFTHOOK=0 git pull --quiet --ff-only
-    uv run scripts/sync_private.py ${verbose[@]+"${verbose[@]}"}
-    uv run scripts/install_skills.py --quiet "$@"
+    @uv run scripts/sync.py {{args}}
 
 # From any machine, sync every machine in _skills_private/fleet.toml, or named ones, to GitHub's main; --check compares them
 [no-exit-message]
