@@ -34,7 +34,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Install skills
 
-`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `authoring/commands/*.md` into Pascal's live agents. Run apply only when Pascal asks; `--dry-run` previews without writing. Before any other install work, read [install skills](docs/maintainer/references/install-skills.md)
+`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `authoring/commands/*.md` into Pascal's live agents. `just sync` pulls first; `just sync-fleet` runs published `main` on every registered machine over SSH. Run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` previews without writing. Before any other install work, read [install skills](docs/maintainer/references/install-skills.md)
 
 ## Read on demand
 

@@ -47,6 +47,7 @@ PROFILES = {
     ),
 }
 EXCLUSIONS = {"mac": frozenset(), "om1": frozenset({"apple-mail"})}
+HOST_PROFILE = "mac" if sys.platform == "darwin" else "om1"
 COMMAND_TARGETS = {
     "mac": (
         ".claude/commands",
@@ -419,14 +420,14 @@ def main(argv: list[str] | None = None) -> int:
 
 examples:
   just install-skills --dry-run --verbose
-  just install-skills --profile om1 --private-root ~/private-skills
+  just install-skills --private-root ~/private-skills
   just install-skills --check --json""",
     )
     parser.add_argument(
         "--profile",
         choices=PROFILES,
-        default="mac",
-        help="local target set; mac is the default",
+        default=HOST_PROFILE,
+        help="local target set; defaults to mac on macOS and om1 elsewhere",
     )
     parser.add_argument(
         "--private-root",
