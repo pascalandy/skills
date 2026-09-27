@@ -547,7 +547,12 @@ def execute(
 
 
 def render(
-    actions: list[Action], profile: str, dry_run: bool, json_output: bool, verbose: bool
+    actions: list[Action],
+    profile: str,
+    synced: tuple[int, int],
+    dry_run: bool,
+    json_output: bool,
+    verbose: bool,
 ) -> str:
     counts = Counter(action.kind for action in actions)
     if json_output:
@@ -560,16 +565,10 @@ def render(
             },
             indent=2,
         )
-    # Distinct names this run keeps installed, whatever their per-target action
-    synced = {
-        (action.source == "command", action.name)
-        for action in actions
-        if action.kind != "remove"
-    }
-    commands = sum(is_command for is_command, _ in synced)
+    skills, commands = synced
     lines = [
         f"{'preview' if dry_run else 'applied'}: {profile}; "
-        f"skills={len(synced) - commands}, commands={commands}; "
+        f"skills={skills}, commands={commands}; "
         + ", ".join(
             f"{kind}={counts[kind]}"
             for kind in ("add", "update", "adopt", "remove", "current", "conflict")
@@ -712,6 +711,7 @@ examples:
             report = render(
                 actions,
                 args.profile,
+                (len(sources.keys() - EXCLUSIONS[args.profile]), len(commands)),
                 args.dry_run or args.check,
                 args.json,
                 args.verbose,
