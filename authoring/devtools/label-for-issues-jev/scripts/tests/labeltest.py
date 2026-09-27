@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -115,6 +116,7 @@ class FakeTypeSafe:
     requests: list[dict[str, Any]] = field(default_factory=list)
     answered_model: str | None = None
     failure: int | None = None
+    stall_from: int | None = None
     url: str = ""
     _server: ThreadingHTTPServer | None = None
 
@@ -176,6 +178,11 @@ class FakeTypeSafe:
             def do_POST(self) -> None:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 fake.requests.append(body)
+                if (
+                    fake.stall_from is not None
+                    and len(fake.requests) >= fake.stall_from
+                ):
+                    time.sleep(30)  # Long enough for a test to interrupt the client
                 self.reply(*fake.respond(body))
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -325,6 +332,18 @@ class Harness:
             check=False,
         )
         return Result(process.returncode, process.stdout, process.stderr)
+
+    def spawn(self, *args: str, **env: str) -> subprocess.Popen[str]:
+        """Start jevlabel without waiting, for tests that signal it."""
+        self.world["calls"] = []
+        self.world_path.write_text(json.dumps(self.world))
+        return subprocess.Popen(
+            [sys.executable, str(self.engine), *args],
+            env=self.env(**env),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
     def preview(self, result: Result) -> dict[str, Any]:
         return json.loads(Path(result.json()["path"]).read_text())
