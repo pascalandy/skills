@@ -42,8 +42,16 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["UV_CACHE_DIR"] = str(home.parent / "uv-cache")
+    # Pin the host-dependent default; a later --profile in args wins.
     return subprocess.run(
-        ["uv", "run", str(repo / "scripts/install_skills.py"), *args],
+        [
+            "uv",
+            "run",
+            str(repo / "scripts/install_skills.py"),
+            "--profile",
+            "mac",
+            *args,
+        ],
         check=False,
         env=env,
         capture_output=True,

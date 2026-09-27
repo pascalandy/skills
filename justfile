@@ -10,6 +10,19 @@ check-frontmatter *args:
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
+# Pull main and the private tree, then install every skill on this machine
+[positional-arguments]
+sync *args:
+    #!/usr/bin/env bash
+    set -Eeuo pipefail
+    git pull --quiet --ff-only
+    if [[ -d _skills_private/.git ]]; then git -C _skills_private pull --quiet --ff-only; fi
+    uv run scripts/install_skills.py "$@"
+
+# Install published main on every machine in _skills_private/fleet.toml, or on named ones
+sync-fleet *args:
+    @uv run scripts/sync_fleet.py {{args}}
+
 # Check native skill discovery after a separately authorized local install
 skills-discover *args:
     @uv run scripts/discover_skills.py {{args}}

@@ -1,6 +1,6 @@
 ---
 name: Install skills
-description: Profiles, private packages, ownership, and cutover for just install-skills
+description: Profiles, private packages, ownership, fleet sync, and cutover for just install-skills
 tags:
   - area/ea
   - kind/doc
@@ -14,10 +14,24 @@ date_updated: 2026-09-27
 
 ## Run it
 
-- `--profile mac` is the default; use `--profile om1` on om1
+- The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
 - Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
 - A name that is both public and private stops the run; delete the stale copy it names
 - Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
+
+## Sync machines
+
+- `just sync` updates this machine: it fast-forwards the checkout and, when `_skills_private/` is a git clone, the private tree, then runs the installer with any flags you pass
+- `just sync-fleet` installs published `main` on every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet om1`. It reads `main` from GitHub once, then on each machine fast-forwards the checkout to that commit, pulls the private tree, and runs `just install-skills` in a login shell over SSH
+- It skips a machine whose checkout is not on `main`, has uncommitted changes, or holds unpushed commits, and changes nothing there. Push first; only published `main` reaches other machines
+- `just sync-fleet --dry-run` connects and reports each machine's readiness without fetching or installing
+- The registry stays in the private tree so hosts and accounts stay out of this public repository. Each `path` is relative to that machine's home:
+
+```toml
+[machines.om1]
+ssh = "pascal@om1.example.ts.net"
+path = "projects/skills"
+```
 
 ## Ownership
 
