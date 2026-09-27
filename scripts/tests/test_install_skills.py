@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import fcntl
+import contextlib
 import json
 import os
 import shutil
 import subprocess
+import sys
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -92,24 +94,70 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
     assert "skills=1, commands=0;" in summary.stdout
 
 
-def test_apply_waits_for_a_running_apply_then_installs_the_newest_tree(
-    sandbox: tuple[Path, Path],
+# Applies like the CLI, but pauses after staging its sources until `resume`
+# exists, so a newer apply can start while this older one is in flight.
+PAUSED_APPLY = """
+import sys
+import time
+from pathlib import Path
+
+scripts, staged, resume = sys.argv[1:]
+sys.path.insert(0, scripts)
+import install_skills
+
+stage = install_skills.skill_sources
+
+
+def paused(*args):
+    sources = stage(*args)
+    Path(staged).touch()
+    while not Path(resume).exists():
+        time.sleep(0.05)
+    return sources
+
+
+install_skills.skill_sources = paused
+raise SystemExit(install_skills.main(["--profile", "mac", "--quiet"]))
+"""
+
+
+def test_overlapping_applies_leave_the_newest_tree_installed(
+    sandbox: tuple[Path, Path], tmp_path: Path
 ) -> None:
     repo, home = sandbox
-    lock = repo / ".git/install-skills.lock"
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        with lock.open("w") as running:
-            fcntl.flock(running, fcntl.LOCK_EX)
-            queued = pool.submit(run, repo, home)
-            with pytest.raises(TimeoutError):
-                queued.result(timeout=2)
-            skill(repo / "authoring/content", "alpha", "new")
-        assert queued.result(timeout=60).returncode == 0
-    assert all(
-        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8")
-        == "# alpha\n\nnew\n"
-        for target in MAC
+    driver, staged, resume = (
+        tmp_path / name for name in ("apply.py", "staged", "resume")
     )
+    driver.write_text(PAUSED_APPLY)
+    older = subprocess.Popen(
+        [sys.executable, str(driver), str(repo / "scripts"), str(staged), str(resume)],
+        env={**os.environ, "HOME": str(home)},
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while not staged.exists():
+            assert older.poll() is None, older.communicate()[1]
+            assert time.monotonic() < deadline, "the older apply never staged"
+            time.sleep(0.05)
+        skill(repo / "authoring/content", "alpha", "new")
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            newer = pool.submit(run, repo, home)
+            # A newer apply that does not wait for the older one finishes here.
+            with contextlib.suppress(TimeoutError):
+                newer.result(timeout=2)
+            resume.touch()
+            _, errors = older.communicate(timeout=60)
+            assert older.returncode == 0, errors
+            assert newer.result(timeout=60).returncode == 0
+    finally:
+        resume.touch()
+        older.kill()
+    assert {
+        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8") for target in MAC
+    } == {"# alpha\n\nnew\n"}
 
 
 def test_every_private_package_installs_and_duplicates_are_all_named(
