@@ -1463,15 +1463,6 @@ def issue_now(repo: str, number: int) -> dict[str, Any]:
     )
 
 
-def family_problems(labels: set[str]) -> list[str]:
-    """One state, one type, and one priority at most."""
-    return [
-        f"several {prefix} labels: {', '.join(sorted(found))}"
-        for prefix in (STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX)
-        if len(found := {label for label in labels if label.startswith(prefix)}) > 1
-    ]
-
-
 def apply_one(
     repo: str, entry: dict[str, Any], catalog: set[str], dry_run: bool
 ) -> dict[str, Any]:
@@ -1497,7 +1488,7 @@ def apply_one(
     filled = [
         label
         for label in todo
-        for prefix in (STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX)
+        for prefix in FAMILIES.values()
         if label.startswith(prefix)
         and any(other.startswith(prefix) for other in labels)
     ]
@@ -1514,13 +1505,8 @@ def apply_one(
     result["labels"] = todo
     if dry_run:
         return outcome("would-apply")
-    try:
-        gh("issue", "edit", str(number), "-R", repo, "--add-label", ",".join(todo))
-        after = {label["name"] for label in issue_now(repo, number).get("labels") or []}
-    except Failure as failure:
-        return outcome(
-            "failed", f"{failure.problems[0]}; reread the issue before retrying"
-        )
+    gh("issue", "edit", str(number), "-R", repo, "--add-label", ",".join(todo))
+    after = {label["name"] for label in issue_now(repo, number).get("labels") or []}
     problems = [
         f"{label} is missing after the write" for label in todo if label not in after
     ]
@@ -1544,7 +1530,20 @@ def cmd_apply(args: argparse.Namespace) -> tuple[str, Any]:
         and (not selected or entry["number"] in selected)
     ]
     catalog = repo_labels(repo) if entries else set()
-    results = [apply_one(repo, entry, catalog, args.dry_run) for entry in entries]
+    results: list[dict[str, Any]] = []
+    for entry in entries:
+        try:
+            results.append(apply_one(repo, entry, catalog, args.dry_run))
+        except Failure as failure:
+            detail = f"{failure.problems[0]}; reread the issue before retrying"
+            results.append(
+                {
+                    "number": entry["number"],
+                    "labels": [],
+                    "outcome": "failed",
+                    "detail": detail,
+                }
+            )
     counts = {
         name: sum(r["outcome"] == name for r in results) for name in APPLY_OUTCOMES
     }

@@ -116,3 +116,25 @@ def test_apply_names_an_unknown_run(harness: Harness) -> None:
 
     assert result.code == 1
     assert "no run record '20990101T000000Z-o-r'" in result.stderr
+
+
+def test_one_unreadable_issue_does_not_stop_the_others(harness: Harness) -> None:
+    harness.issues(issue(1), issue(3, title="Third"))
+    harness.fake.overrides = {
+        "Crash on start": {"bug_repro": 0.05},
+        "Third": {"bug_repro": 0.05},
+    }
+    assert harness.live().code == 0
+    harness.world["repos"]["o/r"]["issues"].pop(0)
+
+    result = harness.run("apply", "last", "--json")
+
+    assert result.code == 1
+    outcomes = {r["number"]: r["outcome"] for r in result.json()["results"]}
+    assert outcomes == {1: "failed", 3: "applied"}
+    assert harness.labels_of(3) == ROUTINE_ADD
+    assert "error: #1: `gh issue view` failed" in result.stderr
+    logs = list(
+        (harness.state / "label-for-issues-jev" / "runs").glob("*.apply-*.json")
+    )
+    assert len(logs) == 1
