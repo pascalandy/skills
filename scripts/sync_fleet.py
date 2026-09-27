@@ -322,9 +322,15 @@ def sync_local(machine: Machine, mode: str) -> Outcome:
 
 
 def mirror(machine: Machine, *flags: str) -> subprocess.CompletedProcess[str]:
+    """Make the machine's private tree match the hub's by content and permissions.
+
+    Sync and --check compare the same attributes, so every difference the check
+    reports is one the next sync repairs; a matching size and time is not enough.
+    """
     return call(
         [
             "rsync",
+            "-rlpc",
             *flags,
             "--delete",
             "--delete-excluded",
@@ -354,7 +360,7 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind {hub.name} at {head[:7]}")
-        diff = mirror(machine, "-rlcn", "-i")
+        diff = mirror(machine, "--dry-run", "--itemize-changes")
         if diff.returncode:
             lines = (diff.stderr + diff.stdout).splitlines()
             problems.append(
@@ -388,7 +394,7 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
         if pushed.returncode:
             detail = reason(pushed.stderr.splitlines(), pushed.returncode)
             return Outcome(machine.name, "failed", f"git push failed: {detail}")
-    mirrored = mirror(machine, "-a")
+    mirrored = mirror(machine)
     if mirrored.returncode:
         detail = reason(mirrored.stderr.splitlines(), mirrored.returncode)
         return Outcome(machine.name, "failed", f"private mirror failed: {detail}")
