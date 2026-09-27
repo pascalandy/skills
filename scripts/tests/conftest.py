@@ -9,6 +9,14 @@ from pathlib import Path
 import pytest
 
 SCRIPTS = Path(__file__).parent.parent
+# Tests replace HOME, which hides the global git config, so commits the scripts
+# make need an identity from the environment.
+GIT_IDENTITY = {
+    "GIT_AUTHOR_NAME": "test",
+    "GIT_AUTHOR_EMAIL": "test@example.com",
+    "GIT_COMMITTER_NAME": "test",
+    "GIT_COMMITTER_EMAIL": "test@example.com",
+}
 
 
 def skill(root: Path, name: str, body: str = "old") -> Path:
@@ -39,6 +47,23 @@ def commit(repo: Path) -> None:
         cwd=repo,
         check=True,
     )
+
+
+def private_remote(parent: Path) -> Path:
+    """A bare skills-private.git beside skills.git, holding the skill secret,
+    the way GitHub holds the private repository."""
+    remote = parent / "skills-private.git"
+    subprocess.run(
+        ["git", "init", "-q", "--bare", "-b", "main", str(remote)], check=True
+    )
+    seed = parent / "private-seed"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(seed)], check=True)
+    (seed / ".gitignore").write_text("/fleet.toml\n")
+    skill(seed / "content", "secret")
+    commit(seed)
+    subprocess.run(["git", "push", "-q", str(remote), "main"], cwd=seed, check=True)
+    shutil.rmtree(seed)
+    return remote
 
 
 @pytest.fixture
