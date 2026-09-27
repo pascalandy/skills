@@ -27,7 +27,7 @@ When updating this skill, verify:
 - [ ] Run `claude --help`, `codex --help`, `opencode --help`, and `pi --help` and spot-check flags used in the recipes.
 - [ ] Smoke test each target CLI (one-shot foreground + one-shot background):
   - [ ] `claude --print --permission-mode plan "echo test"`
-  - [ ] `codex exec -s read-only -c 'approval_policy="never"' 'echo test'` (inside a git repo, without a PTY)
+  - [ ] `codex exec -s read-only -c 'approval_policy="never"' 'echo test' < /dev/null` (inside a git repo, without a PTY; an open stdin makes it hang)
   - [ ] `bash pty:true command:"opencode run 'echo test'"`
   - [ ] `pi -p --model opencode-go/kimi-k2.6 "ping"`
 - [ ] Confirm the boundary with `$pi-subagents` and `pa-advisor` still matches the current guidance for each sibling.

@@ -4,10 +4,10 @@ This table reflects `codex exec --help` in Codex CLI 0.157.1. Run the installed 
 
 | Flag | Use |
 |---|---|
-| `PROMPT` or `-` | Pass inline instructions or read the whole prompt from stdin |
+| `PROMPT` or `-` | Pass inline instructions or read the whole prompt from stdin; with an inline prompt, piped stdin is appended as a `<stdin>` block, so close it with `< /dev/null` when unused |
 | `-C`, `--cd` | Set the target repository |
 | `-s`, `--sandbox` | Set `read-only`, `workspace-write`, or `danger-full-access` |
-| `-c`, `--config` | Override a config key, including `approval_policy` and `model_reasoning_effort` |
+| `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, and `sandbox_mode` for review commands that lack `-s` |
 | `-m`, `--model` | Select a model such as `gpt-6-astra`, `gpt-6-sol`, or `gpt-6-luna` when available |
 | `-p`, `--profile` | Load a named config profile |
 | `--worktree` | Start in a new managed Git worktree |
@@ -25,12 +25,12 @@ This table reflects `codex exec --help` in Codex CLI 0.157.1. Run the installed 
 | `--ignore-user-config` | Skip the user's `config.toml`; authentication still uses `CODEX_HOME` |
 | `--ignore-rules` | Skip user and project execpolicy `.rules` files |
 | `--oss`, `--local-provider` | Use a local model provider such as Ollama or LM Studio |
-| `--approve-for-me` | Route eligible approval requests through automatic review when available |
+| `--approve-for-me` | Route approval requests through automatic review; the run uses the `workspace-write` sandbox |
 | `--dangerously-bypass-approvals-and-sandbox` | Remove both controls; use only with authorization in an isolated runner |
 | `--dangerously-bypass-hook-trust` | Run untrusted hooks; use only in automation that vets the hooks |
 | `-h`, `--help`; `-V`, `--version` | Show command help or the CLI version |
 
-For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. The old `--full-auto` flag remains a deprecated compatibility option in the official docs; use an explicit sandbox in new commands.
+For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. CLI 0.157.1 rejects the old `--full-auto` flag; use an explicit sandbox.
 
 ## Help and model discovery
 

@@ -28,7 +28,7 @@ The CLI choice dictates the execution mode. Not negotiable per invocation.
 | Target CLI | PTY | Base invocation | Notes |
 |---|---|---|---|
 | `claude` | **No** | `claude --print --permission-mode <mode> "<task>"` | Using `pty:true` + `--dangerously-skip-permissions` exits after the confirm dialog. `--print` avoids that. |
-| `codex` | **No** | `codex exec -C <repo> -s <sandbox> -c 'approval_policy="never"' "<task>"` | Use the [Codex run procedure](../codex/MetaSkill.md) for unattended execution and verification. |
+| `codex` | **No** | `codex exec -C <repo> -s <sandbox> -c 'approval_policy="never"' "<task>" < /dev/null` | Use the [Codex run procedure](../codex/MetaSkill.md) for unattended execution and verification. |
 | `opencode` | **Yes** | `opencode run "<task>"` | Pick agent with `--agent <name>` when the user specifies one. |
 | `pi` | **No** | `pi -p --model <model> "<task>"` | Use `-p`/`--print` for one-shot output or `--mode json` for event-stream consumers. Pin model when the user specifies one. |
 
@@ -62,8 +62,8 @@ claude --print --permission-mode bypassPermissions "Add a dark mode toggle to sr
 ### Codex
 
 ```bash
-# Inside an existing repo; no PTY
-codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' 'Add a dark mode toggle to the settings page'
+# Inside an existing repo; no PTY; close stdin or Codex waits for it
+codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' 'Add a dark mode toggle to the settings page' < /dev/null
 
 # For an intentionally trusted non-repository directory, add --skip-git-repo-check
 ```
@@ -97,7 +97,7 @@ Use background mode when the task is long-running and the user wants to keep wor
 
 ```bash
 # Background codex; no PTY
-bash workdir:<cwd> background:true command:"codex exec -s workspace-write -c 'approval_policy=\"never\"' 'Build a REST API for todos'"
+bash workdir:<cwd> background:true command:"codex exec -s workspace-write -c 'approval_policy=\"never\"' 'Build a REST API for todos' < /dev/null"
 # → returns sessionId
 
 # Background claude (no pty)
@@ -120,7 +120,7 @@ For long-running background jobs, append a wake trigger to the task prompt so th
 ```bash
 bash workdir:<cwd> background:true command:"codex exec -s workspace-write -c 'approval_policy=\"never\"' 'Build a REST API for todos.
 
-When completely finished, run: openclaw system event --text \"Done: todos REST API\" --mode now'"
+When completely finished, run: openclaw system event --text \"Done: todos REST API\" --mode now' < /dev/null"
 ```
 
 Only use the `openclaw` notifier when the parent CLI is OpenClaw. Otherwise skip it.
