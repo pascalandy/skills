@@ -94,6 +94,7 @@ VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript-sk"
 JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts"
 JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
+JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -153,8 +154,8 @@ CHECKS = [
     Check(
         "jevlabel",
         *ruff(JEVLABEL),
-        pyright(JEVLABEL),
-        pytest(f"{JEVLABEL}/tests"),
+        pyright(JEVLABEL, JEVLABEL_SDK),
+        pytest(f"{JEVLABEL}/tests", JEVLABEL_SDK),
     ),
 ]
 

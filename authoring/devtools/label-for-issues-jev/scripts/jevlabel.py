@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["typesafe-sdk==0.7.1"]
 # ///
 """jevlabel: bulk GitHub issue triage with Jev, for the label-for-issues vocabulary.
 
@@ -30,10 +30,15 @@ from typing import Any, NoReturn
 import tomllib
 
 VERSION = "0.1.0"
+RUN_SCHEMA = "jevlabel.run/v1"
 PREVIEW_SCHEMA = "jevlabel.preview/v1"
+COMPARE_SCHEMA = "jevlabel.compare/v1"
 DOCTOR_SCHEMA = "jevlabel.doctor/v1"
 QUESTIONS_SCHEMA = "jevlabel.questions/v1"
 EXIT_ERROR, EXIT_USAGE, EXIT_INTERRUPTED = 1, 2, 130
+RUN_FILE = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9-]+\.json$")
+QUEUES = ("routine", "review", "skip")
+OUTCOMES = ("agree", "disagree", "abstain", "unlabeled")
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 QUESTIONS_FILE = SKILL_DIR / "assets" / "questions.toml"
@@ -49,6 +54,9 @@ TERMS_SUMMARY = (
 KEYRING_ARGS = ("secret", "keyring", "get", "--service=typesafe_ai", "--user=api_key")
 KEYRING_TIMEOUT_S = 15
 KEYCHAIN_LOCKED_EXIT = 36
+RETRY_MAX = 2
+RETRY_BUDGET_S = 60.0
+HTTP_TIMEOUT_S = 30.0
 
 # API limits are 64k tokens per request and 32k for the state plus the longest
 # question. No token counter exists, so estimates run high and keep a margin.
@@ -81,23 +89,50 @@ GH_COMMENT_PAGE = 100
 
 # Labels jevlabel reads or proposes. label-for-issues owns their names; a test and
 # every run check that its ## Labels JSON still defines them.
-WIP = "1-wip-by-agent"
-EPIC_PARENT = "4-epic:parent"
-NEEDED_LABELS = (
-    "0-impediment",
-    "1-needs-info",
-    "1-needs-triage",
+IMPEDIMENT = "0-impediment"
+NEEDS_INFO, NEEDS_TRIAGE, WONTFIX = "1-needs-info", "1-needs-triage", "1-wontfix"
+READY_AGENT, READY_HUMAN, WIP = (
     "1-ready-for-agent",
     "1-ready-for-human",
+    "1-wip-by-agent",
+)
+P0, P2 = "3-pty:p0", "3-pty:p2"
+EPIC_PARENT = "4-epic:parent"
+STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX = "1-", "2-type:", "3-pty:"
+NEEDED_LABELS = (
+    IMPEDIMENT,
+    NEEDS_INFO,
+    NEEDS_TRIAGE,
+    READY_AGENT,
+    READY_HUMAN,
     WIP,
-    "1-wontfix",
+    WONTFIX,
     "2-type:bug",
     "2-type:feature",
     "2-type:task",
-    "3-pty:p0",
-    "3-pty:p2",
+    P0,
+    P2,
     EPIC_PARENT,
 )
+# Which checklist questions apply to each kind of issue, and how a missing item reads.
+CHECKLIST = {
+    "bug": ("has_goal", "bug_repro", "bug_expected_actual"),
+    "feature": ("has_goal", "done_condition"),
+    "task": ("has_goal", "done_condition"),
+    "epic": ("has_goal", "done_condition"),
+    None: ("has_goal",),
+}
+CHECKLIST_NAMES = {
+    "has_goal": "what should change",
+    "done_condition": "how to tell the work is done",
+    "bug_repro": "how to reproduce the problem",
+    "bug_expected_actual": "expected and actual behavior",
+}
+NOMINATIONS = {
+    WONTFIX: "a maintainer declined the work; label-for-issues pairs 1-wontfix with an explicit human decision",
+    READY_AGENT: "ready for an agent; label-for-issues requires a recorded readiness review first",
+    READY_HUMAN: "ready for a person; label-for-issues requires a recorded readiness review first",
+}
 
 TYPE_OPTIONS = ("bug", "feature", "task")
 NO_MATCH = "cannot-tell"
@@ -125,10 +160,18 @@ commands:
   doctor    check gh, the label vocabulary, the questions, the API key, and consent
   consent   record which private repositories may send issue text to TypeSafe
   run       fetch issues, ask Jev, and write a run record (--dry-run: preview only)
+  compare   compare a run's judged type and state with the labels issues already had
+
+queues in a run record:
+  routine   every answer used is clear and the labels only fill empty families
+  review    an answer is uncertain, or a label needs a person or new evidence
+  skip      closed, pull request, agent work in progress, or not asked
 
 examples:
-  jevlabel doctor -R pascalandy/skills
+  jevlabel doctor -R pascalandy/skills --online
   jevlabel run -R pascalandy/skills --dry-run
+  jevlabel run -R pascalandy/skills
+  jevlabel compare last
   jevlabel consent add pascalandy/skills-private --by "Pascal Andy"
 
 Run `jevlabel <command> --help` for flags. Every command accepts --json and -v.
@@ -705,6 +748,327 @@ def key_source() -> tuple[str | None, str, str]:
 KEY_FIX = "export TYPESAFE_API_KEY, or store it with `chezmoi secret keyring set --service=typesafe_ai --user=api_key`; --dry-run needs no key"
 
 
+def resolve_key() -> str:
+    key, _, problem = key_source()
+    if key is None:
+        raise Failure(f"{problem}; {KEY_FIX}")
+    return key
+
+
+# ------------------------------------------------------------------ transport
+
+
+def open_client(key: str, model: str) -> Any:
+    from typesafe_sdk import RetryPolicy, TypeSafeClient
+
+    # The SDK owns retries: bounded attempts and budget, honoring retry-after.
+    policy = RetryPolicy(max_retries=RETRY_MAX, timeout=RETRY_BUDGET_S)
+    return TypeSafeClient(
+        api_key=key, model=model, retry=policy, timeout=HTTP_TIMEOUT_S
+    )
+
+
+def transport_error(error: Exception) -> Failure:
+    from typesafe_sdk import (
+        TypeSafeAPIConnectionError,
+        TypeSafeAPIError,
+        TypeSafeAuthenticationError,
+        TypeSafePermissionDeniedError,
+        TypeSafeUnprocessableEntityError,
+    )
+
+    if isinstance(error, TypeSafeAuthenticationError | TypeSafePermissionDeniedError):
+        return Failure(f"TypeSafe rejected the API key: {error}; {KEY_FIX}")
+    if isinstance(error, TypeSafeUnprocessableEntityError):
+        return Failure(f"TypeSafe refused the request as invalid: {error}")
+    if isinstance(error, TypeSafeAPIError):
+        return Failure(
+            f"TypeSafe stayed unavailable after {RETRY_MAX} retries: {error}; rerun later"
+        )
+    if isinstance(error, TypeSafeAPIConnectionError):
+        return Failure(
+            f"could not reach TypeSafe: {error}; check the network and rerun"
+        )
+    return Failure(f"TypeSafe request failed: {error}; rerun later")
+
+
+def send(client: Any, body: dict[str, Any]) -> Any:
+    from typesafe_sdk import TypeSafeError
+
+    try:
+        response = client.system_one(
+            body["state"], body["questions"], model=body["model"]
+        )
+    except TypeSafeError as error:
+        raise transport_error(error) from error
+    try:
+        return json.loads(response.raw_http_response.content)
+    except ValueError as error:
+        raise Failure(
+            "TypeSafe returned a body that is not JSON; rerun later"
+        ) from error
+
+
+def probability(value: Any) -> bool:
+    return number(value) is not None and 0 <= value <= 1
+
+
+def answer_problem(question: dict[str, Any], answer: Any) -> str | None:
+    if not isinstance(answer, dict) or answer.get("type") != question["type"]:
+        return f"expected a {question['type']} answer"
+    if question["type"] == "noul":
+        return None if probability(answer.get("noul")) else "noul is not a probability"
+    probabilities = answer.get("probabilities")
+    if not isinstance(probabilities, dict) or not all(
+        probability(value) for value in probabilities.values()
+    ):
+        return "probabilities are missing or not finite"
+    if not probability(answer.get("confidence")):
+        return "confidence is missing or not finite"
+    options = question["criteria"]
+    if answer.get("choice") not in options or set(probabilities) - set(options):
+        return "choice is not one of the requested options"
+    return None
+
+
+def validate_response(
+    request: dict[str, Any], raw: Any, number_: int
+) -> dict[str, Any]:
+    """Check a response against its request; return the answers and usage."""
+
+    def fail(problem: str) -> Failure:
+        return Failure(f"invalid TypeSafe response for issue #{number_}: {problem}")
+
+    if not isinstance(raw, dict):
+        raise fail("the body is not an object")
+    if raw.get("model") != request["model"]:
+        raise fail(
+            f"answered by {raw.get('model')!r}, but the pin is {request['model']!r}"
+        )
+    answers, questions = raw.get("answers"), request["questions"]
+    if not isinstance(answers, dict) or set(answers) != set(questions):
+        raise fail("the answer IDs do not match the questions")
+    for key, question in questions.items():
+        problem = answer_problem(question, answers[key])
+        if problem:
+            raise fail(f"{key}: {problem}")
+    usage = raw.get("usage")
+    tokens = usage.get("input_tokens") if isinstance(usage, dict) else None
+    if not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0:
+        raise fail("usage.input_tokens is missing")
+    return {"answers": answers, "input_tokens": tokens}
+
+
+# --------------------------------------------------------------------- policy
+
+
+def band(question: Question, value: float) -> str:
+    if value >= question.yes:
+        return "yes"
+    return "no" if value <= question.no else "uncertain"
+
+
+def unique(labels: list[str]) -> list[str]:
+    return list(dict.fromkeys(labels))
+
+
+@dataclass
+class Decision:
+    """What the answers imply for one issue, and what apply may do about it."""
+
+    queue: str
+    reasons: list[str] = field(default_factory=list)
+    add: list[str] = field(default_factory=list)
+    remove: list[str] = field(default_factory=list)
+    judged: dict[str, str | None] = field(default_factory=dict)
+    missing: list[str] = field(default_factory=list)
+    uncertain_answers: list[str] = field(default_factory=list)
+
+    def record(self) -> dict[str, Any]:
+        return {
+            "queue": self.queue,
+            "reasons": self.reasons,
+            "add": self.add,
+            "remove": self.remove,
+            "judged": self.judged,
+            "missing": self.missing,
+            "uncertain_answers": self.uncertain_answers,
+        }
+
+
+def decide(
+    item: Prepared, answers: dict[str, Any], pack: Pack, catalog: set[str]
+) -> Decision:
+    """Combine one issue's answers into labels, following label-for-issues' rules.
+
+    Code never asks Jev for a verdict. Each question judges one condition, and a
+    label reaches `routine` only when every answer it rests on is clearly yes or no
+    and it fills an empty label family. Anything else goes to review with a reason.
+    """
+    questions = pack.questions
+    labels = set(item.labels)
+    decision = Decision(queue="routine")
+    reasons, add, remove = decision.reasons, decision.add, decision.remove
+
+    def judge(base: str, index: int | None = None) -> str:
+        qid = base if index is None else f"{base}_{index}"
+        return band(questions[base], answers[qid]["noul"])
+
+    for qid, answer in answers.items():
+        base = qid if qid in questions else qid.rsplit("_", 1)[0]
+        if (
+            answer["type"] == "noul"
+            and band(questions[base], answer["noul"]) == "uncertain"
+        ):
+            decision.uncertain_answers.append(qid)
+
+    def family(prefix: str) -> list[str]:
+        return sorted(label for label in labels if label.startswith(prefix))
+
+    # Type: one Choice; an epic parent takes no type.
+    existing_type, judged_type = family(TYPE_PREFIX), None
+    if EPIC_PARENT not in labels:
+        answer = answers["type"]
+        if (
+            answer["choice"] != NO_MATCH
+            and answer["confidence"] >= questions["type"].min_confidence
+        ):
+            judged_type = TYPE_PREFIX + answer["choice"]
+        else:
+            decision.uncertain_answers.append("type")
+        if not existing_type and judged_type:
+            add.append(judged_type)
+        elif not existing_type:
+            reasons.append(
+                f"type unclear: {answer['choice']} at confidence {answer['confidence']:.2f}"
+            )
+        elif judged_type and judged_type not in existing_type:
+            reasons.append(
+                f"the answers read the type as {judged_type}, not {', '.join(existing_type)}"
+            )
+            add.append(judged_type)
+            remove.extend(existing_type)
+    if EPIC_PARENT in labels:
+        kind: str | None = "epic"
+    elif len(existing_type) == 1:
+        kind = existing_type[0].removeprefix(TYPE_PREFIX)
+    else:
+        kind = judged_type.removeprefix(TYPE_PREFIX) if judged_type else None
+
+    # Missing information: the checklist for this kind, plus unanswered requests.
+    unsure = False
+    for qid in CHECKLIST.get(kind, CHECKLIST[None]):
+        result = judge(qid)
+        if result == "no":
+            decision.missing.append(CHECKLIST_NAMES[qid])
+        unsure = unsure or result == "uncertain"
+    count = item.facts["comments_sent"]
+    supplies = [judge("supplies_info", i) for i in range(count)]
+    for index in range(count):
+        asked, later = judge("asks_info", index), supplies[index + 1 :]
+        if asked == "no" or "yes" in later:
+            continue
+        if asked == "yes" and all(result == "no" for result in later):
+            decision.missing.append(f"a reply to {item.comments[index]['url']}")
+        else:
+            unsure = True
+
+    # State: one condition per state label; code picks at most one.
+    declined = [
+        judge("declined", index)
+        for index, comment in enumerate(item.comments)
+        if comment["author_role"] == "maintainer"
+    ]
+    conditions = {
+        WONTFIX: "yes"
+        if "yes" in declined
+        else "uncertain"
+        if "uncertain" in declined
+        else "no",
+        NEEDS_INFO: "yes" if decision.missing else "uncertain" if unsure else "no",
+        NEEDS_TRIAGE: judge("open_decision"),
+    }
+    holding = [label for label, result in conditions.items() if result == "yes"]
+    unclear = [label for label, result in conditions.items() if result == "uncertain"]
+    judged_state, state_reason = None, ""
+    if len(holding) > 1:
+        state_reason = f"conflicting states: {', '.join(holding)}"
+    elif unclear:
+        state_reason = f"unclear whether {', '.join(unclear)} applies"
+    elif holding:
+        judged_state = holding[0]
+    elif (human := judge("needs_human_impl")) == "uncertain":
+        state_reason = (
+            "looks ready, but unclear whether an agent or a person should do it"
+        )
+    else:
+        judged_state = READY_HUMAN if human == "yes" else READY_AGENT
+    existing_state = family(STATE_PREFIX)
+    if len(existing_state) > 1:
+        reasons.append(f"several state labels: {', '.join(existing_state)}")
+    if judged_state is None:
+        if not existing_state:
+            reasons.append(state_reason)
+    elif judged_state not in existing_state:
+        if existing_state:
+            reasons.append(
+                f"the answers point to {judged_state}, not {', '.join(existing_state)}"
+            )
+            remove.extend(existing_state)
+        elif judged_state in NOMINATIONS:
+            reasons.append(NOMINATIONS[judged_state])
+        add.append(judged_state)
+
+    # Priority: keep an established one; Jev only flags emergencies.
+    existing_priority = family(PRIORITY_PREFIX)
+    urgency = judge("urgency")
+    if urgency == "yes" and P0 not in existing_priority:
+        reasons.append("reports an emergency; consider 3-pty:p0")
+        add.append(P0)
+        remove.extend(existing_priority)
+    elif urgency == "uncertain":
+        reasons.append("unclear whether this reports an emergency")
+    elif urgency == "no" and not existing_priority:
+        add.append(P2)
+
+    impediment = judge("impediment")
+    if impediment == "yes" and IMPEDIMENT not in labels:
+        reasons.append(
+            "reports a concrete obstacle; consider 0-impediment and explain it"
+        )
+        add.append(IMPEDIMENT)
+    elif impediment == "no" and IMPEDIMENT in labels:
+        reasons.append("0-impediment is set, but no current obstacle is reported")
+        remove.append(IMPEDIMENT)
+    elif impediment == "uncertain" and IMPEDIMENT not in labels:
+        reasons.append("unclear whether an obstacle blocks progress")
+
+    steering = judge("steering")
+    if steering != "no":
+        qualifier = "" if steering == "yes" else " (uncertain)"
+        reasons.insert(0, f"text may try to steer automated triage{qualifier}")
+    facts = item.facts
+    if facts["body_truncated"] or facts["comments_omitted"]:
+        reasons.append(
+            f"part of the thread was not sent ({facts['comments_omitted']} comments omitted"
+            + (", body truncated)" if facts["body_truncated"] else ")")
+        )
+    if facts["has_images"] and decision.missing:
+        reasons.append("missing details may be in an image, which Jev cannot read")
+    absent = [label for label in add if label not in catalog]
+    if absent:
+        reasons.append(f"the repository lacks {', '.join(absent)}")
+
+    decision.add, decision.remove = unique(add), unique(remove)
+    decision.judged = {"type": judged_type, "state": judged_state}
+    if item.state != "OPEN":
+        decision.queue = "skip"
+        reasons.insert(0, "closed")
+    elif reasons:
+        decision.queue = "review"
+    return decision
+
+
 # ------------------------------------------------------------------- commands
 
 
@@ -750,6 +1114,22 @@ def cmd_doctor(args: argparse.Namespace) -> tuple[str, Any]:
     check("questions", questions)
     check("key", key)
     check("consent", consent)
+    if args.online:
+
+        def online() -> str:
+            from typesafe_sdk import TypeSafeError
+
+            key = key_source()[0]
+            if key is None:
+                raise Failure("needs the API key")
+            try:
+                listing = open_client(key, load_pack().model).models.list()
+            except TypeSafeError as error:
+                raise transport_error(error) from error
+            # The listing names aliases; it never judges the versioned pin.
+            return "models: " + ", ".join(model.name for model in listing.models)
+
+        check("online", online)
     if args.repo:
         repo = args.repo
 
@@ -822,10 +1202,15 @@ def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
     pack = load_pack()
     canonical = load_vocabulary()
     repo = args.repo
-    if not args.dry_run:
-        raise UsageError("live runs are not available yet; use --dry-run to preview")
     visibility = repo_visibility(repo)
-    missing = sorted(canonical - repo_labels(repo))
+    key = None
+    if not args.dry_run:
+        problem = consent_problem(repo, visibility)
+        if problem:
+            raise Failure(f"{problem}; nothing was sent; {consent_fix(repo)}")
+        key = resolve_key()
+    catalog = repo_labels(repo)
+    missing = sorted(canonical - catalog)
     if missing:
         print(
             f"warning: {repo} lacks canonical labels {', '.join(missing)}; set them up with label-for-issues before apply",
@@ -834,10 +1219,7 @@ def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
     issues = fetch_issues(repo, args)
     prepared = prepare_all(issues, pack, args.max_requests)
     run_id = new_run_id(repo)
-    asked = [item for item in prepared if item.request is not None]
-    tokens = sum(item.tokens for item in asked)
-    preview = {
-        "schema": PREVIEW_SCHEMA,
+    header = {
         "id": run_id,
         "repo": repo,
         "visibility": visibility,
@@ -850,6 +1232,19 @@ def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
         "questions_digest": pack.digest,
         "calibration": pack.calibration,
         "missing_labels": missing,
+    }
+    if args.dry_run:
+        return preview_run(header, prepared)
+    assert key is not None
+    return live_run(header, prepared, pack, catalog, key, args.verbose)
+
+
+def preview_run(header: dict[str, Any], prepared: list[Prepared]) -> tuple[str, Any]:
+    asked = [item for item in prepared if item.request is not None]
+    tokens = sum(item.tokens for item in asked)
+    preview = {
+        "schema": PREVIEW_SCHEMA,
+        **header,
         "estimated": {
             "requests": len(asked),
             "tokens": tokens,
@@ -857,10 +1252,10 @@ def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
         },
         "issues": [{**item.summary(), "request": item.request} for item in prepared],
     }
-    path = runs_dir() / f"{run_id}.preview.json"
+    path = runs_dir() / f"{header['id']}.preview.json"
     write_json(path, preview)
     line = (
-        f"preview {run_id}: {len(prepared)} issues, {len(asked)} requests, "
+        f"preview {header['id']}: {len(prepared)} issues, {len(asked)} requests, "
         f"~{tokens:,} tokens, ~${cost_usd(tokens):.4f}; nothing sent; payload: {path}"
     )
     summary = {key: value for key, value in preview.items() if key != "issues"}
@@ -875,6 +1270,150 @@ def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
         for i in prepared
     ]
     return line, summary
+
+
+def live_run(
+    header: dict[str, Any],
+    prepared: list[Prepared],
+    pack: Pack,
+    catalog: set[str],
+    key: str,
+    verbose: bool,
+) -> tuple[str, Any]:
+    client = open_client(key, pack.model)
+    entries: list[dict[str, Any]] = []
+    error: str | None = None
+    tokens = requests = 0
+    for item in prepared:
+        entry = item.summary()
+        if item.request is None:
+            entry.update(Decision(queue="skip", reasons=[str(item.skip)]).record())
+        elif error is not None:
+            reason = "not asked: the run stopped at an earlier error"
+            entry.update(Decision(queue="skip", reasons=[reason]).record())
+        else:
+            try:
+                raw = send(client, item.request)
+                result = validate_response(item.request, raw, item.number)
+            except Failure as failure:
+                error = failure.problems[0]
+                entry.update(
+                    Decision(queue="skip", reasons=[f"not asked: {error}"]).record()
+                )
+            else:
+                requests += 1
+                tokens += result["input_tokens"]
+                entry.update(decide(item, result["answers"], pack, catalog).record())
+                entry["answers"] = result["answers"]
+                entry["input_tokens"] = result["input_tokens"]
+                if verbose:
+                    print(f"#{item.number}: {entry['queue']}", file=sys.stderr)
+        entries.append(entry)
+    counts = {queue: sum(e["queue"] == queue for e in entries) for queue in QUEUES}
+    record = {
+        "schema": RUN_SCHEMA,
+        **header,
+        "usage": {
+            "requests": requests,
+            "input_tokens": tokens,
+            "cost_usd": cost_usd(tokens),
+        },
+        "counts": counts,
+        "error": error,
+        "issues": entries,
+    }
+    path = runs_dir() / f"{header['id']}.json"
+    write_json(path, record)
+    if error is not None:
+        raise Failure(error, f"the run stopped; the partial record is {path}")
+    line = (
+        f"run {header['id']}: {len(entries)} issues; "
+        + ", ".join(f"{counts[queue]} {queue}" for queue in QUEUES)
+        + f"; {tokens:,} tokens, ${cost_usd(tokens):.4f}; record: {path}"
+    )
+    summary = {key: value for key, value in record.items() if key != "issues"}
+    summary["path"] = str(path)
+    summary["issues"] = [
+        {
+            key: e[key]
+            for key in ("number", "queue", "add", "remove", "reasons", "missing")
+        }
+        for e in entries
+    ]
+    return line, summary
+
+
+def resolve_run(ref: str) -> Path:
+    if ref == "last":
+        runs = sorted(p for p in runs_dir().glob("*.json") if RUN_FILE.match(p.name))
+        if not runs:
+            raise Failure("no run records yet; run `jevlabel run` first")
+        return runs[-1]
+    path = runs_dir() / f"{ref}.json"
+    if not RUN_FILE.match(path.name) or not path.is_file():
+        raise Failure(f"no run record {ref!r} in {runs_dir()}; pass a run ID or `last`")
+    return path
+
+
+def load_run(ref: str) -> tuple[Path, dict[str, Any]]:
+    path = resolve_run(ref)
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Failure(f"{path} is unreadable: {error}") from error
+    if record.get("schema") != RUN_SCHEMA:
+        raise Failure(f"{path} is not a {RUN_SCHEMA} record")
+    return path, record
+
+
+def cmd_compare(args: argparse.Namespace) -> tuple[str, Any]:
+    """Compare Jev's judged type and state with the labels the issues already had."""
+    _, record = load_run(args.run)
+    families = {"type": TYPE_PREFIX, "state": STATE_PREFIX}
+    counts = {name: dict.fromkeys(OUTCOMES, 0) for name in families}
+    disagreements: list[dict[str, Any]] = []
+    for entry in record["issues"]:
+        if "answers" not in entry:
+            continue
+        for name, prefix in families.items():
+            existing = sorted(
+                label for label in entry["labels"] if label.startswith(prefix)
+            )
+            judged = entry["judged"][name]
+            if judged is None:
+                outcome = "abstain"
+            elif not existing:
+                outcome = "unlabeled"
+            elif judged in existing:
+                outcome = "agree"
+            else:
+                outcome = "disagree"
+                disagreements.append(
+                    {
+                        "number": entry["number"],
+                        "family": name,
+                        "existing": existing,
+                        "judged": judged,
+                    }
+                )
+            counts[name][outcome] += 1
+    result = {
+        "schema": COMPARE_SCHEMA,
+        "run": record["id"],
+        "calibration": record["calibration"],
+        "counts": counts,
+        "disagreements": disagreements,
+    }
+    line = (
+        f"compare {record['id']}: "
+        + "; ".join(
+            f"{name} "
+            + ", ".join(f"{n} {outcome}" for outcome, n in counts[name].items())
+            for name in families
+        )
+        + ". Existing labels are a baseline, not ground truth"
+    )
+    return line, result
 
 
 # ------------------------------------------------------------------------ cli
@@ -906,6 +1445,9 @@ def build_parser() -> Parser:
         "With -R, also check the repository's visibility, consent, and canonical labels.",
     )
     doctor.add_argument("-R", "--repo", type=repo_name, help="owner/repo to check")
+    doctor.add_argument(
+        "--online", action="store_true", help="also list TypeSafe models with the key"
+    )
     common(doctor)
 
     consent = commands.add_parser(
@@ -926,10 +1468,13 @@ def build_parser() -> Parser:
     run = commands.add_parser(
         "run",
         help="triage issues with Jev",
-        description="Fetch issues, build each issue's input, and ask Jev. "
-        "--dry-run writes the exact request bodies to a preview file and sends nothing.",
+        description="Fetch issues, build each issue's input, ask Jev, and write a run "
+        "record with each issue's queue, proposed labels, reasons, and answers. "
+        "--dry-run writes the exact request bodies to a preview file and sends nothing. "
+        "A private repository needs recorded consent before a live run.",
         epilog="examples:\n  jevlabel run -R pascalandy/skills --dry-run\n"
-        "  jevlabel run -R pascalandy/skills --issue 12 --issue 14 --dry-run",
+        "  jevlabel run -R pascalandy/skills\n"
+        "  jevlabel run -R pascalandy/skills --issue 12 --issue 14",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     run.add_argument("-R", "--repo", type=repo_name, required=True, help="owner/repo")
@@ -953,10 +1498,25 @@ def build_parser() -> Parser:
         "--dry-run", action="store_true", help="preview the payload; send nothing"
     )
     common(run)
+    compare = commands.add_parser(
+        "compare",
+        help="compare a run with existing labels",
+        description="For calibration: count where a run's judged type and state agree "
+        "with the labels each issue already had. Existing labels are a baseline, "
+        "not ground truth. Reads the record only; no network.",
+        epilog="example: jevlabel run -R pascalandy/skills --state all && jevlabel compare last",
+    )
+    compare.add_argument("run", help="run ID, or `last`")
+    common(compare)
     return parser
 
 
-COMMANDS = {"doctor": cmd_doctor, "consent": cmd_consent, "run": cmd_run}
+COMMANDS = {
+    "doctor": cmd_doctor,
+    "consent": cmd_consent,
+    "run": cmd_run,
+    "compare": cmd_compare,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
