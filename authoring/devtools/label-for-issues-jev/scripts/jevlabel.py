@@ -33,12 +33,14 @@ VERSION = "0.1.0"
 RUN_SCHEMA = "jevlabel.run/v1"
 PREVIEW_SCHEMA = "jevlabel.preview/v1"
 COMPARE_SCHEMA = "jevlabel.compare/v1"
+APPLY_SCHEMA = "jevlabel.apply/v1"
 DOCTOR_SCHEMA = "jevlabel.doctor/v1"
 QUESTIONS_SCHEMA = "jevlabel.questions/v1"
 EXIT_ERROR, EXIT_USAGE, EXIT_INTERRUPTED = 1, 2, 130
 RUN_FILE = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9-]+\.json$")
 QUEUES = ("routine", "review", "skip")
 OUTCOMES = ("agree", "disagree", "abstain", "unlabeled")
+APPLY_OUTCOMES = ("applied", "would-apply", "already", "stale", "conflict", "failed")
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 QUESTIONS_FILE = SKILL_DIR / "assets" / "questions.toml"
@@ -162,6 +164,7 @@ commands:
   doctor    check gh, the label vocabulary, the questions, the API key, and consent
   consent   record which private repositories may send issue text to TypeSafe
   run       fetch issues, ask Jev, and write a run record (--dry-run: preview only)
+  apply     add the labels of a run's routine issues, rereading each issue first
   compare   compare a run's judged type and state with the labels issues already had
 
 queues in a run record:
@@ -173,6 +176,7 @@ examples:
   jevlabel doctor -R pascalandy/skills --online
   jevlabel run -R pascalandy/skills --dry-run
   jevlabel run -R pascalandy/skills
+  jevlabel apply last --dry-run
   jevlabel compare last
   jevlabel consent add pascalandy/skills-private --by "Pascal Andy"
 
@@ -1453,6 +1457,129 @@ def cmd_compare(args: argparse.Namespace) -> tuple[str, Any]:
     return line, result
 
 
+def issue_now(repo: str, number: int) -> dict[str, Any]:
+    return gh_json(
+        "issue", "view", str(number), "-R", repo, "--json", "labels,state,updatedAt"
+    )
+
+
+def family_problems(labels: set[str]) -> list[str]:
+    """One state, one type, and one priority at most."""
+    return [
+        f"several {prefix} labels: {', '.join(sorted(found))}"
+        for prefix in (STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX)
+        if len(found := {label for label in labels if label.startswith(prefix)}) > 1
+    ]
+
+
+def apply_one(
+    repo: str, entry: dict[str, Any], catalog: set[str], dry_run: bool
+) -> dict[str, Any]:
+    number = entry["number"]
+    result: dict[str, Any] = {"number": number, "labels": []}
+
+    def outcome(name: str, detail: str = "") -> dict[str, Any]:
+        return {**result, "outcome": name, "detail": detail}
+
+    if entry["remove"]:
+        return outcome(
+            "failed", "a routine entry never removes labels; the record is invalid"
+        )
+    current = issue_now(repo, number)
+    labels = {label["name"] for label in current.get("labels") or []}
+    todo = [label for label in entry["add"] if label not in labels]
+    if not todo:
+        return outcome("already", "every proposed label is present")
+    if str(current.get("state", "")).upper() != "OPEN":
+        return outcome("stale", "closed since the run")
+    if current.get("updatedAt") != entry["updated_at"]:
+        return outcome("stale", "changed since the run; run it again before applying")
+    filled = [
+        label
+        for label in todo
+        for prefix in (STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX)
+        if label.startswith(prefix)
+        and any(other.startswith(prefix) for other in labels)
+    ]
+    if filled:
+        return outcome(
+            "conflict", f"its family already has a label: {', '.join(filled)}"
+        )
+    absent = [label for label in todo if label not in catalog]
+    if absent:
+        return outcome(
+            "failed",
+            f"{repo} lacks {', '.join(absent)}; create it with label-for-issues",
+        )
+    result["labels"] = todo
+    if dry_run:
+        return outcome("would-apply")
+    try:
+        gh("issue", "edit", str(number), "-R", repo, "--add-label", ",".join(todo))
+        after = {label["name"] for label in issue_now(repo, number).get("labels") or []}
+    except Failure as failure:
+        return outcome(
+            "failed", f"{failure.problems[0]}; reread the issue before retrying"
+        )
+    problems = [
+        f"{label} is missing after the write" for label in todo if label not in after
+    ]
+    problems += family_problems(after)
+    if problems:
+        return outcome("failed", "; ".join(problems))
+    return outcome("applied")
+
+
+def cmd_apply(args: argparse.Namespace) -> tuple[str, Any]:
+    """Write the labels of routine issues, rereading each issue first."""
+    path, record = load_run(args.run)
+    repo = record["repo"]
+    load_vocabulary()
+    selected = set(args.issue or [])
+    entries = [
+        entry
+        for entry in record["issues"]
+        if entry["queue"] == "routine"
+        and entry["add"]
+        and (not selected or entry["number"] in selected)
+    ]
+    catalog = repo_labels(repo) if entries else set()
+    results = [apply_one(repo, entry, catalog, args.dry_run) for entry in entries]
+    counts = {
+        name: sum(r["outcome"] == name for r in results) for name in APPLY_OUTCOMES
+    }
+    written = sum(
+        len(r["labels"]) for r in results if r["outcome"] in ("applied", "would-apply")
+    )
+    log = {
+        "schema": APPLY_SCHEMA,
+        "run": record["id"],
+        "repo": repo,
+        "created_at": now().isoformat(timespec="seconds"),
+        "dry_run": args.dry_run,
+        "counts": counts,
+        "results": results,
+    }
+    parts = ", ".join(f"{n} {name}" for name, n in counts.items() if n)
+    if args.dry_run:
+        line = f"apply {record['id']} --dry-run: {parts or 'nothing to apply'}; {written} labels; nothing written"
+    else:
+        log_path = path.with_name(
+            f"{record['id']}.apply-{now().strftime('%Y%m%dT%H%M%SZ')}.json"
+        )
+        write_json(log_path, log)
+        log["path"] = str(log_path)
+        line = f"apply {record['id']}: {parts or 'nothing to apply'}; {written} labels; log: {log_path}"
+    failed = [r for r in results if r["outcome"] == "failed"]
+    if failed:
+        raise Failure(
+            *(f"#{r['number']}: {r['detail']}" for r in failed),
+            f"{len(failed)} of {len(results)} issues failed; see {log.get('path', 'the output')}",
+            result=log,
+        )
+    return line, log
+
+
 # ------------------------------------------------------------------------ cli
 
 
@@ -1545,6 +1672,27 @@ def build_parser() -> Parser:
     )
     compare.add_argument("run", help="run ID, or `last`")
     common(compare)
+
+    apply = commands.add_parser(
+        "apply",
+        help="label a run's routine issues",
+        description="Add the proposed labels of every routine issue in a run record. "
+        "Each issue is reread first: a changed or closed issue is stale and left alone, "
+        "a label family that gained a label is a conflict, and labels are only added, "
+        "never removed. After each write the labels are read back and checked. "
+        "Review issues are never touched.",
+        epilog="examples:\n  jevlabel apply last --dry-run\n  jevlabel apply last\n"
+        "  jevlabel apply 20260927T120000Z-pascalandy-skills --issue 12",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    apply.add_argument("run", help="run ID, or `last`")
+    apply.add_argument(
+        "--issue", type=int, action="append", help="only this issue; repeatable"
+    )
+    apply.add_argument(
+        "--dry-run", action="store_true", help="show what would be added"
+    )
+    common(apply)
     return parser
 
 
@@ -1553,6 +1701,7 @@ COMMANDS = {
     "consent": cmd_consent,
     "run": cmd_run,
     "compare": cmd_compare,
+    "apply": cmd_apply,
 }
 
 

@@ -82,6 +82,18 @@ if args[:2] == ["issue", "view"]:
         if issue["number"] == int(args[2]):
             out(fields(issue))
     fail(f"GraphQL: Could not resolve to an issue or pull request with the number of {args[2]}.")
+if args[:2] == ["issue", "edit"]:
+    if world.get("fail_edit"):
+        fail("HTTP 502: Bad Gateway")
+    for issue in repo["issues"]:
+        if issue["number"] == int(args[2]):
+            for label in opt("--add-label").split(","):
+                if label not in repo["labels"]:
+                    fail(f"could not add label: '{label}' not found")
+                if label not in [have["name"] for have in issue["labels"]]:
+                    issue["labels"].append({"name": label})
+            issue["updatedAt"] = "2026-09-30T00:00:00Z"
+            out(issue["url"])
 fail(f"fake gh does not support {args}")
 """
 
@@ -302,7 +314,16 @@ class Harness:
         self.world["repos"][repo]["issues"] = list(items)
 
     def calls(self) -> list[list[str]]:
-        return json.loads(self.world_path.read_text())["calls"]
+        return self.world["calls"]
+
+    def labels_of(self, number: int, repo: str = "o/r") -> list[str]:
+        found = next(
+            i for i in self.world["repos"][repo]["issues"] if i["number"] == number
+        )
+        return [label["name"] for label in found["labels"]]
+
+    def edits(self) -> list[list[str]]:
+        return [call for call in self.calls() if call[:2] == ["issue", "edit"]]
 
     def env(self, **extra: str) -> dict[str, str]:
         environment = {
@@ -331,6 +352,8 @@ class Harness:
             timeout=120,
             check=False,
         )
+        # Keep what the fake gh changed, such as labels, for the next command.
+        self.world = json.loads(self.world_path.read_text())
         return Result(process.returncode, process.stdout, process.stderr)
 
     def spawn(self, *args: str, **env: str) -> subprocess.Popen[str]:

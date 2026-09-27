@@ -27,8 +27,8 @@ Run the CLI with `uv run <skill_dir>/scripts/jevlabel.py`. Every command accepts
    *Complete when the preview file exists and its counts are reported.*
 5. **Run.** Run the same selection without `--dry-run`, adding `--json` to read each issue's queue, `add`, `remove`, `reasons`, and `missing`. The record file it names also holds every answer and probability. A failure stops the run and keeps a partial record; fix the cause it names and rerun.
    *Complete when a run record exists.*
-6. **Label routine issues.** For a request that allows changes, apply each routine issue's `add` through the Apply and verify step of `label-for-issues`. A review-only request stops at reporting them.
-   *Complete when every routine issue's labels are verified, or the request was read-only.*
+6. **Label routine issues.** For a request that allows changes, run `jevlabel apply <run-id> --dry-run`, then `jevlabel apply <run-id>`. It rereads each routine issue, adds only labels whose family is still empty, never removes one, and reads the labels back. An issue changed since the run is `stale`: run it again before applying. A review-only request stops at the dry run.
+   *Complete when `apply` reports no failure, or each failure is reported with the log it names.*
 7. **Investigate review issues.** Work through each review issue with the Inspect and Assess steps of `label-for-issues`, then apply what the evidence supports. Read the reasons as leads, not verdicts: each names the condition to check, and `missing` names what the issue lacks. Nominated labels need the evidence `label-for-issues` requires, such as a recorded readiness review for ready. A comment is written only when the user asks for one.
    *Complete when each review issue has an assessment, or is reported as left open with the reason.*
 8. **Report.** Give the run ID, the queue counts, the tokens and cost, the labels changed, the review outcomes, and any failures. Say that the thresholds are uncalibrated while `calibration` in `assets/questions.toml` says so.
