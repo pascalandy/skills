@@ -4,6 +4,8 @@
 *.swp
 *.swo
 *~
+**/.vscode/*
+!/.vscode/settings.json
 
 # Local dependencies and environments
 node_modules/
