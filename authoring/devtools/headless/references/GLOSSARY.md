@@ -5,7 +5,7 @@ tags:
   - kind/glossary
   - kind/project
 date_created: 2026-07-01
-date_updated: 2026-07-01
+date_updated: 2026-09-26
 ---
 
 # Headless glossary
@@ -15,13 +15,13 @@ date_updated: 2026-07-01
 Canonical vocabulary for the `headless` skill: delegation, CLI routing,
 execution modes, permission posture, workdir safety, and output handling.
 
-This file defines the language used by `SKILL.md`, `references/ROUTER.md`, and
-sub-skills under `references/<cli>/MetaSkill.md`. It does not replace CLI flag
+This file defines the language used by `SKILL.md` and references under
+`references/<cli>/MetaSkill.md`. It does not replace CLI flag
 references or update checklists.
 
 ## Concept map
 
-- Headless skill -> router -> sub-skill
+- Headless skill -> selected reference
 - Delegation sub-skill -> target CLI -> execution mode -> permission posture
 - Target CLI -> PTY posture -> base invocation
 - CLI flag reference -> detailed command syntax
@@ -60,10 +60,9 @@ report why Codex cannot run.
 
 ### Skill router
 
-`references/ROUTER.md`, the dispatch table that maps request patterns to one
-headless sub-skill.
+`SKILL.md`, the entry point that maps a request to one headless reference.
 
-Rule: load router before choosing a sub-skill.
+Rule: load only the reference for the selected path.
 
 ### Sub-skill
 
@@ -92,7 +91,7 @@ Canonical launch mode for a target CLI.
 
 - Claude -> print mode, no PTY
 - Pi -> print/json mode, no PTY
-- Codex -> `codex exec`, PTY
+- Codex -> `codex exec`, no PTY
 - OpenCode -> `opencode run`, PTY
 
 Rule: do not change execution mode by preference; use the matrix in the
@@ -102,8 +101,8 @@ delegation sub-skill.
 
 Whether the delegated command must run with a pseudo-terminal.
 
-- Codex and OpenCode require PTY
-- Claude print mode and Pi print mode do not use PTY
+- OpenCode requires PTY
+- Codex exec, Claude print mode, and Pi print mode do not need PTY
 
 Not: `pty mode`. PTY is a launch constraint, not a user-facing mode.
 
@@ -133,8 +132,8 @@ Examples:
 
 Codex's non-interactive execution path through `codex exec`.
 
-Normally requires a git repository unless the installed Codex version supports
-and permits bypassing that check.
+Normally requires a Git repository. Use `--skip-git-repo-check` only for an
+intentionally trusted non-repository directory.
 
 ### Run mode
 
@@ -163,11 +162,12 @@ Rule: unattended Claude print mode needs an explicit permission strategy.
 
 ### Codex sandbox policy
 
-Codex file-system and approval constraint for an exec run.
+Codex file-system constraint for an exec run, separate from approval policy.
 
 Common values: `read-only`, `workspace-write`, `danger-full-access`.
 
-Rule: ask before danger-level access.
+Rule: use `read-only` for inspection or `workspace-write` for edits. Set the
+approval policy separately for each unattended run.
 
 ### Workdir hygiene
 
