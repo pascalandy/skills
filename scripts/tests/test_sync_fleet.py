@@ -6,25 +6,35 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
-from conftest import SCRIPTS, commit
+from conftest import SCRIPTS, commit, skill
 
 # Drops the options, runs the remote command in the host's home, and refuses
-# the host named down the way ssh reports an unreachable machine.
+# the host named down the way ssh reports an unreachable machine. git and
+# rsync use it too, through GIT_SSH_COMMAND and rsync -e.
 FAKE_SSH = """#!/bin/sh
-while [ "$1" = -o ]; do shift 2; done
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o | -l | -p) shift 2 ;;
+        -*) shift ;;
+        *) break ;;
+    esac
+done
 host=${1#*@}
+shift
 if [ "$host" = down ]; then
     echo "ssh: connect to host down port 22: Connection refused" >&2
     exit 255
 fi
-HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$2"
+cd "$FLEET_HOMES/$host" || exit 255
+HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
 """
 FAKE_JUST = """#!/bin/sh
 echo "$@" >> "$HOME/just.log"
-echo "applied: fake"
+if [ "$2" = --check ]; then cat "$HOME/check.json"; fi
 """
 
 
@@ -36,26 +46,34 @@ def git(repo: Path, *args: str) -> str:
 
 @pytest.fixture
 def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """A control checkout, its origin, and machine homes cloned from it."""
+    """A hub checkout with a private tree, its origin, and a fake ssh and just."""
     origin = tmp_path / "origin.git"
     subprocess.run(
         ["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True
     )
-    control = tmp_path / "control"
-    (control / "scripts").mkdir(parents=True)
-    for name in ("_common.py", "sync_fleet.py"):
-        shutil.copy2(SCRIPTS / name, control / "scripts" / name)
-    (control / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
-    git(tmp_path, "init", "-q", "-b", "main", str(control))
-    commit(control)
-    git(control, "remote", "add", "origin", str(origin))
-    git(control, "push", "-q", "origin", "main")
+    hub = tmp_path / "hub"
+    (hub / "scripts").mkdir(parents=True)
+    for name in (
+        "_common.py",
+        "flatten_skills.py",
+        "install_skills.py",
+        "sync_fleet.py",
+    ):
+        shutil.copy2(SCRIPTS / name, hub / "scripts" / name)
+    (hub / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
+    skill(hub / "authoring/content", "alpha")
+    skill(hub / "skills", "alpha")
+    git(tmp_path, "init", "-q", "-b", "main", str(hub))
+    commit(hub)
+    git(hub, "remote", "add", "origin", str(origin))
+    git(hub, "push", "-q", "origin", "main")
+    skill(hub / "_skills_private/content", "secret")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for name, body in (("ssh", FAKE_SSH), ("just", FAKE_JUST)):
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
-    return control, tmp_path / "homes", bin_dir
+    return hub, tmp_path / "homes", bin_dir
 
 
 def machine(homes: Path, name: str, origin: Path) -> Path:
@@ -65,16 +83,8 @@ def machine(homes: Path, name: str, origin: Path) -> Path:
     return checkout
 
 
-def private_clone(checkout: Path, origin: Path) -> Path:
-    tree = checkout / "_skills_private"
-    subprocess.run(["git", "clone", "-q", str(origin), str(tree)], check=True)
-    return tree
-
-
-def register(control: Path, *names: str) -> None:
-    registry = control / "_skills_private/fleet.toml"
-    registry.parent.mkdir(exist_ok=True)
-    registry.write_text(
+def register(hub: Path, *names: str) -> None:
+    (hub / "_skills_private/fleet.toml").write_text(
         "".join(
             f'[machines.{name}]\nssh = "tester@{name}"\npath = "projects/skills"\n\n'
             for name in names
@@ -82,33 +92,25 @@ def register(control: Path, *names: str) -> None:
     )
 
 
-def publish(control: Path, name: str = "change.txt") -> str:
-    (control / name).write_text("published\n")
-    commit(control)
-    git(control, "push", "-q", "origin", "main")
-    return git(control, "rev-parse", "HEAD")
-
-
-def publish_private(private_origin: Path) -> str:
-    publisher = private_origin.parent / "private-publisher"
-    subprocess.run(
-        ["git", "clone", "-q", str(private_origin), str(publisher)], check=True
-    )
-    (publisher / "private.txt").write_text("published\n")
-    commit(publisher)
-    git(publisher, "push", "-q", "origin", "main")
-    return git(publisher, "rev-parse", "HEAD")
+def change(hub: Path, name: str = "change.txt") -> str:
+    """Commit on the hub without pushing, so only the hub can deliver it."""
+    (hub / name).write_text("new\n")
+    commit(hub)
+    return git(hub, "rev-parse", "HEAD")
 
 
 def run(
-    control: Path, homes: Path, bin_dir: Path, *args: str
+    hub: Path, homes: Path, bin_dir: Path, *args: str
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["FLEET_HOMES"] = str(homes)
+    env["HOME"] = str(hub.parent / "hub-home")
+    env.pop("XDG_STATE_HOME", None)
     return subprocess.run(
-        ["uv", "run", str(control / "scripts/sync_fleet.py"), *args],
+        ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],
         check=False,
+        cwd=hub,
         env=env,
         capture_output=True,
         text=True,
@@ -116,109 +118,157 @@ def run(
     )
 
 
-def test_syncs_clean_machines_and_leaves_the_rest_untouched(
+def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
-    control, homes, bin_dir = fleet
-    origin = control.parent / "origin.git"
-    private_origin = control.parent / "private.git"
-    subprocess.run(
-        ["git", "clone", "-q", "--bare", str(origin), str(private_origin)], check=True
-    )
+    hub, homes, bin_dir = fleet
+    origin = hub.parent / "origin.git"
     behind = machine(homes, "behind", origin)
-    behind_private = private_clone(behind, private_origin)
+    stale = behind / "_skills_private"
+    skill(stale / "content", "retired")
+    (stale / ".cache").mkdir()
     dirty = machine(homes, "dirty", origin)
     (dirty / "draft.txt").write_text("work in progress\n")
-    private_dirty = machine(homes, "private-dirty", origin)
-    (private_clone(private_dirty, private_origin) / "draft.txt").write_text("wip\n")
-    private_ahead = machine(homes, "private-ahead", origin)
-    ahead_tree = private_clone(private_ahead, private_origin)
-    (ahead_tree / "local.txt").write_text("not pushed\n")
-    commit(ahead_tree)
-    stale = git(behind, "rev-parse", "HEAD")
-    private_head = publish_private(private_origin)
-    head = publish(control)
+    branch = machine(homes, "branch", origin)
+    git(branch, "switch", "-q", "-c", "feature")
     ahead = machine(homes, "ahead", origin)
-    (ahead / "local.txt").write_text("not pushed\n")
+    (ahead / "local.txt").write_text("only here\n")
     commit(ahead)
-    unpushed = git(ahead, "rev-parse", "HEAD")
-    register(
-        control, "behind", "dirty", "ahead", "private-dirty", "private-ahead", "down"
-    )
+    before = git(dirty, "rev-parse", "HEAD")
+    head = change(hub)
+    register(hub, "behind", "dirty", "branch", "ahead", "down")
 
-    result = run(control, homes, bin_dir, "--json")
+    result = run(hub, homes, bin_dir, "--json")
 
     assert result.returncode == 1
     report = json.loads(result.stdout)
     assert report["sha"] == head
-    assert report["machines"] == [
-        {"machine": "behind", "status": "synced", "detail": "applied: fake"},
-        {
-            "machine": "dirty",
-            "status": "skipped",
-            "detail": "checkout has uncommitted changes",
-        },
-        {
-            "machine": "ahead",
-            "status": "skipped",
-            "detail": "main has commits that are not on origin/main",
-        },
-        {
-            "machine": "private-dirty",
-            "status": "skipped",
-            "detail": "private tree has uncommitted changes",
-        },
-        {
-            "machine": "private-ahead",
-            "status": "skipped",
-            "detail": "private tree has commits that are not on its upstream",
-        },
-        {
-            "machine": "down",
-            "status": "unreachable",
-            "detail": "ssh: connect to host down port 22: Connection refused",
-        },
+    assert [
+        (entry["machine"], entry["status"], entry["detail"])
+        for entry in report["machines"]
+    ] == [
+        ("behind", "synced", f"synced at {head[:7]}"),
+        ("dirty", "needs-you", "checkout has uncommitted changes"),
+        ("branch", "needs-you", "checkout is on feature, not main"),
+        ("ahead", "needs-you", f"checkout has commits {report['hub']} lacks"),
+        (
+            "down",
+            "offline",
+            "ssh: connect to host down port 22: Connection refused",
+        ),
     ]
     assert git(behind, "rev-parse", "HEAD") == head
-    assert git(behind_private, "rev-parse", "HEAD") == private_head
-    assert (homes / "behind/just.log").read_text() == "install-skills\n"
-    assert git(ahead, "rev-parse", "HEAD") == unpushed
-    # A private tree that fails validation stops the run before main moves.
-    assert git(private_dirty, "rev-parse", "HEAD") == stale
-    assert git(private_ahead, "rev-parse", "HEAD") == stale
-    for name in ("dirty", "ahead", "private-dirty", "private-ahead"):
+    assert git(origin, "rev-parse", "main") == before
+    assert (stale / "content/secret/SKILL.md").is_file()
+    assert not (stale / "content/retired").exists()
+    assert not (stale / "fleet.toml").exists()
+    assert (stale / ".cache").is_dir()
+    assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
+    for name, checkout in (("dirty", dirty), ("branch", branch), ("ahead", ahead)):
+        assert not (checkout / "_skills_private").exists()
         assert not (homes / name / "just.log").exists()
-    assert "error: dirty skipped: checkout has uncommitted changes" in result.stderr
+    assert git(dirty, "rev-parse", "HEAD") == before
+    assert (
+        "error: dirty needs-you: checkout has uncommitted changes; "
+        "fix it on dirty, then rerun just sync-fleet dirty"
+    ) in result.stderr
+    assert "error: down offline:" in result.stderr
 
 
-def test_dry_run_applies_every_check_without_moving_or_installing(
+def test_dry_run_is_silent_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
-    control, homes, bin_dir = fleet
-    origin = control.parent / "origin.git"
-    behind = machine(homes, "behind", origin)
+    hub, homes, bin_dir = fleet
+    behind = machine(homes, "behind", hub.parent / "origin.git")
     before = git(behind, "rev-parse", "HEAD")
-    head = publish(control)
-    ahead = machine(homes, "ahead", origin)
-    (ahead / "local.txt").write_text("not pushed\n")
-    commit(ahead)
-    register(control, "behind", "ahead")
+    change(hub)
+    register(hub, "behind")
 
-    result = run(control, homes, bin_dir, "--dry-run", "--json")
+    result = run(hub, homes, bin_dir, "--dry-run")
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert git(behind, "rev-parse", "HEAD") == before
+    assert not (behind / "_skills_private").exists()
+    assert not (homes / "behind/just.log").exists()
+
+
+def check_report(home: Path, current: int, expected: int) -> None:
+    counts = {
+        "current": current,
+        **({"add": expected - current} if expected > current else {}),
+    }
+    (home / "check.json").write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "target": ".claude/skills",
+                        "expected": expected,
+                        "current": current,
+                        "counts": counts,
+                    }
+                ]
+            },
+            indent=2,
+        )
+    )
+
+
+def test_check_is_silent_when_converged_and_names_each_difference(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    origin = hub.parent / "origin.git"
+    synced = machine(homes, "synced", origin)
+    lagging = machine(homes, "lagging", origin)
+    register(hub, "synced", "lagging")
+    assert run(hub, homes, bin_dir).returncode == 0
+    check_report(homes / "synced", 2, 2)
+    check_report(homes / "lagging", 2, 2)
+    converged = run(hub, homes, bin_dir, "--check")
+    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
+    change(hub)
+    assert run(hub, homes, bin_dir, "synced").returncode == 0
+    (lagging / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    check_report(homes / "lagging", 1, 2)
+
+    result = run(hub, homes, bin_dir, "--check")
 
     assert result.returncode == 1
-    assert json.loads(result.stdout)["machines"] == [
-        {
-            "machine": "behind",
-            "status": "ready",
-            "detail": f"ready to move {before[:7]} to {head[:7]}",
-        },
-        {
-            "machine": "ahead",
-            "status": "skipped",
-            "detail": "main has commits that are not on origin/main",
-        },
-    ]
-    assert git(behind, "rev-parse", "HEAD") == before
-    assert not (homes / "behind/just.log").exists()
-    assert not (homes / "ahead/just.log").exists()
+    assert result.stdout == ""
+    errors = [line for line in result.stderr.splitlines() if line.startswith("error:")]
+    assert len(errors) == 1
+    assert errors[0].startswith("error: lagging drift: checkout is behind ")
+    assert "private tree differs from " in errors[0]
+    assert "~/.claude/skills has 1 of 2 current (add 1)" in errors[0]
+    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+
+
+def test_hook_acts_only_in_the_hub_main_checkout(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    behind = machine(homes, "behind", hub.parent / "origin.git")
+    before = git(behind, "rev-parse", "HEAD")
+    register(hub, "behind")
+    home = hub.parent / "hub-home"
+    fleet_log = home / ".local/state/skills-sync/fleet.log"
+
+    git(hub, "switch", "-q", "-c", "feature")
+    change(hub)
+    assert run(hub, homes, bin_dir, "--hook", "post-commit").returncode == 0
+    git(hub, "switch", "-q", "main")
+    assert run(hub, homes, bin_dir, "--hook", "post-rewrite", "amend").returncode == 0
+    assert not (home / ".local/state").exists()
+    assert not (home / ".claude").exists()
+
+    head = change(hub)
+    result = run(hub, homes, bin_dir, "--hook", "post-commit")
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+    deadline = time.monotonic() + 60
+    while "behind: synced" not in (fleet_log.read_text() if fleet_log.exists() else ""):
+        assert time.monotonic() < deadline, "background sync did not finish"
+        time.sleep(0.2)
+    assert git(behind, "rev-parse", "HEAD") == head != before

@@ -1,6 +1,6 @@
 ---
 name: Install skills
-description: Profiles, private packages, ownership, fleet sync, and cutover for just install-skills
+description: Profiles, private packages, ownership, fleet sync from om1, hooks, and cutover for just install-skills
 tags:
   - area/ea
   - kind/doc
@@ -21,17 +21,31 @@ date_updated: 2026-09-27
 
 ## Sync machines
 
-- `just sync` updates this machine: it fast-forwards the checkout and, when `_skills_private/` is a git clone, the private tree, then runs the installer with any flags you pass. With `--dry-run` or `--check` it skips both pulls and previews the current checkout
-- `just sync-fleet` installs published `main` on every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet om1`. It reads `main` from GitHub once, then on each machine fast-forwards the checkout to that commit, fast-forwards a git private tree to its upstream, and runs `just install-skills` in a login shell over SSH
-- It checks each machine before changing anything there, and skips it when the checkout is off `main`, or when the checkout or a git private tree has uncommitted changes or commits its remote lacks. Push first; only published content reaches other machines. A private tree that is not a git clone is that machine's own and installs as is
-- `just sync-fleet --dry-run` fetches and runs the same checks, then reports each machine as ready or skipped without moving a checkout or installing
+om1 is the hub. Every sync runs there and sends om1's skills to the other machines, which only receive
+
+- `just sync` pulls `main` and installs on the machine it runs on. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pull and previews the current checkout
+- `just sync-fleet` syncs every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. The hub installs its own working tree. Every other machine receives the hub's `main` commit over SSH, without GitHub, fast-forwards its checkout to it, receives an exact mirror of the hub's `_skills_private/` minus `fleet.toml` and runtime files, then runs `just install-skills`
+- A machine whose checkout is off `main`, has uncommitted changes, or has commits the hub lacks reports `needs-you` and stays untouched. An `offline` or `failed` machine gets one retry, then catches up at the next sync
+- Success prints nothing. `--verbose` prints each machine's outcome, and `--dry-run` runs every check without changing anything
+- `just sync-fleet --check` compares each machine's checkout, private tree, and installed skills per harness with the hub, then exits 1 naming each difference. It compares names and contents, so skills other tools installed do not count
+- Private skills live only in the hub's `_skills_private/`; a copy edited on another machine is overwritten at the next sync. Editing a private skill fires no hook, so run `just sync-fleet` afterwards
 - The registry stays in the private tree so hosts and accounts stay out of this public repository. Each `path` is relative to that machine's home:
 
 ```toml
 [machines.om1]
 ssh = "pascal@om1.example.ts.net"
 path = "projects/skills"
+
+[machines.mbp]
+ssh = "andy16@mbp16.example.ts.net"
+path = "Documents/github_local/skills"
 ```
+
+### Hooks
+
+`lefthook install` in the hub's checkout wires `lefthook.yml`. On `main` in that checkout, a commit or a pull that brings commits installs the hub at once, then syncs the other machines in the background, so git never waits on a sleeping laptop. A pull with nothing new fires no hook. Worktrees, other branches, and checkouts without `fleet.toml` skip the sync
+
+The background run logs to `~/.local/state/skills-sync/fleet.log`. It sends a desktop notification only when a machine needs you or fails; an offline machine waits for the next sync
 
 ## Ownership
 
