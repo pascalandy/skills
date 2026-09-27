@@ -35,13 +35,13 @@ Private skills live in the private repository `pascalandy/skills-private`, clone
 GitHub's `main` is the source. Every machine in the fleet runs the same commands and hooks, and any of them can start a sync
 
 - `just sync` pulls `main`, saves and pulls the private clone, and installs on the machine it runs on, without touching the others. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
-- `just sync-fleet` brings every machine in `_skills_private/fleet.toml` to GitHub's `main`, the machine it runs on included; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. It fetches GitHub's `main`, or uses the last one fetched when GitHub is unreachable, and saves and pulls its own private clone first. Each machine then receives that commit over SSH, fast-forwards its checkout to it, saves and pulls its own private clone from GitHub, and runs `just install-skills`. The machine running it takes the same steps in a local shell
+- `just sync-fleet` brings every machine in the fleet registry to GitHub's `main`, the machine it runs on included; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. It fetches GitHub's `main`, or uses the last one fetched when GitHub is unreachable, and saves and pulls its own private clone first. Each machine then receives that commit over SSH, fast-forwards its checkout to it, saves and pulls its own private clone from GitHub, and runs `just install-skills`. The machine running it takes the same steps in a local shell
 - A commit GitHub lacks reaches no other machine, so push it first. A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `skills/`, `scripts/`, or `justfile`, has commits GitHub lacks, or whose `_skills_private` is not a clone reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it
 - An `offline` or `failed` machine gets one retry. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up
 - Success prints nothing. `--verbose` prints GitHub's commit, its public skill count, and each machine's outcome and per-harness counts; `--dry-run` runs every check without changing anything
 - `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference. It compares names and contents, so skills other tools installed do not count
 - Editing a private skill fires no hook, so run `just sync` or `just sync-fleet` afterwards; each sync also saves the private edits of the machines it reaches
-- The registry is tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. Each `path` is relative to that machine's home:
+- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `private-network` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
 
 ```toml
 [machines.om1]
@@ -55,11 +55,11 @@ path = "Documents/github_local/skills"
 
 ### Hooks
 
-Run `lefthook install` once in each machine's main checkout. On `main` in a checkout that has the registry:
+Run `lefthook install` once in each machine's main checkout. On `main` in a checkout that has the private clone:
 
 - A commit installs this machine at once. The other machines wait for GitHub: pushing `main` starts a background job that waits for the push to land, then syncs them
 - A pull that brings commits installs this machine, then syncs the other machines in the background. A pull with nothing new fires no hook
-- Worktrees, other branches, and checkouts without the registry skip all of it. A machine a sync reaches runs its merge with hooks off, so it never starts another sync
+- Worktrees, other branches, and checkouts without the private clone skip all of it. A clone without the registry warns and skips it too, without blocking git. A machine a sync reaches runs its merge with hooks off, so it never starts another sync
 
 Background runs never make git wait on a sleeping laptop. They log to `~/.local/state/skills-sync/fleet.log` and send a desktop notification, `notify-send` on Linux or Notification Center on macOS, only when a machine needs you or fails; an offline machine waits for the next sync
 

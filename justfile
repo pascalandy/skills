@@ -19,7 +19,7 @@ alias ttr := transcript
 transcript url *args:
     @uv run authoring/content/transcript-sk/scripts/transcript.py run youtube --url "$@"
 
-# From any machine, sync every machine in _skills_private/fleet.toml, or named ones, to GitHub's main; --check compares them
+# From any machine, sync every machine in the fleet registry, or named ones, to GitHub's main; --check compares them
 [group('commands')]
 [no-exit-message]
 sync-fleet *args:
@@ -66,7 +66,7 @@ skills-discover *args:
 release-check version *args:
     @uv run scripts/release_check.py "$@"
 
-# Lefthook runs this after a commit or pull and before a push; it acts only in a main checkout with the registry
+# Lefthook runs this after a commit or pull and before a push; it acts only in a main checkout with the private clone
 [private]
 [no-exit-message]
 sync-hook *args:

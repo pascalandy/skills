@@ -14,6 +14,10 @@ from pathlib import Path
 import pytest
 from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
+# Where the private-network skill ships the registry; the seed's .gitignore keeps
+# it untracked, so it never reaches another machine's clone.
+REGISTRY = "_skills_private/integrations/private-network/references/fleet.toml"
+
 # Drops the options, runs the remote command in the host's home, and refuses
 # the host named down the way ssh reports an unreachable machine. git uses it
 # too, through GIT_SSH_COMMAND.
@@ -98,7 +102,8 @@ def machine(homes: Path, name: str, origin: Path) -> Path:
 
 
 def register(hub: Path, *names: str) -> None:
-    (hub / "_skills_private/fleet.toml").write_text(
+    (hub / REGISTRY).parent.mkdir(parents=True, exist_ok=True)
+    (hub / REGISTRY).write_text(
         "".join(
             f'[machines.{name}]\nssh = "tester@{name}"\npath = "projects/skills"\n\n'
             for name in names
@@ -204,7 +209,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert git(private, "show", "main:content/secret/SKILL.md") == "from the hub"
     assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
-    assert not (behind / "_skills_private/fleet.toml").exists()
+    assert not (behind / REGISTRY).exists()
     assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
     installed = homes / "behind/.claude/skills/secret/SKILL.md"
     assert installed.read_text() == "from the hub\n"
@@ -318,6 +323,18 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
         assert time.monotonic() < deadline, "background sync did not finish"
         time.sleep(0.2)
     assert git(behind, "rev-parse", "HEAD") == head != before
+
+
+def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+
+    result = run(hub, homes, bin_dir, "--hook", "post-commit")
+
+    assert result.returncode == 0
+    assert "no fleet.toml" in result.stderr
+    assert not (hub.parent / "hub-home/.claude").exists()
 
 
 def test_brings_the_machine_it_runs_on_to_github_main(
