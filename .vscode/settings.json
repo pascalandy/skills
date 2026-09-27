@@ -1,3 +1,8 @@
 {
-  "folder-color.pathColors": []
+  "folder-color.pathColors": [
+    {
+      "folderPath": "skills/authoring/",
+      "color": "foldercolorizer.color_ffd7af"
+    }
+  ]
 }
