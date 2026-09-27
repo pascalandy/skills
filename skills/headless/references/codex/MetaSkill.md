@@ -1,205 +1,32 @@
----
-name: headless-codex
-description: |
-  Use only when the user explicitly says `headless-codex` to use codex exec commands.
----
+# Run Codex headlessly
 
-# Headless Codex
+Use `codex exec` for a task that must finish without the interactive Codex UI. The calling agent owns the request, process supervision, and verification. The [non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode) and [`codex exec` reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) own current CLI behavior; check `codex exec --help` on the installed version before relying on an option.
 
-Run OpenAI Codex CLI in non-interactive headless mode using `codex exec`.
+## Prepare the run
 
-## Quick Start
+1. Check `codex --version`, `codex exec --help`, and `codex login status`. On a runner without saved authentication, provide `CODEX_API_KEY` only to the Codex invocation through the runner's secret facility. Keep credentials out of prompts, logs, and repository files. For GitHub Actions, follow the [Codex GitHub Action guidance](https://learn.chatgpt.com/docs/non-interactive-mode#authenticate-in-automation)
+2. Set the target repository with `-C <path>`. Inspect its instructions and current changes before delegating edits. Codex normally requires a Git repository; use `--skip-git-repo-check` only for an intentionally trusted directory outside one
+3. Give concurrent editing runs separate worktrees or checkouts. State the task, permitted paths, expected result, and checks in the prompt. Use the caller's process API or an argument array when passing generated or untrusted text
+4. Choose `-s read-only` for inspection or `-s workspace-write` for edits. Set `-c 'approval_policy="never"'` for an unattended run. Broader access or approval bypass requires an authorized, isolated runner. Do not use deprecated `--full-auto` in new commands
 
-```bash
-codex exec "Your prompt here"
-codex exec -m gpt-5.4 "Your prompt"
-```
+## Run and observe
 
-## Model Selection
-
-**Override the default model:**
-```bash
-codex exec -m gpt-5.4 "Your prompt"
-codex exec -m gpt-5-codex "Your prompt"
-```
-
-**Use local OSS model (requires Ollama):**
-```bash
-codex exec --oss "Your prompt"
-```
-
-## Reasoning Effort
-
-Control the model's reasoning depth with inline config:
+Pass a complete prompt on stdin:
 
 ```bash
-codex exec -c 'model_reasoning_effort="high"' "Analyze this codebase"
-codex exec -c 'model_reasoning_effort="xhigh"' "Deep architectural review"
+codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' --json - < prompt.md
 ```
 
-Reasoning effort values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`
+For edits, use `-s workspace-write`. Add `-o result.md` when the caller needs the final message in a file. `--json` emits JSONL events on stdout; without it, stdout contains the final message and progress goes to stderr. No PTY is needed. Retain stderr and the exit status for diagnosis.
 
-## Session Management
+Watch the process until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded. Inspect the actual diff and run relevant checks before reporting completion.
 
-**Resume the most recent session:**
-```bash
-codex exec resume --last "Continue where we left off"
-```
+If Codex fails or asks for unavailable access, report the error and unmet task. Retry only after changing the cause; do not silently widen the sandbox or repeat a write task whose result is uncertain. Terminate a timed-out child and inspect partial changes before another attempt.
 
-**Resume a specific session:**
-```bash
-codex exec resume SESSION_ID "Follow-up question"
-```
+## Continue or structure a task
 
-**Resume from any directory:**
-```bash
-codex exec resume --last --all "Continue from anywhere"
-```
+- Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>"`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. Check `codex exec resume --help` for the installed version's options
+- Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
+- Pass `-m <model>` or `-c 'model_reasoning_effort="high"'` only when the task specifies them or the runner has a deliberate model policy. Check local help and current model availability instead of preserving model names from old examples
 
-**Ephemeral run (no session persistence):**
-```bash
-codex exec --ephemeral "One-off task"
-```
-
-## File Attachments & Images
-
-**Attach images:**
-```bash
-codex exec -i screenshot.png "Explain this UI"
-codex exec -i image1.png,image2.png "Compare these images"
-```
-
-**Set working directory:**
-```bash
-codex exec -C /path/to/project "Analyze this repo"
-```
-
-## Output Handling
-
-**JSON output for programmatic use:**
-```bash
-codex exec --json "List all functions"
-```
-
-**Save final message to file:**
-```bash
-codex exec -o output.txt "Generate a summary"
-```
-
-**Disable colors:**
-```bash
-codex exec --color never "Plain text output"
-```
-
-## Approvals & Sandboxing
-
-Be explicit about approvals and sandboxing for unattended execution.
-
-| Goal | Recommended Command | Why |
-|------|---------------------|-----|
-| Read-only analysis (safest) | `codex exec -s read-only "Review this code"` | Safe default for audits, summaries, reviews |
-| Workspace edits (automated) | `codex exec -s workspace-write "Refactor this file"` | Lets Codex modify files without hanging on approval prompts |
-| Low-friction local work | `codex --full-auto "Quick task"` | On main CLI: shortcut for `-a on-request -s workspace-write` |
-| Externally sandboxed only | `codex exec --dangerously-bypass-approvals-and-sandbox "Risky task"` | Highest risk; only with explicit user permission |
-
-**Important:**
-- For truly unattended headless execution, use `-s workspace-write` or `-s read-only`
-- `--full-auto` is on the main `codex` CLI, not `codex exec`; it maps to `--ask-for-approval on-request` plus `--sandbox workspace-write`
-- Ask before using `--dangerously-bypass-approvals-and-sandbox` or `danger-full-access`
-
-## Piping Input
-
-**Pipe a prompt from stdin:**
-```bash
-cat prompt.md | codex exec -s read-only -
-```
-
-**Pipe with model and reasoning:**
-```bash
-cat prompt.md | codex exec -m gpt-5.4 -c 'model_reasoning_effort="xhigh"' -s read-only -
-```
-
-## Flags Reference
-
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--model` | `-m` | Model to use (e.g., `gpt-5.4`, `gpt-5-codex`) |
-| `--ask-for-approval` | `-a` | Approval mode: `never`, `on-request`, `untrusted` (on main CLI, not exec) |
-| `--sandbox` | `-s` | Sandbox policy: `read-only`, `workspace-write`, `danger-full-access` |
-| `--full-auto` | | Shortcut for `-a on-request -s workspace-write` (on main CLI) |
-| `--config` | `-c` | Inline config override (e.g., `-c 'model_reasoning_effort="high"'`) |
-| `--enable` | | Enable a feature (repeatable) |
-| `--disable` | | Disable a feature (repeatable) |
-| `--json` | | Output newline-delimited JSON events |
-| `--output-last-message` | `-o` | Write final message to file |
-| `--color` | | Color mode: `always`, `never`, `auto` |
-| `--image` | `-i` | Attach image(s) to the prompt |
-| `--cd` | `-C` | Set working directory |
-| `--add-dir` | | Additional directories that should be writable |
-| `--ephemeral` | | Run without persisting session |
-| `--output-schema` | | Path to a JSON Schema file for structured output |
-| `--profile` | `-p` | Load configuration profile |
-| `--oss` | | Use local OSS model provider (Ollama/LM Studio) |
-| `--local-provider` | | Specify local provider: `lmstudio` or `ollama` |
-| `--skip-git-repo-check` | | Allow running outside a Git repository |
-| `--dangerously-bypass-approvals-and-sandbox` | | Bypass all approvals and sandboxing (dangerous) |
-
-## Subcommands
-
-| Command | Description |
-|---------|-------------|
-| `codex exec resume` | Resume a previous exec session by ID |
-| `codex exec resume --last` | Resume the most recent session |
-| `codex exec resume --all` | Include sessions from any directory |
-| `codex exec review` | Run a code review against the current repository |
-
-## Output Handling Best Practices
-
-- Default: formatted text to stdout
-- `--json`: newline-delimited JSON events for parsing
-- Progress and diagnostics appear on stderr
-- Keep stderr visible for debugging
-- Use `--json` or `-o` for clean machine-readable output
-- If the user only wants a concise summary, run Codex, then summarize the result in plain language
-- When relevant, include changed files, tests run, warnings, and the session ID in your summary
-
-## Failure Handling
-
-- On non-zero exit, report the exact failure and ask before retrying with broader access
-- If a run stalls because Codex needs approvals, rerun with explicit sandbox level (`-s read-only` or `-s workspace-write`)
-- If resume warns about a model mismatch, keep the existing model unless the user wants to switch
-- Ask before escalating from `read-only` to `workspace-write`
-- Ask again before any `danger-full-access` or `--dangerously-bypass-approvals-and-sandbox`
-
-## Verification Shortcuts
-
-```bash
-codex --help
-codex exec --help
-codex exec resume --help
-codex login --help
-```
-
-## Gotchas
-
-- `codex exec` is the headless command; plain `codex` launches the interactive TUI
-- `--full-auto` is NOT the same as fully unattended; it still prompts on-request
-- For CI/CD automation, always use explicit sandbox level (`-s read-only` or `-s workspace-write`)
-- Approval flag `-a` is on the main `codex` CLI, not `codex exec` - use `--full-auto` on main CLI or configure sandbox in exec
-- Session resume uses the original working directory unless overridden with `-C`
-- When using `--oss`, ensure Ollama or LM Studio is running first
-- Use `--enable` and `--disable` to toggle feature flags
-- Use `--output-schema` for structured JSON output with schema validation
-
-## Update This Skill
-
-Triggered when the user wants to refresh the skill against the latest official documentation.
-
-**Trigger phrases:**
-- "update the headless-codex skill"
-- "about skill headless-codex, UPDATE the skill"
-- "skill headless-codex, check if we need to update"
-- "refresh headless-codex skill"
-- "sync headless-codex with latest docs"
-
-Load `references/UPDATE.md` and follow the `npx nia-docs` workflow to check the official CLI documentation.
+For maintenance of this reference, follow [the update checklist](references/UPDATE.md).
