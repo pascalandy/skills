@@ -15,7 +15,6 @@ Definitions only. [SKILL.md](../SKILL.md) selects the procedure; each CLI refere
 | Term | Meaning |
 | --- | --- |
 | Headless | Non-interactive CLI execution |
-| Headless delegation | Assigning a task to an external CLI through the [delegation procedure](delegation/MetaSkill.md) |
 | Target CLI | The command-line application selected to perform the task |
 | Workdir | The directory used as the child process's project context |
 | PTY | A pseudo-terminal; distinct from ordinary stdin/stdout pipes |
