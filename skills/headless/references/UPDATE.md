@@ -3,7 +3,7 @@
 Update documentation without installing or upgrading CLIs or invoking billable model runs by default.
 
 1. Read the affected CLI's installed help and official source below. Record version differences instead of claiming universal behavior
-2. Keep command flags and examples in that CLI's reference. Keep process supervision in the delegation reference and definitions in the glossary
+2. Keep command flags and examples in that CLI's reference and definitions in the glossary. Leave delegation policy to the calling workflow
 3. Remove superseded recipes and stale model or local-agent lists. Discover availability at runtime instead of maintaining a second catalog
 4. Check routing from SKILL.md, relative links, stdin handling, permissions, output separation, and exit status. Use parser or stub checks for shell examples; run live model calls only when behavioral evidence needs them and the task authorizes them
 5. Run repository validators and regenerate distributed skills according to the repository's AGENTS.md. Commit source and generated output together
@@ -16,5 +16,3 @@ Update documentation without installing or upgrading CLIs or invoking billable m
 | Pi | `pi --version`, `pi --help`, `pi --list-models` | [CLI integration](https://pi.dev/docs/latest/cli-integration), [CLI](https://pi.dev/docs/latest/cli), [JSON events](https://pi.dev/docs/latest/json), [RPC](https://pi.dev/docs/latest/rpc) |
 
 For Pi, locate the installed `@earendil-works/pi-coding-agent` package through the active package manager, then read its README and JSON/RPC docs as needed. For Codex model discovery, check `codex debug models --help` before using that experimental command.
-
-For delegation changes, check that the strict execution trigger remains distinct from CLI guidance. Use the current harness's actual process tools instead of copying runner-specific pseudocommands.

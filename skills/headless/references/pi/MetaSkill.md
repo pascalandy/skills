@@ -14,20 +14,37 @@ With terminal stdin and stdout, plain `pi` opens the TUI. Redirecting either str
 
 ## Review or execute
 
-Print mode alone does not restrict tools. For file inspection without shell execution or edits:
+For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. This example selects GLM 5.3 Flash through OpenCode Go and requests `max` reasoning. Pi 0.87.1 on `mbp` lists `opencode-go/glm-5.3-flash` with thinking enabled. Before running elsewhere, confirm it with `pi --list-models glm-5.3-flash` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking max` requests that level but does not prove the provider uses effective `max`.
 
 ```bash
-pi -p --no-extensions --tools read,grep,find,ls \
-  "Review src/auth.ts for correctness. Report findings with file and line." \
-  < /dev/null > review.md 2> review.stderr.log
+repo="/absolute/path/to/repository"
+prompt_file="/absolute/path/to/reviewer-prompt.md"
+review_dir="$(mktemp -d /tmp/pi-review.XXXXXX)" || exit 1
+
+review_status=0
+(
+  cd "$repo" || exit 1
+  pi --print \
+    --model opencode-go/glm-5.3-flash \
+    --thinking max \
+    --no-session --no-extensions \
+    --tools read,grep,find,ls \
+    < "$prompt_file" \
+    > "$review_dir/result.md" \
+    2> "$review_dir/stderr.log"
+) || review_status=$?
+
+printf 'Exit status: %s\nReview files: %s\n' \
+  "$review_status" "$review_dir"
 ```
 
-This tool set cannot run tests or obtain a diff through Bash. Supply a diff on stdin or authorize the tools needed for execution. Keep the working directory explicit in the calling process.
+`result.md` contains the final assistant text. The failure handler works under `set -e`; a standalone script should end with `exit "$review_status"` after inspecting the report. Print mode alone does not restrict tools: this allowlist excludes shell execution and edits. Supply a diff in the prompt file when needed; this tool set cannot run tests or obtain a diff through Bash.
 
 For an event stream, select `--mode json`:
 
 ```bash
-pi --mode json --no-extensions --tools read,grep,find,ls \
+pi --mode json --model opencode-go/glm-5.3-flash --thinking max \
+  --no-session --no-extensions --tools read,grep,find,ls \
   "Review this diff and inspect related files" \
   < diff.patch > events.jsonl 2> review.stderr.log
 ```

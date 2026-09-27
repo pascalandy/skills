@@ -4,15 +4,42 @@ Use `claude -p` or `claude --print` from the target repository with ordinary pip
 
 ## Permissions
 
-Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. For a file review without shell execution, restrict available tools:
+Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. Prepare an absolute prompt-file path with the review scope and criteria. This complete example selects Opus 5.5 at `xhigh`, captures raw events, and extracts the final answer:
 
 ```bash
-claude -p "Review src/auth.ts for correctness. Report findings with file and line." \
-  --permission-mode dontAsk --permission-prompts none --tools "Read,Grep,Glob" \
-  < /dev/null > review.md 2> review.stderr.log
+repo="/absolute/path/to/repository"
+prompt_file="/absolute/path/to/reviewer-prompt.md"
+review_dir="$(mktemp -d /tmp/claude-review.XXXXXX)" || exit 1
+
+review_status=0
+(
+  cd "$repo" || exit 1
+  CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --print \
+    --model claude-opus-5-5 --effort xhigh \
+    --permission-mode dontAsk --permission-prompts none \
+    --tools "Read,Grep,Glob" \
+    --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
+    --settings '{"disableAllHooks":true}' \
+    --no-session-persistence \
+    --output-format stream-json --verbose \
+    < "$prompt_file" \
+    > "$review_dir/events.jsonl" \
+    2> "$review_dir/stderr.log"
+) || review_status=$?
+
+if ! jq -ers '[.[] | select(.type == "result")] | last | .result |
+  select(type == "string" and length > 0)' \
+  "$review_dir/events.jsonl" > "$review_dir/result.md"; then
+  if [ "$review_status" -eq 0 ]; then review_status=1; fi
+fi
+
+printf 'Exit status: %s\nReview files: %s\n' \
+  "$review_status" "$review_dir"
 ```
 
-Put the prompt before variadic flags such as `--tools` and `--allowedTools`. This review cannot run tests or obtain a Git diff through Bash. Supply the diff through stdin, or authorize narrowly scoped shell commands when needed.
+Requires `jq` and access to [Opus 5.5](https://code.claude.com/docs/en/model-config). `result.md` holds the complete final answer; `events.jsonl` retains execution metadata and failures. A missing answer makes a successful process exit count as failure. Inspect the result metadata as described below; extraction alone does not validate the review. A standalone script should finish with `exit "$review_status"` after inspection. The failure handler works under `set -e`.
+
+For inline prompts, put them before variadic flags such as `--tools` and `--allowedTools`. This tool set cannot run tests or obtain a Git diff through Bash. Include the diff in the prompt file when needed.
 
 | Option | Use |
 | --- | --- |
@@ -34,6 +61,7 @@ Permission mode and allow rules still govern calls when prompts are disabled. `-
 
 ```bash
 claude -p "Review this diff and inspect related files" \
+  --model claude-opus-5-5 --effort xhigh \
   --permission-mode dontAsk --permission-prompts none \
   --tools "Read,Grep,Glob" --output-format json \
   < diff.patch > result.json 2> review.stderr.log
@@ -45,14 +73,7 @@ claude -p "Review this diff and inspect related files" \
 | `json` | One result object with session metadata and response text in `result` |
 | `stream-json` | JSONL events ending with a `result` record; use `--verbose` |
 
-For streaming output:
-
-```bash
-claude -p "Summarize README.md" \
-  --permission-mode dontAsk --permission-prompts none \
-  --tools "Read,Grep,Glob" --output-format stream-json --verbose \
-  < /dev/null > events.jsonl 2> review.stderr.log
-```
+The complete example above uses streaming output and extracts its final `result` record.
 
 Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in the result object's `structured_output` field, not its `result` field.
 
