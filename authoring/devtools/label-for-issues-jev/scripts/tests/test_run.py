@@ -291,3 +291,13 @@ def test_runs_in_the_same_second_keep_separate_records(harness: Harness) -> None
 
     assert first.json()["id"] != second.json()["id"]
     assert harness.run("compare", "last", "--json").json()["run"] == second.json()["id"]
+
+
+def test_duplicate_labels_in_a_family_need_review(harness: Harness) -> None:
+    harness.issues(issue(1, labels=("2-type:bug", "2-type:task", "1-needs-info")))
+    harness.fake.overrides = MISSING_REPRO
+
+    entry = harness.entry(harness.record(harness.live()), 1)
+
+    assert entry["queue"] == "review"
+    assert entry["reasons"] == ["several type labels: 2-type:bug, 2-type:task"]
