@@ -5,14 +5,17 @@
 # ///
 """Sync skills from this checkout, the hub, to every machine in its fleet.
 
-The hub installs its own working tree. Every other machine receives the hub's
-main commit and a mirror of its private tree over SSH, fast-forwards its
-checkout to that commit, and runs `just install-skills`. A machine whose
-checkout is off main, has uncommitted changes under authoring/, skills/,
-scripts/, or justfile, or has commits the hub lacks is left untouched. A machine that is offline or fails gets one retry.
+The hub saves and pulls its clone of the private repository, then installs its
+own working tree. Every other machine receives the hub's main commit over SSH,
+fast-forwards its checkout to that commit, saves and pulls its own private
+clone from GitHub, and runs `just install-skills`. A machine whose checkout is
+off main, has uncommitted changes under authoring/, skills/, scripts/, or
+justfile, has commits the hub lacks, or whose _skills_private is not a clone is
+left untouched. A machine that is offline or fails gets one retry.
 
-The registry is fleet.toml in the hub's private tree, so hosts stay out of this
-public repository. Each path is relative to that machine's home:
+The registry is fleet.toml in the hub's private clone, which git ignores, so
+hosts stay out of both repositories. Each path is relative to that machine's
+home:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
@@ -36,15 +39,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+import sync_private
 import tomllib
 from _common import ScriptError, exclusive, run_script
-from install_skills import (
-    PRIVATE,
-    RUNTIME_NAMES,
-    RUNTIME_PREFIXES,
-    RUNTIME_SUFFIXES,
-    private_packages,
-)
+from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTALLER = ROOT / "scripts" / "install_skills.py"
@@ -69,18 +67,6 @@ SSH = (
     "-o",
     "StrictHostKeyChecking=yes",
 )
-# The mirror leaves out what the installer skips, plus the hub's registry, and
-# deletes them on the machine, so a retired skill's cache cannot keep its folder
-# alive and no machine but the hub holds a registry.
-EXCLUDES = tuple(
-    f"--exclude={pattern}"
-    for pattern in (
-        "/fleet.toml",
-        *sorted(RUNTIME_NAMES),
-        *(f"{prefix}*" for prefix in RUNTIME_PREFIXES),
-        *(f"*{suffix}" for suffix in RUNTIME_SUFFIXES),
-    )
-)
 NEEDS_YOU = 11
 UNREACHABLE = 255
 TIMEOUT = 600
@@ -103,15 +89,18 @@ enter() {
 edited() {
     [ -n "$(git status --porcelain -- authoring skills scripts justfile)" ]
 }
+plain() {
+    [ -L _skills_private ] || { [ -e _skills_private ] && [ ! -d _skills_private/.git ]; }
+}
 """
-# The mirror would follow a symlinked private root and delete files wherever it
-# points, so a link stops the machine before anything is sent.
+# A private folder that is not a clone may hold edits the sync cannot save, so
+# it stops the machine before anything is sent.
 INSPECT = """
 step() {
     enter "$1" || return
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
-    if [ -L _skills_private ]; then
-        echo "~/$1/_skills_private is a symlink; replace it with a folder"
+    if plain; then
+        echo "~/$1/_skills_private is not a clone of the private repo; move it aside, then rerun"
         return 11
     fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
@@ -136,12 +125,27 @@ step() {
             return 12
         }
     fi
+    uv run --quiet scripts/sync_private.py 2>&1 || return 1
     just install-skills --quiet 2>&1
 }
 """
+# Prints the private clone's state as sync_private.state() reports it, then the
+# installer's report.
 CHECK = """
 step() {
     enter "$1" || return
+    if plain; then
+        echo "private - plain"
+    elif [ ! -e _skills_private ]; then
+        echo "private - missing"
+    else
+        head=$(git -C _skills_private rev-parse -q --verify HEAD) || head=-
+        if [ -n "$(git -C _skills_private status --porcelain)" ]; then
+            echo "private $head dirty"
+        else
+            echo "private $head clean"
+        fi
+    fi
     just install-skills --check --json 2>&1
 }
 """
@@ -171,6 +175,7 @@ class Machine:
 class Hub:
     name: str
     sha: str
+    private: str = ""
 
     def contains(self, commit: str) -> bool:
         return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
@@ -275,6 +280,18 @@ def status_of(code: int) -> str:
     return {NEEDS_YOU: "needs-you", UNREACHABLE: "offline"}.get(code, "failed")
 
 
+def private_problems(head: str, state: str, expected: str) -> list[str]:
+    """Compare a private clone, as sync_private.state() reports it, with GitHub."""
+    if state == "missing":
+        return ["private repo is not cloned"]
+    if state == "plain":
+        return ["_skills_private is not a clone of the private repo"]
+    problems = ["private repo has uncommitted edits"] if state == "dirty" else []
+    if head != expected:
+        problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
+    return problems
+
+
 def judge(name: str, problems: list[str], output: str) -> Outcome:
     """Turn an install-skills --check --json report into per-target drift."""
     lines = output.strip().splitlines()
@@ -305,43 +322,18 @@ def judge(name: str, problems: list[str], output: str) -> Outcome:
     return Outcome(name, status, "; ".join(problems) or status, report["targets"])
 
 
-def sync_local(machine: Machine, mode: str) -> Outcome:
+def sync_local(machine: Machine, hub: Hub, mode: str) -> Outcome:
     flags = {"preview": ["--dry-run"], "check": ["--check", "--json"]}
     result = call([sys.executable, str(INSTALLER), *flags.get(mode, ["--quiet"])])
     if mode == "check":
-        return judge(machine.name, [], result.stdout or result.stderr)
+        problems = private_problems(*sync_private.state(), hub.private)
+        return judge(machine.name, problems, result.stdout or result.stderr)
     if result.returncode:
         lines = (result.stderr + result.stdout).splitlines()
         return Outcome(machine.name, "failed", reason(lines, result.returncode))
     if mode == "preview":
         return Outcome(machine.name, "ready", result.stdout.strip())
     return Outcome(machine.name, "synced", "installed this checkout")
-
-
-def mirror(machine: Machine, *flags: str) -> subprocess.CompletedProcess[str]:
-    """Make the machine's private tree match the hub's by content and permissions.
-
-    Sync and --check compare the same attributes, so every difference the check
-    reports is one the next sync repairs; a matching size and time is not enough.
-    The receiving rsync starts only if the root is still not a symlink, since one
-    made after INSPECT would redirect the deletions.
-    """
-    root = shlex.quote(str(PurePosixPath(machine.path, "_skills_private")))
-    return call(
-        [
-            "rsync",
-            "-rlpc",
-            *flags,
-            f"--rsync-path=test ! -L {root} && rsync",
-            "--delete",
-            "--delete-excluded",
-            *EXCLUDES,
-            "-e",
-            shlex.join(SSH),
-            f"{PRIVATE}/",
-            machine.address("_skills_private") + "/",
-        ]
-    )
 
 
 def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
@@ -361,15 +353,10 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind {hub.name} at {head[:7]}")
-        diff = mirror(machine, "--dry-run", "--itemize-changes")
-        if diff.returncode:
-            lines = (diff.stderr + diff.stdout).splitlines()
-            problems.append(
-                f"private tree unreadable: {reason(lines, diff.returncode)}"
-            )
-        elif changes := len(diff.stdout.splitlines()):
-            problems.append(f"private tree differs from {hub.name} in {changes} items")
         code, lines = remote(machine, CHECK, machine.path)
+        for line in lines:
+            if line.startswith("private ") and len(fields := line.split()) == 3:
+                problems.extend(private_problems(fields[1], fields[2], hub.private))
         return judge(machine.name, problems, "\n".join(lines))
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
@@ -395,10 +382,6 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
         if pushed.returncode:
             detail = reason(pushed.stderr.splitlines(), pushed.returncode)
             return Outcome(machine.name, "failed", f"git push failed: {detail}")
-    mirrored = mirror(machine)
-    if mirrored.returncode:
-        detail = reason(mirrored.stderr.splitlines(), mirrored.returncode)
-        return Outcome(machine.name, "failed", f"private mirror failed: {detail}")
     code, lines = remote(machine, APPLY, machine.path, head, hub.sha)
     if code:
         return Outcome(machine.name, status_of(code), reason(lines, code))
@@ -408,7 +391,7 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
 def sync_machine(machine: Machine, hub: Hub, mode: str) -> Outcome:
     try:
         if machine.is_local():
-            return sync_local(machine, mode)
+            return sync_local(machine, hub, mode)
         return sync_remote(machine, hub, mode)
     except subprocess.TimeoutExpired:
         return Outcome(machine.name, "failed", "timed out")
@@ -524,15 +507,19 @@ def sync(args: argparse.Namespace) -> str:
     if args.others:
         machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
-    remote_apply = mode == "apply" and not all(m.is_local() for m in machines)
-    if remote_apply and not private_packages(None):
-        raise ScriptError(
-            f"no private skills under {PRIVATE}; refusing to mirror an empty tree"
-        )
     local = next((machine.name for machine in registry if machine.is_local()), None)
     # Queue behind any other sync, so each run sends the newest commit.
     with exclusive(STATE / "fleet.lock"):
-        hub = Hub(local or socket.gethostname().split(".")[0], hub_commit())
+        sha = hub_commit()
+        # The hub pushes its private edits before any machine pulls, even when
+        # the hub itself is not selected.
+        if mode == "apply":
+            sync_private.sync()
+        hub = Hub(
+            local or socket.gethostname().split(".")[0],
+            sha,
+            sync_private.github_head() if mode == "check" else "",
+        )
         log.info(
             "%s: %s main at %s",
             f"{datetime.now().astimezone():%F %T}",

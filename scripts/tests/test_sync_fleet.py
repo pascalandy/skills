@@ -8,15 +8,14 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import SCRIPTS, commit, skill
+from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
 # Drops the options, runs the remote command in the host's home, and refuses
-# the host named down the way ssh reports an unreachable machine. git and
-# rsync use it too, through GIT_SSH_COMMAND and rsync -e.
+# the host named down the way ssh reports an unreachable machine. git uses it
+# too, through GIT_SSH_COMMAND.
 FAKE_SSH = """#!/bin/sh
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -50,8 +49,8 @@ def git(repo: Path, *args: str) -> str:
 
 @pytest.fixture
 def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """A hub checkout with a private tree, its origin, and a fake ssh and just."""
-    origin = tmp_path / "origin.git"
+    """A hub checkout with a private clone, both origins, and a fake ssh and just."""
+    origin = tmp_path / "skills.git"
     subprocess.run(
         ["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True
     )
@@ -62,6 +61,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
         "flatten_skills.py",
         "install_skills.py",
         "sync_fleet.py",
+        "sync_private.py",
     ):
         shutil.copy2(SCRIPTS / name, hub / "scripts" / name)
     (hub / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
@@ -71,7 +71,16 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     commit(hub)
     git(hub, "remote", "add", "origin", str(origin))
     git(hub, "push", "-q", "origin", "main")
-    skill(hub / "_skills_private/content", "secret")
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "-q",
+            str(private_remote(tmp_path)),
+            str(hub / "_skills_private"),
+        ],
+        check=True,
+    )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for name, body in (("ssh", FAKE_SSH), ("just", FAKE_JUST)):
@@ -106,7 +115,7 @@ def change(hub: Path, name: str = "change.txt") -> str:
 def run(
     hub: Path, homes: Path, bin_dir: Path, *args: str
 ) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
+    env = {**os.environ, **GIT_IDENTITY}
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["FLEET_HOMES"] = str(homes)
     env["FLEET_PYTHON"] = sys.executable
@@ -123,18 +132,19 @@ def run(
     )
 
 
-def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
+def test_sends_the_hub_commit_saves_private_edits_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    origin = hub.parent / "origin.git"
+    origin = hub.parent / "skills.git"
+    private = hub.parent / "skills-private.git"
     behind = machine(homes, "behind", origin)
-    stale = behind / "_skills_private"
-    retired = skill(stale / "content", "retired")
-    (retired / "__pycache__").mkdir()
     dirty = machine(homes, "dirty", origin)
     skill(dirty / "authoring/content", "draft")
+    # editor has a private skill of its own, uncommitted, and an editor setting.
     editor = machine(homes, "editor", origin)
+    git(editor, "clone", "-q", str(private), "_skills_private")
+    skill(editor / "_skills_private/content", "mine")
     (editor / ".vscode").mkdir()
     (editor / ".vscode/settings.json").write_text("{}\n")
     branch = machine(homes, "branch", origin)
@@ -142,29 +152,16 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     ahead = machine(homes, "ahead", origin)
     (ahead / "local.txt").write_text("only here\n")
     commit(ahead)
-    # linked has a symlinked private root before the sync; relinked gets one
-    # while the push lands, after the inspection passed.
+    # plain holds a private folder that is not a clone; linked a symlink to one.
+    plain = machine(homes, "plain", origin)
+    kept = skill(plain / "_skills_private/content", "kept") / "SKILL.md"
     linked = machine(homes, "linked", origin)
-    relinked = machine(homes, "relinked", origin)
-    for name in ("linked", "relinked"):
-        (homes / name / "unrelated").mkdir()
-        (homes / name / "unrelated/important.txt").write_text("keep\n")
-    (linked / "_skills_private").symlink_to(homes / "linked/unrelated")
-    hook = relinked / ".git/hooks/post-receive"
-    hook.write_text('#!/bin/sh\nln -s "$HOME/unrelated" ../_skills_private\n')
-    hook.chmod(0o755)
+    (linked / "_skills_private").symlink_to(editor / "_skills_private")
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
+    (hub / "_skills_private/content/secret/SKILL.md").write_text("from the hub\n")
     register(
-        hub,
-        "behind",
-        "dirty",
-        "editor",
-        "branch",
-        "ahead",
-        "linked",
-        "relinked",
-        "down",
+        hub, "behind", "dirty", "editor", "branch", "ahead", "plain", "linked", "down"
     )
 
     result = run(hub, homes, bin_dir, "--json")
@@ -172,6 +169,10 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     assert result.returncode == 1
     report = json.loads(result.stdout)
     assert report["sha"] == head
+    not_a_clone = (
+        "~/projects/skills/_skills_private is not a clone of the private repo; "
+        "move it aside, then rerun"
+    )
     assert [
         (entry["machine"], entry["status"], entry["detail"])
         for entry in report["machines"]
@@ -181,14 +182,8 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
         ("editor", "synced", f"synced at {head[:7]}"),
         ("branch", "needs-you", "checkout is on feature, not main"),
         ("ahead", "needs-you", f"checkout has commits {report['hub']} lacks"),
-        *(
-            (
-                name,
-                "needs-you",
-                "~/projects/skills/_skills_private is a symlink; replace it with a folder",
-            )
-            for name in ("linked", "relinked")
-        ),
+        ("plain", "needs-you", not_a_clone),
+        ("linked", "needs-you", not_a_clone),
         (
             "down",
             "offline",
@@ -199,19 +194,21 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     assert git(editor, "rev-parse", "HEAD") == head
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
     assert git(origin, "rev-parse", "main") == before
-    assert (stale / "content/secret/SKILL.md").is_file()
-    assert not retired.exists()
-    assert not (stale / "fleet.toml").exists()
+    assert git(private, "show", "main:content/secret/SKILL.md") == "from the hub"
+    assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
+    assert git(hub / "_skills_private", "status", "--porcelain") == ""
+    assert not (behind / "_skills_private/fleet.toml").exists()
     assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
-    assert (homes / "behind/.claude/skills/secret/SKILL.md").is_file()
+    installed = homes / "behind/.claude/skills/secret/SKILL.md"
+    assert installed.read_text() == "from the hub\n"
+    assert (homes / "editor/.claude/skills/mine/SKILL.md").is_file()
     for name, checkout in (("dirty", dirty), ("branch", branch), ("ahead", ahead)):
         assert not (checkout / "_skills_private").exists()
         assert not (homes / name / "just.log").exists()
     assert git(dirty, "rev-parse", "HEAD") == before
-    for name, checkout in (("linked", linked), ("relinked", relinked)):
-        unrelated = homes / name / "unrelated"
-        assert [path.name for path in unrelated.iterdir()] == ["important.txt"]
-        assert (checkout / "_skills_private").is_symlink()
+    assert kept.read_text() == "# kept\n\nold\n"
+    assert not (plain / "_skills_private/.git").exists()
+    for name, checkout in (("plain", plain), ("linked", linked)):
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
     assert (
@@ -225,7 +222,7 @@ def test_dry_run_is_silent_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    behind = machine(homes, "behind", hub.parent / "origin.git")
+    behind = machine(homes, "behind", hub.parent / "skills.git")
     before = git(behind, "rev-parse", "HEAD")
     change(hub)
     register(hub, "behind")
@@ -242,7 +239,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    origin = hub.parent / "origin.git"
+    origin = hub.parent / "skills.git"
     synced = machine(homes, "synced", origin)
     lagging = machine(homes, "lagging", origin)
     register(hub, "synced", "lagging")
@@ -252,68 +249,39 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
     (lagging / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    # Another machine pushed a private edit that neither has pulled yet.
+    other = hub.parent / "other-private"
+    git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(other))
+    (other / "notes.md").write_text("elsewhere\n")
+    commit(other)
+    git(other, "push", "-q", "origin", "main")
+    github = git(other, "rev-parse", "HEAD")
 
     result = run(hub, homes, bin_dir, "--check")
 
     assert result.returncode == 1
     assert result.stdout == ""
-    errors = [line for line in result.stderr.splitlines() if line.startswith("error:")]
-    assert len(errors) == 1
-    assert errors[0].startswith("error: lagging drift: checkout is behind ")
-    assert "private tree differs from " in errors[0]
-    assert "~/.claude/skills has 1 of 2 current (update 1)" in errors[0]
-    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
-
-
-def same_size_and_time(path: Path) -> None:
-    """Rewrite the bytes but keep the size and time rsync's quick check trusts."""
-    before = path.stat()
-    path.write_text(path.read_text().replace("old", "new"))
-    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
-
-
-def executable(path: Path) -> None:
-    path.chmod(0o755)
-
-
-@pytest.mark.parametrize("edit", [same_size_and_time, executable])
-def test_sync_repairs_the_private_drift_check_reports(
-    fleet: tuple[Path, Path, Path], edit: Callable[[Path], None]
-) -> None:
-    hub, homes, bin_dir = fleet
-    machine(homes, "mac", hub.parent / "origin.git")
-    register(hub, "mac")
-    assert run(hub, homes, bin_dir).returncode == 0
-    source = hub / "_skills_private/content/secret/SKILL.md"
-    received = homes / "mac/projects/skills/_skills_private/content/secret/SKILL.md"
-    # The sync does not copy times, so align them; after the edit, the size and
-    # time rsync's quick check compares still match on both sides.
-    times = source.stat()
-    os.utime(received, ns=(times.st_atime_ns, times.st_mtime_ns))
-    edit(source)
-    assert (received.stat().st_size, received.stat().st_mtime_ns) == (
-        source.stat().st_size,
-        source.stat().st_mtime_ns,
+    errors = sorted(
+        line for line in result.stderr.splitlines() if line.startswith("error:")
     )
-
-    drift = run(hub, homes, bin_dir, "--check")
-    synced = run(hub, homes, bin_dir)
-    converged = run(hub, homes, bin_dir, "--check")
-
-    assert drift.returncode == 1
-    assert "error: mac drift: private tree differs from " in drift.stderr
-    assert (synced.returncode, synced.stderr) == (0, "")
-    installed = homes / "mac/.claude/skills/secret/SKILL.md"
-    assert installed.read_bytes() == source.read_bytes()
-    assert os.access(installed, os.X_OK) == os.access(source, os.X_OK)
-    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
+    assert len(errors) == 2
+    lagging_error, synced_error = errors
+    assert lagging_error.startswith("error: lagging drift: checkout is behind ")
+    assert "private repo has uncommitted edits" in lagging_error
+    assert f", GitHub at {github[:7]}" in lagging_error
+    assert "~/.claude/skills has 1 of 2 current (update 1)" in lagging_error
+    assert synced_error.startswith(
+        f"error: synced drift: private repo is at {git(hub / '_skills_private', 'rev-parse', 'HEAD')[:7]}, "
+        f"GitHub at {github[:7]}"
+    )
+    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 
 def test_hook_acts_only_in_the_hub_main_checkout(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    behind = machine(homes, "behind", hub.parent / "origin.git")
+    behind = machine(homes, "behind", hub.parent / "skills.git")
     before = git(behind, "rev-parse", "HEAD")
     register(hub, "behind")
     home = hub.parent / "hub-home"

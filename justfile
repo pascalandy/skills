@@ -10,14 +10,16 @@ check-frontmatter *args:
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
-# Pull main, then install every skill on this machine; silent on success, previews skip the pull
+# Pull main, save and pull the private clone, then install every skill on this machine; silent on success, previews skip the pulls
 [positional-arguments]
 sync *args:
     #!/usr/bin/env bash
     set -Eeuo pipefail
+    verbose=()
     for arg in "$@"; do
         case "${arg}" in
             --dry-run | --check | -h | --help) exec uv run scripts/install_skills.py "$@" ;;
+            -v | --verbose) verbose=(--verbose) ;;
         esac
     done
     branch=$(git symbolic-ref --short -q HEAD || true)
@@ -26,6 +28,7 @@ sync *args:
         exit 1
     fi
     git pull --quiet --ff-only
+    uv run scripts/sync_private.py ${verbose[@]+"${verbose[@]}"}
     uv run scripts/install_skills.py --quiet "$@"
 
 # From the hub, sync every machine in _skills_private/fleet.toml, or named ones; --check compares them
