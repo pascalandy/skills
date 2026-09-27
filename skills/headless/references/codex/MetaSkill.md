@@ -18,14 +18,45 @@ For an inline inspection task, keep the workspace read-only and use the configur
 codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review src/auth.ts for race conditions. Report findings with file and line." < /dev/null
 ```
 
-For a dedicated review of a branch diff, run one of these from the target repository. The first uses the configured review model; the second selects GPT-6 Astra at High reasoning:
+For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, fetch the base if you need its latest remote state, and keep the checkout stable during the review. This example explicitly selects GPT-6 Sol at High reasoning; omit the model and reasoning options to use configured defaults. Each run gets a separate output directory:
 
 ```bash
-codex review -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' --base main < /dev/null
-codex exec review -m gpt-6-astra -c 'model_reasoning_effort="high"' -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' --base main < /dev/null
+repo="/absolute/path/to/repository"
+review_dir="$(mktemp -d /tmp/codex-review.XXXXXX)" || exit 1
+
+review_status=0
+codex exec \
+  -C "$repo" \
+  review \
+  --base origin/main \
+  -m gpt-6-sol \
+  -c 'model_reasoning_effort="high"' \
+  -c 'sandbox_mode="read-only"' \
+  -c 'approval_policy="never"' \
+  --ephemeral --json \
+  -o "$review_dir/result.md" \
+  < /dev/null \
+  > "$review_dir/events.jsonl" \
+  2> "$review_dir/stderr.log" || review_status=$?
+
+printf 'Exit status: %s\nReview files: %s\n' \
+  "$review_status" "$review_dir"
 ```
 
-The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. A review that runs tests can then modify tracked files, so pin `sandbox_mode` as shown. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Choose one review target: `--base`, `--commit`, `--uncommitted`, or a custom prompt. Check both commands' `--help` on the installed version.
+The failure handler preserves the exit status even with `set -e`. In a standalone script, finish with `exit "$review_status"` after processing the report so `printf` does not hide a failed run. Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+
+Choose exactly one review target:
+
+| Target | Scope |
+| --- | --- |
+| `--base origin/main` | Changes against the specified base branch in this checkout |
+| `--uncommitted` | Staged, unstaged, and untracked changes |
+| `--commit <SHA>` | Changes introduced by one commit |
+| Custom prompt | Review instructions supplied as an argument or through `-` on stdin |
+
+These targets conflict with one another. For an audit with custom criteria and an explicit diff scope, use ordinary `codex exec` with a prompt file as shown below; put the comparison and criteria in that prompt.
+
+The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. Pin `sandbox_mode` as shown. Read-only mode can block tests that write build artifacts; run those separately or use an explicitly authorized writable checkout. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
 
 For file edits, use `workspace-write`. The first command keeps the configured model; the second selects Astra and High reasoning:
 
@@ -57,4 +88,4 @@ If Codex fails or asks for unavailable access, report the error and unmet task. 
 - Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
 - Pass `-m <model>` or `-c 'model_reasoning_effort="high"'` only when the task specifies them or the runner has a deliberate model policy
 
-For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance of this reference, follow [the update checklist](references/UPDATE.md).
+For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).

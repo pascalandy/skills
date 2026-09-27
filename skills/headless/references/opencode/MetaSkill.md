@@ -1,140 +1,56 @@
----
-name: headless-opencode
-description: Use when the user explicitly says "headless-opencode" or needs to run OpenCode CLI commands in non-interactive mode for scripting, automation, CI/CD, or quick answers without the TUI.
----
+# Run OpenCode headlessly
 
-# Headless OpenCode
-
-Run OpenCode CLI in non-interactive headless mode using `opencode run`.
-
-## Quick Start
+Use `opencode run` from an explicit target directory. Check `opencode run --help` and the [official CLI reference](https://opencode.ai/docs/cli/) for installed flags. Run with ordinary pipes; do not request interactive mode for automation.
 
 ```bash
-opencode run "Your prompt here"
-opencode run --agent 1-kimi "Your prompt"
+opencode run --dir /path/to/repo --format json \
+  "Review src/auth.ts for correctness. Report findings only." < /dev/null
 ```
 
-## Agent Selection
+The prompt does not enforce read-only access. Inspect the selected agent's permissions before a review; do not add `--auto` merely to get past denied operations.
 
-**Core agents (numbered for Tab cycling):**
-```bash
-opencode run --agent 1-kimi "Your prompt"    # Kimi 2.5 Turbo (default)
-opencode run --agent 2-opus "Your prompt"    # Claude Opus 4-6
-opencode run --agent 3-gpt "Your prompt"     # GPT-5.4
-opencode run --agent 4-sonnet "Your prompt"  # Claude Sonnet 4-6
-```
+## Agent and model selection
 
-**Specialized agents:**
-```bash
-opencode run --agent worker "Your prompt"     # GPT-5.4 general worker
-opencode run --agent worker1 "Your prompt"   # Claude Sonnet (thinking)
-opencode run --agent worker2 "Your prompt"   # GLM 5.1
-opencode run --agent worker3 "Your prompt"   # agt mini (GPT-5.4-mini)
-opencode run --agent glm "Your prompt"       # GLM 5.1
-opencode run --agent gptmini "Your prompt"   # GPT-5.4 mini
-opencode run --agent gpthigh "Your prompt"   # GPT-5.4 high reasoning
-opencode run --agent gptxhigh "Your prompt"  # GPT-5.4 xhigh reasoning
-opencode run --agent gemini "Your prompt"    # Gemini 3.1 Pro
-opencode run --agent flash "Your prompt"     # Gemini 3 Flash
-```
+Use `opencode agent list` and `opencode models` to discover configured agents and models. Agent names are local configuration, not portable model aliases.
 
-## Session Management
+| Option | Use |
+| --- | --- |
+| `--agent <name>` | Select a configured agent |
+| `--model <provider/model>` | Select a model directly |
+| `--variant <name>` | Set model-specific reasoning effort |
+| `--thinking` | Include thinking output |
+| `--pure` | Skip external plugins |
 
-**Continue last session:**
-```bash
-opencode run --continue "Now add error handling examples"
-```
+## Input, output, and sessions
 
-**Fork session with different agent:**
-```bash
-opencode run --continue --fork --agent 2-opus "Now add error handling examples"
-```
+| Option | Use |
+| --- | --- |
+| `--file <path>` | Attach a file; repeat for multiple files |
+| `--format json` | Emit JSON events |
+| `--session <id>` | Resume a specific session |
+| `--continue` | Resume the latest session |
+| `--fork` | Fork with `--session` or `--continue` |
+| `--title <text>` | Name the session |
+| `--share` | Share the session only when requested |
+| `--dir <path>` | Select the local or attached server's working directory |
 
-**Named session:**
-```bash
-opencode run --title "Code Review Session" "Review this PR"
-```
+Prefer explicit session IDs for concurrent runs. Save stdout and stderr separately and inspect the final event and exit status; a completed process alone does not verify the requested outcome.
 
-**Share session:**
-```bash
-opencode run --share "Explain this code"
-```
+## Reuse a server
 
-## File Attachments & Output
-
-**Attach files:**
-```bash
-opencode run --file src/main.py --file README.md "Review these files"
-```
-
-**JSON output for programmatic use:**
-```bash
-opencode run --format json "List all functions in this file"
-```
-
-## Server Mode (Avoid MCP Cold Boot)
-
-Start a headless server to avoid MCP initialization delays:
+For repeated runs, an existing server avoids repeated MCP startup:
 
 ```bash
-# Terminal 1: Start headless server
 opencode serve
-
-# Terminal 2: Run commands against it
-opencode run --attach http://localhost:4096 "Explain async/await"
 ```
 
-## Flags Reference
+Then, from another process:
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--agent` | | Agent to use (preferred) |
-| `--model` | `-m` | Model to use (provider/model format) |
-| `--variant` | | Model variant (provider-specific reasoning effort, e.g., high, max, minimal) |
-| `--thinking` | | Show thinking blocks |
-| `--command` | | Command to run (use message for args) |
-| `--continue` | `-c` | Continue the last session |
-| `--session` | `-s` | Session ID to continue |
-| `--fork` | | Fork the session when continuing |
-| `--file` | `-f` | File(s) to attach |
-| `--format` | | Output format: `default` or `json` |
-| `--title` | | Title for the session |
-| `--share` | | Share the session |
-| `--attach` | | Attach to running server (e.g., `http://localhost:4096`) |
-| `--password` | `-p` | Basic auth password (defaults to OPENCODE_SERVER_PASSWORD) |
-| `--dir` | | Directory to run in, or path on remote server if attaching |
-| `--port` | | Port for local server (defaults to random if not specified) |
-| `--pure` | | Run without external plugins |
-| `--log-level` | | Log level: DEBUG, INFO, WARN, ERROR |
-| `--print-logs` | | Print logs to stderr |
+```bash
+opencode run --attach http://localhost:4096 --dir /path/to/repo \
+  --format json "Review the current changes" < /dev/null
+```
 
-## Output Handling
+Manage the server's lifetime explicitly. Check `opencode serve --help` for binding and authentication options before exposing it beyond the local machine.
 
-- Default: formatted text to stdout
-- `--format json`: raw JSON events for parsing
-- Progress and diagnostics appear on stderr
-- Keep stderr visible for debugging; use `--format json` for clean machine-readable output
-
-## Gotchas
-
-- Agents are defined in `dot_config/opencode/opencode.json.tmpl` — the numbered agents (1-kimi, 2-opus, etc.) are custom configurations
-- `--continue` resumes with the same agent; use `--fork` to switch agents mid-session
-- When using `--attach`, the server must already be running via `opencode serve`
-- For CI/CD automation, prefer `--format json` for reliable output parsing
-- Use `--variant` to specify reasoning effort (high, max, minimal) for supported models
-- Use `--thinking` to display model thinking blocks in output
-- Use `--pure` to run without loading external plugins
-- Use `--dir` when attaching to specify the remote working directory
-
-## Update This Skill
-
-Triggered when the user wants to refresh the skill against the latest official documentation.
-
-**Trigger phrases:**
-- "update the headless-opencode skill"
-- "about skill headless-opencode, UPDATE the skill"
-- "skill headless-opencode, check if we need to update"
-- "refresh headless-opencode skill"
-- "sync headless-opencode with latest docs"
-
-Load `references/UPDATE.md` and follow the `npx nia-docs` workflow to check the official CLI documentation.
+For maintenance, follow the [update checklist](../UPDATE.md).
