@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -25,6 +27,15 @@ def swap(fresh: Path, destination: Path, previous: Path) -> None:
         if previous.exists() and not destination.exists():
             previous.rename(destination)
         raise
+
+
+@contextmanager
+def exclusive(path: Path) -> Iterator[None]:
+    """Hold the lock at `path` for the block, waiting for any other holder."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        yield
 
 
 def run_script(

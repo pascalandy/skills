@@ -23,11 +23,12 @@ import sys
 import tempfile
 from collections import Counter
 from collections.abc import Iterable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
 import flatten_skills
-from _common import ScriptError, swap
+from _common import ScriptError, exclusive, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -384,6 +385,13 @@ def summarize(actions: list[Action], expected: dict[str, int]) -> list[dict]:
     return summary
 
 
+def install_lock() -> Path:
+    """One lock per repository, shared by its worktrees and outside the home,
+    so a run that fails validation still writes nothing there."""
+    common = os.fsdecode(flatten_skills.git("rev-parse", "--git-common-dir"))
+    return ROOT / common.strip() / "install-skills.lock"
+
+
 def render(
     actions: list[Action],
     profile: str,
@@ -487,7 +495,14 @@ examples:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING)
     home = Path.home()
     try:
-        with tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary:
+        # An apply waits for any other one before it reads the working tree, so
+        # the last to finish installs the newest version. Previews and checks
+        # write nothing and do not wait.
+        applying = not (args.dry_run or args.check)
+        with (
+            exclusive(install_lock()) if applying else nullcontext(),
+            tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
+        ):
             sources = skill_sources(Path(temporary), args.private_root, args.profile)
             commands = command_sources()
             actions = [

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
 import subprocess
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -88,6 +90,26 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
     summary = run(repo, home, "--check")
     assert summary.returncode == 0
     assert "skills=1, commands=0;" in summary.stdout
+
+
+def test_apply_waits_for_a_running_apply_then_installs_the_newest_tree(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    lock = repo / ".git/install-skills.lock"
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with lock.open("w") as running:
+            fcntl.flock(running, fcntl.LOCK_EX)
+            queued = pool.submit(run, repo, home)
+            with pytest.raises(TimeoutError):
+                queued.result(timeout=2)
+            skill(repo / "authoring/content", "alpha", "new")
+        assert queued.result(timeout=60).returncode == 0
+    assert all(
+        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8")
+        == "# alpha\n\nnew\n"
+        for target in MAC
+    )
 
 
 def test_every_private_package_installs_and_duplicates_are_all_named(
