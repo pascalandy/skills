@@ -99,6 +99,8 @@ READY_AGENT, READY_HUMAN, WIP = (
 P0, P2 = "3-pty:p0", "3-pty:p2"
 EPIC_PARENT = "4-epic:parent"
 STATE_PREFIX, TYPE_PREFIX, PRIORITY_PREFIX = "1-", "2-type:", "3-pty:"
+# Families that hold at most one label each.
+FAMILIES = {"state": STATE_PREFIX, "type": TYPE_PREFIX, "priority": PRIORITY_PREFIX}
 NEEDED_LABELS = (
     IMPEDIMENT,
     NEEDS_INFO,
@@ -868,6 +870,15 @@ def band(question: Question, value: float) -> str:
     return "no" if value <= question.no else "uncertain"
 
 
+def family_problems(labels: set[str]) -> list[str]:
+    """One state, one type, and one priority at most."""
+    return [
+        f"several {name} labels: {', '.join(sorted(found))}"
+        for name, prefix in FAMILIES.items()
+        if len(found := {label for label in labels if label.startswith(prefix)}) > 1
+    ]
+
+
 def unique(labels: list[str]) -> list[str]:
     return list(dict.fromkeys(labels))
 
@@ -1003,9 +1014,8 @@ def decide(
         )
     else:
         judged_state = READY_HUMAN if human == "yes" else READY_AGENT
+    reasons.extend(family_problems(labels))
     existing_state = family(STATE_PREFIX)
-    if len(existing_state) > 1:
-        reasons.append(f"several state labels: {', '.join(existing_state)}")
     if judged_state is None:
         if not existing_state:
             reasons.append(state_reason)
@@ -1026,7 +1036,7 @@ def decide(
         reasons.append("reports an emergency; consider 3-pty:p0")
         add.append(P0)
         remove.extend(existing_priority)
-    elif urgency == "uncertain":
+    elif urgency == "uncertain" and P0 not in existing_priority:
         reasons.append("unclear whether this reports an emergency")
     elif urgency == "no" and not existing_priority:
         add.append(P2)
@@ -1377,7 +1387,7 @@ def load_run(ref: str) -> tuple[Path, dict[str, Any]]:
 def cmd_compare(args: argparse.Namespace) -> tuple[str, Any]:
     """Compare Jev's judged type and state with the labels the issues already had."""
     _, record = load_run(args.run)
-    families = {"type": TYPE_PREFIX, "state": STATE_PREFIX}
+    families = {name: FAMILIES[name] for name in ("type", "state")}
     counts = {name: dict.fromkeys(OUTCOMES, 0) for name in families}
     disagreements: list[dict[str, Any]] = []
     for entry in record["issues"]:
