@@ -218,6 +218,16 @@ def registry() -> Path:
     return found[0]
 
 
+def has_registry() -> bool:
+    """For hooks: warn, never block git, when the registry cannot be found."""
+    try:
+        registry()
+    except ScriptError as error:
+        log.warning("warning: %s; the fleet does not sync", error)
+        return False
+    return True
+
+
 def load_registry(path: Path) -> list[Machine]:
     if not path.is_file():
         raise ScriptError(
@@ -519,19 +529,14 @@ def hook(event: list[str]) -> str:
     Lefthook runs this in every checkout; it acts only in a main checkout that
     has the private clone, never in a worktree. A pull that brings commits
     installs here and syncs the other machines. A commit installs here; the
-    other machines sync once a push lands it on GitHub. A clone without the
-    registry warns and never blocks git.
+    other machines sync once a push lands it on GitHub. Without the registry,
+    an event that would act warns and never blocks git.
     """
     name, *rest = event
     if not sync_private.is_clone():
         return ""
-    try:
-        registry()
-    except ScriptError as error:
-        log.warning("warning: %s; the fleet does not sync", error)
-        return ""
     if name == "pre-push":
-        if sha := pushed_main(sys.stdin.read().splitlines()):
+        if (sha := pushed_main(sys.stdin.read().splitlines())) and has_registry():
             background("--after-push", sha)
         return ""
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
@@ -546,6 +551,8 @@ def hook(event: list[str]) -> str:
     if (name == "post-commit" and in_rebase) or (
         name == "post-rewrite" and rest[:1] != ["rebase"]
     ):
+        return ""
+    if not has_registry():
         return ""
     installed = call([sys.executable, str(INSTALLER), "--quiet"])
     if name != "post-commit":
