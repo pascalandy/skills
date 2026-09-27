@@ -1,7 +1,7 @@
-"""Test harness: a copied skill, a fake gh on PATH, and a CLI runner.
+"""Test harness: a copied skill, a fake gh on PATH, a fake TypeSafe, and a CLI runner.
 
-gh is the only faked boundary here. Every test drives jevlabel as a subprocess and
-asserts on its exit code, output, and files.
+gh and the TypeSafe HTTP API are the only faked boundaries. Every test drives
+jevlabel as a subprocess and asserts on its exit code, output, and files.
 """
 
 from __future__ import annotations
@@ -12,7 +12,9 @@ import shutil
 import stat
 import subprocess
 import sys
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -82,6 +84,110 @@ if args[:2] == ["issue", "view"]:
 fail(f"fake gh does not support {args}")
 """
 
+# Answers for a clear, well-specified bug with nothing open: every band is decided.
+CLEAR: dict[str, Any] = {
+    "type": "bug",
+    "has_goal": 0.97,
+    "done_condition": 0.95,
+    "bug_repro": 0.95,
+    "bug_expected_actual": 0.94,
+    "open_decision": 0.03,
+    "needs_human_impl": 0.05,
+    "impediment": 0.03,
+    "urgency": 0.02,
+    "steering": 0.01,
+    "asks_info": 0.05,
+    "supplies_info": 0.05,
+    "declined": 0.02,
+}
+
+
+@dataclass
+class FakeTypeSafe:
+    """A local stand-in for api.typesafe.ai.
+
+    Answers come from CLEAR unless `overrides[issue title]` names a question ID
+    (such as `asks_info_1`) or its base ID (`asks_info`). A Choice override is an
+    option, or an (option, confidence) pair.
+    """
+
+    overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    requests: list[dict[str, Any]] = field(default_factory=list)
+    answered_model: str | None = None
+    failure: int | None = None
+    url: str = ""
+    _server: ThreadingHTTPServer | None = None
+
+    def respond(self, body: dict[str, Any]) -> tuple[int, Any]:
+        if self.failure is not None:
+            return self.failure, {"error": f"status {self.failure}"}
+        chosen = self.overrides.get(body["state"]["issue"]["title"], {})
+        answers: dict[str, Any] = {}
+        for qid, question in body["questions"].items():
+            base = qid if qid in CLEAR else qid.rsplit("_", 1)[0]
+            value = chosen.get(qid, chosen.get(base, CLEAR[base]))
+            if question["type"] == "choice":
+                option, confidence = value if isinstance(value, tuple) else (value, 0.9)
+                answers[qid] = {
+                    "type": "choice",
+                    "choice": option,
+                    "probabilities": {
+                        name: 0.85 if name == option else 0.05
+                        for name in question["criteria"]
+                    },
+                    "confidence": confidence,
+                }
+            else:
+                answers[qid] = {"type": "noul", "noul": value}
+        return 200, {
+            "model": self.answered_model or body["model"],
+            "answers": answers,
+            "usage": {"input_tokens": 1000, "output_tokens": 0},
+        }
+
+    def start(self) -> None:
+        fake = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+            def reply(self, status: int, payload: Any) -> None:
+                data = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_GET(self) -> None:
+                if fake.failure is not None:
+                    self.reply(fake.failure, {"error": f"status {fake.failure}"})
+                    return
+                models = [
+                    {
+                        "name": "jev-latest",
+                        "description": "Jev",
+                        "release_date": "2026-09-17",
+                    }
+                ]
+                self.reply(200, {"models": models})
+
+            def do_POST(self) -> None:
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                fake.requests.append(body)
+                self.reply(*fake.respond(body))
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self._server.server_address[1]}"
+        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+
+    def stop(self) -> None:
+        if self._server is not None:
+            self._server.shutdown()
+            self._server.server_close()
+
+
 CANONICAL = [
     label["name"]
     for label in json.loads(
@@ -143,8 +249,9 @@ class Result:
 class Harness:
     """One isolated skill copy, state directories, and a fake GitHub."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, fake: FakeTypeSafe) -> None:
         self.root = root
+        self.fake = fake
         skills = root / "skills"
         shutil.copytree(
             PACKAGE,
@@ -201,6 +308,7 @@ class Harness:
             XDG_STATE_HOME=str(self.state),
             XDG_CONFIG_HOME=str(self.config),
             FAKE_GH_WORLD=str(self.world_path),
+            TYPESAFE_BASE_URL=self.fake.url,
         )
         environment.update(extra)
         return environment
@@ -220,6 +328,18 @@ class Harness:
 
     def preview(self, result: Result) -> dict[str, Any]:
         return json.loads(Path(result.json()["path"]).read_text())
+
+    def live(self, *args: str) -> Result:
+        """A live run with a key; the fake TypeSafe answers."""
+        return self.run(
+            "run", "-R", "o/r", "--json", *args, TYPESAFE_API_KEY="test-key"
+        )
+
+    def record(self, result: Result) -> dict[str, Any]:
+        return json.loads(Path(result.json()["path"]).read_text())
+
+    def entry(self, record: dict[str, Any], number: int) -> dict[str, Any]:
+        return next(i for i in record["issues"] if i["number"] == number)
 
     def request_for(self, preview: dict[str, Any], number: int) -> dict[str, Any]:
         return next(i for i in preview["issues"] if i["number"] == number)
