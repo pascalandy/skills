@@ -62,7 +62,7 @@ Compare `repos[].name` and `repos[].path` with the filesystem beneath `OPENSRC_H
 
 ### Need to remove one cached repo
 
-Prefer the command-level removal when possible:
+When removal is authorized, resolve and validate `repo_path` using [Cache Location](../SKILL.md#cache-location) first. Keep that value for any fallback cleanup, since removal may delete the registry entry. Prefer the command-level removal:
 
 ```bash
 OPENSRC_HOME="$OPENSRC_HOME" opensrc remove owner/repo
