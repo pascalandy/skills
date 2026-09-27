@@ -22,7 +22,7 @@ import socket
 import subprocess
 from pathlib import Path
 
-from _common import ScriptError, run_script
+from _common import ScriptError, exclusive, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -78,6 +78,15 @@ def github_head() -> str:
 
 
 def sync(dry_run: bool = False) -> str:
+    """Clone, save, pull, and push; runs from one repository take turns."""
+    if dry_run:
+        return save_and_pull(dry_run=True)
+    common = git("rev-parse", "--git-common-dir", cwd=ROOT).stdout.strip()
+    with exclusive(ROOT / common / "sync-private.lock"):
+        return save_and_pull(dry_run=False)
+
+
+def save_and_pull(dry_run: bool) -> str:
     host = socket.gethostname().split(".")[0]
     _, status = state()
     if status == "missing":
