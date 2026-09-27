@@ -369,7 +369,15 @@ def plan(
                         continue
                 elif old is None or old["source"] == "private":
                     continue
-            elif old is not None and old["source"] != selected.kind:
+            elif (
+                old is not None
+                and old["source"] != selected.kind
+                and not (
+                    old["source"] == "private"
+                    and selected.kind == "public"
+                    and retire.get(name) == old["digest"]
+                )
+            ):
                 raise ScriptError(
                     f"source ownership differs for ~/{target}/{name}; resolve the manifest before installing"
                 )
