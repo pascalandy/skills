@@ -19,6 +19,7 @@ import logging
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from collections import Counter
@@ -283,6 +284,47 @@ def owned_skills() -> set[str]:
     }
 
 
+def owned_private(root: Path | None) -> set[str]:
+    """Package names the private clone's history ever added, so deleting one there
+    removes its installed copies. A private tree that is not a clone owns nothing."""
+    root = root or PRIVATE
+    if root.is_symlink() or not (root / ".git").is_dir():
+        return set()
+
+    def git(*args: str) -> bytes:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, check=False
+        )
+        if result.returncode:
+            raise ScriptError(
+                f"git failed in {root}: {os.fsdecode(result.stderr).strip()}"
+            )
+        return result.stdout
+
+    if git("rev-parse", "--is-shallow-repository").strip() == b"true":
+        raise ScriptError(
+            f"shallow clone at {root} hides retired skills; run git fetch --unshallow there and rerun"
+        )
+    listed = git(
+        "log", "--no-renames", "--diff-filter=A", "--name-only", "--format=", "-z"
+    )
+    added = {
+        Path(os.fsdecode(path).strip()) for path in listed.split(b"\0") if path.strip()
+    }
+    entries = {path for path in added if path.name == "SKILL.md"}
+    # A nested reference with its own SKILL.md belongs to the outer package.
+    return {
+        entry.parent.name
+        for entry in entries
+        if entry.parent != Path(".")
+        and not any(
+            parent / "SKILL.md" in entries
+            for parent in entry.parent.parents
+            if parent != Path(".")
+        )
+    }
+
+
 def target_groups(home: Path, targets: Iterable[str]) -> dict[Path, list[str]]:
     groups: dict[Path, list[str]] = {}
     for target in targets:
@@ -510,7 +552,7 @@ examples:
                     home,
                     PROFILES[args.profile],
                     sources,
-                    owned_skills(),
+                    owned_skills() | owned_private(args.private_root),
                 ),
                 *plan(
                     home,

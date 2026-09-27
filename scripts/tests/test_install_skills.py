@@ -202,6 +202,32 @@ def test_private_skill_promotes_to_public_without_flags(
     assert run(repo, home, "--check").returncode == 0
 
 
+def test_private_skill_deleted_in_its_clone_leaves_every_target(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    private = repo / "_skills_private"
+    subprocess.run(["git", "init", "-q", str(private)], check=True)
+    retired = skill(private / "content", "retired")
+    outer = skill(private / "content", "outer")
+    # A nested reference with its own SKILL.md is part of outer, not a skill.
+    skill(outer / "references", "nested")
+    commit(private)
+    assert run(repo, home).returncode == 0
+    nested = skill(home / ".claude/skills", "nested")
+    subprocess.run(["git", "rm", "-qr", "content/retired"], cwd=private, check=True)
+    commit(private)
+
+    result = run(repo, home)
+
+    assert result.returncode == 0, result.stderr
+    assert not retired.exists()
+    assert not any((home / target / "retired").exists() for target in MAC)
+    assert all((home / target / "outer/SKILL.md").is_file() for target in MAC)
+    assert (nested / "SKILL.md").is_file()
+    assert run(repo, home, "--check").returncode == 0
+
+
 def test_removes_only_published_names_and_overwrites_edits(
     sandbox: tuple[Path, Path],
 ) -> None:
