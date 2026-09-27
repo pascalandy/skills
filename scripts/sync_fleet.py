@@ -8,8 +8,8 @@
 The hub installs its own working tree. Every other machine receives the hub's
 main commit and a mirror of its private tree over SSH, fast-forwards its
 checkout to that commit, and runs `just install-skills`. A machine whose
-checkout is off main, has uncommitted changes, or has commits the hub lacks is
-left untouched. A machine that is offline or fails gets one retry.
+checkout is off main, has uncommitted changes under authoring/, skills/,
+scripts/, or justfile, or has commits the hub lacks is left untouched. A machine that is offline or fails gets one retry.
 
 The registry is fleet.toml in the hub's private tree, so hosts stay out of this
 public repository. Each path is relative to that machine's home:
@@ -91,13 +91,18 @@ log = logging.getLogger("sync-fleet")
 
 # Each step runs in the machine's login shell, so `just` and `uv` are on PATH
 # over SSH. The body is one function called with stdin closed: the shell parses
-# it whole before git or just could read the rest from stdin.
+# it whole before git or just could read the rest from stdin. Only changes to
+# what the install reads count as edits; an editor setting does not block a
+# machine, and a fast-forward that would overwrite it fails on its own.
 ENTER = """
 enter() {
     cd "$HOME/$1" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || {
         echo "no skills checkout at ~/$1"
         return 11
     }
+}
+edited() {
+    [ -n "$(git status --porcelain -- authoring skills scripts justfile)" ]
 }
 """
 INSPECT = """
@@ -106,7 +111,7 @@ step() {
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
     head=$(git rev-parse -q --verify HEAD) || head=-
-    if [ -n "$(git status --porcelain)" ]; then state=dirty; else state=clean; fi
+    if edited; then state=dirty; else state=clean; fi
     echo "checkout $branch $head $state"
 }
 """
@@ -116,7 +121,7 @@ APPLY = """
 step() {
     enter "$1" || return
     if [ "$(git symbolic-ref --short -q HEAD)" != main ] ||
-        [ "$(git rev-parse HEAD)" != "$2" ] || [ -n "$(git status --porcelain)" ]; then
+        [ "$(git rev-parse HEAD)" != "$2" ] || edited; then
         echo "checkout changed during the sync"
         return 11
     fi
@@ -333,7 +338,7 @@ def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
         where = "a detached HEAD" if branch == "-" else branch
         problems.append(f"checkout is on {where}, not main")
     if state == "dirty":
-        problems.append("checkout has uncommitted changes")
+        problems.append("checkout has uncommitted skill changes")
     behind = head != hub.sha and hub.contains(head)
     if head != hub.sha and not behind:
         problems.append(f"checkout has commits {hub.name} lacks")
