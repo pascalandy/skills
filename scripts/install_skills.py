@@ -560,8 +560,16 @@ def render(
             },
             indent=2,
         )
+    # Distinct names this run keeps installed, whatever their per-target action
+    synced = {
+        (action.source == "command", action.name)
+        for action in actions
+        if action.kind != "remove"
+    }
+    commands = sum(is_command for is_command, _ in synced)
     lines = [
         f"{'preview' if dry_run else 'applied'}: {profile}; "
+        f"skills={len(synced) - commands}, commands={commands}; "
         + ", ".join(
             f"{kind}={counts[kind]}"
             for kind in ("add", "update", "adopt", "remove", "current", "conflict")

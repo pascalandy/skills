@@ -106,7 +106,9 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
         a["kind"] == "current"
         for a in report(run(repo, home, "--check", "--json"))["actions"]
     )
-    assert run(repo, home, "--check").returncode == 0
+    summary = run(repo, home, "--check")
+    assert summary.returncode == 0
+    assert "skills=1, commands=0;" in summary.stdout
     assert all(
         a["kind"] == "current" for a in report(run(repo, home, "--json"))["actions"]
     )
