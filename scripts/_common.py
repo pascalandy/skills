@@ -34,8 +34,9 @@ def run_script(
 ) -> int:
     """Parse arguments, run `work`, and turn its outcome into output and an exit code.
 
-    `work` returns the one-line success summary and raises ScriptError for expected
-    failures. Call it from `main()` and pass the result to `SystemExit`.
+    `work` returns the one-line success summary, or "" to stay silent, and raises
+    ScriptError for expected failures. Call it from `main()` and pass the result
+    to `SystemExit`.
     """
     parser.add_argument(
         "-v",
@@ -59,7 +60,8 @@ def run_script(
         log.debug("unexpected failure", exc_info=True)
         messages = [f"{type(error).__name__}: {error}"]
     else:
-        print(summary)
+        if summary:
+            print(summary)
         return 0
 
     for message in messages:

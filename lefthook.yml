@@ -12,3 +12,20 @@ pre-commit:
     flattened-skills:
       glob: "{authoring,skills}/**/*"
       run: just flatten-skills --check
+
+# The hub's main checkout installs, then syncs the fleet in the background.
+# sync-hook exits early everywhere else, including worktrees and other branches
+post-commit:
+  commands:
+    sync-skills:
+      run: just sync-hook post-commit
+
+post-merge:
+  commands:
+    sync-skills:
+      run: just sync-hook post-merge
+
+post-rewrite:
+  commands:
+    sync-skills:
+      run: just sync-hook post-rewrite {1}

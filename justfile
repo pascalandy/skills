@@ -10,7 +10,7 @@ check-frontmatter *args:
 install-skills *args:
     @uv run scripts/install_skills.py {{args}}
 
-# Pull main and the private tree, then install every skill on this machine; previews skip the pulls
+# Pull main, then install every skill on this machine; silent on success, previews skip the pull
 [positional-arguments]
 sync *args:
     #!/usr/bin/env bash
@@ -20,13 +20,21 @@ sync *args:
             --dry-run | --check | -h | --help) exec uv run scripts/install_skills.py "$@" ;;
         esac
     done
+    branch=$(git symbolic-ref --short -q HEAD || true)
+    if [[ "${branch}" != main ]]; then
+        echo "error: this checkout is on ${branch:-a detached HEAD}; switch to main, then rerun just sync" >&2
+        exit 1
+    fi
     git pull --quiet --ff-only
-    if [[ -d _skills_private/.git ]]; then git -C _skills_private pull --quiet --ff-only; fi
-    uv run scripts/install_skills.py "$@"
+    uv run scripts/install_skills.py --quiet "$@"
 
-# Install published main on every machine in _skills_private/fleet.toml, or on named ones
+# From the hub, sync every machine in _skills_private/fleet.toml, or named ones; --check compares them
 sync-fleet *args:
     @uv run scripts/sync_fleet.py {{args}}
+
+# Lefthook runs this after a commit or pull; it acts only in the hub's main checkout
+sync-hook *args:
+    @uv run scripts/sync_fleet.py --hook {{args}}
 
 # Check native skill discovery after a separately authorized local install
 skills-discover *args:

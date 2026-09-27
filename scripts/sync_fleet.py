@@ -3,113 +3,137 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Install the published skills on every machine in the fleet.
+"""Sync skills from this checkout, the hub, to every machine in its fleet.
 
-Resolves origin/main once, then on each machine fast-forwards its skills
-checkout to that commit, fast-forwards the private tree when it is a git
-clone, and runs `just install-skills`. A machine is skipped untouched when its
-checkout is off main, or when the checkout or a git private tree has
-uncommitted changes or commits its remote lacks.
+The hub installs its own working tree. Every other machine receives the hub's
+main commit and a mirror of its private tree over SSH, fast-forwards its
+checkout to that commit, and runs `just install-skills`. A machine whose
+checkout is off main, has uncommitted changes, or has commits the hub lacks is
+left untouched. A machine that is offline or fails gets one retry.
 
-The registry is fleet.toml in the private tree, so hosts stay out of this
+The registry is fleet.toml in the hub's private tree, so hosts stay out of this
 public repository. Each path is relative to that machine's home:
 
-  [machines.om1]
-  ssh = "pascal@om1.example.ts.net"
-  path = "projects/skills"
+  [machines.mbp]
+  ssh = "andy16@mbp16.example.ts.net"
+  path = "Documents/github_local/skills"
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import logging
 import os
 import shlex
+import shutil
 import socket
 import subprocess
-from dataclasses import dataclass
+import sys
+import time
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 import tomllib
 from _common import ScriptError, run_script
+from install_skills import (
+    PRIVATE,
+    RUNTIME_NAMES,
+    RUNTIME_PREFIXES,
+    RUNTIME_SUFFIXES,
+    private_packages,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = ROOT / "_skills_private" / "fleet.toml"
-SSH_OPTIONS = (
+INSTALLER = ROOT / "scripts" / "install_skills.py"
+REGISTRY = PRIVATE / "fleet.toml"
+STATE = (
+    Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
+    / "skills-sync"
+)
+HUB_REF = "refs/fleet/hub"
+SSH = (
+    "ssh",
     "-o",
     "BatchMode=yes",
     "-o",
     "ConnectTimeout=8",
     "-o",
+    "ServerAliveInterval=5",
+    "-o",
+    "ServerAliveCountMax=3",
+    "-o",
     "ForwardAgent=no",
     "-o",
     "StrictHostKeyChecking=yes",
 )
-SKIPPED = 11
+# The mirror skips what the installer skips, plus the hub's registry.
+EXCLUDES = tuple(
+    f"--exclude={pattern}"
+    for pattern in (
+        "/fleet.toml",
+        *sorted(RUNTIME_NAMES),
+        *(f"{prefix}*" for prefix in RUNTIME_PREFIXES),
+        *(f"*{suffix}" for suffix in RUNTIME_SUFFIXES),
+    )
+)
+NEEDS_YOU = 11
 UNREACHABLE = 255
 TIMEOUT = 600
+RETRY_DELAY = 3
+FINE = ("synced", "ready", "converged")
 log = logging.getLogger("sync-fleet")
 
-# Runs in the machine's login shell, so `just` and `uv` are on PATH over SSH.
-# Every check runs before anything moves, and a preview stops right after them,
-# so preview and apply judge a machine the same way. Fetching only updates
-# remote-tracking refs. The body is one function called with stdin closed: the
-# shell parses it whole before git or just could read the rest from stdin.
-REMOTE = """
-sync_machine() {
-    cd "$HOME/$1" 2>/dev/null || { echo "no skills checkout at ~/$1"; return 10; }
-    command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 12; }
-    branch=$(git symbolic-ref --short -q HEAD) || branch=""
-    if [ "$branch" != main ]; then
-        echo "checkout is on ${branch:-a detached HEAD}, not main"
+# Each step runs in the machine's login shell, so `just` and `uv` are on PATH
+# over SSH. The body is one function called with stdin closed: the shell parses
+# it whole before git or just could read the rest from stdin.
+ENTER = """
+enter() {
+    cd "$HOME/$1" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || {
+        echo "no skills checkout at ~/$1"
+        return 11
+    }
+}
+"""
+INSPECT = """
+step() {
+    enter "$1" || return
+    command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
+    branch=$(git symbolic-ref --short -q HEAD) || branch=-
+    head=$(git rev-parse -q --verify HEAD) || head=-
+    if [ -n "$(git status --porcelain)" ]; then state=dirty; else state=clean; fi
+    echo "checkout $branch $head $state"
+}
+"""
+# Rechecks the checkout, since it may have moved after the inspection. Hooks
+# stay off so the merge cannot start a sync from this machine.
+APPLY = """
+step() {
+    enter "$1" || return
+    if [ "$(git symbolic-ref --short -q HEAD)" != main ] ||
+        [ "$(git rev-parse HEAD)" != "$2" ] || [ -n "$(git status --porcelain)" ]; then
+        echo "checkout changed during the sync"
         return 11
     fi
-    if [ -n "$(git status --porcelain)" ]; then
-        echo "checkout has uncommitted changes"
-        return 11
-    fi
-    git fetch --quiet origin main || { echo "git fetch failed"; return 12; }
-    if ! git merge-base --is-ancestor HEAD "$2"; then
-        echo "main has commits that are not on origin/main"
-        return 11
-    fi
-    private=_skills_private
-    if [ -d "$private/.git" ]; then
-        if [ -n "$(git -C "$private" status --porcelain)" ]; then
-            echo "private tree has uncommitted changes"
-            return 11
-        fi
-        git -C "$private" rev-parse -q --verify '@{u}' >/dev/null || {
-            echo "private tree has no upstream branch"
-            return 11
-        }
-        git -C "$private" fetch --quiet || { echo "private tree fetch failed"; return 12; }
-        if ! git -C "$private" merge-base --is-ancestor HEAD '@{u}'; then
-            echo "private tree has commits that are not on its upstream"
-            return 11
-        fi
-    else
-        private=""
-    fi
-    if [ "$3" = preview ]; then
-        if [ "$(git rev-parse HEAD)" = "$2" ]; then
-            echo "ready; already at $(git rev-parse --short HEAD)"
-        else
-            echo "ready to move $(git rev-parse --short HEAD) to $(git rev-parse --short "$2")"
-        fi
-        return 0
-    fi
-    git merge --quiet --ff-only "$2" >/dev/null 2>&1 || { echo "main did not fast-forward"; return 12; }
-    if [ -n "$private" ]; then
-        git -C "$private" merge --quiet --ff-only '@{u}' >/dev/null 2>&1 || {
-            echo "private tree did not fast-forward"
+    if [ "$2" != "$3" ]; then
+        LEFTHOOK=0 git merge --quiet --ff-only "$3" >/dev/null 2>&1 || {
+            echo "main did not fast-forward to the hub's commit"
             return 12
         }
     fi
-    just install-skills 2>&1
+    just install-skills --quiet 2>&1
 }
-sync_machine "$@" </dev/null
+"""
+CHECK = """
+step() {
+    enter "$1" || return
+    just install-skills --check --json 2>&1
+}
 """
 
 
@@ -119,12 +143,35 @@ class Machine:
     ssh: str
     path: str
 
+    @property
+    def host(self) -> str:
+        return self.ssh.split("@")[-1].split(".")[0].lower()
+
     def is_local(self) -> bool:
-        host = socket.gethostname().split(".")[0].lower()
-        return host in {
+        return socket.gethostname().split(".")[0].lower() in {
             self.name.lower(),
-            self.ssh.split("@")[-1].split(".")[0].lower(),
+            self.host,
         }
+
+    def address(self, *parts: str) -> str:
+        return f"{self.ssh}:{PurePosixPath(self.path, *parts)}"
+
+
+@dataclass(frozen=True)
+class Hub:
+    name: str
+    sha: str
+
+    def contains(self, commit: str) -> bool:
+        return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
+
+
+@dataclass
+class Outcome:
+    machine: str
+    status: str
+    detail: str
+    targets: list[dict] = field(default_factory=list)
 
 
 def load_registry(path: Path) -> list[Machine]:
@@ -161,90 +208,353 @@ def load_registry(path: Path) -> list[Machine]:
 
 
 def select(machines: list[Machine], names: list[str]) -> list[Machine]:
-    known = {machine.name: machine for machine in machines}
+    """Pick machines by registry name or by the first label of their SSH host."""
+    known: dict[str, Machine] = {}
+    for machine in machines:
+        known.setdefault(machine.name, machine)
+        known.setdefault(machine.host, machine)
     unknown = [name for name in names if name not in known]
     if unknown:
         raise ScriptError(
-            f"unknown machine {', '.join(unknown)}; the registry lists {', '.join(known)}"
+            f"unknown machine {', '.join(unknown)}; the registry lists "
+            + ", ".join(machine.name for machine in machines)
         )
-    return [known[name] for name in dict.fromkeys(names)] if names else machines
+    if not names:
+        return machines
+    return list(dict.fromkeys(known[name] for name in names))
 
 
-def published_main() -> str:
+def call(
+    command: list[str], script: str | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    log.debug("%s", shlex.join(command))
+    return subprocess.run(
+        command,
+        input=script,
+        capture_output=True,
+        text=True,
+        timeout=TIMEOUT,
+        check=False,
+        cwd=ROOT,
+        env=env,
+    )
+
+
+def git(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args], cwd=ROOT, capture_output=True, text=True, check=False
+    )
+
+
+def reason(lines: list[str], code: int) -> str:
+    """The last line that explains a failure; the installer's hint is not one."""
+    useful = [line for line in lines if line and not line.startswith("rerun with")]
+    return useful[-1].removeprefix("error: ") if useful else f"exited {code}"
+
+
+def remote(machine: Machine, body: str, *arguments: str) -> tuple[int, list[str]]:
+    command = [*SSH, machine.ssh, 'exec "$SHELL" -l -s -- ' + shlex.join(arguments)]
+    result = call(command, ENTER + body + '\nstep "$@" </dev/null\n')
+    # Login profiles may print before the step, and ssh reports its own
+    # failures on stderr.
+    lines = result.stdout.strip().splitlines() or result.stderr.strip().splitlines()
+    return result.returncode, lines
+
+
+def status_of(code: int) -> str:
+    return {NEEDS_YOU: "needs-you", UNREACHABLE: "offline"}.get(code, "failed")
+
+
+def judge(name: str, problems: list[str], output: str) -> Outcome:
+    """Turn an install-skills --check --json report into per-target drift."""
+    lines = output.strip().splitlines()
+    # The report is the indented JSON object; uv or a login profile may print
+    # around it.
+    braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
     try:
-        listed = subprocess.run(
-            ["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        ).stdout
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        raise ScriptError(
-            "cannot read main from origin; check this checkout's remote and network"
-        ) from error
-    return listed.split()[0]
-
-
-def sync(machine: Machine, sha: str, mode: str) -> dict[str, str]:
-    arguments = (machine.path, sha, mode)
-    if machine.is_local():
-        command = [os.environ.get("SHELL", "/bin/sh"), "-l", "-s", "--", *arguments]
-    else:
-        remote = 'exec "$SHELL" -l -s -- ' + " ".join(map(shlex.quote, arguments))
-        command = ["ssh", *SSH_OPTIONS, machine.ssh, remote]
-    log.debug("%s: %s", machine.name, shlex.join(command))
-    try:
-        result = subprocess.run(
-            command,
-            check=False,
-            input=REMOTE,
-            capture_output=True,
-            text=True,
-            timeout=TIMEOUT,
+        report = json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
+    except (IndexError, json.JSONDecodeError):
+        return Outcome(name, "failed", reason(lines, 1))
+    for target in report["targets"]:
+        log.info(
+            "%s ~/%s: %d of %d current",
+            name,
+            target["target"],
+            target["current"],
+            target["expected"],
         )
+        other = {k: n for k, n in target["counts"].items() if k != "current"}
+        if other:
+            problems.append(
+                f"~/{target['target']} has {target['current']} of "
+                f"{target['expected']} current ("
+                + ", ".join(f"{kind} {count}" for kind, count in other.items())
+                + ")"
+            )
+    status = "drift" if problems else "converged"
+    return Outcome(name, status, "; ".join(problems) or status, report["targets"])
+
+
+def sync_local(machine: Machine, mode: str) -> Outcome:
+    flags = {"preview": ["--dry-run"], "check": ["--check", "--json"]}
+    result = call([sys.executable, str(INSTALLER), *flags.get(mode, ["--quiet"])])
+    if mode == "check":
+        return judge(machine.name, [], result.stdout or result.stderr)
+    if result.returncode:
+        lines = (result.stderr + result.stdout).splitlines()
+        return Outcome(machine.name, "failed", reason(lines, result.returncode))
+    if mode == "preview":
+        return Outcome(machine.name, "ready", result.stdout.strip())
+    return Outcome(machine.name, "synced", "installed this checkout")
+
+
+def mirror(machine: Machine, *flags: str) -> subprocess.CompletedProcess[str]:
+    return call(
+        [
+            "rsync",
+            *flags,
+            "--delete",
+            *EXCLUDES,
+            "-e",
+            shlex.join(SSH),
+            f"{PRIVATE}/",
+            machine.address("_skills_private") + "/",
+        ]
+    )
+
+
+def sync_remote(machine: Machine, hub: Hub, mode: str) -> Outcome:
+    code, lines = remote(machine, INSPECT, machine.path)
+    if code or not lines or not lines[-1].startswith("checkout "):
+        return Outcome(machine.name, status_of(code), reason(lines, code))
+    _, branch, head, state = lines[-1].split()
+    problems: list[str] = []
+    if branch != "main":
+        where = "a detached HEAD" if branch == "-" else branch
+        problems.append(f"checkout is on {where}, not main")
+    if state == "dirty":
+        problems.append("checkout has uncommitted changes")
+    behind = head != hub.sha and hub.contains(head)
+    if head != hub.sha and not behind:
+        problems.append(f"checkout has commits {hub.name} lacks")
+    if mode == "check":
+        if behind:
+            problems.append(f"checkout is behind {hub.name} at {head[:7]}")
+        diff = mirror(machine, "-rlcn", "-i")
+        if diff.returncode:
+            lines = (diff.stderr + diff.stdout).splitlines()
+            problems.append(
+                f"private tree unreadable: {reason(lines, diff.returncode)}"
+            )
+        elif changes := len(diff.stdout.splitlines()):
+            problems.append(f"private tree differs from {hub.name} in {changes} items")
+        code, lines = remote(machine, CHECK, machine.path)
+        return judge(machine.name, problems, "\n".join(lines))
+    if problems:
+        return Outcome(machine.name, "needs-you", "; ".join(problems))
+    if mode == "preview":
+        if head == hub.sha:
+            return Outcome(machine.name, "ready", f"ready; already at {head[:7]}")
+        return Outcome(
+            machine.name, "ready", f"ready to move {head[:7]} to {hub.sha[:7]}"
+        )
+    if head != hub.sha:
+        pushed = call(
+            [
+                "git",
+                "push",
+                "--quiet",
+                "--no-verify",
+                "--force",
+                machine.address(),
+                f"{hub.sha}:{HUB_REF}",
+            ],
+            env={**os.environ, "GIT_SSH_COMMAND": shlex.join(SSH)},
+        )
+        if pushed.returncode:
+            detail = reason(pushed.stderr.splitlines(), pushed.returncode)
+            return Outcome(machine.name, "failed", f"git push failed: {detail}")
+    mirrored = mirror(machine, "-a")
+    if mirrored.returncode:
+        detail = reason(mirrored.stderr.splitlines(), mirrored.returncode)
+        return Outcome(machine.name, "failed", f"private mirror failed: {detail}")
+    code, lines = remote(machine, APPLY, machine.path, head, hub.sha)
+    if code:
+        return Outcome(machine.name, status_of(code), reason(lines, code))
+    return Outcome(machine.name, "synced", f"synced at {hub.sha[:7]}")
+
+
+def sync_machine(machine: Machine, hub: Hub, mode: str) -> Outcome:
+    try:
+        if machine.is_local():
+            return sync_local(machine, mode)
+        return sync_remote(machine, hub, mode)
     except subprocess.TimeoutExpired:
-        return {"machine": machine.name, "status": "failed", "detail": "timed out"}
-    # The last line is the outcome; login profiles may print before it, and ssh
-    # reports its own failures on stderr.
-    output = result.stdout.strip().splitlines() or result.stderr.strip().splitlines()
-    detail = output[-1] if output else f"exited {result.returncode}"
-    status = {
-        0: "ready" if mode == "preview" else "synced",
-        SKIPPED: "skipped",
-        UNREACHABLE: "unreachable",
-    }.get(result.returncode, "failed")
-    return {"machine": machine.name, "status": status, "detail": detail}
+        return Outcome(machine.name, "failed", "timed out")
+
+
+def attempt(machine: Machine, hub: Hub, mode: str) -> Outcome:
+    """Every step is safe to repeat, so an offline or failed machine gets a retry."""
+    outcome = sync_machine(machine, hub, mode)
+    if outcome.status in ("offline", "failed"):
+        log.debug("%s: %s; retrying", machine.name, outcome.detail)
+        time.sleep(RETRY_DELAY)
+        outcome = sync_machine(machine, hub, mode)
+    log.info("%s: %s: %s", machine.name, outcome.status, outcome.detail)
+    return outcome
+
+
+def advice(outcome: Outcome) -> str:
+    name = outcome.machine
+    hint = {
+        "offline": f"it catches up at the next sync, or rerun just sync-fleet {name}",
+        "needs-you": f"fix it on {name}, then rerun just sync-fleet {name}",
+        "drift": f"rerun just sync-fleet {name}",
+    }.get(outcome.status, f"rerun just sync-fleet {name} --verbose")
+    return f"{name} {outcome.status}: {outcome.detail}; {hint}"
+
+
+def notify(lines: list[str]) -> None:
+    if lines and shutil.which("notify-send"):
+        subprocess.run(
+            [
+                "notify-send",
+                "--app-name=Skills sync",
+                "Skills sync needs you",
+                "\n".join(lines),
+            ],
+            check=False,
+        )
+
+
+@contextmanager
+def exclusive(path: Path) -> Iterator[None]:
+    """Queue behind any other sync, so each run sends the newest commit."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        yield
+
+
+def hub_commit() -> str:
+    branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    if branch != "main":
+        raise ScriptError(
+            f"the hub checkout {ROOT} is on {branch or 'a detached HEAD'}; "
+            "switch it to main, the branch the fleet receives"
+        )
+    return git("rev-parse", "HEAD").stdout.strip()
+
+
+def hook(event: list[str]) -> str:
+    """Install and sync after a commit or a pull that brings commits.
+
+    Lefthook runs this in every checkout; it acts only in the hub's main
+    checkout, never in a worktree or on another branch. The fleet syncs in the
+    background, so git never waits on a sleeping laptop.
+    """
+    name, *rest = event
+    branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    if not REGISTRY.is_file() or branch != "main":
+        return ""
+    in_rebase = any(
+        (ROOT / git("rev-parse", "--git-path", part).stdout.strip()).exists()
+        for part in ("rebase-merge", "rebase-apply")
+    )
+    # A pull that rebases fires post-commit for each replayed commit, then
+    # post-rewrite once at the end; amend already fired post-commit.
+    if (name == "post-commit" and in_rebase) or (
+        name == "post-rewrite" and rest[:1] != ["rebase"]
+    ):
+        return ""
+    installed = call([sys.executable, str(INSTALLER), "--quiet"])
+    STATE.mkdir(parents=True, exist_ok=True)
+    logfile = STATE / "fleet.log"
+    if logfile.exists() and logfile.stat().st_size > 1_000_000:
+        logfile.unlink()
+    with logfile.open("a") as stream:
+        subprocess.Popen(
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--others",
+                "--notify",
+                "-v",
+            ],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    if installed.returncode:
+        lines = (installed.stderr + installed.stdout).splitlines()
+        raise ScriptError(
+            f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose"
+        )
+    return ""
 
 
 def work(args: argparse.Namespace) -> str:
-    machines = select(load_registry(args.fleet), args.machines)
-    sha = published_main()
-    mode = "preview" if args.dry_run else "apply"
-    results = [sync(machine, sha, mode) for machine in machines]
-    for result in results:
-        log.info("%s: %s: %s", result["machine"], result["status"], result["detail"])
-    failures = [
-        result for result in results if result["status"] not in ("synced", "ready")
-    ]
+    if args.hook:
+        return hook(args.hook)
+    try:
+        return sync(args)
+    except ScriptError as error:
+        if args.notify:
+            notify([str(message) for message in error.args])
+        raise
+
+
+def sync(args: argparse.Namespace) -> str:
+    registry = load_registry(args.fleet)
+    machines = select(registry, args.machines)
+    if args.others:
+        machines = [machine for machine in machines if not machine.is_local()]
+    mode = "check" if args.check else "preview" if args.dry_run else "apply"
+    remote_apply = mode == "apply" and not all(m.is_local() for m in machines)
+    if remote_apply and not private_packages(None):
+        raise ScriptError(
+            f"no private skills under {PRIVATE}; refusing to mirror an empty tree"
+        )
+    local = next((machine.name for machine in registry if machine.is_local()), None)
+    with exclusive(STATE / "fleet.lock"):
+        hub = Hub(local or socket.gethostname().split(".")[0], hub_commit())
+        log.info(
+            "%s: %s main at %s",
+            f"{datetime.now().astimezone():%F %T}",
+            hub.name,
+            hub.sha[:7],
+        )
+        with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
+            outcomes = list(
+                pool.map(lambda machine: attempt(machine, hub, mode), machines)
+            )
+    problems = [outcome for outcome in outcomes if outcome.status not in FINE]
+    if args.notify:
+        notify(
+            [
+                f"{outcome.machine}: {outcome.detail}"
+                for outcome in problems
+                if outcome.status in ("needs-you", "failed")
+            ]
+        )
     if args.json:
-        report = json.dumps({"sha": sha, "mode": mode, "machines": results}, indent=2)
-        if not failures:
+        report = json.dumps(
+            {
+                "hub": hub.name,
+                "sha": hub.sha,
+                "mode": mode,
+                "machines": [asdict(outcome) for outcome in outcomes],
+            },
+            indent=2,
+        )
+        if not problems:
             return report
         print(report)
-    if failures:
-        raise ScriptError(
-            *(
-                f"{result['machine']} {result['status']}: {result['detail']}; "
-                f"fix it on {result['machine']}, then rerun just sync-fleet {result['machine']}"
-                for result in failures
-            )
-        )
-    count = f"{len(results)} machine{'' if len(results) == 1 else 's'}"
-    verb = "ready for" if args.dry_run else "synced at"
-    names = ", ".join(result["machine"] for result in results)
-    return f"{count} {verb} {sha[:7]}: {names}"
+    if problems:
+        raise ScriptError(*(advice(outcome) for outcome in problems))
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -252,9 +562,10 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""examples:
-  just sync-fleet --dry-run
-  just sync-fleet
-  just sync-fleet om1 --verbose""",
+  just sync-fleet              # every machine; silent when all synced
+  just sync-fleet mbp          # one machine, by registry name or host
+  just sync-fleet --check      # compare installed skills on every machine
+  just sync-fleet --dry-run --verbose""",
     )
     parser.add_argument(
         "machines", nargs="*", help="registry names to sync; default is every machine"
@@ -265,10 +576,31 @@ def main(argv: list[str] | None = None) -> int:
         default=REGISTRY,
         help="machine registry (default: _skills_private/fleet.toml)",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--dry-run",
         action="store_true",
-        help="fetch and run every check, without moving checkouts or installing",
+        help="run every check without transferring, moving, or installing",
+    )
+    mode.add_argument(
+        "--check",
+        action="store_true",
+        help="compare each machine's checkout, private tree, and installed "
+        "skills with the hub; exit 1 on any difference",
+    )
+    parser.add_argument(
+        "--others", action="store_true", help="skip the machine this runs on"
+    )
+    parser.add_argument(
+        "--notify",
+        action="store_true",
+        help="send a desktop notification when a machine needs you or fails",
+    )
+    parser.add_argument(
+        "--hook",
+        nargs="+",
+        metavar="EVENT",
+        help="run as the lefthook EVENT hook; acts only in the hub's main checkout",
     )
     parser.add_argument(
         "--json", action="store_true", help="print the per-machine report as JSON"
