@@ -1,4 +1,4 @@
-"""Isolated repositories for the installer and discovery CLIs."""
+"""Isolated repositories for the installer, discovery, and sync CLIs."""
 
 from __future__ import annotations
 
