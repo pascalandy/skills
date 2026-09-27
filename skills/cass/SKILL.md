@@ -86,7 +86,7 @@ Run this step after an install, upgrade, or repair, or when step 1 flags drift. 
 Read [references/canaries.md](references/canaries.md). Run its registered lexical canary for each provider required by the task or explicitly expected in the setup. Do not invent a topic or test every connector CASS knows
 
 ```bash
-cass search "ACv4" --robot --mode lexical --no-maintenance --agent codex --limit 3 --fields summary
+cass search "CANARY_QUERY" --robot --mode lexical --no-maintenance --agent PROVIDER_SLUG --limit 3 --fields summary
 ```
 
 If the required provider has no registered canary, keep the gate closed and report the missing QA fixture. A broad unfiltered query can be dominated by one provider and does not prove connector coverage
