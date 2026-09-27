@@ -97,7 +97,7 @@ Expand one returned hit with the coordinates from that same hit
 cass expand SOURCE_PATH --message-index LINE_NUMBER --source SOURCE_ID --conversation-id CONVERSATION_ID -C 3 --json
 ```
 
-Completion criterion: every required provider returns a correctly tagged result, and the expanded message marked `is_target` contains the canary term
+Completion criterion: every required provider returns a correctly tagged result, and the expanded message marked `is_target` contains the canary query
 
 ### 5. Open or stop
 
