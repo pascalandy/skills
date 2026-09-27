@@ -184,11 +184,14 @@ def discover(agent: str, cwd: Path, timeout: float):
 
 def run(args: argparse.Namespace) -> int:
     """Check native adapters; report unsupported Claude without masking supported results."""
-    from install_skills import PROFILES, digest, load_manifest
+    from install_skills import EXCLUSIONS, PROFILES, digest, skill_sources
 
     home = Path.home()
-    state = Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state")
-    owned = load_manifest(state / "install-skills/manifest.json")
+    with tempfile.TemporaryDirectory(prefix=".skills-discover-") as temporary:
+        selected = sorted(
+            skill_sources(Path(temporary), args.private_root).keys()
+            - EXCLUSIONS[args.profile]
+        )
     roots = {
         "codex": ".codex/skills" if args.profile == "om1" else ".agents/skills",
         "pi": ".pi/agent/skills",
@@ -199,7 +202,6 @@ def run(args: argparse.Namespace) -> int:
     results: dict[str, Evidence] = {}
     for agent in agents:
         root = roots[agent]
-        selected = sorted(owned.get(root, {}))
         evidence: Evidence = {
             "status": "unverified",
             "expected": selected,
@@ -210,9 +212,6 @@ def run(args: argparse.Namespace) -> int:
         results[agent] = evidence
         if root not in PROFILES[args.profile]:
             evidence["reason"] = "target is not in the selected profile"
-            continue
-        if not selected:
-            evidence["reason"] = "no owned skills recorded for this agent target"
             continue
         if agent == "claude":
             evidence["reason"] = (
@@ -249,7 +248,6 @@ def run(args: argparse.Namespace) -> int:
                     candidates = (
                         home / target / name / "SKILL.md"
                         for target in PROFILES[args.profile]
-                        if target == root or name in owned.get(target, {})
                     )
                     matched = entry.is_file() and any(
                         candidate.is_file()
@@ -322,6 +320,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", required=True, choices=("mac", "om1"))
     parser.add_argument(
         "--agent", action="append", choices=("codex", "pi", "claude", "opencode")
+    )
+    parser.add_argument(
+        "--private-root",
+        type=Path,
+        help="private package tree, as passed to install-skills",
     )
     parser.add_argument("--timeout", type=float, default=40)
     parser.add_argument(
