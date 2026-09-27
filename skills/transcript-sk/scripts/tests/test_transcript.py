@@ -42,7 +42,9 @@ class TestHelp:
         assert "glm" in stdout
         assert "--provider {codex,openrouter}" in stdout
         assert "--preview" in stdout
-        assert "Render the saved Markdown summary after publication" in stdout
+        assert "Render the saved Markdown summary after publication" in " ".join(
+            stdout.split()
+        )
         assert "opencode" not in stdout.lower()
         assert "claude" not in stdout.lower()
 
@@ -1930,6 +1932,7 @@ class TestYouTubeAuthenticationOrder:
 class TestPipelines:
     def _isolate_external_boundaries(self, transcript, monkeypatch) -> None:
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
+        monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
         monkeypatch.setattr(
             transcript, "render_markdown_with_glow", lambda *_args: None
@@ -2288,18 +2291,12 @@ class TestPreflightAndCleanup:
             transcript.validate_env(transcript.RunBudget(10.0))
 
     def test_missing_summary_cli_fails_before_media_work(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
 
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
-        monkeypatch.setattr(
-            transcript,
-            "ensure_cli_available",
-            lambda command: (_ for _ in ()).throw(
-                transcript.SummaryCLIError(f"missing {command}")
-            ),
-        )
+        monkeypatch.setattr(transcript.shutil, "which", lambda _command: None)
         monkeypatch.setattr(
             transcript,
             "get_video_info",
@@ -2318,6 +2315,7 @@ class TestPreflightAndCleanup:
         )
 
         assert code == 1
+        assert "Required CLI 'pi' was not found" in capsys.readouterr().err
         assert not list(tmp_path.iterdir())
 
     def test_download_failure_cleans_temporary_audio(

@@ -106,6 +106,7 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
         return SimpleNamespace(returncode=0, stdout="audio\n", stderr="")
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
     monkeypatch.setattr(youtube_smoke.subprocess, "run", fake_run)
     monkeypatch.setattr(
         transcript,
@@ -140,6 +141,7 @@ def test_smoke_cleans_temporary_audio_when_ffprobe_fails(monkeypatch) -> None:
         return transcript.DownloadedAudio(audio_path, "arc")
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
     monkeypatch.setattr(
         youtube_smoke.subprocess,
         "run",
@@ -171,6 +173,7 @@ def test_smoke_bounds_ffprobe_with_the_global_budget(monkeypatch) -> None:
         raise subprocess.TimeoutExpired("ffprobe", kwargs["timeout"])
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
     monkeypatch.setattr(youtube_smoke.subprocess, "run", timeout)
 
     code = youtube_smoke.main([CANONICAL_TRANSPORT_URL])
@@ -189,3 +192,17 @@ def test_smoke_rejects_an_invalid_url_before_download(monkeypatch) -> None:
     )
 
     assert youtube_smoke.main(["https://example.com/video"]) == 2
+
+
+def test_smoke_requires_ffprobe_before_download(monkeypatch, capsys) -> None:
+    import youtube_smoke
+
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: None)
+    monkeypatch.setattr(
+        youtube_smoke,
+        "download_audio",
+        lambda *_args, **_kwargs: pytest.fail("download started without ffprobe"),
+    )
+
+    assert youtube_smoke.main([CANONICAL_TRANSPORT_URL]) == 1
+    assert "ffprobe was not found on PATH" in capsys.readouterr().err
