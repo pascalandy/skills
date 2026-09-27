@@ -1,14 +1,16 @@
 # Run Claude Code headlessly
 
-Use `claude -p` from the target repository with ordinary pipes. Check `claude --help`, `claude --version`, and `claude auth status --text` before relying on installed behavior. The [programmatic guide](https://code.claude.com/docs/en/headless) and [CLI reference](https://code.claude.com/docs/en/cli-reference) own the full flag list.
+Use `claude -p` or `claude --print` from the target repository with ordinary pipes. Check `claude --help`, `claude --version`, and `claude auth status --text` before relying on installed behavior. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior; the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Output format does not replace `-p`.
 
 ## Permissions
 
 Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. For a file review without shell execution, restrict available tools:
 
 ```bash
-claude -p --permission-mode dontAsk --tools "Read,Grep,Glob" \
-  "Review src/auth.ts for correctness. Report findings with file and line." < /dev/null
+claude -p --permission-mode dontAsk --permission-prompts none \
+  --tools "Read,Grep,Glob" \
+  "Review src/auth.ts for correctness. Report findings with file and line." \
+  < /dev/null > review.md 2> review.stderr.log
 ```
 
 This review cannot run tests or obtain a Git diff through Bash. Supply the diff through stdin, or authorize narrowly scoped shell commands when needed.
@@ -18,6 +20,7 @@ This review cannot run tests or obtain a Git diff through Bash. Supply the diff 
 | `--permission-mode plan` | Explore without source edits; do not assume it guarantees unattended completion |
 | `--permission-mode acceptEdits` | Approve edits; other operations may still need permission |
 | `--permission-mode dontAsk` | Deny operations that would prompt |
+| `--permission-prompts none` | Do not wait for a permission host; requires v2.1.259 or later |
 | `--allowedTools` | Pre-approve specified tools or command rules |
 | `--tools` | Restrict which built-in tools are available |
 | `--disallowedTools` | Deny named tools |
@@ -26,21 +29,36 @@ This review cannot run tests or obtain a Git diff through Bash. Supply the diff 
 
 Use [permission documentation](https://code.claude.com/docs/en/permissions) for rule syntax. Diagnose denied tools before retrying; do not default to bypass.
 
+Permission mode and allow rules still govern calls when prompts are disabled. `--tools` restricts built-in tools, not startup hooks or configured MCP servers. Use `--strict-mcp-config` with an explicit MCP configuration when the run must limit those servers.
+
 ## Input and output
 
 ```bash
-claude -p --permission-mode dontAsk --tools "Read,Grep,Glob" \
-  --output-format json "Review this diff and inspect related files" < diff.patch
+claude -p --permission-mode dontAsk --permission-prompts none \
+  --tools "Read,Grep,Glob" --output-format json \
+  "Review this diff and inspect related files" \
+  < diff.patch > result.json 2> review.stderr.log
 ```
 
-Use `text` for a plain answer, `json` for a result with session metadata, or `stream-json` for events. Add `--verbose` with streaming output:
+| Output format | Result |
+| --- | --- |
+| `text` | Plain response text |
+| `json` | One result object with session metadata and response text in `result` |
+| `stream-json` | JSONL events ending with a `result` record; use `--verbose` |
+
+For streaming output:
 
 ```bash
-claude -p --permission-mode dontAsk --tools "Read,Grep,Glob" \
-  --output-format stream-json --verbose "Summarize README.md" < /dev/null
+claude -p --permission-mode dontAsk --permission-prompts none \
+  --tools "Read,Grep,Glob" --output-format stream-json --verbose \
+  "Summarize README.md" < /dev/null > events.jsonl 2> review.stderr.log
 ```
 
-Use `--output-format json --json-schema '<schema>'` for a structured result. Capture stdout and stderr separately, preserve the exit status, and inspect the final result for errors and denied tools before declaring success.
+Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in `structured_output`, separate from the result envelope.
+
+## Verify completion
+
+Preserve the process exit status and inspect the final result. Invalid flags fail on stderr; failures during a run can appear on stdout. For JSON output, check `is_error` and `permission_denials` before accepting the report. For streams, consume through the final `result` record; if required plugins or MCP servers are missing or failed in `system/init`, report that limitation even when the process exits 0.
 
 ## Models, limits, and context
 
@@ -58,7 +76,7 @@ Use `--output-format json --json-schema '<schema>'` for a structured result. Cap
 | `--agent <name>`, `--agents <json>` | Select or define an agent |
 | `--worktree <name>` | Use an isolated Git worktree |
 
-Use `--bare` only when deliberately supplying context and authentication yourself: it skips normal discovery and does not use Anthropic subscription credentials. Consult installed help for exact behavior.
+Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. Subscription-authenticated runs should keep normal mode and account for loaded hooks, plugins, and MCP configuration. Consult installed help for exact behavior.
 
 ## Sessions
 
