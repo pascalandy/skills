@@ -1,36 +1,8 @@
-# Update This Skill
+# Update the Codex headless reference
 
-## Intro
+When the Codex headless guidance needs a refresh:
 
-Triggered when the user says something like "skill headless-codex, check if we need to update".
-
-**Important:** This updates the skill documentation from official docs — NOT the CLI tool itself. To update the CLI, use your package manager.
-
-To keep this skill current with the latest documentation, check the official docs using `npx nia-docs`.
-
-## Configuration
-
-```bash
-DOC_URL="https://developers.openai.com/codex/cli/reference"
-```
-
-Then, use `npx nia-docs` for command patterns and usage guidance.
-
-## What to Check For
-
-When updating this skill, verify:
-
-1. **New flags or options** — check the main CLI/command reference
-2. **New subcommands** — look for additions to the command tree
-3. **Output format changes** — verify JSON/text output behavior
-4. **Configuration changes** — new env vars or config file options
-5. **Examples and use cases** — new patterns in the docs
-
-## Update Checklist
-
-- [ ] Run `npx nia-docs "$DOC_URL" -c "cat ./cli.md"` (or main reference file) and compare flags/options
-- [ ] Verify all referenced items match the current implementation
-- [ ] run cli --help and check for any gaps
-- [ ] Check for new examples or use cases in the docs
-- [ ] Update the Gotchas section if new pitfalls are discovered
-- [ ] Test any new commands before documenting them
+1. Read the current [non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode) and [`codex exec` reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec)
+2. Compare their relevant behavior with `codex --version`, `codex exec --help`, `codex review --help`, `codex exec review --help`, `codex exec resume --help`, and `codex login status` on the installed CLI
+3. Check the [Codex model list](https://learn.chatgpt.com/docs/models) and `codex debug models --help` before changing model examples. Update the [flag lookup](FLAGS.md) when the installed and official flag lists change
+4. Check the Codex guidance in `../../delegation/MetaSkill.md` and `../../GLOSSARY.md` for conflicting claims, then regenerate `skills/headless/` with `just flatten-skills`

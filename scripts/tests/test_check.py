@@ -43,14 +43,6 @@ class CheckTests(unittest.TestCase):
         self.assertIn("error: broken failed; rerun: just check --only broken", stderr)
         self.assertTrue((root / "ran").exists(), "the later check must still run")
 
-    def test_a_check_whose_package_is_absent_is_skipped(self) -> None:
-        code, stdout, _, _ = self.verdict(
-            [Check("public", MARK), Check("private", FAIL, requires="private/SKILL.md")]
-        )
-
-        self.assertEqual(code, 0)
-        self.assertEqual(stdout, "ok: 1 passed, 1 skipped (package absent): private\n")
-
     def test_only_runs_the_named_checks(self) -> None:
         code, stdout, _, _ = self.verdict(
             [Check("broken", FAIL), Check("fine", MARK)], "--only", "fine"

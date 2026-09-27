@@ -28,7 +28,7 @@ The CLI choice dictates the execution mode. Not negotiable per invocation.
 | Target CLI | PTY | Base invocation | Notes |
 |---|---|---|---|
 | `claude` | **No** | `claude --print --permission-mode <mode> "<task>"` | Using `pty:true` + `--dangerously-skip-permissions` exits after the confirm dialog. `--print` avoids that. |
-| `codex` | **Yes** | `codex exec "<task>"` (optional `--full-auto` or `--yolo`) | Must run inside a git repo. For scratch: `SCRATCH=$(mktemp -d) && cd "$SCRATCH" && git init`. |
+| `codex` | **No** | `codex exec -C <repo> -s <sandbox> -c 'approval_policy="never"' "<task>" < /dev/null` | Use the [Codex run procedure](../codex/MetaSkill.md) for unattended execution and verification. |
 | `opencode` | **Yes** | `opencode run "<task>"` | Pick agent with `--agent <name>` when the user specifies one. |
 | `pi` | **No** | `pi -p --model <model> "<task>"` | Use `-p`/`--print` for one-shot output or `--mode json` for event-stream consumers. Pin model when the user specifies one. |
 
@@ -38,11 +38,11 @@ Start conservative. Only escalate when the task clearly requires writes.
 
 | Task shape | Claude mode | Codex mode | OpenCode | Pi |
 |---|---|---|---|---|
-| Analysis, summarize, review, explain | `--permission-mode plan` | `codex exec` (default sandbox) | `opencode run` (default) | `pi -p --model <model>` |
-| Edits in-place | `--permission-mode acceptEdits` | `codex exec --full-auto` | `opencode run` | `pi -p --model <model>` only if Pi has tool permissions in the active harness |
-| Fully unattended, edits + shell | `--permission-mode bypassPermissions` | `codex exec --yolo` (ask user) | `opencode run` (rarely needed) | prefer Pi subagents/tooling instead of raw `pi -p` |
+| Analysis, summarize, review, explain | `--permission-mode plan` | `-s read-only -c 'approval_policy="never"'` | `opencode run` (default) | `pi -p --model <model>` |
+| Edits in-place | `--permission-mode acceptEdits` | `-s workspace-write -c 'approval_policy="never"'` | `opencode run` | `pi -p --model <model>` only if Pi has tool permissions in the active harness |
+| Fully unattended, edits + shell | `--permission-mode bypassPermissions` | `-s workspace-write -c 'approval_policy="never"'` | `opencode run` (rarely needed) | prefer Pi subagents/tooling instead of raw `pi -p` |
 
-Ask the user before escalating to `bypassPermissions` or `--yolo`.
+Ask the user before escalating to `bypassPermissions`. Use Codex with broader access only when the user has authorized it and the runner is isolated.
 
 ## Foreground recipes (default)
 
@@ -62,11 +62,10 @@ claude --print --permission-mode bypassPermissions "Add a dark mode toggle to sr
 ### Codex
 
 ```bash
-# Inside an existing repo
-bash pty:true workdir:<cwd> command:"codex exec --full-auto 'Add a dark mode toggle to the settings page'"
+# Inside an existing repo; no PTY; close stdin or Codex waits for it
+codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' 'Add a dark mode toggle to the settings page' < /dev/null
 
-# Scratch work (Codex refuses to run outside a git repo)
-SCRATCH=$(mktemp -d) && cd "$SCRATCH" && git init && codex exec "Write a haiku about caching"
+# For an intentionally trusted non-repository directory, add --skip-git-repo-check
 ```
 
 ### OpenCode
@@ -97,8 +96,8 @@ pi -p --model opencode-go/kimi-k2.6 "ping" 2>&1 \
 Use background mode when the task is long-running and the user wants to keep working. The bash tool returns a session id; track progress via `process` actions.
 
 ```bash
-# Background codex
-bash pty:true workdir:<cwd> background:true command:"codex exec --full-auto 'Build a REST API for todos'"
+# Background codex; no PTY
+bash workdir:<cwd> background:true command:"codex exec -s workspace-write -c 'approval_policy=\"never\"' 'Build a REST API for todos' < /dev/null"
 # → returns sessionId
 
 # Background claude (no pty)
@@ -119,9 +118,9 @@ process action:kill   sessionId:<id>
 For long-running background jobs, append a wake trigger to the task prompt so the parent CLI gets pinged the moment the delegated agent finishes instead of waiting for the next heartbeat:
 
 ```bash
-bash pty:true workdir:<cwd> background:true command:"codex exec --full-auto 'Build a REST API for todos.
+bash workdir:<cwd> background:true command:"codex exec -s workspace-write -c 'approval_policy=\"never\"' 'Build a REST API for todos.
 
-When completely finished, run: openclaw system event --text \"Done: todos REST API\" --mode now'"
+When completely finished, run: openclaw system event --text \"Done: todos REST API\" --mode now' < /dev/null"
 ```
 
 Only use the `openclaw` notifier when the parent CLI is OpenClaw. Otherwise skip it.
@@ -131,18 +130,18 @@ Only use the `openclaw` notifier when the parent CLI is OpenClaw. Otherwise skip
 1. **Parse target CLI** from the user's prompt — match the literal token after `with` against `{claude, codex, opencode, pi}`. If no match, stop and report.
 2. **Resolve workdir** — current working directory by default. Accept an explicit override if the user names one.
 3. **Refuse unsafe workdirs** — never dispatch into `~/.claude`, `~/.pi`, `~/.openclaw`, `~/.opencode`, or `~/Projects/openclaw/`. The delegated agent will read internal config and produce unpredictable output.
-4. **Select execution mode** from the matrix above. Claude and Pi → no pty, print mode. Codex / OpenCode → `pty:true`.
-5. **Pick permission posture** — conservative by default. Escalate only if the task clearly needs writes; ask before `bypassPermissions` / `--yolo`.
-6. **Prepare the workdir** — for Codex scratch work, create `mktemp -d && git init` first. For PR reviews, clone into a temp directory.
+4. **Select execution mode** from the matrix above. Claude, Codex, and Pi → no pty. OpenCode → `pty:true`.
+5. **Pick permission posture** — conservative by default. Escalate only if the task clearly needs writes; ask before `bypassPermissions`.
+6. **Prepare the workdir** — Codex normally requires a Git repo; use `--skip-git-repo-check` only for an intentionally trusted non-repository directory. For PR reviews, clone into a temp directory.
 7. **Emit (and execute) the bash command.** Foreground by default. Background only on explicit request.
 8. **Relay the output verbatim.** If the delegated agent fails, hangs, or exits non-zero, say so in one message. Do not silently take over and hand-code the patch yourself.
 
 ## Patterns to follow
 
 - Strict trigger match — literal `with claude|codex|opencode|pi`.
-- PTY for Codex and OpenCode; never for Claude Code or Pi print mode.
+- PTY for OpenCode; Codex `exec`, Claude Code print mode, and Pi print mode need no PTY.
 - `claude --print --permission-mode <mode>` is the Claude invocation; pick the mode from the permission posture table.
-- Codex scratch work: `mktemp -d && git init` before `codex exec`.
+- Codex execution details and verification: read `../codex/MetaSkill.md`.
 - Pi automation: use `pi -p`/`pi --print`, pin `--model`, and strip terminal control codes before parsing summarized output.
 - Background jobs: return the session id and show the `process` cheat sheet.
 - PR reviews: clone to a temp directory — never review inside the parent CLI's own repo.
@@ -153,7 +152,7 @@ Only use the `openclaw` notifier when the parent CLI is OpenClaw. Otherwise skip
 
 - Do not accept loose triggers like `delegate to codex` or `run this in claude headless` — they collide with `$pi-subagents` and `pa-advisor`.
 - Do not use `--dangerously-skip-permissions` with `pty:true` for Claude Code — the CLI exits after the confirm dialog.
-- Do not invoke Codex outside a git repo without creating a throwaway repo first.
+- Do not bypass the Codex Git repository check for an untrusted directory.
 - Do not start a delegated agent inside the parent CLI's state directory (`~/.claude`, `~/.pi`, `~/.openclaw`, `~/.opencode`, `~/Projects/openclaw/`).
 - Do not silently substitute your own edits when the delegated agent fails — surface the failure.
 - Do not swap the target CLI for a cheaper one. If the user said `with codex`, use Codex.
@@ -163,13 +162,13 @@ Only use the `openclaw` notifier when the parent CLI is OpenClaw. Otherwise skip
 ## Gotchas
 
 - **Claude Code + pty**: `bash pty:true command:"claude --dangerously-skip-permissions ..."` exits silently after the permission dialog. Use `--print --permission-mode bypassPermissions` with no pty.
-- **Codex without git**: `codex exec` refuses to run outside a trusted git directory. Symptom is an immediate error about "untrusted directory". Fix: `mktemp -d && git init`.
+- **Codex without git**: `codex exec` normally requires a Git repository. Use `--skip-git-repo-check` only for an intentionally trusted non-repository directory.
 - **OpenCode MCP cold boot**: if MCP startup is slow, run `opencode serve` in a background session and use `opencode run --attach http://localhost:<port>` for subsequent commands.
 - **Background session forgets input**: `process action:write` sends raw bytes with no newline. Use `action:submit` to send text + Enter (simulating the user pressing return).
 - **PR review inside the parent repo**: never check out a PR branch in the CLI's live working copy. Use `mktemp -d && gh repo clone ... && gh pr checkout <n>` and trash the temp dir after.
 - **Unrelated context leak**: launching a headless agent without `workdir` pointed at the target project causes it to wander into adjacent folders. Always pass `workdir:<target>`.
 - **Pi print cleanup**: `pi -p` can append terminal teardown/control codes after the model answer. If a script tails the last line, strip ANSI/control sequences first or it may report garbage instead of the answer.
-- **Model pinning**: this skill is model-neutral per CLI. If the user wants a specific model, pass it explicitly (`opencode run --agent 2-opus`, `codex exec -m gpt-5-codex`, `claude --print --model claude-opus-4-7`, `pi -p --model opencode-go/kimi-k2.6`).
+- **Model pinning**: this skill is model-neutral per CLI. If the user wants a specific model, pass it explicitly (`opencode run --agent 2-opus`, `codex exec -m <model>`, `claude --print --model claude-opus-4-7`, `pi -p --model opencode-go/kimi-k2.6`).
 
 ## Cross-references
 
