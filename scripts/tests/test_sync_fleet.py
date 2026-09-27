@@ -277,7 +277,16 @@ def test_sync_repairs_the_private_drift_check_reports(
     register(hub, "mac")
     assert run(hub, homes, bin_dir).returncode == 0
     source = hub / "_skills_private/content/secret/SKILL.md"
+    received = homes / "mac/projects/skills/_skills_private/content/secret/SKILL.md"
+    # The sync does not copy times, so align them; after the edit, the size and
+    # time rsync's quick check compares still match on both sides.
+    times = source.stat()
+    os.utime(received, ns=(times.st_atime_ns, times.st_mtime_ns))
     edit(source)
+    assert (received.stat().st_size, received.stat().st_mtime_ns) == (
+        source.stat().st_size,
+        source.stat().st_mtime_ns,
+    )
 
     drift = run(hub, homes, bin_dir, "--check")
     synced = run(hub, homes, bin_dir)
