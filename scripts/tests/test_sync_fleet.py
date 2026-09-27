@@ -6,7 +6,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -32,9 +34,11 @@ fi
 cd "$FLEET_HOMES/$host" || exit 255
 HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
 """
+# Logs the recipe, then runs the machine's real installer like the justfile.
 FAKE_JUST = """#!/bin/sh
 echo "$@" >> "$HOME/just.log"
-if [ "$2" = --check ]; then cat "$HOME/check.json"; fi
+shift
+exec "$FLEET_PYTHON" scripts/install_skills.py "$@"
 """
 
 
@@ -105,6 +109,7 @@ def run(
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["FLEET_HOMES"] = str(homes)
+    env["FLEET_PYTHON"] = sys.executable
     env["HOME"] = str(hub.parent / "hub-home")
     env.pop("XDG_STATE_HOME", None)
     return subprocess.run(
@@ -179,6 +184,7 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     assert not retired.exists()
     assert not (stale / "fleet.toml").exists()
     assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
+    assert (homes / "behind/.claude/skills/secret/SKILL.md").is_file()
     for name, checkout in (("dirty", dirty), ("branch", branch), ("ahead", ahead)):
         assert not (checkout / "_skills_private").exists()
         assert not (homes / name / "just.log").exists()
@@ -211,28 +217,6 @@ def test_dry_run_is_silent_and_changes_nothing(
     assert not (homes / "behind/just.log").exists()
 
 
-def check_report(home: Path, current: int, expected: int) -> None:
-    counts = {
-        "current": current,
-        **({"add": expected - current} if expected > current else {}),
-    }
-    (home / "check.json").write_text(
-        json.dumps(
-            {
-                "targets": [
-                    {
-                        "target": ".claude/skills",
-                        "expected": expected,
-                        "current": current,
-                        "counts": counts,
-                    }
-                ]
-            },
-            indent=2,
-        )
-    )
-
-
 def test_check_is_silent_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -242,14 +226,11 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     lagging = machine(homes, "lagging", origin)
     register(hub, "synced", "lagging")
     assert run(hub, homes, bin_dir).returncode == 0
-    check_report(homes / "synced", 2, 2)
-    check_report(homes / "lagging", 2, 2)
     converged = run(hub, homes, bin_dir, "--check")
     assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
     (lagging / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
-    check_report(homes / "lagging", 1, 2)
 
     result = run(hub, homes, bin_dir, "--check")
 
@@ -259,8 +240,43 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     assert len(errors) == 1
     assert errors[0].startswith("error: lagging drift: checkout is behind ")
     assert "private tree differs from " in errors[0]
-    assert "~/.claude/skills has 1 of 2 current (add 1)" in errors[0]
+    assert "~/.claude/skills has 1 of 2 current (update 1)" in errors[0]
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+
+
+def same_size_and_time(path: Path) -> None:
+    """Rewrite the bytes but keep the size and time rsync's quick check trusts."""
+    before = path.stat()
+    path.write_text(path.read_text().replace("old", "new"))
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+
+
+def executable(path: Path) -> None:
+    path.chmod(0o755)
+
+
+@pytest.mark.parametrize("edit", [same_size_and_time, executable])
+def test_sync_repairs_every_private_difference_check_reports(
+    fleet: tuple[Path, Path, Path], edit: Callable[[Path], None]
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "mac", hub.parent / "origin.git")
+    register(hub, "mac")
+    assert run(hub, homes, bin_dir).returncode == 0
+    source = hub / "_skills_private/content/secret/SKILL.md"
+    edit(source)
+
+    drift = run(hub, homes, bin_dir, "--check")
+    synced = run(hub, homes, bin_dir)
+    converged = run(hub, homes, bin_dir, "--check")
+
+    assert drift.returncode == 1
+    assert "error: mac drift: private tree differs from " in drift.stderr
+    assert (synced.returncode, synced.stderr) == (0, "")
+    installed = homes / "mac/.claude/skills/secret/SKILL.md"
+    assert installed.read_bytes() == source.read_bytes()
+    assert os.access(installed, os.X_OK) == os.access(source, os.X_OK)
+    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
 
 
 def test_hook_acts_only_in_the_hub_main_checkout(
