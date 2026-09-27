@@ -14,9 +14,10 @@ has commits GitHub lacks, or whose _skills_private is not a clone is left
 untouched. A machine that is offline or fails gets one retry, and any later
 sync catches it up.
 
-The registry is fleet.toml in the private repository, so every machine has it
-and hosts stay out of this public one. Each path is relative to that machine's
-home:
+The registry is the one fleet.toml in the private repository, so every machine
+has it and hosts stay out of this public one; the private-network skill ships
+it in references/. Each path is relative to that machine's home, and other keys
+are notes for agents:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
@@ -47,7 +48,6 @@ from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTALLER = ROOT / "scripts" / "install_skills.py"
-REGISTRY = PRIVATE / "fleet.toml"
 STATE = (
     Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
     / "skills-sync"
@@ -196,6 +196,26 @@ class Outcome:
     status: str
     detail: str
     targets: list[dict] = field(default_factory=list)
+
+
+def registry() -> Path:
+    """The one fleet.toml in the private clone, wherever the skill that ships it lives."""
+    found = sorted(
+        path
+        for path in PRIVATE.rglob("fleet.toml")
+        if ".git" not in path.relative_to(PRIVATE).parts
+    )
+    if len(found) > 1:
+        raise ScriptError(
+            f"{len(found)} fleet registries in {PRIVATE}: "
+            + ", ".join(str(path.relative_to(PRIVATE)) for path in found)
+            + "; keep one"
+        )
+    if not found:
+        raise ScriptError(
+            f"no fleet.toml in {PRIVATE}; the private-network skill keeps it in references/"
+        )
+    return found[0]
 
 
 def load_registry(path: Path) -> list[Machine]:
@@ -497,12 +517,18 @@ def hook(event: list[str]) -> str:
     """Install after a commit or a pull, and sync the fleet once GitHub has it.
 
     Lefthook runs this in every checkout; it acts only in a main checkout that
-    has the registry, never in a worktree. A pull that brings commits installs
-    here and syncs the other machines. A commit installs here; the other
-    machines sync once a push lands it on GitHub.
+    has the private clone, never in a worktree. A pull that brings commits
+    installs here and syncs the other machines. A commit installs here; the
+    other machines sync once a push lands it on GitHub. A clone without the
+    registry warns and never blocks git.
     """
     name, *rest = event
-    if not REGISTRY.is_file():
+    if not sync_private.is_clone():
+        return ""
+    try:
+        registry()
+    except ScriptError as error:
+        log.warning("warning: %s; the fleet does not sync", error)
         return ""
     if name == "pre-push":
         if sha := pushed_main(sys.stdin.read().splitlines()):
@@ -544,12 +570,12 @@ def work(args: argparse.Namespace) -> str:
 
 
 def sync(args: argparse.Namespace) -> str:
-    registry = load_registry(args.fleet)
-    machines = select(registry, args.machines)
+    fleet = load_registry(args.fleet or registry())
+    machines = select(fleet, args.machines)
     if args.others:
         machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
-    local = next((machine.name for machine in registry if machine.is_local()), None)
+    local = next((machine.name for machine in fleet if machine.is_local()), None)
     if args.after_push:
         wait_for_push(args.after_push)
     # Queue behind any other sync from here, so each run sends the newest commit.
@@ -616,8 +642,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fleet",
         type=Path,
-        default=REGISTRY,
-        help="machine registry (default: _skills_private/fleet.toml)",
+        help="machine registry (default: the one fleet.toml in _skills_private/)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -643,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
         "--hook",
         nargs="+",
         metavar="EVENT",
-        help="run as the lefthook EVENT hook; acts only in a main checkout with the registry",
+        help="run as the lefthook EVENT hook; acts only in a main checkout with the private clone",
     )
     parser.add_argument(
         "--after-push",
