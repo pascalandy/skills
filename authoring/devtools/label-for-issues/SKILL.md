@@ -5,8 +5,8 @@ description: "Use when triaging GitHub issues, managing issue labels or decision
 
 # Label for issues
 
-Help the user decide what happens next on each issue. Labels and the decision
-comment express the same assessment; label changes alone do not complete triage.
+Help the user decide what happens next on each issue. Labels carry the assessment;
+a decision comment is opt-in, as Ticket comments defines.
 Apply this vocabulary to issues, not PRs. Keep one state and one priority
 per open triaged issue, one type except for epic parents, at most one epic role, and
 optional impediments.
@@ -27,13 +27,14 @@ optional impediments.
    do not audit unrelated code or tickets. Prefer current object states over stale
    prose, but retain explicit human decisions unless new evidence warrants revisiting
 3. **Assess.** Form one assessment per issue: desired labels, evidence, unresolved
-   decision or input, recommendation, next actor, and start conditions. Derive both
-   label edits and the comment from it. Separate facts from inference and name any
+   decision or input, recommendation, next actor, and start conditions. Derive label
+   edits, a one-line summary naming the next actor, recommendation, and any blocker,
+   and any requested comment from it. Separate facts from inference and name any
    uncertainty that could change the recommendation. Stop investigating once the
    next action is supported; if evidence is insufficient, identify the smallest
-   question or check that would resolve it. Prepare any required comment using Ticket
-   comments before writing. For read-only requests, return the label diff and comment
-   preview, then stop
+   question or check that would resolve it. Prepare a requested comment using Ticket
+   comments before writing. For read-only requests, return the label diff, summaries,
+   and any requested comment preview, then stop
 4. **Reconcile.** For setup-only requests, first read the repository label catalog.
    For authorized writes, create missing labels from the JSON below.
    Update metadata only when existing meanings match. Report equivalent names,
@@ -47,24 +48,26 @@ optional impediments.
    writing; revise the assessment if relevant evidence changed. Apply
    targeted additions and removals with `gh issue edit`. Replace only canonical
    labels in the same family. Read back changed labels, review records, and parent
-   links; check family exclusivity and epic membership. Publish any required decision
-   comment using verified results, then read it back. Report issue and comment links,
-   conflicts, and partial failures. If a write times out or fails, reread before
-   retrying and perform only missing operations. Continue independent issues;
-   report triage as complete only when its labels and any required comment are verified
+   links; check family exclusivity and epic membership. Publish a requested decision
+   comment using verified results, then read it back. Report each issue's label
+   changes and summary, issue and comment links, conflicts, and partial failures.
+   Without a comment request, flag an existing managed comment that the new labels
+   contradict as stale and leave it unedited. If a write times out or fails, reread
+   before retrying and perform only missing operations. Continue independent issues;
+   report triage as complete only when its labels and any requested comment are verified
 
 ## Ticket comments
 
-When preparing comments, load and apply `$sparring` from the active skill catalog
-once per run. Apply it to each assessment, including read-only previews and
-migration comments. If unavailable, withhold the comment and report the missing
-dependency; label-only progress must not be reported as complete.
+Write or update an issue comment only when the user explicitly asks for one.
+Triage, issue creation, PR links, and label changes do not imply a comment.
+
+When preparing a requested comment, load and apply `$sparring` from the active skill
+catalog once per run, including for read-only previews. If unavailable, withhold the
+comment and report the missing dependency; the requested comment remains incomplete.
 Use its reasoning discipline to help the human decide or act; keep the comment
 proportional to the decision, without manufacturing a debate.
 
-Authorized issue triage includes maintaining one concise decision comment per issue,
-even when the labels already fit. Explicit label-only requests and repository
-metadata-only updates need no issue comments. Explain verified changes, not intended
+Keep one concise decision comment per issue. Explain verified changes, not intended
 ones; a partial failure must not produce a prompt claiming prerequisites are met.
 In read-only previews, describe label edits as proposed, never completed.
 
@@ -78,9 +81,10 @@ Otherwise create one without altering human comments. If ownership is ambiguous 
 multiple managed comments exist, report the conflict rather than adding another.
 Recheck the selected comment before editing and preserve intervening human additions.
 
-Refresh that comment when the evidence, options, or recommendation changes, even if
-the labels stay the same. Leave it untouched when both labels and reasoning remain
-current; recover missing comments after partial failures.
+When asked to update it, refresh that comment when the evidence, options, or
+recommendation changes, even if the labels stay the same. Leave it untouched when
+both labels and reasoning remain current; recover missing comments after partial
+failures.
 
 End every comment you create or update with `Updated by [AGENT NAME]`, replacing
 the placeholder with your actual agent name. On edits, replace the existing agent
