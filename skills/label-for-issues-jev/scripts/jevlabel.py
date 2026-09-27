@@ -1193,9 +1193,17 @@ def cmd_consent(args: argparse.Namespace) -> tuple[str, Any]:
 
 
 def new_run_id(repo: str) -> str:
-    return now().strftime("%Y%m%dT%H%M%SZ-") + re.sub(
+    """A timestamped ID that no earlier preview or record in this second uses."""
+    base = now().strftime("%Y%m%dT%H%M%SZ-") + re.sub(
         r"[^a-z0-9]+", "-", repo.lower()
     ).strip("-")
+    run_id, count = base, 1
+    while any(
+        (runs_dir() / f"{run_id}{end}").exists() for end in (".json", ".preview.json")
+    ):
+        count += 1
+        run_id = f"{base}-{count}"
+    return run_id
 
 
 def cmd_run(args: argparse.Namespace) -> tuple[str, Any]:
@@ -1345,10 +1353,10 @@ def live_run(
 
 def resolve_run(ref: str) -> Path:
     if ref == "last":
-        runs = sorted(p for p in runs_dir().glob("*.json") if RUN_FILE.match(p.name))
+        runs = [p for p in runs_dir().glob("*.json") if RUN_FILE.match(p.name)]
         if not runs:
             raise Failure("no run records yet; run `jevlabel run` first")
-        return runs[-1]
+        return max(runs, key=lambda p: (p.stat().st_mtime_ns, p.name))
     path = runs_dir() / f"{ref}.json"
     if not RUN_FILE.match(path.name) or not path.is_file():
         raise Failure(f"no run record {ref!r} in {runs_dir()}; pass a run ID or `last`")
