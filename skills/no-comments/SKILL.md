@@ -1,7 +1,6 @@
 ---
 name: "no-comments"
 description: "Use only when the user explicitly invokes `no-comments`, including `No comments` as an instruction."
-disable-model-invocation: true
 ---
 
 # No comments

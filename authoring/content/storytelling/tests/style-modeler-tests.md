@@ -90,15 +90,14 @@ Run `uv run tests/validate-package.py .` from the storytelling directory on
 storytelling itself. For every generated package, run:
 
 ```text
-uv run tests/validate-package.py --explicit-runtime <target-runtime> <package-directory>
+uv run tests/validate-package.py <package-directory>
 ```
 
-Repeat `--explicit-runtime` when the package targets multiple supported runtimes.
-These commands check metadata, invocation controls, and local Markdown links. Inspect
+These commands check metadata, agent invocation, and local Markdown links. Inspect
 behavior separately through the actual runs above.
 
 Run `uv run tests/test_validate_package.py` to check the validator's link boundaries
-and strict invocation failures, including `file:` dependencies that Markdown renderers
+and invocation guard, including `file:` dependencies that Markdown renderers
 may suppress during parsing.
 
 - The router's only new capability text is the Style Modeler trigger and pointer

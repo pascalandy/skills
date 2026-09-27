@@ -96,11 +96,6 @@ def validate_entry(
         if metadata is not None:
             if metadata.get("name") != package_name:
                 errors.append(f'{label}: require name: "{package_name}"')
-            if (
-                package_name == "matt-mode"
-                and metadata.get("disable-model-invocation") is not True
-            ):
-                errors.append(f"{label}: require disable-model-invocation: true")
             description = metadata.get("description")
             if not isinstance(description, str) or not description.strip():
                 errors.append(f"{label}: require a non-empty description string")
@@ -110,25 +105,6 @@ def validate_entry(
         if expected_link is not None and expected_link not in links:
             errors.append(f"{label}: missing upstream body link: {expected_link}")
     return links
-
-
-def validate_policy(package: Path, errors: list[str]) -> None:
-    policy_path = package / "agents/openai.yaml"
-    label = "matt-mode/agents/openai.yaml"
-    policy = layout.read_utf8(policy_path, label, errors)
-    if policy is None:
-        return
-    metadata = parse_metadata(policy, label, errors)
-    if metadata is None:
-        return
-    invocation = metadata.get("policy")
-    if (
-        not isinstance(invocation, dict)
-        or invocation.get("allow_implicit_invocation") is not False
-    ):
-        errors.append(
-            f"{label}: require one policy block with allow_implicit_invocation: false"
-        )
 
 
 def validate_mapping_shapes(registry, errors: list[str]) -> tuple[set[str], set[str]]:
@@ -185,7 +161,6 @@ def validate(root: Path) -> list[str]:
                     "matt-mode/SKILL.md: route table disagrees with lock; "
                     f"missing: {missing}; unexpected: {unexpected}"
                 )
-            validate_policy(package, errors)
         layout.validate_markdown_links(package, errors)
         layout.validate_portability(package, errors)
         layout.validate_asset_modes(package, [], [], errors)

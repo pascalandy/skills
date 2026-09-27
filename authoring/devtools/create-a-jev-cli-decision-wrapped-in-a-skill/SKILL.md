@@ -1,7 +1,6 @@
 ---
 name: "create-a-jev-cli-decision-wrapped-in-a-skill"
 description: "Use only when the user explicitly invokes `create-a-jev-cli-decision-wrapped-in-a-skill`."
-disable-model-invocation: true
 ---
 
 # Create a Jev decision CLI wrapped in a skill

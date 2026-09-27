@@ -1,7 +1,6 @@
 ---
 name: "meta-sc"
 description: "Use only when the user explicitly invokes `$meta-sc` to create or refactor a skill with several internal branches behind one entry point."
-disable-model-invocation: true
 ---
 
 # Meta-skill creator

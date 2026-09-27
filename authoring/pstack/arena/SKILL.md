@@ -1,7 +1,6 @@
 ---
 name: "arena"
 description: "Use when the user invokes `arena`, or when competing designs or implementations should be compared before choosing an approach for a non-trivial artifact."
-disable-model-invocation: true
 ---
 
 # Arena

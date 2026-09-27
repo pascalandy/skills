@@ -35,9 +35,9 @@ The ownership pass is complete when every changed meaning has one **single sourc
 
 ## Create or scaffold a skill
 
-1. **Set the target.** Choose the skill name, category, invocation mode, and content shape: **steps**, **reference**, or mixed. Ask only for missing decisions that block a predictable scaffold
+1. **Set the target.** Choose the skill name, category, and content shape: **steps**, **reference**, or mixed. Ask only for missing decisions that block a predictable scaffold
 2. **Respect repository policy.** Use the managed source location and distribution workflow from the repository instructions
-3. **Scaffold minimally.** Create `SKILL.md` first. Add `agents/openai.yaml` when the skill is user-invoked. Add `references/`, `scripts/`, or `assets/` only when the skill needs disclosed reference, executable code, or reusable resources
+3. **Scaffold minimally.** Create `SKILL.md` first. Add `references/`, `scripts/`, or `assets/` only when the skill needs disclosed reference, executable code, or reusable resources
 4. **Validate the result.** Apply the final checks in this skill to the actual package and its active consumers
 
 Standard layout:
@@ -45,7 +45,7 @@ Standard layout:
 ```text
 skill-name/
 ├── SKILL.md
-├── agents/       # openai.yaml, required for user-invoked skills
+├── agents/       # optional runtime metadata
 ├── scripts/      # optional executable code
 ├── references/   # optional disclosed reference
 └── assets/       # optional templates, schemas, resources
@@ -63,7 +63,6 @@ Quote every string scalar and string list item with double quotes. Leave boolean
 ---
 name: "skill-name"
 description: "Use when the user wants a clear trigger and predictable behavior."
-disable-model-invocation: true
 allowed-tools:
   - "Bash(tool-name *)"
 ---
@@ -71,20 +70,9 @@ allowed-tools:
 
 Keep scanner-facing metadata boring. Plain or block string scalars invite YAML edge cases around `:`, `#`, `{}`, `[]`, `&`, `*`, booleans, and version-like values.
 
-## Choose invocation deliberately
+## Keep skills available to agents
 
-Use the definitions under [Invocation](GLOSSARY.md#invocation), then apply the supported metadata for the active runtime.
-
-- A **model-invoked** skill keeps a precise trigger description and omits `disable-model-invocation`
-- A **user-invoked** skill sets `disable-model-invocation: true` and keeps a concise description of the explicit trigger for runtimes and catalogs that display it. Codex ignores that field and allows implicit invocation by default, so the skill also needs `agents/openai.yaml` with the policy below. Create the file when it is absent
-- A **router skill** earns its place when several user-invoked skills create too much **cognitive load**
-
-```yaml
-policy:
-  allow_implicit_invocation: false
-```
-
-Choose model invocation only when the agent or another skill must reach the skill without the human naming it.
+Follow the repository's `AGENTS.md`: omit `disable-model-invocation` and do not set `policy.allow_implicit_invocation: false` in runtime metadata.
 
 ## Make the description an invocation rule
 
@@ -130,7 +118,7 @@ Apply the failure-mode definitions in the glossary rather than restating them in
 Before closing skill work, verify all applicable checks:
 
 - `name` matches the directory and every frontmatter string is quoted
-- The description matches the invocation mode and does not conflict with neighboring triggers
+- The description does not conflict with neighboring triggers
 - Bundled and cross-skill paths resolve from both managed source and the flattened installation shape
 - Every changed meaning has one active owner, and consumers reach it through a precise pointer
 - Moving a rule removed its superseded active copy in the same change

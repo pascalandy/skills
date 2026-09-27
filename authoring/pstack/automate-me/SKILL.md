@@ -69,7 +69,7 @@ Resolve and load `writing-great-skills` through the runtime contract. If the aut
 - Handle: the user's first name or chosen identifier.
 - Frontmatter `description`: trigger on their name + `/<handle>-mode` + "work in their style", not on generic keywords like "write code" or "review PR".
 - Frontmatter formatting: quote every string scalar and keep `description` on one line.
-- Frontmatter `disable-model-invocation: true` by default. Runtime support varies; use supported persistent instructions if the user wants the mode loaded every turn.
+- Keep the mode skill available for agent invocation, with a precise trigger on the person's name or mode handle. Use supported persistent instructions if the user wants the mode loaded every turn.
 
 ### 5. Iterate on prose
 

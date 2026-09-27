@@ -1,7 +1,6 @@
 ---
 name: "swarm"
 description: "Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration."
-disable-model-invocation: true
 ---
 
 # Swarm
