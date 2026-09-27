@@ -156,7 +156,15 @@ def test_sends_the_hub_commit_and_private_tree_and_leaves_the_rest_untouched(
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
     register(
-        hub, "behind", "dirty", "editor", "branch", "ahead", "linked", "relinked", "down"
+        hub,
+        "behind",
+        "dirty",
+        "editor",
+        "branch",
+        "ahead",
+        "linked",
+        "relinked",
+        "down",
     )
 
     result = run(hub, homes, bin_dir, "--json")
