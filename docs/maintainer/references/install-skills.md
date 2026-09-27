@@ -1,6 +1,6 @@
 ---
 name: Install skills
-description: Profiles, private packages, ownership, fleet sync from om1, hooks, and cutover for just install-skills
+description: Profiles, the private clone, ownership, fleet sync from om1, hooks, and cutover for just install-skills
 tags:
   - area/ea
   - kind/doc
@@ -20,17 +20,28 @@ date_updated: 2026-09-27
 - Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. Previews and checks do not wait
 
+## Private skills
+
+Private skills live in the private repository `pascalandy/skills-private`, cloned inside this checkout at `_skills_private/`. Its URL is this checkout's `origin` with `skills` renamed to `skills-private`, so each machine reaches GitHub the way its public checkout does
+
+- Git uses the nearest `.git` above the current directory. Inside `_skills_private/`, git commands act on the private repository; anywhere else, on the public one
+- This repository's `.gitignore` line `/_skills_private/` keeps the clone and its `.git` out of the public repository; it is not a submodule. Keep that line, and never `git add -f` the folder
+- `scripts/sync_private.py` manages the clone; `just sync` and `just sync-fleet` run it. It clones a missing folder, commits uncommitted edits as `🧰 skill: private: save edits from <machine>`, pulls with rebase, and pushes. A folder that is not a clone, or a clone off `main`, stops it untouched. Edits that conflict with GitHub stay committed on that machine and stop it; resolve them with `git pull --rebase` in `_skills_private/`
+- Commits need an author email GitHub accepts for pushes, such as `pascalandy@users.noreply.github.com`; set it in the clone with `git -C _skills_private config user.email` when the global one is private
+- Worktrees do not get `_skills_private/`, since git does not copy ignored folders; edit private skills in the main checkout
+- `fleet.toml` stays on the hub, ignored by the private repository: the hook treats a checkout that has it as the hub
+
 ## Sync machines
 
-om1 is the hub. Every sync runs there and sends om1's skills to the other machines, which only receive
+om1 is the hub. Every sync runs there and sends om1's public commit to the other machines, which only receive it
 
-- `just sync` pulls `main` and installs on the machine it runs on. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pull and previews the current checkout
-- `just sync-fleet` syncs every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. The hub installs its own working tree. Every other machine receives the hub's `main` commit over SSH, without GitHub, fast-forwards its checkout to it, receives an exact mirror of the hub's `_skills_private/`, compared by content and permissions, without `fleet.toml` or runtime files, which the mirror also deletes there, then runs `just install-skills`
-- A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `skills/`, `scripts/`, or `justfile`, has commits the hub lacks, or has a symlinked `_skills_private` reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it. An `offline` or `failed` machine gets one retry, then catches up at the next sync
+- `just sync` pulls `main`, saves and pulls the private clone, and installs on the machine it runs on. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
+- `just sync-fleet` syncs every machine in `_skills_private/fleet.toml`; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. The hub first saves and pulls its private clone, then installs its own working tree. Every other machine receives the hub's `main` commit over SSH, without GitHub, fast-forwards its checkout to it, saves and pulls its own private clone from GitHub, then runs `just install-skills`
+- A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `skills/`, `scripts/`, or `justfile`, has commits the hub lacks, or whose `_skills_private` is not a clone reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it. An `offline` or `failed` machine gets one retry, then catches up at the next sync
 - Success prints nothing. `--verbose` prints each machine's outcome, and `--dry-run` runs every check without changing anything
-- `just sync-fleet --check` compares each machine's checkout, private tree, and installed skills per harness with the hub, then exits 1 naming each difference. It compares names and contents, so skills other tools installed do not count
-- Private skills live only in the hub's `_skills_private/`; a copy edited on another machine is overwritten at the next sync. Editing a private skill fires no hook, so run `just sync-fleet` afterwards
-- The registry stays in the private tree so hosts and accounts stay out of this public repository. Each `path` is relative to that machine's home:
+- `just sync-fleet --check` compares each machine's checkout with the hub, its private clone with the private repository's `main` on GitHub, and its installed skills per harness with its sources, then exits 1 naming each difference. It compares names and contents, so skills other tools installed do not count
+- Editing a private skill fires no hook, so run `just sync-fleet` afterwards; a private edit on another machine is saved at its next sync
+- The registry stays in the private clone, ignored by git, so hosts and accounts stay out of both repositories. Each `path` is relative to that machine's home:
 
 ```toml
 [machines.om1]
@@ -52,8 +63,8 @@ The background run logs to `~/.local/state/skills-sync/fleet.log`. It sends a de
 
 - The installer keeps no state. It owns every name git history ever added under `skills/` or `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
-- A private skill that was never published is not owned. After deleting it from the private tree, trash its installed copies yourself
-- Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/` or the private tree
+- A private skill that was never published is not owned. After deleting it from the private clone, trash its installed copies yourself. `mermaid` and `investigation` were published once, so an install that runs while `_skills_private/` is missing removes them until the next install
+- Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/` or the private clone
 - To promote a private skill, move it into `authoring/`, delete the private copy, and rerun
 
 ## Cutover
