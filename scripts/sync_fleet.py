@@ -412,41 +412,52 @@ def status_of(code: int) -> str:
 
 
 def failure(name: str, code: int, lines: list[str]) -> Outcome:
-    """A failed remote step; offline and a step's own 75 are worth a retry."""
+    """A failed remote step; an unreachable machine or a step's own 75 is worth
+    a retry, but ssh also exits 255 when it reaches a machine and cannot log in."""
+    why = reason(lines, code)
+    if code == UNREACHABLE and not is_network_failure("\n".join(lines)):
+        return Outcome(name, "failed", why)
     return Outcome(
-        name,
-        status_of(code),
-        reason(lines, code),
-        temporary=code in (UNREACHABLE, TEMPORARY),
+        name, status_of(code), why, temporary=code in (UNREACHABLE, TEMPORARY)
     )
 
 
 def private_problems(head: str, state: str, expected: str) -> list[str]:
-    """Compare a private clone, as sync_private.state() reports it, with GitHub."""
+    """Compare a private clone, as sync_private.state() reports it, with GitHub;
+    without `expected`, only its state."""
     if state == "missing":
         return ["private repo is not cloned"]
     if state == "plain":
         return ["_skills_private is not a clone of the private repo"]
     problems = ["private repo has uncommitted edits"] if state == "dirty" else []
-    if head != expected:
+    if expected and head != expected:
         problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
     return problems
 
 
-def judge(name: str, problems: list[str], output: str) -> Outcome:
-    """Turn an install-skills --dry-run --json report into per-target drift."""
-    lines = output.strip().splitlines()
+def installed(
+    machine: Machine, source: Source
+) -> Outcome | tuple[list[str], list[dict]]:
+    """Run the CHECK step: what differs on the machine, from its private clone
+    to each install target, with the targets' counts; an Outcome when it fails."""
+    code, lines = remote(machine, CHECK, machine.path)
+    if code:
+        return failure(machine.name, code, lines)
+    problems: list[str] = []
+    for line in lines:
+        if line.startswith("private ") and len(fields := line.split()) == 3:
+            problems.extend(private_problems(fields[1], fields[2], source.private))
     # The report is the indented JSON object; uv or a login profile may print
     # around it.
     braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
     try:
         report = json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
     except (IndexError, json.JSONDecodeError):
-        return Outcome(name, "failed", reason(lines, 1))
+        return Outcome(machine.name, "failed", reason(lines, 1))
     for target in report["targets"]:
         log.info(
             "%s ~/%s: %d of %d current",
-            name,
+            machine.name,
             target["target"],
             target["current"],
             target["expected"],
@@ -459,8 +470,7 @@ def judge(name: str, problems: list[str], output: str) -> Outcome:
                 + ", ".join(f"{kind} {count}" for kind, count in other.items())
                 + ")"
             )
-    status = "drift" if problems else "converged"
-    return Outcome(name, status, "; ".join(problems) or status, report["targets"])
+    return problems, report["targets"]
 
 
 def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
@@ -480,22 +490,30 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind GitHub at {head[:7]}")
-        code, lines = remote(machine, CHECK, machine.path)
-        for line in lines:
-            if line.startswith("private ") and len(fields := line.split()) == 3:
-                problems.extend(private_problems(fields[1], fields[2], source.private))
-        return judge(machine.name, problems, "\n".join(lines))
+        found = installed(machine, source)
+        if isinstance(found, Outcome):
+            return found
+        problems += found[0]
+        status = "drift" if problems else "converged"
+        return Outcome(machine.name, status, "; ".join(problems) or status, found[1])
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
-        if head == source.sha:
-            return Outcome(machine.name, "ready", f"ready; already at {head[:7]}")
-        return Outcome(
-            machine.name,
-            "ready",
-            f"ready to move {head[:7]} to {source.sha[:7]}",
-            changes=[f"move {head[:7]} to {source.sha[:7]}"],
-        )
+        if head != source.sha:
+            return Outcome(
+                machine.name,
+                "ready",
+                f"ready to move {head[:7]} to {source.sha[:7]}",
+                changes=[f"move {head[:7]} to {source.sha[:7]}"],
+            )
+        # At GitHub's main already, a sync would still save and pull the
+        # private clone and install what differs
+        found = installed(machine, source)
+        if isinstance(found, Outcome):
+            return found
+        pending, targets = found
+        detail = "; ".join(pending) or f"ready; already at {head[:7]}"
+        return Outcome(machine.name, "ready", detail, targets, changes=pending)
     if head != source.sha:
         pushed = call(
             [
@@ -574,27 +592,32 @@ def notify(lines: list[str]) -> None:
 
 def github_main() -> Source:
     """Fetch GitHub's main; when GitHub is unreachable, use the last one fetched."""
-    fetched = call(["git", "fetch", "--quiet", "origin", "main"])
-    why = reason(fetched.stderr.splitlines(), fetched.returncode)
-    if fetched.returncode:
+    try:
+        fetched = call(["git", "fetch", "--quiet", "origin", "main"])
+        why = reason(fetched.stderr.splitlines(), fetched.returncode)
+        failed, temporary = fetched.returncode != 0, is_network_failure(fetched.stderr)
+    except subprocess.TimeoutExpired:
+        why, failed, temporary = f"git fetch took longer than {TIMEOUT}s", True, True
+    if failed:
         log.info("could not fetch GitHub's main: %s", why)
     sha = git("rev-parse", "-q", "--verify", f"{GITHUB_MAIN}^{{commit}}").stdout.strip()
     if not sha:
-        if is_network_failure(fetched.stderr):
+        if temporary:
             raise TemporaryError(f"GitHub's main is unknown here: {why}")
         raise ScriptError(
-            f"GitHub's main is unknown here: {why}; fix origin, then rerun"
+            f"GitHub's main is unknown here: {why}; fix origin, then rerun just sync-fleet"
         )
     return Source(sha)
 
 
 def wait_for_push(sha: str, timeout: float) -> None:
-    """Return once GitHub's main is `sha`; fail if the push never lands."""
+    """Return once GitHub's main is `sha`; a push that has not landed in time
+    exits 75."""
     deadline = time.monotonic() + min(PUSH_WAIT, timeout)
     while github_main().sha != sha:
         if time.monotonic() > deadline:
-            raise ScriptError(
-                f"GitHub's main never reached {sha[:7]}; the push did not land"
+            raise TemporaryError(
+                f"GitHub's main did not reach {sha[:7]} in time; the push has not landed"
             )
         time.sleep(RETRY_DELAY)
 
@@ -706,7 +729,8 @@ def sync(args: argparse.Namespace) -> str:
         if mode == "apply":
             for change in sync_private.sync(timeout=args.timeout):
                 log.info("%s", change)
-        if mode == "check":
+        # A check needs the private clone; a preview compares with it when here
+        if mode == "check" or (mode == "preview" and sync_private.is_clone()):
             source = Source(source.sha, sync_private.github_head(args.timeout))
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(

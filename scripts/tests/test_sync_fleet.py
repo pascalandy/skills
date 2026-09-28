@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 
 import pytest
+import sync_fleet
+from _cli import TemporaryError
 from conftest import (
     GIT_IDENTITY,
     SCRIPTS,
@@ -42,6 +44,19 @@ shift
 if [ "$host" = down ]; then
     echo "ssh: connect to host down port 22: Connection refused" >&2
     exit 255
+fi
+if [ "$host" = locked ]; then
+    echo "tester@locked: Permission denied (publickey)." >&2
+    exit 255
+fi
+# flaky answers its first call, then drops off the network
+if [ "$host" = flaky ]; then
+    calls="$FLEET_HOMES/flaky.calls"
+    echo call >> "$calls"
+    if [ "$(wc -l < "$calls")" -gt 1 ]; then
+        echo "ssh: connect to host flaky port 22: Connection timed out" >&2
+        exit 255
+    fi
 fi
 cd "$FLEET_HOMES/$host" || exit 255
 HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
@@ -246,27 +261,36 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
 
 
 @exits("sync_fleet", 0)
-def test_dry_run_names_each_machine_it_would_move_and_changes_nothing(
+def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    behind = machine(homes, "behind", hub.parent / "skills.git")
-    current = machine(homes, "current", hub.parent / "skills.git")
-    before = git(behind, "rev-parse", "HEAD")
+    origin = hub.parent / "skills.git"
+    behind = machine(homes, "behind", origin)
+    current = machine(homes, "current", origin)
+    stale = machine(homes, "stale", origin)
+    register(hub, "behind", "current", "stale")
+    assert run(hub, homes, bin_dir).returncode == 0
     head = change(hub)
-    git(current, "pull", "-q")
-    register(hub, "behind", "current")
+    before = git(behind, "rev-parse", "HEAD")
+    for checkout in (current, stale):
+        git(checkout, "pull", "-q")
+    # stale is at GitHub's main, but lost an installed skill
+    shutil.rmtree(homes / "stale/.claude/skills/alpha")
 
     result = run(hub, homes, bin_dir, "-n")
+    preview = json.loads(run(hub, homes, bin_dir, "-n", "--json").stdout)
 
     assert (result.returncode, result.stdout, result.stderr) == (
         0,
-        f"ready\tbehind\t{head[:7]}\n",
+        f"ready\tbehind\t{head[:7]}\nready\tstale\t{head[:7]}\n",
         "",
     )
+    assert preview["machines"][2]["changes"] == [
+        "~/.claude/skills has 1 of 2 current (add 1)"
+    ]
     assert git(behind, "rev-parse", "HEAD") == before
-    assert not (behind / "_skills_private").exists()
-    assert not (homes / "behind/just.log").exists()
+    assert not (homes / "stale/.claude/skills/alpha").exists()
 
 
 def test_check_is_silent_when_converged_and_names_each_difference(
@@ -412,3 +436,57 @@ def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> 
     assert (result.returncode, result.stdout) == (2, "")
     assert "error: unknown machine mpb; the registry lists mbp\n" in result.stderr
     assert result.stderr.endswith("run 'just sync-fleet --help'\n")
+
+
+@exits("sync_fleet", 1)
+def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down", "locked")
+
+    result = run(hub, homes, bin_dir, "--dry-run", "--json")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    outcomes = {m["machine"]: m for m in json.loads(result.stderr)["machines"]}
+    assert (outcomes["down"]["status"], outcomes["down"]["temporary"]) == (
+        "offline",
+        True,
+    )
+    assert outcomes["locked"] == {
+        "machine": "locked",
+        "status": "failed",
+        "detail": "tester@locked: Permission denied (publickey).",
+        "targets": [],
+        "changes": [],
+        "temporary": False,
+    }
+
+
+@exits("sync_fleet", 75)
+def test_a_check_that_loses_the_machine_midway_exits_75(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "flaky", hub.parent / "skills.git")
+    register(hub, "flaky")
+
+    result = run(hub, homes, bin_dir, "--check")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert "error: flaky offline: ssh: connect to host flaky port 22: " in result.stderr
+
+
+def test_a_fetch_that_times_out_without_a_known_main_exits_75(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def slow(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("git fetch", sync_fleet.TIMEOUT)
+
+    monkeypatch.setattr(sync_fleet, "call", slow)
+    monkeypatch.setattr(
+        sync_fleet, "git", lambda *args: subprocess.CompletedProcess(args, 1, "", "")
+    )
+
+    with pytest.raises(TemporaryError, match="git fetch took longer than 600s"):
+        sync_fleet.github_main()
