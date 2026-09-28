@@ -192,7 +192,7 @@ def run_script(
             action="store_true",
             help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
         )
-    if given(argv, "-h", "--help"):
+    if given(argv, "-h", "--help", parser=parser):
         parser.print_help()
         return 0
 

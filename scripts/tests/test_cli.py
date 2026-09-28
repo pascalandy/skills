@@ -62,6 +62,20 @@ def test_a_flag_counts_only_before_the_end_of_options() -> None:
     assert not given(["--notes", "help.md"], "-h", "--help")
 
 
+def test_a_bundle_of_flag_letters_counts_when_the_parser_is_known() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", action="store_true")
+    parser.add_argument("-o")
+    command = parser.add_subparsers().add_parser("run")
+    command.add_argument("-q", action="store_true")
+
+    assert given(["--timeout", "nope", "-vh"], "-h", "--help", parser=parser)
+    assert given(["run", "-qh"], "-h", "--help", parser=parser)
+    assert not given(["-vh"], "-h", "--help")
+    assert not given(["-ohello"], "-h", "--help", parser=parser)
+    assert not given(["--", "-vh"], "-h", "--help", parser=parser)
+
+
 @pytest.mark.parametrize(
     ("environment", "disabled", "expected"),
     [

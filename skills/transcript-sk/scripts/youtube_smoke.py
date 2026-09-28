@@ -28,10 +28,10 @@ from transcript import (
     YtDlpError,
     _clean_subprocess_diagnostic,
     _rerun,
-    asks_for_help,
     download_audio,
     duration,
     exit_codes,
+    given,
     log,
     run_child,
     run_guarded,
@@ -174,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the transport check and return its exit code, as listed in --help."""
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
-    if asks_for_help(parser, argv):
+    if given(argv, "-h", "--help", parser=parser):
         parser.print_help()
         return 0
 
