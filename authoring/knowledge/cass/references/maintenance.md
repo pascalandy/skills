@@ -119,6 +119,6 @@ Before replacing a corrupt archive
 
 ## Shared-agent distribution
 
-The CLI binary is shared through the shell `PATH`. Each agent also needs the CASS skill in its own skill directory
+The CLI binary is shared through the shell `PATH`. Each agent also needs the CASS skill in its own skill directory. `just install-skills` ships the skill to one machine and `just sync-fleet` ships it to every machine, but neither installs the `cass` binary, which each machine needs separately
 
 Edit only the managed source at `authoring/knowledge/cass/` in `pascalandy/skills`, then follow that repository's `AGENTS.md` to regenerate and install the copies. Never edit an installed copy
