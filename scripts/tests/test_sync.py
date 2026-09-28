@@ -95,10 +95,7 @@ def test_refuses_a_checkout_off_main_before_pulling_or_installing(
     assert (result.returncode, result.stdout, result.stderr) == (
         1,
         "",
-        (
-            "error: this checkout is on feature; switch to main, then rerun just sync\n"
-            "rerun with --verbose for details\n"
-        ),
+        "error: this checkout is on feature; switch to main, then rerun just sync\n",
     )
     assert not (repo / "_skills_private").exists()
     assert not (home / ".claude").exists()

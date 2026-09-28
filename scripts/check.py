@@ -64,13 +64,13 @@ def ruff(path: str, version: str = RUFF) -> tuple[Command, Command]:
     )
 
 
-def pyright(path: str, *deps: str) -> Command:
+def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
     return (
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
         PYRIGHT,
         "--pythonversion",
-        "3.11",
+        python,
         path,
     )
 
@@ -100,7 +100,8 @@ CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
     Check("flatten", uv_run("scripts/flatten_skills.py", "--check")),
     Check("lint", *ruff("scripts")),
-    Check("typecheck", pyright("scripts")),
+    # Skill scripts paste the block in _cli.py, and some run on Python 3.10
+    Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
     Check("test", ("uvx", f"pytest@{PYTEST}")),
     # Optional local linters stay off so every machine agrees
     Check(

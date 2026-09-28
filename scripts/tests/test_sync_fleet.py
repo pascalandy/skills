@@ -62,6 +62,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     hub = tmp_path / "hub"
     (hub / "scripts").mkdir(parents=True)
     for name in (
+        "_cli.py",
         "_common.py",
         "flatten_skills.py",
         "install_skills.py",
@@ -223,11 +224,12 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     for name, checkout in (("plain", plain), ("linked", linked)):
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
+    errors = json.loads(result.stderr)["errors"]
     assert (
-        "error: dirty needs-you: checkout has uncommitted skill changes; "
+        "dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
-    ) in result.stderr
-    assert "error: down offline:" in result.stderr
+    ) in errors
+    assert any(error.startswith("down offline:") for error in errors)
 
 
 def test_dry_run_is_silent_and_changes_nothing(

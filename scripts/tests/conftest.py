@@ -72,6 +72,7 @@ def sandbox(tmp_path: Path) -> tuple[Path, Path]:
     scripts = repo / "scripts"
     scripts.mkdir(parents=True)
     for name in (
+        "_cli.py",
         "_common.py",
         "flatten_skills.py",
         "install_skills.py",

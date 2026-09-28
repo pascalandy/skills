@@ -31,7 +31,7 @@ def machines(tmp_path: Path) -> tuple[Path, Path, Path]:
     """Two public checkouts of skills.git and the private remote beside it."""
     public = tmp_path / "public"
     (public / "scripts").mkdir(parents=True)
-    for name in ("_common.py", "sync_private.py"):
+    for name in ("_cli.py", "_common.py", "sync_private.py"):
         shutil.copy2(SCRIPTS / name, public / "scripts" / name)
     (public / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
     subprocess.run(["git", "init", "-q", "-b", "main", str(public)], check=True)
