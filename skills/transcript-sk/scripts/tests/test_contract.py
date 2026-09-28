@@ -15,6 +15,7 @@ import json
 import os
 import pty
 import re
+import select
 import shlex
 import signal
 import subprocess
@@ -843,16 +844,26 @@ def on_terminal(sandbox: Sandbox, *args: str, **env: str) -> bytes:
     )
     os.close(follower)
     drawn = []
-    while True:
-        try:
-            chunk = os.read(leader, 4096)
-        except OSError:  # the terminal closed with the process
-            break
-        if not chunk:
-            break
-        drawn.append(chunk)
-    process.wait(timeout=60)
-    os.close(leader)
+    deadline = time.monotonic() + 60
+    try:
+        while True:
+            assert time.monotonic() < deadline, "the run kept its terminal too long"
+            ready, _, _ = select.select([leader], [], [], 0.5)
+            if not ready:
+                if process.poll() is not None:
+                    break
+                continue
+            try:
+                chunk = os.read(leader, 4096)
+            except OSError:  # the terminal closed with the process
+                break
+            if not chunk:
+                break
+            drawn.append(chunk)
+    finally:
+        process.kill()
+        process.wait()
+        os.close(leader)
     return b"".join(drawn)
 
 
