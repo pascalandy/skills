@@ -1456,7 +1456,7 @@ def cmd_labels(args: argparse.Namespace) -> tuple[str, Any]:
         raise Failure(
             *(f"{r['name']}: {r['outcome']}: {r['detail']}" for r in failed),
             *hints,
-            f"{len(failed)} canonical labels are not in place; see {log.get('path', 'the output')}",
+            f"not in place: {', '.join(r['name'] for r in failed)}; see {log.get('path', 'the output')}",
             result=log,
         )
     return line, log

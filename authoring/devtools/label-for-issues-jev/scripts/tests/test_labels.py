@@ -111,6 +111,7 @@ def test_a_case_variant_blocks_its_canonical_label(harness: Harness) -> None:
         in result.stderr
     )
     assert "rename a case variant only after the user approves" in result.stderr
+    assert "error: not in place: 2-type:bug; see the output" in result.stderr
     assert harness.writes() == []
 
 
