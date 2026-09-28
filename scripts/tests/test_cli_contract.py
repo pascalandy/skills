@@ -148,7 +148,31 @@ def check_list(_: Sandbox) -> tuple[str, ...]:
     return ("--list",)
 
 
+def release_ready(sandbox: Sandbox) -> None:
+    """A committed changelog section, with HEAD on origin/main."""
+    (sandbox.repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [0.1.0] - 2026-09-26\n\n- First\n", encoding="utf-8"
+    )
+    commit(sandbox.repo)
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+        cwd=sandbox.repo,
+        check=True,
+    )
+
+
+def first_release(_: Sandbox) -> tuple[str, ...]:
+    return ("v0.1.0",)
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/release_check.py": Entry(
+        name="just release-check",
+        block="git",
+        prepare=release_ready,
+        safe=first_release,
+        positional=("v0.1.0",),
+    ),
     "scripts/check.py": Entry(
         name="just check",
         block="uv",
@@ -174,7 +198,6 @@ PENDING = {
     "scripts/discover_skills.py",
     "scripts/flatten_skills.py",
     "scripts/install_skills.py",
-    "scripts/release_check.py",
     "scripts/sync.py",
     "scripts/sync_fleet.py",
     "scripts/sync_private.py",

@@ -8,25 +8,35 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import re
+import shlex
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from _common import ScriptError, run_script
+from _cli import Parser, ScriptError, exit_codes
+from _common import run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 SECTION = re.compile(r"## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}")
 
 EPILOG = """\
+A valid candidate prints nothing, or its release notes with --notes -.
+
 examples:
+  just release-check v0.1.0
   just release-check v0.1.0 --verbose
   just release-check v0.1.0 --notes /tmp/notes.md
+  just release-check v0.1.0 --notes -"""
 
-exit codes: 0 ok, 1 release check failed, 2 bad usage, 130 interrupted"""
+EXIT_CODES = exit_codes(
+    {0: "HEAD is a valid release candidate", 1: "a release check failed"}
+)
+
+log = logging.getLogger("release-check")
 
 
 @dataclass(frozen=True)
@@ -36,33 +46,23 @@ class SkillChanges:
     removed: tuple[str, ...]
     first_release: bool
 
-    def summary(self, version: str) -> str:
+    def log_names(self) -> None:
         if self.first_release:
-            count = len(self.added)
-            return f"ok: {version}: {count} skill{'s' if count != 1 else ''} total"
-        return (
-            f"ok: {version}: {len(self.added)} added, "
-            f"{len(self.changed)} changed, {len(self.removed)} removed"
-        )
-
-    def print_names(self) -> None:
-        if self.first_release:
-            print(
-                f"skills ({len(self.added)}): {', '.join(self.added)}", file=sys.stderr
-            )
+            log.info("skills (%d): %s", len(self.added), ", ".join(self.added))
             return
         for label, names in (
             ("added", self.added),
             ("changed", self.changed),
             ("removed", self.removed),
         ):
-            print(f"{label} ({len(names)}): {', '.join(names) or '-'}", file=sys.stderr)
+            log.info("%s (%d): %s", label, len(names), ", ".join(names) or "-")
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
     executable = shutil.which("git")
     if executable is None:
         raise ScriptError("git not found on PATH; install git and rerun")
+    log.debug("git %s", shlex.join(args))
     return subprocess.run(
         [executable, *args], cwd=ROOT, text=True, capture_output=True, check=False
     )
@@ -80,6 +80,15 @@ def parse_version(value: str) -> tuple[int, int, int] | None:
     if match is None:
         return None
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def release_version(value: str) -> str:
+    """An argparse type: the version argument, checked before any git call."""
+    if parse_version(value) is None:
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not vMAJOR.MINOR.PATCH without leading zeros, such as v0.1.0"
+        )
+    return value
 
 
 def skill_names(revision: str) -> set[str]:
@@ -142,11 +151,10 @@ def changelog_body(version: str) -> tuple[str | None, str | None]:
     return body + "\n", None
 
 
-def check_release(version: str, notes: Path | None, verbose: bool) -> str:
+def check_release(version: str, notes: str | None) -> str:
+    """Validate HEAD for `version`; return its notes when `notes` is "-"."""
     errors: list[str] = []
     requested = parse_version(version)
-    if requested is None:
-        errors.append("version must be vMAJOR.MINOR.PATCH without leading zeros")
 
     releases: dict[str, tuple[int, int, int]] = {}
     ignored: list[str] = []
@@ -167,11 +175,9 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
     ):
         errors.append(f"version must be greater than the latest release tag {previous}")
 
-    changes = skill_changes(previous)
-    if verbose:
-        if ignored:
-            print(f"ignored non-release tags: {', '.join(ignored)}", file=sys.stderr)
-        changes.print_names()
+    if ignored:
+        log.info("ignored non-release tags: %s", ", ".join(ignored))
+    skill_changes(previous).log_names()
 
     body, changelog_error = changelog_body(version)
     if changelog_error:
@@ -185,11 +191,7 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
             "HEAD is not an ancestor of origin/main; run git fetch --tags origin main"
         )
 
-    if (
-        requested is not None
-        and git("show-ref", "--verify", "--quiet", f"refs/tags/{version}").returncode
-        == 0
-    ):
+    if git("show-ref", "--verify", "--quiet", f"refs/tags/{version}").returncode == 0:
         tagged = git_output("rev-parse", f"refs/tags/{version}^{{commit}}")
         if tagged != head:
             errors.append(
@@ -199,26 +201,35 @@ def check_release(version: str, notes: Path | None, verbose: bool) -> str:
     if git_output("status", "--porcelain", "--untracked-files=all"):
         errors.append("working tree is dirty; commit or remove changes before release")
 
-    if errors:
+    if errors or body is None:
         raise ScriptError(*errors)
-    if notes is not None and body is not None:
-        notes.write_text(body, encoding="utf-8")
-    return changes.summary(version)
+    if notes == "-":
+        return body.rstrip("\n")
+    if notes is not None:
+        Path(notes).write_text(body, encoding="utf-8")
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="just release-check",
         description="Validate HEAD for a versioned release and extract its notes",
         epilog=EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_codes=EXIT_CODES,
     )
-    parser.add_argument("version", help="release tag, for example v0.1.0")
     parser.add_argument(
-        "--notes", type=Path, metavar="FILE", help="write release notes to FILE"
+        "version", type=release_version, help="release tag, for example v0.1.0"
+    )
+    parser.add_argument(
+        "--notes",
+        metavar="FILE",
+        help="write the release notes to FILE, or to stdout when FILE is -",
     )
     return run_script(
-        parser, lambda args: check_release(args.version, args.notes, args.verbose), argv
+        parser,
+        lambda args: check_release(args.version, args.notes),
+        argv,
+        debug="RELEASE_CHECK_DEBUG",
     )
 
 
