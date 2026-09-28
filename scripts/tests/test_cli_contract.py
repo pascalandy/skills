@@ -18,7 +18,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from itertools import takewhile
 from pathlib import Path
@@ -726,6 +726,17 @@ CONTRACT_DOC = ROOT / "docs/maintainer/references/script-conventions.md"
 CONTRACT_COMMAND = ROOT / "authoring/commands/cli-contract.md"
 
 
+def headings(lines: Sequence[str]) -> Iterator[tuple[int, str]]:
+    """Every `## ` line outside a fence, so an example heading ends no section."""
+    fence = ""
+    for offset, line in enumerate(lines):
+        marker = line[:3]
+        if marker in ("```", "~~~"):
+            fence = "" if fence == marker else fence or marker
+        if not fence and line.startswith("## "):
+            yield offset, line
+
+
 def contract_sections(path: Path) -> str:
     """The Baseline and Opt-in sections, from their file's own headings.
 
@@ -733,13 +744,14 @@ def contract_sections(path: Path) -> str:
     each file keeps its own sections around the shared ones.
     """
     lines = path.read_text().splitlines()
-    assert "## Baseline" in lines, f"{path.name} has no Baseline section"
-    start = lines.index("## Baseline")
+    found = dict(headings(lines))
+    assert "## Baseline" in found.values(), f"{path.name} has no Baseline section"
+    start = next(offset for offset, line in found.items() if line == "## Baseline")
     end = next(
         (
             offset
-            for offset in range(start + 1, len(lines))
-            if lines[offset].startswith("## ") and lines[offset] != "## Opt-in"
+            for offset, line in found.items()
+            if offset > start and line != "## Opt-in"
         ),
         len(lines),
     )

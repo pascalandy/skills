@@ -19,8 +19,8 @@ If the project already has a CLI contract doc, shared CLI code, or contract test
 3. Audit the wave as one summary table, one row per script: Baseline items that fail, Opt-in flags to add, and breaking changes. Add a table for a single script only where an item fails or a caller breaks. A breaking change is an exit code, a renamed flag, output moved between stdout and stderr, or a moved path
 4. Stop and show me the audit. Wait for my approval
 5. Implement the approved wave. Use the project's argument parser and its shared CLI code; where the project has neither, use the language's standard library. Where a script cannot meet an item without switching parser, mark the item fail, say why, and ask before switching
-6. A script written in another language than the shared code meets what fits. Each item it cannot meet becomes a one-line documented exception. Do not port it to another language
-7. A wave is done when every approved item passes, the project's own check passes, each migrated script leaves the migration list, and the report names the breaking changes with the test command and its output
+6. A script written in another language than the shared code meets what fits, and does not get ported to another language. Only a Parsing item its language genuinely cannot express becomes a one-line documented exception, and the audit says which language limit forces it. Exit codes, the Rule of Silence, and help behavior are never waived
+7. A wave is done when every approved item passes, the project's own check passes, each migrated script leaves the migration list where the project keeps one, and the report names the breaking changes with the test command and its output
 
 ## Baseline
 
@@ -97,7 +97,7 @@ A duration is `30s`, `5m`, `2h`, or bare seconds
 ## Tests
 
 - Every script: each exit code it can return has a test that triggers it, including `130` through SIGINT and `143` through SIGTERM. A successful default run with no warnings writes nothing to stderr
-- A script with `--verbose` or `--debug`: across default, `--verbose`, and `--debug`, the same exit code, identical stdout, and stderr holding only what that level allows
+- A script with `--verbose` or `--debug`: across default and each level it accepts, the same exit code, identical stdout, and stderr holding only what that level allows
 - A script with `--json`: stdout parses as exactly one JSON object
 - Tests run offline: stub every network call and every external command
 - Use the project's test runner. Propose one in the audit only where the project has none
