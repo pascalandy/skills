@@ -309,6 +309,7 @@ class Failure(ScriptError):
 
     `label` names that command: `fix`, `retry` for a temporary failure, or `rerun`.
     `result` holds what a failed run still produced, for the JSON error object.
+    `usage` is the command whose usage frames a usage error, as argparse's do.
     """
 
     def __init__(
@@ -321,12 +322,14 @@ class Failure(ScriptError):
         label: str = "fix",
         result: Mapping[str, Any] | None = None,
         detail: str = "",
+        usage: argparse.ArgumentParser | None = None,
     ) -> None:
         super().__init__(message, detail=detail, report=result)
         self.kind = kind
         self.fix = fix
         self.code = code
         self.label = label
+        self.usage = usage
 
 
 class TranscriptParser(Parser):
@@ -2697,8 +2700,12 @@ def report_failure(error: Failure, *, as_json: bool, warnings: list[str]) -> int
         return error.code
     if error.detail:
         print(error.detail, file=sys.stderr)
+    if error.usage is not None:
+        error.usage.print_usage(sys.stderr)
     print(f"error: {message}", file=sys.stderr)
     print(f"{error.label}: {error.fix}", file=sys.stderr)
+    if error.usage is not None:
+        print(f"run '{error.usage.prog} --help'", file=sys.stderr)
     return error.code
 
 
@@ -2724,6 +2731,7 @@ def _run(
     argv: Sequence[str],
     prompts: list[PromptSpec],
     warnings: list[str],
+    source_parser: argparse.ArgumentParser,
 ) -> int:
     """Transcribe one source, publish its result folder, and print where it went."""
     try:
@@ -2731,7 +2739,11 @@ def _run(
         selected_prompt = _resolve_prompt_for_run(plan, args, prompts)
     except ConfigurationError as error:
         raise Failure(
-            "invalid_configuration", str(error), error.fix, code=USAGE
+            "invalid_configuration",
+            str(error),
+            error.fix,
+            code=USAGE,
+            usage=source_parser,
         ) from error
     except SummaryCLIError as error:
         raise Failure("preflight_failed", str(error), _without_summary(argv)) from error
@@ -2749,6 +2761,7 @@ def _run(
             str(error),
             _rerun(argv, drop={"--url", "--path", "--latest"}, add=replacement),
             code=USAGE,
+            usage=source_parser,
         ) from error
     except SourceUnavailableError as error:
         raise Failure(
@@ -2952,7 +2965,8 @@ def _dispatch(
         return 0
     if args.command == "doctor":
         return _run_doctor(args)
-    return _run(args, argv, prompts, warnings)
+    source_parser = _subcommands(_subcommands(parser)["run"])[args.source]
+    return _run(args, argv, prompts, warnings, source_parser)
 
 
 def run_guarded(

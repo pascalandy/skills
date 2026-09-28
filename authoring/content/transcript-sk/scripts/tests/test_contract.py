@@ -192,6 +192,19 @@ def test_version_is_one_line_on_stdout(capsys) -> None:
                 "seconds, or 30s, 5m, 2h"
             ),
         ),
+        (
+            ["run", "youtube", "--url", "https://example.com/video", "-n"],
+            "transcript run youtube",
+            "Invalid YouTube URL: https://example.com/video",
+        ),
+        (
+            ["run", "youtube", "--url", URL, "--prompt", "nope", "-n"],
+            "transcript run youtube",
+            (
+                "Unknown prompt 'nope'. Available prompts: follow_along_note, "
+                "short_summary, summary_with_quotes"
+            ),
+        ),
     ],
     ids=[
         "no-command",
@@ -202,6 +215,8 @@ def test_version_is_one_line_on_stdout(capsys) -> None:
         "unknown-resource",
         "unknown-help-topic",
         "bad-duration",
+        "invalid-url",
+        "unknown-prompt",
     ],
 )
 def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
