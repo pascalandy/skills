@@ -1,4 +1,4 @@
-> Frozen research record, 2026-09-28. The report GPT-6 Sol (high reasoning) returned through `codex exec` (Codex CLI 0.157.1) with live web search, finished 2026-09-28T12:57Z. Everything below the rule is unedited. It contains two errors, corrected in [verification.md](verification.md#3-errors-found-and-corrected). Index: [README](README.md).
+> Frozen research record, 2026-09-28. The report GPT-6 Sol (high reasoning) returned through `codex exec` (Codex CLI 0.157.1) with live web search, finished 2026-09-28T12:57Z. Everything below the rule is unedited. Its errors and qualifications are listed in [verification.md](verification.md#3-errors-found-and-corrected). Index: [README](README.md).
 
 ---
 
