@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import subprocess
 import sys
 import unicodedata
@@ -201,12 +202,7 @@ class TestPureDiscovery:
 
         monkeypatch.setattr(transcript, "get_api_key_from_keyring", fail_if_called)
 
-        if argv[0] in {"--help", "--version"}:
-            with pytest.raises(SystemExit) as error:
-                transcript.main(argv)
-            assert error.value.code == 0
-        else:
-            assert transcript.main(argv) == 0
+        assert transcript.main(argv) == 0
 
 
 class TestRunPlan:
@@ -315,40 +311,45 @@ class TestRunPlan:
 
 
 class TestProgressReporting:
-    """Long-running CLI work remains visible without polluting stdout."""
+    """Long-running work is silent by default and visible with -v, never on stdout."""
 
-    def test_non_tty_step_emits_stable_start_and_done_lines(self) -> None:
+    def test_verbose_non_tty_step_emits_stable_start_and_done_lines(
+        self, capsys
+    ) -> None:
         import transcript
-        from rich.console import Console
 
-        stream = io.StringIO()
+        transcript.configure_logging(verbose=True, debug=False, as_json=False)
         now = iter([10.0, 12.345])
-        reporter = transcript.ExecutionReporter(
-            Console(file=stream, force_terminal=False, color_system=None),
-            interactive=False,
-            clock=lambda: next(now),
-        )
+        reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
         with reporter.step("Deepgram transcription"):
             pass
 
-        assert stream.getvalue().splitlines() == [
+        assert capsys.readouterr().err.splitlines() == [
             "Starting Deepgram transcription...",
             "Completed Deepgram transcription in 2.3s",
         ]
 
+    def test_default_step_prints_nothing_without_a_terminal(self, capsys) -> None:
+        import transcript
+
+        transcript.configure_logging(verbose=False, debug=False, as_json=False)
+        reporter = transcript.ExecutionReporter()
+
+        with reporter.step("Deepgram transcription"):
+            pass
+
+        assert capsys.readouterr() == ("", "")
+
     def test_tty_step_uses_a_live_status_and_stops_it_on_error(
-        self, monkeypatch
+        self, monkeypatch, capsys
     ) -> None:
         import transcript
         from rich.console import Console
 
-        # Rich picks its color system from TERM; a dumb terminal keeps
-        # highlight codes out of the asserted message.
-        monkeypatch.setenv("TERM", "dumb")
+        transcript.configure_logging(verbose=True, debug=False, as_json=False)
         events = []
-        stream = io.StringIO()
-        console = Console(file=stream, force_terminal=True)
+        console = Console(file=io.StringIO(), force_terminal=True)
 
         class FakeStatus:
             def __enter__(self):
@@ -363,11 +364,7 @@ class TestProgressReporting:
             "status",
             lambda *_args, **_kwargs: FakeStatus(),
         )
-        reporter = transcript.ExecutionReporter(
-            console,
-            interactive=True,
-            clock=lambda: 10.0,
-        )
+        reporter = transcript.ExecutionReporter(console, clock=lambda: 10.0)
 
         with (
             pytest.raises(RuntimeError, match="boom"),
@@ -376,25 +373,20 @@ class TestProgressReporting:
             raise RuntimeError("boom")
 
         assert events == ["start", "stop"]
-        assert "Audio download failed after 0.0s" in stream.getvalue()
+        assert "Audio download failed after 0.0s" in capsys.readouterr().err
 
-    def test_handled_step_failure_is_not_reported_as_completed(self) -> None:
+    def test_handled_step_failure_is_not_reported_as_completed(self, capsys) -> None:
         import transcript
-        from rich.console import Console
 
-        stream = io.StringIO()
+        transcript.configure_logging(verbose=True, debug=False, as_json=False)
         now = iter([10.0, 12.345])
-        reporter = transcript.ExecutionReporter(
-            Console(file=stream, force_terminal=False, color_system=None),
-            interactive=False,
-            clock=lambda: next(now),
-        )
+        reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
         with reporter.step("Summary generation") as step:
             step.failed = True
             step.detail = "status=failed"
 
-        assert stream.getvalue().splitlines()[-1] == (
+        assert capsys.readouterr().err.splitlines()[-1] == (
             "Summary generation failed after 2.3s · status=failed"
         )
 
@@ -424,7 +416,6 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "Progress", FakeProgress)
         reporter = transcript.ExecutionReporter(
             Console(file=io.StringIO(), force_terminal=True),
-            interactive=True,
             clock=lambda: 10.0,
         )
 
@@ -465,7 +456,6 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "Progress", FakeProgress)
         reporter = transcript.ExecutionReporter(
             Console(file=io.StringIO(), force_terminal=True),
-            interactive=True,
             clock=lambda: 10.0,
         )
 
@@ -498,7 +488,6 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "Progress", FakeProgress)
         reporter = transcript.ExecutionReporter(
             Console(file=io.StringIO(), force_terminal=True),
-            interactive=True,
             clock=lambda: 10.0,
         )
 
@@ -508,22 +497,19 @@ class TestProgressReporting:
 
         assert events == ["start", "stop"]
 
-    def test_non_tty_summary_step_has_no_counter_or_terminal_controls(self) -> None:
+    def test_verbose_non_tty_summary_step_has_no_counter_or_terminal_controls(
+        self, capsys
+    ) -> None:
         import transcript
-        from rich.console import Console
 
-        stream = io.StringIO()
+        transcript.configure_logging(verbose=True, debug=False, as_json=False)
         now = iter([10.0, 12.345])
-        reporter = transcript.ExecutionReporter(
-            Console(file=stream, force_terminal=False, color_system=None),
-            interactive=False,
-            clock=lambda: next(now),
-        )
+        reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
         with reporter.step("Summary generation"):
             pass
 
-        output = stream.getvalue()
+        output = capsys.readouterr().err
         assert output.splitlines() == [
             "Starting Summary generation...",
             "Completed Summary generation in 2.3s",
@@ -536,41 +522,26 @@ class TestProgressReporting:
         [(True, "\n\n"), (False, "\n")],
     )
     def test_result_path_spacing_before_summary_preview(
-        self, tmp_path, monkeypatch, interactive, expected_suffix
+        self, tmp_path, monkeypatch, capsys, interactive, expected_suffix
     ) -> None:
         import transcript
-        from rich.console import Console
 
-        stream = io.StringIO()
-        monkeypatch.setattr(
-            transcript,
-            "console",
-            Console(
-                file=stream,
-                force_terminal=interactive,
-                color_system=None,
-                width=200,
-            ),
-        )
+        monkeypatch.setattr(transcript.sys.stdout, "isatty", lambda: interactive)
 
         transcript.print_result_path(tmp_path, preview_follows=True)
 
-        assert stream.getvalue().endswith(expected_suffix)
-        assert not stream.getvalue().endswith("\n\n\n")
+        assert capsys.readouterr().out == f"{tmp_path}{expected_suffix}"
 
-    def test_result_path_uses_normal_terminal_text(self, tmp_path, monkeypatch) -> None:
+    def test_result_path_prints_on_one_line_however_long(
+        self, tmp_path, capsys
+    ) -> None:
         import transcript
 
-        messages = []
-        fake_console = SimpleNamespace(
-            is_terminal=False,
-            print=lambda message="": messages.append(message),
-        )
-        monkeypatch.setattr(transcript, "console", fake_console)
+        result = tmp_path / ("2026-05-03 14.46.55 Camille Exemple, réunion longue " * 3)
 
-        transcript.print_result_path(tmp_path, preview_follows=False)
+        transcript.print_result_path(result, preview_follows=False)
 
-        assert messages == [tmp_path]
+        assert capsys.readouterr().out == f"{result}\n"
 
     @pytest.mark.parametrize(
         "argv,expected",
@@ -598,53 +569,35 @@ class TestProgressReporting:
         ],
     )
     def test_run_configuration_precedes_slow_preflight(
-        self, argv, expected, monkeypatch
+        self, argv, expected, monkeypatch, capsys
     ) -> None:
         import transcript
 
-        events = []
+        printed_before_preflight = []
 
         def stop_at_preflight(*_args):
-            events.append("preflight")
+            printed_before_preflight.append(capsys.readouterr().err)
             raise transcript.SummaryCLIError("stop")
 
         monkeypatch.setattr(transcript, "_preflight", stop_at_preflight)
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: events.append(str(message)),
-        )
 
-        assert transcript.main(argv) == 1
-        assert events[0] == expected
-        assert events[1].startswith("Starting Preflight")
-        assert events.index("preflight") > 0
+        assert transcript.main([*argv, "-v"]) == 1
+        lines = printed_before_preflight[0].splitlines()
+        assert lines[0] == expected
+        assert lines[1].startswith("Starting Preflight")
 
     @pytest.mark.parametrize(
         ("preview_args", "expect_preview"),
         [([], False), (["--preview"], True)],
     )
     def test_youtube_pipeline_reports_order_method_and_preview_streams(
-        self, tmp_path, monkeypatch, preview_args, expect_preview
+        self, tmp_path, monkeypatch, capsys, preview_args, expect_preview
     ) -> None:
         import transcript
-
-        stderr_lines = []
-        stdout_lines = []
 
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: stderr_lines.append(str(message)),
-        )
-        monkeypatch.setattr(
-            transcript.console,
-            "print",
-            lambda message: stdout_lines.append(str(message)),
-        )
         monkeypatch.setattr(
             transcript,
             "get_video_info",
@@ -666,9 +619,9 @@ class TestProgressReporting:
                 "reasoning_effort": "medium",
             }
 
-        def fake_preview(markdown_path, _budget):
+        def fake_preview(markdown_path, _budget, **_kwargs):
             assert markdown_path.parent.parent == tmp_path
-            transcript.console.print(markdown_path.read_text(encoding="utf-8"))
+            print(markdown_path.read_text(encoding="utf-8"))
 
         monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(
@@ -685,10 +638,14 @@ class TestProgressReporting:
                 "https://youtu.be/abc",
                 "--output-dir",
                 str(tmp_path),
+                "-v",
                 *preview_args,
             ]
         )
 
+        captured = capsys.readouterr()
+        stderr_lines = captured.err.splitlines()
+        stdout_lines = captured.out.splitlines()
         assert code == 0
         starts = [line for line in stderr_lines if line.startswith("Starting ")]
         expected_starts = [
@@ -711,19 +668,20 @@ class TestProgressReporting:
         if not expect_preview:
             assert not any("Summary preview" in line for line in stderr_lines)
         output_dir = next(path for path in tmp_path.iterdir() if path.is_dir())
-        combined_output = "\n".join([*stderr_lines, *stdout_lines])
-        assert combined_output.count(str(output_dir)) == 1
-        assert str(output_dir) in stdout_lines
+        assert (
+            captured.out.count(str(output_dir)) + captured.err.count(str(output_dir))
+            == 1
+        )
+        assert stdout_lines[0] == str(output_dir)
         metadata = (output_dir / "meta.txt").read_text()
         assert "YouTube audio method: arc" in metadata
         assert "Summary status: succeeded" in metadata
 
     def test_zoom_no_prompt_progress_never_claims_youtube_access(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
 
-        stderr_lines = []
         meeting = tmp_path / "meeting"
         meeting.mkdir()
         (meeting / "audio.m4a").write_bytes(b"audio")
@@ -733,11 +691,6 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
         monkeypatch.setattr(
             transcript, "transcribe_audio", lambda *_args: deepgram_response()
-        )
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: stderr_lines.append(str(message)),
         )
 
         code = transcript.main(
@@ -749,9 +702,11 @@ class TestProgressReporting:
                 "--output-dir",
                 str(exports),
                 "--no-summary",
+                "-v",
             ]
         )
 
+        stderr_lines = capsys.readouterr().err.splitlines()
         assert code == 0
         assert stderr_lines[0] == (
             "Run: source=Zoom | provider=none | model=none | effort=none | "
@@ -768,11 +723,10 @@ class TestProgressReporting:
         assert "YouTube audio method:" not in metadata
 
     def test_preview_failure_keeps_published_result_successful(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
 
-        stderr_lines = []
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
@@ -805,12 +759,7 @@ class TestProgressReporting:
         monkeypatch.setattr(
             transcript,
             "render_markdown_with_glow",
-            lambda *_args: (_ for _ in ()).throw(OSError("preview broke")),
-        )
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: stderr_lines.append(str(message)),
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("preview broke")),
         )
 
         code = transcript.main(
@@ -828,9 +777,9 @@ class TestProgressReporting:
         assert code == 0
         result = next(path for path in tmp_path.iterdir() if path.is_dir())
         assert (result / "follow_along_note.md").read_text() == "# Saved summary\n"
-        assert any(
-            "Summary preview unavailable; the saved result is intact" in line
-            for line in stderr_lines
+        assert (
+            "warning: Summary preview unavailable; the saved result is intact"
+            in capsys.readouterr().err
         )
 
 
@@ -1097,7 +1046,7 @@ class TestRunOpenRouterPrompt:
             return SimpleNamespace(stdout="Summary output\n", stderr="")
 
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda _cmd: None)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
         result = transcript.run_summary_prompt(
             transcript.PROVIDER_OPENROUTER,
@@ -1141,7 +1090,7 @@ class TestRunCodexPrompt:
             return SimpleNamespace(stdout="Summary output\n", stderr="")
 
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda _cmd: None)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
         result = transcript.run_summary_prompt(
             transcript.PROVIDER_CODEX,
@@ -1193,7 +1142,7 @@ class TestRunCodexPrompt:
             return SimpleNamespace(stdout="Safe summary\n", stderr="")
 
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda _cmd: None)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
         transcript.run_summary_prompt(
             transcript.PROVIDER_CODEX,
@@ -1345,7 +1294,7 @@ class TestDeepgramContract:
             transcript.transcribe_audio(audio, "secret", transcript.RunBudget(10))
 
     def test_upload_streams_bounded_chunks_without_changing_audio(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, caplog
     ) -> None:
         import httpx
         import transcript
@@ -1374,14 +1323,9 @@ class TestDeepgramContract:
             return httpx.Response(200, json=deepgram_response(), request=request)
 
         monkeypatch.setattr(transcript.httpx, "post", inspect_post)
-        notes = []
-        transcript.transcribe_audio(
-            audio,
-            "secret",
-            transcript.RunBudget.start(),
-            SimpleNamespace(note=notes.append),
-        )
-        assert notes == [
+        caplog.set_level(logging.INFO, logger="transcript")
+        transcript.transcribe_audio(audio, "secret", transcript.RunBudget.start())
+        assert caplog.messages == [
             (
                 "Audio upload complete: 1000000/1000000 bytes sent. "
                 "Waiting for Deepgram transcription."
@@ -1514,17 +1458,17 @@ class TestRetryPolicy:
             transcript, "render_markdown_with_glow", lambda *_args: None
         )
 
-        def fake_video_info(_url, _budget, _reporter=None):
+        def fake_video_info(_url, _budget):
             now[0] += 100
             return {"title": "A video", "video_id": "abc"}
 
-        def fake_download(_url, output_dir, _budget, _reporter=None):
+        def fake_download(_url, output_dir, _budget):
             now[0] += 100
             audio = output_dir / "audio.mp3"
             audio.write_bytes(b"audio")
             return transcript.DownloadedAudio(audio, "anonymous")
 
-        def fake_transcribe(_path, _key, _budget, _reporter):
+        def fake_transcribe(_path, _key, _budget):
             now[0] += transcript.WORKFLOW_TOTAL_TIMEOUT - 250
             return deepgram_response()
 
@@ -1536,7 +1480,7 @@ class TestRetryPolicy:
         monkeypatch.setattr(transcript, "get_video_info", fake_video_info)
         monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(transcript, "transcribe_audio", fake_transcribe)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_subprocess_run)
+        monkeypatch.setattr(transcript, "run_child", fake_subprocess_run)
 
         code = transcript.main(
             [
@@ -1559,8 +1503,8 @@ class TestRetryPolicy:
 
         monkeypatch.setattr(transcript.time, "monotonic", lambda: 10.0)
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: pytest.fail("subprocess started after deadline"),
         )
 
@@ -1578,7 +1522,7 @@ class TestRetryPolicy:
         asset = transcript.SourceAsset("zoom", "Meeting", str(audio), audio, "zoom")
         attempts = 0
 
-        def fail_once(_path, _key, _budget, _reporter):
+        def fail_once(_path, _key, _budget):
             nonlocal attempts
             attempts += 1
             raise httpx.ReadTimeout("response timed out after upload")
@@ -1620,7 +1564,7 @@ class TestRetryPolicy:
             )
 
         monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
         monkeypatch.setattr(transcript.httpx, "post", fake_post)
         budget = transcript.RunBudget(20)
 
@@ -1655,8 +1599,8 @@ class TestYouTubeAuthenticationOrder:
 
         monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             fake_run,
         )
 
@@ -1672,7 +1616,7 @@ class TestYouTubeAuthenticationOrder:
         assert calls[0][0][:2] == [sys.executable, str(transcript.ARC_ADAPTER_PATH)]
 
     def test_ytdlp_falls_back_to_anonymous_after_arc_failure(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, caplog
     ) -> None:
         import transcript
 
@@ -1683,20 +1627,18 @@ class TestYouTubeAuthenticationOrder:
             SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr=""),
         ]
         calls = []
-        notes = []
 
         def fake_run(command, **kwargs):
             calls.append((command, kwargs))
             return responses.pop(0)
 
         monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
         result = transcript.run_ytdlp(
             ["--get-title", "--get-id"],
             "url",
             transcript.RunBudget(float("inf")),
-            reporter=SimpleNamespace(note=notes.append),
         )
 
         assert result.method == "anonymous"
@@ -1706,7 +1648,12 @@ class TestYouTubeAuthenticationOrder:
             f"chrome:{arc_profile}",
         ]
         assert calls[1][0][:3] == [sys.executable, "-m", "yt_dlp"]
-        assert notes == ["Arc YouTube access failed; retrying anonymously"]
+        assert caplog.messages == [
+            (
+                "Arc YouTube access failed; retrying anonymously. "
+                "Sign in to YouTube in Arc to use your session"
+            )
+        ]
 
     def test_ytdlp_uses_chrome_first_when_arc_is_absent(
         self, tmp_path, monkeypatch
@@ -1719,8 +1666,8 @@ class TestYouTubeAuthenticationOrder:
             transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
         )
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda command, **_kwargs: (
                 commands.append(command)
                 or SimpleNamespace(returncode=0, stdout="ok", stderr="")
@@ -1740,7 +1687,7 @@ class TestYouTubeAuthenticationOrder:
         ]
 
     def test_ytdlp_falls_back_to_anonymous_after_chrome_failure(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, caplog
     ) -> None:
         import transcript
 
@@ -1749,7 +1696,6 @@ class TestYouTubeAuthenticationOrder:
             SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr=""),
         ]
         commands = []
-        notes = []
 
         def fake_run(command, **_kwargs):
             commands.append(command)
@@ -1758,17 +1704,17 @@ class TestYouTubeAuthenticationOrder:
         monkeypatch.setattr(
             transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
         )
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
-        result = transcript.run_ytdlp(
-            [],
-            "url",
-            transcript.RunBudget(float("inf")),
-            reporter=SimpleNamespace(note=notes.append),
-        )
+        result = transcript.run_ytdlp([], "url", transcript.RunBudget(float("inf")))
 
         assert result.method == "anonymous"
-        assert notes == ["Chrome YouTube access failed; retrying anonymously"]
+        assert caplog.messages == [
+            (
+                "Chrome YouTube access failed; retrying anonymously. "
+                "Sign in to YouTube in Chrome to use your session"
+            )
+        ]
         assert commands[0][3:5] == ["--cookies-from-browser", "chrome"]
         assert commands[1][:3] == [sys.executable, "-m", "yt_dlp"]
 
@@ -1786,7 +1732,7 @@ class TestYouTubeAuthenticationOrder:
             return SimpleNamespace(returncode=0, stdout="ok", stderr="")
 
         monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
-        monkeypatch.setattr(transcript.subprocess, "run", fake_run)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
 
         result = transcript.run_ytdlp(
             [],
@@ -1813,8 +1759,8 @@ class TestYouTubeAuthenticationOrder:
             transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
         )
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: pytest.fail(
                 "subprocess started without the required Arc profile"
             ),
@@ -1855,8 +1801,8 @@ class TestYouTubeAuthenticationOrder:
 
         monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: failures.pop(0),
         )
 
@@ -2262,8 +2208,8 @@ class TestPreflightAndCleanup:
 
         monkeypatch.setenv("DEEPGRAM_API_KEY", "environment-secret")
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(
                 subprocess.TimeoutExpired("chezmoi", 15)
             ),
@@ -2282,8 +2228,8 @@ class TestPreflightAndCleanup:
         monkeypatch.setenv("DEEPGRAM_API_KEY", "environment-secret")
         monkeypatch.setattr(transcript.time, "monotonic", lambda: 10.0)
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: pytest.fail("keyring started after deadline"),
         )
 
@@ -2368,7 +2314,7 @@ class TestPreflightAndCleanup:
         assert cleaned == [True]
 
     def test_ytdlp_failure_returns_one_with_clean_actionable_diagnostic(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
 
@@ -2380,21 +2326,13 @@ class TestPreflightAndCleanup:
                 stderr="\x1b[31mERROR:\x1b[0m Sign in to confirm you are not a bot\n",
             ),
         ]
-        diagnostics = []
-
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda _name: None)
         monkeypatch.setattr(
-            transcript.subprocess,
-            "run",
+            transcript,
+            "run_child",
             lambda *_args, **_kwargs: failures.pop(0),
         )
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: diagnostics.append(str(message)),
-        )
-
         code = transcript.main(
             [
                 "run",
@@ -2407,11 +2345,10 @@ class TestPreflightAndCleanup:
             ]
         )
 
+        diagnostics = capsys.readouterr().err
         assert code == 1
-        assert any(
-            "Sign in to confirm you are not a bot" in line for line in diagnostics
-        )
-        assert all("\x1b" not in line for line in diagnostics)
+        assert "Sign in to confirm you are not a bot" in diagnostics
+        assert "\x1b" not in diagnostics
         assert list(tmp_path.iterdir()) == []
 
 

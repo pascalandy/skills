@@ -1,8 +1,9 @@
 """Every entry point against the contract in docs/maintainer/references/script-conventions.md.
 
 ENTRIES registers each script that follows the contract with what an isolated
-run needs. PENDING lists the scripts a later wave migrates and EXCLUDED the ones
-the contract leaves out; a script in none of them fails the suite. Each probe
+run needs. PENDING lists the scripts a later wave migrates, OWN_SUITE the ones
+whose own suite runs these probes, and EXCLUDED the ones the contract leaves out;
+a script in none of them fails the suite. Each probe
 runs in its own repository and home, with a bin/ directory first on PATH.
 """
 
@@ -300,7 +301,6 @@ PENDING = {
     "authoring/content/image-creator/scripts/image_creator.py",
     "authoring/content/mermaid/scripts/render_examples.py",
     "authoring/content/storytelling/tests/validate-package.py",
-    "authoring/content/transcript-sk/scripts/transcript.py",
     "authoring/devtools/coding-language/references/Bash/scripts/pref_bash_script_template.sh",
     "authoring/devtools/coding-language/references/Bash/scripts/run_shellck.sh",
     "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/jevgate.py",
@@ -318,6 +318,14 @@ PENDING = {
     "authoring/verify/verify-transcript-sk/scripts/verify_transcript_sk.py",
     "authoring/verify/verify-video-archive/scripts/verify_video_archive.py",
     "authoring/web-research/tavily/scripts/grokipedia.py",
+}
+
+# Migrated scripts whose own suite runs these probes, because they have
+# subcommands or PEP 723 dependencies this harness does not load
+OWN_SUITE = {
+    "authoring/content/transcript-sk/scripts/transcript.py": (
+        "authoring/content/transcript-sk/scripts/tests/test_contract.py"
+    ),
 }
 
 EXCLUDED = {
@@ -494,12 +502,24 @@ def entry(request: pytest.FixtureRequest) -> tuple[str, Entry]:
 
 
 def test_every_entry_point_is_registered() -> None:
-    listed = set(ENTRIES) | PENDING | set(EXCLUDED)
+    listed = set(ENTRIES) | PENDING | set(OWN_SUITE) | set(EXCLUDED)
     found = entry_points()
 
     assert sorted(found - listed) == [], "register these in ENTRIES or PENDING"
     assert sorted(listed - found) == [], "these are gone; drop them"
     assert not set(ENTRIES) & PENDING
+    assert not set(OWN_SUITE) & (set(ENTRIES) | PENDING | set(EXCLUDED))
+
+
+def test_an_own_suite_script_names_a_suite_that_probes_it() -> None:
+    missing = [
+        f"{script}: {suite}"
+        for script, suite in sorted(OWN_SUITE.items())
+        if not (ROOT / suite).is_file()
+        or Path(script).stem not in (ROOT / suite).read_text(encoding="utf-8")
+    ]
+
+    assert missing == [], "point OWN_SUITE at the suite that runs the contract probes"
 
 
 def test_a_pending_script_has_not_moved_onto_the_contract() -> None:

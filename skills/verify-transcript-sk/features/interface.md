@@ -35,6 +35,7 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `command.prompts` | `configuration.prompts` |
 | `command.profiles` | `configuration.profiles` |
 | `command.models` | `configuration.models` |
+| `command.help` | `interface.help-version` |
 | `option.help` | `interface.help-version` |
 | `option.version` | `interface.help-version` |
 | `option.url` | `youtube.dry-run-summary` |
@@ -53,7 +54,10 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `option.timeout` | `dry-runs.transcript-only` |
 | `option.open` | Would open Finder |
 | `option.preview` | Would render an interactive preview |
-| `option.debug` | Only changes unexpected internal-error tracebacks |
+| `option.debug` | Only adds internals, timings, and tracebacks on stderr; transcript-sk contract tests compare every verbosity level |
+| `option.verbose` | Only adds progress lines on stderr; transcript-sk contract tests compare every verbosity level |
+| `option.no-color` | Only changes terminal rendering; transcript-sk contract tests drive it on a pseudo-terminal |
+| `option.no-progress` | Only hides the terminal spinner; transcript-sk contract tests drive it on a pseudo-terminal |
 | `stream.text-stdout` | `interface.help-version` |
 | `stream.success-json-stdout` | `dry-runs.transcript-only` |
 | `stream.invalid-json-stderr` | `interface.structured-recovery` |
@@ -62,6 +66,7 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `exit.runtime-failure` | Runtime exit paths require injected external failures and are covered by unit tests |
 | `exit.invalid-input` | `interface.structured-recovery` |
 | `exit.interrupted` | Requires sending a process signal and is covered by unit tests |
+| `exit.temporary` | Requires an injected network failure and is covered by unit tests |
 | `transcription.upload-completion` | `youtube.real-summary` |
 | `transcription.upload-timeouts` | Slow and interrupted uploads are covered by transcript-sk TestDeepgramContract tests without paid calls |
 | `publication.summary-success` | `youtube.real-summary` |
@@ -72,7 +77,8 @@ The inventory assigns every public behavior to an executable feature or an expli
 ## Gotchas
 
 - Help and version are text on `stdout`
-- Successful JSON and diagnostic reports are on `stdout`, including an unready doctor report that exits `1`
-- Fatal JSON is on `stderr` with exit `1`, `2`, or `130`
+- Successful JSON and a ready doctor report are on `stdout`, with an empty `stderr`
+- An unready doctor report exits `1` and moves to `stderr`, with an `error` object beside its checks
+- Fatal JSON is on `stderr` with exit `1`, `2`, `75`, `130`, or `143`; its `error.hint` is the command that fixes it
 - The verifier detects a new help command or option until this inventory assigns it an owner or exclusion
 - The verifier never drives `--open`, `--preview`, private Zoom media, or an unapproved paid path

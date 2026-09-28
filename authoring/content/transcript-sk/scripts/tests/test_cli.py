@@ -14,15 +14,14 @@ from cli_support import run_script
 
 
 class TestCommandTree:
-    def test_no_args_shows_top_level_help(self) -> None:
+    def test_no_args_is_a_usage_error_that_points_to_help(self) -> None:
         stdout, stderr, code = run_script()
 
-        assert code == 0
-        assert stderr == ""
-        assert "transcript run" in stdout
-        assert "transcript list" in stdout
-        assert "transcript doctor" in stdout
-        assert "--prompt" not in stdout
+        assert code == 2
+        assert stdout == ""
+        assert stderr.startswith("usage: transcript ")
+        assert "the following arguments are required: COMMAND" in stderr
+        assert stderr.splitlines()[-1] == "run 'transcript --help'"
 
     @pytest.mark.parametrize(
         "argv,expected",
@@ -44,7 +43,7 @@ class TestCommandTree:
         assert code == 0
         assert stderr == ""
         assert expected in stdout
-        assert "Examples:" in stdout
+        assert "examples:" in stdout
 
     def test_old_flat_syntax_fails_with_migration_hint(self) -> None:
         _stdout, stderr, code = run_script("https://youtu.be/abc")
@@ -136,7 +135,10 @@ class TestParsing:
         payload = json.loads(stderr)
         assert payload["ok"] is False
         assert payload["error"]["code"] == "invalid_source"
-        assert "transcript run youtube --help" in payload["error"]["hint"]
+        assert payload["error"]["hint"] == (
+            "transcript run youtube --no-summary --json "
+            "--url 'https://www.youtube.com/watch?v=VIDEO_ID'"
+        )
 
     def test_invalid_model_names_the_current_discovery_command(self) -> None:
         stdout, stderr, code = run_script(
@@ -206,7 +208,6 @@ class TestDryRun:
             "_acquire_and_transcribe",
             lambda *_args: pytest.fail("dry-run started media work"),
         )
-        monkeypatch.setattr(transcript.console, "print", print)
 
         code = transcript.main(
             [
@@ -297,10 +298,18 @@ class TestDoctor:
 
         code = transcript.main(["doctor", "--source", "youtube", "--json"])
 
+        captured = capsys.readouterr()
         assert code == 1
-        payload = json.loads(capsys.readouterr().out)
+        # A failed report is the error: stdout stays empty
+        assert captured.out == ""
+        payload = json.loads(captured.err)
         assert payload["ok"] is False
-        assert payload["checks"][0]["hint"] == ("Install pi or rerun with --no-summary")
+        assert payload["checks"][0]["hint"] == "Install pi or rerun with --no-summary"
+        assert payload["error"] == {
+            "code": "doctor_failed",
+            "message": "1 required check failed: pi",
+            "hint": "Install pi or rerun with --no-summary",
+        }
 
 
 class TestStructuredRunResult:
@@ -417,51 +426,57 @@ class TestStructuredRunResult:
 
 
 class TestProcessBoundary:
-    def test_ctrl_c_exits_130_without_traceback(self, monkeypatch) -> None:
-        import transcript
-
-        messages = []
-        monkeypatch.setattr(
-            transcript,
-            "main",
-            lambda _argv: (_ for _ in ()).throw(KeyboardInterrupt()),
-        )
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: messages.append(str(message)),
-        )
-
-        assert transcript.entrypoint(["run", "youtube", "--url", "URL"]) == 130
-        assert messages == ["Interrupted by user"]
-
-    def test_unexpected_error_has_debug_recovery_hint(self, monkeypatch) -> None:
-        import transcript
-
-        messages = []
-        monkeypatch.setattr(
-            transcript,
-            "main",
-            lambda _argv: (_ for _ in ()).throw(RuntimeError("boom")),
-        )
-        monkeypatch.setattr(
-            transcript.error_console,
-            "print",
-            lambda message: messages.append(str(message)),
-        )
-
-        assert transcript.entrypoint(["run", "youtube", "--url", "URL"]) == 1
-        assert "Error internal_error: boom" in messages[0]
-        assert "Rerun with --debug" in messages[0]
-
-    def test_debug_reraises_unexpected_error(self, monkeypatch) -> None:
+    def test_ctrl_c_exits_130_without_traceback(self, monkeypatch, capsys) -> None:
         import transcript
 
         monkeypatch.setattr(
             transcript,
-            "main",
-            lambda _argv: (_ for _ in ()).throw(RuntimeError("boom")),
+            "_dispatch",
+            lambda *_args: (_ for _ in ()).throw(KeyboardInterrupt()),
         )
 
-        with pytest.raises(RuntimeError, match="boom"):
-            transcript.entrypoint(["run", "youtube", "--url", "URL", "--debug"])
+        assert transcript.main(["run", "youtube", "--url", "https://youtu.be/a"]) == 130
+        assert capsys.readouterr() == ("", "interrupted\n")
+
+    def test_unexpected_error_names_the_debug_rerun(self, monkeypatch, capsys) -> None:
+        import transcript
+
+        monkeypatch.setattr(
+            transcript,
+            "_dispatch",
+            lambda *_args: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        code = transcript.main(["run", "youtube", "--url", "https://youtu.be/a"])
+
+        assert code == 1
+        assert capsys.readouterr() == (
+            "",
+            (
+                "error: RuntimeError: boom\n"
+                "rerun: transcript run youtube --url https://youtu.be/a --debug\n"
+            ),
+        )
+
+    def test_debug_prints_the_traceback_and_keeps_the_exit_code(
+        self, monkeypatch, capsys
+    ) -> None:
+        import transcript
+
+        monkeypatch.setattr(
+            transcript,
+            "_dispatch",
+            lambda *_args: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        code = transcript.main(
+            ["run", "youtube", "--url", "https://youtu.be/a", "--debug"]
+        )
+
+        err = capsys.readouterr().err
+        assert code == 1
+        assert "Traceback (most recent call last)" in err
+        assert err.splitlines()[-2:] == [
+            "error: RuntimeError: boom",
+            "report: report the traceback above as a bug",
+        ]
