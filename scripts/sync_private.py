@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import logging
 import re
-import shlex
 import socket
 import subprocess
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import exclusive, is_network_failure, run, run_script
+from _common import exclusive, is_network_failure, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -51,18 +50,7 @@ log = logging.getLogger("sync-private")
 def git(
     *args: str, cwd: Path = PRIVATE, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
-    log.debug("git %s", shlex.join(args))
-    try:
-        return run(
-            ["git", *args],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        raise TemporaryError(f"git {args[0]} took longer than {timeout:g}s") from None
+    return run_git(*args, cwd=cwd, timeout=timeout)
 
 
 def last_line(result: subprocess.CompletedProcess[str]) -> str:

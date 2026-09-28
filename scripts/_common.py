@@ -9,11 +9,12 @@ import logging
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,30 @@ def run(
             stop(process)
             raise
     return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+
+
+def run_git(
+    *args: str,
+    cwd: Path,
+    timeout: float | None = None,
+    env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run git in `cwd` and return its text output; a timeout is temporary."""
+    if shutil.which("git") is None:
+        raise ScriptError("git not found on PATH; install git and rerun")
+    log.debug("git %s", shlex.join(args))
+    try:
+        return run(
+            ["git", *args],
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise TemporaryError(f"git {args[0]} took longer than {timeout:g}s") from None
 
 
 def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> None:

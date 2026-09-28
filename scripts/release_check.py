@@ -10,14 +10,12 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-import shlex
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run, run_script
+from _common import run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
@@ -59,17 +57,7 @@ class SkillChanges:
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    executable = shutil.which("git")
-    if executable is None:
-        raise ScriptError("git not found on PATH; install git and rerun")
-    log.debug("git %s", shlex.join(args))
-    return run(
-        [executable, *args],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    return run_git(*args, cwd=ROOT)
 
 
 def git_output(*args: str) -> str:

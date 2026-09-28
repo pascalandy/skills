@@ -54,7 +54,16 @@ from _cli import (
     duration,
     exit_codes,
 )
-from _common import GRACE, exclusive, is_network_failure, run, run_script, send, stop
+from _common import (
+    GRACE,
+    exclusive,
+    is_network_failure,
+    run,
+    run_git,
+    run_script,
+    send,
+    stop,
+)
 from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -377,13 +386,7 @@ def stop_children() -> None:
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return run(
-        ["git", *args],
-        cwd=ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    return run_git(*args, cwd=ROOT)
 
 
 def reason(lines: list[str], code: int) -> str:

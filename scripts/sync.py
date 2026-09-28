@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import is_network_failure, run, run_script
+from _common import is_network_failure, run, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -45,21 +45,10 @@ log = logging.getLogger("sync")
 
 
 def git(*args: str, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
-    log.debug("git %s", shlex.join(args))
-    try:
-        return run(
-            ["git", *args],
-            cwd=ROOT,
-            # Hooks stay off: just sync is this machine only; just sync-fleet
-            # reaches the others
-            env=os.environ | {"LEFTHOOK": "0"},
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        raise TemporaryError(f"git {args[0]} took longer than {timeout:g}s") from None
+    # Hooks stay off: just sync is this machine only; just sync-fleet reaches
+    # the others
+    env = os.environ | {"LEFTHOOK": "0"}
+    return run_git(*args, cwd=ROOT, timeout=timeout, env=env)
 
 
 def pull_main(timeout: float) -> list[str]:
