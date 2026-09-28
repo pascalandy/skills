@@ -188,6 +188,7 @@ def duration(text: str) -> float:
 # <<< cli-block
 
 import difflib
+import functools
 import logging
 import math
 import platform
@@ -466,21 +467,6 @@ KEYRING_TIMEOUT = 15
 DEEPGRAM_TIMEOUT = 300
 POST_RUN_TIMEOUT = 10
 
-# Values a rerun hint must drop together with their option
-VALUE_OPTIONS = frozenset(
-    {
-        "--url",
-        "--path",
-        "--profile",
-        "--provider",
-        "--prompt",
-        "--model",
-        "--effort",
-        "--output-dir",
-        "--timeout",
-        "--source",
-    }
-)
 SUMMARY_OPTIONS = frozenset(
     {"--profile", "--provider", "--prompt", "--model", "--effort", "--preview"}
 )
@@ -1604,7 +1590,9 @@ def _add_global_options(parser: argparse.ArgumentParser, *, nested: bool) -> Non
     command name is not reset by the command's own parser.
     """
     default: Any = argparse.SUPPRESS if nested else False
-    group = parser.add_argument_group("global options")
+    group = parser.add_argument_group(
+        "global options", "These work before or after the command name."
+    )
     group.add_argument(
         "-v",
         "--verbose",
@@ -2611,6 +2599,18 @@ def _generate_summary(
     return SummaryOutcome(status="succeeded", path=summary_path, usage=usage)
 
 
+@functools.cache
+def _value_options() -> frozenset[str]:
+    """Every option that takes a value, read from the parser, so a rerun hint
+    that drops an option drops its value too."""
+    return frozenset(
+        option
+        for parser in _all_parsers(build_parser())
+        for option, action in parser._option_string_actions.items()
+        if action.nargs != 0
+    )
+
+
 def _rerun(
     argv: Sequence[str],
     drop: Iterable[str] = (),
@@ -2628,7 +2628,7 @@ def _rerun(
             continue
         name = token.split("=", 1)[0]
         if name in dropped:
-            skip_value = "=" not in token and name in VALUE_OPTIONS
+            skip_value = "=" not in token and name in _value_options()
             continue
         kept.append(token)
     return shlex.join([prog, *kept, *add])

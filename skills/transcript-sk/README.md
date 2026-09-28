@@ -2,7 +2,7 @@
 
 `scripts/transcript.py` is the executable boundary for `transcript-sk`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free Pi process.
 
-The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the repository's CLI contract in `docs/maintainer/references/script-conventions.md`.
+The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/maintainer/references/script-conventions.md` of the `pascalandy/skills` repository.
 
 ## Runtime requirements
 
@@ -33,8 +33,6 @@ uv run <skill_dir>/scripts/transcript.py --help
 uv run <skill_dir>/scripts/transcript.py help run youtube
 uv run <skill_dir>/scripts/transcript.py run zoom --help
 ```
-
-`-v`, `--debug`, `--json`, `--no-color`, and `--no-progress` work before or after the command name.
 
 ## Manage inference profiles
 
@@ -107,8 +105,6 @@ A successful run payload includes:
 A summary failure still publishes the raw artifacts and records the reason in metadata. The run exits `1` with the same payload, plus its `error`, on `stderr`, so the published folder stays findable.
 
 Exit `75` means a temporary failure before any paid request, such as a network error reaching YouTube or Deepgram refusing the audio; rerunning the same command is safe. A failure after the Deepgram upload started exits `1`, because Deepgram may have transcribed, and billed, the audio.
-
-`TRANSCRIPT_DEBUG=1` does what `--debug` does.
 
 ## Safety and reruns
 
