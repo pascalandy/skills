@@ -100,7 +100,7 @@ FINE = ("synced", "ready", "converged")
 CHANGE = re.compile(r"(clone|commit|pull|push|add|update|remove)\t")
 EPILOG = """\
 A run prints one line per machine it changed, `synced<TAB>NAME<TAB>SHA`, and a
-dry run one per machine it would move, `ready<TAB>NAME<TAB>SHA`; a run with
+dry run one per machine it would change, `ready<TAB>NAME<TAB>SHA`; a run with
 nothing to change prints nothing. A failure prints every machine's status and
 what to do on stderr.
 
@@ -818,7 +818,7 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         "--dry-run",
         action="store_true",
-        help="run every check and print each machine a sync would move, "
+        help="run every check and print each machine a sync would change, "
         "without transferring, moving, or installing",
     )
     mode.add_argument(
