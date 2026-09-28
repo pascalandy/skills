@@ -10,46 +10,46 @@ default:
 [group('commands')]
 [no-exit-message]
 sync *args:
-    @uv run scripts/sync.py "$@"
+    @uv run --quiet scripts/sync.py "$@"
 
 alias ttr := transcript
 
 # Transcribe one YouTube URL; extra flags go to `transcript.py run youtube`
 [group('commands')]
 transcript url *args:
-    @uv run authoring/content/transcript-sk/scripts/transcript.py run youtube --url "$@"
+    @uv run --quiet authoring/content/transcript-sk/scripts/transcript.py run youtube --url "$@"
 
 # From any machine, sync every machine in the fleet registry, or named ones, to GitHub's main; --check compares them
 [group('commands')]
 [no-exit-message]
 sync-fleet *args:
-    @uv run scripts/sync_fleet.py "$@"
+    @uv run --quiet scripts/sync_fleet.py "$@"
 
 # Install skills/ into the agent skill directories
 [group('commands')]
 [no-exit-message]
 install-skills *args:
-    @uv run scripts/install_skills.py "$@"
+    @uv run --quiet scripts/install_skills.py "$@"
 
 # Flatten categorized authoring packages into the published skills directory
 [group('commands')]
 flatten-skills *args:
-    @uv run scripts/flatten_skills.py "$@"
+    @uv run --quiet scripts/flatten_skills.py "$@"
 
 # Run any transcript-sk command, such as `--help`, `list prompts`, or `doctor --source all`
 [group('commands')]
 transcript-cli *args:
-    @uv run authoring/content/transcript-sk/scripts/transcript.py "$@"
+    @uv run --quiet authoring/content/transcript-sk/scripts/transcript.py "$@"
 
 # Run the same CI verdict as GitHub Actions; --list names each check, --only NAME reruns one
 [group('checks')]
 check *args:
-    @uv run scripts/check.py "$@"
+    @uv run --quiet scripts/check.py "$@"
 
 # Check SKILL.md frontmatter quoting; lefthook runs it when a SKILL.md is staged
 [group('checks')]
 check-frontmatter *args:
-    @uv run scripts/check_frontmatter.py "$@"
+    @uv run --quiet scripts/check_frontmatter.py "$@"
 
 # Scan staged changes for secrets; lefthook runs it on every commit
 [group('checks')]
@@ -59,15 +59,15 @@ gitleaks-staged:
 # Check native skill discovery after a separately authorized local install
 [group('checks')]
 skills-discover *args:
-    @uv run scripts/discover_skills.py "$@"
+    @uv run --quiet scripts/discover_skills.py "$@"
 
 # Validate HEAD as a release candidate and optionally extract release notes
 [group('checks')]
 release-check version *args:
-    @uv run scripts/release_check.py "$@"
+    @uv run --quiet scripts/release_check.py "$@"
 
 # Lefthook runs this after a commit or pull and before a push; it acts only in a main checkout with the private clone
 [private]
 [no-exit-message]
 sync-hook *args:
-    @uv run scripts/sync_fleet.py --hook "$@"
+    @uv run --quiet scripts/sync_fleet.py --hook "$@"
