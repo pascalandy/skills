@@ -183,4 +183,4 @@ uv run <skill_dir>/scripts/distill.py --provider claude --prompt short_summary ~
 ## See also
 
 - `distill-prompt` - the sibling prompt library
-- `transcript-sk` - separate YouTube and Zoom workflow. YouTube uses bundled prompts; Zoom summaries use `synthese-rencontre` from `distill-prompt`
+- `transcript` - separate YouTube and Zoom workflow. YouTube uses bundled prompts; Zoom summaries use `synthese-rencontre` from `distill-prompt`

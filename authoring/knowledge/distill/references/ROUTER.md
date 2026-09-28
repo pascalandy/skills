@@ -11,8 +11,8 @@ description: Routes distill requests to the right input sub-skill based on what 
 |---|---|
 | distill `<local-text-file>`, summarize this text file, notes from article.md, process a markdown file | `from-file/MetaSkill.md` |
 | distill this URL, summarize a web page, fetch and distill | **Out of scope in v1.** Deferred to a future `from-url/MetaSkill.md`. |
-| summarize a YouTube URL or Zoom recording | **Out of scope.** Use `$transcript-sk`. `from-media/MetaSkill.md` is future work. |
-| distill a video file or podcast audio | **Out of scope.** `transcript-sk` accepts YouTube and Zoom inputs only. |
+| summarize a YouTube URL or Zoom recording | **Out of scope.** Use `$transcript`. `from-media/MetaSkill.md` is future work. |
+| distill a video file or podcast audio | **Out of scope.** `transcript` accepts YouTube and Zoom inputs only. |
 
 ## Default
 

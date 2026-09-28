@@ -315,7 +315,7 @@ PENDING = {
     "authoring/pstack/poteto-mode/scripts/watch-pr/watch-pr",
     "authoring/pstack/poteto-mode/scripts/worktree-audit.sh",
     "authoring/pstack/show-me-your-work/scripts/log.sh",
-    "authoring/verify/verify-transcript-sk/scripts/verify_transcript_sk.py",
+    "authoring/verify/verify-transcript/scripts/verify_transcript.py",
     "authoring/verify/verify-video-archive/scripts/verify_video_archive.py",
     "authoring/web-research/tavily/scripts/grokipedia.py",
 }
@@ -323,16 +323,16 @@ PENDING = {
 # Migrated scripts whose own suite runs these probes, because they have
 # subcommands or PEP 723 dependencies this harness does not load
 OWN_SUITE = {
-    "authoring/content/transcript-sk/scripts/transcript.py": (
-        "authoring/content/transcript-sk/scripts/tests/test_contract.py"
+    "authoring/content/transcript/scripts/transcript.py": (
+        "authoring/content/transcript/scripts/tests/test_contract.py"
     ),
-    "authoring/content/transcript-sk/scripts/youtube_smoke.py": (
-        "authoring/content/transcript-sk/scripts/tests/test_contract.py"
+    "authoring/content/transcript/scripts/youtube_smoke.py": (
+        "authoring/content/transcript/scripts/tests/test_contract.py"
     ),
 }
 
 EXCLUDED = {
-    "authoring/content/transcript-sk/scripts/ytdlp_arc.py": "owner decision: out of scope",
+    "authoring/content/transcript/scripts/ytdlp_arc.py": "owner decision: out of scope",
     ".lefthook/pre-push/sync-skills.sh": "exec shim for just sync-hook",
     "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/tests/proof_live_noul.py": "live proof against the TypeSafe API",
 }
