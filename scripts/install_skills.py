@@ -17,6 +17,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -51,21 +52,14 @@ PROFILES = {
 }
 EXCLUSIONS = {"mac": frozenset(), "om1": frozenset({"apple-mail"})}
 HOST_PROFILE = "mac" if sys.platform == "darwin" else "om1"
-COMMAND_TARGETS = {
-    "mac": (
-        ".claude/commands",
-        ".pi/agent/prompts",
-        ".codex/prompts",
-        ".config/opencode/commands",
-        ".config/agents/commands",
-    ),
-    "om1": (
-        ".claude/commands",
-        ".pi/agent/prompts",
-        ".codex/prompts",
-        ".config/opencode/commands",
-    ),
-}
+COMMAND_TARGETS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
+# Codex dropped custom prompts, so it gets each command as a skill; on om1 the
+# directory also holds every skill
+CODEX_SKILLS = ".codex/skills"
+# Codex and Amp stopped reading these; each run removes the commands put there
+RETIRED_COMMAND_TARGETS = (".codex/prompts", ".config/agents/commands")
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
+DESCRIPTION = re.compile(r"^description:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 RUNTIME_NAMES = frozenset(
     {
         "node_modules",
@@ -106,8 +100,8 @@ profiles:
   om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
        ~/.config/opencode/skills (excludes apple-mail)
   commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
-        ~/.codex/prompts, ~/.config/opencode/commands
-  commands on mac: ~/.config/agents/commands
+        ~/.config/opencode/commands, and ~/.codex/skills as one skill each
+  retired, cleared of commands: ~/.codex/prompts, ~/.config/agents/commands
 
 examples:
   just install-skills --dry-run
@@ -122,6 +116,22 @@ class Source:
     path: Path
     kind: str
     digest: str
+
+
+@dataclass(frozen=True)
+class Group:
+    """Targets that hold the same sources and own the same names. `retired` is
+    the source a removal reports; command targets hold files, the rest
+    directories."""
+
+    targets: tuple[str, ...]
+    sources: dict[str, Source]
+    owned: set[str]
+    retired: str = "public"
+
+    @property
+    def files(self) -> bool:
+        return self.retired == "command"
 
 
 @dataclass(frozen=True)
@@ -284,6 +294,41 @@ def command_sources() -> dict[str, Source]:
     return sources
 
 
+def unquote(value: str) -> str:
+    """Read a one-line YAML scalar; a block scalar or broken quoting reads as empty."""
+    if value.startswith('"'):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return ""
+    if value.startswith("'"):
+        return value[1:-1].replace("''", "'") if value.endswith("'") else ""
+    return "" if value.startswith(("|", ">")) else value
+
+
+def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source]:
+    """Stage each command under `stage` as a Codex skill: its name, its
+    description, then its body unchanged."""
+    sources: dict[str, Source] = {}
+    for filename, command in commands.items():
+        name = Path(filename).stem
+        text = command.path.read_text(encoding="utf-8")
+        header = FRONTMATTER.match(text)
+        found = DESCRIPTION.search(header.group(1)) if header else None
+        description = unquote(found.group(1)) if found else ""
+        body = text[header.end() :] if header else text
+        package = stage / name
+        package.mkdir(parents=True)
+        (package / "SKILL.md").write_text(
+            f"---\nname: {json.dumps(name, ensure_ascii=False)}\n"
+            f"description: {json.dumps(description or name, ensure_ascii=False)}\n"
+            f"---\n\n{body.lstrip()}",
+            encoding="utf-8",
+        )
+        sources[name] = Source(package, "command-skill", digest(package))
+    return sources
+
+
 def published(directory: str) -> list[Path]:
     """List every path git history ever added under `directory`, relative to it."""
     if flatten_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
@@ -377,21 +422,54 @@ def target_groups(home: Path, targets: Iterable[str]) -> dict[Path, list[str]]:
     return groups
 
 
-def plan(
+def layout(
     home: Path,
-    targets: Iterable[str],
-    sources: dict[str, Source],
+    profile: str,
+    skills: dict[str, Source],
+    codex: dict[str, Source],
+    commands: dict[str, Source],
     owned: set[str],
-    files: bool = False,
-) -> list[Action]:
-    """Install every source and remove owned names without one; skill targets hold
-    directories and command targets hold files."""
+    owned_commands: set[str],
+) -> list[Group]:
+    """Group the profile's targets by what they hold. On om1 the Codex directory
+    holds the skills beside the commands. A retired target reached through a
+    symlink is left alone, since it may be a live target or a command source."""
+    shared = CODEX_SKILLS in PROFILES[profile]
+    owned_codex = {Path(name).stem for name in owned_commands}
+    active = [
+        Group(tuple(t for t in PROFILES[profile] if t != CODEX_SKILLS), skills, owned),
+        Group(
+            (CODEX_SKILLS,),
+            {**skills, **codex} if shared else codex,
+            owned | owned_codex if shared else owned_codex,
+            retired="public" if shared else "command-skill",
+        ),
+        Group(COMMAND_TARGETS, commands, owned_commands, retired="command"),
+    ]
+
+    def where(target: str) -> Path:
+        return (home / target).resolve()
+
+    skill_dirs = {where(target): target for target in active[0].targets}
+    if where(CODEX_SKILLS) in skill_dirs:
+        raise ScriptError(
+            f"~/{CODEX_SKILLS} is the same directory as "
+            f"~/{skill_dirs[where(CODEX_SKILLS)]}; make it a directory of its own, "
+            "then rerun: just install-skills"
+        )
+    real = home.resolve()
+    retired = tuple(t for t in RETIRED_COMMAND_TARGETS if where(t) == real / t)
+    return [*active, Group(retired, {}, owned_commands, retired="command")]
+
+
+def plan(home: Path, group: Group) -> list[Action]:
+    """Install every source and remove owned names without one."""
+    files, retired, sources = group.files, group.retired, group.sources
     measure = digest_command if files else digest
-    retired = "command" if files else "public"
     actions: list[Action] = []
-    for aliases in target_groups(home, targets).values():
+    for aliases in target_groups(home, group.targets).values():
         target = aliases[0]
-        for name in sorted(sources.keys() | owned):
+        for name in sorted(sources.keys() | group.owned):
             source = sources.get(name)
             path = home / target / name
             if path.is_symlink() or (path.exists() and path.is_dir() == files):
@@ -466,13 +544,16 @@ def install_lock() -> Path:
 
 
 def report(
-    actions: list[Action], profile: str, synced: tuple[int, int], preview: bool
+    actions: list[Action],
+    profile: str,
+    groups: list[Group],
+    synced: tuple[int, int],
+    preview: bool,
 ) -> dict:
     """The --json object: counts per target and every action."""
     skills, commands = synced
     expected = {
-        **dict.fromkeys(PROFILES[profile], skills),
-        **dict.fromkeys(COMMAND_TARGETS[profile], commands),
+        target: len(group.sources) for group in groups for target in group.targets
     }
     return {
         "profile": profile,
@@ -495,28 +576,36 @@ def install(args: argparse.Namespace) -> str:
         nullcontext() if preview else exclusive(install_lock(), args.timeout),
         tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
     ):
-        sources = skill_sources(Path(temporary), args.private_root, args.profile)
+        stage = Path(temporary)
+        sources = skill_sources(stage / "skills", args.private_root, args.profile)
         commands = command_sources()
-        actions = [
-            *plan(
-                home,
-                PROFILES[args.profile],
-                sources,
-                owned_skills() | owned_private(args.private_root),
-            ),
-            *plan(
-                home,
-                COMMAND_TARGETS[args.profile],
-                commands,
-                {
-                    path.name
-                    for path in published("authoring/commands")
-                    if len(path.parts) == 1 and path.suffix == ".md"
-                },
-                files=True,
-            ),
-        ]
-        summary = report(actions, args.profile, (len(sources), len(commands)), preview)
+        codex = command_skills(stage / "commands", commands)
+        clashes = sorted(sources.keys() & codex.keys())
+        if clashes:
+            raise ScriptError(
+                *(
+                    f"command {name!r} has the same name as a skill; rename "
+                    f"authoring/commands/{name}.md, then rerun: just install-skills"
+                    for name in clashes
+                )
+            )
+        groups = layout(
+            home,
+            args.profile,
+            sources,
+            codex,
+            commands,
+            owned_skills() | owned_private(args.private_root),
+            {
+                path.name
+                for path in published("authoring/commands")
+                if len(path.parts) == 1 and path.suffix == ".md"
+            },
+        )
+        actions = [action for group in groups for action in plan(home, group)]
+        summary = report(
+            actions, args.profile, groups, (len(sources), len(commands)), preview
+        )
         for target in summary["targets"]:
             log.info(
                 "~/%s: %d of %d current",
@@ -551,7 +640,7 @@ def install(args: argparse.Namespace) -> str:
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
         flatten_skills.flatten()
-        execute(home, sources, commands, actions)
+        execute(home, {**sources, **codex}, commands, actions)
         return output
 
 

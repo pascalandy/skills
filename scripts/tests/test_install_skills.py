@@ -27,13 +27,8 @@ MAC = (
     ".config/agents/skills",
 )
 OM1 = (".pi/agent/skills", ".codex/skills", ".claude/skills", ".config/opencode/skills")
-MAC_COMMANDS = (
-    ".claude/commands",
-    ".pi/agent/prompts",
-    ".codex/prompts",
-    ".config/opencode/commands",
-    ".config/agents/commands",
-)
+COMMANDS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
+RETIRED = (".codex/prompts", ".config/agents/commands")
 
 
 def command(repo: Path, name: str, body: str = "command") -> Path:
@@ -351,40 +346,146 @@ def test_commands_install_and_only_published_ones_are_removed(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    source = command(repo, "review", "shared command")
+    text = '---\ndescription: "Review it"\n---\n\nshared command'
+    source = command(repo, "review", text)
     commit(repo)
     foreign = home / ".claude/commands/foreign.md"
     foreign.parent.mkdir(parents=True)
     foreign.write_text("keep\n", encoding="utf-8")
     preview = report(run(repo, home, "--dry-run", "--json"))
-    assert [(a["target"], a["kind"]) for a in preview if a["source"] == "command"] == [
-        (target, "add") for target in MAC_COMMANDS
+    assert [
+        (a["target"], a["name"], a["kind"]) for a in preview if a["name"] != "alpha"
+    ] == [(".codex/skills", "review", "add")] + [
+        (target, "review.md", "add") for target in COMMANDS
     ]
     assert run(repo, home).returncode == 0
     assert all(
-        (home / target / "review.md").read_text(encoding="utf-8") == "shared command\n"
-        for target in MAC_COMMANDS
+        (home / target / "review.md").read_text(encoding="utf-8") == text + "\n"
+        for target in COMMANDS
+    )
+    assert (home / ".codex/skills/review/SKILL.md").read_text(encoding="utf-8") == (
+        '---\nname: "review"\ndescription: "Review it"\n---\n\nshared command\n'
     )
     assert run(repo, home, "--check").returncode == 0
     (home / ".claude/commands/review.md").write_text("local edit\n", encoding="utf-8")
     source.unlink()
     assert run(repo, home).returncode == 0
-    assert not any((home / target / "review.md").exists() for target in MAC_COMMANDS)
+    assert not any((home / target / "review.md").exists() for target in COMMANDS)
+    assert not (home / ".codex/skills/review").exists()
     assert foreign.read_text(encoding="utf-8") == "keep\n"
 
 
-def test_om1_preserves_inactive_mac_command_target(
+def test_om1_codex_directory_holds_skills_beside_commands(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    source = command(repo, "review", "old")
-    assert run(repo, home, "--profile", "mac").returncode == 0
-    source.write_text("new\n", encoding="utf-8")
-    preview = report(run(repo, home, "--profile", "om1", "--dry-run", "--json"))
-    assert not any(a["target"] == ".config/agents/commands" for a in preview)
+    command(repo, "review")
+    commit(repo)
     assert run(repo, home, "--profile", "om1").returncode == 0
-    assert (home / ".config/agents/commands/review.md").read_text() == "old\n"
-    assert (home / ".codex/prompts/review.md").read_text() == "new\n"
+    assert sorted(path.name for path in (home / ".codex/skills").iterdir()) == [
+        "alpha",
+        "review",
+    ]
+    checked = run(repo, home, "--profile", "om1", "--check", "--json")
+    assert checked.returncode == 0
+    targets = {t["target"]: t for t in json.loads(checked.stdout)["targets"]}
+    assert targets[".codex/skills"]["expected"] == 2
+    assert targets[".codex/skills"]["current"] == 2
+
+
+def test_retired_command_targets_lose_only_published_commands(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "review")
+    commit(repo)
+    for target in RETIRED:
+        (home / target).mkdir(parents=True)
+        (home / target / "review.md").write_text("old\n", encoding="utf-8")
+        (home / target / "mine.md").write_text("keep\n", encoding="utf-8")
+    applied = run(repo, home, "--profile", "om1")
+    assert applied.returncode == 0
+    assert {f"remove\t~/{target}/review.md" for target in RETIRED} <= set(
+        applied.stdout.splitlines()
+    )
+    for target in RETIRED:
+        assert not (home / target / "review.md").exists()
+        assert (home / target / "mine.md").read_text(encoding="utf-8") == "keep\n"
+    assert run(repo, home, "--profile", "om1", "--check").returncode == 0
+
+
+def test_retired_targets_reached_through_a_symlink_are_left_alone(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "review", "shared")
+    commit(repo)
+    # One links to a live target, the other to a checkout's command sources
+    checkout = home / "checkout/authoring/commands"
+    for directory in (home / ".claude/commands", checkout, home / ".codex"):
+        directory.mkdir(parents=True)
+    (checkout / "review.md").write_text("source\n", encoding="utf-8")
+    (home / ".codex/prompts").symlink_to(home / ".claude/commands")
+    (home / ".config/agents").mkdir(parents=True)
+    (home / ".config/agents/commands").symlink_to(checkout)
+    assert run(repo, home).returncode == 0
+    assert run(repo, home).stdout == ""
+    assert (home / ".claude/commands/review.md").read_text(encoding="utf-8") == (
+        "shared\n"
+    )
+    assert (checkout / "review.md").read_text(encoding="utf-8") == "source\n"
+
+
+def test_codex_skill_descriptions_follow_yaml_quoting(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "inner", '---\ndescription: Use "review"\n---\nbody')
+    command(repo, "single", "---\ndescription: 'It''s here'\n---\nbody")
+    command(repo, "escaped", '---\ndescription: "Say \\"hi\\""\n---\nbody')
+    command(repo, "folded", "---\ndescription: >\n  long\n---\nbody")
+    command(repo, "bare", "body")
+    assert run(repo, home).returncode == 0
+    headers = {
+        name: (home / ".codex/skills" / name / "SKILL.md")
+        .read_text(encoding="utf-8")
+        .splitlines()[2]
+        for name in ("inner", "single", "escaped", "folded", "bare")
+    }
+    assert headers == {
+        "inner": 'description: "Use \\"review\\""',
+        "single": 'description: "It\'s here"',
+        "escaped": 'description: "Say \\"hi\\""',
+        "folded": 'description: "folded"',
+        "bare": 'description: "bare"',
+    }
+
+
+def test_a_command_named_like_a_skill_stops_before_writing(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "alpha")
+    result = run(repo, home)
+    assert (result.returncode, result.stdout) == (1, "")
+    assert result.stderr == (
+        "error: command 'alpha' has the same name as a skill; rename "
+        "authoring/commands/alpha.md, then rerun: just install-skills\n"
+    )
+    assert not home.exists()
+
+
+def test_a_codex_directory_linked_to_a_skill_target_stops_before_writing(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    (home / ".agents/skills").mkdir(parents=True)
+    (home / ".codex").mkdir()
+    (home / ".codex/skills").symlink_to(home / ".agents/skills")
+    result = run(repo, home)
+    assert (result.returncode, result.stdout) == (1, "")
+    assert "~/.codex/skills is the same directory as ~/.agents/skills" in result.stderr
+    assert list((home / ".agents/skills").iterdir()) == []
 
 
 @exits("install_skills", 0, 1)
@@ -397,7 +498,8 @@ def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_targe
     commit(repo)
     lines = sorted(
         [f"add\t~/{target}/{name}" for target in MAC for name in ("alpha", "beta")]
-        + [f"add\t~/{target}/hello.md" for target in MAC_COMMANDS]
+        + [f"add\t~/{target}/hello.md" for target in COMMANDS]
+        + ["add\t~/.codex/skills/hello"]
     )
 
     preview = run(repo, home, "-n")
