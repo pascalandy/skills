@@ -41,6 +41,8 @@ NETWORK_FAILURE = re.compile(
     r"|no route to host"
     r"|host is down"
     r"|temporary failure in name resolution"
+    r"|closed by remote host"
+    r"|broken pipe"
     r"|the remote end hung up unexpectedly"
     r"|early eof"
     r"|returned error: (429|5\d\d)",

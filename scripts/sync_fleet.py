@@ -400,8 +400,10 @@ def remote(machine: Machine, body: str, *arguments: str) -> tuple[int, list[str]
         command = [*SSH, machine.ssh, login]
     result = call(command, ENTER + body + '\nstep "$@" </dev/null\n')
     # Login profiles may print before the step, and ssh reports its own
-    # failures on stderr.
+    # failures on stderr, after whatever the step printed before a disconnect.
     lines = result.stdout.strip().splitlines() or result.stderr.strip().splitlines()
+    if result.returncode == UNREACHABLE and result.stdout.strip():
+        lines += result.stderr.strip().splitlines()
     for line in lines:
         log.debug("%s: %s", machine.name, line)
     return result.returncode, lines
@@ -415,7 +417,7 @@ def failure(name: str, code: int, lines: list[str]) -> Outcome:
     """A failed remote step; an unreachable machine or a step's own 75 is worth
     a retry, but ssh also exits 255 when it reaches a machine and cannot log in."""
     why = reason(lines, code)
-    if code == UNREACHABLE and not is_network_failure("\n".join(lines)):
+    if code == UNREACHABLE and not is_network_failure(why):
         return Outcome(name, "failed", why)
     return Outcome(
         name, status_of(code), why, temporary=code in (UNREACHABLE, TEMPORARY)
@@ -435,25 +437,34 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
     return problems
 
 
+def report_in(lines: list[str]) -> dict | None:
+    """The installer's indented JSON object; uv or a login profile may print
+    around it."""
+    braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
+    try:
+        return json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
+    except (IndexError, json.JSONDecodeError):
+        return None
+
+
 def installed(
     machine: Machine, source: Source
 ) -> Outcome | tuple[list[str], list[dict]]:
     """Run the CHECK step: what differs on the machine, from its private clone
     to each install target, with the targets' counts; an Outcome when it fails."""
     code, lines = remote(machine, CHECK, machine.path)
+    report = report_in(lines)
     if code:
-        return failure(machine.name, code, lines)
+        outcome = failure(machine.name, code, lines)
+        if report and report.get("errors"):
+            outcome.detail = "; ".join(report["errors"])
+        return outcome
+    if report is None:
+        return Outcome(machine.name, "failed", reason(lines, 1))
     problems: list[str] = []
     for line in lines:
         if line.startswith("private ") and len(fields := line.split()) == 3:
             problems.extend(private_problems(fields[1], fields[2], source.private))
-    # The report is the indented JSON object; uv or a login profile may print
-    # around it.
-    braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
-    try:
-        report = json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
-    except (IndexError, json.JSONDecodeError):
-        return Outcome(machine.name, "failed", reason(lines, 1))
     for target in report["targets"]:
         log.info(
             "%s ~/%s: %d of %d current",

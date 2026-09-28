@@ -50,12 +50,13 @@ if [ "$host" = locked ]; then
     echo "tester@locked: Permission denied (publickey)." >&2
     exit 255
 fi
-# flaky answers its first call, then drops off the network
+# flaky answers its first call, then drops the connection partway through
 if [ "$host" = flaky ]; then
     calls="$FLEET_HOMES/flaky.calls"
     echo call >> "$calls"
     if [ "$(wc -l < "$calls")" -gt 1 ]; then
-        echo "ssh: connect to host flaky port 22: Connection timed out" >&2
+        echo "private - missing"
+        echo "Connection to flaky closed by remote host." >&2
         exit 255
     fi
 fi
@@ -475,7 +476,10 @@ def test_a_check_that_loses_the_machine_midway_exits_75(
     result = run(hub, homes, bin_dir, "--check")
 
     assert (result.returncode, result.stdout) == (75, "")
-    assert "error: flaky offline: ssh: connect to host flaky port 22: " in result.stderr
+    assert (
+        "error: flaky offline: Connection to flaky closed by remote host.; "
+        in result.stderr
+    )
 
 
 def test_a_fetch_that_times_out_without_a_known_main_exits_75(
@@ -491,6 +495,24 @@ def test_a_fetch_that_times_out_without_a_known_main_exits_75(
 
     with pytest.raises(TemporaryError, match="git fetch took longer than 600s"):
         sync_fleet.github_main()
+
+
+@exits("sync_fleet", 1)
+def test_a_failed_install_step_reports_the_installers_own_error(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "broken", hub.parent / "skills.git")
+    # A file where the agent directories go makes the installer fail
+    (homes / "broken/.config").write_text("not a directory\n")
+    register(hub, "broken")
+
+    result = run(hub, homes, bin_dir, "--check", "--json")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    [outcome] = json.loads(result.stderr)["machines"]
+    assert outcome["status"] == "failed"
+    assert "has a file ancestor" in outcome["detail"]
 
 
 def test_an_interrupt_kills_a_group_whose_leader_exits_first(
