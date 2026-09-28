@@ -7,7 +7,7 @@ Use `codex exec` for a task that must finish without the interactive Codex UI. T
 1. Check `codex --version`, `codex exec --help`, and `codex login status`. On a runner without saved authentication, provide `CODEX_API_KEY` only to the Codex invocation through the runner's secret facility. Keep credentials out of prompts, logs, and repository files. For GitHub Actions, follow the [Codex GitHub Action guidance](https://learn.chatgpt.com/docs/non-interactive-mode#authenticate-in-automation)
 2. Set the target repository with `-C <path>`. Inspect its instructions and current changes before delegating edits. Codex normally requires a Git repository; use `--skip-git-repo-check` only for an intentionally trusted directory outside one
 3. Give concurrent editing runs separate worktrees or checkouts. State the task, permitted paths, expected result, and checks in the prompt. Use the caller's process API or an argument array when passing generated or untrusted text
-4. Choose `-s read-only` for inspection or `-s workspace-write` for edits. Set `-c 'approval_policy="never"'` for an unattended run. Broader access or approval bypass requires an authorized, isolated runner. Do not use `--full-auto`; CLI 0.157.1 rejects it
+4. Choose `-s read-only` for inspection or `-s workspace-write` for edits. Set `-c 'approval_policy="never"'` for an unattended run. Broader access or approval bypass requires an authorized, isolated runner. Do not use `--full-auto`; CLI 0.158.0 rejects it
 5. Close stdin with `< /dev/null` whenever the prompt is an argument. Codex reads piped stdin until EOF and appends it to the prompt, and an agent harness usually leaves stdin open, so the run prints `Reading additional input from stdin...` and hangs. Omit the redirect only when stdin carries the prompt or deliberate context
 
 ## Choose a run
@@ -108,7 +108,7 @@ If Codex fails or asks for unavailable access, report the error and unmet task. 
 
 ## Continue or structure a task
 
-- Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>" < /dev/null`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. Check `codex exec resume --help` for the installed version's options
+- Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>" < /dev/null`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. On CLI 0.158.0, `resume` accepts `-m`, `--json`, and `-o` but not `-s` or `--add-dir`, so pin the sandbox through config: `codex exec resume <SESSION_ID> -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -o "$review_dir/result.md" "<follow-up>" < /dev/null`. Check `codex exec resume --help` for the installed version's options
 - Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
 
 For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).
