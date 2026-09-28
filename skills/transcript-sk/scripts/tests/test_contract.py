@@ -140,6 +140,22 @@ def test_every_help_page_lists_examples_and_exit_codes_and_wins(
         assert cli(capsys, *argv) == (0, shown, ""), argv
 
 
+@pytest.mark.parametrize(
+    ("argv", "command"),
+    [
+        (["run", "youtube", "--timeout", "nope", "-vh"], ["run", "youtube"]),
+        (["ru", "-vh"], []),
+    ],
+    ids=["bad-value-first", "unknown-command-first"],
+)
+def test_a_bundled_help_flag_wins_too(
+    argv: list[str], command: list[str], capsys
+) -> None:
+    shown = cli(capsys, *command, "--help")
+
+    assert cli(capsys, *argv) == shown
+
+
 def test_version_is_one_line_on_stdout(capsys) -> None:
     assert cli(capsys, "--version") == (0, f"transcript {transcript.__version__}\n", "")
 

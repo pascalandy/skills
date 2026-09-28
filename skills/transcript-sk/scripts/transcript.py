@@ -1757,12 +1757,35 @@ def configure_parsers(
         each.color = color  # type: ignore[attr-defined]
 
 
+def asks_for_help(parser: argparse.ArgumentParser, argv: Sequence[str]) -> bool:
+    """Whether -h or --help comes before `--`, alone or in a bundle such as -vh.
+
+    A bundle counts only when every letter is a flag, so an option value such as
+    `-ohello` never reads as help.
+    """
+    flags = {
+        option[1]
+        for each in _all_parsers(parser)
+        for option, action in each._option_string_actions.items()
+        if len(option) == 2 and option[1] != "-" and action.nargs == 0
+    }
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in ("-h", "--help"):
+            return True
+        bundle = re.fullmatch(r"-[A-Za-z]{2,}", arg)
+        if bundle and "h" in arg[1:] and set(arg[1:]) <= flags:
+            return True
+    return False
+
+
 def help_target(
     parser: argparse.ArgumentParser, argv: Sequence[str]
 ) -> argparse.ArgumentParser | None:
     """The deepest command named before -h or --help, or None without either,
     so help wins over every other argument before `--`."""
-    if not given(argv, "-h", "--help"):
+    if not asks_for_help(parser, argv):
         return None
     target = parser
     for token in argv:
