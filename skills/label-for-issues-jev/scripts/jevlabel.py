@@ -35,12 +35,22 @@ PREVIEW_SCHEMA = "jevlabel.preview/v1"
 COMPARE_SCHEMA = "jevlabel.compare/v1"
 APPLY_SCHEMA = "jevlabel.apply/v1"
 DOCTOR_SCHEMA = "jevlabel.doctor/v1"
+LABELS_SCHEMA = "jevlabel.labels/v1"
 QUESTIONS_SCHEMA = "jevlabel.questions/v1"
 EXIT_ERROR, EXIT_USAGE, EXIT_INTERRUPTED = 1, 2, 130
 RUN_FILE = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9-]+\.json$")
 QUEUES = ("routine", "review", "skip")
 OUTCOMES = ("agree", "disagree", "abstain", "unlabeled")
 APPLY_OUTCOMES = ("applied", "would-apply", "already", "stale", "conflict", "failed")
+LABEL_OUTCOMES = (
+    "created",
+    "fixed",
+    "would-create",
+    "would-fix",
+    "ok",
+    "blocked",
+    "failed",
+)
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 QUESTIONS_FILE = SKILL_DIR / "assets" / "questions.toml"
@@ -137,6 +147,9 @@ NOMINATIONS = {
     READY_AGENT: "ready for an agent; label-for-issues requires a recorded readiness review first",
     READY_HUMAN: "ready for a person; label-for-issues requires a recorded readiness review first",
 }
+# Near-duplicate label names compare without case, a numeric or family prefix,
+# or punctuation, so `bug` and `Priority: P1` match `2-type:bug` and `3-pty:p1`.
+LABEL_PREFIX = re.compile(r"^(?:\d+-)?(?:(?:type|pty|priority|epic|state)\s*:\s*)?")
 
 TYPE_OPTIONS = ("bug", "feature", "task")
 NO_MATCH = "cannot-tell"
@@ -162,6 +175,7 @@ jevlabel: triage many GitHub issues with Jev, then label the clear ones
 
 commands:
   doctor    check gh, the label vocabulary, the questions, the API key, and consent
+  labels    create missing canonical labels; report look-alikes, never migrate them
   consent   record which private repositories may send issue text to TypeSafe
   run       fetch issues, ask Jev, and write a run record (--dry-run: preview only)
   apply     add routine issues' labels and review issues' fill, rereading each first
@@ -175,6 +189,7 @@ queues in a run record:
 
 examples:
   jevlabel doctor -R pascalandy/skills --online
+  jevlabel labels -R pascalandy/skills --dry-run
   jevlabel run -R pascalandy/skills --dry-run
   jevlabel run -R pascalandy/skills
   jevlabel apply last --dry-run
@@ -317,6 +332,44 @@ def repo_labels(repo: str) -> set[str]:
     return {label["name"] for label in data}
 
 
+def repo_label_details(repo: str) -> dict[str, dict[str, str]]:
+    data = gh_json(
+        "label",
+        "list",
+        "-R",
+        repo,
+        "--limit",
+        "1000",
+        "--json",
+        "name,color,description",
+    )
+    return {
+        label["name"]: {
+            "color": str(label.get("color") or "").lower(),
+            "description": str(label.get("description") or ""),
+        }
+        for label in data
+    }
+
+
+def labeled_issues(repo: str, label: str) -> list[int]:
+    data = gh_json(
+        "issue",
+        "list",
+        "-R",
+        repo,
+        "--label",
+        label,
+        "--state",
+        "all",
+        "--limit",
+        "1000",
+        "--json",
+        "number",
+    )
+    return sorted(issue["number"] for issue in data)
+
+
 def fetch_issue(repo: str, number: int) -> dict[str, Any]:
     return gh_json("issue", "view", str(number), "-R", repo, "--json", ISSUE_FIELDS)
 
@@ -344,8 +397,8 @@ def fetch_issues(repo: str, args: argparse.Namespace) -> list[dict[str, Any]]:
 # ----------------------------------------------------------------- vocabulary
 
 
-def load_vocabulary() -> set[str]:
-    """Read the canonical label names from label-for-issues' ## Labels JSON."""
+def vocabulary_labels() -> list[dict[str, str]]:
+    """The canonical labels, with color and description, from label-for-issues' ## Labels JSON."""
     try:
         text = VOCABULARY_FILE.read_text(encoding="utf-8")
     except OSError as error:
@@ -357,12 +410,23 @@ def load_vocabulary() -> set[str]:
     )
     if match is None:
         raise Failure(f"{VOCABULARY_FILE} has no JSON block under ## Labels")
+    fields = ("name", "color", "description")
     try:
-        names = {label["name"] for label in json.loads(match.group(1))}
+        labels = [
+            {key: label[key] for key in fields} for label in json.loads(match.group(1))
+        ]
     except (ValueError, KeyError, TypeError) as error:
         raise Failure(
             f"the ## Labels JSON in {VOCABULARY_FILE} is malformed"
         ) from error
+    if not all(isinstance(label[key], str) for label in labels for key in fields):
+        raise Failure(f"the ## Labels JSON in {VOCABULARY_FILE} is malformed")
+    return labels
+
+
+def load_vocabulary() -> set[str]:
+    """Read the canonical label names, and check the policy's labels are among them."""
+    names = {label["name"] for label in vocabulary_labels()}
     missing = [name for name in NEEDED_LABELS if name not in names]
     if missing:
         raise Failure(
@@ -1182,7 +1246,7 @@ def cmd_doctor(args: argparse.Namespace) -> tuple[str, Any]:
             missing = sorted(canonical - repo_labels(repo))
             if missing:
                 raise Failure(
-                    f"{repo} lacks {', '.join(missing)}; create them with label-for-issues (setup-only request) before apply"
+                    f"{repo} lacks {', '.join(missing)}; create them with `jevlabel labels -R {repo}` before apply"
                 )
             return "all canonical labels exist"
 
@@ -1194,6 +1258,159 @@ def cmd_doctor(args: argparse.Namespace) -> tuple[str, Any]:
     if failed:
         raise Failure(*(f"{c['name']}: {c['detail']}" for c in failed), result=result)
     return "ok: " + ", ".join(c["name"] for c in checks), result
+
+
+def label_key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", LABEL_PREFIX.sub("", name.lower(), count=1))
+
+
+def lookalikes(
+    wanted: list[dict[str, str]], existing: dict[str, dict[str, str]]
+) -> list[dict[str, Any]]:
+    """Existing labels whose names resemble a canonical one without matching it."""
+    names = {label["name"] for label in wanted}
+    by_case = {name.lower(): name for name in names}
+    by_key = {label_key(name): name for name in names}
+    found: list[dict[str, Any]] = []
+    for name in sorted(existing):
+        target = by_case.get(name.lower()) or by_key.get(label_key(name))
+        if name in names or target is None:
+            continue
+        kind = "case variant" if name.lower() == target.lower() else "near duplicate"
+        found.append({"name": name, "canonical": target, "kind": kind})
+    return found
+
+
+def write_labels(
+    repo: str, spec: dict[str, dict[str, str]], todo: list[dict[str, Any]]
+) -> None:
+    """Create or fix each planned label, then read every written one back."""
+    for result in todo:
+        label = spec[result["name"]]
+        verb = "create" if result["outcome"] == "would-create" else "edit"
+        try:
+            gh(
+                "label",
+                verb,
+                label["name"],
+                "-R",
+                repo,
+                "--color",
+                label["color"],
+                "--description",
+                label["description"],
+            )
+        except Failure as failure:
+            result.update(outcome="failed", detail=failure.problems[0])
+        else:
+            result["outcome"] = "created" if verb == "create" else "fixed"
+    written = [result for result in todo if result["outcome"] != "failed"]
+    try:
+        after = repo_label_details(repo)
+    except Failure as failure:
+        for result in written:
+            result.update(
+                outcome="failed", detail=f"not read back: {failure.problems[0]}"
+            )
+        return
+    for result in written:
+        label = spec[result["name"]]
+        wanted = {"color": label["color"].lower(), "description": label["description"]}
+        if after.get(label["name"]) != wanted:
+            result.update(
+                outcome="failed",
+                detail="its color or description differs after the write",
+            )
+
+
+def cmd_labels(args: argparse.Namespace) -> tuple[str, Any]:
+    """Create missing canonical labels and fix drifted metadata on exact names."""
+    repo = args.repo
+    wanted = vocabulary_labels()
+    existing = repo_label_details(repo)
+    similar = lookalikes(wanted, existing)
+    # GitHub label names ignore case, so a case variant holds the canonical name.
+    held = {
+        item["canonical"]: item["name"]
+        for item in similar
+        if item["kind"] == "case variant"
+    }
+    results: list[dict[str, Any]] = []
+    for label in wanted:
+        name, have = label["name"], existing.get(label["name"])
+        result = {"name": name, "outcome": "ok", "detail": ""}
+        if name in held:
+            result.update(
+                outcome="blocked", detail=f"{held[name]} holds its name in another case"
+            )
+        elif have is None:
+            result["outcome"] = "would-create"
+        else:
+            canon = {
+                "color": label["color"].lower(),
+                "description": label["description"],
+            }
+            drift = [
+                f"{key} {have[key]!r} -> {canon[key]!r}"
+                for key in ("color", "description")
+                if have[key] != canon[key]
+            ]
+            if drift:
+                result.update(outcome="would-fix", detail="; ".join(drift))
+        results.append(result)
+    for item in similar:
+        item["issues"] = labeled_issues(repo, item["name"])
+    todo = [r for r in results if r["outcome"] in ("would-create", "would-fix")]
+    if todo and not args.dry_run:
+        write_labels(repo, {label["name"]: label for label in wanted}, todo)
+    counts = {
+        name: sum(r["outcome"] == name for r in results) for name in LABEL_OUTCOMES
+    }
+    log: dict[str, Any] = {
+        "schema": LABELS_SCHEMA,
+        "repo": repo,
+        "created_at": now().isoformat(timespec="seconds"),
+        "dry_run": args.dry_run,
+        "counts": counts,
+        "results": results,
+        "lookalikes": similar,
+    }
+    parts = ", ".join(f"{n} {name}" for name, n in counts.items() if n)
+    if args.dry_run:
+        line = f"labels {repo} --dry-run: {parts}; nothing written"
+    elif todo:
+        log_path = new_log(state_home() / "labels", f"{stamp()}-{slug(repo)}")
+        write_json(log_path, log)
+        log["path"] = str(log_path)
+        line = f"labels {repo}: {parts}; log: {log_path}"
+    else:
+        line = f"labels {repo}: {parts}"
+    for item in similar:
+        if item["kind"] == "near duplicate":
+            carriers = ", ".join(f"#{n}" for n in item["issues"]) or "none"
+            print(
+                f"warning: {item['name']} looks like {item['canonical']} (issues: "
+                f"{carriers}); jevlabel never renames, deletes, or migrates a label: "
+                "ask the user before migrating it",
+                file=sys.stderr,
+            )
+    failed = [r for r in results if r["outcome"] in ("blocked", "failed")]
+    if failed:
+        blocked = any(r["outcome"] == "blocked" for r in failed)
+        hints = (
+            [
+                "rename a case variant only after the user approves the migration, then rerun"
+            ]
+            if blocked
+            else []
+        )
+        raise Failure(
+            *(f"{r['name']}: {r['outcome']}: {r['detail']}" for r in failed),
+            *hints,
+            f"{len(failed)} canonical labels are not in place; see {log.get('path', 'the output')}",
+            result=log,
+        )
+    return line, log
 
 
 def cmd_consent(args: argparse.Namespace) -> tuple[str, Any]:
@@ -1228,11 +1445,26 @@ def cmd_consent(args: argparse.Namespace) -> tuple[str, Any]:
     return f"approved {repo} under {TERMS_NAME}", {"repo": repo, **entries[repo]}
 
 
+def slug(repo: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", repo.lower()).strip("-")
+
+
+def stamp() -> str:
+    return now().strftime("%Y%m%dT%H%M%SZ")
+
+
+def new_log(directory: Path, stem: str) -> Path:
+    """A log path that no earlier log in this second uses."""
+    path, count = directory / f"{stem}.json", 1
+    while path.exists():
+        count += 1
+        path = directory / f"{stem}-{count}.json"
+    return path
+
+
 def new_run_id(repo: str) -> str:
     """A timestamped ID that no earlier preview or record in this second uses."""
-    base = now().strftime("%Y%m%dT%H%M%SZ-") + re.sub(
-        r"[^a-z0-9]+", "-", repo.lower()
-    ).strip("-")
+    base = now().strftime("%Y%m%dT%H%M%SZ-") + slug(repo)
     run_id, count = base, 1
     while any(
         (runs_dir() / f"{run_id}{end}").exists() for end in (".json", ".preview.json")
@@ -1626,6 +1858,28 @@ def build_parser() -> Parser:
     )
     common(doctor)
 
+    labels = commands.add_parser(
+        "labels",
+        help="create missing canonical labels",
+        description="Create each canonical label that label-for-issues defines and the "
+        "repository lacks, and fix the color or description of a label whose name "
+        "matches exactly. Report case variants and near-duplicate labels, such as `bug` "
+        "for 2-type:bug, with the issues that carry them; never rename, delete, or "
+        "migrate one, since that needs the user's approval. Written labels are read "
+        "back, and a log is kept. Exits 1 while a canonical label is blocked or failed.",
+        epilog="examples:\n  jevlabel labels -R pascalandy/skills --dry-run\n"
+        "  jevlabel labels -R pascalandy/skills\n"
+        "  jevlabel labels -R pascalandy/skills --dry-run --json",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    labels.add_argument(
+        "-R", "--repo", type=repo_name, required=True, help="owner/repo"
+    )
+    labels.add_argument(
+        "--dry-run", action="store_true", help="show what would change; write nothing"
+    )
+    common(labels)
+
     consent = commands.add_parser(
         "consent",
         help="record private repositories approved for TypeSafe",
@@ -1712,6 +1966,7 @@ def build_parser() -> Parser:
 
 COMMANDS = {
     "doctor": cmd_doctor,
+    "labels": cmd_labels,
     "consent": cmd_consent,
     "run": cmd_run,
     "compare": cmd_compare,

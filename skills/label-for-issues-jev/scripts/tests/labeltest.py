@@ -72,10 +72,30 @@ if repo is None:
 if args[:2] == ["repo", "view"]:
     out({"visibility": repo["visibility"]})
 if args[:2] == ["label", "list"]:
-    out([{"name": label} for label in repo["labels"]])
+    out([fields({"name": label, **repo["label_meta"][label]}) for label in repo["labels"]])
+if args[:2] in (["label", "create"], ["label", "edit"]):
+    if world.get("fail_label"):
+        fail("HTTP 502: Bad Gateway")
+    label = args[2]
+    taken = [have for have in repo["labels"] if have.lower() == label.lower()]
+    if args[1] == "create" and taken:
+        fail(f'label with name "{taken[0]}" already exists; use `--force` to update')
+    if args[1] == "edit" and not taken:
+        fail("HTTP 404: Not Found")
+    if args[1] == "create":
+        repo["labels"].append(label)
+    meta = {"color": opt("--color"), "description": opt("--description", "")}
+    repo["label_meta"][taken[0] if taken else label] = meta
+    out("")
 if args[:2] == ["issue", "list"]:
     state = opt("--state", "open").upper()
-    chosen = [i for i in repo["issues"] if state == "ALL" or i["state"] == state]
+    label = opt("--label")
+    chosen = [
+        i
+        for i in repo["issues"]
+        if (state == "ALL" or i["state"] == state)
+        and (label is None or label in [have["name"] for have in i["labels"]])
+    ]
     out([fields(i, comment_page=100) for i in chosen[: int(opt("--limit", "30"))]])
 if args[:2] == ["issue", "view"]:
     for issue in repo["issues"]:
@@ -207,12 +227,15 @@ class FakeTypeSafe:
             self._server.server_close()
 
 
-CANONICAL = [
-    label["name"]
-    for label in json.loads(
-        VOCABULARY.read_text().split("```json\n", 1)[1].split("```", 1)[0]
-    )
-]
+VOCABULARY_LABELS: list[dict[str, str]] = json.loads(
+    VOCABULARY.read_text().split("```json\n", 1)[1].split("```", 1)[0]
+)
+CANONICAL = [label["name"] for label in VOCABULARY_LABELS]
+META = {
+    label["name"]: {"color": label["color"], "description": label["description"]}
+    for label in VOCABULARY_LABELS
+}
+CUSTOM = {"color": "ededed", "description": ""}
 
 
 def comment(
@@ -303,10 +326,13 @@ class Harness:
         visibility: str = "PUBLIC",
         labels: list[str] | None = None,
         issues: list[dict[str, Any]] | None = None,
+        meta: dict[str, dict[str, str]] | None = None,
     ) -> None:
+        names = list(CANONICAL if labels is None else labels)
         self.world["repos"][name] = {
             "visibility": visibility,
-            "labels": CANONICAL if labels is None else labels,
+            "labels": names,
+            "label_meta": {n: META.get(n, CUSTOM) for n in names} | (meta or {}),
             "issues": issues or [],
         }
 
@@ -324,6 +350,11 @@ class Harness:
 
     def edits(self) -> list[list[str]]:
         return [call for call in self.calls() if call[:2] == ["issue", "edit"]]
+
+    def writes(self) -> list[list[str]]:
+        """Every call that changes GitHub: issue edits and label writes."""
+        changing = (["issue", "edit"], ["label", "create"], ["label", "edit"])
+        return [call for call in self.calls() if call[:2] in changing]
 
     def env(self, **extra: str) -> dict[str, str]:
         environment = {

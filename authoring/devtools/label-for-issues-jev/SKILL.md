@@ -19,7 +19,7 @@ Run the CLI with `uv run <skill_dir>/scripts/jevlabel.py`. Every command accepts
 
 1. **Load the owner.** Load `label-for-issues` from the active skill catalog. The CLI reads its `## Labels` JSON from the sibling skill directory. If it is missing, report the missing dependency and stop.
    *Complete when `label-for-issues` is loaded.*
-2. **Check readiness.** Run `jevlabel doctor -R <owner/repo> --online` and fix what it names. Missing canonical labels need the setup-only request of `label-for-issues` first. Without a TypeSafe key, only previews work: report the missing key and stop after step 4.
+2. **Check readiness.** Run `jevlabel doctor -R <owner/repo> --online` and fix what it names. For missing canonical labels, run `jevlabel labels -R <owner/repo> --dry-run`, then, for a request that allows changes, the same without `--dry-run`. It creates missing labels and fixes the color or description of exact names. Report each case variant or near-duplicate it names; migrating one needs the user's approval. Without a TypeSafe key, only previews work: report the missing key and stop after step 4.
    *Complete when every check passes, or each failure is reported with its fix.*
 3. **Get consent for a private repository.** Issue text goes to TypeSafe, which hosts in the US. When `doctor` reports that a private repository has no consent, run the preview in step 4, then show the user the payload file it names and the terms that `jevlabel consent --help` prints. Ask whether its issue text may be sent. Only after they approve, run `jevlabel consent add <owner/repo> --by "<their name>"`. Never approve on their behalf.
    *Complete when the repository is public, consent is recorded, or the user declined.*
