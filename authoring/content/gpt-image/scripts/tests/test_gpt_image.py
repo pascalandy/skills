@@ -146,19 +146,18 @@ def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
     assert receipt["prompt"] == "A hero\nAspect ratio: 16:9, landscape."
 
 
-@pytest.mark.parametrize("intent", ["draft", "standard", "high", "max"])
+@pytest.mark.parametrize("intent", [None, "draft", "standard", "high", "max"])
 def test_openrouter_key_never_changes_the_default_mode(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    intent: str,
+    intent: str | None,
 ) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     code, stdout, _ = run(
         capsys,
         "generate",
-        "--intent",
-        intent,
+        *(["--intent", intent] if intent else []),
         "--prompt",
         "poster",
         "--out",
@@ -167,7 +166,11 @@ def test_openrouter_key_never_changes_the_default_mode(
         "--json",
     )
     assert code == 0
-    assert json.loads(stdout)["backend"] == "plan"
+    receipt = json.loads(stdout)
+    assert receipt["backend"] == "plan"
+    if intent is None:
+        assert receipt["intent"] == "high"
+        assert receipt["outputs"] == [str(plan_login / f"out-{i}.png") for i in (1, 2)]
 
 
 def test_no_plan_does_not_fall_back_to_paid_openrouter(
@@ -212,7 +215,7 @@ def test_explicit_model_uses_openrouter_image_protocol(
         expected = {
             "model": f"openai/gpt-image-2.5-{model}",
             "prompt": "poster",
-            "quality": "medium",
+            "quality": "high",
             "background": "auto",
             "output_format": "png",
             "n": 1,
@@ -266,7 +269,7 @@ def test_explicit_model_uses_openrouter_image_protocol(
     assert out.read_bytes() == original
 
 
-def test_explicit_openrouter_high_intent_uses_sunburst(
+def test_explicit_openrouter_defaults_to_high_intent(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -275,8 +278,6 @@ def test_explicit_openrouter_high_intent_uses_sunburst(
     code, stdout, _ = run(
         capsys,
         "generate",
-        "--intent",
-        "high",
         "--aspect",
         "3:2",
         "--prompt",
@@ -344,7 +345,9 @@ def test_existing_output_is_kept_without_overwrite(
 ) -> None:
     out = plan_login / "keep.png"
     out.write_bytes(b"old")
-    code, _, err = run(capsys, "generate", "--prompt", "x", "--out", str(out))
+    code, _, err = run(
+        capsys, "generate", "--candidates", "1", "--prompt", "x", "--out", str(out)
+    )
     assert code == 2
     assert "already exists" in err
     assert out.read_bytes() == b"old"
@@ -363,6 +366,8 @@ def test_plan_run_writes_the_image_at_the_exact_requested_size(
     code, stdout, err = run(
         capsys,
         "generate",
+        "--candidates",
+        "1",
         "--size",
         "1536x864",
         "--prompt",
@@ -387,7 +392,14 @@ def test_plan_run_warns_when_codex_changed_the_prompt(
 ) -> None:
     monkeypatch.setenv("FAKE_TRACE_BODY", json.dumps({"prompt": "something else"}))
     code, stdout, err = run(
-        capsys, "generate", "--prompt", "A cat", "--out", str(plan_login / "cat.png")
+        capsys,
+        "generate",
+        "--candidates",
+        "1",
+        "--prompt",
+        "A cat",
+        "--out",
+        str(plan_login / "cat.png"),
     )
     assert code == 0
     assert stdout.startswith("wrote cat.png 1254x1254 via plan in ")
@@ -403,6 +415,8 @@ def test_transparent_request_without_alpha_warns(
     code, _, err = run(
         capsys,
         "generate",
+        "--candidates",
+        "1",
         "--transparent",
         "--prompt",
         "A fox",
