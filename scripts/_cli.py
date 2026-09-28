@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
+import json
 import os
 import re
 import signal
@@ -85,7 +86,12 @@ def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
 
 class Parser(argparse.ArgumentParser):
     """argparse without abbreviated options, whose help ends with the exit codes
-    and whose usage errors print short usage and the help hint, then exit 2."""
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
 
     def __init__(
         self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
@@ -102,16 +108,20 @@ class Parser(argparse.ArgumentParser):
         self.exit_codes = dict(exit_codes)
 
     def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
         self.print_usage(sys.stderr)
         self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
 
 
-def wants_help(argv: Sequence[str]) -> bool:
-    """Whether -h or --help comes before any `--`; help wins over every other argument."""
+def given(argv: Sequence[str], *flags: str) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early."""
     for arg in argv:
         if arg == "--":
             return False
-        if arg in ("-h", "--help"):
+        if arg in flags:
             return True
     return False
 

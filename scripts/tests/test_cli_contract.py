@@ -128,6 +128,7 @@ class Entry:
     safe: Callable[[Sandbox], tuple[str, ...]] = no_arguments
     positional: tuple[str, ...] = ()
     debug: bool = True
+    has_json: bool = False
 
 
 def quoted_frontmatter(sandbox: Sandbox) -> None:
@@ -240,6 +241,7 @@ ENTRIES: dict[str, Entry] = {
         args=("--dry-run",),
         prepare=fleet_of_one,
         safe=far_is_behind,
+        has_json=True,
     ),
     # The preview blocks in the installer it starts, so signals test the handoff
     "scripts/sync.py": Entry(
@@ -257,9 +259,10 @@ ENTRIES: dict[str, Entry] = {
         args=("--agent", "opencode"),
         safe=opencode_finds_alpha,
         positional=("--profile", "mac"),
+        has_json=True,
     ),
     "scripts/install_skills.py": Entry(
-        name="just install-skills", block="git", safe=mac_preview
+        name="just install-skills", block="git", safe=mac_preview, has_json=True
     ),
     "scripts/flatten_skills.py": Entry(
         name="just flatten-skills", block="git", safe=new_skill_preview
@@ -681,6 +684,25 @@ def test_verbosity_changes_only_stderr(
         via_env = sandbox.run(path, *args, **{variable: "1"})
         assert (via_env.returncode, via_env.stdout) == (quiet.returncode, quiet.stdout)
         assert len(via_env.stderr.splitlines()) == len(runs[-1].stderr.splitlines())
+
+
+def test_json_is_one_object_on_stdout_and_a_json_usage_error_one_on_stderr(
+    entry: tuple[str, Entry], tmp_path: Path
+) -> None:
+    path, script = entry
+    if not script.has_json:
+        pytest.skip("has no --json")
+    sandbox = prepared(script, tmp_path)
+    shown = sandbox.run(path, *script.safe(sandbox), "--json")
+    refused = sandbox.run(path, *script.positional, "--json", "--bogus-flag")
+
+    assert (shown.returncode, shown.stderr) == (0, "")
+    assert isinstance(json.loads(shown.stdout), dict)
+    assert (refused.returncode, refused.stdout) == (2, "")
+    assert json.loads(refused.stderr) == {
+        "errors": ["unrecognized arguments: --bogus-flag"],
+        "help": f"{script.name} --help",
+    }
 
 
 def test_doc_lines_that_run_a_script_use_only_its_flags(

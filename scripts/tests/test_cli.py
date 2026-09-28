@@ -14,8 +14,8 @@ from _cli import (
     color_enabled,
     duration,
     exit_codes,
+    given,
     signals_interrupt,
-    wants_help,
 )
 
 
@@ -55,11 +55,11 @@ def test_exit_codes_refuse_codes_the_shell_reserves(code: int) -> None:
         exit_codes({code: "clashes"})
 
 
-def test_help_wins_only_before_the_end_of_options() -> None:
-    assert wants_help(["--bogus", "-h"])
-    assert wants_help(["mbp", "--help"])
-    assert not wants_help(["--", "--help"])
-    assert not wants_help(["--notes", "help.md"])
+def test_a_flag_counts_only_before_the_end_of_options() -> None:
+    assert given(["--bogus", "-h"], "-h", "--help")
+    assert given(["mbp", "--help"], "-h", "--help")
+    assert not given(["--", "--help"], "-h", "--help")
+    assert not given(["--notes", "help.md"], "-h", "--help")
 
 
 @pytest.mark.parametrize(
