@@ -7,12 +7,12 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 import re
 from pathlib import Path
 
-from _common import ScriptError, run_script
+from _cli import Parser, ScriptError, exit_codes
+from _common import run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
@@ -25,9 +25,11 @@ rule:
 
 examples:
   just check-frontmatter
-  just check-frontmatter --verbose
+  just check-frontmatter --verbose"""
 
-exit codes: 0 ok, 1 style errors found, 2 bad usage, 130 interrupted"""
+EXIT_CODES = exit_codes(
+    {0: "every SKILL.md follows the rule", 1: "a style error was found"}
+)
 
 FRONTMATTER_DELIMITER = "---\n"
 KEY_VALUE_RE = re.compile(r"^\s*(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)$")
@@ -111,25 +113,25 @@ def check_file(path: Path) -> list[str]:
 
 
 def check() -> str:
-    """Check every SKILL.md under authoring/ and return the summary line."""
+    """Check every SKILL.md under authoring/; success prints nothing."""
     paths = sorted(AUTHORING.glob("**/SKILL.md"))
     if not paths:
         raise ScriptError("no SKILL.md files found under authoring/")
     errors: list[str] = []
     for path in paths:
-        log.debug("check %s", path.relative_to(ROOT))
+        log.info("check %s", path.relative_to(ROOT))
         errors.extend(check_file(path))
     if errors:
         raise ScriptError(*errors)
-    return f"ok: {len(paths)} SKILL.md files"
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="just check-frontmatter",
         description="Check SKILL.md frontmatter quoting under authoring/",
         epilog=EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_codes=EXIT_CODES,
     )
     return run_script(parser, lambda args: check(), argv)
 

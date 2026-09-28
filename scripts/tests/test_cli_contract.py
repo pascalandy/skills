@@ -122,7 +122,18 @@ class Entry:
     debug: bool = True
 
 
+def quoted_frontmatter(sandbox: Sandbox) -> None:
+    path = sandbox.repo / "authoring/content/alpha/SKILL.md"
+    path.write_text('---\nname: "alpha"\n---\n', encoding="utf-8")
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/check_frontmatter.py": Entry(
+        name="just check-frontmatter",
+        block="fifo:authoring/content/beta/SKILL.md",
+        prepare=quoted_frontmatter,
+        debug=False,
+    ),
     "scripts/check_cli_block.py": Entry(
         name="scripts/check_cli_block.py",
         block="fifo:authoring/content/alpha/scripts/tool.py",
@@ -133,7 +144,6 @@ ENTRIES: dict[str, Entry] = {
 # Scripts a later wave moves onto the contract
 PENDING = {
     "scripts/check.py",
-    "scripts/check_frontmatter.py",
     "scripts/discover_skills.py",
     "scripts/flatten_skills.py",
     "scripts/install_skills.py",
