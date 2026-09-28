@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 import re
 import stat
+import urllib.request
 from pathlib import Path
 
 import gpt_image
@@ -37,7 +39,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A machine with no backend until a test adds one."""
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     (tmp_path / "bin").mkdir()
     return tmp_path
 
@@ -88,7 +90,7 @@ def test_parse_size_names_the_broken_rule(size: str, problem: str) -> None:
         gpt_image.parse_size(size)
 
 
-def test_output_tokens_match_the_guide_cost_table() -> None:
+def test_output_tokens_match_calculator_estimates() -> None:
     assert gpt_image.output_tokens(1024, 1024, "high") == 1756
     assert gpt_image.output_tokens(1536, 864, "low") == 120
     assert gpt_image.output_tokens(3840, 2160, "max") == 13342
@@ -116,7 +118,7 @@ def test_no_backend_is_a_usage_error(
         capsys, "generate", "--prompt", "a cat", "--out", str(env / "cat.png")
     )
     assert code == 2
-    assert "no backend available" in err
+    assert "plan backend unavailable" in err
 
 
 def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
@@ -144,12 +146,132 @@ def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
     assert receipt["prompt"] == "A hero\nAspect ratio: 16:9, landscape."
 
 
-def test_high_intent_uses_sunburst_through_the_api_when_a_key_exists(
+@pytest.mark.parametrize("intent", ["draft", "standard", "high", "max"])
+def test_openrouter_key_never_changes_the_default_mode(
+    plan_login: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    code, stdout, _ = run(
+        capsys,
+        "generate",
+        "--intent",
+        intent,
+        "--prompt",
+        "poster",
+        "--out",
+        str(plan_login / "out.png"),
+        "--dry-run",
+        "--json",
+    )
+    assert code == 0
+    assert json.loads(stdout)["backend"] == "plan"
+
+
+def test_no_plan_does_not_fall_back_to_paid_openrouter(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    code, _, err = run(
+        capsys,
+        "generate",
+        "--prompt",
+        "poster",
+        "--out",
+        str(env / "out.png"),
+        "--dry-run",
+    )
+    assert code == 2
+    assert "no paid fallback was selected" in err
+
+
+@pytest.mark.parametrize("model", ["flare", "sunburst"])
+@pytest.mark.parametrize("command", ["generate", "edit"])
+def test_explicit_model_uses_openrouter_image_protocol(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
+    command: str,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    original = png_bytes(1024, 1024)
+    source = env / "input.png"
+    source.write_bytes(original)
+    out = env / "out.png"
+
+    def respond(request: urllib.request.Request, timeout: int) -> io.BytesIO:
+        assert request.full_url == "https://openrouter.ai/api/v1/images"
+        assert request.get_header("Authorization") == "Bearer sk-test"
+        assert request.get_method() == "POST"
+        assert isinstance(request.data, bytes)
+        expected = {
+            "model": f"openai/gpt-image-2.5-{model}",
+            "prompt": "poster",
+            "quality": "medium",
+            "background": "auto",
+            "output_format": "png",
+            "n": 1,
+        }
+        if command == "edit":
+            expected["size"] = "1024x1024"
+            expected["input_references"] = [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64,"
+                        + base64.b64encode(original).decode(),
+                    },
+                }
+            ]
+        assert json.loads(request.data) == expected
+        return io.BytesIO(
+            json.dumps(
+                {
+                    "data": [
+                        {
+                            "b64_json": base64.b64encode(original).decode(),
+                            "media_type": "image/png",
+                        }
+                    ],
+                    "usage": {"cost": 0.013},
+                    "size": "1024x1024",
+                }
+            ).encode()
+        )
+
+    monkeypatch.setattr(gpt_image.urllib.request, "urlopen", respond)
+    args = [
+        command,
+        "--model",
+        model,
+        "--prompt",
+        "poster",
+        "--out",
+        str(out),
+        "--json",
+    ]
+    if command == "edit":
+        args += ["--image", str(source)]
+    code, stdout, err = run(capsys, *args)
+    assert code == 0
+    assert err == ""
+    receipt = json.loads(stdout)
+    assert receipt["backend"] == "openrouter"
+    assert receipt["usage"]["cost"] == 0.013
+    assert out.read_bytes() == original
+
+
+def test_explicit_openrouter_high_intent_uses_sunburst(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     code, stdout, _ = run(
         capsys,
         "generate",
@@ -159,6 +281,8 @@ def test_high_intent_uses_sunburst_through_the_api_when_a_key_exists(
         "3:2",
         "--prompt",
         "A product",
+        "--backend",
+        "openrouter",
         "--out",
         str(plan_login / "p.png"),
         "--dry-run",
@@ -166,9 +290,9 @@ def test_high_intent_uses_sunburst_through_the_api_when_a_key_exists(
     )
     receipt = json.loads(stdout)
     assert code == 0
-    assert receipt["backend"] == "api"
+    assert receipt["backend"] == "openrouter"
     assert receipt["request"] == {
-        "model": "gpt-image-2.5-sunburst",
+        "model": "openai/gpt-image-2.5-sunburst",
         "quality": "high",
         "size": "1872x1248",
         "background": "auto",
@@ -196,7 +320,7 @@ def test_api_only_flags_on_the_plan_backend_are_refused(
         str(plan_login / "x.png"),
     )
     assert code == 2
-    assert "--quality need the API backend" in err
+    assert "--quality needs --backend openrouter" in err
 
 
 def test_transparent_jpeg_is_refused(
@@ -293,6 +417,7 @@ def test_alpha_report_reads_a_real_cutout() -> None:
     image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
     image.paste((255, 0, 0, 254), (25, 25, 75, 75))
     assert gpt_image.alpha_report(image) == {
+        "fully_opaque": False,
         "transparent_share": 0.75,
         "near_opaque_share": 0.25,
         "corners_transparent": True,
@@ -340,3 +465,88 @@ def test_edit_keeps_the_first_input_shape(
     assert code == 0
     assert receipt.get("target_size") == expected_target
     assert receipt["prompt"] == f"Change only the color.\n{expected_line}"
+
+
+@pytest.mark.parametrize("format", ["jpeg", "webp", "png"])
+def test_api_output_preserves_original_bytes(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    format: str,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    image = Image.effect_noise((128, 128), 70).convert("RGB")
+    buffer = io.BytesIO()
+    image.save(buffer, format.upper())
+    original = buffer.getvalue()
+    monkeypatch.setattr(
+        gpt_image,
+        "api_post",
+        lambda route, body: {
+            "data": [{"b64_json": base64.b64encode(original).decode()}],
+        },
+    )
+    out = env / f"out.{format}"
+    code, _, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "texture",
+        "--out",
+        str(out),
+    )
+    assert code == 0
+    assert err == ""
+    assert out.read_bytes() == original
+
+
+def test_api_mismatches_warn_and_list_only_delivered_files(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    buffer = io.BytesIO()
+    Image.new("RGBA", (1024, 1024), (255, 0, 0, 255)).save(buffer, "PNG")
+    monkeypatch.setattr(
+        gpt_image,
+        "api_post",
+        lambda route, body: {
+            "data": [{"b64_json": base64.b64encode(buffer.getvalue()).decode()}],
+            "size": "1024x1024",
+            "quality": "low",
+            "background": "opaque",
+            "output_format": "webp",
+        },
+    )
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "sticker",
+        "--out",
+        str(out),
+        "--size",
+        "1536x864",
+        "--quality",
+        "high",
+        "--transparent",
+        "--candidates",
+        "2",
+        "--json",
+    )
+    assert code == 0
+    assert "requested 2 images but received 1" in err
+    assert "requested quality=high, API reported low" in err
+    assert "requested size=1536x864, API reported 1024x1024" in err
+    assert "requested background=transparent, API reported opaque" in err
+    assert "requested output_format=png, API reported webp" in err
+    assert "out-1.png is 1024x1024, requested 1536x864" in err
+    assert "out-1.png is fully opaque" in err
+    assert json.loads(stdout)["outputs"] == [str(env / "out-1.png")]
+    assert not (env / "out-2.png").exists()
