@@ -543,6 +543,40 @@ def test_a_deepgram_failure_that_may_have_been_paid_is_never_75(
     assert (code, out) == (1, "")
 
 
+@exits("transcript", 75)
+def test_a_deadline_passing_before_deepgram_is_safe_to_retry(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    now = [0.0]
+
+    def slow_download(_url, output_dir, *_args, **_kwargs):
+        now[0] = 10_000.0
+        audio = output_dir / "audio.mp3"
+        audio.write_bytes(b"audio")
+        return transcript.DownloadedAudio(audio, "anonymous")
+
+    monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
+    fake_youtube(
+        monkeypatch,
+        download=slow_download,
+        transcribe=lambda *_args: pytest.fail("Deepgram was called after the deadline"),
+    )
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        URL,
+        "--no-summary",
+        "--output-dir",
+        str(tmp_path),
+    )
+
+    assert (code, out) == (75, "")
+    assert err.splitlines()[-1].startswith("retry: transcript run youtube ")
+
+
 def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     monkeypatch, capsys
 ) -> None:

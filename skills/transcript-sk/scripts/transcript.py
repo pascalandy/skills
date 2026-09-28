@@ -2534,6 +2534,9 @@ def _acquire_and_transcribe(
                 video_id=info["video_id"],
                 youtube_method=downloaded.method,
             )
+        # A deadline that has already passed stops the run before any paid
+        # request, so it stays safe to retry
+        budget.remaining("Deepgram transcription")
         with reporter.step("Deepgram transcription") as step:
             # From here on, a failure may follow a paid request
             try:
