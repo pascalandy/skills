@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-27
+date_updated: 2026-09-28
 ---
 
 `just install-skills` installs public skills, every package in the private tree, and `authoring/commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -17,8 +17,8 @@ date_updated: 2026-09-27
 - The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
 - Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
 - A name that is both public and private stops the run; delete the stale copy it names
-- Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
-- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. Previews and checks do not wait
+- A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
+- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout`, 5 minutes by default, then exits 75; previews and checks do not wait
 
 ## Private skills
 

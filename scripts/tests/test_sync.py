@@ -57,14 +57,15 @@ def behind(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path]:
     return repo, home
 
 
-def test_pulls_then_runs_the_pulled_private_sync_and_installs_quietly(
+def test_pulls_then_runs_the_pulled_private_sync_and_installs(
     behind: tuple[Path, Path],
 ) -> None:
     repo, home = behind
 
     result = run(repo, home)
 
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (result.returncode, result.stderr) == (0, "")
+    assert "add\t~/.claude/skills/alpha" in result.stdout.splitlines()
     assert (repo / "pulled-private-sync-ran").is_file()
     installed = home / ".claude/skills/alpha/SKILL.md"
     assert installed.read_text() == "# alpha\n\npulled\n"
@@ -110,10 +111,10 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
     check = run(repo, home, "--check")
 
     assert (preview.returncode, preview.stderr) == (0, "")
-    # The profile, and so the target count, depends on the host
-    assert preview.stdout.startswith("preview: ")
-    assert "; skills=1, commands=0; " in preview.stdout
-    # Nothing is installed yet, so the check reports work to do
-    assert (check.returncode, check.stderr) == (1, "")
+    # The profile, and so the target list, depends on the host
+    assert "add\t~/.claude/skills/alpha" in preview.stdout.splitlines()
+    # Nothing is installed yet, so the check lists the work on stderr
+    assert (check.returncode, check.stdout) == (1, "")
+    assert check.stderr.startswith(preview.stdout)
     assert not (repo / "_skills_private").exists()
     assert not (home / ".claude").exists()

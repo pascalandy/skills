@@ -131,11 +131,11 @@ step() {
         }
     fi
     uv run --quiet scripts/sync_private.py 2>&1 || return 1
-    just install-skills --quiet 2>&1
+    just install-skills 2>&1
 }
 """
 # Prints the private clone's state as sync_private.state() reports it, then the
-# installer's report.
+# installer's preview, from which judge() finds the drift.
 CHECK = """
 step() {
     enter "$1" || return
@@ -151,7 +151,7 @@ step() {
             echo "private $head clean"
         fi
     fi
-    just install-skills --check --json 2>&1
+    just install-skills --dry-run --json 2>&1
 }
 """
 
@@ -338,7 +338,7 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
 
 
 def judge(name: str, problems: list[str], output: str) -> Outcome:
-    """Turn an install-skills --check --json report into per-target drift."""
+    """Turn an install-skills --dry-run --json report into per-target drift."""
     lines = output.strip().splitlines()
     # The report is the indented JSON object; uv or a login profile may print
     # around it.
@@ -554,7 +554,7 @@ def hook(event: list[str]) -> str:
         return ""
     if not has_registry():
         return ""
-    installed = call([sys.executable, str(INSTALLER), "--quiet"])
+    installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
     if installed.returncode:

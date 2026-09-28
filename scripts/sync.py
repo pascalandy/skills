@@ -57,7 +57,7 @@ def sync(args: argparse.Namespace) -> str:
         pull_main()
         # Later steps start new processes, so they run the code the pull brought
         step(sys.executable, str(SCRIPTS / "sync_private.py"), *verbose)
-        flags = ["--quiet"]
+        flags = []
     # The installer is the last step, so its report and exit code are this run's
     installer = [sys.executable, str(SCRIPTS / "install_skills.py"), *flags, *verbose]
     os.execv(sys.executable, installer)

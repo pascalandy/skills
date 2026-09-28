@@ -8,6 +8,7 @@ import json
 import logging
 import shlex
 import sys
+import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -38,11 +39,23 @@ def swap(fresh: Path, destination: Path, previous: Path) -> None:
 
 
 @contextmanager
-def exclusive(path: Path) -> Iterator[None]:
-    """Hold the lock at `path` for the block, waiting for any other holder."""
+def exclusive(path: Path, timeout: float | None = None) -> Iterator[None]:
+    """Hold the lock at `path` for the block, waiting up to `timeout` seconds
+    for another holder, or forever without one; raise TemporaryError when the
+    wait runs out."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = None if timeout is None else time.monotonic() + timeout
     with path.open("w") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TemporaryError(
+                        f"another run still holds {path} after {timeout:g}s"
+                    ) from None
+                time.sleep(0.1)
         yield
 
 

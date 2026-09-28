@@ -29,7 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import flatten_skills
-from _common import ScriptError, exclusive, swap
+from _cli import Parser, ScriptError, duration, exit_codes
+from _common import exclusive, run_script, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -85,6 +86,34 @@ RUNTIME_NAMES = frozenset(
 )
 RUNTIME_PREFIXES = (".coverage.", "._")
 RUNTIME_SUFFIXES = (".pyc", ".pyo", ".tsbuildinfo", ".swp", ".swo", "~")
+CHANGES = ("add", "update", "remove")
+EXIT_CODES = exit_codes(
+    {
+        0: "installed, or nothing to change",
+        1: "a conflict blocks the install, or --check found pending changes",
+        75: "another install still held the lock after --timeout",
+    }
+)
+EPILOG = """\
+Each run prints one line per change: add, update, or remove, then a tab and
+the installed path. A dry run prints the same lines and writes nothing; a run
+with nothing to change prints nothing. A conflict, a symlink or wrong type at
+a target path, blocks the install and is reported on stderr.
+
+profiles:
+  mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
+       ~/.config/opencode/skills, ~/.config/agents/skills
+  om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
+       ~/.config/opencode/skills (excludes apple-mail)
+  commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
+        ~/.codex/prompts, ~/.config/opencode/commands
+  commands on mac: ~/.config/agents/commands
+
+examples:
+  just install-skills --dry-run
+  just install-skills
+  just install-skills --private-root ~/private-skills
+  just install-skills --check --json"""
 log = logging.getLogger("install-skills")
 
 
@@ -434,67 +463,102 @@ def install_lock() -> Path:
     return ROOT / common.strip() / "install-skills.lock"
 
 
-def render(
-    actions: list[Action],
-    profile: str,
-    synced: tuple[int, int],
-    dry_run: bool,
-    json_output: bool,
-    verbose: bool,
-) -> str:
-    counts = Counter(action.kind for action in actions)
+def report(
+    actions: list[Action], profile: str, synced: tuple[int, int], preview: bool
+) -> dict:
+    """The --json object: counts per target and every action."""
     skills, commands = synced
-    if json_output:
-        expected = {
-            **dict.fromkeys(PROFILES[profile], skills),
-            **dict.fromkeys(COMMAND_TARGETS[profile], commands),
-        }
-        return json.dumps(
-            {
-                "profile": profile,
-                "mode": "preview" if dry_run else "apply",
-                "skills": skills,
-                "commands": commands,
-                "counts": dict(counts),
-                "targets": summarize(actions, expected),
-                "actions": [action.__dict__ for action in actions],
-            },
-            indent=2,
-        )
-    lines = [
-        f"{'preview' if dry_run else 'applied'}: {profile}; "
-        f"skills={skills}, commands={commands}; "
-        + ", ".join(
-            f"{kind}={counts[kind]}"
-            for kind in ("add", "update", "remove", "current", "conflict")
-        )
-    ]
-    if verbose:
-        lines.extend(
-            f"{action.kind}: ~/{action.target}/{action.name}"
-            + (f" ({action.detail})" if action.detail else "")
+    expected = {
+        **dict.fromkeys(PROFILES[profile], skills),
+        **dict.fromkeys(COMMAND_TARGETS[profile], commands),
+    }
+    return {
+        "profile": profile,
+        "mode": "preview" if preview else "apply",
+        "skills": skills,
+        "commands": commands,
+        "counts": dict(Counter(action.kind for action in actions)),
+        "targets": summarize(actions, expected),
+        "actions": [action.__dict__ for action in actions],
+    }
+
+
+def install(args: argparse.Namespace) -> str:
+    home = Path.home()
+    preview = args.dry_run or args.check
+    # An apply waits for any other one before it reads the working tree, so
+    # the last to finish installs the newest version. Previews and checks
+    # write nothing and do not wait.
+    with (
+        nullcontext() if preview else exclusive(install_lock(), args.timeout),
+        tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
+    ):
+        sources = skill_sources(Path(temporary), args.private_root, args.profile)
+        commands = command_sources()
+        actions = [
+            *plan(
+                home,
+                PROFILES[args.profile],
+                sources,
+                owned_skills() | owned_private(args.private_root),
+            ),
+            *plan(
+                home,
+                COMMAND_TARGETS[args.profile],
+                commands,
+                {
+                    path.name
+                    for path in published("authoring/commands")
+                    if len(path.parts) == 1 and path.suffix == ".md"
+                },
+                files=True,
+            ),
+        ]
+        summary = report(actions, args.profile, (len(sources), len(commands)), preview)
+        for target in summary["targets"]:
+            log.info(
+                "~/%s: %d of %d current",
+                target["target"],
+                target["current"],
+                target["expected"],
+            )
+        changes = "\n".join(
+            f"{action.kind}\t~/{action.target}/{action.name}"
             for action in actions
+            if action.kind in CHANGES
         )
-    return "\n".join(lines)
+        conflicts = [
+            f"{action.detail}; move it aside, then rerun: just install-skills"
+            for action in actions
+            if action.kind == "conflict"
+        ]
+        output = json.dumps(summary, indent=2) if args.json else changes
+        pending = [action for action in actions if action.kind != "current"]
+        if args.check and pending:
+            raise ScriptError(
+                *conflicts,
+                f"{len(pending)} installed entries differ from the checkout; "
+                "run: just install-skills",
+                detail=changes,
+                report=summary,
+            )
+        if preview:
+            for conflict in conflicts:
+                log.warning("warning: %s", conflict)
+            return output
+        if conflicts:
+            raise ScriptError(*conflicts, report=summary)
+        flatten_skills.flatten()
+        execute(home, sources, commands, actions)
+        return output
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
+        prog="just install-skills",
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""profiles:
-  mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
-       ~/.config/opencode/skills, ~/.config/agents/skills
-  om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
-       ~/.config/opencode/skills (excludes apple-mail)
-  commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
-        ~/.codex/prompts, ~/.config/opencode/commands
-  commands on mac: ~/.config/agents/commands
-
-examples:
-  just install-skills --dry-run --verbose
-  just install-skills --private-root ~/private-skills
-  just install-skills --check --json""",
+        epilog=EPILOG,
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument(
         "--profile",
@@ -509,97 +573,28 @@ examples:
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
+        "-n",
         "--dry-run",
         action="store_true",
-        help="preview all actions, including conflicts, without writes; exit 0",
+        help="print the changes an install would make, and warn about conflicts, without writing",
     )
     mode.add_argument(
         "--check",
         action="store_true",
-        help="preview and exit 1 if any selected target needs work or conflicts",
+        help="dry run that exits 1 when an installed entry differs, listing the changes on stderr",
     )
     parser.add_argument(
-        "--json", action="store_true", help="print the per-target report as JSON"
-    )
-    parser.add_argument(
-        "-q",
-        "--quiet",
+        "--json",
         action="store_true",
-        help="print nothing after a successful apply",
+        help="print the per-target report as one JSON object",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="show per-item detail and error tracebacks",
+        "--timeout",
+        type=duration,
+        default="5m",
+        help="how long an install waits for another one to finish (default: 5m)",
     )
-    args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING)
-    home = Path.home()
-    try:
-        # An apply waits for any other one before it reads the working tree, so
-        # the last to finish installs the newest version. Previews and checks
-        # write nothing and do not wait.
-        applying = not (args.dry_run or args.check)
-        with (
-            exclusive(install_lock()) if applying else nullcontext(),
-            tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
-        ):
-            sources = skill_sources(Path(temporary), args.private_root, args.profile)
-            commands = command_sources()
-            actions = [
-                *plan(
-                    home,
-                    PROFILES[args.profile],
-                    sources,
-                    owned_skills() | owned_private(args.private_root),
-                ),
-                *plan(
-                    home,
-                    COMMAND_TARGETS[args.profile],
-                    commands,
-                    {
-                        path.name
-                        for path in published("authoring/commands")
-                        if len(path.parts) == 1 and path.suffix == ".md"
-                    },
-                    files=True,
-                ),
-            ]
-            report = render(
-                actions,
-                args.profile,
-                (len(sources), len(commands)),
-                args.dry_run or args.check,
-                args.json,
-                args.verbose,
-            )
-            if args.check:
-                print(report)
-                return int(any(action.kind != "current" for action in actions))
-            if args.dry_run:
-                print(report)
-                return 0
-            if any(action.kind == "conflict" for action in actions):
-                print(report)
-                return 1
-            flatten_skills.flatten(dry_run=False)
-            execute(home, sources, commands, actions)
-            if args.json or args.verbose or not args.quiet:
-                print(report)
-            return 0
-    except KeyboardInterrupt:
-        print("interrupted", file=sys.stderr)
-        return 130
-    except ScriptError as error:
-        for message in error.args:
-            print(f"error: {message}", file=sys.stderr)
-    except Exception as error:
-        log.debug("unexpected failure", exc_info=True)
-        print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
-    if not args.verbose:
-        print("rerun with --verbose for details", file=sys.stderr)
-    return 1
+    return run_script(parser, install, argv, debug="INSTALL_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

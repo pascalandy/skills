@@ -170,7 +170,14 @@ def new_skill_preview(sandbox: Sandbox) -> tuple[str, ...]:
     return ("--dry-run",)
 
 
+def mac_preview(_: Sandbox) -> tuple[str, ...]:
+    return ("--profile", "mac", "--dry-run")
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/install_skills.py": Entry(
+        name="just install-skills", block="git", safe=mac_preview
+    ),
     "scripts/flatten_skills.py": Entry(
         name="just flatten-skills", block="git", safe=new_skill_preview
     ),
@@ -204,7 +211,6 @@ ENTRIES: dict[str, Entry] = {
 # Scripts a later wave moves onto the contract
 PENDING = {
     "scripts/discover_skills.py",
-    "scripts/install_skills.py",
     "scripts/sync.py",
     "scripts/sync_fleet.py",
     "scripts/sync_private.py",

@@ -211,7 +211,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
     assert not (behind / REGISTRY).exists()
-    assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
+    assert (homes / "behind/just.log").read_text() == "install-skills\n"
     installed = homes / "behind/.claude/skills/secret/SKILL.md"
     assert installed.read_text() == "from the hub\n"
     assert (homes / "editor/.claude/skills/mine/SKILL.md").is_file()
@@ -358,5 +358,5 @@ def test_brings_the_machine_it_runs_on_to_github_main(
 
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     assert git(hub, "rev-parse", "HEAD") == github != before
-    assert (home / "just.log").read_text() == "install-skills --quiet\n"
+    assert (home / "just.log").read_text() == "install-skills\n"
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
