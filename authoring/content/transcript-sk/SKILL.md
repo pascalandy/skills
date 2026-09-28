@@ -22,7 +22,7 @@ uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
 uv run <skill_dir>/scripts/transcript.py run zoom --path "<folder-name-or-full-path>" --json
 ```
 
-The default profile is `astra`. Use `--profile sol` or `--profile glm` only when the user selects that profile.
+Pass `--profile` only when the user selects a profile; `list profiles --json` marks the default.
 
 ## Manage inference through profiles
 
@@ -36,36 +36,17 @@ uv run <skill_dir>/scripts/transcript.py list profiles --json
 
 Show the current profile names, providers, models, and efforts. Then ask whether the user wants to select an existing profile, update one, or create one. If the user already named a profile, show its configuration and use `--profile <name>`.
 
-The built-in profiles are:
+The list order records preference only. The CLI runs one profile and never falls back to another profile.
 
-| Profile | Provider | Model | Effort |
-|---|---|---|---|
-| `astra` | `codex` | `gpt-6-astra` | `low` |
-| `sol` | `codex` | `gpt-5.6-sol` | `medium` |
-| `glm` | `openrouter` | `z-ai/glm-5.3-flash` | `medium` |
-
-The order records preference only. The CLI runs one profile and never falls back to another profile.
-
-To update or create a profile, edit the `INFERENCE_PROFILES` registry in `scripts/transcript.py`, update this table and `README.md`, then run the validation procedure in `README.md`.
+To update or create a profile, edit the `INFERENCE_PROFILES` registry in `scripts/transcript.py`, the only list of profiles, then run the validation procedure in `README.md`.
 
 For Zoom, `--path` names the meeting folder, not its `audio*.m4a` file. A plain folder name resolves under `~/Documents/Zoom`.
 
-Use these options only when the request calls for them:
-
-- `--no-summary` saves transcript artifacts without an AI summary
-- `--profile NAME` selects a complete inference configuration
-- `--provider`, `--model`, and `--effort` form an advanced custom target and must be supplied together; use them only for diagnostics
-- `--prompt` overrides the summary prompt
-- `--output-dir DIR` changes the parent directory for the result folder
-- `--preview` renders the saved summary and cannot be combined with `--json`
-- `--open` opens Finder after publication; the default has no GUI side effect
-- `--timeout SECONDS` changes the workflow deadline
-
-YouTube defaults to `follow_along_note` and the `astra` profile. Zoom uses `distill-prompt/references/synthese-rencontre/prompt.md` and the same profile.
+`help run youtube` and `help run zoom` list every run option and its default. Add an option only when the request calls for it. `--provider`, `--model`, and `--effort` form an advanced custom target for diagnostics only. `--open` and `--preview` are opt-in, so a normal run has no GUI side effect.
 
 ## Agent operation
 
-Use `--json` for discovery, dry runs, and real runs unless the user asks for a terminal preview. JSON success output is one document on `stdout`; progress stays on `stderr`.
+Use `--json` for discovery, dry runs, and real runs unless the user asks for a terminal preview. JSON success is one object on `stdout` and leaves `stderr` empty; warnings join it as a `warnings` list. A failure leaves `stdout` empty and writes one JSON object on `stderr`.
 
 For an unfamiliar machine or after a preflight failure, run:
 
@@ -92,9 +73,9 @@ uv run <skill_dir>/scripts/transcript.py list models --provider openrouter --jso
 uv run <skill_dir>/scripts/transcript.py --help
 ```
 
-Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Read the error `code`, `message`, and `hint`; use `doctor` when the hint names it. Exit `130` means the user interrupted the run.
+Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Exit `75` means a temporary failure before any paid request; rerunning the same command is safe. Exits `130` and `143` mean the run was interrupted. Read the error `code`, `message`, and `hint`; the hint is the command that fixes it. Never rerun an exit `1` run automatically, because Deepgram may already have billed the audio.
 
-Report the result folder and summary status. Do not paste the generated summary into chat unless the user asks.
+Report the result folder and summary status. After a summary failure, the transcript is still published: read `output_dir` from the `stderr` JSON. Do not paste the generated summary into chat unless the user asks.
 
 ## YouTube transport check
 

@@ -102,6 +102,10 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
+- `transcript` in `transcript-sk`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
+- `transcript`: no `--plain`; `list` already prints one item per line, tab-separated and colorless
+- `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
+- `transcript`: a JSON error keeps `{"ok": false, "error": {"code", "message", "hint"}}`, which its agents and `verify-transcript-sk` read, instead of the shared `errors` list; `hint` is the command that fixes it
 
 ## Shared code
 
@@ -116,6 +120,8 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI
 
 `test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it in docs, hooks, CI, and `scripts/`. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
+
+A migrated script with subcommands or PEP 723 dependencies is listed in `OWN_SUITE` with the suite that runs the same probes where those dependencies are installed, such as `transcript-sk`'s `test_contract.py`, run by `just check --only transcript-sk`
 
 Each script's exit-code table drives its tests: every code needs a test that triggers it. The contract tests cover `2`, `130`, and `143`; a script's own suite marks the rest with `@exits(script, code)`, which fails unless the test really sees that exit
 

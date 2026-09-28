@@ -115,15 +115,41 @@ class Parser(argparse.ArgumentParser):
         self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
 
 
-def given(argv: Sequence[str], *flags: str) -> bool:
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
     """Whether one of `flags` comes before `--`, where options end; use it to let
-    -h and --help win over every other argument, or to spot --json early."""
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
     for arg in argv:
         if arg == "--":
             return False
         if arg in flags:
             return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
     return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
 
 
 @contextmanager

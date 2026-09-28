@@ -38,7 +38,9 @@ FEATURE_AREAS = (
 
 Layout = Literal["source", "applied"]
 Verdict = Literal["PASS", "FAIL"]
-OutputKind = Literal["stdout-json", "stderr-json", "stdout-text"]
+# "json-by-exit" reads stdout on exit 0 and stderr otherwise, as a doctor
+# report moves to stderr when a check fails
+OutputKind = Literal["stdout-json", "stderr-json", "json-by-exit", "stdout-text"]
 SurfaceKind = Literal["command", "option", "behavior"]
 ProbeKind = Literal[
     "help-version",
@@ -158,37 +160,37 @@ class RunContext:
     youtube_url: str
 
 
-RUN_OPTIONS = frozenset(
-    {
-        "--debug",
-        "--dry-run",
-        "--effort",
-        "--help",
-        "--json",
-        "--model",
-        "--no-summary",
-        "--open",
-        "--output-dir",
-        "--preview",
-        "--profile",
-        "--prompt",
-        "--provider",
-        "--timeout",
-    }
+# Options every transcript command accepts, before or after its name
+GLOBAL_OPTIONS = frozenset(
+    {"--help", "--verbose", "--debug", "--json", "--no-color", "--no-progress"}
 )
+
+RUN_OPTIONS = GLOBAL_OPTIONS | {
+    "--dry-run",
+    "--effort",
+    "--model",
+    "--no-summary",
+    "--open",
+    "--output-dir",
+    "--preview",
+    "--profile",
+    "--prompt",
+    "--provider",
+    "--timeout",
+}
 
 HELP_CONTRACTS = (
     HelpContract(
         "root-help",
         ("--help",),
-        frozenset({"run", "list", "doctor"}),
-        frozenset({"--help", "--version"}),
+        frozenset({"run", "list", "doctor", "help"}),
+        GLOBAL_OPTIONS | {"--version"},
     ),
     HelpContract(
         "run-help",
         ("run", "--help"),
         frozenset({"youtube", "zoom"}),
-        frozenset({"--help"}),
+        GLOBAL_OPTIONS,
     ),
     HelpContract(
         "youtube-help",
@@ -206,31 +208,37 @@ HELP_CONTRACTS = (
         "list-help",
         ("list", "--help"),
         frozenset({"profiles", "prompts", "models"}),
-        frozenset({"--help"}),
+        GLOBAL_OPTIONS,
     ),
     HelpContract(
         "prompts-help",
         ("list", "prompts", "--help"),
         frozenset(),
-        frozenset({"--help", "--json"}),
+        GLOBAL_OPTIONS,
     ),
     HelpContract(
         "profiles-help",
         ("list", "profiles", "--help"),
         frozenset(),
-        frozenset({"--help", "--json"}),
+        GLOBAL_OPTIONS,
     ),
     HelpContract(
         "models-help",
         ("list", "models", "--help"),
         frozenset(),
-        frozenset({"--help", "--json", "--provider"}),
+        GLOBAL_OPTIONS | {"--provider"},
     ),
     HelpContract(
         "doctor-help",
         ("doctor", "--help"),
         frozenset(),
-        frozenset({"--help", "--json", "--no-summary", "--source"}),
+        GLOBAL_OPTIONS | {"--no-summary", "--source"},
+    ),
+    HelpContract(
+        "help-help",
+        ("help", "--help"),
+        frozenset(),
+        GLOBAL_OPTIONS,
     ),
 )
 
@@ -282,6 +290,7 @@ PUBLIC_SURFACES = (
         "models",
         ("configuration.models",),
     ),
+    PublicSurface("command.help", "command", "help", ("interface.help-version",)),
     PublicSurface("option.help", "option", "--help", ("interface.help-version",)),
     PublicSurface("option.version", "option", "--version", ("interface.help-version",)),
     PublicSurface("option.url", "option", "--url", ("youtube.dry-run-summary",)),
@@ -366,7 +375,37 @@ PUBLIC_SURFACES = (
         "option.debug",
         "option",
         "--debug",
-        exclusion_reason="Only changes unexpected internal-error tracebacks",
+        exclusion_reason=(
+            "Only adds internals, timings, and tracebacks on stderr; "
+            "transcript-sk contract tests compare every verbosity level"
+        ),
+    ),
+    PublicSurface(
+        "option.verbose",
+        "option",
+        "--verbose",
+        exclusion_reason=(
+            "Only adds progress lines on stderr; "
+            "transcript-sk contract tests compare every verbosity level"
+        ),
+    ),
+    PublicSurface(
+        "option.no-color",
+        "option",
+        "--no-color",
+        exclusion_reason=(
+            "Only changes terminal rendering; "
+            "transcript-sk contract tests drive it on a pseudo-terminal"
+        ),
+    ),
+    PublicSurface(
+        "option.no-progress",
+        "option",
+        "--no-progress",
+        exclusion_reason=(
+            "Only hides the terminal spinner; "
+            "transcript-sk contract tests drive it on a pseudo-terminal"
+        ),
     ),
     PublicSurface(
         "stream.text-stdout",
@@ -407,6 +446,13 @@ PUBLIC_SURFACES = (
         "exit.interrupted",
         "behavior",
         exclusion_reason="Requires sending a process signal and is covered by unit tests",
+    ),
+    PublicSurface(
+        "exit.temporary",
+        "behavior",
+        exclusion_reason=(
+            "Requires an injected network failure and is covered by unit tests"
+        ),
     ),
     PublicSurface(
         "publication.summary-success",
@@ -717,7 +763,7 @@ def build_commands(
             CommandPlan(
                 "doctor-youtube",
                 ("doctor", "--source", "youtube", "--json"),
-                expectation=OutputExpectation("stdout-json", (0, 1)),
+                expectation=OutputExpectation("json-by-exit", (0, 1)),
             ),
         )
     if feature.probe == "doctor-zoom":
@@ -725,7 +771,7 @@ def build_commands(
             CommandPlan(
                 "doctor-zoom",
                 ("doctor", "--source", "zoom", "--json"),
-                expectation=OutputExpectation("stdout-json", (0, 1)),
+                expectation=OutputExpectation("json-by-exit", (0, 1)),
             ),
         )
     if feature.probe == "youtube-dry-run-summary":
@@ -929,11 +975,14 @@ def parse_expected_output(
         process.exit_code in expectation.exit_codes,
         f"transcript exited {process.exit_code}; expected {expectation.exit_codes}",
     )
-    if expectation.kind == "stdout-json":
+    kind = expectation.kind
+    if kind == "json-by-exit":
+        kind = "stdout-json" if process.exit_code == 0 else "stderr-json"
+    if kind == "stdout-json":
         _require(not process.stderr, "stdout JSON command wrote to stderr")
         _require(bool(process.stdout.strip()), "stdout JSON output is empty")
         return _parse_json_document(process.stdout, "stdout")
-    if expectation.kind == "stderr-json":
+    if kind == "stderr-json":
         _require(not process.stdout, "stderr JSON command wrote to stdout")
         _require(bool(process.stderr.strip()), "stderr JSON output is empty")
         return _parse_json_document(process.stderr, "stderr")
@@ -948,9 +997,12 @@ def capture_command(
     context: RunContext,
 ) -> tuple[CapturedProcess, dict[str, object]]:
     assert_safe_command(feature, plan, context)
+    # --quiet keeps uv's own setup lines, such as "Installed 12 packages", off
+    # stderr; a fresh checkout triggers them, and they are not transcript's output
     argv = (
         "uv",
         "run",
+        "--quiet",
         str(context.located.transcript_script),
         *plan.args,
     )
@@ -1187,10 +1239,10 @@ def _help_section(text: str, heading: str) -> str:
 
 
 def _help_options(text: str) -> frozenset[str]:
-    declarations = text.split("\nExamples:\n", 1)[0]
+    declarations = re.split(r"\n[Ee]xamples:\n", text, maxsplit=1)[0]
     return frozenset(
         re.findall(
-            r"^  (?:-h, )?(--[a-z][a-z-]*)",
+            r"^  (?:-[A-Za-z], )?(--[a-z][a-z-]*)",
             declarations,
             flags=re.MULTILINE,
         )

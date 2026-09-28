@@ -276,6 +276,17 @@ def test_response_contract_enforces_json_streams():
         )
 
 
+def test_a_doctor_report_is_read_from_the_stream_its_exit_code_names():
+    by_exit = verify_transcript_sk.OutputExpectation("json-by-exit", (0, 1))
+    ready = verify_transcript_sk.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
+    unready = verify_transcript_sk.CapturedProcess(
+        (), 1, "", '{"ok":false}\n', 0.1, False
+    )
+
+    assert verify_transcript_sk.parse_expected_output(ready, by_exit) == {"ok": True}
+    assert verify_transcript_sk.parse_expected_output(unready, by_exit) == {"ok": False}
+
+
 def test_new_free_commands_remain_safe_and_confined(tmp_path: Path):
     context = make_context(tmp_path)
     feature_ids = {
