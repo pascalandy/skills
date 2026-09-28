@@ -45,8 +45,8 @@ def test_a_bug_names_the_rerun_and_only_debug_shows_the_traceback() -> None:
         "",
         "error: RuntimeError: boom\nrerun: just tool --debug\n",
     )
-    assert traced[2].startswith("error: RuntimeError: boom\nunexpected failure\n")
-    assert "Traceback" in traced[2]
+    assert traced[2].startswith("unexpected failure\nTraceback")
+    assert traced[2].endswith("\nerror: RuntimeError: boom\n")
 
 
 def test_under_json_a_bug_and_a_temporary_failure_are_one_object_each() -> None:
@@ -64,6 +64,16 @@ def test_under_json_a_bug_and_a_temporary_failure_are_one_object_each() -> None:
         "errors": ["the lock is held"],
         "retry": "just tool --json",
     }
+
+
+def test_under_json_and_debug_the_error_object_still_ends_stderr() -> None:
+    code, stdout, stderr = call(broken, "--json", "--debug")
+    lines = stderr.splitlines()
+    start = len(lines) - 1 - lines[::-1].index("{")
+
+    assert (code, stdout) == (1, "")
+    assert "Traceback" in stderr
+    assert json.loads("\n".join(lines[start:])) == {"errors": ["RuntimeError: boom"]}
 
 
 def started(script: str, tmp_path: Path) -> subprocess.Popen[str]:

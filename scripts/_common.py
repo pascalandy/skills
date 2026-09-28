@@ -203,12 +203,12 @@ def run_script(
         except ScriptError as error:
             return report(error, parser, as_json, command)
         except Exception as error:
+            # The traceback comes first, so the error, or its JSON object, ends stderr
+            log.debug("unexpected failure", exc_info=True)
             unexpected = ScriptError(f"{type(error).__name__}: {error}")
-            code = report(
+            return report(
                 unexpected, parser, as_json, command, rerun=bool(debug) and not tracing
             )
-            log.debug("unexpected failure", exc_info=True)
-            return code
 
 
 def report(
