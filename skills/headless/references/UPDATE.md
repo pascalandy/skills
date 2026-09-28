@@ -12,7 +12,7 @@ Update documentation without installing or upgrading CLIs or invoking billable m
 | --- | --- | --- |
 | Claude Code | `claude --version`, `claude --help` | [Programmatic guide](https://code.claude.com/docs/en/headless), [CLI](https://code.claude.com/docs/en/cli-reference), [permissions](https://code.claude.com/docs/en/permissions) |
 | Codex | `codex --version`, `codex exec --help`, `codex review --help`, `codex exec review --help`, `codex exec resume --help` | [Non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode), [commands](https://learn.chatgpt.com/docs/developer-commands#codex-exec), [models](https://learn.chatgpt.com/docs/models) |
-| OpenCode | `opencode --version`, `opencode run --help`, `opencode serve --help`; v2: `opencode debug agents`, v1: `opencode agent list` | [V2 run](https://opencode.ai/v2/docs/cli/commands/#run), [v1 CLI](https://opencode.ai/docs/cli/) |
+| OpenCode | `opencode --version`, `opencode run --help`, `opencode serve --help`. Avoid v2 `opencode debug agents`: it leaves a background service running | [V2 run](https://opencode.ai/v2/docs/cli/commands/#run), [v2 agents](https://opencode.ai/v2/docs/agents/), [v1 CLI](https://opencode.ai/docs/cli/), [v1 agents](https://opencode.ai/docs/agents/) |
 | Pi | `pi --version`, `pi --help`, `pi --list-models` | [CLI integration](https://pi.dev/docs/latest/cli-integration), [CLI](https://pi.dev/docs/latest/cli), [JSON events](https://pi.dev/docs/latest/json), [RPC](https://pi.dev/docs/latest/rpc) |
 
 For Pi, locate the installed `@earendil-works/pi-coding-agent` package through the active package manager, then read its README and JSON/RPC docs as needed. For Codex model discovery, check `codex debug models --help` before using that experimental command.

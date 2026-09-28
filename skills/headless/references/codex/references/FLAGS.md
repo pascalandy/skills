@@ -8,7 +8,7 @@ This table reflects `codex exec --help` in Codex CLI 0.157.1. Run the installed 
 | `-C`, `--cd` | Set the target repository |
 | `-s`, `--sandbox` | Set `read-only`, `workspace-write`, or `danger-full-access` |
 | `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, and `sandbox_mode` for review commands that lack `-s` |
-| `-m`, `--model` | Select a model such as `gpt-6-astra`, `gpt-6-sol`, or `gpt-6-luna` when available |
+| `-m`, `--model` | Select a model available to the account |
 | `-p`, `--profile` | Load a named config profile |
 | `--worktree` | Start in a new managed Git worktree |
 | `--add-dir` | Grant write access to another directory |
