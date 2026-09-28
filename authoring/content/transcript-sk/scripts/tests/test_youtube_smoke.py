@@ -107,7 +107,7 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
-    monkeypatch.setattr(youtube_smoke.subprocess, "run", fake_run)
+    monkeypatch.setattr(youtube_smoke, "run_child", fake_run)
     monkeypatch.setattr(
         transcript,
         "transcribe_audio",
@@ -122,7 +122,8 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
     code = youtube_smoke.main([CANONICAL_TRANSPORT_URL])
 
     assert code == 0
-    assert "Arc adapter exercised" in capsys.readouterr().out
+    # A pass says nothing; -v reports the steps on stderr
+    assert capsys.readouterr() == ("", "")
     assert len(observed_audio_paths) == 1
     assert not observed_audio_paths[0].parent.exists()
 
@@ -143,8 +144,8 @@ def test_smoke_cleans_temporary_audio_when_ffprobe_fails(monkeypatch) -> None:
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
     monkeypatch.setattr(
-        youtube_smoke.subprocess,
-        "run",
+        youtube_smoke,
+        "run_child",
         lambda *_args, **_kwargs: SimpleNamespace(
             returncode=1, stdout="", stderr="invalid media"
         ),
@@ -174,11 +175,11 @@ def test_smoke_bounds_ffprobe_with_the_global_budget(monkeypatch) -> None:
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
-    monkeypatch.setattr(youtube_smoke.subprocess, "run", timeout)
+    monkeypatch.setattr(youtube_smoke, "run_child", timeout)
 
     code = youtube_smoke.main([CANONICAL_TRANSPORT_URL])
 
-    assert code == 1
+    assert code == youtube_smoke.TEMPORARY
     assert 0 < observed_timeouts[0] <= youtube_smoke.FFPROBE_TIMEOUT
 
 

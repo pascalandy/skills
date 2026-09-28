@@ -19,11 +19,13 @@ def no_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail an in-process test that would start yt-dlp, pi, or the keyring, or
     call Deepgram; a test that needs one replaces it first."""
     import transcript
+    import youtube_smoke
 
     def refuse(command: Any, *_args: Any, **_kwargs: Any) -> Any:
         pytest.fail(f"test reached a real external boundary: {command!r}")
 
     monkeypatch.setattr(transcript, "run_child", refuse)
+    monkeypatch.setattr(youtube_smoke, "run_child", refuse)
     monkeypatch.setattr(transcript.httpx, "post", refuse)
 
 

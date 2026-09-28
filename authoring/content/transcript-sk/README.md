@@ -175,7 +175,7 @@ Run the free transport check:
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. It never calls Deepgram, Pi, Codex, or OpenRouter. A pass proves the Arc adapter ran. It does not prove the full user flow.
+The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass prints nothing and exits `0`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram, Pi, Codex, or OpenRouter. A pass proves the Arc adapter ran. It does not prove the full user flow.
 
 ## Validation model
 

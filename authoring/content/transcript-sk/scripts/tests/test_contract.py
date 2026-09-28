@@ -1,8 +1,8 @@
 """The CLI contract in docs/maintainer/references/script-conventions.md, for
-transcript.py.
+transcript.py and youtube_smoke.py.
 
-scripts/tests/test_cli_contract.py probes the flat scripts in scripts/; this one
-has subcommands and PEP 723 dependencies, so this suite runs the same probes
+scripts/tests/test_cli_contract.py probes the flat scripts in scripts/; these two
+have subcommands and PEP 723 dependencies, so this suite runs the same probes
 here, where the transcript-sk check provides those dependencies. In-process
 probes call main() the way the command line does. Signal and terminal probes run
 the real script with this test's Python, in an isolated home with stub commands
@@ -29,6 +29,7 @@ from pathlib import Path
 import httpx
 import pytest
 import transcript
+import youtube_smoke
 from conftest import DECLARED, covers, exits, observe
 from test_transcript import deepgram_response
 
@@ -61,6 +62,12 @@ def section(text: str, title: str) -> list[str]:
 def cli(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
     """Run transcript's main() the way the command line does."""
     code = observe("transcript", transcript.main(list(argv)))
+    captured = capsys.readouterr()
+    return code, captured.out, captured.err
+
+
+def smoke(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
+    code = observe("youtube_smoke", youtube_smoke.main(list(argv)))
     captured = capsys.readouterr()
     return code, captured.out, captured.err
 
@@ -161,6 +168,18 @@ def test_version_is_one_line_on_stdout(capsys) -> None:
     assert cli(capsys, "--version") == (0, f"transcript {transcript.__version__}\n", "")
 
 
+def test_smoke_help_lists_examples_and_exit_codes_and_wins(capsys) -> None:
+    code, shown, err = smoke(capsys, "--help")
+    examples = section(shown, "examples")
+    codes = [int(line.split()[0]) for line in section(shown, "exit codes")]
+
+    assert (code, err) == (0, "")
+    assert 2 <= len(examples) <= 5
+    assert codes == list(youtube_smoke.EXIT_CODES)
+    for argv in (["-h"], ["--bogus-flag", "--help"], ["--help", "--bogus-flag"]):
+        assert smoke(capsys, *argv) == (0, shown, "")
+
+
 # ---------------------------------------------------------------------------
 # Usage errors and parsing
 # ---------------------------------------------------------------------------
@@ -246,6 +265,28 @@ def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
     assert lines[0].startswith(f"usage: {command} ")
     assert f"error: {error}" in lines
     assert lines[-1] == f"run '{command} --help'"
+
+
+@exits("youtube_smoke", 2)
+@pytest.mark.parametrize(
+    ("argv", "error"),
+    [
+        (["--bogus-flag"], "unrecognized arguments: --bogus-flag"),
+        (
+            ["https://example.com/video"],
+            "invalid YouTube URL: 'https://example.com/video'",
+        ),
+    ],
+    ids=["unknown-flag", "invalid-url"],
+)
+def test_a_smoke_usage_error_exits_2_with_the_help_hint(
+    argv: list[str], error: str, capsys
+) -> None:
+    code, out, err = smoke(capsys, *argv)
+
+    assert (code, out) == (2, "")
+    assert f"error: {error}" in err.splitlines()
+    assert err.splitlines()[-1] == "run 'youtube_smoke.py --help'"
 
 
 def test_a_json_usage_error_is_one_object_on_stderr(capsys) -> None:
@@ -656,6 +697,42 @@ def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     assert "retry: transcript run youtube" in err
 
 
+@exits("youtube_smoke", 0, 1, 75)
+def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> None:
+    def downloaded(_url, output_dir, *_args, **_kwargs):
+        audio = output_dir / "audio.mp3"
+        audio.write_bytes(b"audio")
+        return transcript.DownloadedAudio(audio, "arc")
+
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: "/bin/ffprobe")
+    monkeypatch.setattr(youtube_smoke, "download_audio", downloaded)
+    monkeypatch.setattr(
+        youtube_smoke,
+        "run_child",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "audio\n", ""),
+    )
+    assert smoke(capsys) == (0, "", "")
+    verbose = smoke(capsys, "-v")
+    assert verbose[:2] == (0, "")
+    assert "Arc adapter exercised; audio stream verified" in verbose[2]
+
+    monkeypatch.setattr(
+        youtube_smoke,
+        "download_audio",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            transcript.YtDlpError("HTTP Error 503", temporary=True)
+        ),
+    )
+    code, out, err = smoke(capsys)
+    assert (code, out) == (75, "")
+    assert err.splitlines()[-1] == "retry: youtube_smoke.py"
+
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: None)
+    code, out, err = smoke(capsys)
+    assert (code, out) == (1, "")
+    assert err.splitlines()[-1] == "fix: brew install ffmpeg"
+
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -838,6 +915,31 @@ def test_a_child_on_the_terminal_stays_in_our_process_group(monkeypatch) -> None
     assert result.returncode == 0
 
 
+@covers("youtube_smoke", 130, 143)
+@pytest.mark.parametrize(
+    ("number", "code", "word"),
+    [(signal.SIGINT, 130, "interrupted"), (signal.SIGTERM, 143, "terminated")],
+    ids=["sigint", "sigterm"],
+)
+def test_a_signal_stops_the_smoke_check_and_removes_its_download(
+    number: signal.Signals, code: int, word: str, monkeypatch, capsys
+) -> None:
+    downloads: list[Path] = []
+
+    def signalled_download(_url, output_dir, *_args, **_kwargs):
+        downloads.append(output_dir)
+        (output_dir / "audio.mp3").write_bytes(b"partial")
+        os.kill(os.getpid(), number)
+        time.sleep(5)
+        pytest.fail("the signal did not interrupt the download")
+
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: "/bin/ffprobe")
+    monkeypatch.setattr(youtube_smoke, "download_audio", signalled_download)
+
+    assert smoke(capsys) == (code, "", f"{word}\n")
+    assert not downloads[0].exists()
+
+
 # ---------------------------------------------------------------------------
 # Terminal: color and the spinner
 # ---------------------------------------------------------------------------
@@ -914,7 +1016,9 @@ DOCS = [
     REPO_ROOT / "authoring/verify/verify-transcript-sk/SKILL.md",
 ]
 # A doc line runs transcript through its path or a just recipe
-RUNS = re.compile(r"scripts/(transcript)\.py|just (ttr|transcript)(?:-cli)?\b")
+RUNS = re.compile(
+    r"scripts/(transcript|youtube_smoke)\.py|just (ttr|transcript)(?:-cli)?\b"
+)
 FLAG = re.compile(r"(?<![\w/.-])(--?[A-Za-z][\w-]*)")
 
 
@@ -943,6 +1047,8 @@ def help_flags(
     capsys: pytest.CaptureFixture[str], script: str, args: list[str]
 ) -> set[str]:
     """The flags the help page of the command `args` names accepts."""
+    if script == "youtube_smoke":
+        return set(FLAG.findall(smoke(capsys, "--help")[1]))
     target = transcript.build_parser()
     command: list[str] = []
     for token in args:
@@ -967,4 +1073,5 @@ def test_doc_lines_that_run_a_script_use_only_its_flags(capsys) -> None:
 
 def test_every_exit_code_has_a_test_that_triggers_it() -> None:
     # Help and usage probes above trigger 2; the signal probes 130 and 143
-    assert DECLARED.get("transcript", set()) == set(transcript.EXIT_CODES)
+    for name, module in (("transcript", transcript), ("youtube_smoke", youtube_smoke)):
+        assert DECLARED.get(name, set()) == set(module.EXIT_CODES), name

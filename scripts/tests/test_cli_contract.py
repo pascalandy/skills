@@ -326,11 +326,13 @@ OWN_SUITE = {
     "authoring/content/transcript-sk/scripts/transcript.py": (
         "authoring/content/transcript-sk/scripts/tests/test_contract.py"
     ),
+    "authoring/content/transcript-sk/scripts/youtube_smoke.py": (
+        "authoring/content/transcript-sk/scripts/tests/test_contract.py"
+    ),
 }
 
 EXCLUDED = {
     "authoring/content/transcript-sk/scripts/ytdlp_arc.py": "owner decision: out of scope",
-    "authoring/content/transcript-sk/scripts/youtube_smoke.py": "live check against YouTube",
     ".lefthook/pre-push/sync-skills.sh": "exec shim for just sync-hook",
     "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/tests/proof_live_noul.py": "live proof against the TypeSafe API",
 }
