@@ -18,7 +18,7 @@ For an inline inspection task, keep the workspace read-only and use the configur
 codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review src/auth.ts for race conditions. Report findings with file and line." < /dev/null
 ```
 
-For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, fetch the base if you need its latest remote state, and keep the checkout stable during the review. This example selects GPT-6 Sol at High reasoning:
+For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, and fetch the base if you need its latest remote state. This example selects GPT-6 Sol at High reasoning:
 
 ```bash
 repo="/absolute/path/to/repository"
@@ -61,7 +61,7 @@ Choose exactly one review target:
 
 These targets conflict with one another. For an audit with custom criteria and an explicit diff scope, use ordinary `codex exec` with a prompt file as shown below; put the comparison and criteria in that prompt.
 
-The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. Pin `sandbox_mode` as shown. Read-only mode can block tests that write build artifacts; run those separately or use an explicitly authorized writable checkout. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
+The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. Pin `sandbox_mode` as shown. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
 
 For file edits, use `workspace-write`. The first command keeps the configured model; the second selects Astra and High reasoning:
 
@@ -83,7 +83,7 @@ Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for 
 
 Add `-o result.md` when the caller needs the final message in a file. `--json` emits JSONL events on stdout; without it, stdout contains the final message and progress goes to stderr. No PTY is needed. Retain stderr and the exit status for diagnosis. Without `--json`, the stderr header names the effective `model`, `sandbox`, and `approval`; `--json` omits that header.
 
-Watch the process until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded; a read-only run asked to edit still exits 0. Inspect the actual diff and run relevant checks before reporting completion.
+[Wait for the process](../../SKILL.md#wait-for-a-run) until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded; a read-only run asked to edit still exits 0. Inspect the actual diff and run relevant checks before reporting completion.
 
 If Codex fails or asks for unavailable access, report the error and unmet task. Retry only after changing the cause; do not silently widen the sandbox or repeat a write task whose result is uncertain. Terminate a timed-out child and inspect partial changes before another attempt.
 
