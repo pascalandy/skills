@@ -173,3 +173,6 @@ def duration(text: str) -> float:
             f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
         )
     return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+# <<< cli-block

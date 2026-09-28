@@ -122,7 +122,13 @@ class Entry:
     debug: bool = True
 
 
-ENTRIES: dict[str, Entry] = {}
+ENTRIES: dict[str, Entry] = {
+    "scripts/check_cli_block.py": Entry(
+        name="scripts/check_cli_block.py",
+        block="fifo:authoring/content/alpha/scripts/tool.py",
+        debug=False,
+    ),
+}
 
 # Scripts a later wave moves onto the contract
 PENDING = {

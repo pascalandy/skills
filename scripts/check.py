@@ -99,6 +99,7 @@ JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
     Check("flatten", uv_run("scripts/flatten_skills.py", "--check")),
+    Check("cli-block", uv_run("scripts/check_cli_block.py")),
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
