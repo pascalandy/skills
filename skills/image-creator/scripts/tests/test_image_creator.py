@@ -1,4 +1,4 @@
-"""Behavior tests for gpt_image.py; no network and no plan usage."""
+"""Behavior tests for image_creator.py; no network and no plan usage."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import stat
 import urllib.request
 from pathlib import Path
 
-import gpt_image
+import image_creator
 import pytest
 from PIL import Image
 
@@ -63,16 +63,16 @@ def plan_login(env: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
-    code = gpt_image.main(list(argv))
+    code = image_creator.main(list(argv))
     captured = capsys.readouterr()
     return code, captured.out, captured.err
 
 
 def test_fit_size_returns_canonical_sizes() -> None:
-    assert gpt_image.fit_size(1.0, 1024 * 1024) == (1024, 1024)
-    assert gpt_image.fit_size(1.5, 1536 * 1024) == (1536, 1024)
-    assert gpt_image.fit_size(16 / 9, 2560 * 1440) == (2560, 1440)
-    assert gpt_image.fit_size(9 / 16, 2560 * 1440) == (1440, 2560)
+    assert image_creator.fit_size(1.0, 1024 * 1024) == (1024, 1024)
+    assert image_creator.fit_size(1.5, 1536 * 1024) == (1536, 1024)
+    assert image_creator.fit_size(16 / 9, 2560 * 1440) == (2560, 1440)
+    assert image_creator.fit_size(9 / 16, 2560 * 1440) == (1440, 2560)
 
 
 @pytest.mark.parametrize(
@@ -86,15 +86,15 @@ def test_fit_size_returns_canonical_sizes() -> None:
     ],
 )
 def test_parse_size_names_the_broken_rule(size: str, problem: str) -> None:
-    with pytest.raises(gpt_image.UsageError, match=problem):
-        gpt_image.parse_size(size)
+    with pytest.raises(image_creator.UsageError, match=problem):
+        image_creator.parse_size(size)
 
 
 def test_output_tokens_match_calculator_estimates() -> None:
-    assert gpt_image.output_tokens(1024, 1024, "high") == 1756
-    assert gpt_image.output_tokens(1536, 864, "low") == 120
-    assert gpt_image.output_tokens(3840, 2160, "max") == 13342
-    assert gpt_image.output_tokens(2048, 1152, "xhigh") == 2511
+    assert image_creator.output_tokens(1024, 1024, "high") == 1756
+    assert image_creator.output_tokens(1536, 864, "low") == 120
+    assert image_creator.output_tokens(3840, 2160, "max") == 13342
+    assert image_creator.output_tokens(2048, 1152, "xhigh") == 2511
 
 
 def test_tiers_match_the_guide_tier_table() -> None:
@@ -107,7 +107,7 @@ def test_tiers_match_the_guide_tier_table() -> None:
         )
     }
     assert rows == {
-        name: (tier.model, tier.quality) for name, tier in gpt_image.TIERS.items()
+        name: (tier.model, tier.quality) for name, tier in image_creator.TIERS.items()
     }
 
 
@@ -247,7 +247,7 @@ def test_explicit_model_uses_openrouter_image_protocol(
             ).encode()
         )
 
-    monkeypatch.setattr(gpt_image.urllib.request, "urlopen", respond)
+    monkeypatch.setattr(image_creator.urllib.request, "urlopen", respond)
     args = [
         command,
         "--model",
@@ -300,7 +300,7 @@ def test_explicit_openrouter_defaults_to_high_intent(
         "output_format": "png",
         "n": 1,
     }
-    assert receipt["estimated_output_tokens"] == gpt_image.output_tokens(
+    assert receipt["estimated_output_tokens"] == image_creator.output_tokens(
         1872, 1248, "high"
     )
 
@@ -430,7 +430,7 @@ def test_transparent_request_without_alpha_warns(
 def test_alpha_report_reads_a_real_cutout() -> None:
     image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
     image.paste((255, 0, 0, 254), (25, 25, 75, 75))
-    assert gpt_image.alpha_report(image) == {
+    assert image_creator.alpha_report(image) == {
         "fully_opaque": False,
         "transparent_share": 0.75,
         "near_opaque_share": 0.25,
@@ -444,7 +444,7 @@ def test_sent_prompt_reads_the_codex_trace_line() -> None:
         "codex_http_client::transport: POST to https://chatgpt.com/backend-api/codex/images/generations: "
         '{"prompt":"A red circle on white.","background":"auto","model":"gpt-image-2","quality":"auto","size":"auto"}'
     )
-    assert gpt_image.sent_prompt(f"noise\n{line}\n") == "A red circle on white."
+    assert image_creator.sent_prompt(f"noise\n{line}\n") == "A red circle on white."
 
 
 @pytest.mark.parametrize(
@@ -494,7 +494,7 @@ def test_api_output_preserves_original_bytes(
     image.save(buffer, format.upper())
     original = buffer.getvalue()
     monkeypatch.setattr(
-        gpt_image,
+        image_creator,
         "api_post",
         lambda route, body: {
             "data": [{"b64_json": base64.b64encode(original).decode()}],
@@ -525,7 +525,7 @@ def test_api_mismatches_warn_and_list_only_delivered_files(
     buffer = io.BytesIO()
     Image.new("RGBA", (1024, 1024), (255, 0, 0, 255)).save(buffer, "PNG")
     monkeypatch.setattr(
-        gpt_image,
+        image_creator,
         "api_post",
         lambda route, body: {
             "data": [{"b64_json": base64.b64encode(buffer.getvalue()).decode()}],

@@ -1,11 +1,11 @@
 ---
-name: "gpt-image"
+name: "image-creator"
 description: "Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter."
 ---
 
-# GPT Image
+# Image Creator
 
-Use `<skill_dir>/scripts/gpt_image.py`. Read [settings](references/guide.md#3-request-reference) when choosing flags, [prompting](references/guide.md#4-write-the-prompt) when composing a brief.
+Use `<skill_dir>/scripts/image_creator.py`. Read [settings](references/guide.md#3-request-reference) when choosing flags, [prompting](references/guide.md#4-write-the-prompt) when composing a brief.
 
 ## Steps
 
@@ -15,8 +15,8 @@ Use `<skill_dir>/scripts/gpt_image.py`. Read [settings](references/guide.md#3-re
 4. Run the CLI; use `--prompt-file` for long briefs and `--dry-run --json` to inspect settings and estimated output cost
 
    ```sh
-   uv run <skill_dir>/scripts/gpt_image.py generate --intent high --aspect 16:9 --out out/hero.png --prompt "..."
-   uv run <skill_dir>/scripts/gpt_image.py generate --model flare --quality high --size 1536x864 --out out/2.5.png --prompt "..."
+   uv run <skill_dir>/scripts/image_creator.py generate --intent high --aspect 16:9 --out out/hero.png --prompt "..."
+   uv run <skill_dir>/scripts/image_creator.py generate --model flare --quality high --size 1536x864 --out out/2.5.png --prompt "..."
    ```
 
 5. View every output, apply the [checks](references/guide.md#51-checks), and resolve stderr warnings. Exit 0 alone does not establish visual quality
