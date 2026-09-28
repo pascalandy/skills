@@ -12,6 +12,8 @@ Choose a preset, then set dimensions for the destination. For comparisons, speci
 
 ## 2. Tiers
 
+**Default: High** (`--intent high`). Use another tier only when requested. Ask about unresolved requirements without a documented default.
+
 On the plan, Draft/Standard produce one candidate, High two, Max three. Intent does not change the plan model or generation quality.
 
 For explicitly selected OpenRouter, these presets supply defaults. An explicit `--model` overrides the table; generic 2.5 uses `--model flare`. OpenAI positions Flare for speed and Sunburst for precision. Presets do not guarantee acceptance.

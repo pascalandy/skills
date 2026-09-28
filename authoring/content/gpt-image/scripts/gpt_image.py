@@ -713,8 +713,8 @@ def doctor() -> dict[str, Any]:
 
 INTENT_USE = {
     "draft": "quick idea",
-    "standard": "everyday image (default)",
-    "high": "client-facing final",
+    "standard": "everyday image",
+    "high": "client-facing final (default)",
     "max": "quality is paramount",
 }
 
@@ -765,8 +765,8 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--intent",
         choices=INTENTS,
-        default="standard",
-        help="quality intent (default: standard)",
+        default="high",
+        help="quality intent (default: high)",
     )
     shape = parser.add_mutually_exclusive_group()
     shape.add_argument("--aspect", help="aspect ratio such as 16:9, 1:1, 2:3")
