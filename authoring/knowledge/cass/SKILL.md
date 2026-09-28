@@ -33,12 +33,14 @@ For install, upgrade, or repair work, finish that work first, then run the gate 
 cass --version
 ```
 
-When the command fails, classify the failure before reporting it
+When the command fails, classify the failure before reporting it. `command -v` is a shell builtin, so run it through `sh -c`; both probes then work with or without an `rtk` prefix
 
 ```bash
-command -v cass
+sh -c 'command -v cass'
 ls -l ~/.local/bin/cass
 ```
+
+A wrapper error containing "No such file or directory" can mean a missing command or an installed binary whose loader is missing, and it may omit the command's name. For a missing command, `rtk proxy` exits 1 rather than 127. Classify with the probes, not the wrapper's wording or exit code
 
 | State | Signal | Action |
 |---|---|---|
