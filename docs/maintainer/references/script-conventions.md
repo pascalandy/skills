@@ -18,7 +18,7 @@ Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one 
 
 ## Baseline
 
-Every script meets all of these.
+Every script meets all of these. No exception waives an exit code, the Rule of Silence, or help behavior.
 
 Output follows the Rule of Silence: when nothing needs saying, print nothing
 
@@ -90,7 +90,7 @@ A duration is `30s`, `5m`, `2h`, or bare seconds
 
 ## Exceptions
 
-Opt-in flags that would give no real choice are left out, and a script outside the shared block's language drops only a Parsing item its language cannot express. Exit codes, the Rule of Silence, and help behavior are never waived. Each exception gets one line:
+Opt-in flags that would give no real choice are left out, and a script outside the shared block's language drops only a Parsing item its language cannot express. Each exception gets one line:
 
 - `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
 - Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
