@@ -296,6 +296,7 @@ ENTRIES: dict[str, Entry] = {
 
 # Scripts a later wave moves onto the contract
 PENDING = {
+    "authoring/content/gpt-image/scripts/gpt_image.py",
     "authoring/content/html-mode/scripts/check_html_mode.py",
     "authoring/content/mermaid/scripts/render_examples.py",
     "authoring/content/storytelling/tests/validate-package.py",
