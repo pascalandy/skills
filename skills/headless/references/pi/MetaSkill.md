@@ -14,7 +14,7 @@ With terminal stdin and stdout, plain `pi` opens the TUI. Redirecting either str
 
 ## Review or execute
 
-For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. This example selects GLM 5.3 Flash through OpenCode Go and requests `max` reasoning. Pi 0.87.1 on `mbp` lists `opencode-go/glm-5.3-flash` with thinking enabled. Before running elsewhere, confirm it with `pi --list-models glm-5.3-flash` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking max` requests that level but does not prove the provider uses effective `max`.
+For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. This example selects GLM 5.3 Flash through OpenCode Go and requests `max` reasoning. Before running, confirm the model with `pi --list-models glm-5.3-flash` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking max` requests that level but does not prove the provider uses effective `max`.
 
 ```bash
 repo="/absolute/path/to/repository"
@@ -27,24 +27,28 @@ review_status=0
   pi --print \
     --model opencode-go/glm-5.3-flash \
     --thinking max \
-    --no-session --no-extensions \
+    --no-session --no-extensions --no-approve \
     --tools read,grep,find,ls \
     < "$prompt_file" \
     > "$review_dir/result.md" \
     2> "$review_dir/stderr.log"
 ) || review_status=$?
 
+if [ "$review_status" -eq 0 ] && [ ! -s "$review_dir/result.md" ]; then
+  review_status=1
+fi
+
 printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-`result.md` contains the final assistant text. The failure handler works under `set -e`; a standalone script should end with `exit "$review_status"` after inspecting the report. Print mode alone does not restrict tools: this allowlist excludes shell execution and edits. Supply a diff in the prompt file when needed; this tool set cannot run tests or obtain a diff through Bash.
+`result.md` contains the final assistant text; Pi exits 0 when that text is empty, so the recipe checks for it. `--no-approve` ignores the reviewed repository's trust-gated settings, extensions, and skills, which print mode otherwise loads when a saved trust decision or `defaultProjectTrust: "always"` allows them. Print mode alone does not restrict tools: this allowlist excludes shell execution and edits. Supply a diff in the prompt file when needed; this tool set cannot run tests or obtain a diff through Bash.
 
 For an event stream, select `--mode json`:
 
 ```bash
 pi --mode json --model opencode-go/glm-5.3-flash --thinking max \
-  --no-session --no-extensions --tools read,grep,find,ls \
+  --no-session --no-extensions --no-approve --tools read,grep,find,ls \
   "Review this diff and inspect related files" \
   < diff.patch > events.jsonl 2> review.stderr.log
 ```
@@ -64,7 +68,7 @@ pi --mode json --model opencode-go/glm-5.3-flash --thinking max \
 | `--tools <names>` | Allow only the named tools |
 | `--no-extensions` | Disable extension discovery |
 
-Pin the model and reasoning only when requested or required by the runner's policy. Prefer explicit session IDs over latest-session selection when runs overlap.
+Prefer explicit session IDs over latest-session selection when runs overlap.
 
 ## Verify output
 

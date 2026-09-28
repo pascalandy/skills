@@ -2,9 +2,9 @@
 
 Use `claude -p` or `claude --print` from the target repository with ordinary pipes. Check `claude --help`, `claude --version`, and `claude auth status --text` before relying on installed behavior. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior; the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Output format does not replace `-p`.
 
-## Permissions
+## Review run
 
-Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. Prepare an absolute prompt-file path with the review scope and criteria. This complete example selects Opus 5.5 at `xhigh`, captures raw events, and extracts the final answer:
+Prepare an absolute prompt-file path with the review scope and criteria. This complete example selects Opus 5.5 at `xhigh`, captures raw events, and extracts the final answer:
 
 ```bash
 repo="/absolute/path/to/repository"
@@ -14,12 +14,13 @@ review_dir="$(mktemp -d /tmp/claude-review.XXXXXX)" || exit 1
 review_status=0
 (
   cd "$repo" || exit 1
-  CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --print \
-    --model claude-opus-5-5 --effort xhigh \
+  claude --print \
+    --model claude-opus-5-5 \
+    --setting-sources user \
+    --settings '{"disableAllHooks":true,"env":{"CLAUDE_CODE_EFFORT_LEVEL":"xhigh"}}' \
     --permission-mode dontAsk --permission-prompts none \
     --tools "Read,Grep,Glob" \
     --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-    --settings '{"disableAllHooks":true}' \
     --no-session-persistence \
     --output-format stream-json --verbose \
     < "$prompt_file" \
@@ -37,9 +38,15 @@ printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-Requires `jq` and access to [Opus 5.5](https://code.claude.com/docs/en/model-config). `result.md` holds the complete final answer; `events.jsonl` retains execution metadata and failures. A missing answer makes a successful process exit count as failure. Inspect the result metadata as described below; extraction alone does not validate the review. A standalone script should finish with `exit "$review_status"` after inspection. The failure handler works under `set -e`.
+Requires `jq` and access to [Opus 5.5](https://code.claude.com/docs/en/model-config). `result.md` holds the complete final answer; `events.jsonl` keeps execution metadata and failures. [Verify completion](#verify-completion) before trusting the answer.
 
-For inline prompts, put them before variadic flags such as `--tools` and `--allowedTools`. This tool set cannot run tests or obtain a Git diff through Bash. Include the diff in the prompt file when needed.
+Print mode loads the reviewed repository's `.claude/settings.json` without a trust prompt, so that file can change the environment, including the API endpoint and effort. `--setting-sources user` skips project and local settings. `CLAUDE_CODE_EFFORT_LEVEL` overrides `--effort` and can come from the shell or any settings file; the value in `--settings` takes precedence over both, so the recipe pins effort there.
+
+This tool set cannot run tests or obtain a Git diff through Bash. Include the diff in the prompt file when needed.
+
+## Permissions
+
+Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. Put an inline prompt before variadic flags such as `--tools` and `--allowedTools`.
 
 | Option | Use |
 | --- | --- |
@@ -61,7 +68,6 @@ Permission mode and allow rules still govern calls when prompts are disabled. `-
 
 ```bash
 claude -p "Review this diff and inspect related files" \
-  --model claude-opus-5-5 --effort xhigh \
   --permission-mode dontAsk --permission-prompts none \
   --tools "Read,Grep,Glob" --output-format json \
   < diff.patch > result.json 2> review.stderr.log
@@ -73,7 +79,7 @@ claude -p "Review this diff and inspect related files" \
 | `json` | One result object with session metadata and response text in `result` |
 | `stream-json` | JSONL events ending with a `result` record; use `--verbose` |
 
-The complete example above uses streaming output and extracts its final `result` record.
+The [review run](#review-run) uses streaming output and extracts its final `result` record.
 
 Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in the result object's `structured_output` field, not its `result` field.
 
@@ -86,7 +92,7 @@ Preserve the process exit status and inspect the final result. Invalid flags fai
 | Option | Use |
 | --- | --- |
 | `--model <model>` | Select the requested alias or exact model |
-| `--effort <level>` | Select a level supported by the model and installed CLI |
+| `--effort <level>` | Select a level supported by the model and installed CLI; `CLAUDE_CODE_EFFORT_LEVEL` overrides it |
 | `--fallback-model <model>` | Allow substitution only when the caller permits it |
 | `--max-turns <n>`, `--max-budget-usd <amount>` | Bound the run |
 | `--append-system-prompt <text>` | Add instructions while retaining the default prompt |
@@ -97,7 +103,7 @@ Preserve the process exit status and inspect the final result. Invalid flags fai
 | `--agent <name>`, `--agents <json>` | Select or define an agent |
 | `--worktree <name>` | Use an isolated Git worktree |
 
-Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. For subscription-authenticated runs, keep normal mode; add `--setting-sources user` when repository settings and `.mcp.json` should not load. To disable all hooks for that run, pass `--settings '{"disableAllHooks":true}'`. Supply required allow rules on the CLI rather than relying on an untrusted project's rules; see [workspace trust](https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder).
+Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. For subscription-authenticated runs, keep normal mode with the review run's `--setting-sources user` and `--settings`. Supply required allow rules on the CLI rather than relying on an untrusted project's rules; see [workspace trust](https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder).
 
 ## Sessions
 

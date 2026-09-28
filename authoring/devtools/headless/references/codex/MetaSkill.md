@@ -18,7 +18,7 @@ For an inline inspection task, keep the workspace read-only and use the configur
 codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review src/auth.ts for race conditions. Report findings with file and line." < /dev/null
 ```
 
-For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, fetch the base if you need its latest remote state, and keep the checkout stable during the review. This example explicitly selects GPT-6 Sol at High reasoning; omit the model and reasoning options to use configured defaults. Each run gets a separate output directory:
+For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, fetch the base if you need its latest remote state, and keep the checkout stable during the review. This example selects GPT-6 Sol at High reasoning:
 
 ```bash
 repo="/absolute/path/to/repository"
@@ -39,11 +39,16 @@ codex exec \
   > "$review_dir/events.jsonl" \
   2> "$review_dir/stderr.log" || review_status=$?
 
+if [ ! -s "$review_dir/result.md" ] ||
+  grep -q '^Review was interrupted' "$review_dir/result.md"; then
+  if [ "$review_status" -eq 0 ]; then review_status=1; fi
+fi
+
 printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-The failure handler preserves the exit status even with `set -e`. In a standalone script, finish with `exit "$review_status"` after processing the report so `printf` does not hide a failed run. Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the check above counts that as a failure. Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
 
 Choose exactly one review target:
 
@@ -72,11 +77,11 @@ codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' --json - <
 git -C /path/to/repo diff main | codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review this diff for regressions."
 ```
 
-`-m` also accepts `gpt-6-sol` and `gpt-6-luna` when available to the account. Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for model names and supported reasoning levels; an installed CLI's catalog can differ by sign-in and rollout. Omit `-m` and `model_reasoning_effort` to use the configured defaults.
+Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for model names and supported reasoning levels; an installed CLI's catalog can differ by sign-in and rollout.
 
 ## Observe and verify
 
-Add `-o result.md` when the caller needs the final message in a file. `--json` emits JSONL events on stdout; without it, stdout contains the final message and progress goes to stderr. No PTY is needed. Retain stderr and the exit status for diagnosis. The stderr header names the effective `model`, `sandbox`, and `approval`; check it when a setting matters.
+Add `-o result.md` when the caller needs the final message in a file. `--json` emits JSONL events on stdout; without it, stdout contains the final message and progress goes to stderr. No PTY is needed. Retain stderr and the exit status for diagnosis. Without `--json`, the stderr header names the effective `model`, `sandbox`, and `approval`; `--json` omits that header.
 
 Watch the process until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded; a read-only run asked to edit still exits 0. Inspect the actual diff and run relevant checks before reporting completion.
 
@@ -86,6 +91,5 @@ If Codex fails or asks for unavailable access, report the error and unmet task. 
 
 - Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>" < /dev/null`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. Check `codex exec resume --help` for the installed version's options
 - Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
-- Pass `-m <model>` or `-c 'model_reasoning_effort="high"'` only when the task specifies them or the runner has a deliberate model policy
 
 For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).

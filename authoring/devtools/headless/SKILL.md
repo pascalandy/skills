@@ -1,6 +1,6 @@
 ---
 name: "headless"
-description: "Use when the user asks how to run `codex exec`, Claude Code, OpenCode, or Pi non-interactively."
+description: "Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them."
 ---
 
 # Headless CLI agents
@@ -13,6 +13,16 @@ Load only the reference for the requested path:
 - For Pi or `headless-pi`, read [Pi](references/pi/MetaSkill.md)
 - For skill maintenance, follow the [update checklist](references/UPDATE.md)
 
-Read the [glossary](references/GLOSSARY.md) only when its terminology is needed. For current CLI behavior, check the installed command's `--help` and its official documentation.
+Read the [glossary](references/GLOSSARY.md) only when its terminology is needed. For current CLI behavior, check the installed command's `--help` and its official documentation. Delegation policy belongs to the calling workflow, not this skill.
 
-Capture reviewer output without filtering. Use the plain CLI commands below, or `rtk proxy <command>` when RTK is required; for example, `rtk proxy env CLAUDE_CODE_EFFORT_LEVEL=xhigh claude ...`. Use `rtk proxy jq ...` to extract an answer from JSON without shortening it. Event logs are execution records; read the complete final answer before deciding whether the review succeeded. Delegation policy belongs to the calling workflow, not this skill.
+## Capture a review
+
+Each reference's review recipe applies these rules:
+
+- Give every run its own `mktemp -d` directory, with the answer, events, and stderr in separate files
+- Record the exit status with `|| review_status=$?`, which also works under `set -e`. A standalone script ends with `exit "$review_status"` after inspecting the answer
+- Count an empty answer as a failure even when the process exits 0
+- Read the complete answer before deciding whether the review succeeded; a zero exit or an event log alone proves nothing
+- The recipes pin a model and reasoning level as examples. Keep a pin only when the task or runner policy requires it; otherwise omit both options to use configured defaults
+
+RTK leaves commands that redirect their output to a file unchanged, so the recipes capture everything. To read JSON output under RTK, use `rtk proxy jq ...`; `rtk jq` shortens long answers.
