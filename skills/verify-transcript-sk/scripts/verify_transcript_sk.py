@@ -997,9 +997,12 @@ def capture_command(
     context: RunContext,
 ) -> tuple[CapturedProcess, dict[str, object]]:
     assert_safe_command(feature, plan, context)
+    # --quiet keeps uv's own setup lines, such as "Installed 12 packages", off
+    # stderr; a fresh checkout triggers them, and they are not transcript's output
     argv = (
         "uv",
         "run",
+        "--quiet",
         str(context.located.transcript_script),
         *plan.args,
     )
