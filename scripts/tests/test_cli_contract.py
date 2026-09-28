@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import errno
 import importlib
+import json
 import os
 import re
 import shutil
@@ -174,7 +175,24 @@ def mac_preview(_: Sandbox) -> tuple[str, ...]:
     return ("--profile", "mac", "--dry-run")
 
 
+def opencode_finds_alpha(sandbox: Sandbox) -> tuple[str, ...]:
+    """An installed alpha and an OpenCode that reports it."""
+    entry = sandbox.home / ".config/opencode/skills/alpha/SKILL.md"
+    entry.parent.mkdir(parents=True)
+    entry.write_text("# alpha\n", encoding="utf-8")
+    listing = json.dumps([{"name": "alpha", "location": str(entry)}])
+    sandbox.stub("opencode", f"echo '{listing}'\n")
+    return ("--profile", "mac", "--agent", "opencode")
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/discover_skills.py": Entry(
+        name="just skills-discover",
+        block="opencode",
+        args=("--agent", "opencode"),
+        safe=opencode_finds_alpha,
+        positional=("--profile", "mac"),
+    ),
     "scripts/install_skills.py": Entry(
         name="just install-skills", block="git", safe=mac_preview
     ),
@@ -210,7 +228,6 @@ ENTRIES: dict[str, Entry] = {
 
 # Scripts a later wave moves onto the contract
 PENDING = {
-    "scripts/discover_skills.py",
     "scripts/sync.py",
     "scripts/sync_fleet.py",
     "scripts/sync_private.py",
