@@ -8,11 +8,13 @@ from pathlib import Path
 from labeltest import Harness, issue
 
 ROUTINE_ADD = ["2-type:bug", "1-needs-info", "3-pty:p2"]
+FILL = ["2-type:bug", "3-pty:p2"]
 
 
 def two_issues_one_routine(harness: Harness) -> None:
-    """#1 is routine (missing repro steps); #2 is review (only nominated ready)."""
-    harness.issues(issue(1), issue(2, title="Ready one"))
+    """#1 is routine (missing repro steps); #2 is review (only nominated ready)
+    with nothing to fill, since its type and priority are set."""
+    harness.issues(issue(1), issue(2, title="Ready one", labels=tuple(FILL)))
     harness.fake.overrides = {"Crash on start": {"bug_repro": 0.05}}
     assert harness.live().code == 0
 
@@ -24,7 +26,7 @@ def test_apply_adds_routine_labels_and_leaves_review_issues(harness: Harness) ->
 
     assert result.code == 0, result.stderr
     assert harness.labels_of(1) == ROUTINE_ADD
-    assert harness.labels_of(2) == []
+    assert harness.labels_of(2) == FILL
     assert harness.edits() == [
         ["issue", "edit", "1", "-R", "o/r", "--add-label", ",".join(ROUTINE_ADD)]
     ]
@@ -138,3 +140,39 @@ def test_one_unreadable_issue_does_not_stop_the_others(harness: Harness) -> None
         (harness.state / "label-for-issues-jev" / "runs").glob("*.apply-*.json")
     )
     assert len(logs) == 1
+
+
+def test_a_review_issue_gets_only_its_fill(harness: Harness) -> None:
+    harness.issues(issue(2, title="Ready one"))
+    assert harness.live().code == 0
+
+    result = harness.run("apply", "last", "--json")
+
+    assert result.code == 0, result.stderr
+    assert harness.labels_of(2) == FILL
+    assert result.json()["results"] == [
+        {"number": 2, "labels": FILL, "outcome": "applied", "detail": ""}
+    ]
+
+
+def test_a_review_issue_with_removals_still_gets_its_fill(harness: Harness) -> None:
+    harness.issues(issue(1, labels=("1-ready-for-agent",)))
+    harness.fake.overrides = {"Crash on start": {"bug_repro": 0.05}}
+    assert harness.live().code == 0
+
+    result = harness.run("apply", "last")
+
+    assert result.code == 0, result.stderr
+    assert harness.labels_of(1) == ["1-ready-for-agent", *FILL]
+
+
+def test_text_that_may_steer_triage_fills_nothing(harness: Harness) -> None:
+    harness.issues(issue(2, title="Ready one"))
+    harness.fake.overrides = {"Ready one": {"steering": 0.5}}
+    assert harness.live().code == 0
+
+    result = harness.run("apply", "last")
+
+    assert result.code == 0, result.stderr
+    assert "nothing to apply" in result.stdout
+    assert harness.edits() == []

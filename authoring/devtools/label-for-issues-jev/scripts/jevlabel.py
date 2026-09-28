@@ -164,12 +164,13 @@ commands:
   doctor    check gh, the label vocabulary, the questions, the API key, and consent
   consent   record which private repositories may send issue text to TypeSafe
   run       fetch issues, ask Jev, and write a run record (--dry-run: preview only)
-  apply     add the labels of a run's routine issues, rereading each issue first
+  apply     add routine issues' labels and review issues' fill, rereading each first
   compare   compare a run's judged type and state with the labels issues already had
 
 queues in a run record:
   routine   every answer used is clear and the labels only fill empty families
-  review    an answer is uncertain, or a label needs a person or new evidence
+  review    an answer is uncertain, or a label needs a person or new evidence;
+            its fill is the judged type and p2, each only for an empty family
   skip      closed, pull request, agent work in progress, or not asked
 
 examples:
@@ -898,6 +899,9 @@ class Decision:
     judged: dict[str, str | None] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
     uncertain_answers: list[str] = field(default_factory=list)
+    # For a review issue, the labels apply may still add: a judged type or p2,
+    # each into an empty family.
+    fill: list[str] = field(default_factory=list)
 
     def record(self) -> dict[str, Any]:
         return {
@@ -905,6 +909,7 @@ class Decision:
             "reasons": self.reasons,
             "add": self.add,
             "remove": self.remove,
+            "fill": self.fill,
             "judged": self.judged,
             "missing": self.missing,
             "uncertain_answers": self.uncertain_answers,
@@ -918,12 +923,14 @@ def decide(
 
     Code never asks Jev for a verdict. Each question judges one condition, and a
     label reaches `routine` only when every answer it rests on is clearly yes or no
-    and it fills an empty label family. Anything else goes to review with a reason.
+    and it fills an empty label family. Anything else goes to review with a reason;
+    its judged type and p2 may still fill empty families.
     """
     questions = pack.questions
     labels = set(item.labels)
     decision = Decision(queue="routine")
     reasons, add, remove = decision.reasons, decision.add, decision.remove
+    fill: list[str] = []
 
     def judge(base: str, index: int | None = None) -> str:
         qid = base if index is None else f"{base}_{index}"
@@ -953,6 +960,7 @@ def decide(
             decision.uncertain_answers.append("type")
         if not existing_type and judged_type:
             add.append(judged_type)
+            fill.append(judged_type)
         elif not existing_type:
             reasons.append(
                 f"type unclear: {answer['choice']} at confidence {answer['confidence']:.2f}"
@@ -1054,6 +1062,7 @@ def decide(
         reasons.append("unclear whether this reports an emergency")
     elif urgency == "no" and not existing_priority:
         add.append(P2)
+        fill.append(P2)
 
     impediment = judge("impediment")
     if impediment == "yes" and IMPEDIMENT not in labels:
@@ -1090,6 +1099,9 @@ def decide(
         reasons.insert(0, "closed")
     elif reasons:
         decision.queue = "review"
+        # Text that may steer triage may have steered the type too.
+        if steering == "no":
+            decision.fill = [label for label in fill if label in catalog]
     return decision
 
 
@@ -1374,13 +1386,8 @@ def live_run(
     )
     summary = {key: value for key, value in record.items() if key != "issues"}
     summary["path"] = str(path)
-    summary["issues"] = [
-        {
-            key: e[key]
-            for key in ("number", "queue", "add", "remove", "reasons", "missing")
-        }
-        for e in entries
-    ]
+    shown = ("number", "queue", "add", "remove", "fill", "reasons", "missing")
+    summary["issues"] = [{key: e[key] for key in shown} for e in entries]
     return line, summary
 
 
@@ -1463,6 +1470,14 @@ def issue_now(repo: str, number: int) -> dict[str, Any]:
     )
 
 
+def writable(entry: dict[str, Any]) -> list[str]:
+    """A routine issue's proposed labels, or a review issue's fill."""
+    if entry["queue"] == "routine":
+        return entry["add"]
+    # Records from before fill existed have none.
+    return entry.get("fill", []) if entry["queue"] == "review" else []
+
+
 def apply_one(
     repo: str, entry: dict[str, Any], catalog: set[str], dry_run: bool
 ) -> dict[str, Any]:
@@ -1472,13 +1487,13 @@ def apply_one(
     def outcome(name: str, detail: str = "") -> dict[str, Any]:
         return {**result, "outcome": name, "detail": detail}
 
-    if entry["remove"]:
+    if entry["queue"] == "routine" and entry["remove"]:
         return outcome(
             "failed", "a routine entry never removes labels; the record is invalid"
         )
     current = issue_now(repo, number)
     labels = {label["name"] for label in current.get("labels") or []}
-    todo = [label for label in entry["add"] if label not in labels]
+    todo = [label for label in writable(entry) if label not in labels]
     if not todo:
         return outcome("already", "every proposed label is present")
     if str(current.get("state", "")).upper() != "OPEN":
@@ -1517,7 +1532,7 @@ def apply_one(
 
 
 def cmd_apply(args: argparse.Namespace) -> tuple[str, Any]:
-    """Write the labels of routine issues, rereading each issue first."""
+    """Write routine issues' labels and review issues' fill, rereading each first."""
     path, record = load_run(args.run)
     repo = record["repo"]
     load_vocabulary()
@@ -1525,9 +1540,7 @@ def cmd_apply(args: argparse.Namespace) -> tuple[str, Any]:
     entries = [
         entry
         for entry in record["issues"]
-        if entry["queue"] == "routine"
-        and entry["add"]
-        and (not selected or entry["number"] in selected)
+        if writable(entry) and (not selected or entry["number"] in selected)
     ]
     catalog = repo_labels(repo) if entries else set()
     results: list[dict[str, Any]] = []
@@ -1674,12 +1687,14 @@ def build_parser() -> Parser:
 
     apply = commands.add_parser(
         "apply",
-        help="label a run's routine issues",
-        description="Add the proposed labels of every routine issue in a run record. "
+        help="label a run's routine issues and fill its review issues",
+        description="Add the proposed labels of every routine issue in a run record, "
+        "and the fill of every review issue: its judged type and p2, each only for an "
+        "empty family, and none when its text may steer triage. "
         "Each issue is reread first: a changed or closed issue is stale and left alone, "
         "a label family that gained a label is a conflict, and labels are only added, "
         "never removed. After each write the labels are read back and checked. "
-        "Review issues are never touched.",
+        "A review issue's other labels are left to the agent.",
         epilog="examples:\n  jevlabel apply last --dry-run\n  jevlabel apply last\n"
         "  jevlabel apply 20260927T120000Z-pascalandy-skills --issue 12",
         formatter_class=argparse.RawDescriptionHelpFormatter,

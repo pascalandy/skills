@@ -74,6 +74,32 @@ def test_existing_labels_stay_unless_the_answers_disagree(harness: Harness) -> N
     ]
 
 
+def test_review_fill_is_a_judged_type_and_p2_into_empty_families(
+    harness: Harness,
+) -> None:
+    harness.issues(
+        issue(1),
+        issue(2, title="Typed", labels=("2-type:task",)),
+        issue(3, title="Urgent maybe"),
+        issue(4, title="Routine"),
+    )
+    harness.fake.overrides = {
+        "Urgent maybe": {"urgency": 0.5},
+        "Routine": {"bug_repro": 0.05},
+    }
+
+    record = harness.record(harness.live())
+
+    fills = {n: harness.entry(record, n)["fill"] for n in (1, 2, 3, 4)}
+    assert fills == {
+        1: ["2-type:bug", "3-pty:p2"],
+        2: ["3-pty:p2"],
+        3: ["2-type:bug"],
+        4: [],
+    }
+    assert harness.entry(record, 4)["queue"] == "routine"
+
+
 def test_an_unanswered_request_for_information_is_missing(harness: Harness) -> None:
     thread = [
         comment("Which version?", author="owner", association="OWNER", number=7),
