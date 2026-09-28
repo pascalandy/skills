@@ -6,6 +6,7 @@ import argparse
 import fcntl
 import json
 import logging
+import re
 import shlex
 import sys
 import time
@@ -24,6 +25,25 @@ from _cli import (
 )
 
 log = logging.getLogger(__name__)
+
+# git's messages when the network, not the repository or its credentials, failed
+NETWORK_FAILURE = re.compile(
+    r"could not resolve (host|hostname)"
+    r"|failed to connect"
+    r"|connection (refused|timed out|reset|closed)"
+    r"|operation timed out"
+    r"|network is unreachable"
+    r"|temporary failure in name resolution"
+    r"|the remote end hung up unexpectedly"
+    r"|early eof"
+    r"|returned error: (429|5\d\d)",
+    re.IGNORECASE,
+)
+
+
+def is_network_failure(message: str) -> bool:
+    """Whether git's error names a network failure that a later retry may fix."""
+    return NETWORK_FAILURE.search(message) is not None
 
 
 def swap(fresh: Path, destination: Path, previous: Path) -> None:

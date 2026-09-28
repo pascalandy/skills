@@ -15,30 +15,69 @@ here and stop the run.
 
 from __future__ import annotations
 
-import argparse
 import logging
 import re
+import shlex
 import socket
 import subprocess
 from pathlib import Path
 
-from _common import ScriptError, exclusive, run_script
+from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
+from _common import exclusive, is_network_failure, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
+LABEL = "_skills_private"
+TIMEOUT = 300.0
+EPILOG = """\
+Each run prints one line per change: clone, commit, pull, or push, a tab,
+_skills_private, a tab, and a detail. A dry run skips the network, so it
+lists only the clone or commit a run would make.
+
+examples:
+  uv run scripts/sync_private.py
+  uv run scripts/sync_private.py --dry-run
+  uv run scripts/sync_private.py --timeout 30s"""
+EXIT_CODES = exit_codes(
+    {
+        0: "the clone is saved and current, or nothing needed doing",
+        1: "the folder needs you: not a clone, off main, or conflicting edits",
+        75: "the network failed, or another sync held the lock; retry",
+    }
+)
 log = logging.getLogger("sync-private")
 
 
-def git(*args: str, cwd: Path = PRIVATE) -> subprocess.CompletedProcess[str]:
-    log.debug("git %s", " ".join(args))
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=False
-    )
+def git(
+    *args: str, cwd: Path = PRIVATE, timeout: float | None = None
+) -> subprocess.CompletedProcess[str]:
+    log.debug("git %s", shlex.join(args))
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise TemporaryError(f"git {args[0]} took longer than {timeout:g}s") from None
 
 
 def last_line(result: subprocess.CompletedProcess[str]) -> str:
     lines = (result.stderr + result.stdout).strip().splitlines()
     return lines[-1] if lines else f"git exited {result.returncode}"
+
+
+def failed(
+    what: str, result: subprocess.CompletedProcess[str], fix: str
+) -> ScriptError:
+    """The error for a failed network step: temporary when the network failed."""
+    reason = last_line(result)
+    if is_network_failure(result.stderr):
+        return TemporaryError(f"{what}: {reason}")
+    return ScriptError(f"{what}: {reason}; {fix}")
 
 
 def private_url() -> str:
@@ -67,36 +106,47 @@ def state() -> tuple[str, str]:
     return head, "dirty" if dirty else "clean"
 
 
-def github_head() -> str:
+def github_head(timeout: float = TIMEOUT) -> str:
     """The private repository's main on GitHub, which every machine should match."""
     if not is_clone():
         raise ScriptError(f"{PRIVATE} is not a clone of the private repository")
-    listed = git("ls-remote", "--quiet", "origin", "refs/heads/main")
+    listed = git("ls-remote", "--quiet", "origin", "refs/heads/main", timeout=timeout)
     if listed.returncode or not listed.stdout.strip():
-        raise ScriptError(f"could not read the private repository: {last_line(listed)}")
+        raise failed(
+            "could not read the private repository",
+            listed,
+            f"check the origin remote in {PRIVATE}",
+        )
     return listed.stdout.split()[0]
 
 
-def sync(dry_run: bool = False) -> str:
-    """Clone, save, pull, and push; runs from one repository take turns."""
+def sync(dry_run: bool = False, timeout: float = TIMEOUT) -> list[str]:
+    """Clone, save, pull, and push; return one line per change. Runs from one
+    repository take turns, each waiting up to `timeout` seconds."""
     if dry_run:
-        return save_and_pull(dry_run=True)
+        return save_and_pull(dry_run=True, timeout=timeout)
     common = git("rev-parse", "--git-common-dir", cwd=ROOT).stdout.strip()
-    with exclusive(ROOT / common / "sync-private.lock"):
-        return save_and_pull(dry_run=False)
+    with exclusive(ROOT / common / "sync-private.lock", timeout):
+        return save_and_pull(dry_run=False, timeout=timeout)
 
 
-def save_and_pull(dry_run: bool) -> str:
+def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
     host = socket.gethostname().split(".")[0]
     _, status = state()
     if status == "missing":
         url = private_url()
-        if dry_run:
-            return f"would clone {url} into {PRIVATE}"
-        cloned = git("clone", "--quiet", url, str(PRIVATE), cwd=ROOT)
-        if cloned.returncode:
-            raise ScriptError(f"could not clone {url}: {last_line(cloned)}")
-        return ""
+        if not dry_run:
+            log.info("clone %s", url)
+            cloned = git(
+                "clone", "--quiet", url, str(PRIVATE), cwd=ROOT, timeout=timeout
+            )
+            if cloned.returncode:
+                raise failed(
+                    f"could not clone {url}",
+                    cloned,
+                    "check that the private repository exists and you can read it",
+                )
+        return [f"clone\t{LABEL}\t{url}"]
     if status == "plain":
         raise ScriptError(
             f"{PRIVATE} is not a clone of the private repository; move it aside, "
@@ -107,8 +157,9 @@ def save_and_pull(dry_run: bool) -> str:
         raise ScriptError(
             f"{PRIVATE} is on {branch or 'a detached HEAD'}; switch it to main, then rerun"
         )
+    changes = [f"commit\t{LABEL}\tsave edits from {host}"] if status == "dirty" else []
     if dry_run:
-        return f"would commit private edits from {host}" if status == "dirty" else ""
+        return changes
     if status == "dirty":
         for step in (
             ("add", "--all"),
@@ -117,7 +168,9 @@ def save_and_pull(dry_run: bool) -> str:
             done = git(*step)
             if done.returncode:
                 raise ScriptError(f"could not commit private edits: {last_line(done)}")
-    pulled = git("pull", "--rebase", "--quiet")
+    before = git("rev-parse", "HEAD").stdout.strip()
+    log.info("pull %s", LABEL)
+    pulled = git("pull", "--rebase", "--quiet", timeout=timeout)
     if pulled.returncode:
         rebasing = any(
             (PRIVATE / git("rev-parse", "--git-path", part).stdout.strip()).exists()
@@ -129,32 +182,54 @@ def save_and_pull(dry_run: bool) -> str:
                 f"private edits on {host} conflict with GitHub; resolve them with "
                 f"git pull --rebase in {PRIVATE}, then rerun"
             )
-        raise ScriptError(f"could not pull the private repository: {last_line(pulled)}")
+        raise failed(
+            "could not pull the private repository",
+            pulled,
+            f"fix the clone at {PRIVATE}, then rerun",
+        )
+    after = git("rev-parse", "HEAD").stdout.strip()
+    if after != before:
+        changes.append(f"pull\t{LABEL}\t{before[:7]}..{after[:7]}")
     ahead = git("rev-list", "--count", "@{upstream}..HEAD").stdout.strip()
     if ahead not in ("", "0"):
-        pushed = git("push", "--quiet")
+        log.info("push %s", LABEL)
+        pushed = git("push", "--quiet", timeout=timeout)
         if pushed.returncode:
-            raise ScriptError(
-                f"could not push private edits from {host}: {last_line(pushed)}"
+            raise failed(
+                f"could not push private edits from {host}",
+                pushed,
+                f"fix the clone at {PRIVATE}, then rerun",
             )
-    log.debug("private repository at %s", git("rev-parse", "HEAD").stdout.strip())
-    return ""
+        changes.append(f"push\t{LABEL}\t{ahead} commit{'s' if ahead != '1' else ''}")
+    log.debug("private repository at %s", after)
+    return changes
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
+        prog="scripts/sync_private.py",
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""examples:
-  just sync                                # runs this, then installs
-  uv run scripts/sync_private.py --dry-run # what a sync would clone or commit""",
+        epilog=EPILOG,
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument(
+        "-n",
         "--dry-run",
         action="store_true",
-        help="print what would be cloned or committed without changing anything",
+        help="print the clone or commit a run would make without changing anything",
     )
-    return run_script(parser, lambda args: sync(args.dry_run), argv)
+    parser.add_argument(
+        "--timeout",
+        type=duration,
+        default="5m",
+        help="how long to wait for another sync, and for each clone, pull, or push (default: 5m)",
+    )
+    return run_script(
+        parser,
+        lambda args: "\n".join(sync(args.dry_run, args.timeout)),
+        argv,
+        debug="SYNC_PRIVATE_DEBUG",
+    )
 
 
 if __name__ == "__main__":

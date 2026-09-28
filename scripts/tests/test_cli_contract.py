@@ -185,7 +185,25 @@ def opencode_finds_alpha(sandbox: Sandbox) -> tuple[str, ...]:
     return ("--profile", "mac", "--agent", "opencode")
 
 
+def with_origin(sandbox: Sandbox) -> None:
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://example.invalid/skills.git"],
+        cwd=sandbox.repo,
+        check=True,
+    )
+
+
+def dry_run(_: Sandbox) -> tuple[str, ...]:
+    return ("--dry-run",)
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/sync_private.py": Entry(
+        name="scripts/sync_private.py",
+        block="git",
+        prepare=with_origin,
+        safe=dry_run,
+    ),
     "scripts/discover_skills.py": Entry(
         name="just skills-discover",
         block="opencode",
@@ -230,7 +248,6 @@ ENTRIES: dict[str, Entry] = {
 PENDING = {
     "scripts/sync.py",
     "scripts/sync_fleet.py",
-    "scripts/sync_private.py",
     "authoring/content/html-mode/scripts/check_html_mode.py",
     "authoring/content/mermaid/scripts/render_examples.py",
     "authoring/content/storytelling/tests/validate-package.py",
