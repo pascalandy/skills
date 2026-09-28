@@ -38,6 +38,6 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Read on demand
 
-- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/maintainer/references/script-conventions.md)
+- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/maintainer/references/script-conventions.md). `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and `authoring/commands/cli-contract.md` carries the same contract to other projects
 - Before adding or changing a check, hook, or CI step, read [checks](docs/maintainer/references/checks.md)
 - To release, follow [release](docs/maintainer/references/release.md). Never move or delete a pushed tag

@@ -10,13 +10,15 @@ date_created: 2026-09-26
 date_updated: 2026-09-28
 ---
 
-Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` lists the ones that have not yet
+Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and a script leaves it once it meets the contract and `just check` passes
+
+`authoring/commands/cli-contract.md` carries the Baseline and Opt-in sections below word for word, so the contract travels to a project that does not have this doc. `just check --only test` fails when the two drift; edit this doc and copy the sections across
 
 `<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
 
 ## Baseline
 
-Every script meets all of these.
+Every script meets all of these. No exception waives an exit code, the Rule of Silence, or help behavior.
 
 Output follows the Rule of Silence: when nothing needs saying, print nothing
 
@@ -49,7 +51,7 @@ Documentation:
 
 - Flags and defaults are documented once, in the argument parser
 - Other docs say "run `<name> --help`" instead of copying flag lists, and keep only what code cannot say: why, where, and dependencies
-- A doc line that runs a script may use only flags that script accepts; `test_cli_contract.py` checks every such line in docs, hooks, CI, and `scripts/`
+- A doc line that runs a script may use only flags that script accepts; a test checks every such line in docs, hooks, and CI
 
 ## Opt-in
 
@@ -88,7 +90,7 @@ A duration is `30s`, `5m`, `2h`, or bare seconds
 
 ## Exceptions
 
-Opt-in flags that would give no real choice are left out; each exception gets one line:
+Opt-in flags that would give no real choice are left out, and a script outside the shared block's language drops only a Parsing item its language cannot express. Each exception gets one line:
 
 - `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
 - Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
@@ -113,7 +115,7 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 
 Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI
 
-`test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
+`test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it in docs, hooks, CI, and `scripts/`. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
 
 Each script's exit-code table drives its tests: every code needs a test that triggers it. The contract tests cover `2`, `130`, and `143`; a script's own suite marks the rest with `@exits(script, code)`, which fails unless the test really sees that exit
 
