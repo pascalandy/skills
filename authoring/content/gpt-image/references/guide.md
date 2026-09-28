@@ -150,7 +150,7 @@ High/Max request two/three candidates. `--aspect` guides the prompt; `--size` cr
 
 ## 8. Test evidence
 
-The original work reported 12 plan-backend scenarios producing 17 images, plus eight endpoint probes. It did not establish Flare/Sunburst API parameter behavior. Prompts, image artifacts, and raw results are not bundled, so these reports are not independently reproducible evidence. Single samples and shared conversation context also limit conclusions.
+The original work reported 12 plan-backend scenarios producing 17 images, plus eight endpoint probes. It did not establish Flare/Sunburst API parameter behavior. [research-2026-09-28](research-2026-09-28/README.md) keeps that day's prompts, the agents' unedited reports, and the verification notes as a frozen record. Images and raw logs are not bundled, so visual judgments cannot be re-checked. Single samples and shared conversation context also limit conclusions.
 
 No verified, controlled Flare-versus-Sunburst API comparison is included. Validate model-specific recommendations with saved prompts, settings, outputs, usage, timing, and visual judgments; change one setting at a time and repeat consequential comparisons.
 
