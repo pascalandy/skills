@@ -74,7 +74,7 @@ For a run with changed source or summary settings, inspect the plan first with `
 
 `stderr` stays empty on success unless a warning needs action, such as browser access falling back to anonymous. `-v` adds the run plan and one line per step; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off.
 
-With `--json`, success is one JSON object on `stdout`, and warnings join it as a `warnings` list. A failure is one JSON object on `stderr` with `ok: false` and an `error` object holding `code`, `message`, and `hint`. The hint is the command that fixes the error.
+With `--json`, success is one JSON object on `stdout`, and warnings join it as a `warnings` list. A failure is one JSON object on `stderr` with `ok: false` and an `error` object holding `code`, `message`, and `hint`. The hint is the command that fixes the error. With `-v` or `--debug`, their lines come first, and the JSON object still ends `stderr`.
 
 A successful run payload includes:
 
