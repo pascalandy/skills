@@ -474,7 +474,7 @@ def plan_generate_one(
     prompt: str, images: list[Path], verbose: bool
 ) -> tuple[bytes, dict[str, Any]]:
     started = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="gpt-image-") as work:
+    with tempfile.TemporaryDirectory(prefix="image-creator-") as work:
         cmd = [
             "codex", "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
             "-C", work, "-s", "read-only", "-c", 'approval_policy="never"',
@@ -732,18 +732,18 @@ OpenRouter requires OPENROUTER_API_KEY; there is no automatic paid fallback.
 The plan fixes model, quality, and size; --size is applied by cropping and resizing.
 
 examples:
-  gpt_image.py generate --prompt "Minimal poster ..." --out poster.png
-  gpt_image.py generate --intent max --aspect 16:9 --prompt-file brief.txt --out hero.png --json
-  gpt_image.py generate --intent draft --out idea.jpg --prompt "Three layout ideas for ..."
-  gpt_image.py generate --transparent --out logo.png --prompt "Flat vector logo ..."
+  image_creator.py generate --prompt "Minimal poster ..." --out poster.png
+  image_creator.py generate --intent max --aspect 16:9 --prompt-file brief.txt --out hero.png --json
+  image_creator.py generate --intent draft --out idea.jpg --prompt "Three layout ideas for ..."
+  image_creator.py generate --transparent --out logo.png --prompt "Flat vector logo ..."
 """
 )
 
 EPILOG_EDIT = """\
 examples:
-  gpt_image.py edit --image photo.png --out photo-snow.png \\
+  image_creator.py edit --image photo.png --out photo-snow.png \\
     --prompt "Change only the weather to light snow. Keep the person, pose, and framing unchanged."
-  gpt_image.py edit --image scene.png --image subject.png --intent high --out combined.png \\
+  image_creator.py edit --image scene.png --image subject.png --intent high --out combined.png \\
     --prompt "Image 1 is the scene; image 2 is the subject. ..."
 """
 
@@ -812,7 +812,7 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = Parser(
-        prog="gpt_image.py",
+        prog="image_creator.py",
         description="Generate or edit images with GPT Image through a ChatGPT plan or the OpenRouter API.",
     )
     parser.add_argument("--version", action="version", version=__version__)

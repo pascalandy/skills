@@ -1,4 +1,4 @@
-"""Test configuration: import gpt_image from the scripts directory."""
+"""Test configuration: import image_creator from the scripts directory."""
 
 from __future__ import annotations
 
