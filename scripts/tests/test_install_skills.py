@@ -409,10 +409,9 @@ def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_targe
     assert applied.stdout == preview.stdout
     assert run(repo, home).stdout == ""
     # A caller from before this version still passes -q
-    assert (run(repo, home, "--quiet").returncode, run(repo, home, "-q").stdout) == (
-        0,
-        "",
-    )
+    for flag in ("-q", "--quiet"):
+        bridged = run(repo, home, flag)
+        assert (bridged.returncode, bridged.stdout, bridged.stderr) == (0, "", "")
     shutil.rmtree(home / ".claude/skills/beta")
 
     checked = run(repo, home, "--check", "--json")
