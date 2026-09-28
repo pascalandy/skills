@@ -178,7 +178,7 @@ step() {
 }
 """
 # Prints the private clone's state as sync_private.state() reports it, then the
-# installer's preview, from which judge() finds the drift.
+# installer's preview, from which installed() finds the drift.
 CHECK = """
 step() {
     enter "$1" || return
@@ -602,7 +602,7 @@ def notify(lines: list[str]) -> None:
         command = ["osascript", "-e", script, title, body]
     else:
         return
-    subprocess.run(command, check=False, capture_output=True)
+    run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def github_main() -> Source:
