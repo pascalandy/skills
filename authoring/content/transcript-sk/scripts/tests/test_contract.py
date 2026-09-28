@@ -180,6 +180,12 @@ def test_smoke_help_lists_examples_and_exit_codes_and_wins(capsys) -> None:
         assert smoke(capsys, *argv) == (0, shown, "")
 
 
+def test_a_bundled_help_flag_wins_in_the_smoke_check_too(capsys) -> None:
+    shown = smoke(capsys, "--help")
+
+    assert smoke(capsys, "--timeout", "nope", "-vh") == shown
+
+
 # ---------------------------------------------------------------------------
 # Usage errors and parsing
 # ---------------------------------------------------------------------------
