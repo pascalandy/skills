@@ -31,7 +31,7 @@ Run the CLI with `uv run <skill_dir>/scripts/jevlabel.py`. Every command accepts
    *Complete when `apply` reports no failure, or each failure is reported with the log it names.*
 7. **Investigate review issues.** Work through each review issue with the Inspect and Assess steps of `label-for-issues`, then apply what the evidence supports. Read the reasons as leads, not verdicts: each names the condition to check, and `missing` names what the issue lacks. A type or priority that `apply` filled is Jev's judgment; change it when the evidence disagrees. Nominated labels need the evidence `label-for-issues` requires, such as a recorded readiness review for ready. A comment is written only when the user asks for one.
    *Complete when each review issue has an assessment, or is reported as left open with the reason.*
-8. **Report.** Give the run ID, the queue counts, the tokens and cost, the labels changed, the review outcomes, and any failures. Say that the thresholds are uncalibrated while `calibration` in `assets/questions.toml` says so.
+8. **Report.** Give the run ID, the queue counts, the tokens and cost, the labels changed, the review outcomes, and any failures. Report the calibration status that `calibration` in `assets/questions.toml` records, such as `partial`, with its caveats.
 
 ## Calibrate
 
