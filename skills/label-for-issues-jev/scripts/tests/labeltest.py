@@ -434,6 +434,9 @@ class Harness:
         event: dict[str, Any] = {"__typename": kind, "createdAt": at}
         if label is not None:
             event["label"] = {"name": label}
+            found["labels"] = [h for h in found["labels"] if h["name"] != label]
+            if kind == "LabeledEvent":
+                found["labels"].append({"name": label})
         found.setdefault("timeline", []).append(event)
         found["updatedAt"] = at
 

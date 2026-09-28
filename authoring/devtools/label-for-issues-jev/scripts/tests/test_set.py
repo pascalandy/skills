@@ -76,7 +76,7 @@ def test_apply_and_earlier_sets_do_not_make_it_stale(harness: Harness) -> None:
     ("kind", "label", "reason"),
     [
         ("IssueComment", None, "new comment"),
-        ("LabeledEvent", "3-pty:p1", "3-pty:p1 added outside jevlabel"),
+        ("LabeledEvent", "3-pty:p1", "3-pty:p1 changed outside jevlabel"),
         ("RenamedTitleEvent", None, "title changed"),
         ("AssignedEvent", None, "updated outside jevlabel"),
     ],
@@ -92,6 +92,39 @@ def test_a_change_since_the_run_makes_it_stale(
     assert result.code == 1
     assert f"error: #1: stale: {reason} since run " in result.stderr
     assert harness.edits() == []
+
+
+def test_a_proposed_label_that_a_person_added_is_stale(harness: Harness) -> None:
+    review(harness)
+    harness.change(1, "LabeledEvent", "2026-10-01T00:00:00Z", label="3-pty:p2")
+
+    result = harness.run("set", "last", "1", "--add", "1-needs-triage")
+
+    assert result.code == 1
+    assert "error: #1: stale: 3-pty:p2 changed outside jevlabel" in result.stderr
+
+
+def test_a_label_changed_within_the_snapshot_second_is_stale(harness: Harness) -> None:
+    review(harness)
+    snapshot = harness.found(1)["updatedAt"]
+    harness.change(1, "LabeledEvent", snapshot, label="3-pty:p1")
+
+    result = harness.run("set", "last", "1", "--add", "1-needs-triage")
+
+    assert result.code == 1
+    assert "error: #1: stale: 3-pty:p1 changed outside jevlabel" in result.stderr
+
+
+def test_a_person_repeating_an_own_write_is_stale(harness: Harness) -> None:
+    review(harness)
+    assert harness.run("apply", "last").code == 0
+    assert harness.run("set", "last", "1", "--add", "3-pty:p1").code == 0
+    harness.change(1, "LabeledEvent", "2026-10-01T00:00:00Z", label="3-pty:p2")
+
+    result = harness.run("set", "last", "1", "--add", "1-needs-triage")
+
+    assert result.code == 1
+    assert "error: #1: stale: 3-pty:p2 added outside jevlabel" in result.stderr
 
 
 def test_a_closed_issue_is_stale(harness: Harness) -> None:
@@ -185,6 +218,11 @@ def test_nothing_to_change_writes_nothing(harness: Harness) -> None:
             "its 2-type:chore label is not canonical",
         ),
         (("4-epic:parent",), ["--add", "2-type:task"], "it is an epic parent"),
+        (
+            ("1-needs-triage",),
+            ["--remove", "1-needs-triage"],
+            "it would have no state label",
+        ),
     ],
 )
 def test_a_family_conflict_is_refused(

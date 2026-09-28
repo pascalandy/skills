@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1880,17 +1881,30 @@ def moment(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def own_writes(run_id: str, entry: dict[str, Any]) -> tuple[set[str], set[str]]:
-    """Labels this run's apply and set may have added to or removed from one issue."""
-    added, removed = set(writable(entry)), set()
-    for path in runs_dir().glob(f"{run_id}.set-{entry['number']}-*.json"):
-        try:
-            log = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue  # An unreadable log only makes the check stricter
-        added.update(log.get("added", []))
-        removed.update(log.get("removed", []))
-    return added, removed
+def read_log(path: Path) -> dict[str, Any]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}  # An unreadable log only makes the stale check stricter
+
+
+def own_writes(run_id: str, number: int) -> Counter[tuple[str, str]]:
+    """The label events that this run's verified apply and set writes produced on one issue.
+
+    Only writes read back as applied count, and each explains one timeline event,
+    so a person who repeats the same change later is still caught.
+    """
+    events: Counter[tuple[str, str]] = Counter()
+    for path in runs_dir().glob(f"{run_id}.apply-*.json"):
+        for result in read_log(path).get("results", []):
+            if result.get("number") == number and result.get("outcome") == "applied":
+                events.update(("LabeledEvent", label) for label in result["labels"])
+    for path in runs_dir().glob(f"{run_id}.set-{number}-*.json"):
+        log = read_log(path)
+        if log.get("outcome") == "set":
+            events.update(("LabeledEvent", label) for label in log["added"])
+            events.update(("UnlabeledEvent", label) for label in log["removed"])
+    return events
 
 
 def changes_since(repo: str, number: int, since: str) -> dict[str, Any]:
@@ -1921,10 +1935,18 @@ def stale_reason(
     closed = str(current.get("state", "")).upper() != "OPEN"
     if closed and entry["state"] == "OPEN":
         return "closed"
+    own = own_writes(run_id, entry["number"])
+    # Labels first: a change in the snapshot's own second leaves updatedAt alone.
+    added = {label for kind, label in own if kind == "LabeledEvent"}
+    removed = {label for kind, label in own if kind == "UnlabeledEvent"}
+    snapshot = set(entry["labels"])
+    labels = {label["name"] for label in current.get("labels") or []}
+    outside = sorted((labels - snapshot - added) | (snapshot - labels - removed))
+    if outside:
+        return f"{', '.join(outside)} changed outside jevlabel"
     since = entry["updated_at"]
     if current.get("updatedAt") == since:
         return None
-    added, removed = own_writes(run_id, entry)
     changes = changes_since(repo, entry["number"], since)
     timeline = changes.get("timelineItems") or {}
     latest: datetime | None = None
@@ -1932,10 +1954,10 @@ def stale_reason(
         at = moment(item["createdAt"])
         if at <= moment(since):
             continue
-        kind, label = item["__typename"], (item.get("label") or {}).get("name")
-        if (kind == "LabeledEvent" and label in added) or (
-            kind == "UnlabeledEvent" and label in removed
-        ):
+        kind = item["__typename"]
+        label = str((item.get("label") or {}).get("name") or "")
+        if own[(kind, label)] > 0:
+            own[(kind, label)] -= 1
             latest = at if latest is None else max(latest, at)
         elif kind in ("LabeledEvent", "UnlabeledEvent"):
             verb = "added" if kind == "LabeledEvent" else "removed"
@@ -2054,6 +2076,7 @@ def show_text(view: dict[str, Any]) -> str:
         f"state: {view['state'].lower()}; labels: {', '.join(view['labels']) or 'none'}",
     ]
     triage = view["triage"]
+    shown = {comment["url"]: index for index, comment in enumerate(view["comments"], 1)}
     if triage is None:
         lines.append(f"run {view['run']}: not in this run")
     else:
@@ -2072,8 +2095,10 @@ def show_text(view: dict[str, Any]) -> str:
                 )
             else:
                 value = f"{answer['choice']} at {answer['confidence']} (needs {answer['min_confidence']})"
+            where = answer.get("comment")
+            where = f" on comment {shown[where]}" if where in shown else ""
             question = f": {answer['question']}" if answer.get("question") else ""
-            lines.append(f"  medium: {answer['id']} {value}{question}")
+            lines.append(f"  medium: {answer['id']} {value}{where}{question}")
         if triage["fill"]:
             lines.append(f"  fill: {', '.join(triage['fill'])}")
         if triage["questions_changed"]:
@@ -2266,6 +2291,20 @@ def cmd_set(args: argparse.Namespace) -> tuple[str, Any]:
     added = [label for label in add if label not in labels]
     removed = unique([label for label in remove if label in labels] + replaced)
     result.update(added=added, removed=removed)
+    final = (labels - set(removed)) | set(added)
+    emptied = [
+        name
+        for name, prefix in FAMILIES.items()
+        if any(label.startswith(prefix) for label in labels)
+        and not any(label.startswith(prefix) for label in final)
+        and not (name == "type" and EPIC_PARENT in final)
+    ]
+    if emptied:
+        refuse(
+            "conflict",
+            f"it would have no {' or '.join(emptied)} label, and label-for-issues keeps "
+            "one per open triaged issue; add the replacement instead",
+        )
     if not added and not removed:
         result["outcome"] = "already"
         return f"set #{number}: nothing to change", result

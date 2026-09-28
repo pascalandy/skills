@@ -114,6 +114,21 @@ def test_show_reads_as_text(harness: Harness) -> None:
     assert "comment 2 · maintainer · pascal" in lines
 
 
+def test_text_names_the_comment_a_medium_answer_is_about(harness: Harness) -> None:
+    thread = (
+        comment("Coverage report", author="codecov", number=1),
+        comment("Which version?", author="bob", number=2),
+    )
+    harness.issues(issue(1, comments=thread))
+    harness.fake.overrides = {"Crash on start": {"asks_info_0": 0.5}}
+    assert harness.live("--issue", "1").code == 0
+
+    lines = harness.run("show", "last", "--issue", "1").stdout.splitlines()
+
+    [medium] = [line for line in lines if line.startswith("  medium: asks_info_0 ")]
+    assert " on comment 2: " in medium
+
+
 def test_show_names_a_change_since_the_run(harness: Harness) -> None:
     one_review_issue(harness)
     harness.change(1, "IssueComment", "2026-10-01T00:00:00Z")
