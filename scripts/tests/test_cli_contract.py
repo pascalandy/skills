@@ -165,7 +165,15 @@ def first_release(_: Sandbox) -> tuple[str, ...]:
     return ("v0.1.0",)
 
 
+def new_skill_preview(sandbox: Sandbox) -> tuple[str, ...]:
+    skill(sandbox.repo / "authoring/content", "beta")
+    return ("--dry-run",)
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/flatten_skills.py": Entry(
+        name="just flatten-skills", block="git", safe=new_skill_preview
+    ),
     "scripts/release_check.py": Entry(
         name="just release-check",
         block="git",
@@ -196,7 +204,6 @@ ENTRIES: dict[str, Entry] = {
 # Scripts a later wave moves onto the contract
 PENDING = {
     "scripts/discover_skills.py",
-    "scripts/flatten_skills.py",
     "scripts/install_skills.py",
     "scripts/sync.py",
     "scripts/sync_fleet.py",

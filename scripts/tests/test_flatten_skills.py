@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import flatten_skills
+from conftest import exits, observe
 
 
 class FlattenSkillsTests(unittest.TestCase):
@@ -48,15 +49,17 @@ class FlattenSkillsTests(unittest.TestCase):
             ):
                 yield root, source, destination
 
-    def check(self, *, verbose: bool = False) -> tuple[int, str, str]:
+    def cli(self, *argv: str) -> tuple[int, str, str]:
         stdout = StringIO()
         stderr = StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            result = flatten_skills.main(
-                ["--check", *(["--verbose"] if verbose else [])]
-            )
+            result = observe("flatten_skills", flatten_skills.main(list(argv)))
         return result, stdout.getvalue(), stderr.getvalue()
 
+    def check(self, *, verbose: bool = False) -> tuple[int, str, str]:
+        return self.cli("--check", *(["--verbose"] if verbose else []))
+
+    @exits("flatten_skills", 0)
     def test_check_accepts_synchronized_tree_and_ignored_runtime_files(self) -> None:
         with self.repository() as (root, _, _):
             cache = root / "skills" / "example" / "__pycache__"
@@ -64,10 +67,29 @@ class FlattenSkillsTests(unittest.TestCase):
             (cache / "junk.pyc").write_bytes(b"runtime cache")
             result, stdout, stderr = self.check()
 
-        self.assertEqual(result, 0)
-        self.assertEqual(stdout, "ok: 1 skills, 1 files match skills/\n")
-        self.assertEqual(stderr, "")
+        self.assertEqual((result, stdout, stderr), (0, "", ""))
 
+    @exits("flatten_skills", 0)
+    def test_dry_run_prints_the_lines_a_real_run_prints_then_a_rerun_is_silent(
+        self,
+    ) -> None:
+        with self.repository() as (root, source, _):
+            source.write_text("# Changed\n", encoding="utf-8")
+            added = root / "authoring/devtools/fresh/SKILL.md"
+            added.parent.mkdir()
+            added.write_text("# Fresh\n", encoding="utf-8")
+            subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
+            lines = "update\tskills/example\nadd\tskills/fresh\n"
+
+            self.assertEqual(self.cli("-vn")[:2], (0, lines))
+            self.assertEqual(
+                (root / "skills/example/SKILL.md").read_text(), "# Example\n"
+            )
+            self.assertEqual(self.cli(), (0, lines, ""))
+            self.assertEqual((root / "skills/fresh/SKILL.md").read_text(), "# Fresh\n")
+            self.assertEqual(self.cli(), (0, "", ""))
+
+    @exits("flatten_skills", 1)
     def test_check_reports_content_missing_extra_and_mode_drift(self) -> None:
         cases = {
             "content": (
@@ -113,10 +135,12 @@ class FlattenSkillsTests(unittest.TestCase):
             source.write_text("# Changed\n", encoding="utf-8")
             result, stdout, stderr = self.check()
 
-        self.assertEqual(result, 1)
-        self.assertEqual(stdout, "")
-        self.assertEqual(stderr.count("error:"), 1)
-        self.assertIn("example; run just flatten-skills", stderr)
+        self.assertEqual((result, stdout), (1, ""))
+        self.assertEqual(
+            stderr,
+            "update\tskills/example\n"
+            "error: skills/ differs from authoring/; run: just flatten-skills\n",
+        )
 
     def test_interrupt_after_moving_output_restores_previous_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
