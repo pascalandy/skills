@@ -414,20 +414,51 @@ def test_retired_command_targets_lose_only_published_commands(
     assert run(repo, home, "--profile", "om1", "--check").returncode == 0
 
 
-def test_retired_target_linked_to_an_active_one_is_left_alone(
+def test_retired_targets_reached_through_a_symlink_are_left_alone(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
     command(repo, "review", "shared")
     commit(repo)
-    (home / ".claude/commands").mkdir(parents=True)
-    (home / ".codex").mkdir()
+    # One links to a live target, the other to a checkout's command sources
+    checkout = home / "checkout/authoring/commands"
+    for directory in (home / ".claude/commands", checkout, home / ".codex"):
+        directory.mkdir(parents=True)
+    (checkout / "review.md").write_text("source\n", encoding="utf-8")
     (home / ".codex/prompts").symlink_to(home / ".claude/commands")
+    (home / ".config/agents").mkdir(parents=True)
+    (home / ".config/agents/commands").symlink_to(checkout)
     assert run(repo, home).returncode == 0
     assert run(repo, home).stdout == ""
     assert (home / ".claude/commands/review.md").read_text(encoding="utf-8") == (
         "shared\n"
     )
+    assert (checkout / "review.md").read_text(encoding="utf-8") == "source\n"
+
+
+def test_codex_skill_descriptions_follow_yaml_quoting(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "inner", '---\ndescription: Use "review"\n---\nbody')
+    command(repo, "single", "---\ndescription: 'It''s here'\n---\nbody")
+    command(repo, "escaped", '---\ndescription: "Say \\"hi\\""\n---\nbody')
+    command(repo, "folded", "---\ndescription: >\n  long\n---\nbody")
+    command(repo, "bare", "body")
+    assert run(repo, home).returncode == 0
+    headers = {
+        name: (home / ".codex/skills" / name / "SKILL.md")
+        .read_text(encoding="utf-8")
+        .splitlines()[2]
+        for name in ("inner", "single", "escaped", "folded", "bare")
+    }
+    assert headers == {
+        "inner": 'description: "Use \\"review\\""',
+        "single": 'description: "It\'s here"',
+        "escaped": 'description: "Say \\"hi\\""',
+        "folded": 'description: "folded"',
+        "bare": 'description: "bare"',
+    }
 
 
 def test_a_command_named_like_a_skill_stops_before_writing(

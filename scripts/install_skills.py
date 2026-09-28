@@ -294,6 +294,18 @@ def command_sources() -> dict[str, Source]:
     return sources
 
 
+def unquote(value: str) -> str:
+    """Read a one-line YAML scalar; a block scalar or broken quoting reads as empty."""
+    if value.startswith('"'):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return ""
+    if value.startswith("'"):
+        return value[1:-1].replace("''", "'") if value.endswith("'") else ""
+    return "" if value.startswith(("|", ">")) else value
+
+
 def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source]:
     """Stage each command under `stage` as a Codex skill: its name, its
     description, then its body unchanged."""
@@ -303,7 +315,7 @@ def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source
         text = command.path.read_text(encoding="utf-8")
         header = FRONTMATTER.match(text)
         found = DESCRIPTION.search(header.group(1)) if header else None
-        description = found.group(1).strip("\"'") if found else ""
+        description = unquote(found.group(1)) if found else ""
         body = text[header.end() :] if header else text
         package = stage / name
         package.mkdir(parents=True)
@@ -420,8 +432,8 @@ def layout(
     owned_commands: set[str],
 ) -> list[Group]:
     """Group the profile's targets by what they hold. On om1 the Codex directory
-    holds the skills beside the commands; a retired target that is another name
-    for an active one is left alone."""
+    holds the skills beside the commands. A retired target reached through a
+    symlink is left alone, since it may be a live target or a command source."""
     shared = CODEX_SKILLS in PROFILES[profile]
     owned_codex = {Path(name).stem for name in owned_commands}
     active = [
@@ -445,8 +457,8 @@ def layout(
             f"~/{skill_dirs[where(CODEX_SKILLS)]}; make it a directory of its own, "
             "then rerun: just install-skills"
         )
-    taken = {where(target) for group in active for target in group.targets}
-    retired = tuple(t for t in RETIRED_COMMAND_TARGETS if where(t) not in taken)
+    real = home.resolve()
+    retired = tuple(t for t in RETIRED_COMMAND_TARGETS if where(t) == real / t)
     return [*active, Group(retired, {}, owned_commands, retired="command")]
 
 
