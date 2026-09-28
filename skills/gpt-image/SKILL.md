@@ -1,34 +1,26 @@
 ---
 name: "gpt-image"
-description: "Use when generating or editing a raster image from the terminal, such as a photo, poster, diagram, logo, or transparent cutout, with OpenAI's GPT Image models through a ChatGPT plan or an API key."
+description: "Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter."
 ---
 
 # GPT Image
 
-`<skill_dir>/scripts/gpt_image.py` generates and edits images. It owns every request setting: backend, model, quality, size, format, candidates, and output checks. You supply an intent, a shape, and a prompt. [The guide](references/guide.md) explains every setting it chooses.
+Use `<skill_dir>/scripts/gpt_image.py`. Read [settings](references/guide.md#3-request-reference) when choosing flags, [prompting](references/guide.md#4-write-the-prompt) when composing a brief.
 
 ## Steps
 
-1. **Pick the intent** from the user's words: `draft` for a quick idea, `standard` for an everyday image (the default), `high` for a client-facing final, dense text, a product shot, or a portrait, `max` when quality is paramount. Done when one intent is chosen.
-2. **Pick the shape.** `--aspect W:H` from where the image will be shown, or `--size WxH` when the delivery needs exact pixels. An edit keeps its first input's size when you pass neither. Add `--transparent` for logos, stickers, and cutouts, with a `.png` or `.webp` output. Done when the shape matches the destination.
-3. **Write the prompt** with the rules and template in [guide section 4](references/guide.md#4-write-the-prompt), and the matching row of its use-case table. Done when the prompt names the deliverable, composition, visible details, exact text in quotes with its count, and the exclusions.
-4. **Run the CLI.** Pass long prompts with `--prompt-file`.
+1. Default to the Codex plan with `gpt-image-2`. Only when the user explicitly requests 2.5, use OpenRouter with `OPENROUTER_API_KEY`: `--model flare` for generic 2.5 or Flare, `--model sunburst` for Sunburst. A high-quality request alone does not authorize switching modes
+2. Choose an [intent](references/guide.md#2-tiers), then set `--aspect W:H` for composition or `--size WxH` for exact delivery pixels. Add `--transparent` with `.png` or `.webp` for cutouts
+3. Name the deliverable, composition, visible details, quoted text, and exclusions. For edits, state the change and what must remain unchanged
+4. Run the CLI; use `--prompt-file` for long briefs and `--dry-run --json` to inspect settings and estimated output cost
 
    ```sh
    uv run <skill_dir>/scripts/gpt_image.py generate --intent high --aspect 16:9 --out out/hero.png --prompt "..."
-   uv run <skill_dir>/scripts/gpt_image.py edit --image in.png --out out/in-v2.png --prompt "Change only ... Keep ... unchanged."
+   uv run <skill_dir>/scripts/gpt_image.py generate --model flare --quality high --size 1536x864 --out out/2.5.png --prompt "..."
    ```
 
-   It prints one line naming the files, or the full receipt with `--json`. Each `warning:` line on stderr names a defect to handle in step 5. Done when the command exits 0.
-5. **Inspect every output image** against the checks in [guide section 5.1](references/guide.md#51-checks). When the run produced candidates (`hero-1.png`, `hero-2.png`, …), pick the one that passes the most checks. Done when every output has been viewed and judged.
-6. **Iterate one change at a time** with the ladder in [guide section 5.2](references/guide.md#52-the-ladder). With this CLI, "raise `quality`" and "switch to Sunburst" both mean raising `--intent` one step. Done when an output passes every check, or the user accepts it.
-7. **Report** the chosen file, the backend from the receipt, and any unresolved warning.
+5. View every output, apply the [checks](references/guide.md#51-checks), and resolve stderr warnings. Exit 0 alone does not establish visual quality
+6. Retry one variable at a time within the chosen mode. OpenRouter exposes `--quality` and `--model`; the plan does not. Hold other settings fixed; changing `--intent` can change several together
+7. Deliver the chosen file, receipt backend, and unresolved defects
 
-## Backends
-
-`gpt_image.py doctor` shows which backends are ready. The CLI chooses one per run and records why in the receipt:
-
-- **Plan** (default): the user's ChatGPT plan through `codex exec`, with no API key. OpenAI fixes the model (`gpt-image-2`), quality, and a size near 1.57 MP there ([guide section 7](references/guide.md#7-chatgpt-and-codex-plans)). The CLI states the aspect ratio in the prompt, crops and resizes to `--size`, and spends `high` and `max` on 2 and 3 candidates
-- **API**: `OPENAI_API_KEY`. Each intent maps to Flare or Sunburst at a quality tier. `high` and `max` use it automatically when a key exists, as do `--mask`, `--model`, and `--quality`. It bills API prices; `--dry-run --json` shows the estimate before any call
-
-`--backend plan` or `--backend api` forces a backend. Run `gpt_image.py generate --help` for the full intent table and every flag.
+Run `doctor` for backend readiness or `generate --help` for flags. There is no paid fallback when the [plan](references/guide.md#7-chatgpt-and-codex-plans) is unavailable. Its `high` and `max` intents request more candidates; resizing adds pixels, not native detail
