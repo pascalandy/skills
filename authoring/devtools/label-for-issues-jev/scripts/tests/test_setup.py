@@ -36,14 +36,14 @@ def test_doctor_passes_with_a_key(harness: Harness) -> None:
     )
 
 
-def test_doctor_names_missing_labels_and_the_setup_skill(harness: Harness) -> None:
+def test_doctor_names_missing_labels_and_the_labels_command(harness: Harness) -> None:
     harness.add_repo("o/r", labels=["bug"])
 
     result = harness.run("doctor", "-R", "o/r", TYPESAFE_API_KEY="k")
 
     assert result.code == 1
     assert "error: labels: o/r lacks 0-impediment" in result.stderr
-    assert "label-for-issues" in result.stderr
+    assert "create them with `jevlabel labels -R o/r` before apply" in result.stderr
 
 
 def test_private_repository_needs_recorded_consent(harness: Harness) -> None:
