@@ -28,7 +28,7 @@ def just(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_every_recipe_is_one_line_without_shell_logic() -> None:
+def test_every_recipe_is_one_quiet_line_without_shell_logic() -> None:
     problems: list[str] = []
     recipes = json.loads(just("--dump", "--dump-format", "json").stdout)["recipes"]
     for name, recipe in recipes.items():
@@ -41,6 +41,9 @@ def test_every_recipe_is_one_line_without_shell_logic() -> None:
             problems.append(f"{name}: {len(lines)} lines; move them into a script")
         elif operator := next((op for op in OPERATORS if op in lines[0]), None):
             problems.append(f"{name}: uses {operator!r}; move the logic into a script")
+        elif "uv run " in lines[0] and "uv run --quiet " not in lines[0]:
+            # uv's own progress lines would break a script's quiet stderr
+            problems.append(f"{name}: runs uv without --quiet")
 
     assert problems == []
 

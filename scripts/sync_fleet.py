@@ -30,11 +30,14 @@ import argparse
 import json
 import logging
 import os
+import re
 import shlex
 import shutil
+import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
@@ -43,7 +46,24 @@ from pathlib import Path, PurePosixPath
 
 import sync_private
 import tomllib
-from _common import ScriptError, exclusive, run_script
+from _cli import (
+    Parser,
+    ScriptError,
+    TemporaryError,
+    UsageError,
+    duration,
+    exit_codes,
+)
+from _common import (
+    GRACE,
+    exclusive,
+    is_network_failure,
+    run,
+    run_git,
+    run_script,
+    send,
+    stop,
+)
 from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,10 +92,42 @@ SSH = (
 )
 NEEDS_YOU = 11
 UNREACHABLE = 255
+TEMPORARY = 75
 TIMEOUT = 600
 RETRY_DELAY = 3
 FINE = ("synced", "ready", "converged")
+# What a remote step prints for each change it makes
+CHANGE = re.compile(r"(clone|commit|pull|push|add|update|remove)\t")
+EPILOG = """\
+A run prints one line per machine it changed, `synced<TAB>NAME<TAB>SHA`, and a
+dry run one per machine it would change, `ready<TAB>NAME<TAB>SHA`; a run with
+nothing to change prints nothing. A failure prints every machine's status and
+what to do on stderr.
+
+examples:
+  just sync-fleet              # every machine
+  just sync-fleet mbp          # one machine, by registry name or host
+  just sync-fleet --check      # compare installed skills on every machine
+  just sync-fleet --dry-run --verbose"""
+EXIT_CODES = exit_codes(
+    {
+        0: "every selected machine is synced, ready, or converged",
+        1: "a machine needs you, drifted, or failed",
+        75: "every failure was temporary: offline, timed out, or a held lock; retry",
+    }
+)
 log = logging.getLogger("sync-fleet")
+
+# Children each run in their own session; an interrupt stops them all, and no
+# worker thread starts another
+CHILDREN: set[subprocess.Popen[str]] = set()
+CHILDREN_LOCK = threading.Lock()
+STOPPING = threading.Event()
+
+
+class Stopped(Exception):
+    """The run was interrupted, so a worker thread starts no new child."""
+
 
 # Each step runs in the machine's login shell, so `just` and `uv` are on PATH
 # over SSH. The body is one function called with stdin closed: the shell parses
@@ -130,12 +182,12 @@ step() {
             return 12
         }
     fi
-    uv run --quiet scripts/sync_private.py 2>&1 || return 1
-    just install-skills --quiet 2>&1
+    uv run --quiet scripts/sync_private.py 2>&1 || return
+    just install-skills 2>&1
 }
 """
 # Prints the private clone's state as sync_private.state() reports it, then the
-# installer's report.
+# installer's preview, from which installed() finds the drift.
 CHECK = """
 step() {
     enter "$1" || return
@@ -151,7 +203,7 @@ step() {
             echo "private $head clean"
         fi
     fi
-    just install-skills --check --json 2>&1
+    just install-skills --dry-run --json 2>&1
 }
 """
 
@@ -181,10 +233,12 @@ class Machine:
 
 @dataclass(frozen=True)
 class Source:
-    """GitHub's main, and the private repository's main in a check."""
+    """GitHub's main, the private repository's main in a check or a preview, and
+    in a preview the private changes this machine saves before others pull."""
 
     sha: str
     private: str = ""
+    saves: tuple[str, ...] = ()
 
     def contains(self, commit: str) -> bool:
         return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
@@ -196,6 +250,8 @@ class Outcome:
     status: str
     detail: str
     targets: list[dict] = field(default_factory=list)
+    changes: list[str] = field(default_factory=list)
+    temporary: bool = False
 
 
 def registry() -> Path:
@@ -269,7 +325,7 @@ def select(machines: list[Machine], names: list[str]) -> list[Machine]:
         known.setdefault(machine.host, machine)
     unknown = [name for name in names if name not in known]
     if unknown:
-        raise ScriptError(
+        raise UsageError(
             f"unknown machine {', '.join(unknown)}; the registry lists "
             + ", ".join(machine.name for machine in machines)
         )
@@ -281,23 +337,56 @@ def select(machines: list[Machine], names: list[str]) -> list[Machine]:
 def call(
     command: list[str], script: str | None = None, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
+    """Run a child in its own session, so an interrupt stops it and all it started."""
     log.debug("%s", shlex.join(command))
-    return subprocess.run(
-        command,
-        input=script,
-        capture_output=True,
-        text=True,
-        timeout=TIMEOUT,
-        check=False,
-        cwd=ROOT,
-        env=env,
-    )
+    with CHILDREN_LOCK:
+        if STOPPING.is_set():
+            raise Stopped
+        process = subprocess.Popen(
+            command,
+            stdin=None if script is None else subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=ROOT,
+            env=env,
+            start_new_session=True,
+        )
+        CHILDREN.add(process)
+    try:
+        stdout, stderr = process.communicate(script, timeout=TIMEOUT)
+    except BaseException:
+        stop(process, group=True)
+        raise
+    finally:
+        with CHILDREN_LOCK:
+            CHILDREN.discard(process)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def stop_children() -> None:
+    """Stop every child the worker threads run, and keep them from starting more.
+
+    Each child's process group gets SIGTERM, and SIGKILL once the leaders exit
+    or GRACE seconds pass, since a descendant may outlive its leader and hold
+    the pipes a worker reads; the workers then return.
+    """
+    with CHILDREN_LOCK:
+        STOPPING.set()
+        running = list(CHILDREN)
+    for process in running:
+        send(process, signal.SIGTERM, group=True)
+    deadline = time.monotonic() + GRACE
+    while time.monotonic() < deadline and any(
+        process.poll() is None for process in running
+    ):
+        time.sleep(0.05)
+    for process in running:
+        send(process, signal.SIGKILL, group=True)
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=ROOT, capture_output=True, text=True, check=False
-    )
+    return run_git(*args, cwd=ROOT)
 
 
 def reason(lines: list[str], code: int) -> str:
@@ -316,8 +405,12 @@ def remote(machine: Machine, body: str, *arguments: str) -> tuple[int, list[str]
         command = [*SSH, machine.ssh, login]
     result = call(command, ENTER + body + '\nstep "$@" </dev/null\n')
     # Login profiles may print before the step, and ssh reports its own
-    # failures on stderr.
+    # failures on stderr, after whatever the step printed before a disconnect.
     lines = result.stdout.strip().splitlines() or result.stderr.strip().splitlines()
+    if result.returncode == UNREACHABLE and result.stdout.strip():
+        lines += result.stderr.strip().splitlines()
+    for line in lines:
+        log.debug("%s: %s", machine.name, line)
     return result.returncode, lines
 
 
@@ -325,32 +418,62 @@ def status_of(code: int) -> str:
     return {NEEDS_YOU: "needs-you", UNREACHABLE: "offline"}.get(code, "failed")
 
 
+def failure(name: str, code: int, lines: list[str]) -> Outcome:
+    """A failed remote step; an unreachable machine or a step's own 75 is worth
+    a retry, but ssh also exits 255 when it reaches a machine and cannot log in."""
+    why = reason(lines, code)
+    if code == UNREACHABLE and not is_network_failure(why):
+        return Outcome(name, "failed", why)
+    return Outcome(
+        name, status_of(code), why, temporary=code in (UNREACHABLE, TEMPORARY)
+    )
+
+
 def private_problems(head: str, state: str, expected: str) -> list[str]:
-    """Compare a private clone, as sync_private.state() reports it, with GitHub."""
+    """Compare a private clone, as sync_private.state() reports it, with GitHub;
+    without `expected`, only its state."""
     if state == "missing":
         return ["private repo is not cloned"]
     if state == "plain":
         return ["_skills_private is not a clone of the private repo"]
     problems = ["private repo has uncommitted edits"] if state == "dirty" else []
-    if head != expected:
+    if expected and head != expected:
         problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
     return problems
 
 
-def judge(name: str, problems: list[str], output: str) -> Outcome:
-    """Turn an install-skills --check --json report into per-target drift."""
-    lines = output.strip().splitlines()
-    # The report is the indented JSON object; uv or a login profile may print
-    # around it.
+def report_in(lines: list[str]) -> dict | None:
+    """The installer's indented JSON object; uv or a login profile may print
+    around it."""
     braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
     try:
-        report = json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
+        return json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
     except (IndexError, json.JSONDecodeError):
-        return Outcome(name, "failed", reason(lines, 1))
+        return None
+
+
+def installed(
+    machine: Machine, source: Source
+) -> Outcome | tuple[list[str], list[dict]]:
+    """Run the CHECK step: what differs on the machine, from its private clone
+    to each install target, with the targets' counts; an Outcome when it fails."""
+    code, lines = remote(machine, CHECK, machine.path)
+    report = report_in(lines)
+    if code:
+        outcome = failure(machine.name, code, lines)
+        if report and report.get("errors"):
+            outcome.detail = "; ".join(report["errors"])
+        return outcome
+    if report is None:
+        return Outcome(machine.name, "failed", reason(lines, 1))
+    problems: list[str] = []
+    for line in lines:
+        if line.startswith("private ") and len(fields := line.split()) == 3:
+            problems.extend(private_problems(fields[1], fields[2], source.private))
     for target in report["targets"]:
         log.info(
             "%s ~/%s: %d of %d current",
-            name,
+            machine.name,
             target["target"],
             target["current"],
             target["expected"],
@@ -363,14 +486,13 @@ def judge(name: str, problems: list[str], output: str) -> Outcome:
                 + ", ".join(f"{kind} {count}" for kind, count in other.items())
                 + ")"
             )
-    status = "drift" if problems else "converged"
-    return Outcome(name, status, "; ".join(problems) or status, report["targets"])
+    return problems, report["targets"]
 
 
 def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     code, lines = remote(machine, INSPECT, machine.path)
     if code or not lines or not lines[-1].startswith("checkout "):
-        return Outcome(machine.name, status_of(code), reason(lines, code))
+        return failure(machine.name, code, lines)
     _, branch, head, state = lines[-1].split()
     problems: list[str] = []
     if branch != "main":
@@ -384,19 +506,32 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind GitHub at {head[:7]}")
-        code, lines = remote(machine, CHECK, machine.path)
-        for line in lines:
-            if line.startswith("private ") and len(fields := line.split()) == 3:
-                problems.extend(private_problems(fields[1], fields[2], source.private))
-        return judge(machine.name, problems, "\n".join(lines))
+        found = installed(machine, source)
+        if isinstance(found, Outcome):
+            return found
+        problems += found[0]
+        status = "drift" if problems else "converged"
+        return Outcome(machine.name, status, "; ".join(problems) or status, found[1])
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
-        if head == source.sha:
-            return Outcome(machine.name, "ready", f"ready; already at {head[:7]}")
-        return Outcome(
-            machine.name, "ready", f"ready to move {head[:7]} to {source.sha[:7]}"
-        )
+        if head != source.sha:
+            return Outcome(
+                machine.name,
+                "ready",
+                f"ready to move {head[:7]} to {source.sha[:7]}",
+                changes=[f"move {head[:7]} to {source.sha[:7]}"],
+            )
+        # At GitHub's main already, a sync would still save and pull the
+        # private clone and install what differs
+        found = installed(machine, source)
+        if isinstance(found, Outcome):
+            return found
+        pending, targets = found
+        if source.saves:
+            pending.append("pull the private edits this sync saves first")
+        detail = "; ".join(pending) or f"ready; already at {head[:7]}"
+        return Outcome(machine.name, "ready", detail, targets, changes=pending)
     if head != source.sha:
         pushed = call(
             [
@@ -412,11 +547,21 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         )
         if pushed.returncode:
             detail = reason(pushed.stderr.splitlines(), pushed.returncode)
-            return Outcome(machine.name, "failed", f"git push failed: {detail}")
+            return Outcome(
+                machine.name,
+                "failed",
+                f"git push failed: {detail}",
+                temporary=is_network_failure(pushed.stderr),
+            )
     code, lines = remote(machine, APPLY, machine.path, head, source.sha)
     if code:
-        return Outcome(machine.name, status_of(code), reason(lines, code))
-    return Outcome(machine.name, "synced", f"synced at {source.sha[:7]}")
+        return failure(machine.name, code, lines)
+    changes = [line for line in lines if CHANGE.match(line)]
+    if head != source.sha:
+        changes.insert(0, f"move {head[:7]} to {source.sha[:7]}")
+    return Outcome(
+        machine.name, "synced", f"synced at {source.sha[:7]}", changes=changes
+    )
 
 
 def attempt(machine: Machine, source: Source, mode: str) -> Outcome:
@@ -426,14 +571,16 @@ def attempt(machine: Machine, source: Source, mode: str) -> Outcome:
         try:
             return sync_machine(machine, source, mode)
         except subprocess.TimeoutExpired:
-            return Outcome(machine.name, "failed", "timed out")
+            return Outcome(machine.name, "failed", "timed out", temporary=True)
 
     outcome = once()
-    if outcome.status in ("offline", "failed"):
+    # An interrupt ends the wait at once and skips the retry
+    if outcome.status in ("offline", "failed") and not STOPPING.wait(RETRY_DELAY):
         log.debug("%s: %s; retrying", machine.name, outcome.detail)
-        time.sleep(RETRY_DELAY)
         outcome = once()
     log.info("%s: %s: %s", machine.name, outcome.status, outcome.detail)
+    for change in outcome.changes:
+        log.info("%s: %s", machine.name, change)
     return outcome
 
 
@@ -443,7 +590,7 @@ def advice(outcome: Outcome) -> str:
         "offline": f"it catches up at the next sync, or rerun just sync-fleet {name}",
         "needs-you": f"fix it on {name}, then rerun just sync-fleet {name}",
         "drift": f"rerun just sync-fleet {name}",
-    }.get(outcome.status, f"rerun just sync-fleet {name} --verbose")
+    }.get(outcome.status, f"rerun just sync-fleet {name} --debug")
     return f"{name} {outcome.status}: {outcome.detail}; {hint}"
 
 
@@ -458,30 +605,37 @@ def notify(lines: list[str]) -> None:
         command = ["osascript", "-e", script, title, body]
     else:
         return
-    subprocess.run(command, check=False, capture_output=True)
+    run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def github_main() -> Source:
     """Fetch GitHub's main; when GitHub is unreachable, use the last one fetched."""
-    fetched = call(["git", "fetch", "--quiet", "origin", "main"])
-    if fetched.returncode:
-        log.info(
-            "could not fetch GitHub's main: %s",
-            reason(fetched.stderr.splitlines(), fetched.returncode),
-        )
+    try:
+        fetched = call(["git", "fetch", "--quiet", "origin", "main"])
+        why = reason(fetched.stderr.splitlines(), fetched.returncode)
+        failed, temporary = fetched.returncode != 0, is_network_failure(fetched.stderr)
+    except subprocess.TimeoutExpired:
+        why, failed, temporary = f"git fetch took longer than {TIMEOUT}s", True, True
+    if failed:
+        log.info("could not fetch GitHub's main: %s", why)
     sha = git("rev-parse", "-q", "--verify", f"{GITHUB_MAIN}^{{commit}}").stdout.strip()
     if not sha:
-        raise ScriptError("GitHub's main is unknown here; check the network and rerun")
+        if temporary:
+            raise TemporaryError(f"GitHub's main is unknown here: {why}")
+        raise ScriptError(
+            f"GitHub's main is unknown here: {why}; fix origin, then rerun just sync-fleet"
+        )
     return Source(sha)
 
 
-def wait_for_push(sha: str) -> None:
-    """Return once GitHub's main is `sha`; give up quietly if the push never lands."""
-    deadline = time.monotonic() + PUSH_WAIT
+def wait_for_push(sha: str, timeout: float) -> None:
+    """Return once GitHub's main is `sha`; a push that has not landed in time
+    exits 75."""
+    deadline = time.monotonic() + min(PUSH_WAIT, timeout)
     while github_main().sha != sha:
         if time.monotonic() > deadline:
-            raise ScriptError(
-                f"GitHub's main never reached {sha[:7]}; the push did not land"
+            raise TemporaryError(
+                f"GitHub's main did not reach {sha[:7]} in time; the push has not landed"
             )
         time.sleep(RETRY_DELAY)
 
@@ -554,7 +708,7 @@ def hook(event: list[str]) -> str:
         return ""
     if not has_registry():
         return ""
-    installed = call([sys.executable, str(INSTALLER), "--quiet"])
+    installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
     if installed.returncode:
@@ -584,16 +738,22 @@ def sync(args: argparse.Namespace) -> str:
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
     local = next((machine.name for machine in fleet if machine.is_local()), None)
     if args.after_push:
-        wait_for_push(args.after_push)
+        wait_for_push(args.after_push, args.timeout)
     # Queue behind any other sync from here, so each run sends the newest commit.
-    with exclusive(STATE / "fleet.lock"):
+    with exclusive(STATE / "fleet.lock", args.timeout):
         source = github_main()
         # This machine pushes its private edits before any machine pulls, even
         # when it is not selected.
         if mode == "apply":
-            sync_private.sync()
-        if mode == "check":
-            source = Source(source.sha, sync_private.github_head())
+            for change in sync_private.sync(timeout=args.timeout):
+                log.info("%s", change)
+        # A check needs the private clone; a preview compares with it when here,
+        # and counts the edits a sync would save from it before others pull
+        if mode == "check" or (mode == "preview" and sync_private.is_clone()):
+            source = Source(source.sha, sync_private.github_head(args.timeout))
+        if mode == "preview" and sync_private.is_clone():
+            saves = tuple(sync_private.sync(dry_run=True))
+            source = Source(source.sha, source.private, saves)
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
             "%s: GitHub main at %s with %d public skills, from %s",
@@ -603,9 +763,13 @@ def sync(args: argparse.Namespace) -> str:
             local or socket.gethostname().split(".")[0],
         )
         with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
-            outcomes = list(
-                pool.map(lambda machine: attempt(machine, source, mode), machines)
-            )
+            try:
+                outcomes = list(
+                    pool.map(lambda machine: attempt(machine, source, mode), machines)
+                )
+            except KeyboardInterrupt:
+                stop_children()
+                raise
     problems = [outcome for outcome in outcomes if outcome.status not in FINE]
     if args.notify:
         notify(
@@ -615,33 +779,31 @@ def sync(args: argparse.Namespace) -> str:
                 if outcome.status in ("needs-you", "failed")
             ]
         )
-    if args.json:
-        report = json.dumps(
-            {
-                "from": local,
-                "sha": source.sha,
-                "mode": mode,
-                "machines": [asdict(outcome) for outcome in outcomes],
-            },
-            indent=2,
-        )
-        if not problems:
-            return report
-        print(report)
+    report = {
+        "from": local,
+        "sha": source.sha,
+        "mode": mode,
+        "machines": [asdict(outcome) for outcome in outcomes],
+    }
+    lines = "\n".join(
+        f"{outcome.status}\t{outcome.machine}\t{source.sha[:7]}"
+        for outcome in outcomes
+        if problems or outcome.changes
+    )
     if problems:
-        raise ScriptError(*(advice(outcome) for outcome in problems))
-    return ""
+        temporary = all(outcome.temporary for outcome in problems)
+        raise (TemporaryError if temporary else ScriptError)(
+            *(advice(outcome) for outcome in problems), detail=lines, report=report
+        )
+    return json.dumps(report, indent=2) if args.json else lines
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
+        prog="just sync-fleet",
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""examples:
-  just sync-fleet              # every machine; silent when all synced
-  just sync-fleet mbp          # one machine, by registry name or host
-  just sync-fleet --check      # compare installed skills on every machine
-  just sync-fleet --dry-run --verbose""",
+        epilog=EPILOG,
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument(
         "machines", nargs="*", help="registry names to sync; default is every machine"
@@ -653,9 +815,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
+        "-n",
         "--dry-run",
         action="store_true",
-        help="run every check without transferring, moving, or installing",
+        help="run every check and print each machine a sync would change, "
+        "without transferring, moving, or installing",
     )
     mode.add_argument(
         "--check",
@@ -683,9 +847,16 @@ def main(argv: list[str] | None = None) -> int:
         help="wait until GitHub's main is SHA before syncing; the pre-push hook passes it",
     )
     parser.add_argument(
+        "--timeout",
+        type=duration,
+        default="30m",
+        help="how long to wait for another sync from this machine, and for the "
+        "private clone's network steps (default: 30m)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="print the per-machine report as JSON"
     )
-    return run_script(parser, work, argv)
+    return run_script(parser, work, argv, debug="SYNC_FLEET_DEBUG")
 
 
 if __name__ == "__main__":

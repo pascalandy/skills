@@ -8,11 +8,22 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 import pytest
-from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
+import sync_fleet
+from _cli import TemporaryError
+from conftest import (
+    GIT_IDENTITY,
+    SCRIPTS,
+    commit,
+    exits,
+    observe,
+    private_remote,
+    skill,
+)
 
 # Where the private-network skill ships the registry; the seed's .gitignore keeps
 # it untracked, so it never reaches another machine's clone.
@@ -34,6 +45,20 @@ shift
 if [ "$host" = down ]; then
     echo "ssh: connect to host down port 22: Connection refused" >&2
     exit 255
+fi
+if [ "$host" = locked ]; then
+    echo "tester@locked: Permission denied (publickey)." >&2
+    exit 255
+fi
+# flaky answers its first call, then drops the connection partway through
+if [ "$host" = flaky ]; then
+    calls="$FLEET_HOMES/flaky.calls"
+    echo call >> "$calls"
+    if [ "$(wc -l < "$calls")" -gt 1 ]; then
+        echo "private - missing"
+        echo "Connection to flaky closed by remote host." >&2
+        exit 255
+    fi
 fi
 cd "$FLEET_HOMES/$host" || exit 255
 HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
@@ -62,6 +87,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     hub = tmp_path / "hub"
     (hub / "scripts").mkdir(parents=True)
     for name in (
+        "_cli.py",
         "_common.py",
         "flatten_skills.py",
         "install_skills.py",
@@ -129,7 +155,7 @@ def run(
     env["FLEET_PYTHON"] = sys.executable
     env["HOME"] = str(hub.parent / "hub-home")
     env.pop("XDG_STATE_HOME", None)
-    return subprocess.run(
+    result = subprocess.run(
         ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],
         check=False,
         cwd=hub,
@@ -139,8 +165,11 @@ def run(
         text=True,
         timeout=120,
     )
+    observe("sync_fleet", result.returncode)
+    return result
 
 
+@exits("sync_fleet", 1)
 def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -177,8 +206,8 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
 
     result = run(hub, homes, bin_dir, "--json")
 
-    assert result.returncode == 1
-    report = json.loads(result.stdout)
+    assert (result.returncode, result.stdout) == (1, "")
+    report = json.loads(result.stderr)
     assert report["sha"] == head
     not_a_clone = (
         "~/projects/skills/_skills_private is not a clone of the private repo; "
@@ -210,7 +239,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
     assert not (behind / REGISTRY).exists()
-    assert (homes / "behind/just.log").read_text() == "install-skills --quiet\n"
+    assert (homes / "behind/just.log").read_text() == "install-skills\n"
     installed = homes / "behind/.claude/skills/secret/SKILL.md"
     assert installed.read_text() == "from the hub\n"
     assert (homes / "editor/.claude/skills/mine/SKILL.md").is_file()
@@ -224,27 +253,56 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
     assert (
-        "error: dirty needs-you: checkout has uncommitted skill changes; "
+        "dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
-    ) in result.stderr
-    assert "error: down offline:" in result.stderr
+    ) in report["errors"]
+    assert any(error.startswith("down offline:") for error in report["errors"])
+    behind_changes = report["machines"][0]["changes"]
+    assert behind_changes[0] == f"move {before[:7]} to {head[:7]}"
+    assert "add\t~/.claude/skills/secret" in behind_changes
 
 
-def test_dry_run_is_silent_and_changes_nothing(
+@exits("sync_fleet", 0)
+def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
-    behind = machine(homes, "behind", hub.parent / "skills.git")
+    origin = hub.parent / "skills.git"
+    behind = machine(homes, "behind", origin)
+    current = machine(homes, "current", origin)
+    stale = machine(homes, "stale", origin)
+    register(hub, "behind", "current", "stale")
+    assert run(hub, homes, bin_dir).returncode == 0
+    head = change(hub)
     before = git(behind, "rev-parse", "HEAD")
-    change(hub)
-    register(hub, "behind")
+    for checkout in (current, stale):
+        git(checkout, "pull", "-q")
+    # stale is at GitHub's main, but lost an installed skill
+    shutil.rmtree(homes / "stale/.claude/skills/alpha")
 
-    result = run(hub, homes, bin_dir, "--dry-run")
+    result = run(hub, homes, bin_dir, "-n")
+    preview = json.loads(run(hub, homes, bin_dir, "-n", "--json").stdout)
 
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (result.returncode, result.stdout, result.stderr) == (
+        0,
+        f"ready\tbehind\t{head[:7]}\nready\tstale\t{head[:7]}\n",
+        "",
+    )
+    assert preview["machines"][2]["changes"] == [
+        "~/.claude/skills has 1 of 2 current (add 1)"
+    ]
     assert git(behind, "rev-parse", "HEAD") == before
-    assert not (behind / "_skills_private").exists()
-    assert not (homes / "behind/just.log").exists()
+    assert not (homes / "stale/.claude/skills/alpha").exists()
+
+    # A sync first saves this machine's private edits, which every machine pulls
+    (hub / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    saving = run(hub, homes, bin_dir, "-n")
+
+    assert (saving.returncode, saving.stderr) == (0, "")
+    assert saving.stdout == "".join(
+        f"ready\t{name}\t{head[:7]}\n" for name in ("behind", "current", "stale")
+    )
+    assert git(hub / "_skills_private", "status", "--porcelain") != ""
 
 
 def test_check_is_silent_when_converged_and_names_each_difference(
@@ -354,7 +412,141 @@ def test_brings_the_machine_it_runs_on_to_github_main(
 
     result = run(hub, homes, bin_dir)
 
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (result.returncode, result.stdout, result.stderr) == (
+        0,
+        f"synced\t{here}\t{github[:7]}\n",
+        "",
+    )
     assert git(hub, "rev-parse", "HEAD") == github != before
-    assert (home / "just.log").read_text() == "install-skills --quiet\n"
+    assert (home / "just.log").read_text() == "install-skills\n"
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
+
+
+@exits("sync_fleet", 75)
+def test_a_run_whose_only_failures_are_offline_machines_exits_75(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down")
+
+    result = run(hub, homes, bin_dir, "--dry-run")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert (
+        result.stderr.splitlines()[0]
+        == f"offline\tdown\t{git(hub, 'rev-parse', '--short=7', 'HEAD')}"
+    )
+    assert result.stderr.endswith("retry: just sync-fleet --dry-run\n")
+
+
+def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "mbp")
+
+    result = run(hub, homes, bin_dir, "mpb")
+
+    assert (result.returncode, result.stdout) == (2, "")
+    assert "error: unknown machine mpb; the registry lists mbp\n" in result.stderr
+    assert result.stderr.endswith("run 'just sync-fleet --help'\n")
+
+
+@exits("sync_fleet", 1)
+def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down", "locked")
+
+    result = run(hub, homes, bin_dir, "--dry-run", "--json")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    outcomes = {m["machine"]: m for m in json.loads(result.stderr)["machines"]}
+    assert (outcomes["down"]["status"], outcomes["down"]["temporary"]) == (
+        "offline",
+        True,
+    )
+    assert outcomes["locked"] == {
+        "machine": "locked",
+        "status": "failed",
+        "detail": "tester@locked: Permission denied (publickey).",
+        "targets": [],
+        "changes": [],
+        "temporary": False,
+    }
+
+
+@exits("sync_fleet", 75)
+def test_a_check_that_loses_the_machine_midway_exits_75(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "flaky", hub.parent / "skills.git")
+    register(hub, "flaky")
+
+    result = run(hub, homes, bin_dir, "--check")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert (
+        "error: flaky offline: Connection to flaky closed by remote host.; "
+        in result.stderr
+    )
+
+
+def test_a_fetch_that_times_out_without_a_known_main_exits_75(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def slow(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("git fetch", sync_fleet.TIMEOUT)
+
+    monkeypatch.setattr(sync_fleet, "call", slow)
+    monkeypatch.setattr(
+        sync_fleet, "git", lambda *args: subprocess.CompletedProcess(args, 1, "", "")
+    )
+
+    with pytest.raises(TemporaryError, match="git fetch took longer than 600s"):
+        sync_fleet.github_main()
+
+
+@exits("sync_fleet", 1)
+def test_a_failed_install_step_reports_the_installers_own_error(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "broken", hub.parent / "skills.git")
+    # A file where the agent directories go makes the installer fail
+    (homes / "broken/.config").write_text("not a directory\n")
+    register(hub, "broken")
+
+    result = run(hub, homes, bin_dir, "--check", "--json")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    [outcome] = json.loads(result.stderr)["machines"]
+    assert outcome["status"] == "failed"
+    assert "has a file ancestor" in outcome["detail"]
+
+
+def test_an_interrupt_kills_a_group_whose_leader_exits_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sync_fleet, "GRACE", 0.3)
+    monkeypatch.setattr(sync_fleet, "STOPPING", threading.Event())
+    ready = tmp_path / "ready"
+    # The leader exits on SIGTERM; its child ignores it and keeps the pipes open
+    script = (
+        f'(trap "" TERM; exec sleep 30) &\ntrap "exit 0" TERM\n: > "{ready}"\nwait\n'
+    )
+    done: list[subprocess.CompletedProcess[str]] = []
+    worker = threading.Thread(
+        target=lambda: done.append(sync_fleet.call(["sh", "-c", script]))
+    )
+    worker.start()
+    deadline = time.monotonic() + 10
+    while not ready.exists():
+        assert time.monotonic() < deadline, "the step never started"
+        time.sleep(0.02)
+
+    sync_fleet.stop_children()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive(), "a descendant kept the worker waiting"
+    assert done[0].returncode == 0

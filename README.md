@@ -51,10 +51,10 @@ To update, repeat with a fresh clone after moving or removing your previous copy
 
 ### Maintainer bulk install
 
-The repository's installer handles multiple agent directories. Preview its work before running it:
+The repository's installer handles multiple agent directories. Preview its work before running it; both commands print one line per change:
 
 ```sh
-just install-skills --dry-run --verbose
+just install-skills --dry-run
 just install-skills
 ```
 

@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-27
+date_updated: 2026-09-28
 ---
 
 `just install-skills` installs public skills, every package in the private tree, and `authoring/commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -17,8 +17,8 @@ date_updated: 2026-09-27
 - The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
 - Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
 - A name that is both public and private stops the run; delete the stale copy it names
-- Preview via `just install-skills --dry-run --json`; use `--check` to exit nonzero when selected targets need work
-- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. Previews and checks do not wait
+- A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
+- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
 
 ## Private skills
 
@@ -37,9 +37,9 @@ GitHub's `main` is the source. Every machine in the fleet runs the same commands
 - `just sync` pulls `main`, saves and pulls the private clone, and installs on the machine it runs on, without touching the others. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
 - `just sync-fleet` brings every machine in the fleet registry to GitHub's `main`, the machine it runs on included; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. It fetches GitHub's `main`, or uses the last one fetched when GitHub is unreachable, and saves and pulls its own private clone first. Each machine then receives that commit over SSH, fast-forwards its checkout to it, saves and pulls its own private clone from GitHub, and runs `just install-skills`. The machine running it takes the same steps in a local shell
 - A commit GitHub lacks reaches no other machine, so push it first. A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `skills/`, `scripts/`, or `justfile`, has commits GitHub lacks, or whose `_skills_private` is not a clone reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it
-- An `offline` or `failed` machine gets one retry. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up
-- Success prints nothing. `--verbose` prints GitHub's commit, its public skill count, and each machine's outcome and per-harness counts; `--dry-run` runs every check without changing anything
-- `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference. It compares names and contents, so skills other tools installed do not count
+- An `offline` or `failed` machine gets one retry. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up. A run whose only failures are temporary, such as offline machines, exits 75 instead of 1
+- A run prints `synced<TAB>NAME<TAB>SHA` for each machine it changed, and nothing when none needed a change; `--dry-run` runs every check without changing anything and prints `ready<TAB>NAME<TAB>SHA` for each machine a sync would change: one behind GitHub, or one whose private clone or installed skills would change. A failure lists every machine's status on stderr. `--verbose` adds GitHub's commit, its public skill count, and each machine's outcome and changes; `--debug` adds the remote output
+- `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference on stderr. It compares names and contents, so skills other tools installed do not count
 - Editing a private skill fires no hook, so run `just sync` or `just sync-fleet` afterwards; each sync also saves the private edits of the machines it reaches
 - The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `private-network` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
 

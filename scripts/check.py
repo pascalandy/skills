@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run the CI verdict: every check in CHECKS, in order, then one summary line."""
+"""Run the CI verdict: every check in CHECKS, in order; success prints nothing."""
 
 from __future__ import annotations
 
@@ -13,23 +13,25 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-from _common import ScriptError, run_script
+from _cli import Parser, ScriptError, exit_codes
+from _common import run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 
 EPILOG = """\
 Each check is one row of CHECKS in scripts/check.py; add a row to add a check.
-A failing check does not stop the others.
+A failing check does not stop the others; its output is replayed on stderr.
 
 examples:
   just check
   just check --list
   just check --only lint --only tavily
-  just check --only jevgate --verbose
+  just check --only jevgate --verbose"""
 
-exit codes: 0 ok, 1 a check failed, 2 bad usage, 130 interrupted"""
+EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
@@ -64,13 +66,13 @@ def ruff(path: str, version: str = RUFF) -> tuple[Command, Command]:
     )
 
 
-def pyright(path: str, *deps: str) -> Command:
+def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
     return (
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
         PYRIGHT,
         "--pythonversion",
-        "3.11",
+        python,
         path,
     )
 
@@ -100,8 +102,10 @@ GPT_IMAGE = "authoring/content/gpt-image/scripts"
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
     Check("flatten", uv_run("scripts/flatten_skills.py", "--check")),
+    Check("cli-block", uv_run("scripts/check_cli_block.py")),
     Check("lint", *ruff("scripts")),
-    Check("typecheck", pyright("scripts")),
+    # Skill scripts paste the block in _cli.py, and some run on Python 3.10
+    Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
     Check("test", ("uvx", f"pytest@{PYTEST}")),
     # Optional local linters stay off so every machine agrees
     Check(
@@ -168,16 +172,23 @@ CHECKS = [
 
 
 def passes(check: Check, verbose: bool) -> bool:
-    """Run one check; quiet runs replay a failing command's output on stderr."""
+    """Run one check; verbose runs stream each command's output to stderr, and
+    quiet runs replay a failing command's output there."""
     for command in check.commands:
         log.info("==> %s: %s", check.name, shlex.join(command))
-        result = subprocess.run(
+        started = time.monotonic()
+        result = run(
             command,
             cwd=ROOT,
-            stdout=None if verbose else subprocess.PIPE,
+            stdout=sys.stderr if verbose else subprocess.PIPE,
             stderr=None if verbose else subprocess.STDOUT,
             text=True,
-            check=False,
+        )
+        log.debug(
+            "%s: exited %d after %.1fs",
+            check.name,
+            result.returncode,
+            time.monotonic() - started,
         )
         if result.returncode != 0:
             if not verbose:
@@ -187,15 +198,13 @@ def passes(check: Check, verbose: bool) -> bool:
     return True
 
 
-def run(args: argparse.Namespace) -> str:
+def verdict(args: argparse.Namespace) -> str:
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
-        lines: list[str] = []
         for check in selected:
-            lines.append(check.name)
-            if args.verbose:
-                lines.extend(f"  {shlex.join(command)}" for command in check.commands)
-        return "\n".join(lines)
+            for command in check.commands:
+                log.info("%s: %s", check.name, shlex.join(command))
+        return "\n".join(check.name for check in selected)
 
     failed: list[str] = []
     for check in selected:
@@ -206,15 +215,15 @@ def run(args: argparse.Namespace) -> str:
         raise ScriptError(
             *(f"{name} failed; rerun: just check --only {name}" for name in failed)
         )
-    return f"ok: {len(selected)} passed"
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="just check",
         description="Run the CI verdict: the same checks GitHub Actions runs",
         epilog=EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument(
         "--only",
@@ -224,9 +233,11 @@ def main(argv: list[str] | None = None) -> int:
         help="run only this check; repeat for more (see --list)",
     )
     parser.add_argument(
-        "--list", action="store_true", help="print the check names and exit"
+        "--list",
+        action="store_true",
+        help="print the check names and exit; -v adds their commands on stderr",
     )
-    return run_script(parser, run, argv)
+    return run_script(parser, verdict, argv, debug="CHECK_DEBUG")
 
 
 if __name__ == "__main__":

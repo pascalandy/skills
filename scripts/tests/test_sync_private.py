@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import shutil
+import socket
 import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
+from conftest import (
+    GIT_IDENTITY,
+    SCRIPTS,
+    commit,
+    exits,
+    observe,
+    private_remote,
+    skill,
+)
+
+HOST = socket.gethostname().split(".")[0]
 
 
 def git(repo: Path, *args: str) -> str:
@@ -31,7 +43,7 @@ def machines(tmp_path: Path) -> tuple[Path, Path, Path]:
     """Two public checkouts of skills.git and the private remote beside it."""
     public = tmp_path / "public"
     (public / "scripts").mkdir(parents=True)
-    for name in ("_common.py", "sync_private.py"):
+    for name in ("_cli.py", "_common.py", "sync_private.py"):
         shutil.copy2(SCRIPTS / name, public / "scripts" / name)
     (public / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
     subprocess.run(["git", "init", "-q", "-b", "main", str(public)], check=True)
@@ -50,7 +62,7 @@ def machines(tmp_path: Path) -> tuple[Path, Path, Path]:
 def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, **GIT_IDENTITY, "HOME": str(repo.parent / "home")}
     env.pop("XDG_CONFIG_HOME", None)
-    return subprocess.run(
+    result = subprocess.run(
         ["uv", "run", str(repo / "scripts/sync_private.py"), *args],
         check=False,
         cwd=repo,
@@ -59,23 +71,31 @@ def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=120,
     )
+    observe("sync_private", result.returncode)
+    return result
 
 
 def quiet(result: subprocess.CompletedProcess[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+@exits("sync_private", 0)
 def test_clones_then_saves_edits_every_machine_receives(
     machines: tuple[Path, Path, Path],
 ) -> None:
     one, two, remote = machines
 
-    assert quiet(run(one)) == (0, "", "")
-    assert quiet(run(two)) == (0, "", "")
+    assert quiet(run(one)) == (0, f"clone\t_skills_private\t{remote}\n", "")
+    assert quiet(run(two)) == (0, f"clone\t_skills_private\t{remote}\n", "")
+    assert quiet(run(two)) == (0, "", ""), "a current clone is a no-op"
     (one / "_skills_private/content/secret/SKILL.md").write_text("from one\n")
     skill(one / "_skills_private/content", "added")
-    assert quiet(run(one)) == (0, "", "")
-    assert quiet(run(two)) == (0, "", "")
+    commit_line = f"commit\t_skills_private\tsave edits from {HOST}\n"
+    assert quiet(run(one, "-n")) == (0, commit_line, "")
+    assert quiet(run(one)) == (0, f"{commit_line}push\t_skills_private\t1 commit\n", "")
+    before = git(two / "_skills_private", "rev-parse", "--short=7", "HEAD")
+    after = git(remote, "rev-parse", "--short=7", "main")
+    assert quiet(run(two)) == (0, f"pull\t_skills_private\t{before}..{after}\n", "")
 
     received = two / "_skills_private/content"
     assert (received / "secret/SKILL.md").read_text() == "from one\n"
@@ -86,6 +106,7 @@ def test_clones_then_saves_edits_every_machine_receives(
     assert git(one, "status", "--porcelain") == ""
 
 
+@exits("sync_private", 1)
 def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     machines: tuple[Path, Path, Path],
 ) -> None:
@@ -129,9 +150,49 @@ def test_dry_run_names_the_clone_and_changes_nothing(
 
     result = run(one, "--dry-run")
 
+    assert quiet(result) == (0, f"clone\t_skills_private\t{remote}\n", "")
+    assert not (one / "_skills_private").exists()
+
+
+@exits("sync_private", 75)
+def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
+    machines: tuple[Path, Path, Path],
+) -> None:
+    one, _, _ = machines
+    lock = one / ".git/sync-private.lock"
+
+    with lock.open("w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        result = run(one, "--timeout", "1s")
+
     assert quiet(result) == (
-        0,
-        f"would clone {remote} into {one / '_skills_private'}\n",
+        75,
         "",
+        (
+            f"error: another run still holds {lock} after 1s\n"
+            "retry: scripts/sync_private.py --timeout 1s\n"
+        ),
     )
     assert not (one / "_skills_private").exists()
+
+
+@exits("sync_private", 1, 75)
+def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
+    machines: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    one, _, _ = machines
+    # Nothing listens on port 9, so git reports a refused connection
+    git(one, "remote", "set-url", "origin", "http://127.0.0.1:9/skills.git")
+    offline = run(one)
+    git(one, "remote", "set-url", "origin", str(tmp_path / "absent/skills.git"))
+    missing = run(one)
+
+    assert (offline.returncode, offline.stdout) == (75, "")
+    assert "error: could not clone http://127.0.0.1:9/skills-private.git: " in (
+        offline.stderr
+    )
+    assert offline.stderr.endswith("retry: scripts/sync_private.py\n")
+    assert (missing.returncode, missing.stdout) == (1, "")
+    assert missing.stderr.endswith(
+        "; check that the private repository exists and you can read it\n"
+    )

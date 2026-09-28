@@ -1,46 +1,57 @@
-"""Behavior checks for the skill frontmatter checker."""
+"""Behavior checks for the skill frontmatter checker, through its CLI."""
 
 from __future__ import annotations
 
-import tempfile
-import unittest
+import io
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
 
 import check_frontmatter
-from _common import ScriptError
+import pytest
+from conftest import exits, observe
 
 
-class CheckFrontmatterTests(unittest.TestCase):
-    def test_commas_inside_quoted_inline_items_keep_their_quotes(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            authoring = root / "authoring"
-            skill = authoring / "devtools" / "example" / "SKILL.md"
-            skill.parent.mkdir(parents=True)
-            skill.write_text(
-                '---\nkeywords: ["foo, bar", "baz"]\n'
-                'invalid: ["foo, bar", plain]\n---\n',
-                encoding="utf-8",
-            )
-
-            with (
-                patch.object(check_frontmatter, "ROOT", root),
-                patch.object(check_frontmatter, "AUTHORING", authoring),
-                self.assertRaises(ScriptError) as raised,
-            ):
-                check_frontmatter.check()
-
-            self.assertEqual(
-                raised.exception.args,
-                (
-                    (
-                        "authoring/devtools/example/SKILL.md:3: invalid "
-                        "inline list string items must be double-quoted"
-                    ),
-                ),
-            )
+@pytest.fixture
+def authoring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(check_frontmatter, "ROOT", tmp_path)
+    monkeypatch.setattr(check_frontmatter, "AUTHORING", tmp_path / "authoring")
+    return tmp_path / "authoring"
 
 
-if __name__ == "__main__":
-    unittest.main()
+def write(authoring: Path, name: str, frontmatter: str) -> None:
+    path = authoring / "devtools" / name / "SKILL.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(f"---\n{frontmatter}---\n", encoding="utf-8")
+
+
+def run(*argv: str) -> tuple[int, str, str]:
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = check_frontmatter.main(list(argv))
+    return observe("check_frontmatter", code), stdout.getvalue(), stderr.getvalue()
+
+
+@exits("check_frontmatter", 0)
+def test_quoted_frontmatter_passes_silently(authoring: Path) -> None:
+    write(authoring, "example", 'name: "example"\nkeywords: ["foo, bar", 3]\n')
+
+    assert run() == (0, "", "")
+    assert run("--verbose") == (0, "", "check authoring/devtools/example/SKILL.md\n")
+
+
+@exits("check_frontmatter", 1)
+def test_commas_inside_quoted_inline_items_keep_their_quotes(authoring: Path) -> None:
+    write(
+        authoring,
+        "example",
+        'keywords: ["foo, bar", "baz"]\ninvalid: ["foo, bar", plain]\n',
+    )
+
+    assert run() == (
+        1,
+        "",
+        (
+            "error: authoring/devtools/example/SKILL.md:3: invalid "
+            "inline list string items must be double-quoted\n"
+        ),
+    )

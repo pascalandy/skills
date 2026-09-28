@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import os
 import shutil
@@ -15,7 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from conftest import commit, skill
+from conftest import commit, exits, observe, skill
 from install_skills import replace
 
 MAC = (
@@ -47,7 +48,7 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env["HOME"] = str(home)
     env["UV_CACHE_DIR"] = str(home.parent / "uv-cache")
     # Pin the host-dependent default; a later --profile in args wins.
-    return subprocess.run(
+    result = subprocess.run(
         [
             "uv",
             "run",
@@ -62,12 +63,15 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=60,
     )
+    observe("install_skills", result.returncode)
+    return result
 
 
 def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
     return json.loads(result.stdout)["actions"]
 
 
+@exits("install_skills", 0, 1)
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "alpha", "new")
@@ -89,9 +93,8 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
         == "# alpha\n\nnew\n"
         for target in MAC
     )
-    summary = run(repo, home, "--check")
-    assert summary.returncode == 0
-    assert "skills=1, commands=0;" in summary.stdout
+    converged = run(repo, home, "--check")
+    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
 
 
 # Applies like the CLI, but pauses after staging its sources until `resume`
@@ -117,7 +120,7 @@ def paused(*args):
 
 
 install_skills.skill_sources = paused
-raise SystemExit(install_skills.main(["--profile", "mac", "--quiet"]))
+raise SystemExit(install_skills.main(["--profile", "mac"]))
 """
 
 
@@ -279,19 +282,29 @@ def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
     assert "git fetch --unshallow" in refused.stderr
 
 
-def test_symlink_at_a_target_blocks_apply(sandbox: tuple[Path, Path]) -> None:
+@exits("install_skills", 0, 1)
+def test_symlink_at_a_target_blocks_apply_and_a_preview_warns(
+    sandbox: tuple[Path, Path],
+) -> None:
     repo, home = sandbox
     elsewhere = skill(home / "elsewhere", "alpha")
     link = home / ".claude/skills/alpha"
     link.parent.mkdir(parents=True)
     link.symlink_to(elsewhere, target_is_directory=True)
-    blocked = run(repo, home, "--verbose")
-    assert blocked.returncode == 1
-    assert (
-        "conflict: ~/.claude/skills/alpha (~/.claude/skills/alpha is a symlink or file)"
-        in blocked.stdout
+    conflict = (
+        "~/.claude/skills/alpha is a symlink or file; "
+        "move it aside, then rerun: just install-skills"
     )
+
+    blocked = run(repo, home)
+    preview = run(repo, home, "--dry-run")
+
+    assert (blocked.returncode, blocked.stdout) == (1, "")
+    assert blocked.stderr == f"error: {conflict}\n"
     assert not (home / ".agents").exists()
+    assert preview.returncode == 0
+    assert "add\t~/.agents/skills/alpha\n" in preview.stdout
+    assert preview.stderr == f"warning: {conflict}\n"
 
 
 def test_om1_exclusion_and_inactive_mac_target(sandbox: tuple[Path, Path]) -> None:
@@ -374,21 +387,41 @@ def test_om1_preserves_inactive_mac_command_target(
     assert (home / ".codex/prompts/review.md").read_text() == "new\n"
 
 
-def test_quiet_apply_is_silent_and_check_counts_each_target(
+@exits("install_skills", 0, 1)
+def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_target(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "beta")
     command(repo, "hello")
     commit(repo)
-    applied = run(repo, home, "--quiet")
-    assert (applied.returncode, applied.stdout, applied.stderr) == (0, "", "")
+    lines = sorted(
+        [f"add\t~/{target}/{name}" for target in MAC for name in ("alpha", "beta")]
+        + [f"add\t~/{target}/hello.md" for target in MAC_COMMANDS]
+    )
+
+    preview = run(repo, home, "-n")
+    applied = run(repo, home)
+
+    assert (preview.returncode, preview.stderr) == (0, "")
+    assert (applied.returncode, applied.stderr) == (0, "")
+    assert sorted(preview.stdout.splitlines()) == lines
+    assert applied.stdout == preview.stdout
+    assert run(repo, home).stdout == ""
+    # A caller from before this version still passes -q
+    for flag in ("-q", "--quiet"):
+        bridged = run(repo, home, flag)
+        assert (bridged.returncode, bridged.stdout, bridged.stderr) == (0, "", "")
     shutil.rmtree(home / ".claude/skills/beta")
 
     checked = run(repo, home, "--check", "--json")
 
-    assert checked.returncode == 1
-    targets = {t["target"]: t for t in json.loads(checked.stdout)["targets"]}
+    assert (checked.returncode, checked.stdout) == (1, "")
+    failure = json.loads(checked.stderr)
+    assert failure["errors"] == [
+        "1 installed entries differ from the checkout; run: just install-skills"
+    ]
+    targets = {t["target"]: t for t in failure["targets"]}
     assert targets[".claude/skills"] == {
         "target": ".claude/skills",
         "expected": 2,
@@ -401,3 +434,23 @@ def test_quiet_apply_is_silent_and_check_counts_each_target(
         "current": 1,
         "counts": {"current": 1},
     }
+
+
+@exits("install_skills", 75)
+def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    lock = repo / ".git/install-skills.lock"
+    with lock.open("w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        waited = run(repo, home, "--timeout", "1s")
+        preview = run(repo, home, "--dry-run", "--timeout", "1s")
+
+    assert (waited.returncode, waited.stdout) == (75, "")
+    assert waited.stderr == (
+        f"error: another run still holds {lock} after 1s\n"
+        "retry: just install-skills --profile mac --timeout 1s\n"
+    )
+    assert not home.exists()
+    assert (preview.returncode, preview.stderr) == (0, ""), "a preview never waits"

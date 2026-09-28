@@ -13,13 +13,31 @@ import selectors
 import shutil
 import signal
 import subprocess
-import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import TypedDict
 
-from _common import ScriptError
+from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
+from _common import run_script
+
+EPILOG = """\
+Codex, Pi, and OpenCode have native adapters; Claude is reported as
+unverified. Success prints one line per agent, its name, a tab, and its
+status.
+
+examples:
+  just skills-discover --profile mac
+  just skills-discover --profile mac --json
+  just skills-discover --profile om1 --agent codex --timeout 2m"""
+
+EXIT_CODES = exit_codes(
+    {
+        0: "every agent with a native adapter loaded the expected skills",
+        1: "an agent missed a skill, or its adapter failed",
+        75: "every failing agent timed out; retry",
+    }
+)
 
 log = logging.getLogger("skills-discover")
 
@@ -182,7 +200,17 @@ def discover(agent: str, cwd: Path, timeout: float):
         rpc.close()
 
 
-def run(args: argparse.Namespace) -> int:
+def problem(agent: str, evidence: Evidence, profile: str) -> str:
+    """One error line that says what failed and what to run."""
+    if evidence["missing"]:
+        return (
+            f"{agent} did not load {', '.join(evidence['missing'])}; "
+            f"run just install-skills --profile {profile}, then rerun"
+        )
+    return f"{agent}: {evidence['reason']}"
+
+
+def run(args: argparse.Namespace) -> str:
     """Check native adapters; report unsupported Claude without masking supported results."""
     from install_skills import PROFILES, digest, skill_sources
 
@@ -199,6 +227,7 @@ def run(args: argparse.Namespace) -> int:
     }
     agents = args.agent or list(roots)
     results: dict[str, Evidence] = {}
+    timed_out: set[str] = set()
     for agent in agents:
         root = roots[agent]
         evidence: Evidence = {
@@ -210,7 +239,9 @@ def run(args: argparse.Namespace) -> int:
         }
         results[agent] = evidence
         if root not in PROFILES[args.profile]:
-            evidence["reason"] = "target is not in the selected profile"
+            evidence["reason"] = (
+                f"~/{root} is not a {args.profile} target; drop --agent {agent}"
+            )
             continue
         if agent == "claude":
             evidence["reason"] = (
@@ -218,7 +249,9 @@ def run(args: argparse.Namespace) -> int:
             )
             continue
         if shutil.which(agent) is None:
-            evidence["reason"] = f"{agent} CLI is unavailable"
+            evidence["reason"] = (
+                f"the {agent} CLI is not on PATH; install it, or drop --agent {agent}"
+            )
             continue
         try:
             items = discover(agent, home, args.timeout)
@@ -266,93 +299,84 @@ def run(args: argparse.Namespace) -> int:
             evidence["discovered"] = discovered
             evidence["missing"] = missing
             evidence["status"] = "missing" if missing else "verified"
+        except (TimeoutError, subprocess.TimeoutExpired):
+            timed_out.add(agent)
+            evidence["reason"] = (
+                f"timed out after {args.timeout:g}s; retry, or pass a longer --timeout"
+            )
         except (
             OSError,
             ValueError,
             KeyError,
             TypeError,
             RuntimeError,
-            TimeoutError,
             subprocess.SubprocessError,
         ) as error:
+            log.debug("%s adapter failed", agent, exc_info=True)
             evidence["reason"] = (
-                f"native adapter changed or failed: {type(error).__name__}: {error}"
+                f"native adapter changed or failed: {type(error).__name__}: {error}; "
+                f"see where with just skills-discover --profile {args.profile} "
+                f"--agent {agent} --debug"
             )
     supported = [agent for agent in agents if agent != "claude"]
-    failed = not supported or any(
-        results[agent]["status"] != "verified" for agent in supported
-    )
+    failing = [agent for agent in supported if results[agent]["status"] != "verified"]
+    failed = not supported or bool(failing)
     verdict = (
         "unverified" if failed else "partial" if "claude" in agents else "verified"
     )
-    if args.json:
-        print(
-            json.dumps(
-                {"profile": args.profile, "verdict": verdict, "agents": results},
-                indent=2,
-                sort_keys=True,
-            )
-        )
-    else:
-        statuses = ", ".join(f"{agent}={results[agent]['status']}" for agent in agents)
-        print(f"{'ok' if not failed else 'unverified'}: {args.profile}; {statuses}")
-    if args.verbose:
-        for agent, evidence in results.items():
-            if evidence["reason"]:
-                print(f"{agent}: {evidence['reason']}", file=sys.stderr)
-            if evidence["missing"]:
-                print(
-                    f"{agent}: missing {', '.join(evidence['missing'])}",
-                    file=sys.stderr,
-                )
-    return int(failed)
+    for agent, evidence in results.items():
+        if evidence["reason"]:
+            log.info("%s: %s", agent, evidence["reason"])
+    summary = {"profile": args.profile, "verdict": verdict, "agents": results}
+    lines = "\n".join(f"{agent}\t{results[agent]['status']}" for agent in agents)
+    if failed:
+        problems = [
+            problem(agent, results[agent], args.profile) for agent in failing
+        ] or [
+            "no selected agent has a native adapter; add --agent codex, pi, or opencode"
+        ]
+        temporary = bool(failing) and set(failing) <= timed_out
+        error = TemporaryError if temporary else ScriptError
+        raise error(*problems, detail=lines, report=summary)
+    return json.dumps(summary, indent=2, sort_keys=True) if args.json else lines
 
 
 # Native discovery is a separate post-install proof. File hashes alone cannot
 # establish that an agent actually loaded a skill.
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
+        prog="just skills-discover",
         description=__doc__,
-        epilog="Codex, Pi, and OpenCode have native adapters. Claude is reported as unverified.\nExamples: just skills-discover --profile mac --json; just skills-discover --profile om1 --agent codex",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=EPILOG,
+        exit_codes=EXIT_CODES,
     )
-    parser.add_argument("--profile", required=True, choices=("mac", "om1"))
     parser.add_argument(
-        "--agent", action="append", choices=("codex", "pi", "claude", "opencode")
+        "--profile",
+        required=True,
+        choices=("mac", "om1"),
+        help="the install profile whose targets to check",
+    )
+    parser.add_argument(
+        "--agent",
+        action="append",
+        choices=("codex", "pi", "claude", "opencode"),
+        help="check only this agent; repeat for more (default: all four)",
     )
     parser.add_argument(
         "--private-root",
         type=Path,
         help="private package tree, as passed to install-skills",
     )
-    parser.add_argument("--timeout", type=float, default=40)
+    parser.add_argument(
+        "--timeout",
+        type=duration,
+        default="40s",
+        help="how long each agent may take to list its skills (default: 40s)",
+    )
     parser.add_argument(
         "--json", action="store_true", help="print the per-agent report as JSON"
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="print per-agent reasons and error tracebacks",
-    )
-    args = parser.parse_args(argv)
-    if args.timeout <= 0:
-        parser.error("--timeout must be positive")
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING)
-    try:
-        return run(args)
-    except KeyboardInterrupt:
-        print("interrupted", file=sys.stderr)
-        return 130
-    except ScriptError as error:
-        for message in error.args:
-            print(f"error: {message}", file=sys.stderr)
-    except Exception as error:
-        log.debug("unexpected failure", exc_info=True)
-        print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
-    if not args.verbose:
-        print("rerun with --verbose for details", file=sys.stderr)
-    return 1
+    return run_script(parser, run, argv, debug="DISCOVER_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

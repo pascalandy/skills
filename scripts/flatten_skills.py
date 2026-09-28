@@ -10,27 +10,37 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shlex
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
-from _common import ScriptError, run_script, swap
+from _cli import Parser, ScriptError, exit_codes
+from _common import run, run_script, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
 OUTPUT = ROOT / "skills"
 
 EPILOG = """\
+Each run prints one line per skill it changes: add, update, or remove, then a
+tab and skills/<name>. A dry run prints the same lines and changes nothing;
+a run with nothing to change prints nothing.
+
 examples:
   just flatten-skills
   just flatten-skills --dry-run
   just flatten-skills --check
-  just flatten-skills --verbose
+  just flatten-skills --verbose"""
 
-exit codes: 0 ok, 1 flatten failed, 2 bad usage, 130 interrupted"""
+EXIT_CODES = exit_codes(
+    {
+        0: "skills/ matches authoring/, or now does",
+        1: "flatten failed, or --check found changes",
+    }
+)
 
 log = logging.getLogger("flatten-skills")
 
@@ -40,9 +50,13 @@ def git(*args: str) -> bytes:
     executable = shutil.which("git")
     if executable is None:
         raise ScriptError("git not found on PATH; install git and rerun")
-    result = subprocess.run(
-        [executable, *args], cwd=ROOT, capture_output=True, check=False
+    result = run(
+        [executable, *args],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+    log.debug("git %s: exit %d", shlex.join(args), result.returncode)
     if result.returncode != 0:
         raise ScriptError(f"git {args[0]} failed: {result.stderr.decode().strip()}")
     return result.stdout
@@ -109,7 +123,7 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
             raise ScriptError(
                 f"skill entry point is missing or git-ignored: {package.relative_to(ROOT)}/SKILL.md"
             )
-        log.debug("%s (%d files)", package.relative_to(AUTHORING), len(files[name]))
+        log.debug("%s: %d files", package.relative_to(AUTHORING), len(files[name]))
 
     return files
 
@@ -123,71 +137,62 @@ def build_expected() -> dict[Path, Path]:
     }
 
 
-def compare(expected: dict[Path, Path] | None = None) -> list[tuple[Path, str]]:
-    """Return generated-file differences without modifying the working tree."""
-    if expected is None:
-        expected = build_expected()
-    if OUTPUT.is_symlink():
-        return [(Path("skills"), "symlink")]
-    if OUTPUT.exists() and not OUTPUT.is_dir():
-        return [(Path("skills"), "not a directory")]
-
+def changes(expected: dict[Path, Path]) -> list[str]:
+    """One `<action>\tskills/<name>` line per skill whose generated copy differs."""
     actual = {
         path
         for path in git_files("skills")
         if (ROOT / path).is_file() or (ROOT / path).is_symlink()
     }
-    problems: list[tuple[Path, str]] = []
+    stale: dict[str, str] = {}
     for relative, source in sorted(expected.items()):
         destination = ROOT / relative
         if relative not in actual:
-            problems.append((relative, "missing file"))
+            reason = "missing file"
         elif any(
             parent.is_symlink()
             for parent in (destination, *destination.parents)
             if parent.is_relative_to(OUTPUT)
         ):
-            problems.append((relative, "symlink"))
+            reason = "symlink"
         elif source.read_bytes() != destination.read_bytes():
-            problems.append((relative, "changed content"))
+            reason = "changed content"
         elif (stat.S_IMODE(source.stat().st_mode) & 0o111) != (
             stat.S_IMODE(destination.stat().st_mode) & 0o111
         ):
-            problems.append((relative, "executable bit changed"))
+            reason = "executable bit changed"
+        else:
+            continue
+        log.info("%s: %s", relative, reason)
+        stale[relative.parts[1]] = reason
     for relative in sorted(actual - expected.keys()):
-        problems.append(
-            (relative, "symlink" if (ROOT / relative).is_symlink() else "extra file")
+        log.info(
+            "%s: %s",
+            relative,
+            "symlink" if (ROOT / relative).is_symlink() else "extra file",
         )
-    return problems
+        stale[relative.parts[1]] = "extra file"
+    present = {path.parts[1] for path in actual}
+    wanted = {path.parts[1] for path in expected}
+    return [
+        f"{'add' if name not in present else 'remove' if name not in wanted else 'update'}"
+        f"\tskills/{name}"
+        for name in sorted(stale)
+    ]
 
 
-def flatten(*, dry_run: bool, check: bool = False, verbose: bool = False) -> str:
-    """Rebuild skills/ from authoring/ and return the summary line."""
-    expected = build_expected()
-    counts = (
-        f"{len({path.parts[1] for path in expected})} skills, {len(expected)} files"
-    )
-    if check:
-        problems = compare(expected)
-        if problems:
-            if verbose:
-                for relative, reason in problems:
-                    print(f"{relative}: {reason}", file=sys.stderr)
-            names = sorted(
-                {
-                    path.parts[1] if len(path.parts) > 1 else "skills/"
-                    for path, _ in problems
-                }
-            )
-            raise ScriptError(
-                f"stale generated skills: {', '.join(names)}; run just flatten-skills"
-            )
-        return f"ok: {counts} match skills/"
-
+def flatten(*, dry_run: bool = False) -> list[str]:
+    """Rebuild skills/ from authoring/ when they differ; return one change line
+    per skill, and change nothing on a dry run."""
     if OUTPUT.is_symlink() or (OUTPUT.exists() and not OUTPUT.is_dir()):
-        raise ScriptError("skills/ must be a directory, not a file or symlink")
-    if dry_run:
-        return f"dry run: {counts}; skills/ unchanged"
+        raise ScriptError(
+            "skills/ must be a directory, not a file or symlink; "
+            "move it aside, then rerun just flatten-skills"
+        )
+    expected = build_expected()
+    lines = changes(expected)
+    if dry_run or not lines:
+        return lines
 
     with tempfile.TemporaryDirectory(prefix=".skills-flatten-", dir=ROOT) as temporary:
         staging = Path(temporary) / "skills"
@@ -197,35 +202,39 @@ def flatten(*, dry_run: bool, check: bool = False, verbose: bool = False) -> str
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         swap(staging, OUTPUT, Path(temporary) / "previous")
+    return lines
 
-    return f"ok: {counts} -> skills/"
+
+def work(args: argparse.Namespace) -> str:
+    lines = flatten(dry_run=args.dry_run or args.check)
+    if args.check and lines:
+        raise ScriptError(
+            "skills/ differs from authoring/; run: just flatten-skills",
+            detail="\n".join(lines),
+        )
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="just flatten-skills",
         description="Flatten authoring/<category>/<skill>/ packages into skills/<skill>/",
         epilog=EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_codes=EXIT_CODES,
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
+        "-n",
         "--dry-run",
         action="store_true",
-        help="validate and count without replacing skills/",
+        help="print the changes a run would make without making them",
     )
     mode.add_argument(
         "--check",
         action="store_true",
-        help="fail if skills/ differs from authoring/ without writing files",
+        help="dry run that exits 1 when skills/ differs, listing the changes on stderr",
     )
-    return run_script(
-        parser,
-        lambda args: flatten(
-            dry_run=args.dry_run, check=args.check, verbose=args.verbose
-        ),
-        argv,
-    )
+    return run_script(parser, work, argv, debug="FLATTEN_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

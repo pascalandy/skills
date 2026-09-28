@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import release_check
+from conftest import exits, observe
 
 CHANGELOG = """# Changelog
 
@@ -56,7 +57,7 @@ class ReleaseCheckTests(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            result = release_check.main(list(args))
+            result = observe("release_check", release_check.main(list(args)))
         return result, stdout.getvalue(), stderr.getvalue()
 
     def commit(self, root: Path, message: str) -> None:
@@ -64,23 +65,27 @@ class ReleaseCheckTests(unittest.TestCase):
         git(root, "commit", "-qm", message)
         git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
 
-    def test_valid_first_release_with_existing_tag_at_head(self) -> None:
+    @exits("release_check", 0)
+    def test_valid_first_release_with_existing_tag_at_head_prints_nothing(
+        self,
+    ) -> None:
         with self.repository() as root:
             git(root, "tag", "v0.1.0")
             result, stdout, stderr = self.run_check("v0.1.0")
 
-        self.assertEqual(result, 0)
-        self.assertEqual(stdout, "ok: v0.1.0: 1 skill total\n")
-        self.assertEqual(stderr, "")
+        self.assertEqual((result, stdout, stderr), (0, "", ""))
 
-    def test_invalid_version(self) -> None:
+    def test_invalid_version_is_a_usage_error_before_any_git_call(self) -> None:
         with self.repository():
             result, stdout, stderr = self.run_check("v01.0.0")
 
-        self.assertEqual(result, 1)
-        self.assertEqual(stdout, "")
-        self.assertIn("error: version must be vMAJOR.MINOR.PATCH", stderr)
+        self.assertEqual((result, stdout), (2, ""))
+        self.assertIn(
+            "error: argument version: 'v01.0.0' is not vMAJOR.MINOR.PATCH", stderr
+        )
+        self.assertTrue(stderr.endswith("run 'just release-check --help'\n"))
 
+    @exits("release_check", 1)
     def test_version_must_exceed_other_tags(self) -> None:
         with self.repository() as root:
             git(root, "tag", "v0.2.0")
@@ -98,8 +103,7 @@ class ReleaseCheckTests(unittest.TestCase):
             git(root, "tag", "vendor-x")
             result, stdout, stderr = self.run_check("v0.1.0", "--verbose")
 
-        self.assertEqual(result, 0)
-        self.assertEqual(stdout, "ok: v0.1.0: 1 skill total\n")
+        self.assertEqual((result, stdout), (0, ""))
         self.assertIn("ignored non-release tags: v9.9.9-rc1, vendor-x\n", stderr)
 
     def test_missing_duplicated_and_empty_changelog_sections(self) -> None:
@@ -168,10 +172,16 @@ class ReleaseCheckTests(unittest.TestCase):
             result, stdout, stderr = self.run_check("v0.1.0", "--notes", str(notes))
             contents = notes.read_text(encoding="utf-8")
 
-        self.assertEqual(result, 0)
-        self.assertEqual(stdout, "ok: v0.1.0: 1 skill total\n")
-        self.assertEqual(stderr, "")
+        self.assertEqual((result, stdout, stderr), (0, "", ""))
         self.assertEqual(contents, "### Added\n\n- Initial snapshot\n")
+
+    def test_notes_dash_prints_the_section_body_on_stdout(self) -> None:
+        with self.repository():
+            result, stdout, stderr = self.run_check("v0.1.0", "--notes", "-")
+
+        self.assertEqual(
+            (result, stdout, stderr), (0, "### Added\n\n- Initial snapshot\n", "")
+        )
 
     def test_changed_skill_summary_since_previous_tag(self) -> None:
         with self.repository(with_beta=True) as root:
@@ -189,8 +199,7 @@ class ReleaseCheckTests(unittest.TestCase):
             self.commit(root, "change skills")
             result, stdout, stderr = self.run_check("v0.1.1", "--verbose")
 
-        self.assertEqual(result, 0)
-        self.assertEqual(stdout, "ok: v0.1.1: 1 added, 1 changed, 1 removed\n")
+        self.assertEqual((result, stdout), (0, ""))
         self.assertIn("added (1): gamma\n", stderr)
         self.assertIn("changed (1): alpha\n", stderr)
         self.assertIn("removed (1): beta\n", stderr)
