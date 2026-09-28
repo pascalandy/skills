@@ -749,8 +749,9 @@ def run_child(
 ) -> subprocess.CompletedProcess[str]:
     """subprocess.run that stops its child gently.
 
-    On a timeout or an interrupt, the child gets SIGTERM, so it can clean up,
-    and SIGKILL only GRACE seconds later.
+    The child leads its own process group, so what it starts, such as the
+    ffmpeg that yt-dlp runs, stops with it. On a timeout or an interrupt, the
+    group gets SIGTERM, so it can clean up, and SIGKILL only GRACE seconds later.
     """
     log.debug("run %s", _describe(command))
     started = time.monotonic()
@@ -762,6 +763,7 @@ def run_child(
         stderr=pipe,
         text=True,
         cwd=cwd,
+        process_group=0,
     ) as process:
         try:
             stdout, stderr = process.communicate(input, timeout=timeout)
@@ -782,16 +784,22 @@ def run_child(
 
 
 def stop_child(process: subprocess.Popen[str]) -> None:
-    """SIGTERM a child, then SIGKILL it after GRACE seconds. A descendant may
-    still hold the pipes, so stop reading them GRACE seconds later."""
-    process.terminate()
+    """SIGTERM a child's process group, then SIGKILL it after GRACE seconds. A
+    descendant may still hold the pipes, so stop reading them GRACE seconds later."""
+    signal_group(process, signal.SIGTERM)
     try:
         process.communicate(timeout=GRACE)
         return
     except subprocess.TimeoutExpired:
-        process.kill()
+        signal_group(process, signal.SIGKILL)
     with suppress(subprocess.TimeoutExpired):
         process.communicate(timeout=GRACE)
+
+
+def signal_group(process: subprocess.Popen[str], number: int) -> None:
+    """Send `number` to the process group `process` leads, if any of it remains."""
+    with suppress(ProcessLookupError):
+        os.killpg(process.pid, number)
 
 
 def _describe(command: Sequence[str]) -> str:

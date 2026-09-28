@@ -696,6 +696,44 @@ def test_a_signal_exits_without_a_traceback_and_stops_children_gently(
                 os.kill(pid, signal.SIGKILL)
 
 
+# A child that starts its own child and has no TERM trap, as yt-dlp starts ffmpeg
+UNCOOPERATIVE = """\
+#!/bin/sh
+sleep 60 &
+echo "$!" > "{ready}.tmp" && mv "{ready}.tmp" "{ready}"
+wait
+"""
+
+
+def test_a_signal_also_stops_what_a_child_started(
+    sandbox: Sandbox, tmp_path: Path
+) -> None:
+    ready = tmp_path / "ready"
+    sandbox.stub("chezmoi", UNCOOPERATIVE.format(ready=ready))
+    process = subprocess.Popen(
+        sandbox.command("run", "youtube", "--url", URL, "--no-summary"),
+        cwd=sandbox.home,
+        env=sandbox.env(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    grandchild = 0
+    try:
+        wait_for(ready.exists, "the stub to start its own child")
+        grandchild = int(ready.read_text())
+        process.send_signal(signal.SIGTERM)
+        process.communicate(timeout=60)
+
+        assert observe("transcript", process.returncode) == 143
+        wait_for(lambda: not alive(grandchild), "the grandchild to end", 5)
+    finally:
+        process.kill()
+        process.wait()
+        if grandchild and alive(grandchild):
+            os.kill(grandchild, signal.SIGKILL)
+
+
 # ---------------------------------------------------------------------------
 # Terminal: color and the spinner
 # ---------------------------------------------------------------------------
