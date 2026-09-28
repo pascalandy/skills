@@ -20,6 +20,13 @@ date_updated: 2026-09-28
 - A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
 
+## Commands
+
+- Claude Code, Pi, and OpenCode read each command as a file. Codex dropped custom prompts, so each command also installs as a skill in `~/.codex/skills`, called as `$name`, with the command's description. Pi and OpenCode do not read that folder, so no agent sees a command twice
+- A command that shares a skill's name stops the run: Claude Code would hide the command, and Codex would need one folder for both. `scripts/tests/test_commands.py` catches a clash with a public skill in CI
+- Pi and OpenCode read `$1`, `$2`, … as arguments even inside a word, so `$2nd-pass` reaches the agent as `nd-pass`. The same test rejects a digit placeholder followed by a letter
+- Each run removes the commands earlier versions put in `~/.codex/prompts` and `~/.config/agents/commands`, which Codex and Amp no longer read
+
 ## Private skills
 
 Private skills live in the private repository `pascalandy/skills-private`, cloned inside this checkout at `_skills_private/`. Its URL is this checkout's `origin` with `skills` renamed to `skills-private`, so each machine reaches GitHub the way its public checkout does
