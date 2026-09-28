@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow>=11"]
 # ///
-"""Generate or edit images with GPT Image through a ChatGPT (Codex) plan or the OpenAI API.
+"""Generate or edit images with GPT Image through a Codex plan or OpenRouter.
 
 The caller states an intent and a prompt; this CLI owns every other setting.
 See ../references/guide.md for the rationale behind each choice.
@@ -37,7 +37,10 @@ __version__ = "0.1.0"
 
 INTENTS = ("draft", "standard", "high", "max")
 
-MODELS = {"flare": "gpt-image-2.5-flare", "sunburst": "gpt-image-2.5-sunburst"}
+MODELS = {
+    "flare": "openai/gpt-image-2.5-flare",
+    "sunburst": "openai/gpt-image-2.5-sunburst",
+}
 QUALITIES = ("low", "medium", "high", "xhigh", "max")
 
 
@@ -66,7 +69,7 @@ MAX_RATIO = 3.0
 EXPERIMENTAL_PIXELS = 2560 * 1440
 JPEG_COMPRESSION = 85
 
-API_BASE = "https://api.openai.com/v1"
+API_BASE = "https://openrouter.ai/api/v1"
 API_MAX_IMAGES = 16
 PLAN_MAX_IMAGES = 5
 PLAN_CONTROLLER = "gpt-6-luna"
@@ -163,7 +166,7 @@ def fit_size(ratio: float, budget: int) -> tuple[int, int]:
 
 
 def output_tokens(width: int, height: int, quality: str) -> int:
-    """OpenAI's published GPT Image 2.5 output-token estimate (guide section 3.4)."""
+    """Estimate image output tokens using OpenAI's GPT Image 2.5 calculator formula."""
     grid = {"low": 16, "medium": 24, "high": 48, "xhigh": 64, "max": 96}[quality]
     scaled = grid / (max(width, height) / min(width, height))
     floor = math.floor(scaled)
@@ -199,7 +202,6 @@ class Job:
     size: tuple[int, int] | None
     transparent: bool
     images: list[Path]
-    mask: Path | None
     candidates: int | None
     model: str | None
     quality: str | None
@@ -239,50 +241,29 @@ def plan_ready() -> tuple[bool, str]:
 
 
 def api_ready() -> tuple[bool, str]:
-    if os.environ.get("OPENAI_API_KEY"):
-        return True, "OPENAI_API_KEY is set"
-    return False, "OPENAI_API_KEY is not set"
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return True, "OPENROUTER_API_KEY is set"
+    return False, "OPENROUTER_API_KEY is not set"
 
 
 def choose_backend(job: Job) -> tuple[str, str]:
-    has_plan, plan_note = plan_ready()
-    has_api, api_note = api_ready()
-    api_only = [
-        flag
-        for flag, used in (
-            ("--mask", job.mask),
-            ("--model", job.model),
-            ("--quality", job.quality),
+    if job.backend == "plan" and job.model:
+        raise UsageError("--model selects GPT Image 2.5; use --backend openrouter")
+    if job.backend == "openrouter" or job.model:
+        ready, note = api_ready()
+        if not ready:
+            raise UsageError(f"OpenRouter backend unavailable: {note}")
+        return "openrouter", "explicit GPT Image 2.5 request through OpenRouter"
+    if job.quality:
+        raise UsageError(
+            "--quality needs --backend openrouter or --model; the Codex plan fixes quality"
         )
-        if used
-    ]
-    if job.backend == "plan":
-        if api_only:
-            raise UsageError(
-                f"{', '.join(api_only)} need the API backend; drop them or pass --backend api"
-            )
-        if not has_plan:
-            raise UsageError(f"plan backend unavailable: {plan_note}")
-        return "plan", "requested with --backend plan"
-    if job.backend == "api":
-        if not has_api:
-            raise UsageError(
-                "API backend needs OPENAI_API_KEY; export it or pass --backend plan"
-            )
-        return "api", "requested with --backend api"
-    if api_only:
-        if not has_api:
-            raise UsageError(
-                f"{', '.join(api_only)} need OPENAI_API_KEY; export it or drop those flags"
-            )
-        return "api", f"{', '.join(api_only)} need the API"
-    if job.intent in ("high", "max") and has_api:
-        return "api", f"intent {job.intent} uses Sunburst through the API"
-    if has_plan:
-        return "plan", "ChatGPT plan through Codex"
-    if has_api:
-        return "api", "no Codex login; using OPENAI_API_KEY"
-    raise UsageError(f"no backend available: {plan_note}, and {api_note}")
+    ready, note = plan_ready()
+    if not ready:
+        raise UsageError(
+            f"plan backend unavailable: {note}; no paid fallback was selected"
+        )
+    return "plan", "Codex plan is the default for every intent"
 
 
 def shape_of(ratio: float) -> str:
@@ -312,7 +293,7 @@ def resolve(job: Job) -> Plan:
             "--transparent needs a .png or .webp --out; JPEG has no alpha channel"
         )
     backend, reason = choose_backend(job)
-    limit = API_MAX_IMAGES if backend == "api" else PLAN_MAX_IMAGES
+    limit = API_MAX_IMAGES if backend == "openrouter" else PLAN_MAX_IMAGES
     if len(job.images) > limit:
         raise UsageError(
             f"{backend} backend accepts at most {limit} --image inputs, got {len(job.images)}"
@@ -352,11 +333,12 @@ def resolve(job: Job) -> Plan:
         "prompt": job.prompt.strip()
         + (f"\n{TRANSPARENT_LINE}" if job.transparent else ""),
         "quality": quality,
-        "size": f"{size[0]}x{size[1]}" if size else "auto",
         "background": "transparent" if job.transparent else "auto",
         "output_format": api_format,
         "n": count,
     }
+    if size:
+        body["size"] = f"{size[0]}x{size[1]}"
     if api_format in ("jpeg", "webp"):
         body["output_compression"] = JPEG_COMPRESSION
     plan = Plan(
@@ -407,6 +389,7 @@ def alpha_report(image: Image.Image) -> dict[str, Any]:
         alpha.getpixel((image.width - 1, image.height - 1)),
     ]
     return {
+        "fully_opaque": histogram[255] == total,
         "transparent_share": round(histogram[0] / total, 4),
         "near_opaque_share": round(sum(histogram[250:]) / total, 4),
         "corners_transparent": all(c == 0 for c in corners),
@@ -420,6 +403,9 @@ def save_image(
     notes = []
     with Image.open(io.BytesIO(data)) as source:
         image = source.copy()
+        unchanged = source.format == out_format.upper() and (
+            target is None or source.size == target
+        )
     if target and image.size != target:
         tw, th = target
         scale = max(tw / image.width, th / image.height)
@@ -439,7 +425,10 @@ def save_image(
     save_kwargs: dict[str, Any] = (
         {"quality": JPEG_COMPRESSION} if out_format in ("jpeg", "webp") else {}
     )
-    image.save(tmp, format=out_format.upper(), **save_kwargs)
+    if unchanged:
+        tmp.write_bytes(data)
+    else:
+        image.save(tmp, format=out_format.upper(), **save_kwargs)
     tmp.replace(dest)
     return notes
 
@@ -502,7 +491,7 @@ def plan_generate_one(
             )  # fmt: skip
         except subprocess.TimeoutExpired:
             raise RunError(
-                f"codex exec timed out after {PLAN_TIMEOUT_S} s; retry, or use --backend api"
+                f"codex exec timed out after {PLAN_TIMEOUT_S} s; retry the plan request"
             ) from None
     thread_id = None
     for line in result.stdout.splitlines():
@@ -569,7 +558,7 @@ def api_post(route: str, body: dict[str, Any]) -> dict[str, Any]:
         f"{API_BASE}/{route}",
         data=json.dumps(body).encode(),
         headers={
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
             "Content-Type": "application/json",
         },
     )
@@ -588,8 +577,9 @@ def api_post(route: str, body: dict[str, Any]) -> dict[str, Any]:
                 detail = {"message": payload[:300]}
             code = detail.get("code") or detail.get("type") or error.code
             hint = {
-                401: "check OPENAI_API_KEY",
-                403: "the organization may need API verification for GPT Image models",
+                401: "check OPENROUTER_API_KEY",
+                402: "check your OpenRouter credit balance",
+                403: "check OpenRouter account and provider access",
             }.get(
                 error.code,
                 "change the prompt or inputs before retrying"
@@ -597,11 +587,11 @@ def api_post(route: str, body: dict[str, Any]) -> dict[str, Any]:
                 else "retry later",
             )
             raise RunError(
-                f"OpenAI API {error.code} ({code}): {detail.get('message', '')}; {hint}"
+                f"OpenRouter API {error.code} ({code}): {detail.get('message', '')}; {hint}"
             ) from None
         except urllib.error.URLError as error:
-            raise RunError(f"cannot reach the OpenAI API: {error.reason}") from None
-    raise RunError("OpenAI API kept failing after 3 attempts; retry later")
+            raise RunError(f"cannot reach the OpenRouter API: {error.reason}") from None
+    raise RunError("OpenRouter API kept failing after 3 attempts; retry later")
 
 
 def api_run(plan: Plan, job: Job) -> tuple[list[bytes], dict[str, Any]]:
@@ -609,19 +599,17 @@ def api_run(plan: Plan, job: Job) -> tuple[list[bytes], dict[str, Any]]:
     body = dict(plan.api_body)
     started = time.monotonic()
     if job.command == "edit":
-        body["images"] = [{"image_url": data_url(p)} for p in job.images]
-        if job.mask:
-            body["mask"] = {"image_url": data_url(job.mask)}
-        response = api_post("images/edits", body)
-    else:
-        response = api_post("images/generations", body)
+        body["input_references"] = [
+            {"type": "image_url", "image_url": {"url": data_url(p)}} for p in job.images
+        ]
+    response = api_post("images", body)
     images = [
         base64.b64decode(item["b64_json"])
         for item in response.get("data", [])
         if item.get("b64_json")
     ]
     if not images:
-        raise RunError("OpenAI API returned no image data; retry once")
+        raise RunError("OpenRouter API returned no image data; retry once")
     meta = {
         "seconds": round(time.monotonic() - started, 1),
         "effective": {
@@ -671,16 +659,41 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
         plan_run(plan, job, verbose) if plan.backend == "plan" else api_run(plan, job)
     )
     receipt.update(meta)
+    if len(images) != plan.count:
+        plan.warnings.append(
+            f"requested {plan.count} images but received {len(images)}; inspect the outputs"
+        )
+    if plan.api_body:
+        for key, actual in meta.get("effective", {}).items():
+            expected = plan.api_body.get(key)
+            if (
+                expected not in (None, "auto")
+                and actual is not None
+                and actual != expected
+            ):
+                plan.warnings.append(
+                    f"requested {key}={expected}, API reported {actual}"
+                )
     files = []
     for data, path in zip(images, plan.paths, strict=False):
         target = plan.target_size if plan.backend == "plan" else None
         plan.warnings += save_image(data, path, plan.output_format, target)
         info = describe(path)
+        if plan.target_size and (info["width"], info["height"]) != plan.target_size:
+            plan.warnings.append(
+                f"{path.name} is {info['width']}x{info['height']}, "
+                f"requested {plan.target_size[0]}x{plan.target_size[1]}"
+            )
         if job.transparent and "alpha" not in info:
             plan.warnings.append(
-                f"{path.name} has no alpha channel; retry, or use --backend api"
+                f"{path.name} has no alpha channel; retry with a transparent background"
+            )
+        elif job.transparent and info["alpha"]["fully_opaque"]:
+            plan.warnings.append(
+                f"{path.name} is fully opaque; retry with a transparent background"
             )
         files.append(info)
+    receipt["outputs"] = [f["path"] for f in files]
     receipt["files"] = files
     receipt["warnings"] = plan.warnings
     return receipt
@@ -691,7 +704,7 @@ def doctor() -> dict[str, Any]:
     has_api, api_note = api_ready()
     return {
         "plan": {"ready": has_plan, "detail": plan_note},
-        "api": {"ready": has_api, "detail": api_note},
+        "openrouter": {"ready": has_api, "detail": api_note},
     }
 
 
@@ -713,8 +726,9 @@ EPILOG_GENERATE = (
         for name, t in TIERS.items()
     )
     + """
-backend auto: the ChatGPT plan through Codex, except high and max when
-OPENAI_API_KEY is set, and --mask, --model, or --quality, which need the API.
+backend auto: always the Codex plan, including high and max.
+Select GPT Image 2.5 explicitly with --model flare/sunburst or --backend openrouter.
+OpenRouter requires OPENROUTER_API_KEY; there is no automatic paid fallback.
 The plan fixes model, quality, and size; --size is applied by cropping and resizing.
 
 examples:
@@ -767,12 +781,18 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
         type=int,
         help="images to produce (default: set by intent and backend)",
     )
-    parser.add_argument("--backend", choices=("auto", "plan", "api"), default="auto")
     parser.add_argument(
-        "--model", choices=tuple(MODELS), help="API only: override the intent's model"
+        "--backend", choices=("auto", "plan", "openrouter"), default="auto"
     )
     parser.add_argument(
-        "--quality", choices=QUALITIES, help="API only: override the intent's quality"
+        "--model",
+        choices=tuple(MODELS),
+        help="OpenRouter only: override the intent's model",
+    )
+    parser.add_argument(
+        "--quality",
+        choices=QUALITIES,
+        help="OpenRouter only: override the intent's quality",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="replace existing output files"
@@ -793,7 +813,7 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = Parser(
         prog="gpt_image.py",
-        description="Generate or edit images with GPT Image through a ChatGPT plan or the OpenAI API.",
+        description="Generate or edit images with GPT Image through a ChatGPT plan or the OpenRouter API.",
     )
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
@@ -812,11 +832,6 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         type=Path,
         help="input image; repeat, order matters",
-    )
-    edit.add_argument(
-        "--mask",
-        type=Path,
-        help="API only: PNG mask with alpha, same size as the first image",
     )
     add_job_options(edit)
     check = sub.add_parser("doctor", help="report which backends are ready")
@@ -858,8 +873,7 @@ def job_from_args(args: argparse.Namespace) -> Job:
         parse_aspect(aspect)
     size = parse_size(args.size) if args.size else None
     images = list(getattr(args, "image", None) or [])
-    mask = getattr(args, "mask", None)
-    for path in [*images, *([mask] if mask else [])]:
+    for path in images:
         if not path.is_file():
             raise UsageError(f"input image {path} does not exist")
     if images and not (size or aspect):
@@ -873,7 +887,6 @@ def job_from_args(args: argparse.Namespace) -> Job:
         size=size,
         transparent=args.transparent,
         images=images,
-        mask=mask,
         candidates=args.candidates,
         model=args.model,
         quality=args.quality,
