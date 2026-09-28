@@ -596,6 +596,9 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long an install waits for another one to finish (default: 5m)",
     )
+    # Syncs started before this version pass -q to the installer they pulled;
+    # accept it silently until every machine runs this one
+    parser.add_argument("-q", "--quiet", action="store_true", help=argparse.SUPPRESS)
     return run_script(parser, install, argv, debug="INSTALL_SKILLS_DEBUG")
 
 
