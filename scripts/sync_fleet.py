@@ -345,7 +345,7 @@ def call(
     try:
         stdout, stderr = process.communicate(script, timeout=TIMEOUT)
     except BaseException:
-        stop(process)
+        stop(process, group=True)
         raise
     finally:
         with CHILDREN_LOCK:
@@ -356,22 +356,22 @@ def call(
 def stop_children() -> None:
     """Stop every child the worker threads run, and keep them from starting more.
 
-    Each gets SIGTERM, then SIGKILL if it outlives GRACE seconds; the workers
-    waiting on them then return.
+    Each child's process group gets SIGTERM, and SIGKILL once the leaders exit
+    or GRACE seconds pass, since a descendant may outlive its leader and hold
+    the pipes a worker reads; the workers then return.
     """
     with CHILDREN_LOCK:
         STOPPING.set()
         running = list(CHILDREN)
     for process in running:
-        send(process, signal.SIGTERM)
+        send(process, signal.SIGTERM, group=True)
     deadline = time.monotonic() + GRACE
     while time.monotonic() < deadline and any(
         process.poll() is None for process in running
     ):
         time.sleep(0.05)
     for process in running:
-        if process.poll() is None:
-            send(process, signal.SIGKILL)
+        send(process, signal.SIGKILL, group=True)
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:

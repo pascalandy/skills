@@ -8,6 +8,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -490,3 +491,30 @@ def test_a_fetch_that_times_out_without_a_known_main_exits_75(
 
     with pytest.raises(TemporaryError, match="git fetch took longer than 600s"):
         sync_fleet.github_main()
+
+
+def test_an_interrupt_kills_a_group_whose_leader_exits_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sync_fleet, "GRACE", 0.3)
+    monkeypatch.setattr(sync_fleet, "STOPPING", threading.Event())
+    ready = tmp_path / "ready"
+    # The leader exits on SIGTERM; its child ignores it and keeps the pipes open
+    script = (
+        f'(trap "" TERM; exec sleep 30) &\ntrap "exit 0" TERM\n: > "{ready}"\nwait\n'
+    )
+    done: list[subprocess.CompletedProcess[str]] = []
+    worker = threading.Thread(
+        target=lambda: done.append(sync_fleet.call(["sh", "-c", script]))
+    )
+    worker.start()
+    deadline = time.monotonic() + 10
+    while not ready.exists():
+        assert time.monotonic() < deadline, "the step never started"
+        time.sleep(0.02)
+
+    sync_fleet.stop_children()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive(), "a descendant kept the worker waiting"
+    assert done[0].returncode == 0

@@ -5,11 +5,18 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
+import signal
+import subprocess
+import time
 from collections.abc import Callable
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
 
+import _common
+import pytest
 from _cli import Parser, TemporaryError, exit_codes
-from _common import run_script
+from _common import run_script, stop
 
 
 def broken(_: argparse.Namespace) -> str:
@@ -57,3 +64,56 @@ def test_under_json_a_bug_and_a_temporary_failure_are_one_object_each() -> None:
         "errors": ["the lock is held"],
         "retry": "just tool --json",
     }
+
+
+def started(script: str, tmp_path: Path) -> subprocess.Popen[str]:
+    """A shell running `script` once it has set its traps and written ready."""
+    ready = tmp_path / "ready"
+    process = subprocess.Popen(
+        ["sh", "-c", f'{script}\n: > "{ready}"\nwait'],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    deadline = time.monotonic() + 10
+    while not ready.exists():
+        assert time.monotonic() < deadline, "the shell never got ready"
+        time.sleep(0.02)
+    return process
+
+
+def test_stop_kills_a_child_that_ignores_sigterm_after_the_grace_period(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_common, "GRACE", 0.3)
+    sleeper = tmp_path / "sleeper"
+    process = started(
+        f'trap "" TERM\nsleep 30 <&- >&- & echo $! > "{sleeper}"', tmp_path
+    )
+    try:
+        began = time.monotonic()
+        stop(process)
+
+        assert process.returncode == -signal.SIGKILL
+        assert time.monotonic() - began < 2
+    finally:
+        os.kill(int(sleeper.read_text()), signal.SIGKILL)
+
+
+def test_stop_stops_reading_pipes_a_descendant_keeps_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_common, "GRACE", 0.3)
+    holder = tmp_path / "holder"
+    # The shell exits on SIGTERM, but its child ignores it and keeps stdout
+    process = started(
+        f'(trap "" TERM; exec sleep 30) & echo $! > "{holder}"\ntrap "exit 0" TERM',
+        tmp_path,
+    )
+    try:
+        began = time.monotonic()
+        stop(process)
+
+        assert process.returncode == 0
+        assert time.monotonic() - began < 2
+    finally:
+        os.kill(int(holder.read_text()), signal.SIGKILL)

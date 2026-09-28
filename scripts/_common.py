@@ -81,23 +81,27 @@ def run(
     return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
-def send(process: subprocess.Popen[Any], number: int) -> None:
-    """Signal a child, or its whole session when it leads one."""
+def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> None:
+    """Signal a child, or with `group` the process group of a child started in
+    its own session; the group outlives a leader that exits first."""
     with suppress(ProcessLookupError):
-        if os.getpgid(process.pid) == process.pid:
+        if group:
             os.killpg(process.pid, number)
         else:
             process.send_signal(number)
 
 
-def stop(process: subprocess.Popen[Any]) -> None:
-    """SIGTERM a child, then SIGKILL it if it outlives GRACE seconds."""
-    send(process, signal.SIGTERM)
+def stop(process: subprocess.Popen[Any], group: bool = False) -> None:
+    """SIGTERM a child, then SIGKILL it after GRACE seconds. A descendant may
+    still hold the pipes, so stop reading them GRACE seconds later."""
+    send(process, signal.SIGTERM, group)
     try:
         process.communicate(timeout=GRACE)
+        return
     except subprocess.TimeoutExpired:
-        send(process, signal.SIGKILL)
-        process.communicate()
+        send(process, signal.SIGKILL, group)
+    with suppress(subprocess.TimeoutExpired):
+        process.communicate(timeout=GRACE)
 
 
 def swap(fresh: Path, destination: Path, previous: Path) -> None:
