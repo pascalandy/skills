@@ -95,6 +95,7 @@ JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scrip
 JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
 JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
+GPT_IMAGE = "authoring/content/gpt-image/scripts"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -156,6 +157,12 @@ CHECKS = [
         *ruff(JEVLABEL),
         pyright(JEVLABEL, JEVLABEL_SDK),
         pytest(f"{JEVLABEL}/tests", JEVLABEL_SDK),
+    ),
+    Check(
+        "gpt-image",
+        *ruff(GPT_IMAGE),
+        pyright(GPT_IMAGE, "pillow"),
+        pytest(f"{GPT_IMAGE}/tests", "pillow"),
     ),
 ]
 
