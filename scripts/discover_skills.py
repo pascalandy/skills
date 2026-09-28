@@ -239,7 +239,9 @@ def run(args: argparse.Namespace) -> str:
         }
         results[agent] = evidence
         if root not in PROFILES[args.profile]:
-            evidence["reason"] = "target is not in the selected profile"
+            evidence["reason"] = (
+                f"~/{root} is not a {args.profile} target; drop --agent {agent}"
+            )
             continue
         if agent == "claude":
             evidence["reason"] = (
@@ -247,7 +249,9 @@ def run(args: argparse.Namespace) -> str:
             )
             continue
         if shutil.which(agent) is None:
-            evidence["reason"] = f"{agent} CLI is unavailable"
+            evidence["reason"] = (
+                f"the {agent} CLI is not on PATH; install it, or drop --agent {agent}"
+            )
             continue
         try:
             items = discover(agent, home, args.timeout)
@@ -310,7 +314,8 @@ def run(args: argparse.Namespace) -> str:
         ) as error:
             log.debug("%s adapter failed", agent, exc_info=True)
             evidence["reason"] = (
-                f"native adapter changed or failed: {type(error).__name__}: {error}"
+                f"native adapter changed or failed: {type(error).__name__}: {error}; "
+                f"rerun with --debug to see where"
             )
     supported = [agent for agent in agents if agent != "claude"]
     failing = [agent for agent in supported if results[agent]["status"] != "verified"]

@@ -86,7 +86,8 @@ def private_url() -> str:
     if not found:
         raise ScriptError(
             f"origin {origin or '(none)'} does not end in skills, so the private "
-            "repository's URL is unknown"
+            "repository's URL is unknown; point it at the skills repository with "
+            "git remote set-url origin <url>, then rerun"
         )
     return url
 
@@ -167,7 +168,10 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
         ):
             done = git(*step)
             if done.returncode:
-                raise ScriptError(f"could not commit private edits: {last_line(done)}")
+                raise ScriptError(
+                    f"could not commit private edits: {last_line(done)}; "
+                    f"commit them with git in {PRIVATE}, then rerun"
+                )
     before = git("rev-parse", "HEAD").stdout.strip()
     log.info("pull %s", LABEL)
     pulled = git("pull", "--rebase", "--quiet", timeout=timeout)

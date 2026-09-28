@@ -116,9 +116,9 @@ class Entry:
     """How the probes run one script.
 
     `block` is the command a stub on PATH blocks in, or `fifo:<path>` for a file
-    the script reads; `args` reach that block. `safe` prepares a run that
-    changes nothing a user owns and returns its arguments. `positional` holds
-    the arguments every usage probe needs.
+    the script reads; `args` reach that block. `safe` prepares a successful run
+    that changes nothing a user owns and returns its arguments. `positional`
+    holds the arguments every usage probe needs.
     """
 
     name: str
@@ -674,10 +674,10 @@ def test_verbosity_changes_only_stderr(
     runs = [sandbox.run(path, *args, *level) for level in levels]
     quiet = runs[0]
 
-    assert [(run.returncode, run.stdout) for run in runs] == [
-        (quiet.returncode, quiet.stdout)
-    ] * len(runs)
-    assert quiet.returncode != 0 or quiet.stderr == ""
+    assert (quiet.returncode, quiet.stderr) == (0, ""), quiet.stderr
+    assert [(run.returncode, run.stdout) for run in runs] == [(0, quiet.stdout)] * len(
+        runs
+    )
     assert not any("Traceback" in run.stderr for run in runs[:2])
     if script.debug:
         variable = f"{Path(path).stem.upper()}_DEBUG"
