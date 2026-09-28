@@ -186,6 +186,24 @@ def test_a_bundled_help_flag_wins_in_the_smoke_check_too(capsys) -> None:
     assert smoke(capsys, "--timeout", "nope", "-vh") == shown
 
 
+def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
+    monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: "/bin/ffprobe")
+    monkeypatch.setattr(
+        youtube_smoke,
+        "download_audio",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            transcript.WorkflowTimeoutError("budget exhausted before the download")
+        ),
+    )
+
+    code, out, err = smoke(capsys, "--", URL)
+
+    assert (code, out) == (75, "")
+    assert err.splitlines()[-1] == f"retry: youtube_smoke.py --timeout 20m -- {URL}"
+
+
 # ---------------------------------------------------------------------------
 # Usage errors and parsing
 # ---------------------------------------------------------------------------

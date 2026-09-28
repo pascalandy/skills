@@ -2674,11 +2674,19 @@ def _rerun(
     *,
     prog: str = PROG,
 ) -> str:
-    """The user's command without the `drop` options, with `add` appended."""
+    """The user's command without the `drop` options, with `add` appended.
+
+    Arguments after `--` are positional, so they stay last and untouched.
+    """
+    options = list(argv)
+    rest: list[str] = []
+    if "--" in options:
+        cut = options.index("--")
+        options, rest = options[:cut], options[cut:]
     dropped = set(drop)
     kept: list[str] = []
     skip_value = False
-    for token in argv:
+    for token in options:
         if skip_value:
             skip_value = False
             continue
@@ -2687,7 +2695,7 @@ def _rerun(
             skip_value = "=" not in token and name in _value_options()
             continue
         kept.append(token)
-    return shlex.join([prog, *kept, *add])
+    return shlex.join([prog, *kept, *add, *rest])
 
 
 def _without_summary(argv: Sequence[str]) -> str:
