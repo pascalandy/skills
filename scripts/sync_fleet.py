@@ -224,10 +224,12 @@ class Machine:
 
 @dataclass(frozen=True)
 class Source:
-    """GitHub's main, and the private repository's main in a check."""
+    """GitHub's main, the private repository's main in a check or a preview, and
+    in a preview the private changes this machine saves before others pull."""
 
     sha: str
     private: str = ""
+    saves: tuple[str, ...] = ()
 
     def contains(self, commit: str) -> bool:
         return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
@@ -523,6 +525,8 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         if isinstance(found, Outcome):
             return found
         pending, targets = found
+        if source.saves:
+            pending.append("pull the private edits this sync saves first")
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
         return Outcome(machine.name, "ready", detail, targets, changes=pending)
     if head != source.sha:
@@ -740,9 +744,13 @@ def sync(args: argparse.Namespace) -> str:
         if mode == "apply":
             for change in sync_private.sync(timeout=args.timeout):
                 log.info("%s", change)
-        # A check needs the private clone; a preview compares with it when here
+        # A check needs the private clone; a preview compares with it when here,
+        # and counts the edits a sync would save from it before others pull
         if mode == "check" or (mode == "preview" and sync_private.is_clone()):
             source = Source(source.sha, sync_private.github_head(args.timeout))
+        if mode == "preview" and sync_private.is_clone():
+            saves = tuple(sync_private.sync(dry_run=True))
+            source = Source(source.sha, source.private, saves)
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
             "%s: GitHub main at %s with %d public skills, from %s",

@@ -294,6 +294,16 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (homes / "stale/.claude/skills/alpha").exists()
 
+    # A sync first saves this machine's private edits, which every machine pulls
+    (hub / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    saving = run(hub, homes, bin_dir, "-n")
+
+    assert (saving.returncode, saving.stderr) == (0, "")
+    assert saving.stdout == "".join(
+        f"ready\t{name}\t{head[:7]}\n" for name in ("behind", "current", "stale")
+    )
+    assert git(hub / "_skills_private", "status", "--porcelain") != ""
+
 
 def test_check_is_silent_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
