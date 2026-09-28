@@ -1663,7 +1663,9 @@ def _command_parser(
     return parser
 
 
-def _add_run_options(parser: argparse.ArgumentParser, *, output_default: Path) -> None:
+def _add_run_options(
+    parser: argparse.ArgumentParser, *, output_default: Path, prompt_default: str
+) -> None:
     """Add the shared execution contract to one source command."""
     summary = parser.add_argument_group("Summary")
     summary.add_argument(
@@ -1687,7 +1689,10 @@ def _add_run_options(parser: argparse.ArgumentParser, *, output_default: Path) -
     summary.add_argument(
         "--prompt",
         metavar="NAME",
-        help="Bundled prompt name; use 'transcript list prompts' to discover values",
+        help=(
+            "Bundled prompt name; use 'transcript list prompts' to discover values "
+            f"(default: {prompt_default})"
+        ),
     )
     summary.add_argument(
         "--model",
@@ -1849,7 +1854,7 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
     )
     youtube.add_argument("--url", required=True, metavar="URL", help="YouTube URL")
     youtube.set_defaults(zoom=False, zoom_custom_path=None)
-    _add_run_options(youtube, output_default=OUTPUT_DIR)
+    _add_run_options(youtube, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT)
 
     zoom = _command_parser(
         sources,
@@ -1876,7 +1881,11 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help="Meeting folder name under ~/Documents/Zoom or a full folder path",
     )
     zoom.set_defaults(url=None, zoom=False, zoom_custom_path=None)
-    _add_run_options(zoom, output_default=ZOOM_EXPORT_DIR)
+    _add_run_options(
+        zoom,
+        output_default=ZOOM_EXPORT_DIR,
+        prompt_default=f"{ZOOM_DEFAULT_PROMPT_NAME} from distill-prompt",
+    )
 
     list_parser = _command_parser(
         commands,

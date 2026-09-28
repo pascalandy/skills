@@ -48,6 +48,7 @@ class TestHelp:
         )
         assert "opencode" not in stdout.lower()
         assert "claude" not in stdout.lower()
+        assert "(default: follow_along_note)" in " ".join(stdout.split())
 
     def test_help_marks_zoom_summary_as_conditional(self) -> None:
         stdout, _stderr, code = run_script("run", "zoom", "--help")
@@ -55,6 +56,9 @@ class TestHelp:
         assert code == 0
         assert "--no-summary" in stdout
         assert str(Path("~/Desktop/Travail/Mandats").expanduser()) in stdout
+        assert "(default: synthese-rencontre from distill-prompt)" in " ".join(
+            stdout.split()
+        )
 
 
 class TestListPrompts:
