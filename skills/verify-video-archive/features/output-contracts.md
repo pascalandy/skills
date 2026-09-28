@@ -1,20 +1,23 @@
 # Output contracts
 
-The archive command keeps redirected human output append-only and writes one
-batch document to standard output in JSON mode. Progress stays on standard
-error, and the journal remains plain text.
+Redirected, the archive command prints each archived path on standard output
+and keeps standard error quiet. In JSON mode it writes one batch document to
+standard output; `-v` adds plain progress and outcomes on standard error. The
+journal remains plain text.
 
 ## Sub-features
 
-- `output.redirected` checks plain human output without cursor controls
+- `output.redirected` checks one archived path on standard output and an empty
+  standard error
 - `output.json` parses one `video-archive.batch/v1` document
-- `output.json-stderr` checks append-only progress on standard error
+- `output.json-stderr` checks that `-v` adds plain progress and the outcome on
+  standard error
 - `output.journal-plain` rejects terminal controls in the journal
 
 ## How to get to it (user POV)
 
-Redirect `just convert-video` to a file, or run `just convert-video --json` with
-standard output and standard error separated.
+Redirect `just convert-video` to a file, or run `just convert-video --json -v`
+with standard output and standard error separated.
 
 ## Driving it with verify-video-archive
 

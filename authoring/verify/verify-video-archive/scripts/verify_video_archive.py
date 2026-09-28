@@ -1894,7 +1894,8 @@ def scenario_output_contracts(
     ).read_text(encoding="utf-8", errors="replace")
 
     ffmpeg_fixture(manifest, manifest_path, paths, "json.mkv")
-    json_invocation = run_just(manifest, manifest_path, paths, "json", "--json")
+    # -v adds the progress lines and results that a redirected run keeps quiet.
+    json_invocation = run_just(manifest, manifest_path, paths, "json", "--json", "-v")
     json_stdout = invocation_text(manifest_path, json_invocation)
     json_stderr = evidence_path(
         manifest_path, require_text(json_invocation, "stderr")
@@ -1903,16 +1904,19 @@ def scenario_output_contracts(
         document = cast(object, json.loads(json_stdout))
     except json.JSONDecodeError:
         document = None
+    archived = redirected_stdout.splitlines()
     checks = [
         check(
             "output.redirected",
             redirected["exit_status"] == 0
             and not has_terminal_controls(redirected_stdout)
             and "\r" not in redirected_stdout
-            and "success · converted" in redirected_stdout
+            and len(archived) == 1
+            and archived[0].endswith(".mp4")
+            and Path(archived[0]).is_file()
             and not redirected_stderr,
-            "Redirected human output is append-only plain text on stdout",
-            "plain stdout and empty stderr",
+            "Redirected stdout lists the archived file; stderr stays quiet",
+            "one archived path on stdout and empty stderr",
             {"stdout": redirected_stdout, "stderr": redirected_stderr},
             evidence=(
                 cast(str, redirected["stdout"]),
@@ -1935,7 +1939,7 @@ def scenario_output_contracts(
             not has_terminal_controls(json_stderr)
             and "encoding" in json_stderr
             and "success · converted" in json_stderr,
-            "JSON progress and diagnostics stay append-only on stderr",
+            "With -v, JSON progress and the outcome stay plain on stderr",
             "plain progress and durable outcome on stderr",
             json_stderr,
             evidence=(cast(str, json_invocation["stderr"]),),
