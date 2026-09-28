@@ -1225,8 +1225,12 @@ def open_folder(path: Path, budget: RunBudget) -> None:
                 capture=False,
                 timeout=budget.remaining("Finder", POST_RUN_TIMEOUT),
             )
-        except (subprocess.TimeoutExpired, WorkflowTimeoutError):
-            log.warning("Could not open the output folder before timeout")
+        except (subprocess.TimeoutExpired, OSError) as error:
+            # The result is already published; a GUI nicety cannot fail the run
+            log.warning(
+                "Could not open the output folder in Finder: "
+                f"{error or type(error).__name__}"
+            )
 
 
 def render_markdown_with_glow(

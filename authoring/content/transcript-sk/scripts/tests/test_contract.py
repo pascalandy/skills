@@ -444,6 +444,33 @@ def test_a_human_warning_goes_to_stderr_once_and_keeps_success(
     assert err == f"warning: {FALLBACK}\n"
 
 
+def test_a_failed_finder_launch_warns_and_keeps_success(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    def no_open(command, **_kwargs):
+        raise FileNotFoundError(2, "No such file or directory", command[0])
+
+    fake_youtube(monkeypatch)
+    monkeypatch.setattr(transcript.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(transcript, "run_child", no_open)
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        URL,
+        "--no-summary",
+        "--output-dir",
+        str(tmp_path),
+        "--open",
+    )
+
+    assert code == 0
+    assert out == f"{next(tmp_path.iterdir())}\n"
+    assert err.startswith("warning: Could not open the output folder in Finder: ")
+
+
 def test_a_dry_run_prints_where_the_result_would_go_and_writes_nothing(
     tmp_path, capsys
 ) -> None:
