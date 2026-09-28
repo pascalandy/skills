@@ -626,17 +626,23 @@ class ElapsedSecondsColumn(ProgressColumn):
 class StderrHandler(logging.Handler):
     """Print each record on the current sys.stderr, so a live spinner can
     redirect it above itself. Under --json, warnings join the JSON object in
-    `collected` instead of stderr."""
+    `collected` instead of stderr. A repeated warning, such as the browser
+    fallback that every yt-dlp step hits, appears once."""
 
     def __init__(self, collected: list[str] | None = None) -> None:
         super().__init__()
         self.collected = collected
+        self.warned: set[str] = set()
         self.setFormatter(logging.Formatter("%(message)s"))
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.levelno >= logging.WARNING and self.collected is not None:
-            self.collected.append(record.getMessage())
-            return
+        if record.levelno >= logging.WARNING:
+            if record.getMessage() in self.warned:
+                return
+            self.warned.add(record.getMessage())
+            if self.collected is not None:
+                self.collected.append(record.getMessage())
+                return
         text = self.format(record)
         if record.levelno >= logging.WARNING:
             text = f"warning: {text}"

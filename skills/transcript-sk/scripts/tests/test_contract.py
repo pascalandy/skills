@@ -64,6 +64,26 @@ def cli(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
     return code, captured.out, captured.err
 
 
+FALLBACK = "Arc YouTube access failed; retrying anonymously"
+
+
+def fall_back_twice(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Warn from both yt-dlp steps, as a run without a browser session does."""
+
+    def warn_then_download(_url, output_dir, *_args, **_kwargs):
+        transcript.log.warning(FALLBACK)
+        audio = output_dir / "audio.mp3"
+        audio.write_bytes(b"audio")
+        return transcript.DownloadedAudio(audio, "anonymous")
+
+    def warn_then_describe(*_args):
+        transcript.log.warning(FALLBACK)
+        return {"title": "A video", "video_id": "abc"}
+
+    fake_youtube(monkeypatch, download=warn_then_download)
+    monkeypatch.setattr(transcript, "get_video_info", warn_then_describe)
+
+
 def fake_youtube(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -351,16 +371,10 @@ def test_json_stdout_is_exactly_one_object(
     assert out.count("\n") == 1
 
 
-def test_json_warnings_join_the_object_and_leave_stderr_empty(
+def test_json_warnings_join_the_object_once_and_leave_stderr_empty(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    def warn_then_download(_url, output_dir, *_args, **_kwargs):
-        transcript.log.warning("Arc YouTube access failed; retrying anonymously")
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
-
-    fake_youtube(monkeypatch, download=warn_then_download)
+    fall_back_twice(monkeypatch)
 
     code, out, err = cli(
         capsys,
@@ -375,21 +389,13 @@ def test_json_warnings_join_the_object_and_leave_stderr_empty(
     )
 
     assert (code, err) == (0, "")
-    assert json.loads(out)["warnings"] == [
-        "Arc YouTube access failed; retrying anonymously"
-    ]
+    assert json.loads(out)["warnings"] == [FALLBACK]
 
 
-def test_a_human_warning_goes_to_stderr_and_keeps_success(
+def test_a_human_warning_goes_to_stderr_once_and_keeps_success(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    def warn_then_download(_url, output_dir, *_args, **_kwargs):
-        transcript.log.warning("Arc YouTube access failed; retrying anonymously")
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
-
-    fake_youtube(monkeypatch, download=warn_then_download)
+    fall_back_twice(monkeypatch)
 
     code, out, err = cli(
         capsys,
@@ -404,7 +410,7 @@ def test_a_human_warning_goes_to_stderr_and_keeps_success(
 
     assert code == 0
     assert out == f"{next(tmp_path.iterdir())}\n"
-    assert err == "warning: Arc YouTube access failed; retrying anonymously\n"
+    assert err == f"warning: {FALLBACK}\n"
 
 
 def test_a_dry_run_prints_where_the_result_would_go_and_writes_nothing(
