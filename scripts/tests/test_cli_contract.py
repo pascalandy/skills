@@ -429,37 +429,59 @@ def doc_flags(path: str) -> Iterator[tuple[str, str]]:
                     yield flag, f"{source.relative_to(ROOT)}:{number}"
 
 
+# Blocks until SIGTERM, then stops its own child, says it is cleaning up, and
+# waits for the test to release it; it writes its PID and its child's last,
+# once the trap is set
+STUB = """\
+trap 'kill "$child"; : > "{ready}.cleanup"; while [ ! -e "{ready}.release" ]; do sleep 0.05; done; exit 0' TERM
+sleep 60 &
+child=$!
+echo "$$ $child" > "{ready}.tmp" && mv "{ready}.tmp" "{ready}"
+wait
+"""
+
+
+def wait_for(condition: Callable[[], object], what: str, seconds: float = 30) -> None:
+    deadline = time.monotonic() + seconds
+    while not condition():
+        assert time.monotonic() < deadline, f"timed out waiting for {what}"
+        time.sleep(0.05)
+
+
 def wait_until_blocked(
     process: subprocess.Popen[str], ready: Path | None, fifo: Path | None
-) -> tuple[int | None, int | None]:
-    """Wait until the script sits in its block: return the stub's PID, or an
-    open write end of the FIFO the script is reading."""
+) -> tuple[list[int], int | None]:
+    """Wait until the script sits in its block: return the stub's PID and its
+    child's, or an open write end of the FIFO the script is reading."""
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise AssertionError(f"exited before blocking: {process.communicate()}")
         if fifo is not None:
             try:
-                return None, os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+                return [], os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
             except OSError as error:
                 if error.errno != errno.ENXIO:
                     raise
-        elif ready is not None and (
-            text := ready.read_text().strip() if ready.exists() else ""
-        ):
-            return int(text), None
+        elif ready is not None and ready.exists():
+            return [int(pid) for pid in ready.read_text().split()], None
         time.sleep(0.05)
     raise AssertionError("the script never reached its block")
 
 
 def alive(pid: int) -> bool:
-    """Whether `pid` runs; a zombie waiting for init to reap it counts as gone."""
+    """Whether `pid` runs; on Linux, a zombie waiting for init counts as gone."""
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    status = Path(f"/proc/{pid}/stat")
-    return not (status.exists() and status.read_text().split(") ")[-1].startswith("Z"))
+    if not Path("/proc/self/stat").exists():
+        return True
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().split(") ")[-1]
+    except FileNotFoundError:
+        return False
+    return not state.startswith("Z")
 
 
 @pytest.fixture(params=sorted(ENTRIES))
@@ -568,31 +590,35 @@ def test_double_dash_ends_options_so_help_after_it_is_an_argument(
 
 
 @pytest.mark.parametrize(
-    ("signals", "code", "last"),
+    ("first", "repeat", "code", "last"),
     [
-        ((signal.SIGINT,), 130, "interrupted"),
-        ((signal.SIGTERM,), 143, "terminated"),
-        ((signal.SIGTERM, signal.SIGINT), 143, "terminated"),
+        (signal.SIGINT, None, 130, "interrupted"),
+        (signal.SIGTERM, None, 143, "terminated"),
+        (signal.SIGTERM, signal.SIGINT, 143, "terminated"),
     ],
     ids=["sigint", "sigterm", "repeat"],
 )
 def test_a_signal_exits_without_a_traceback_and_stops_children(
     entry: tuple[str, Entry],
-    signals: tuple[signal.Signals, ...],
+    first: signal.Signals,
+    repeat: signal.Signals | None,
     code: int,
     last: str,
     tmp_path: Path,
 ) -> None:
     path, script = entry
+    fifo_block = script.block.startswith("fifo:")
+    if fifo_block and repeat is not None:
+        pytest.skip("no child to clean up; test_cli.py covers the repeat itself")
     sandbox = prepared(script, tmp_path)
     ready = fifo = None
-    if script.block.startswith("fifo:"):
+    if fifo_block:
         fifo = sandbox.repo / script.block.removeprefix("fifo:")
         fifo.parent.mkdir(parents=True, exist_ok=True)
         os.mkfifo(fifo)
     else:
         ready = tmp_path / "ready"
-        sandbox.stub(script.block, f'echo $$ > "{ready}"\nexec sleep 60\n')
+        sandbox.stub(script.block, STUB.format(ready=ready))
     process = subprocess.Popen(
         sandbox.command(path, *script.positional, *script.args),
         cwd=sandbox.repo,
@@ -601,27 +627,36 @@ def test_a_signal_exits_without_a_traceback_and_stops_children(
         stderr=subprocess.PIPE,
         text=True,
     )
-    child = writer = None
+    children: list[int] = []
+    writer = None
     try:
-        child, writer = wait_until_blocked(process, ready, fifo)
-        for number in signals:
-            process.send_signal(number)
-            time.sleep(0.2)
+        children, writer = wait_until_blocked(process, ready, fifo)
+        process.send_signal(first)
+        if ready is not None:
+            cleanup = Path(f"{ready}.cleanup")
+            # The script passed SIGTERM on and now waits for the stub to clean up
+            wait_for(cleanup.exists, "the stub to start cleaning up")
+            if repeat is not None:
+                process.send_signal(repeat)
+                time.sleep(0.3)
+                assert process.poll() is None, "a repeated signal cut cleanup short"
+            Path(f"{ready}.release").touch()
         stdout, stderr = process.communicate(timeout=30)
         observe(Path(path).stem, process.returncode)
 
         assert process.returncode == code, stderr
         assert (stdout, stderr.splitlines()[-1]) == ("", last)
         assert "Traceback" not in stderr
-        deadline = time.monotonic() + 10
-        while child is not None and alive(child) and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert child is None or not alive(child), "the blocked child outlived it"
+        for pid in children:
+            wait_for(lambda pid=pid: not alive(pid), f"process {pid} to end", 10)
     finally:
         process.kill()
         process.wait()
-        if child is not None and alive(child):
-            os.kill(child, signal.SIGKILL)
+        if ready is not None:
+            Path(f"{ready}.release").touch()
+        for pid in children:
+            if alive(pid):
+                os.kill(pid, signal.SIGKILL)
         if writer is not None:
             os.close(writer)
 

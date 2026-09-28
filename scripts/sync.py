@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import is_network_failure, run_script
+from _common import is_network_failure, run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -47,15 +47,15 @@ log = logging.getLogger("sync")
 def git(*args: str, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     log.debug("git %s", shlex.join(args))
     try:
-        return subprocess.run(
+        return run(
             ["git", *args],
             cwd=ROOT,
             # Hooks stay off: just sync is this machine only; just sync-fleet
             # reaches the others
             env=os.environ | {"LEFTHOOK": "0"},
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
@@ -99,28 +99,16 @@ def step(name: str, *command: str) -> list[str]:
     """
     log.info("run %s", name)
     log.debug("%s", shlex.join(command))
-    with subprocess.Popen(
-        command, cwd=ROOT, stdout=subprocess.PIPE, text=True
-    ) as process:
-        try:
-            output, _ = process.communicate()
-        except KeyboardInterrupt:
-            # Ctrl-C in a terminal reached the step too; a SIGTERM sent to
-            # this script alone did not, so pass it on and let the step clean up
-            process.terminate()
-            try:
-                process.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                process.kill()
-            raise
-    if process.returncode == 75:
+    # An interrupt passes SIGTERM on to the step, so it cleans up too
+    finished = run(command, cwd=ROOT, stdout=subprocess.PIPE, text=True)
+    if finished.returncode == 75:
         raise TemporaryError(f"{name} could not finish")
-    if process.returncode < 0:
-        raise ScriptError(f"{name} was killed by signal {-process.returncode}")
-    if process.returncode:
+    if finished.returncode < 0:
+        raise ScriptError(f"{name} was killed by signal {-finished.returncode}")
+    if finished.returncode:
         # The step has said what failed and how to fix it
         raise ScriptError()
-    return output.splitlines()
+    return finished.stdout.splitlines()
 
 
 def sync(args: argparse.Namespace) -> str:

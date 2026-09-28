@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run_script
+from _common import run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
@@ -63,8 +63,12 @@ def git(*args: str) -> subprocess.CompletedProcess[str]:
     if executable is None:
         raise ScriptError("git not found on PATH; install git and rerun")
     log.debug("git %s", shlex.join(args))
-    return subprocess.run(
-        [executable, *args], cwd=ROOT, text=True, capture_output=True, check=False
+    return run(
+        [executable, *args],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
 

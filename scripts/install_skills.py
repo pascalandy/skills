@@ -30,7 +30,7 @@ from pathlib import Path
 
 import flatten_skills
 from _cli import Parser, ScriptError, duration, exit_codes
-from _common import exclusive, run_script, swap
+from _common import exclusive, run, run_script, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -321,8 +321,10 @@ def owned_private(root: Path | None) -> set[str]:
         return set()
 
     def git(*args: str) -> bytes:
-        result = subprocess.run(
-            ["git", "-C", str(root), *args], capture_output=True, check=False
+        result = run(
+            ["git", "-C", str(root), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         if result.returncode:
             raise ScriptError(

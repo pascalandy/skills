@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run_script
+from _common import run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -170,13 +170,12 @@ def passes(check: Check, verbose: bool) -> bool:
     for command in check.commands:
         log.info("==> %s: %s", check.name, shlex.join(command))
         started = time.monotonic()
-        result = subprocess.run(
+        result = run(
             command,
             cwd=ROOT,
             stdout=sys.stderr if verbose else subprocess.PIPE,
             stderr=None if verbose else subprocess.STDOUT,
             text=True,
-            check=False,
         )
         log.debug(
             "%s: exited %d after %.1fs",
@@ -192,7 +191,7 @@ def passes(check: Check, verbose: bool) -> bool:
     return True
 
 
-def run(args: argparse.Namespace) -> str:
+def verdict(args: argparse.Namespace) -> str:
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
         for check in selected:
@@ -231,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the check names and exit; -v adds their commands on stderr",
     )
-    return run_script(parser, run, argv, debug="CHECK_DEBUG")
+    return run_script(parser, verdict, argv, debug="CHECK_DEBUG")
 
 
 if __name__ == "__main__":

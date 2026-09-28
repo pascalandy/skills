@@ -40,7 +40,6 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -55,7 +54,7 @@ from _cli import (
     duration,
     exit_codes,
 )
-from _common import exclusive, is_network_failure, run_script
+from _common import GRACE, exclusive, is_network_failure, run, run_script, send, stop
 from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -354,31 +353,34 @@ def call(
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
-def stop(process: subprocess.Popen[str]) -> None:
-    """SIGTERM the child's session so its steps clean up; SIGKILL it after 10s."""
-    with suppress(ProcessLookupError):
-        os.killpg(process.pid, signal.SIGTERM)
-    try:
-        process.communicate(timeout=10)
-    except subprocess.TimeoutExpired:
-        with suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGKILL)
-        process.communicate()
-
-
 def stop_children() -> None:
-    """Stop every running child, and keep worker threads from starting more."""
+    """Stop every child the worker threads run, and keep them from starting more.
+
+    Each gets SIGTERM, then SIGKILL if it outlives GRACE seconds; the workers
+    waiting on them then return.
+    """
     with CHILDREN_LOCK:
         STOPPING.set()
         running = list(CHILDREN)
     for process in running:
-        with suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGTERM)
+        send(process, signal.SIGTERM)
+    deadline = time.monotonic() + GRACE
+    while time.monotonic() < deadline and any(
+        process.poll() is None for process in running
+    ):
+        time.sleep(0.05)
+    for process in running:
+        if process.poll() is None:
+            send(process, signal.SIGKILL)
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=ROOT, capture_output=True, text=True, check=False
+    return run(
+        ["git", *args],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
 

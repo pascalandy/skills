@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import exclusive, is_network_failure, run_script
+from _common import exclusive, is_network_failure, run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -53,12 +53,12 @@ def git(
 ) -> subprocess.CompletedProcess[str]:
     log.debug("git %s", shlex.join(args))
     try:
-        return subprocess.run(
+        return run(
             ["git", *args],
             cwd=cwd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:

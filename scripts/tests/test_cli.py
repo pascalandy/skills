@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
+import signal
+import time
 
 import pytest
-from _cli import color_enabled, duration, exit_codes, wants_help
+from _cli import (
+    Interrupted,
+    color_enabled,
+    duration,
+    exit_codes,
+    signals_interrupt,
+    wants_help,
+)
 
 
 class Terminal(io.StringIO):
@@ -73,3 +83,34 @@ def test_color_needs_a_terminal_and_no_opt_out(
 
     assert color_enabled(Terminal(), disabled) is expected
     assert color_enabled(io.StringIO(), disabled) is False
+
+
+@pytest.fixture
+def handlers():
+    """Put back pytest's own signal handlers after a test replaces them."""
+    saved = {
+        number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)
+    }
+    yield
+    for number, handler in saved.items():
+        signal.signal(number, handler)
+
+
+def test_the_first_signal_interrupts_and_a_repeat_is_ignored(handlers: None) -> None:
+    with pytest.raises(Interrupted) as raised, signals_interrupt():
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(5)
+    os.kill(os.getpid(), signal.SIGINT)
+    time.sleep(0.1)
+
+    assert raised.value.code == 143
+    assert signal.getsignal(signal.SIGINT) == signal.SIG_IGN
+
+
+def test_handlers_come_back_when_no_signal_arrived(handlers: None) -> None:
+    before = signal.getsignal(signal.SIGTERM)
+
+    with signals_interrupt():
+        assert signal.getsignal(signal.SIGTERM) != before
+
+    assert signal.getsignal(signal.SIGTERM) == before

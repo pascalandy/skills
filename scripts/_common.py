@@ -6,13 +6,17 @@ import argparse
 import fcntl
 import json
 import logging
+import os
 import re
 import shlex
+import signal
+import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
+from typing import Any
 
 from _cli import (
     INTERRUPTED,
@@ -44,6 +48,53 @@ NETWORK_FAILURE = re.compile(
 def is_network_failure(message: str) -> bool:
     """Whether git's error names a network failure that a later retry may fix."""
     return NETWORK_FAILURE.search(message) is not None
+
+
+# How long a child may clean up after SIGTERM before SIGKILL
+GRACE = 10.0
+
+
+def run(
+    command: Sequence[str],
+    *,
+    input: str | None = None,
+    timeout: float | None = None,
+    **options: Any,
+) -> subprocess.CompletedProcess[Any]:
+    """subprocess.run that stops its child gently.
+
+    On a timeout or an interrupt, the child gets SIGTERM, so it can remove its
+    lock files and stop its own children, and SIGKILL only after GRACE seconds.
+    Pass stdout and stderr as for Popen.
+    """
+    if input is not None:
+        options["stdin"] = subprocess.PIPE
+    with subprocess.Popen(command, **options) as process:
+        try:
+            stdout, stderr = process.communicate(input, timeout=timeout)
+        except BaseException:
+            stop(process)
+            raise
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+
+
+def send(process: subprocess.Popen[Any], number: int) -> None:
+    """Signal a child, or its whole session when it leads one."""
+    with suppress(ProcessLookupError):
+        if os.getpgid(process.pid) == process.pid:
+            os.killpg(process.pid, number)
+        else:
+            process.send_signal(number)
+
+
+def stop(process: subprocess.Popen[Any]) -> None:
+    """SIGTERM a child, then SIGKILL it if it outlives GRACE seconds."""
+    send(process, signal.SIGTERM)
+    try:
+        process.communicate(timeout=GRACE)
+    except subprocess.TimeoutExpired:
+        send(process, signal.SIGKILL)
+        process.communicate()
 
 
 def swap(fresh: Path, destination: Path, previous: Path) -> None:

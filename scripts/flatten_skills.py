@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run_script, swap
+from _common import run, run_script, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
@@ -50,8 +50,11 @@ def git(*args: str) -> bytes:
     executable = shutil.which("git")
     if executable is None:
         raise ScriptError("git not found on PATH; install git and rerun")
-    result = subprocess.run(
-        [executable, *args], cwd=ROOT, capture_output=True, check=False
+    result = run(
+        [executable, *args],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     log.debug("git %s: exit %d", shlex.join(args), result.returncode)
     if result.returncode != 0:
@@ -202,7 +205,7 @@ def flatten(*, dry_run: bool = False) -> list[str]:
     return lines
 
 
-def run(args: argparse.Namespace) -> str:
+def work(args: argparse.Namespace) -> str:
     lines = flatten(dry_run=args.dry_run or args.check)
     if args.check and lines:
         raise ScriptError(
@@ -231,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="dry run that exits 1 when skills/ differs, listing the changes on stderr",
     )
-    return run_script(parser, run, argv, debug="FLATTEN_SKILLS_DEBUG")
+    return run_script(parser, work, argv, debug="FLATTEN_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":
