@@ -54,6 +54,6 @@ Each feature page uses these four H2 sections in this order.
 - [Publication recovery](recovery.md) covers a durable interruption and second real invocation
 - [Cleanup pending](cleanup-pending.md) covers verified publication with failed source removal
 - [Graceful interruption](interruption.md) covers SIGINT during encoding and exit 130
-- [Output contracts](output-contracts.md) covers redirected text, JSON streams, and plain journals
+- [Output contracts](output-contracts.md) covers redirected paths, JSON streams, and plain journals
 - [Backend benchmark](backend-benchmark.md) covers repeated full-command measurements, pre-fallback candidate size, preservation gates, and blinded quality review
 - [Parallel batch](parallel-batch.md) covers 100-video serial, normal, maximum, cancellation, lock contention, and recovery runs
