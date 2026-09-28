@@ -10,7 +10,9 @@ date_created: 2026-09-26
 date_updated: 2026-09-28
 ---
 
-Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` lists the ones that have not yet
+Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and a script leaves it once it meets the contract and `just check` passes
+
+`authoring/commands/cli-contract.md` carries the Baseline and Opt-in sections below word for word, so the contract travels to a project that does not have this doc. `just check --only test` fails when the two drift; edit this doc and copy the sections across
 
 `<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
 
