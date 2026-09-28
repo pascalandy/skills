@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import commit, skill
+from conftest import commit, exits, observe, skill
 
 # The commit waiting on GitHub edits the skill alpha and swaps the private sync
 # for this stub, so a test sees whether the sync ran the code the pull brought
@@ -26,7 +26,7 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
     }
     # Keep the caller's git settings, such as pull.rebase, out of the pull
     env.pop("XDG_CONFIG_HOME", None)
-    return subprocess.run(
+    result = subprocess.run(
         ["uv", "run", str(repo / "scripts/sync.py"), *args],
         check=False,
         cwd=repo,
@@ -35,6 +35,14 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=60,
     )
+    observe("sync", result.returncode)
+    return result
+
+
+def git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
 
 
 def on_feature_branch(repo: Path) -> None:
@@ -57,20 +65,28 @@ def behind(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path]:
     return repo, home
 
 
+@exits("sync", 0)
 def test_pulls_then_runs_the_pulled_private_sync_and_installs(
     behind: tuple[Path, Path],
 ) -> None:
     repo, home = behind
+    before = git(repo, "rev-parse", "--short=7", "HEAD")
 
     result = run(repo, home)
 
+    lines = result.stdout.splitlines()
     assert (result.returncode, result.stderr) == (0, "")
-    assert "add\t~/.claude/skills/alpha" in result.stdout.splitlines()
+    assert (
+        lines[0]
+        == f"pull\tmain\t{before}..{git(repo, 'rev-parse', '--short=7', 'HEAD')}"
+    )
+    assert "add\t~/.claude/skills/alpha" in lines
     assert (repo / "pulled-private-sync-ran").is_file()
     installed = home / ".claude/skills/alpha/SKILL.md"
     assert installed.read_text() == "# alpha\n\npulled\n"
 
 
+@exits("sync", 1)
 def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
     behind: tuple[Path, Path],
 ) -> None:
@@ -79,8 +95,9 @@ def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
 
     result = run(repo, home)
 
-    assert result.returncode != 0
+    assert (result.returncode, result.stdout) == (1, "")
     assert "authoring/content/alpha/SKILL.md" in result.stderr
+    assert result.stderr.endswith("then rerun just sync\n")
     assert not (repo / "pulled-private-sync-ran").exists()
     assert not (home / ".claude").exists()
 
@@ -117,4 +134,20 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
     assert (check.returncode, check.stdout) == (1, "")
     assert check.stderr.startswith(preview.stdout)
     assert not (repo / "_skills_private").exists()
+    assert not (home / ".claude").exists()
+
+
+@exits("sync", 75)
+def test_a_fetch_that_cannot_reach_origin_exits_75_before_installing(
+    behind: tuple[Path, Path],
+) -> None:
+    repo, home = behind
+    # Nothing listens on port 9, so git reports a refused connection
+    git(repo, "remote", "set-url", "origin", "http://127.0.0.1:9/skills.git")
+
+    result = run(repo, home, "--timeout", "30s")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert result.stderr.startswith("error: could not fetch main: ")
+    assert result.stderr.endswith("retry: just sync --timeout 30s\n")
     assert not (home / ".claude").exists()

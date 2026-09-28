@@ -6,7 +6,7 @@ set positional-arguments
 default:
     @{{ just_executable() }} --list --unsorted
 
-# Pull main, save and pull the private clone, then install every skill on this machine; silent on success, previews skip the pulls
+# Pull main, save and pull the private clone, then install every skill on this machine; prints one line per change, previews skip the pulls
 [group('commands')]
 [no-exit-message]
 sync *args:

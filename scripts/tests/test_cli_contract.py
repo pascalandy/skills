@@ -198,6 +198,10 @@ def dry_run(_: Sandbox) -> tuple[str, ...]:
 
 
 ENTRIES: dict[str, Entry] = {
+    # The preview blocks in the installer it starts, so signals test the handoff
+    "scripts/sync.py": Entry(
+        name="just sync", block="git", args=("--dry-run",), safe=dry_run
+    ),
     "scripts/sync_private.py": Entry(
         name="scripts/sync_private.py",
         block="git",
@@ -246,7 +250,6 @@ ENTRIES: dict[str, Entry] = {
 
 # Scripts a later wave moves onto the contract
 PENDING = {
-    "scripts/sync.py",
     "scripts/sync_fleet.py",
     "authoring/content/html-mode/scripts/check_html_mode.py",
     "authoring/content/mermaid/scripts/render_examples.py",
