@@ -827,6 +827,17 @@ def test_a_signal_also_stops_what_a_child_started(
             os.kill(grandchild, signal.SIGKILL)
 
 
+def test_a_child_on_the_terminal_stays_in_our_process_group(monkeypatch) -> None:
+    """glow and Finder share the terminal; in another process group, glow would
+    stop the moment it read the terminal to learn its colors."""
+    monkeypatch.undo()  # run one real, harmless child
+    same_group = f"import os, sys; sys.exit(os.getpgid(0) != {os.getpgid(0)})"
+
+    result = transcript.run_child([sys.executable, "-c", same_group], capture=False)
+
+    assert result.returncode == 0
+
+
 # ---------------------------------------------------------------------------
 # Terminal: color and the spinner
 # ---------------------------------------------------------------------------

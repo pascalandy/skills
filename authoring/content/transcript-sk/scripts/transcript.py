@@ -752,9 +752,11 @@ def run_child(
 ) -> subprocess.CompletedProcess[str]:
     """subprocess.run that stops its child gently.
 
-    The child leads its own process group, so what it starts, such as the
-    ffmpeg that yt-dlp runs, stops with it. On a timeout or an interrupt, the
-    group gets SIGTERM, so it can clean up, and SIGKILL only GRACE seconds later.
+    A captured child leads its own process group, so what it starts, such as
+    the ffmpeg that yt-dlp runs, stops with it. A child on the terminal, such as
+    glow, stays in ours: in another group, reading the terminal would stop it.
+    On a timeout or an interrupt, the child gets SIGTERM, so it can clean up,
+    and SIGKILL only GRACE seconds later.
     """
     log.debug("run %s", _describe(command))
     started = time.monotonic()
@@ -766,12 +768,12 @@ def run_child(
         stderr=pipe,
         text=True,
         cwd=cwd,
-        process_group=0,
+        process_group=0 if capture else None,
     ) as process:
         try:
             stdout, stderr = process.communicate(input, timeout=timeout)
         except BaseException:
-            stop_child(process)
+            stop_child(process, group=capture)
             raise
     log.debug(
         "%s exited %s after %.1fs",
@@ -786,23 +788,27 @@ def run_child(
     return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
-def stop_child(process: subprocess.Popen[str]) -> None:
-    """SIGTERM a child's process group, then SIGKILL it after GRACE seconds. A
-    descendant may still hold the pipes, so stop reading them GRACE seconds later."""
-    signal_group(process, signal.SIGTERM)
+def stop_child(process: subprocess.Popen[str], *, group: bool) -> None:
+    """SIGTERM a child, and its process group when it leads one, then SIGKILL
+    after GRACE seconds. A descendant may still hold the pipes, so stop reading
+    them GRACE seconds later."""
+    send_signal(process, signal.SIGTERM, group=group)
     try:
         process.communicate(timeout=GRACE)
         return
     except subprocess.TimeoutExpired:
-        signal_group(process, signal.SIGKILL)
+        send_signal(process, signal.SIGKILL, group=group)
     with suppress(subprocess.TimeoutExpired):
         process.communicate(timeout=GRACE)
 
 
-def signal_group(process: subprocess.Popen[str], number: int) -> None:
-    """Send `number` to the process group `process` leads, if any of it remains."""
+def send_signal(process: subprocess.Popen[str], number: int, *, group: bool) -> None:
+    """Send `number` to the child, or to the process group it leads."""
     with suppress(ProcessLookupError):
-        os.killpg(process.pid, number)
+        if group:
+            os.killpg(process.pid, number)
+        else:
+            process.send_signal(number)
 
 
 def _describe(command: Sequence[str]) -> str:
