@@ -18,13 +18,40 @@ For an inline inspection task, keep the workspace read-only and use the configur
 codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review src/auth.ts for race conditions. Report findings with file and line." < /dev/null
 ```
 
-For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, and fetch the base if you need its latest remote state. This example selects GPT-6 Sol at High reasoning:
+For a review, write the scope and criteria to a prompt file and run ordinary `codex exec`. This works for a plan, document, contract, or diff. For a diff, name the comparison in the prompt, such as `git diff origin/main...HEAD`; confirm the checkout and branch, and fetch the base if you need its latest remote state. This example selects GPT-6 Sol at High reasoning:
 
 ```bash
 repo="/absolute/path/to/repository"
+prompt_file="/absolute/path/to/reviewer-prompt.md"
 review_dir="$(mktemp -d /tmp/codex-review.XXXXXX)" || exit 1
 
 review_status=0
+codex exec \
+  -C "$repo" \
+  -s read-only \
+  -m gpt-6-sol \
+  -c 'model_reasoning_effort="high"' \
+  -c 'approval_policy="never"' \
+  --ephemeral --json \
+  -o "$review_dir/result.md" \
+  - < "$prompt_file" \
+  > "$review_dir/events.jsonl" \
+  2> "$review_dir/stderr.log" || review_status=$?
+
+if [ ! -s "$review_dir/result.md" ] ||
+  grep -q '^Review was interrupted' "$review_dir/result.md"; then
+  if [ "$review_status" -eq 0 ]; then review_status=1; fi
+fi
+
+printf 'Exit status: %s\nReview files: %s\n' \
+  "$review_status" "$review_dir"
+```
+
+Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+
+For a quick diff review with Codex's built-in criteria, replace the `codex exec` invocation in the recipe with `codex exec review`. It takes no prompt file, and it does not accept `-s`, so pin the sandbox through config:
+
+```bash
 codex exec \
   -C "$repo" \
   review \
@@ -38,17 +65,9 @@ codex exec \
   < /dev/null \
   > "$review_dir/events.jsonl" \
   2> "$review_dir/stderr.log" || review_status=$?
-
-if [ ! -s "$review_dir/result.md" ] ||
-  grep -q '^Review was interrupted' "$review_dir/result.md"; then
-  if [ "$review_status" -eq 0 ]; then review_status=1; fi
-fi
-
-printf 'Exit status: %s\nReview files: %s\n' \
-  "$review_status" "$review_dir"
 ```
 
-When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the check above counts that as a failure. Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the recipe's check counts that as a failure. Without criteria, a run can also answer in one line; the [review rules](../../SKILL.md#capture-a-review) treat that as weak evidence.
 
 Choose exactly one review target:
 
@@ -59,9 +78,9 @@ Choose exactly one review target:
 | `--commit <SHA>` | Changes introduced by one commit |
 | Custom prompt | Review instructions supplied as an argument or through `-` on stdin |
 
-These targets conflict with one another. For an audit with custom criteria and an explicit diff scope, use ordinary `codex exec` with a prompt file as shown below; put the comparison and criteria in that prompt.
+These targets conflict with one another. For custom criteria with an explicit diff scope, use the prompt-file recipe above.
 
-The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. Pin `sandbox_mode` as shown. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
+Without the `sandbox_mode` pin, the review commands inherit the configured sandbox, which can be `workspace-write`. On CLI 0.158.0, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
 
 For file edits, use `workspace-write`. The first command keeps the configured model; the second selects Astra and High reasoning:
 
