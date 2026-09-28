@@ -169,8 +169,8 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
             done = git(*step)
             if done.returncode:
                 raise ScriptError(
-                    f"could not commit private edits: {last_line(done)}; "
-                    f"commit them with git in {PRIVATE}, then rerun"
+                    f"could not commit private edits: {last_line(done)}; see why with "
+                    f"git -C {PRIVATE} commit, then rerun uv run scripts/sync_private.py"
                 )
     before = git("rev-parse", "HEAD").stdout.strip()
     log.info("pull %s", LABEL)

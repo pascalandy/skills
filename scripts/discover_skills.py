@@ -315,7 +315,8 @@ def run(args: argparse.Namespace) -> str:
             log.debug("%s adapter failed", agent, exc_info=True)
             evidence["reason"] = (
                 f"native adapter changed or failed: {type(error).__name__}: {error}; "
-                f"rerun with --debug to see where"
+                f"see where with just skills-discover --profile {args.profile} "
+                f"--agent {agent} --debug"
             )
     supported = [agent for agent in agents if agent != "claude"]
     failing = [agent for agent in supported if results[agent]["status"] != "verified"]
