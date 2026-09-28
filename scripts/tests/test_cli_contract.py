@@ -720,3 +720,38 @@ def test_doc_lines_that_run_a_script_use_only_its_flags(
     ]
 
     assert unknown == []
+
+
+CONTRACT_DOC = ROOT / "docs/maintainer/references/script-conventions.md"
+CONTRACT_COMMAND = ROOT / "authoring/commands/cli-contract.md"
+
+
+def contract_sections(path: Path) -> str:
+    """The Baseline and Opt-in sections, from their file's own headings.
+
+    The span ends at the first heading after Baseline that is not Opt-in, so
+    each file keeps its own sections around the shared ones.
+    """
+    lines = path.read_text().splitlines()
+    assert "## Baseline" in lines, f"{path.name} has no Baseline section"
+    start = lines.index("## Baseline")
+    end = next(
+        (
+            offset
+            for offset in range(start + 1, len(lines))
+            if lines[offset].startswith("## ") and lines[offset] != "## Opt-in"
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end]).strip("\n")
+
+
+def test_the_portable_command_copies_the_contract_word_for_word() -> None:
+    """authoring/commands/cli-contract.md carries the contract outside this repo."""
+    doc = contract_sections(CONTRACT_DOC)
+    command = contract_sections(CONTRACT_COMMAND)
+
+    assert command == doc, (
+        f"{CONTRACT_COMMAND.name} and {CONTRACT_DOC.name} disagree; "
+        "edit the doc, then copy its Baseline and Opt-in sections across"
+    )

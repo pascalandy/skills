@@ -1,18 +1,26 @@
 ---
-name: Script conventions
-description: The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it
-tags:
-  - area/ea
-  - kind/doc
-  - topic/scripts
-  - status/stable
-date_created: 2026-09-26
-date_updated: 2026-09-28
+description: cli-contract
 ---
 
-Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` lists the ones that have not yet
+# CLI contract
 
-`<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
+Bring the CLI scripts in this project onto the contract below.
+
+Audit every script first and decide which flags each one actually needs. Keep it lean: a flag earns its place only when the script has the matching behavior. The Baseline applies to every script; everything under Opt-in is added only where it fits.
+
+If the project already has a CLI contract doc, shared CLI code, or contract tests, they win over this text: use their wording, their mechanisms, and their migration list. Otherwise this text is the contract.
+
+`<name>` is a script's command name and `<NAME>` its uppercase form, such as `passgen` and `PASSGEN_DEBUG`.
+
+## Process
+
+1. Inventory: list every script and CLI entry point in the project (executables, wrapper scripts, `[project.scripts]` entries, files with a `__main__` block or a shebang). A project that keeps a migration list uses that list as the inventory
+2. Batch the inventory into waves by language family: the language of the project's shared CLI code first, then the rest. Each wave gets its own audit and its own approval
+3. Audit the wave as one summary table, one row per script: Baseline items that fail, Opt-in flags to add, and breaking changes. Add a table for a single script only where an item fails or a caller breaks. A breaking change is an exit code, a renamed flag, output moved between stdout and stderr, or a moved path
+4. Stop and show me the audit. Wait for my approval
+5. Implement the approved wave. Use the project's argument parser and its shared CLI code; where the project has neither, use the language's standard library. Where a script cannot meet an item without switching parser, mark the item fail, say why, and ask before switching
+6. A script written in another language than the shared code meets what fits. Each item it cannot meet becomes a one-line documented exception. Do not port it to another language
+7. A wave is done when every approved item passes, the project's own check passes, each migrated script leaves the migration list, and the report names the breaking changes with the test command and its output
 
 ## Baseline
 
@@ -86,40 +94,10 @@ Decide at the failing boundary whether a failure is temporary. A network error f
 
 A duration is `30s`, `5m`, `2h`, or bare seconds
 
-## Exceptions
-
-Opt-in flags that would give no real choice are left out; each exception gets one line:
-
-- `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
-- Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
-- `just check-frontmatter`, `just flatten-skills`: no `-r`; each walks one fixed tree
-- `just flatten-skills`, `just install-skills`: no `-o` or `-`; they write fixed trees, `skills/` and the agent directories
-- `just install-skills`: no `--force`; it would delete entries the installer does not own
-- `just install-skills`: accepts a hidden `-q/--quiet` and ignores it, because a `just sync` or `just sync-fleet` started before this contract passes it; remove it once every machine has synced
-- `just release-check`: `--notes FILE` names what `-o` would write; `--notes -` writes to stdout
-- `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
-- `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
-- `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
-
-## Shared code
-
-`scripts/_cli.py` holds the contract pieces: the parser, the help pre-scan, signal handling, `<NAME>_DEBUG`, color detection, the duration parser, the exit-code table, and `ScriptError` (1), `UsageError` (2), and `TemporaryError` (75). Everything below its `cli-block` marker is the block a skill script pastes whole; `just check --only cli-block` fails when a copy differs, and `uv run scripts/check_cli_block.py --fix` rewrites the copies. Keep the block on the standard library and Python 3.10
-
-`scripts/_common.py` builds the `scripts/` entry point on it. Build a `Parser` with the script's `exit_codes(...)` table, then return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. `work` returns what stdout holds, or "" to stay silent, and raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, prints output only on success, and turns each outcome into its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
-
-Use only the standard library unless a dependency earns its place. Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool through `uv run --quiet`; branching and chaining belong in the script. Bare `just` lists recipes in file order: the `commands` group, most-run first, then the `checks` group; hook-only recipes are `[private]`. `scripts/tests/test_justfile.py` enforces it
-
 ## Tests
 
-Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI
-
-`test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it in docs, hooks, CI, and `scripts/`. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
-
-Each script's exit-code table drives its tests: every code needs a test that triggers it. The contract tests cover `2`, `130`, and `143`; a script's own suite marks the rest with `@exits(script, code)`, which fails unless the test really sees that exit
-
-The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just check --only jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
-
-## Related
-
-- [[checks]]
-- [[release]]
+- Every script: each exit code it can return has a test that triggers it, including `130` through SIGINT and `143` through SIGTERM. A successful default run with no warnings writes nothing to stderr
+- A script with `--verbose` or `--debug`: across default, `--verbose`, and `--debug`, the same exit code, identical stdout, and stderr holding only what that level allows
+- A script with `--json`: stdout parses as exactly one JSON object
+- Tests run offline: stub every network call and every external command
+- Use the project's test runner. Propose one in the audit only where the project has none
