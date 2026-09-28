@@ -36,6 +36,8 @@ COMPARE_SCHEMA = "jevlabel.compare/v1"
 APPLY_SCHEMA = "jevlabel.apply/v1"
 DOCTOR_SCHEMA = "jevlabel.doctor/v1"
 LABELS_SCHEMA = "jevlabel.labels/v1"
+SHOW_SCHEMA = "jevlabel.show/v1"
+SET_SCHEMA = "jevlabel.set/v1"
 QUESTIONS_SCHEMA = "jevlabel.questions/v1"
 EXIT_ERROR, EXIT_USAGE, EXIT_INTERRUPTED = 1, 2, 130
 RUN_FILE = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9-]+\.json$")
@@ -147,9 +149,41 @@ NOMINATIONS = {
     READY_AGENT: "ready for an agent; label-for-issues requires a recorded readiness review first",
     READY_HUMAN: "ready for a person; label-for-issues requires a recorded readiness review first",
 }
+# `set` needs --reason to add these: the evidence label-for-issues asks for.
+READINESS = "the readiness review: reviewer, date, scope, conclusion, and blockers"
+NEEDS_REASON = {
+    READY_AGENT: READINESS,
+    READY_HUMAN: READINESS,
+    WONTFIX: "the maintainer's decision to decline the work",
+    P0: "the concrete emergency",
+    IMPEDIMENT: "the obstacle, which the issue must also explain",
+}
+EPIC_PREFIX = "4-epic:"
 # Near-duplicate label names compare without case, a numeric or family prefix,
 # or punctuation, so `bug` and `Priority: P1` match `2-type:bug` and `3-pty:p1`.
 LABEL_PREFIX = re.compile(r"^(?:\d+-)?(?:(?:type|pty|priority|epic|state)\s*:\s*)?")
+# `Blocked by` prerequisites in an issue body: a heading's section, or a line that
+# starts with it. Mid-sentence, it often describes another issue, as in an epic.
+HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
+BLOCKED_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+blocked by\b", re.IGNORECASE)
+BLOCKED_LINE = re.compile(
+    r"^[\s>*_+-]*blocked by\b(.*?)(?:[.;](?:\s|$)|$)", re.IGNORECASE
+)
+LINK_DEFINITION = re.compile(r"^\s*\[[^\]]+\]:\s")
+# In a `Blocked by` section, a list item or a line that starts with a reference.
+BLOCKER_LINE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s|^\s*\[?#\d|^\s*https://")
+# Timeline items that tell `set` who changed an issue since a run.
+TIMELINE_TYPES = (
+    "LABELED_EVENT, UNLABELED_EVENT, ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT, "
+    "RENAMED_TITLE_EVENT"
+)
+CHANGES = {
+    "IssueComment": "new comment",
+    "ClosedEvent": "closed",
+    "ReopenedEvent": "reopened",
+    "RenamedTitleEvent": "title changed",
+}
+LINKED = "number title state url"
 
 TYPE_OPTIONS = ("bug", "feature", "task")
 NO_MATCH = "cannot-tell"
@@ -179,6 +213,8 @@ commands:
   consent   record which private repositories may send issue text to TypeSafe
   run       fetch issues, ask Jev, and write a run record (--dry-run: preview only)
   apply     add routine issues' labels and review issues' fill, rereading each first
+  show      print one issue of a run: thread, links, and the run's reasons
+  set       write the agent's review decision on one issue of a run
   compare   compare a run's judged type and state with the labels issues already had
 
 queues in a run record:
@@ -193,6 +229,8 @@ examples:
   jevlabel run -R pascalandy/skills --dry-run
   jevlabel run -R pascalandy/skills
   jevlabel apply last --dry-run
+  jevlabel show last --issue 24
+  jevlabel set last 24 --add 1-needs-triage --dry-run
   jevlabel compare last
   jevlabel consent add pascalandy/skills-private --by "Pascal Andy"
 
@@ -320,6 +358,16 @@ def gh_json(*args: str) -> Any:
         raise Failure(
             f"`gh {' '.join(args[:2])}` returned output that is not JSON"
         ) from error
+
+
+def graphql(query: str, **variables: str | int) -> dict[str, Any]:
+    args = ["api", "graphql", "-f", f"query={query}"]
+    for key, value in variables.items():
+        args += ["-F" if isinstance(value, int) else "-f", f"{key}={value}"]
+    data = gh_json(*args)
+    if not isinstance(data, dict) or not isinstance(data.get("data"), dict):
+        raise Failure("`gh api graphql` returned no data")
+    return data["data"]
 
 
 def repo_visibility(repo: str) -> str:
@@ -1824,6 +1872,456 @@ def cmd_apply(args: argparse.Namespace) -> tuple[str, Any]:
     return line, log
 
 
+def run_entry(record: dict[str, Any], number: int) -> dict[str, Any] | None:
+    return next((e for e in record["issues"] if e["number"] == number), None)
+
+
+def moment(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def own_writes(run_id: str, entry: dict[str, Any]) -> tuple[set[str], set[str]]:
+    """Labels this run's apply and set may have added to or removed from one issue."""
+    added, removed = set(writable(entry)), set()
+    for path in runs_dir().glob(f"{run_id}.set-{entry['number']}-*.json"):
+        try:
+            log = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue  # An unreadable log only makes the check stricter
+        added.update(log.get("added", []))
+        removed.update(log.get("removed", []))
+    return added, removed
+
+
+def changes_since(repo: str, number: int, since: str) -> dict[str, Any]:
+    owner, name = repo.split("/")
+    query = (
+        "query($owner: String!, $name: String!, $number: Int!, $since: DateTime!) {"
+        " repository(owner: $owner, name: $name) { issue(number: $number) { lastEditedAt"
+        f" timelineItems(first: 100, since: $since, itemTypes: [{TIMELINE_TYPES}]) {{"
+        " pageInfo { hasNextPage } nodes { __typename"
+        " ... on LabeledEvent { createdAt label { name } }"
+        " ... on UnlabeledEvent { createdAt label { name } }"
+        " ... on IssueComment { createdAt } ... on ClosedEvent { createdAt }"
+        " ... on ReopenedEvent { createdAt } ... on RenamedTitleEvent { createdAt }"
+        " } } } } }"
+    )
+    data = graphql(query, owner=owner, name=name, number=number, since=since)
+    return data["repository"]["issue"] or {}
+
+
+def stale_reason(
+    repo: str, run_id: str, entry: dict[str, Any], current: dict[str, Any]
+) -> str | None:
+    """What changed an issue since the run, or None when nothing did.
+
+    Label writes by this run's apply and set do not count: apply fills a review
+    issue before the agent decides it. Anything else does, whoever made it.
+    """
+    closed = str(current.get("state", "")).upper() != "OPEN"
+    if closed and entry["state"] == "OPEN":
+        return "closed"
+    since = entry["updated_at"]
+    if current.get("updatedAt") == since:
+        return None
+    added, removed = own_writes(run_id, entry)
+    changes = changes_since(repo, entry["number"], since)
+    timeline = changes.get("timelineItems") or {}
+    latest: datetime | None = None
+    for item in timeline.get("nodes") or []:
+        at = moment(item["createdAt"])
+        if at <= moment(since):
+            continue
+        kind, label = item["__typename"], (item.get("label") or {}).get("name")
+        if (kind == "LabeledEvent" and label in added) or (
+            kind == "UnlabeledEvent" and label in removed
+        ):
+            latest = at if latest is None else max(latest, at)
+        elif kind in ("LabeledEvent", "UnlabeledEvent"):
+            verb = "added" if kind == "LabeledEvent" else "removed"
+            return f"{label} {verb} outside jevlabel"
+        else:
+            return CHANGES.get(kind, kind)
+    if (timeline.get("pageInfo") or {}).get("hasNextPage"):
+        return "more than 100 timeline changes"
+    edited = changes.get("lastEditedAt")
+    if edited and moment(edited) > moment(since):
+        return "body edited"
+    # A later update that no timeline item explains, such as an assignment.
+    if latest is None or moment(current["updatedAt"]) > latest:
+        return "updated outside jevlabel"
+    return None
+
+
+def blockers(body: str, repo: str) -> list[int]:
+    """Issues this repository's body names as `Blocked by` prerequisites."""
+    reference = re.compile(
+        rf"(?<![\w/&])#(\d+)\b|https://github\.com/{re.escape(repo)}/(?:issues|pull)/(\d+)",
+        re.IGNORECASE,
+    )
+    numbers: list[int] = []
+    section = False
+    for line in body.splitlines():
+        heading = HEADING.match(line) is not None
+        if heading:
+            section = BLOCKED_HEADING.match(line) is not None
+        listed = BLOCKER_LINE.match(line) and not LINK_DEFINITION.match(line)
+        opener = BLOCKED_LINE.match(line)
+        if section and not heading and listed:
+            text = line
+        else:
+            text = opener.group(1) if opener else ""
+        numbers += [int(a or b) for a, b in reference.findall(text)]
+    return list(dict.fromkeys(numbers))
+
+
+def issue_links(repo: str, number: int, body: str) -> dict[str, list[dict[str, Any]]]:
+    """Each linked issue or pull request with its state."""
+    owner, name = repo.split("/")
+    named = [n for n in blockers(body, repo) if n != number]
+    either = f"... on Issue {{ {LINKED} }} ... on PullRequest {{ {LINKED} }}"
+    aliases = "".join(
+        f" b{n}: issueOrPullRequest(number: {n}) {{ {either} }}" for n in named
+    )
+    query = (
+        "query($owner: String!, $name: String!, $number: Int!) {"
+        " repository(owner: $owner, name: $name) {"
+        f" issue(number: $number) {{ parent {{ {LINKED} }}"
+        f" subIssues(first: 100) {{ nodes {{ {LINKED} }} }}"
+        f" blockedBy(first: 100) {{ nodes {{ {LINKED} }} }}"
+        f" blocking(first: 100) {{ nodes {{ {LINKED} }} }}"
+        " closedByPullRequestsReferences(first: 100, includeClosedPrs: true)"
+        f" {{ nodes {{ {LINKED} }} }} }}{aliases} }} }}"
+    )
+    data = graphql(query, owner=owner, name=name, number=number)["repository"]
+    issue = data.get("issue") or {}
+
+    def nodes(key: str) -> list[dict[str, Any]]:
+        return [node for node in (issue.get(key) or {}).get("nodes") or [] if node]
+
+    blocked_by = [{**node, "source": "relationship"} for node in nodes("blockedBy")]
+    known = {node["number"] for node in blocked_by}
+    for n in named:
+        if n not in known:
+            node = data.get(f"b{n}") or {
+                "number": n,
+                "title": "",
+                "state": "NOT FOUND",
+                "url": "",
+            }
+            blocked_by.append({**node, "source": "body"})
+    return {
+        "parent": [issue["parent"]] if issue.get("parent") else [],
+        "sub_issues": nodes("subIssues"),
+        "blocked_by": blocked_by,
+        "blocking": nodes("blocking"),
+        "pull_requests": nodes("closedByPullRequestsReferences"),
+    }
+
+
+def medium_answers(entry: dict[str, Any], pack: Pack) -> list[dict[str, Any]]:
+    """The run's answers in a medium band, each with the question to answer instead."""
+    found: list[dict[str, Any]] = []
+    for qid in entry.get("uncertain_answers") or []:
+        base, _, index = qid.rpartition("_")
+        if qid in pack.questions or not index.isdigit():
+            base, index = qid, ""
+        answer = (entry.get("answers") or {}).get(qid) or {}
+        question = pack.questions.get(base)
+        item: dict[str, Any] = {"id": qid}
+        if answer.get("type") == "choice":
+            item["choice"] = answer.get("choice")
+            item["confidence"] = answer.get("confidence")
+            item["min_confidence"] = question.min_confidence if question else None
+        else:
+            item["value"] = answer.get("noul")
+            item["no"], item["yes"] = (
+                (question.no, question.yes) if question else (None, None)
+            )
+        if question is not None:
+            wire = question.wire(int(index) if index else None)
+            item["question"] = wire["instructions"]
+        if index:
+            item["comment"] = entry["comments"][int(index)]["url"]
+        found.append(item)
+    return found
+
+
+def show_text(view: dict[str, Any]) -> str:
+    lines = [
+        f"#{view['number']} {view['title']}",
+        view["url"],
+        f"state: {view['state'].lower()}; labels: {', '.join(view['labels']) or 'none'}",
+    ]
+    triage = view["triage"]
+    if triage is None:
+        lines.append(f"run {view['run']}: not in this run")
+    else:
+        status = (
+            f"stale: {triage['stale']} since the run"
+            if triage["stale"]
+            else "unchanged since the run"
+        )
+        lines.append(f"run {view['run']}: {triage['queue']}; {status}")
+        lines += [f"  reason: {reason}" for reason in triage["reasons"]]
+        lines += [f"  missing: {item}" for item in triage["missing"]]
+        for answer in triage["medium_answers"]:
+            if "value" in answer:
+                value = (
+                    f"{answer['value']} (medium band {answer['no']} to {answer['yes']})"
+                )
+            else:
+                value = f"{answer['choice']} at {answer['confidence']} (needs {answer['min_confidence']})"
+            question = f": {answer['question']}" if answer.get("question") else ""
+            lines.append(f"  medium: {answer['id']} {value}{question}")
+        if triage["fill"]:
+            lines.append(f"  fill: {', '.join(triage['fill'])}")
+        if triage["questions_changed"]:
+            lines.append("  note: the questions changed since the run")
+    kinds = {
+        "parent": "parent",
+        "sub_issues": "sub-issue",
+        "blocked_by": "blocked by",
+        "blocking": "blocking",
+        "pull_requests": "pull request",
+    }
+    for key, kind in kinds.items():
+        for link in view["links"][key]:
+            source = ", named in the body" if link.get("source") == "body" else ""
+            lines.append(
+                f"{kind} #{link['number']} ({link['state'].lower()}{source}): {link['title']}"
+            )
+    lines += ["", "body:", view["body"] or "(empty)"]
+    for index, comment in enumerate(view["comments"], 1):
+        flags = [
+            flag
+            for flag, on in (
+                ("minimized", comment["minimized"]),
+                ("managed triage comment", comment["managed"]),
+            )
+            if on
+        ]
+        header = [f"comment {index}", comment["role"], comment["author"]]
+        header += [comment["created_at"] or "", *flags]
+        lines += ["", " · ".join(part for part in header if part), comment["url"]]
+        lines.append(comment["body"])
+    return "\n".join(lines)
+
+
+def cmd_show(args: argparse.Namespace) -> tuple[str, Any]:
+    """Print an issue's current thread and links, and what a run found about it."""
+    _, record = load_run(args.run)
+    repo, number = record["repo"], args.issue
+    issue = fetch_issue(repo, number)
+    if "/pull/" in str(issue.get("url") or ""):
+        raise Failure(
+            f"#{number} is a pull request; label-for-issues labels issues only"
+        )
+    author = login(issue.get("author"))
+    body = str(issue.get("body") or "")
+    comments = [
+        {
+            "author": login(c.get("author")),
+            "role": "bot"
+            if is_bot(login(c.get("author")))
+            else comment_role(c, author),
+            "created_at": c.get("createdAt"),
+            "url": str(c.get("url") or ""),
+            "minimized": bool(c.get("isMinimized")),
+            "managed": MANAGED_MARKER in str(c.get("body") or ""),
+            "body": str(c.get("body") or ""),
+        }
+        for c in issue.get("comments") or []
+    ]
+    entry = run_entry(record, number)
+    triage = None
+    if entry is not None:
+        pack = load_pack()
+        triage = {
+            "queue": entry["queue"],
+            "stale": stale_reason(repo, record["id"], entry, issue),
+            "reasons": entry["reasons"],
+            "missing": entry.get("missing") or [],
+            "add": entry.get("add") or [],
+            "remove": entry.get("remove") or [],
+            "fill": entry.get("fill") or [],
+            "medium_answers": medium_answers(entry, pack),
+            "questions_changed": record.get("questions_digest") != pack.digest,
+        }
+    view = {
+        "schema": SHOW_SCHEMA,
+        "run": record["id"],
+        "repo": repo,
+        "number": number,
+        "title": str(issue.get("title") or ""),
+        "url": str(issue.get("url") or ""),
+        "state": str(issue.get("state") or "").upper(),
+        "updated_at": issue.get("updatedAt"),
+        "author": author,
+        "labels": sorted(label["name"] for label in issue.get("labels") or []),
+        "triage": triage,
+        "links": issue_links(repo, number, body),
+        "body": body,
+        "comments": comments,
+    }
+    return show_text(view), view
+
+
+def set_problems(
+    add: list[str], remove: list[str], reason: str, canonical: set[str]
+) -> list[str]:
+    """What makes a requested decision invalid before the issue is read."""
+    named = unique(add + remove)
+    problems = [] if named else ["name at least one --add or --remove label"]
+    problems += [
+        f"{label} is not a canonical label; label-for-issues owns the vocabulary"
+        for label in named
+        if label not in canonical
+    ]
+    problems += [
+        f"{label} depends on parent links; set epic roles with label-for-issues"
+        for label in named
+        if label.startswith(EPIC_PREFIX)
+    ]
+    if WIP in add:
+        problems.append(f"{WIP} marks started work, not a review decision")
+    problems += [
+        f"{label} is both added and removed" for label in add if label in remove
+    ]
+    for name, prefix in FAMILIES.items():
+        same = [label for label in add if label.startswith(prefix)]
+        if len(same) > 1:
+            problems.append(f"add one {name} label at most, not {', '.join(same)}")
+    if not reason:
+        problems += [
+            f"adding {label} needs --reason with {NEEDS_REASON[label]}"
+            for label in add
+            if label in NEEDS_REASON
+        ]
+    return problems
+
+
+def cmd_set(args: argparse.Namespace) -> tuple[str, Any]:
+    """Write the agent's review decision on one issue, rereading it first."""
+    canonical = load_vocabulary()
+    add, remove = unique(args.add or []), unique(args.remove or [])
+    reason = (args.reason or "").strip()
+    problems = set_problems(add, remove, reason, canonical)
+    if problems:
+        raise UsageError("; ".join(problems))
+    path, record = load_run(args.run)
+    repo, number, run_id = record["repo"], args.number, record["id"]
+    entry = run_entry(record, number)
+    if entry is None:
+        raise Failure(
+            f"#{number} is not in run {run_id}; run `jevlabel run -R {repo} --issue {number}` first"
+        )
+    if entry["queue"] == "skip":
+        raise Failure(
+            f"run {run_id} skipped #{number} ({entry['reasons'][0]}); "
+            "set only decides issues the run asked Jev about"
+        )
+    result: dict[str, Any] = {
+        "schema": SET_SCHEMA,
+        "run": run_id,
+        "repo": repo,
+        "number": number,
+        "created_at": now().isoformat(timespec="seconds"),
+        "dry_run": args.dry_run,
+        "reason": reason,
+        "added": [],
+        "removed": [],
+        "outcome": "",
+        "detail": "",
+    }
+
+    def refuse(outcome: str, problem: str) -> NoReturn:
+        result.update(outcome=outcome, detail=problem)
+        raise Failure(f"#{number}: {outcome}: {problem}", result=result)
+
+    current = issue_now(repo, number)
+    stale = stale_reason(repo, run_id, entry, current)
+    if stale:
+        refuse(
+            "stale",
+            f"{stale} since run {run_id}; run `jevlabel run -R {repo} --issue {number}` "
+            "again, then show and set it from the new run",
+        )
+    labels = {label["name"] for label in current.get("labels") or []}
+    if EPIC_PARENT in labels and any(label.startswith(TYPE_PREFIX) for label in add):
+        refuse("conflict", "it is an epic parent, which takes no type label")
+    # Adding into a filled family replaces its canonical label; a custom one stays.
+    replaced: list[str] = []
+    for label in add:
+        prefix = next((p for p in FAMILIES.values() if label.startswith(p)), None)
+        for old in sorted(labels):
+            if prefix is None or not old.startswith(prefix) or old == label:
+                continue
+            if old not in canonical:
+                refuse(
+                    "conflict",
+                    f"its {old} label is not canonical; migrate it with the user before adding {label}",
+                )
+            replaced.append(old)
+    added = [label for label in add if label not in labels]
+    removed = unique([label for label in remove if label in labels] + replaced)
+    result.update(added=added, removed=removed)
+    if not added and not removed:
+        result["outcome"] = "already"
+        return f"set #{number}: nothing to change", result
+    absent = [label for label in added if label not in repo_labels(repo)]
+    if absent:
+        refuse(
+            "failed",
+            f"{repo} lacks {', '.join(absent)}; create it with `jevlabel labels -R {repo}`",
+        )
+    verbs = (("add", "added", added), ("remove", "removed", removed))
+    planned = " and ".join(
+        f"{verb} {', '.join(names)}" for verb, _, names in verbs if names
+    )
+    done = " and ".join(
+        f"{verb} {', '.join(names)}" for _, verb, names in verbs if names
+    )
+    if args.dry_run:
+        result["outcome"] = "would-set"
+        return f"set #{number} --dry-run: would {planned}; nothing written", result
+    command = ["issue", "edit", str(number), "-R", repo]
+    if added:
+        command += ["--add-label", ",".join(added)]
+    if removed:
+        command += ["--remove-label", ",".join(removed)]
+    log_path = new_log(path.parent, f"{run_id}.set-{number}-{stamp()}")
+    try:
+        gh(*command)
+        after = {label["name"] for label in issue_now(repo, number).get("labels") or []}
+    except Failure as failure:
+        problems = [
+            f"{failure.problems[0]}; reread it with `jevlabel show {run_id} --issue {number}` before retrying"
+        ]
+    else:
+        problems = [
+            f"{label} is missing after the write"
+            for label in added
+            if label not in after
+        ]
+        problems += [
+            f"{label} is still set after the write"
+            for label in removed
+            if label in after
+        ]
+        problems += family_problems(after)
+    result.update(outcome="failed" if problems else "set", detail="; ".join(problems))
+    write_json(log_path, result)
+    result["path"] = str(log_path)
+    if problems:
+        raise Failure(
+            *(f"#{number}: {problem}" for problem in problems),
+            f"the write is logged in {log_path}",
+            result=result,
+        )
+    return f"set #{number}: {done}; log: {log_path}", result
+
+
 # ------------------------------------------------------------------------ cli
 
 
@@ -1961,6 +2459,57 @@ def build_parser() -> Parser:
         "--dry-run", action="store_true", help="show what would be added"
     )
     common(apply)
+
+    show = commands.add_parser(
+        "show",
+        help="print one issue of a run with its context",
+        description="Print an issue's current state, labels, body, and comments with "
+        "each author's role, and each linked issue or pull request with its state: "
+        "parent, sub-issues, blockers from relationships and from `Blocked by` in the "
+        "body, issues it blocks, and closing pull requests. For an issue in the run, "
+        "also print the run's queue, reasons, missing items, fill, each medium-band "
+        "answer with its question, and whether the issue changed since the run. "
+        "Reads only; writes nothing.",
+        epilog="examples:\n  jevlabel show last --issue 24\n"
+        "  jevlabel show 20260928T025156Z-pascalandy-skills --issue 24 --json",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    show.add_argument("run", help="run ID, or `last`")
+    show.add_argument("--issue", type=int, required=True, help="issue number")
+    common(show)
+
+    set_ = commands.add_parser(
+        "set",
+        help="write the agent's review decision on one issue",
+        description="Add and remove canonical labels on one issue that a run asked "
+        "about. Adding a state, type, or priority replaces the canonical label its "
+        "family holds. Adding 1-ready-for-agent, 1-ready-for-human, 1-wontfix, "
+        "3-pty:p0, or 0-impediment needs --reason with the evidence label-for-issues "
+        "asks for; the reason is logged, not posted. Epic roles and 1-wip-by-agent "
+        "stay with label-for-issues. The issue is reread first and refused as stale "
+        "when it changed or closed since the run, except for this run's own apply and "
+        "set label writes. After the write, the labels are read back and the result "
+        "is logged next to the run record.",
+        epilog="examples:\n  jevlabel set last 24 --add 1-needs-triage --dry-run\n"
+        "  jevlabel set last 24 --add 1-needs-triage\n"
+        "  jevlabel set last 12 --add 2-type:task --remove 0-impediment\n"
+        '  jevlabel set last 12 --add 1-ready-for-agent --reason "readiness review '
+        '2026-09-28 by Claude: scope and criteria clear; no blockers"',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    set_.add_argument("run", help="run ID, or `last`")
+    set_.add_argument("number", type=int, help="issue number")
+    set_.add_argument(
+        "--add", action="append", metavar="LABEL", help="label to add; repeatable"
+    )
+    set_.add_argument(
+        "--remove", action="append", metavar="LABEL", help="label to remove; repeatable"
+    )
+    set_.add_argument("--reason", help="the evidence behind the decision; logged")
+    set_.add_argument(
+        "--dry-run", action="store_true", help="show the change; write nothing"
+    )
+    common(set_)
     return parser
 
 
@@ -1971,6 +2520,8 @@ COMMANDS = {
     "run": cmd_run,
     "compare": cmd_compare,
     "apply": cmd_apply,
+    "show": cmd_show,
+    "set": cmd_set,
 }
 
 
