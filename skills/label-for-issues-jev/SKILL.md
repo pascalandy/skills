@@ -10,7 +10,7 @@ description: "Use when labeling or triaging many GitHub issues at once, such as 
 Each issue in a run lands in one queue:
 
 - `routine`: every answer the labels rest on is clearly yes or no, and the labels only fill empty families
-- `review`: an answer is uncertain, or a label needs a person or new evidence: ready, wontfix, p0, an impediment, or a change to an existing label. Each carries its reasons
+- `review`: an answer is uncertain, or a label needs a person or new evidence: ready, wontfix, p0, an impediment, or a change to an existing label. Each carries its reasons, and its `fill`: the judged type and p2, each only for an empty family, and none when its text may steer triage
 - `skip`: closed, a pull request, agent work in progress, or not asked
 
 Run the CLI with `uv run <skill_dir>/scripts/jevlabel.py`. Every command accepts `--help` and `--json`. Previews and run records go to `$XDG_STATE_HOME/label-for-issues-jev/runs/`, by default `~/.local/state/label-for-issues-jev/runs/`.
@@ -25,11 +25,11 @@ Run the CLI with `uv run <skill_dir>/scripts/jevlabel.py`. Every command accepts
    *Complete when the repository is public, consent is recorded, or the user declined.*
 4. **Preview.** Run `jevlabel run -R <owner/repo> --dry-run`. Select issues with `--issue N` (repeatable), `--search QUERY`, or `--state open|closed|all`, and cap requests with `--max-requests N`. The preview names each skipped issue and why, the requests, the estimated tokens and cost, and the payload file holding the exact request bodies. Nothing goes to TypeSafe.
    *Complete when the preview file exists and its counts are reported.*
-5. **Run.** Run the same selection without `--dry-run`, adding `--json` to read each issue's queue, `add`, `remove`, `reasons`, and `missing`. The record file it names also holds every answer and probability. A failure stops the run and keeps a partial record; fix the cause it names and rerun.
+5. **Run.** Run the same selection without `--dry-run`, adding `--json` to read each issue's queue, `add`, `remove`, `fill`, `reasons`, and `missing`. The record file it names also holds every answer and probability. A failure stops the run and keeps a partial record; fix the cause it names and rerun.
    *Complete when a run record exists.*
-6. **Label routine issues.** For a request that allows changes, run `jevlabel apply <run-id> --dry-run`, then `jevlabel apply <run-id>`. It rereads each routine issue, adds only labels whose family is still empty, never removes one, and reads the labels back. An issue changed since the run is `stale`: run it again before applying. A review-only request stops at the dry run.
+6. **Apply the clear labels.** For a request that allows changes, run `jevlabel apply <run-id> --dry-run`, then `jevlabel apply <run-id>`. It adds each routine issue's labels and each review issue's `fill`. It rereads each issue first, adds only labels whose family is still empty, never removes one, and reads the labels back. An issue changed since the run is `stale`: run it again before applying. A review-only request stops at the dry run.
    *Complete when `apply` reports no failure, or each failure is reported with the log it names.*
-7. **Investigate review issues.** Work through each review issue with the Inspect and Assess steps of `label-for-issues`, then apply what the evidence supports. Read the reasons as leads, not verdicts: each names the condition to check, and `missing` names what the issue lacks. Nominated labels need the evidence `label-for-issues` requires, such as a recorded readiness review for ready. A comment is written only when the user asks for one.
+7. **Investigate review issues.** Work through each review issue with the Inspect and Assess steps of `label-for-issues`, then apply what the evidence supports. Read the reasons as leads, not verdicts: each names the condition to check, and `missing` names what the issue lacks. A type or priority that `apply` filled is Jev's judgment; change it when the evidence disagrees. Nominated labels need the evidence `label-for-issues` requires, such as a recorded readiness review for ready. A comment is written only when the user asks for one.
    *Complete when each review issue has an assessment, or is reported as left open with the reason.*
 8. **Report.** Give the run ID, the queue counts, the tokens and cost, the labels changed, the review outcomes, and any failures. Say that the thresholds are uncalibrated while `calibration` in `assets/questions.toml` says so.
 
