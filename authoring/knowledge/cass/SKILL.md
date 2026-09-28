@@ -16,7 +16,7 @@ This skill is verified against cass 0.9.0. The project changes frequently, so th
 - Never edit, move, or prune provider session logs
 - Preserve an existing CASS archive before replacing it
 - Do not call a setup healthy because one search returned results
-- Do not install an unreleased build as a stability fix unless the user explicitly accepts that tradeoff
+- Install or upgrade `cass` only when the user asks for it or approves it. A history request is not approval, even when it names `cass`. A delegated agent reports back to its parent instead of installing. Installing an unreleased build as a stability fix also needs the user to accept that tradeoff explicitly
 - Never return history from a stale or unproven index without the user's explicit approval to proceed in degraded mode
 
 Humans can run bare `cass` after agent validation is complete
@@ -33,6 +33,21 @@ For install, upgrade, or repair work, finish that work first, then run the gate 
 cass --version
 ```
 
+When the command fails, classify the failure before reporting it
+
+```bash
+command -v cass
+ls -l ~/.local/bin/cass
+```
+
+| State | Signal | Action |
+|---|---|---|
+| Not installed | `command -v cass` prints nothing and `~/.local/bin/cass` does not exist | Report that `cass` is not installed on this machine and point to [installation](references/maintenance.md#installation-and-upgrades) |
+| Installed, not on `PATH` | `command -v cass` prints nothing and `~/.local/bin/cass` exists | Report a `PATH` problem. Do not reinstall |
+| Installed but broken | `cass` is found but fails to run, such as exit 126, a loader error, or a crash | Diagnose through [references/maintenance.md](references/maintenance.md). Do not report it as missing |
+
+Keep the gate closed in every state. Install only under the install rule in [non-negotiable rules](#non-negotiable-rules), and do not search other directories for the binary
+
 When the version differs from 0.9.0, check the installed contract before relying on this skill. Do not load the entire capabilities response into context
 
 ```bash
@@ -42,7 +57,7 @@ cass robot-docs guide
 
 Add the user's requested command to the filter. Capabilities lists only parent commands, so the nested `sources agents list` probe in step 2 must still parse as valid JSON. If the contract differs from this skill, follow the binary, flag the skill drift, and run step 4
 
-Completion criterion: the version is 0.9.0, or the installed contract lists every command and flag this skill uses plus the requested operation
+Completion criterion: `cass --version` succeeds, and the version is 0.9.0 or the installed contract lists every command and flag this skill uses plus the requested operation. If `cass --version` fails, the gate stays closed and the report names one of the three failure states
 
 ### 2. Pass the structural gate
 
