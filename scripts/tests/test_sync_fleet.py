@@ -12,7 +12,15 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
+from conftest import (
+    GIT_IDENTITY,
+    SCRIPTS,
+    commit,
+    exits,
+    observe,
+    private_remote,
+    skill,
+)
 
 # Where the private-network skill ships the registry; the seed's .gitignore keeps
 # it untracked, so it never reaches another machine's clone.
@@ -130,7 +138,7 @@ def run(
     env["FLEET_PYTHON"] = sys.executable
     env["HOME"] = str(hub.parent / "hub-home")
     env.pop("XDG_STATE_HOME", None)
-    return subprocess.run(
+    result = subprocess.run(
         ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],
         check=False,
         cwd=hub,
@@ -140,8 +148,11 @@ def run(
         text=True,
         timeout=120,
     )
+    observe("sync_fleet", result.returncode)
+    return result
 
 
+@exits("sync_fleet", 1)
 def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -178,8 +189,8 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
 
     result = run(hub, homes, bin_dir, "--json")
 
-    assert result.returncode == 1
-    report = json.loads(result.stdout)
+    assert (result.returncode, result.stdout) == (1, "")
+    report = json.loads(result.stderr)
     assert report["sha"] == head
     not_a_clone = (
         "~/projects/skills/_skills_private is not a clone of the private repo; "
@@ -224,26 +235,35 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     for name, checkout in (("plain", plain), ("linked", linked)):
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
-    errors = json.loads(result.stderr)["errors"]
     assert (
         "dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
-    ) in errors
-    assert any(error.startswith("down offline:") for error in errors)
+    ) in report["errors"]
+    assert any(error.startswith("down offline:") for error in report["errors"])
+    behind_changes = report["machines"][0]["changes"]
+    assert behind_changes[0] == f"move {before[:7]} to {head[:7]}"
+    assert "add\t~/.claude/skills/secret" in behind_changes
 
 
-def test_dry_run_is_silent_and_changes_nothing(
+@exits("sync_fleet", 0)
+def test_dry_run_names_each_machine_it_would_move_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
     behind = machine(homes, "behind", hub.parent / "skills.git")
+    current = machine(homes, "current", hub.parent / "skills.git")
     before = git(behind, "rev-parse", "HEAD")
-    change(hub)
-    register(hub, "behind")
+    head = change(hub)
+    git(current, "pull", "-q")
+    register(hub, "behind", "current")
 
-    result = run(hub, homes, bin_dir, "--dry-run")
+    result = run(hub, homes, bin_dir, "-n")
 
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (result.returncode, result.stdout, result.stderr) == (
+        0,
+        f"ready\tbehind\t{head[:7]}\n",
+        "",
+    )
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (behind / "_skills_private").exists()
     assert not (homes / "behind/just.log").exists()
@@ -356,7 +376,39 @@ def test_brings_the_machine_it_runs_on_to_github_main(
 
     result = run(hub, homes, bin_dir)
 
-    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (result.returncode, result.stdout, result.stderr) == (
+        0,
+        f"synced\t{here}\t{github[:7]}\n",
+        "",
+    )
     assert git(hub, "rev-parse", "HEAD") == github != before
     assert (home / "just.log").read_text() == "install-skills\n"
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
+
+
+@exits("sync_fleet", 75)
+def test_a_run_whose_only_failures_are_offline_machines_exits_75(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down")
+
+    result = run(hub, homes, bin_dir, "--dry-run")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert (
+        result.stderr.splitlines()[0]
+        == f"offline\tdown\t{git(hub, 'rev-parse', '--short=7', 'HEAD')}"
+    )
+    assert result.stderr.endswith("retry: just sync-fleet --dry-run\n")
+
+
+def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "mbp")
+
+    result = run(hub, homes, bin_dir, "mpb")
+
+    assert (result.returncode, result.stdout) == (2, "")
+    assert "error: unknown machine mpb; the registry lists mbp\n" in result.stderr
+    assert result.stderr.endswith("run 'just sync-fleet --help'\n")

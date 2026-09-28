@@ -197,7 +197,50 @@ def dry_run(_: Sandbox) -> tuple[str, ...]:
     return ("--dry-run",)
 
 
+def fleet_of_one(sandbox: Sandbox) -> None:
+    """GitHub as a bare clone, and a registry naming one remote machine."""
+    origin = sandbox.repo.parent / "origin.git"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(sandbox.repo), str(origin)], check=True
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(origin)], cwd=sandbox.repo, check=True
+    )
+    subprocess.run(["git", "fetch", "-q", "origin"], cwd=sandbox.repo, check=True)
+    registry = sandbox.repo / "_skills_private/fleet.toml"
+    registry.parent.mkdir()
+    registry.write_text(
+        '[machines.far]\nssh = "tester@far"\npath = "projects/skills"\n'
+    )
+
+
+def far_is_behind(sandbox: Sandbox) -> tuple[str, ...]:
+    """GitHub moves one commit ahead of the checkout far reports."""
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=sandbox.repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    (sandbox.repo / "change.txt").write_text("new\n")
+    commit(sandbox.repo)
+    subprocess.run(
+        ["git", "push", "-q", "origin", "HEAD:main"], cwd=sandbox.repo, check=True
+    )
+    sandbox.stub("ssh", f"echo 'checkout main {head} clean'\n")
+    return ("--dry-run",)
+
+
 ENTRIES: dict[str, Entry] = {
+    # A preview blocks in the SSH step a worker thread runs
+    "scripts/sync_fleet.py": Entry(
+        name="just sync-fleet",
+        block="ssh",
+        args=("--dry-run",),
+        prepare=fleet_of_one,
+        safe=far_is_behind,
+    ),
     # The preview blocks in the installer it starts, so signals test the handoff
     "scripts/sync.py": Entry(
         name="just sync", block="git", args=("--dry-run",), safe=dry_run
@@ -250,7 +293,6 @@ ENTRIES: dict[str, Entry] = {
 
 # Scripts a later wave moves onto the contract
 PENDING = {
-    "scripts/sync_fleet.py",
     "authoring/content/html-mode/scripts/check_html_mode.py",
     "authoring/content/mermaid/scripts/render_examples.py",
     "authoring/content/storytelling/tests/validate-package.py",
