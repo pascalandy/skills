@@ -454,6 +454,7 @@ PROVIDER_PI_PREFIXES = {
     PROVIDER_OPENROUTER: "openrouter/",
 }
 
+PROMPTS_DIR = SCRIPT_DIR.parent / "references" / "prompts"
 DEFAULT_PROMPT = "follow_along_note"
 
 ZOOM_ROOT = Path("~/Documents/Zoom").expanduser()
@@ -3012,7 +3013,7 @@ def _dispatch(
     """Run the command `args` names and return its exit code."""
     if args.command == "help":
         return _show_help(parser, args.topic)
-    prompts = scan_prompts(SCRIPT_DIR / "prompts")
+    prompts = scan_prompts(PROMPTS_DIR)
     if args.command == "list":
         _print_discovery(args, prompts)
         return 0

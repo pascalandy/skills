@@ -18,7 +18,7 @@ from types import SimpleNamespace
 import pytest
 from cli_support import SCRIPT_PATH, run_script
 
-PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+PROMPTS_DIR = Path(__file__).parents[2] / "references" / "prompts"
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ class TestHelp:
 
 
 class TestListPrompts:
-    """list prompts should print prompt names from scripts/prompts/."""
+    """list prompts should print prompt names from references/prompts/."""
 
     def test_lists_bundled_prompts(self) -> None:
         stdout, _stderr, code = run_script("list", "prompts")
