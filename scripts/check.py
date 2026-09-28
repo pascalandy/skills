@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run the CI verdict: every check in CHECKS, in order, then one summary line."""
+"""Run the CI verdict: every check in CHECKS, in order; success prints nothing."""
 
 from __future__ import annotations
 
@@ -13,23 +13,25 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-from _common import ScriptError, run_script
+from _cli import Parser, ScriptError, exit_codes
+from _common import run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 
 EPILOG = """\
 Each check is one row of CHECKS in scripts/check.py; add a row to add a check.
-A failing check does not stop the others.
+A failing check does not stop the others; its output is replayed on stderr.
 
 examples:
   just check
   just check --list
   just check --only lint --only tavily
-  just check --only jevgate --verbose
+  just check --only jevgate --verbose"""
 
-exit codes: 0 ok, 1 a check failed, 2 bad usage, 130 interrupted"""
+EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
@@ -163,16 +165,24 @@ CHECKS = [
 
 
 def passes(check: Check, verbose: bool) -> bool:
-    """Run one check; quiet runs replay a failing command's output on stderr."""
+    """Run one check; verbose runs stream each command's output to stderr, and
+    quiet runs replay a failing command's output there."""
     for command in check.commands:
         log.info("==> %s: %s", check.name, shlex.join(command))
+        started = time.monotonic()
         result = subprocess.run(
             command,
             cwd=ROOT,
-            stdout=None if verbose else subprocess.PIPE,
+            stdout=sys.stderr if verbose else subprocess.PIPE,
             stderr=None if verbose else subprocess.STDOUT,
             text=True,
             check=False,
+        )
+        log.debug(
+            "%s: exited %d after %.1fs",
+            check.name,
+            result.returncode,
+            time.monotonic() - started,
         )
         if result.returncode != 0:
             if not verbose:
@@ -185,12 +195,10 @@ def passes(check: Check, verbose: bool) -> bool:
 def run(args: argparse.Namespace) -> str:
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
-        lines: list[str] = []
         for check in selected:
-            lines.append(check.name)
-            if args.verbose:
-                lines.extend(f"  {shlex.join(command)}" for command in check.commands)
-        return "\n".join(lines)
+            for command in check.commands:
+                log.info("%s: %s", check.name, shlex.join(command))
+        return "\n".join(check.name for check in selected)
 
     failed: list[str] = []
     for check in selected:
@@ -201,15 +209,15 @@ def run(args: argparse.Namespace) -> str:
         raise ScriptError(
             *(f"{name} failed; rerun: just check --only {name}" for name in failed)
         )
-    return f"ok: {len(selected)} passed"
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="just check",
         description="Run the CI verdict: the same checks GitHub Actions runs",
         epilog=EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument(
         "--only",
@@ -219,9 +227,11 @@ def main(argv: list[str] | None = None) -> int:
         help="run only this check; repeat for more (see --list)",
     )
     parser.add_argument(
-        "--list", action="store_true", help="print the check names and exit"
+        "--list",
+        action="store_true",
+        help="print the check names and exit; -v adds their commands on stderr",
     )
-    return run_script(parser, run, argv)
+    return run_script(parser, run, argv, debug="CHECK_DEBUG")
 
 
 if __name__ == "__main__":

@@ -95,6 +95,13 @@ def make_sandbox(root: Path) -> Sandbox:
     return sandbox
 
 
+def prepared(script: Entry, root: Path) -> Sandbox:
+    """A sandbox holding the files every run of `script` needs."""
+    sandbox = make_sandbox(root)
+    script.prepare(sandbox)
+    return sandbox
+
+
 def nothing(_: Sandbox) -> None:
     return None
 
@@ -127,7 +134,28 @@ def quoted_frontmatter(sandbox: Sandbox) -> None:
     path.write_text('---\nname: "alpha"\n---\n', encoding="utf-8")
 
 
+def jev_pins(sandbox: Sandbox) -> None:
+    """check.py reads the TypeSafe SDK pins from both engines when it loads."""
+    for relative in (
+        "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/jevgate.py",
+        "authoring/devtools/label-for-issues-jev/scripts/jevlabel.py",
+    ):
+        (sandbox.repo / relative).parent.mkdir(parents=True)
+        shutil.copy2(ROOT / relative, sandbox.repo / relative)
+
+
+def check_list(_: Sandbox) -> tuple[str, ...]:
+    return ("--list",)
+
+
 ENTRIES: dict[str, Entry] = {
+    "scripts/check.py": Entry(
+        name="just check",
+        block="uv",
+        args=("--only", "frontmatter"),
+        prepare=jev_pins,
+        safe=check_list,
+    ),
     "scripts/check_frontmatter.py": Entry(
         name="just check-frontmatter",
         block="fifo:authoring/content/beta/SKILL.md",
@@ -143,7 +171,6 @@ ENTRIES: dict[str, Entry] = {
 
 # Scripts a later wave moves onto the contract
 PENDING = {
-    "scripts/check.py",
     "scripts/discover_skills.py",
     "scripts/flatten_skills.py",
     "scripts/install_skills.py",
@@ -362,7 +389,7 @@ def test_help_shows_examples_and_exit_codes_and_wins(
     entry: tuple[str, Entry], tmp_path: Path
 ) -> None:
     path, script = entry
-    sandbox = make_sandbox(tmp_path)
+    sandbox = prepared(script, tmp_path)
     shown = sandbox.run(path, "--help")
     examples = section(shown.stdout, "examples")
     codes = [int(line.split()[0]) for line in section(shown.stdout, "exit codes")]
@@ -393,7 +420,7 @@ def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
     entry: tuple[str, Entry], argv: list[str], error: str, tmp_path: Path
 ) -> None:
     path, script = entry
-    result = make_sandbox(tmp_path).run(path, *script.positional, *argv)
+    result = prepared(script, tmp_path).run(path, *script.positional, *argv)
     lines = result.stderr.splitlines()
 
     assert (result.returncode, result.stdout) == (2, "")
@@ -408,7 +435,7 @@ def test_a_missing_argument_exits_2_with_the_help_hint(
     path, script = entry
     if not script.positional:
         pytest.skip("takes no required argument")
-    result = make_sandbox(tmp_path).run(path)
+    result = prepared(script, tmp_path).run(path)
 
     assert (result.returncode, result.stdout) == (2, "")
     assert "the following arguments are required" in result.stderr
@@ -419,7 +446,7 @@ def test_double_dash_ends_options_so_help_after_it_is_an_argument(
     entry: tuple[str, Entry], tmp_path: Path
 ) -> None:
     path, script = entry
-    result = make_sandbox(tmp_path).run(path, *script.positional, "--", "--help")
+    result = prepared(script, tmp_path).run(path, *script.positional, "--", "--help")
 
     assert result.returncode != 0
     assert result.stdout == ""
@@ -442,8 +469,7 @@ def test_a_signal_exits_without_a_traceback_and_stops_children(
     tmp_path: Path,
 ) -> None:
     path, script = entry
-    sandbox = make_sandbox(tmp_path)
-    script.prepare(sandbox)
+    sandbox = prepared(script, tmp_path)
     ready = fifo = None
     if script.block.startswith("fifo:"):
         fifo = sandbox.repo / script.block.removeprefix("fifo:")
@@ -489,8 +515,7 @@ def test_verbosity_changes_only_stderr(
     entry: tuple[str, Entry], tmp_path: Path
 ) -> None:
     path, script = entry
-    sandbox = make_sandbox(tmp_path)
-    script.prepare(sandbox)
+    sandbox = prepared(script, tmp_path)
     args = script.safe(sandbox)
     levels = [[], ["-v"], *([["--debug"]] if script.debug else [])]
     runs = [sandbox.run(path, *args, *level) for level in levels]
@@ -511,8 +536,8 @@ def test_verbosity_changes_only_stderr(
 def test_doc_lines_that_run_a_script_use_only_its_flags(
     entry: tuple[str, Entry], tmp_path: Path
 ) -> None:
-    path, _ = entry
-    shown = make_sandbox(tmp_path).run(path, "--help")
+    path, script = entry
+    shown = prepared(script, tmp_path).run(path, "--help")
     allowed = set(FLAG.findall("\n".join(section(shown.stdout, "options"))))
 
     unknown = [

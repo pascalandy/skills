@@ -2,54 +2,79 @@
 
 from __future__ import annotations
 
-import io
 import sys
-import tempfile
-import unittest
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
 
 import check
+import pytest
 from check import Check
+from conftest import exits, observe
 
 FAIL = (sys.executable, "-c", "print('boom'); raise SystemExit(3)")
 MARK = (sys.executable, "-c", "open('ran', 'w').close()")
+TALK = (sys.executable, "-c", "print('child says hi')")
 
 
-class CheckTests(unittest.TestCase):
-    def verdict(self, checks: list[Check], *argv: str) -> tuple[int, str, str, Path]:
-        """Run main() over `checks` in a scratch root; return exit, stdout, stderr, root."""
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        stdout, stderr = io.StringIO(), io.StringIO()
-        with (
-            patch.object(check, "ROOT", root),
-            patch.object(check, "CHECKS", checks),
-            redirect_stdout(stdout),
-            redirect_stderr(stderr),
-        ):
-            code = check.main(list(argv))
-        return code, stdout.getvalue(), stderr.getvalue(), root
-
-    def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
-        self,
-    ) -> None:
-        code, _, stderr, root = self.verdict(
-            [Check("broken", FAIL, MARK), Check("later", MARK)]
-        )
-
-        self.assertEqual(code, 1)
-        self.assertIn("boom", stderr)
-        self.assertIn("error: broken failed; rerun: just check --only broken", stderr)
-        self.assertTrue((root / "ran").exists(), "the later check must still run")
-
-    def test_only_runs_the_named_checks(self) -> None:
-        code, stdout, _, _ = self.verdict(
-            [Check("broken", FAIL), Check("fine", MARK)], "--only", "fine"
-        )
-
-        self.assertEqual((code, stdout), (0, "ok: 1 passed\n"))
+@pytest.fixture
+def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(check, "ROOT", tmp_path)
+    return tmp_path
 
 
-if __name__ == "__main__":
-    unittest.main()
+def verdict(
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    checks: list[Check],
+    *argv: str,
+) -> tuple[int, str, str]:
+    """Run main() over `checks`; children write straight to the captured descriptors."""
+    monkeypatch.setattr(check, "CHECKS", checks)
+    code = observe("check", check.main(list(argv)))
+    stdout, stderr = capfd.readouterr()
+    return code, stdout, stderr
+
+
+@exits("check", 1)
+def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    code, stdout, stderr = verdict(
+        monkeypatch, capfd, [Check("broken", FAIL, MARK), Check("later", MARK)]
+    )
+
+    assert (code, stdout) == (1, "")
+    assert "boom" in stderr
+    assert stderr.endswith("error: broken failed; rerun: just check --only broken\n")
+    assert (root / "ran").exists(), "the later check must still run"
+
+
+@exits("check", 0)
+def test_only_runs_the_named_checks_and_success_prints_nothing(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    checks = [Check("broken", FAIL), Check("fine", MARK)]
+
+    assert verdict(monkeypatch, capfd, checks, "--only", "fine") == (0, "", "")
+
+
+@exits("check", 0)
+def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_empty(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    code, stdout, stderr = verdict(monkeypatch, capfd, [Check("talk", TALK)], "-v")
+
+    assert (code, stdout) == (0, "")
+    assert stderr.startswith("==> talk: ")
+    assert stderr.endswith("child says hi\n")
+
+
+@exits("check", 0)
+def test_list_prints_names_and_verbose_adds_commands_on_stderr(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    checks = [Check("fine", MARK), Check("talk", TALK)]
+
+    code, stdout, stderr = verdict(monkeypatch, capfd, checks, "--list", "-v")
+
+    assert (code, stdout) == (0, "fine\ntalk\n")
+    assert stderr.splitlines()[0].startswith(f"fine: {sys.executable} -c ")
