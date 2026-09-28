@@ -24,7 +24,7 @@ PACKAGE = SCRIPTS.parent
 VOCABULARY = PACKAGE.parent / "label-for-issues" / "SKILL.md"
 
 FAKE_GH = r"""
-import json, os, sys
+import json, os, re, sys
 
 path = os.environ["FAKE_GH_WORLD"]
 with open(path) as handle:
@@ -61,16 +61,72 @@ def fail(message):
     sys.exit(1)
 
 
+def variables():
+    found = {}
+    for flag, value in zip(args, args[1:]):
+        if flag in ("-f", "-F"):
+            key, _, text = value.partition("=")
+            found[key] = text
+    return found
+
+
+def find(number):
+    return next((i for i in repo["issues"] if i["number"] == number), None)
+
+
+def linked(number):
+    other = find(number)
+    if other is None:
+        return None
+    return {key: other[key] for key in ("number", "title", "state", "url")}
+
+
+def graphql(query, issue):
+    if "timelineItems" in query:
+        # GitHub does not document `since` as exclusive, so the fake keeps the boundary
+        since = variables()["since"]
+        kinds = re.search(r"itemTypes: \[([^\]]*)\]", query).group(1).split(", ")
+        nodes = [
+            e
+            for e in issue.get("timeline", [])
+            if e["createdAt"] >= since
+            and re.sub(r"(?<!^)(?=[A-Z])", "_", e["__typename"]).upper() in kinds
+        ]
+        timeline = {"pageInfo": {"hasNextPage": False}, "nodes": nodes}
+        return {"issue": {"lastEditedAt": issue.get("lastEditedAt"), "timelineItems": timeline}}
+    links = {
+        key: {"nodes": [linked(n) for n in issue.get(field, [])]}
+        for key, field in (
+            ("subIssues", "sub_issues"),
+            ("blockedBy", "blocked_by"),
+            ("blocking", "blocking"),
+            ("closedByPullRequestsReferences", "pull_requests"),
+        )
+    }
+    data = {"issue": {"parent": linked(issue.get("parent")), **links}}
+    for alias, number in re.findall(r"(\w+): issueOrPullRequest\(number: (\d+)\)", query):
+        data[alias] = linked(int(number))
+    return data
+
+
 if args[:2] == ["auth", "status"]:
     if world["auth"]:
         out("Logged in")
     fail("You are not logged into any GitHub hosts")
-name = args[2] if args[:2] == ["repo", "view"] else opt("-R")
+if args[:2] == ["api", "graphql"]:
+    name = "{owner}/{name}".format(**variables())
+else:
+    name = args[2] if args[:2] == ["repo", "view"] else opt("-R")
 repo = world["repos"].get(name)
 if repo is None:
     fail(f"GraphQL: Could not resolve to a Repository with the name '{name}'.")
 if args[:2] == ["repo", "view"]:
     out({"visibility": repo["visibility"]})
+if args[:2] == ["api", "graphql"]:
+    issue = find(int(variables()["number"]))
+    if issue is None or "/pull/" in issue["url"]:
+        fail("GraphQL: Could not resolve to an Issue with the number of that number.")
+    out({"data": {"repository": graphql(variables()["query"], issue)}})
 if args[:2] == ["label", "list"]:
     out([fields({"name": label, **repo["label_meta"][label]}) for label in repo["labels"]])
 if args[:2] in (["label", "create"], ["label", "edit"]):
@@ -98,22 +154,33 @@ if args[:2] == ["issue", "list"]:
     ]
     out([fields(i, comment_page=100) for i in chosen[: int(opt("--limit", "30"))]])
 if args[:2] == ["issue", "view"]:
-    for issue in repo["issues"]:
-        if issue["number"] == int(args[2]):
-            out(fields(issue))
+    issue = find(int(args[2]))
+    if issue is not None:
+        out(fields(issue))
     fail(f"GraphQL: Could not resolve to an issue or pull request with the number of {args[2]}.")
 if args[:2] == ["issue", "edit"]:
     if world.get("fail_edit"):
         fail("HTTP 502: Bad Gateway")
-    for issue in repo["issues"]:
-        if issue["number"] == int(args[2]):
-            for label in opt("--add-label").split(","):
-                if label not in repo["labels"]:
-                    fail(f"could not add label: '{label}' not found")
-                if label not in [have["name"] for have in issue["labels"]]:
-                    issue["labels"].append({"name": label})
-            issue["updatedAt"] = "2026-09-30T00:00:00Z"
-            out(issue["url"])
+    issue = find(int(args[2]))
+    add = [label for label in (opt("--add-label") or "").split(",") if label]
+    remove = [label for label in (opt("--remove-label") or "").split(",") if label]
+    for label in add + remove:
+        if label not in repo["labels"]:
+            fail(f"could not add label: '{label}' not found")
+    # Each write gets its own second, and a timeline event per label, as on GitHub.
+    world["clock"] = world.get("clock", -1) + 1
+    at = f"2026-09-30T00:00:{world['clock']:02d}Z"
+    timeline = issue.setdefault("timeline", [])
+    for label in add:
+        if label not in [have["name"] for have in issue["labels"]]:
+            issue["labels"].append({"name": label})
+            timeline.append({"__typename": "LabeledEvent", "createdAt": at, "label": {"name": label}})
+    for label in remove:
+        if label in [have["name"] for have in issue["labels"]]:
+            issue["labels"] = [have for have in issue["labels"] if have["name"] != label]
+            timeline.append({"__typename": "UnlabeledEvent", "createdAt": at, "label": {"name": label}})
+    issue["updatedAt"] = at
+    out(issue["url"])
 fail(f"fake gh does not support {args}")
 """
 
@@ -355,6 +422,20 @@ class Harness:
         """Every call that changes GitHub: issue edits and label writes."""
         changing = (["issue", "edit"], ["label", "create"], ["label", "edit"])
         return [call for call in self.calls() if call[:2] in changing]
+
+    def found(self, number: int, repo: str = "o/r") -> dict[str, Any]:
+        return next(
+            i for i in self.world["repos"][repo]["issues"] if i["number"] == number
+        )
+
+    def change(self, number: int, kind: str, at: str, label: str | None = None) -> None:
+        """Someone else changes an issue: one timeline event and a new updatedAt."""
+        found = self.found(number)
+        event: dict[str, Any] = {"__typename": kind, "createdAt": at}
+        if label is not None:
+            event["label"] = {"name": label}
+        found.setdefault("timeline", []).append(event)
+        found["updatedAt"] = at
 
     def env(self, **extra: str) -> dict[str, str]:
         environment = {
