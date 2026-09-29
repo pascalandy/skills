@@ -239,7 +239,7 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
   --json
 ```
 
-When the change affects Zoom, also run the relevant real Zoom path:
+A real Zoom run is not part of the closeout for now, even when a change affects Zoom: Pascal does not use Zoom. Zoom mode stays supported, and its coverage is the automated tests plus the free `zoom.dry-run` and `diagnostics.zoom` features of `verify-transcript`. Report Zoom E2E as `NOT RUN`. To exercise Zoom anyway, run:
 
 ```bash
 uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
@@ -257,7 +257,7 @@ Before deciding E2E:
 - confirm a `--json` success left `stderr` empty
 - confirm default success has no summary preview and does not open Finder
 - confirm YouTube creates one folder under the chosen output parent
-- confirm Zoom creates one meeting folder under the chosen output parent when Zoom changed
+- confirm Zoom creates one meeting folder under the chosen output parent when a real Zoom run was made
 - confirm the relevant Checks and Automated tests passed
 
 Report the categories separately:
