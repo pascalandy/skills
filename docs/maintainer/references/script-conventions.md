@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-28
+date_updated: 2026-09-29
 ---
 
 Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and a script leaves it once it meets the contract and `just check` passes
@@ -100,6 +100,7 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `just install-skills`: accepts a hidden `-q/--quiet` and ignores it, because a `just sync` or `just sync-fleet` started before this contract passes it; remove it once every machine has synced
 - `just release-check`: `--notes FILE` names what `-o` would write; `--notes -` writes to stdout
 - `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
+- `just jev-skill-retro`: no `-` or `-o`; a run reads a transcript by path and writes its records to its own state folder
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
