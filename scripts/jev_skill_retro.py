@@ -78,11 +78,13 @@ MISSING_COMMAND = re.compile(
 GITHUB = re.compile(r"github\.com[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
 JS_COMMAND = re.compile(r"\bcmd\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)")
 EXIT_CODE = re.compile(r"\"exit_code\"\s*:\s*(-?\d+)")
-TEXT_EXIT = re.compile(r"(?m)^(?:Process exited with code|Exit code:?)\s*(-?\d+)")
-# Evidence that a fetch itself failed, not some other part of the command
+# An exit status at the very start of a tool result, where Codex puts its envelope
+TEXT_EXIT = re.compile(r"\A\s*(?:Process exited with code|Exit code:?)\s*(-?\d+)")
+# Evidence that a fetch itself failed: an HTTP error status or an unresolved host
 FETCH_FAILED = re.compile(
-    r"\b(?:40[34]|410|5\d\d)\b|(?<!command )not found|could not resolve"
-    r"|failed to (?:fetch|connect)|request failed|unable to (?:fetch|resolve)",
+    r"status(?: code)?:? (?:40[34]|410|5\d\d)\b|returned error: (?:40[34]|410|5\d\d)\b"
+    r"|\bHTTP(?:/[\d.]+)? (?:40[34]|410|5\d\d)\b|\b(?:404 Not Found|403 Forbidden|410 Gone)\b"
+    r"|could not resolve host|failed to fetch|unable to resolve",
     re.IGNORECASE,
 )
 # One command that prints one file: cat, rtk cat, nl -ba, or sed -n 'A,Bp'
@@ -118,6 +120,8 @@ class Event:
     text: str
     error: bool = False
     call: str = ""
+    # The transcript itself cut this event's result short
+    partial: bool = False
 
 
 @dataclass
@@ -131,6 +135,8 @@ class SkillFile:
     anchor: str
     partial: bool = False
     first_line: int = 1
+    # The first event that could have followed this text
+    read_at: int = 0
 
     def numbered(self) -> list[str]:
         return [
@@ -285,7 +291,7 @@ def claude_text(session: Session, actor: str, text: str, after: int) -> None:
             Path(directory).name,
             directory,
             after,
-            [SkillFile(f"{directory}/SKILL.md", body, "excerpt")],
+            [SkillFile(f"{directory}/SKILL.md", body, "excerpt", read_at=after)],
         )
     )
 
@@ -332,6 +338,7 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
                 shown = result if found is None else result[: found.start()]
                 event.text = f"{event.text}\n{shown}".strip("\n")
                 event.error = event.error or error
+                event.partial = event.partial or "Output too large" in result
                 event.call = call
                 if found is not None:
                     claude_text(
@@ -358,13 +365,15 @@ def record_read(
                 Path(target).parent.name,
                 str(Path(target).parent),
                 index + 1,
-                [SkillFile(target, text, "file", partial, first)],
+                [SkillFile(target, text, "file", partial, first, index + 1)],
             )
         )
         return
     for load in reversed(session.loads):
         if target.startswith(load.directory.rstrip("/") + "/"):
-            load.files.append(SkillFile(target, text, "file", partial, first))
+            load.files.append(
+                SkillFile(target, text, "file", partial, first, index + 1)
+            )
             return
 
 
@@ -412,7 +421,9 @@ def outputs_of(output: Any) -> tuple[list[str], bool, bool]:
             continue
         if isinstance(value, str):
             found.append(value)
-    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text) + TEXT_EXIT.findall(text)
+    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text)
+    if not codes and (envelope := TEXT_EXIT.match(text)):
+        codes = [envelope[1]]
     failed = any(int(code) != 0 for code in codes) or (
         '"status":"rejected"' in f"{raw}{text}".replace(" ", "")
     )
@@ -471,8 +482,9 @@ def read_codex(path: Path, items: list[dict[str, Any]]) -> Session:
             outputs, failed, truncated = outputs_of(payload.get("output"))
             event.text = f"{event.text}\n" + "\n".join(outputs)
             event.error = failed
+            event.partial = truncated
             event.call = call
-            record_cats(session, commands, outputs, truncated, event.index)
+            record_cats(session, commands, outputs, truncated, failed, event.index)
     return session
 
 
@@ -481,9 +493,11 @@ def record_cats(
     commands: list[str],
     outputs: list[str],
     truncated: bool,
+    failed: bool,
     index: int,
 ) -> None:
-    """Count each SKILL.md a command printed, when its text is in the output."""
+    """Count each SKILL.md a command printed, when its text is in the output,
+    and each file a successful single-file read printed beneath a loaded skill."""
     for command in commands:
         for match in SKILL_FILE.finditer(command):
             target = match[0]
@@ -508,10 +522,10 @@ def record_cats(
                     match[1],
                     directory,
                     index + 1,
-                    [SkillFile(target, text, "file", truncated)],
+                    [SkillFile(target, text, "file", truncated, read_at=index + 1)],
                 )
             )
-    if len(commands) != len(outputs):
+    if failed or len(commands) != len(outputs):
         return
     for command, output in zip(commands, outputs):
         read = SINGLE_READ.match(command)
@@ -528,7 +542,9 @@ def record_cats(
                 )
                 first, text = shown or (int(read["first"] or 1), output.rstrip("\n"))
                 partial = truncated or read["first"] is not None
-                load.files.append(SkillFile(target, text, "file", partial, first))
+                load.files.append(
+                    SkillFile(target, text, "file", partial, first, index + 1)
+                )
                 break
 
 
@@ -602,7 +618,12 @@ def facts(session: Session) -> list[dict[str, Any]]:
             continue
         text = "\n".join(file.text for file in load.files)
         urls = set(URL.findall(text))
-        for event in session.events[load.after :]:
+        later = [
+            other.after
+            for other in session.loads
+            if other.skill == load.skill and other.after > load.after
+        ]
+        for event in session.events[load.after : min(later, default=None)]:
             if not event.error:
                 continue
             for url in sorted(urls):
@@ -781,10 +802,19 @@ def plan_triage(session: Session) -> tuple[list[dict[str, Any]], list[int]]:
     if not skills:
         return [], []
     start = skills[0].after
+    first = {id(load) for load in skills}
+    reloads = {
+        load.after
+        for load in session.loads
+        if load.status == "roster" and load.files and id(load) not in first
+    }
     planned: list[dict[str, Any]] = []
     oversized: list[int] = []
     chunk: list[Event] = []
     for event in session.events[start:]:
+        if chunk and event.index in reloads:
+            planned.append(triage_request(session, chunk, skills))
+            chunk = []
         if fits(triage_request(session, [*chunk, event], skills)):
             chunk.append(event)
             continue
@@ -822,14 +852,19 @@ def run_directory(session: Session) -> Path:
     return root / "runs" / name
 
 
-def write_json(path: Path, value: Any) -> None:
-    """Replace `path` atomically, so an interrupted write leaves the old record."""
+def write_private(path: Path, text: str) -> None:
+    """Replace `path` atomically with a file only its owner can read, so an
+    interrupted write leaves the old one."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(handle, "w", encoding="utf-8") as stream:
-        stream.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+        stream.write(text)
     temporary.replace(path)
+
+
+def write_json(path: Path, value: Any) -> None:
+    write_private(path, json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
 
 def load_summary(load: Load) -> dict[str, Any]:
@@ -844,6 +879,7 @@ def load_summary(load: Load) -> dict[str, Any]:
                 "anchor": file.anchor,
                 "partial": file.partial,
                 "first_line": file.first_line,
+                "read_at": file.read_at,
                 "lines": len(file.text.splitlines()),
                 "sha256": file.digest(),
             }
