@@ -36,6 +36,10 @@ def jev() -> Iterator[tuple[str, list[dict]]]:
         def do_POST(self) -> None:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             seen.append(body["state"])
+            if body["state"]["story"] == "busy":
+                self.send_response(503)
+                self.end_headers()
+                return
             scores = SCORES[body["state"]["story"]]
             answers = {name: {"type": "noul", "noul": p} for name, p in scores.items()}
             reply = json.dumps({"model": "jev-1.13.0", "answers": answers}).encode()
@@ -146,6 +150,19 @@ def test_recorded_consent_lets_a_private_story_through(tmp_path: Path, jev) -> N
     )
 
     assert done.returncode == 0
+
+
+def test_a_temporary_failure_after_paid_answers_exits_1(tmp_path: Path, jev) -> None:
+    url, _ = jev
+    done = run(
+        tmp_path,
+        [story("clear"), story("busy")],
+        TYPESAFE_API_KEY="k",
+        TYPESAFE_BASE_URL=url,
+    )
+
+    assert (done.returncode, done.stdout) == (1, "")
+    assert "HTTP 503 for story busy after judging clear" in done.stderr
 
 
 def test_an_unreachable_api_exits_75(tmp_path: Path) -> None:

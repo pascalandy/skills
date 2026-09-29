@@ -350,7 +350,17 @@ def run(args: argparse.Namespace) -> str:
     key = api_key()
     results = []
     for number, story in enumerate(stories, 1):
-        model, scores = ask(story, key, args.timeout)
+        try:
+            model, scores = ask(story, key, args.timeout)
+        except Failure as failure:
+            # Paid answers already came back, so a plain rerun is not free
+            if failure.code == TEMPORARY and results:
+                judged = ", ".join(result["id"] for result in results)
+                raise Failure(
+                    f"{failure} after judging {judged}",
+                    f"rerun {PROG} on the stories not yet judged",
+                ) from failure
+            raise
         decision, close = decide(scores)
         reviewer = story.get("reviewer")
         results.append(
