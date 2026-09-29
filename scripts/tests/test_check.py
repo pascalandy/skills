@@ -104,12 +104,18 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
         Check("alpha", touch("alpha-ran", "authoring/content/alpha/scripts/tests")),
         Check("beta", touch("beta-ran", "authoring/content/beta")),
         Check("gamma", touch("gamma-ran", "authoring/content/gamma")),
+        Check(
+            "reader",
+            touch("reader-ran", "authoring/content/beta"),
+            reads=("authoring/content/alpha",),
+        ),
     ]
 
     assert verdict(monkeypatch, capfd, checks) == (0, "", "")
     assert sorted(p.name for p in root.glob("*-ran")) == [
         "alpha-ran",
         "gamma-ran",
+        "reader-ran",
         "repo-ran",
     ]
 

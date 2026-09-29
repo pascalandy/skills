@@ -43,7 +43,7 @@ Commit hooks never sign off: git has no hook after a push, and GitHub accepts a 
 
 Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
 
-A check whose commands name a path under `authoring/` belongs to the skill package holding that path. `just check` runs it only when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. Every other check always runs, and when git cannot compare with `origin/main`, every check runs. `--only NAME` runs a check whatever changed, and `--all` runs every check; `--verbose` names each skipped check
+A check whose commands name a path under `authoring/` belongs to the skill package holding that path. `just check` runs it only when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them runs it too. Every other check always runs, and when git cannot compare with `origin/main`, every check runs. `--only NAME` runs a check whatever changed, and `--all` runs every check; `--verbose` names each skipped check
 
 `just check` prints nothing when every check passes and replays a failing check's output on stderr. `just check --list` names every check, and `just check --only NAME` reruns one. `just check --list --verbose` adds each check's commands on stderr; run a command directly to pass extra flags, such as `-k` to pytest
 
