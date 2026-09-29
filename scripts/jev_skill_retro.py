@@ -59,7 +59,7 @@ examples:
   {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run
   {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b
   {PROG} scan ~/.codex/sessions/2026/09/28/rollout-2026-09-28T12-53-45-01a0.jsonl --json
-  {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --replay"""
+  {PROG} write 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run"""
 
 # Jev 1.13's limits: 32k tokens for state plus the longest question, 64k in all
 STATE_LIMIT = 32_000
@@ -1354,6 +1354,303 @@ def load_summary(load: Load) -> dict[str, Any]:
     }
 
 
+# --- Write -----------------------------------------------------------------------
+
+# The fork's marker names no skill: a skill name there loaded that skill during
+# the 2026-09-28 pilot
+MARKER = "[jev-skill-retro fork]"
+# claude -p attaches any @path in its prompt; inside a JSON string this escape
+# keeps the character for the model without the mention
+AT_ESCAPE = chr(92) + "u0040"
+# The 2026-09-28 retro's API-equivalent price of a fork, per context token
+FORK_PRICE = 40 / 600_000
+STORY_FIELDS = (
+    "title",
+    "user_story",
+    "wanted",
+    "problem",
+    "workaround",
+    "fix",
+    "evidence",
+)
+FORK_PROMPT = """\
+{marker} End-of-session skill feedback
+
+You are a read-only copy of this conversation. Do not edit files, commit, open \
+issues, or run commands that write. Do not load any skill; you may only reread a \
+skill file to check a detail. Answer in the conversation's main language.
+
+An automated scan flagged the items below: moments where a skill you loaded may \
+have made your work harder. For each item, decide whether the skill itself caused \
+a problem worth fixing: an error, a gap, a missing detail, or an instruction that \
+did not match what you found. Report only findings that are actionable and easy to \
+fix. Skip anything tied to this conversation's specific context, because fixing \
+one-off cases makes the skills unmanageable. When the skill was fine, or the cause \
+was your own mistake, the environment, or the request, answer `nothing` for that \
+item. An item marked `review` is one the scan was unsure about.
+
+Items, one JSON object per line:
+{items}
+
+Answer with exactly one JSON object per line and nothing else, one per item:
+{{"item": "<id>", "verdict": "nothing"}}
+{{"item": "<id>", "verdict": "story", "title": "<short title>", "user_story": \
+"As an agent using the `<skill>` skill, I want …, so that …", "wanted": "<what you \
+were trying to do>", "problem": "<the problem you hit>", "workaround": "<what you \
+did to work around it>", "fix": "<the smallest change to the skill that removes \
+it>", "evidence": "<a short quote, command, or error from this conversation>"}}
+Related items may share one story: write it once with "items": ["<id>", "<id>"] \
+in place of "item", and no other line for those items.
+"""
+
+
+def flagged(scan_report: dict[str, Any], session: Session) -> list[dict[str, Any]]:
+    """Every candidate or review item of the scan, as the fork will see it."""
+    found: list[dict[str, Any]] = []
+    for outcome in scan_report.get("outcomes", []):
+        for item in outcome["items"]:
+            if item["outcome"] == "nothing":
+                continue
+            event = session.events[item["event"]]
+            line = item.get("line")
+            found.append(
+                {
+                    "id": f"{outcome['skill']}-e{item['event']}",
+                    "skill": outcome["skill"],
+                    "home": outcome["home"],
+                    "outcome": item["outcome"],
+                    "category": item["category"],
+                    "event": item["event"],
+                    "excerpt": shorten(event.text),
+                    "line": (
+                        f"{line['file']}:{line['number']}: {line['text']}"
+                        if line
+                        else "no line of the skill covers this step"
+                    ),
+                }
+            )
+    return found
+
+
+def fork_prompt(items: list[dict[str, Any]]) -> str:
+    shown = "\n".join(
+        json.dumps(
+            {
+                key: item[key]
+                for key in ("id", "skill", "outcome", "category", "excerpt", "line")
+            },
+            ensure_ascii=True,
+        ).replace("@", AT_ESCAPE)
+        for item in items
+    )
+    return FORK_PROMPT.format(marker=MARKER, items=shown)
+
+
+def fork_command(session: Session, output: Path) -> list[str]:
+    if session.harness == "claude":
+        command = [
+            "claude",
+            "-p",
+            "--resume",
+            session.id,
+            "--fork-session",
+            "--no-session-persistence",
+            "--permission-mode",
+            "dontAsk",
+            "--strict-mcp-config",
+            "--tools",
+            "Read,Grep,Glob",
+            "--output-format",
+            "json",
+        ]
+        return command + (["--model", session.model] if session.model else [])
+    return [
+        "codex",
+        "exec",
+        "fork",
+        session.id,
+        "-",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "-c",
+        'sandbox_mode="read-only"',
+        "-c",
+        'approval_policy="never"',
+        "-o",
+        str(output),
+    ]
+
+
+def estimate(session: Session) -> dict[str, Any]:
+    """The fork's context size and cost, from the transcript's size. JSON
+    overhead makes bytes/4 an upper bound; bytes/8 is the lower one."""
+    size = session.path.stat().st_size
+    low, high = size // 8, size // 4
+    return {
+        "context_tokens": [low, high],
+        "cost_usd": [round(low * FORK_PRICE, 2), round(high * FORK_PRICE, 2)],
+        "price": "fallback: about $40 per 600k tokens (API-equivalent, 2026-09-28 retro)",
+    }
+
+
+def parse_answer(text: str, ids: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Stories and the IDs answered `nothing`; exactly one disposition per ID."""
+    answered: dict[str, dict[str, Any]] = {}
+    problems: list[str] = []
+    for line in text.splitlines():
+        line = line.strip().strip("`")
+        if not line.startswith("{"):
+            continue
+        try:
+            answer = json.loads(line)
+        except json.JSONDecodeError:
+            problems.append(f"not JSON: {line[:80]}")
+            continue
+        covered = answer.get("items") or [answer.get("item")]
+        verdict = answer.get("verdict")
+        if verdict not in ("story", "nothing"):
+            problems.append(f"verdict {verdict!r} for {covered}; use story or nothing")
+        if verdict == "story":
+            empty = [
+                name for name in STORY_FIELDS if not str(answer.get(name) or "").strip()
+            ]
+            if empty:
+                problems.append(f"the story for {covered} lacks {', '.join(empty)}")
+        for item in covered:
+            if item not in ids:
+                problems.append(f"unknown item {item!r}")
+            elif item in answered:
+                problems.append(f"item {item!r} answered twice")
+            else:
+                answered[item] = answer
+    problems += [f"item {item!r} has no answer" for item in ids if item not in answered]
+    if problems:
+        raise ValueError("; ".join(problems))
+    unique = {id(answer): answer for answer in answered.values()}
+    stories = [answer for answer in unique.values() if answer["verdict"] == "story"]
+    nothing = [
+        item for item, answer in answered.items() if answer["verdict"] == "nothing"
+    ]
+    return stories, nothing
+
+
+def fork(session: Session, prompt: str, path: Path, raw: Path, timeout: float) -> str:
+    """Run the fork once and return its final message."""
+    if not Path(session.cwd).is_dir():
+        raise ScriptError(
+            f"the session's working directory {session.cwd} is gone, so its "
+            f"conversation cannot be resumed; restore it and rerun {PROG} write"
+        )
+    command = fork_command(session, raw)
+    if shutil.which(command[0]) is None:
+        raise ScriptError(
+            f"{command[0]} is not installed, so the session cannot be forked"
+        )
+    env = {name: value for name, value in os.environ.items() if name != "CLAUDECODE"}
+    write_json(path, {"kind": "fork", "state": "sent", "command": command})
+    try:
+        done = run(
+            command,
+            input=prompt,
+            cwd=session.cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise ScriptError(
+            f"the fork ran longer than {timeout:g}s and was stopped; it may have been billed",
+            "rerun with a longer --timeout and --retry to fork again",
+        ) from None
+    if done.returncode != 0:
+        raise ScriptError(
+            f"{command[0]} exited {done.returncode}: {done.stderr.strip()[-400:]}",
+            "rerun with --retry to fork again; the failed fork may have been billed",
+        )
+    if session.harness == "claude":
+        try:
+            message = str(json.loads(done.stdout).get("result") or "")
+        except (json.JSONDecodeError, AttributeError):
+            message = done.stdout
+        raw.write_text(message, encoding="utf-8")
+    message = raw.read_text(encoding="utf-8") if raw.exists() else ""
+    write_json(
+        path, {"kind": "fork", "state": "done", "command": command, "raw": str(raw)}
+    )
+    return message
+
+
+def write_step(args: argparse.Namespace) -> dict[str, Any]:
+    session = read_session(locate(args.target))
+    directory = run_directory(session)
+    scanned = directory / "scan.json"
+    if not scanned.exists():
+        raise ScriptError(
+            f"{session.id} has no scan yet", f"{PROG} scan {shlex.quote(args.target)}"
+        )
+    items = flagged(json.loads(scanned.read_text()), session)
+    report: dict[str, Any] = {
+        "run": str(directory),
+        "session": {
+            "harness": session.harness,
+            "id": session.id,
+            "model": session.model,
+        },
+        "items": items,
+    }
+    if not items:
+        report["fork"] = None
+        return report
+    prompt = fork_prompt(items)
+    op = operation("fork", {"session": session.id, "prompt": prompt})
+    report["fork"] = {"op": op, **estimate(session)}
+    with exclusive(directory / "lock", args.timeout):
+        prompt_path = directory / "write" / f"{op}.prompt.txt"
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt_path.write_text(prompt, encoding="utf-8")
+        report["fork"]["prompt"] = str(prompt_path)
+        if args.dry_run:
+            return report
+        record_path = directory / "ops" / f"{op}.json"
+        raw = directory / "write" / f"{op}.answer.txt"
+        record = json.loads(record_path.read_text()) if record_path.exists() else {}
+        if record.get("state") == "done" and op not in args.retry:
+            message = raw.read_text(encoding="utf-8")
+        elif record.get("state") == "sent" and op not in args.retry:
+            raise ScriptError(
+                f"fork {op} started but never finished; it may have been billed",
+                f"rerun with --retry {op} to fork again",
+            )
+        elif not args.yes:
+            raise ScriptError(
+                "a fork resumes the whole conversation and is paid; show Pascal "
+                f"`{PROG} write {shlex.quote(args.target)} --dry-run` and pass --yes "
+                "after he approves"
+            )
+        else:
+            message = fork(session, prompt, record_path, raw, args.timeout)
+        try:
+            stories, nothing = parse_answer(message, [item["id"] for item in items])
+        except ValueError as error:
+            raise ScriptError(
+                f"the fork's answer is invalid: {error}; it is saved in {raw}",
+                f"rerun with --retry {op} to fork again, which is paid",
+            ) from error
+        by_id = {item["id"]: item for item in items}
+        report["stories"] = [
+            {
+                **{name: story[name] for name in STORY_FIELDS},
+                "items": [by_id[i] for i in (story.get("items") or [story["item"]])],
+            }
+            for story in stories
+        ]
+        report["nothing"] = nothing
+        write_json(directory / "stories.json", report)
+    return report
+
+
 # --- Steps -----------------------------------------------------------------------
 
 
@@ -1492,16 +1789,61 @@ def lines(report: dict[str, Any]) -> str:
     return "\n".join(rows)
 
 
+def write_lines(report: dict[str, Any]) -> str:
+    rows = [f"run\\t{report['run']}"]
+    fork = report["fork"]
+    if fork is None:
+        rows.append("skip\\tno skill in this session is a candidate or review")
+        return "\\n".join(rows)
+    low, high = fork["context_tokens"]
+    cost_low, cost_high = fork["cost_usd"]
+    session = report["session"]
+    rows.append(
+        f"fork\\t{fork['op']}\\t{session['harness']}\\t{session['id']}"
+        f"\\t{low}-{high} tokens\\t${cost_low:.2f}-${cost_high:.2f}"
+    )
+    rows += [
+        f"item\\t{item['id']}\\t{item['outcome']}\\t{item['category']}"
+        for item in report["items"]
+    ]
+    rows.append(f"prompt\\t{fork['prompt']}")
+    for story in report.get("stories", []):
+        items = ",".join(item["id"] for item in story["items"])
+        rows.append(
+            f"story\\t{story['items'][0]['skill']}\\t{items}\\t{story['title']}"
+        )
+    rows += [f"nothing\\t{item}" for item in report.get("nothing", [])]
+    return "\\n".join(rows)
+
+
+# How long each step waits, by default, for its lock and its slowest child
+TIMEOUTS = {"scan": 60.0, "write": 1200.0}
+# Flags each step takes beyond the shared ones
+STEP_FLAGS = {"scan": {"replay", "repo"}, "write": {"yes"}}
+
+
 def work(args: argparse.Namespace) -> str:
     if args.max_requests < 1:
         raise UsageError("--max-requests must be at least 1")
-    if args.dry_run and (args.replay or args.retry):
+    given = {"replay": args.replay, "repo": args.repo, "yes": args.yes}
+    for name, value in given.items():
+        if value and name not in STEP_FLAGS[args.step]:
+            raise UsageError(f"{args.step} takes no --{name}")
+    if args.dry_run and (args.replay or args.retry or args.yes):
         raise UsageError(
-            "--dry-run sends nothing, so it takes neither --replay nor --retry"
+            "--dry-run sends nothing, so it takes no --replay, --retry, or --yes"
         )
-    report = scan(args)
+    args.timeout = args.timeout or TIMEOUTS[args.step]
+    if args.step == "write":
+        report = write_step(args)
+        render = write_lines
+    else:
+        report = scan(args)
+        render = lines
     return (
-        json.dumps(report, indent=2, ensure_ascii=False) if args.json else lines(report)
+        json.dumps(report, indent=2, ensure_ascii=False)
+        if args.json
+        else render(report)
     )
 
 
@@ -1514,11 +1856,17 @@ def build_parser() -> Parser:
             "friction. scan asks Jev one friction question per loaded skill and event, "
             "locates and qualifies the flagged events, and decides each skill's outcome: "
             "candidate, review, or nothing. Every request needs recorded consent for the "
-            "session's repo and each skill's home repo, and passes a gitleaks scan first."
+            "session's repo and each skill's home repo, and passes a gitleaks scan first. "
+            "write forks the session read-only, once, after Pascal approves its cost."
         ),
         epilog=EXAMPLES,
     )
-    parser.add_argument("step", choices=("scan",), help="the step to run: scan")
+    parser.add_argument(
+        "step",
+        choices=("scan", "write"),
+        help="scan asks Jev about the session's skills; write forks the session so "
+        "its own agent writes a story for each flagged item",
+    )
     parser.add_argument(
         "target", metavar="SESSION", help="a session ID, or the path of its transcript"
     )
@@ -1526,7 +1874,8 @@ def build_parser() -> Parser:
         "-n",
         "--dry-run",
         action="store_true",
-        help="plan and save the triage requests without sending them; needs no key or consent",
+        help="scan: plan and save the triage requests, sending nothing; "
+        "write: show the fork, its items, and its cost, and save its prompt",
     )
     parser.add_argument(
         "--replay",
@@ -1538,7 +1887,14 @@ def build_parser() -> Parser:
         action="append",
         default=[],
         metavar="OP",
-        help="resend a request whose answer never arrived; it may be billed twice",
+        help="send again a request or fork whose answer never arrived or was invalid; "
+        "it may be billed twice",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="write: approve the paid fork that --dry-run shows",
     )
     parser.add_argument(
         "--repo",
@@ -1555,10 +1911,10 @@ def build_parser() -> Parser:
     parser.add_argument(
         "--timeout",
         type=duration,
-        default=60.0,
         metavar="DURATION",
-        help="how long to wait for the session lock, gitleaks, or one TypeSafe answer: "
-        "30s, 5m, or seconds (default: 60s)",
+        help="how long to wait for the session lock and the slowest child: one TypeSafe "
+        "answer or gitleaks for scan, the fork for write; 30s, 5m, or seconds "
+        "(default: 60s for scan, 20m for write)",
     )
     parser.add_argument(
         "--json", action="store_true", help="print one JSON object on stdout"

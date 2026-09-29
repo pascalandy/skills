@@ -929,3 +929,256 @@ def test_without_a_key_nothing_is_sent(live: Live) -> None:
 
     assert (result.returncode, live.fake.bodies) == (1, [])
     assert "no TypeSafe API key" in result.stderr
+
+
+# --- Write: forks against fake claude and codex ------------------------------------
+
+
+def fake_agent(sandbox: Sandbox, name: str, answer: str) -> Path:
+    """A fake claude or codex first on PATH. Each call saves its arguments, its
+    working directory, and its prompt in calls/<n>/, then answers with `answer`:
+    claude as print mode's JSON on stdout, codex in the file after -o."""
+    calls = sandbox.home / f"{name}-calls"
+    calls.mkdir()
+    reply = sandbox.home / f"{name}-reply"
+    reply.write_text(json.dumps({"result": answer}) if name == "claude" else answer)
+    sandbox.stub(
+        name,
+        f'call="{calls}/$(ls "{calls}" | wc -l | tr -d " ")"\n'
+        'mkdir "$call"\n'
+        'printf "%s\\n" "$@" > "$call/argv"\n'
+        'pwd > "$call/cwd"\n'
+        'cat > "$call/prompt"\n'
+        'out=""; previous=""\n'
+        'for arg in "$@"; do [ "$previous" = "-o" ] && out="$arg"; previous="$arg"; done\n'
+        f'if [ -n "$out" ]; then cat "{reply}" > "$out"; else cat "{reply}"; fi\n',
+    )
+    return calls
+
+
+def story(item: str, **extra: Any) -> str:
+    fields = {
+        "verdict": "story",
+        "title": "Document the removed --all flag",
+        "user_story": "As an agent using the `alpha` skill, I want its flags current, so that my first call works",
+        "wanted": "list the things",
+        "problem": "alpha-cli rejected --all",
+        "workaround": "ran it without --all",
+        "fix": "Drop --all from line 1",
+        "evidence": "unknown flag --all",
+        **extra,
+    }
+    return json.dumps({"item": item, **fields} if "items" not in extra else fields)
+
+
+def calls(folder: Path) -> list[Path]:
+    return sorted(folder.iterdir())
+
+
+def written(live: Live, target: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return live.sandbox.run("write", str(target), "--json", *args)
+
+
+def test_write_dry_run_shows_the_fork_and_saves_a_prompt_without_raw_mentions(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .user("list the things")
+        .load(live.sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list"},
+            "unknown flag; see @notes.txt",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "claude", "")
+
+    result = written(live, transcript, "--dry-run")
+    report = json.loads(result.stdout)
+    prompt = Path(report["fork"]["prompt"]).read_text()
+
+    assert (result.returncode, calls(agent)) == (0, [])
+    assert [(i["id"], i["outcome"], i["category"]) for i in report["items"]] == [
+        ("alpha-e1", "candidate", "contradicted")
+    ]
+    assert report["fork"]["cost_usd"][0] <= report["fork"]["cost_usd"][1]
+    assert prompt.startswith("[jev-skill-retro fork] End-of-session skill feedback")
+    assert "@" not in prompt
+    assert "see \\u0040notes.txt" in prompt
+
+
+def test_a_fork_needs_yes_after_the_dry_run(live: Live) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "claude", "")
+
+    result = written(live, transcript)
+
+    assert (result.returncode, calls(agent)) == (1, [])
+    assert "pass --yes after he approves" in result.stderr
+
+
+def test_write_forks_claude_read_only_in_the_sessions_directory_and_saves_stories(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "claude", story("alpha-e1"))
+
+    result = written(live, transcript, "--yes")
+    report = json.loads(result.stdout)
+    call = calls(agent)[0]
+
+    assert result.returncode == 0, result.stderr
+    assert (call / "argv").read_text().split("\n")[:-1] == [
+        "-p", "--resume", "11111111-2222-3333-4444-555555555555", "--fork-session",
+        "--no-session-persistence", "--permission-mode", "dontAsk",
+        "--strict-mcp-config", "--tools", "Read,Grep,Glob", "--output-format", "json",
+        "--model", "claude-opus-5-5",
+    ]  # fmt: skip
+    assert (call / "cwd").read_text().strip() == str(live.sandbox.repo)
+    assert [(s["title"], [i["id"] for i in s["items"]]) for s in report["stories"]] == [
+        ("Document the removed --all flag", ["alpha-e1"])
+    ]
+    assert json.loads(Path(report["run"], "stories.json").read_text()) == report
+
+
+def test_write_forks_codex_with_a_read_only_sandbox(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha", ".codex")
+    transcript = (
+        Codex(live.sandbox.repo)
+        .user("list the things")
+        .exec("c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))])
+        .exec("c2", ["alpha-cli list --all"], [(2, "unknown flag --all")])
+        .write(live.sandbox.home / "rollout.jsonl")
+    )
+    live.fake.friction = {2: 0.92}
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "codex", story("alpha-e2"))
+
+    report = json.loads(written(live, transcript, "--yes").stdout)
+    argv = (calls(agent)[0] / "argv").read_text().split("\n")[:-1]
+
+    assert argv[:12] == [
+        "exec", "fork", "01a0e8ef-0000-7000-8000-000000000000", "-", "--ephemeral",
+        "--skip-git-repo-check", "-c", 'sandbox_mode="read-only"', "-c",
+        'approval_policy="never"', "-o", argv[11],
+    ]  # fmt: skip
+    assert [s["items"][0]["id"] for s in report["stories"]] == ["alpha-e2"]
+
+
+def test_an_invalid_answer_fails_and_forks_again_only_with_retry(live: Live) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "claude", "I found nothing worth fixing.")
+
+    first = written(live, transcript, "--yes")
+    again = written(live, transcript, "--yes")
+    op = json.loads(written(live, transcript, "--dry-run").stdout)["fork"]["op"]
+    retried = written(live, transcript, "--yes", "--retry", op)
+
+    assert first.returncode == again.returncode == retried.returncode == 1
+    assert "the fork's answer is invalid: item 'alpha-e1' has no answer" in first.stderr
+    assert len(calls(agent)) == 2
+
+
+def test_related_items_can_share_one_story_and_the_rest_say_nothing(live: Live) -> None:
+    live.fake.friction = {1: 0.92, 2: 0.9, 3: 0.91}
+    session = (
+        Claude(live.sandbox.repo)
+        .user("go")
+        .load(live.sandbox.installed("alpha"), ALPHA)
+    )
+    for call in ("t1", "t2", "t3"):
+        session.tool(
+            call,
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+    transcript = session.write(live.sandbox.home / "session.jsonl")
+    live.scan(transcript)
+    answer = "\n".join(
+        [
+            story("", items=["alpha-e1", "alpha-e2"]),
+            json.dumps({"item": "alpha-e3", "verdict": "nothing"}),
+        ]
+    )
+    fake_agent(live.sandbox, "claude", f"```json\n{answer}\n```")
+
+    report = json.loads(written(live, transcript, "--yes").stdout)
+
+    assert [[i["id"] for i in s["items"]] for s in report["stories"]] == [
+        ["alpha-e1", "alpha-e2"]
+    ]
+    assert report["nothing"] == ["alpha-e3"]
+
+
+def test_a_session_without_flagged_skills_is_not_forked(live: Live) -> None:
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+    agent = fake_agent(live.sandbox, "claude", "")
+
+    result = written(live, transcript, "--yes")
+
+    assert (result.returncode, json.loads(result.stdout)["fork"], calls(agent)) == (
+        0,
+        None,
+        [],
+    )
+
+
+def test_write_before_a_scan_fails(live: Live) -> None:
+    result = written(live, friction_session(live.sandbox, ("alpha", ALPHA)), "--yes")
+
+    assert result.returncode == 1
+    assert "has no scan yet" in result.stderr
+
+
+def test_a_session_whose_directory_is_gone_is_reported_not_forked(live: Live) -> None:
+    gone = live.sandbox.home / "worktree"
+    gone.mkdir()
+    live.fake.friction = {1: 0.92}
+    transcript = (
+        Claude(gone)
+        .user("list the things")
+        .load(live.sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+    live.scan(transcript, "--repo", PUBLIC)
+    gone.rmdir()
+    agent = fake_agent(live.sandbox, "claude", story("alpha-e1"))
+
+    result = written(live, transcript, "--yes")
+
+    assert (result.returncode, calls(agent)) == (1, [])
+    assert f"the session's working directory {gone} is gone" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("step", "flag"), [("scan", "--yes"), ("write", "--replay")], ids=["scan", "write"]
+)
+def test_a_flag_another_step_owns_is_a_usage_error(
+    sandbox: Sandbox, step: str, flag: str
+) -> None:
+    result = sandbox.run(step, "missing-session", flag)
+
+    assert (result.returncode, result.stdout) == (2, "")
+    assert f"{step} takes no {flag}" in result.stderr
