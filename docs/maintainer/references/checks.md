@@ -20,7 +20,7 @@ Push the branch, then run `just signoff`. It runs `just check`, and only when ev
 
 | Situation | Do |
 |---|---|
-| Refused: HEAD not pushed | `git push`, then `gh signoff`; the passing check already covers this HEAD |
+| Refused: HEAD not pushed | `git push`, or `git push -u origin HEAD` for a new branch, then `gh signoff`; the passing check already covers this HEAD |
 | Refused: uncommitted or untracked files | Commit or remove them, then `just signoff` |
 | A check failed | Fix it, commit, push, then `just signoff` |
 | Pushed more commits | `just signoff` again |
