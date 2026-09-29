@@ -93,17 +93,18 @@ def test_run_decides_each_story_and_flags_close_calls(tmp_path: Path, jev) -> No
     }
 
 
-def test_json_prints_one_object(tmp_path: Path, jev) -> None:
+@pytest.mark.parametrize("flags", [("--json",), ("--json", "--dry-run")])
+def test_json_prints_one_object(tmp_path: Path, jev, flags: tuple[str, ...]) -> None:
     url, _ = jev
     done = run(
         tmp_path,
-        [story("clear")],
-        "--json",
+        [story("clear"), story("close")],
+        *flags,
         TYPESAFE_API_KEY="k",
         TYPESAFE_BASE_URL=url,
     )
 
-    assert json.loads(done.stdout)["stories"][0]["decision"] == "accept"
+    assert [s["id"] for s in json.loads(done.stdout)["stories"]] == ["clear", "close"]
 
 
 def test_dry_run_shows_each_state_without_key_consent_or_network(

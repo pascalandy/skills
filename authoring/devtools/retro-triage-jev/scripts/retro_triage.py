@@ -340,10 +340,12 @@ def build_parser() -> Parser:
 def run(args: argparse.Namespace) -> str:
     stories = read_stories(args.stories)
     if args.dry_run:
-        return "\n".join(
-            json.dumps({"id": s["id"], "repo": s["repo"], "state": state_of(s)})
-            for s in stories
-        )
+        previews = [
+            {"id": s["id"], "repo": s["repo"], "state": state_of(s)} for s in stories
+        ]
+        if args.json:
+            return json.dumps({"stories": previews}, indent=2)
+        return "\n".join(json.dumps(preview) for preview in previews)
     require_consent({story["repo"] for story in stories})
     key = api_key()
     results = []
