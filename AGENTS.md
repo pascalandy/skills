@@ -28,7 +28,8 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Checks
 
-- `just check` is exactly what `just signoff` and the manual CI workflow run; a failure names the `just check --only NAME` to rerun
+- `just signoff` runs `just check`; the manual CI workflow runs `just check --all`. A failure names the `just check --only NAME` to rerun
+- `just check` always runs the repository checks, and runs a skill's own checks only when the branch or working tree changes that skill. Test a skill while working on it with `just check --only NAME`
 - `main` merges a PR only when its head commit carries a green `signoff` status; GitHub Actions runs only when started by hand. After pushing a PR branch, run `just signoff` and leave the checkout untouched until it finishes. Merge only a signed-off head, never with `gh pr merge --admin`
 - Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
 - When `just` is not installed, use `uvx --from rust-just just <recipe>`
@@ -39,6 +40,6 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Read on demand
 
-- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/maintainer/references/script-conventions.md). `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and `authoring/commands/cli-contract.md` carries the same contract to other projects
+- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/maintainer/references/script-conventions.md). `authoring/commands/cli-contract.md` carries the same contract to other projects
 - Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/maintainer/references/checks.md)
 - To release, follow [release](docs/maintainer/references/release.md). Never move or delete a pushed tag

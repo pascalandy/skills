@@ -8,8 +8,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from conftest import exits, observe
-
 GIT = Path(shutil.which("git") or "/usr/bin/git").parent
 
 
@@ -31,7 +29,6 @@ def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess
         text=True,
         timeout=20,
     )
-    observe("discover_skills", result.returncode)
     return result
 
 
@@ -51,7 +48,6 @@ def fake_opencode(binary: Path, location: Path) -> None:
     binary.chmod(0o755)
 
 
-@exits("discover_skills", 0, 1)
 def test_native_opencode_discovery_and_unverified_claude(
     sandbox: tuple[Path, Path], tmp_path: Path
 ) -> None:
@@ -127,7 +123,6 @@ def test_native_opencode_discovery_and_unverified_claude(
     assert failure(unverified)["agents"]["claude"]["status"] == "unverified"
 
 
-@exits("discover_skills", 75)
 def test_an_agent_that_times_out_exits_75(
     sandbox: tuple[Path, Path], tmp_path: Path
 ) -> None:

@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import flatten_skills
-from conftest import exits, observe
 
 
 class FlattenSkillsTests(unittest.TestCase):
@@ -53,13 +52,12 @@ class FlattenSkillsTests(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            result = observe("flatten_skills", flatten_skills.main(list(argv)))
+            result = flatten_skills.main(list(argv))
         return result, stdout.getvalue(), stderr.getvalue()
 
     def check(self, *, verbose: bool = False) -> tuple[int, str, str]:
         return self.cli("--check", *(["--verbose"] if verbose else []))
 
-    @exits("flatten_skills", 0)
     def test_check_accepts_synchronized_tree_and_ignored_runtime_files(self) -> None:
         with self.repository() as (root, _, _):
             cache = root / "skills" / "example" / "__pycache__"
@@ -69,7 +67,6 @@ class FlattenSkillsTests(unittest.TestCase):
 
         self.assertEqual((result, stdout, stderr), (0, "", ""))
 
-    @exits("flatten_skills", 0)
     def test_dry_run_prints_the_lines_a_real_run_prints_then_a_rerun_is_silent(
         self,
     ) -> None:
@@ -89,7 +86,6 @@ class FlattenSkillsTests(unittest.TestCase):
             self.assertEqual((root / "skills/fresh/SKILL.md").read_text(), "# Fresh\n")
             self.assertEqual(self.cli(), (0, "", ""))
 
-    @exits("flatten_skills", 1)
     def test_check_reports_content_missing_extra_and_mode_drift(self) -> None:
         cases = {
             "content": (

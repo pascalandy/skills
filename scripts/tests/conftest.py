@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import functools
 import shutil
 import subprocess
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar, cast
 
 import pytest
 
@@ -20,43 +17,6 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_NAME": "test",
     "GIT_COMMITTER_EMAIL": "test@example.com",
 }
-
-
-Test = TypeVar("Test", bound=Callable[..., Any])
-
-# Exit codes each test declares with @exits, and the ones scripts really return
-DECLARED: dict[str, set[int]] = {}
-OBSERVED: list[tuple[str, int]] = []
-
-
-def observe(script: str, code: int) -> int:
-    """Record that `script`, a file stem such as install_skills, exited with `code`."""
-    OBSERVED.append((script, code))
-    return code
-
-
-def exits(script: str, *codes: int) -> Callable[[Test], Test]:
-    """Declare that the test makes `script` exit with each of `codes`.
-
-    test_cli_contract.py counts the declarations against each script's exit-code
-    table, and the test fails unless its run helpers observe every code.
-    """
-
-    def declare(test: Test) -> Test:
-        DECLARED.setdefault(script, set()).update(codes)
-
-        @functools.wraps(test)
-        def checked(*args: Any, **kwargs: Any) -> Any:
-            start = len(OBSERVED)
-            result = test(*args, **kwargs)
-            seen = {code for name, code in OBSERVED[start:] if name == script}
-            missing = sorted(set(codes) - seen)
-            assert not missing, f"{script} never exited {missing} in this test"
-            return result
-
-        return cast("Test", checked)
-
-    return declare
 
 
 def skill(root: Path, name: str, body: str = "old") -> Path:

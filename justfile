@@ -41,7 +41,7 @@ flatten-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
-# Run every check, the verdict `just signoff` posts; --list names each check, --only NAME reruns one
+# Run the repo checks and those of each skill the change touches, the verdict `just signoff` posts; --all runs every check, --only NAME reruns one
 [group('checks')]
 check *args:
     @uv run --quiet scripts/check.py "$@"

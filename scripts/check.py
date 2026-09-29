@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run the CI verdict: every check in CHECKS, in order; success prints nothing."""
+"""Run the CI verdict: the checks in CHECKS, in order; success prints nothing."""
 
 from __future__ import annotations
 
@@ -17,16 +17,19 @@ import time
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run, run_script
+from _common import run, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 
 EPILOG = """\
 Each check is one row of CHECKS in scripts/check.py; add a row to add a check.
+A check that names a path under authoring/ runs only when this branch, compared
+with origin/main, or the working tree changes that skill, or scripts/check.py.
 A failing check does not stop the others; its output is replayed on stderr.
 
 examples:
   just check
+  just check --all
   just check --list
   just check --only lint --only tavily
   just check --only jevgate --verbose"""
@@ -36,6 +39,7 @@ EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
 PYTEST = "9.1.1"
+XDIST = "pytest-xdist==3.8.0"
 ACTIONLINT = "actionlint-py@1.7.12.25"
 
 log = logging.getLogger("check")
@@ -44,11 +48,33 @@ Command = tuple[str, ...]
 
 
 class Check:
-    """A named step whose commands run from the repository root and stop at the first failure."""
+    """A named step whose commands run from the repository root and stop at the first failure.
 
-    def __init__(self, name: str, *commands: Command) -> None:
+    `reads` names files or directories outside the check's skill package that it
+    depends on, so a change there runs it too.
+    """
+
+    def __init__(
+        self, name: str, *commands: Command, reads: tuple[str, ...] = ()
+    ) -> None:
         self.name = name
         self.commands = commands
+        self.reads = reads
+
+    def skills(self) -> set[str]:
+        """The skill packages the commands name; none means the check covers the repository."""
+        found: set[str] = set()
+        for arg in (arg for command in self.commands for arg in command):
+            if not arg.startswith("authoring/"):
+                continue
+            path = ROOT / arg
+            package = next(
+                (p for p in (path, *path.parents) if (p / "SKILL.md").is_file()), None
+            )
+            if package is None:
+                raise ScriptError(f"{self.name}: {arg} is not inside a skill package")
+            found.add(package.relative_to(ROOT).as_posix())
+        return found
 
 
 def uv_run(script: str, *args: str) -> Command:
@@ -78,7 +104,17 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
 
 
 def pytest(path: str, *deps: str) -> Command:
-    return ("uvx", "--from", f"pytest@{PYTEST}", *with_deps(deps), "pytest", path)
+    """Run a suite on every core; script-conventions.md says what that asks of a test."""
+    return (
+        "uvx",
+        "--from",
+        f"pytest@{PYTEST}",
+        *with_deps((XDIST, *deps)),
+        "pytest",
+        "-n",
+        "auto",
+        path,
+    )
 
 
 def script_pin(script: str, package: str) -> str:
@@ -107,7 +143,7 @@ CHECKS = [
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
-    Check("test", ("uvx", f"pytest@{PYTEST}")),
+    Check("test", pytest("scripts/tests")),
     # Optional local linters stay off so every machine agrees
     Check(
         "workflows",
@@ -120,8 +156,14 @@ CHECKS = [
         "matt-mode",
         uv_run("authoring/mattpocock/matt-mode/scripts/check_matt_mode.py"),
         uv_run("authoring/mattpocock/matt-mode/scripts/update_matt_mode.py", "check"),
+        # It validates the upstream imports of every package in the bucket
+        reads=("authoring/mattpocock",),
     ),
-    Check("distill", pytest("authoring/knowledge/distill/scripts/tests")),
+    Check(
+        "distill",
+        pytest("authoring/knowledge/distill/scripts/tests"),
+        reads=("authoring/knowledge/distill-prompt",),
+    ),
     Check(
         "tavily",
         pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
@@ -129,6 +171,8 @@ CHECKS = [
     Check(
         "transcript",
         pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
+        # Its doc test checks the flags these files pass to transcript
+        reads=("justfile", "authoring/verify/verify-transcript/SKILL.md"),
     ),
     Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
     Check(
@@ -203,6 +247,39 @@ def passes(check: Check, verbose: bool) -> bool:
     return True
 
 
+def changed() -> list[str] | None:
+    """Files this branch changes against origin/main, committed or not; None when git cannot tell."""
+    base = run_git("merge-base", "HEAD", "origin/main", cwd=ROOT)
+    if base.returncode != 0:
+        return None
+    # -z keeps git from quoting names with spaces or non-ASCII characters
+    diff = run_git(
+        "diff", "--name-only", "--no-renames", "-z", base.stdout.strip(), cwd=ROOT
+    )
+    untracked = run_git("ls-files", "-z", "--others", "--exclude-standard", cwd=ROOT)
+    if diff.returncode != 0 or untracked.returncode != 0:
+        return None
+    return [path for path in f"{diff.stdout}\0{untracked.stdout}".split("\0") if path]
+
+
+def in_scope(checks: list[Check]) -> list[Check]:
+    """Every repository check, and each skill check whose skill the change touches."""
+    paths = changed()
+    if paths is None or "scripts/check.py" in paths:
+        return checks
+    scoped: list[Check] = []
+    for check in checks:
+        skills = check.skills()
+        watched = sorted({*skills, *check.reads})
+        if not skills or any(
+            path == w or path.startswith(f"{w}/") for path in paths for w in watched
+        ):
+            scoped.append(check)
+        else:
+            log.info("skip %s: no change under %s", check.name, ", ".join(watched))
+    return scoped
+
+
 def verdict(args: argparse.Namespace) -> str:
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
@@ -210,6 +287,8 @@ def verdict(args: argparse.Namespace) -> str:
             for command in check.commands:
                 log.info("%s: %s", check.name, shlex.join(command))
         return "\n".join(check.name for check in selected)
+    if not args.only and not args.all:
+        selected = in_scope(selected)
 
     failed: list[str] = []
     for check in selected:
@@ -230,12 +309,18 @@ def main(argv: list[str] | None = None) -> int:
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )
-    parser.add_argument(
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
         "--only",
         action="append",
         choices=[check.name for check in CHECKS],
         metavar="NAME",
-        help="run only this check; repeat for more (see --list)",
+        help="run only this check, even when the change does not touch its skill; repeat for more (see --list)",
+    )
+    scope.add_argument(
+        "--all",
+        action="store_true",
+        help="run every check, including skill checks the change does not touch",
     )
     parser.add_argument(
         "--list",

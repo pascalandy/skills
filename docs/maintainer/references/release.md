@@ -17,7 +17,7 @@ A pushed `vX.Y.Z` tag publishes nothing by itself. From `main` on your machine, 
 1. Choose `vX.Y.Z` using the 0.x policy in `CHANGELOG.md`
 2. Run `just release-check vX.Y.Z --verbose` to list changed skills
 3. Write that version's `CHANGELOG.md` section and merge it to `main`
-4. On `main`, run `just check && just release-check vX.Y.Z`; both print nothing when HEAD is ready
+4. On `main`, run `just check --all && just release-check vX.Y.Z`; both print nothing when HEAD is ready
 5. Run `git tag vX.Y.Z && git push origin vX.Y.Z`
 6. Publish from the same HEAD: `notes=$(mktemp) && just release-check vX.Y.Z --notes "$notes" && gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file "$notes"`
 7. Never move or delete a pushed tag, or edit or replace a published release

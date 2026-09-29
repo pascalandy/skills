@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import commit, exits, observe, skill
+from conftest import commit, skill
 
 # The commit waiting on GitHub edits the skill alpha and swaps the private sync
 # for this stub, so a test sees whether the sync ran the code the pull brought
@@ -35,7 +35,6 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=60,
     )
-    observe("sync", result.returncode)
     return result
 
 
@@ -65,7 +64,6 @@ def behind(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path]:
     return repo, home
 
 
-@exits("sync", 0)
 def test_pulls_then_runs_the_pulled_private_sync_and_installs(
     behind: tuple[Path, Path],
 ) -> None:
@@ -86,7 +84,6 @@ def test_pulls_then_runs_the_pulled_private_sync_and_installs(
     assert installed.read_text() == "# alpha\n\npulled\n"
 
 
-@exits("sync", 1)
 def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
     behind: tuple[Path, Path],
 ) -> None:
@@ -137,7 +134,6 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
     assert not (home / ".claude").exists()
 
 
-@exits("sync", 75)
 def test_a_fetch_that_cannot_reach_origin_exits_75_before_installing(
     behind: tuple[Path, Path],
 ) -> None:

@@ -16,7 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from conftest import commit, exits, observe, skill
+from conftest import commit, skill
 from install_skills import replace
 
 MAC = (
@@ -58,7 +58,6 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=60,
     )
-    observe("install_skills", result.returncode)
     return result
 
 
@@ -66,7 +65,6 @@ def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
     return json.loads(result.stdout)["actions"]
 
 
-@exits("install_skills", 0, 1)
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "alpha", "new")
@@ -277,7 +275,6 @@ def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
     assert "git fetch --unshallow" in refused.stderr
 
 
-@exits("install_skills", 0, 1)
 def test_symlink_at_a_target_blocks_apply_and_a_preview_warns(
     sandbox: tuple[Path, Path],
 ) -> None:
@@ -488,7 +485,6 @@ def test_a_codex_directory_linked_to_a_skill_target_stops_before_writing(
     assert list((home / ".agents/skills").iterdir()) == []
 
 
-@exits("install_skills", 0, 1)
 def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_target(
     sandbox: tuple[Path, Path],
 ) -> None:
@@ -538,7 +534,6 @@ def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_targe
     }
 
 
-@exits("install_skills", 75)
 def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
     sandbox: tuple[Path, Path],
 ) -> None:

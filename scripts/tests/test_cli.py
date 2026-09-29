@@ -1,4 +1,4 @@
-"""The contract pieces in _cli.py that no single script exercises."""
+"""The contract pieces in _cli.py, tested once here instead of in every script."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import time
 import pytest
 from _cli import (
     Interrupted,
+    Parser,
     color_enabled,
     duration,
     exit_codes,
@@ -53,6 +54,23 @@ def test_exit_codes_always_list_the_base_codes_in_order() -> None:
 def test_exit_codes_refuse_codes_the_shell_reserves(code: int) -> None:
     with pytest.raises(ValueError, match="reserved"):
         exit_codes({code: "clashes"})
+
+
+def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    parser = Parser(prog="just demo", exit_codes=exit_codes({}))
+    parser.add_argument("--count", type=int)
+
+    with pytest.raises(SystemExit) as stopped:
+        parser.parse_args(["--count", "x"])
+
+    stderr = capsys.readouterr().err
+    assert stopped.value.code == 2
+    assert stderr.startswith("usage: just demo ")
+    assert stderr.endswith(
+        "error: argument --count: invalid int value: 'x'\nrun 'just demo --help'\n"
+    )
 
 
 def test_a_flag_counts_only_before_the_end_of_options() -> None:

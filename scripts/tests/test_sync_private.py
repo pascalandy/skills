@@ -10,15 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import (
-    GIT_IDENTITY,
-    SCRIPTS,
-    commit,
-    exits,
-    observe,
-    private_remote,
-    skill,
-)
+from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
 HOST = socket.gethostname().split(".")[0]
 
@@ -71,7 +63,6 @@ def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=120,
     )
-    observe("sync_private", result.returncode)
     return result
 
 
@@ -79,7 +70,6 @@ def quiet(result: subprocess.CompletedProcess[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
-@exits("sync_private", 0)
 def test_clones_then_saves_edits_every_machine_receives(
     machines: tuple[Path, Path, Path],
 ) -> None:
@@ -106,7 +96,6 @@ def test_clones_then_saves_edits_every_machine_receives(
     assert git(one, "status", "--porcelain") == ""
 
 
-@exits("sync_private", 1)
 def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     machines: tuple[Path, Path, Path],
 ) -> None:
@@ -154,7 +143,6 @@ def test_dry_run_names_the_clone_and_changes_nothing(
     assert not (one / "_skills_private").exists()
 
 
-@exits("sync_private", 75)
 def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
     machines: tuple[Path, Path, Path],
 ) -> None:
@@ -176,7 +164,6 @@ def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
     assert not (one / "_skills_private").exists()
 
 
-@exits("sync_private", 1, 75)
 def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
     machines: tuple[Path, Path, Path], tmp_path: Path
 ) -> None:

@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-09-29
 ---
 
-`just check` is the verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check` only when started by hand
+`just check` is the verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --all` only when started by hand
 
 ## Sign off a PR
 
@@ -37,11 +37,13 @@ Commit hooks never sign off: git has no hook after a push, and GitHub accepts a 
 
 ## Manual CI workflow
 
-`.github/workflows/ci.yml` runs only when started by hand, and its result is not the `signoff` status. `gh workflow run ci.yml --ref <branch>` runs `just check` on a GitHub runner. Started on a `vX.Y.Z` tag, it also validates and publishes that release, a fallback for the local publish step in [[release]]
+`.github/workflows/ci.yml` runs only when started by hand, and its result is not the `signoff` status. `gh workflow run ci.yml --ref <branch>` runs `just check --all` on a GitHub runner. Started on a `vX.Y.Z` tag, it also validates and publishes that release, a fallback for the local publish step in [[release]]
 
 ## Add or change a check
 
 Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
+
+A check whose commands name a path under `authoring/` belongs to the skill package holding that path. `just check` runs it only when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them runs it too. Every other check always runs, and when git cannot compare with `origin/main`, every check runs. `--only NAME` runs a check whatever changed, and `--all` runs every check; `--verbose` names each skipped check
 
 `just check` prints nothing when every check passes and replays a failing check's output on stderr. `just check --list` names every check, and `just check --only NAME` reruns one. `just check --list --verbose` adds each check's commands on stderr; run a command directly to pass extra flags, such as `-k` to pytest
 
