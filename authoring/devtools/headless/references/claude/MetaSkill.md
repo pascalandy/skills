@@ -64,7 +64,7 @@ Use [permission documentation](https://code.claude.com/docs/en/permissions) for 
 
 To bound writes, allow an `Edit` path rule such as `--allowedTools "Edit(//abs/path/**)"`. `Edit` rules cover every built-in file-editing tool; Claude Code never consults a `Write(path)` rule. `//path` is absolute, while `/path` is relative to the settings source.
 
-Permission mode and allow rules still govern calls when prompts are disabled. `--tools` restricts built-in tools, not startup hooks or configured MCP servers. Use `--strict-mcp-config` with an explicit MCP configuration when the run must limit those servers.
+Permission mode and allow rules still govern calls when prompts are disabled. `--tools` restricts built-in tools, not startup hooks or configured MCP servers. Use `--strict-mcp-config` with an explicit MCP configuration when the run must limit those servers. `disableAllHooks` in `--settings` does not disable hooks from managed settings.
 
 ## Input and output
 
@@ -74,6 +74,8 @@ claude -p "Review this diff and inspect related files" \
   --tools "Read,Grep,Glob" --output-format json \
   < diff.patch > result.json 2> review.stderr.log
 ```
+
+Print mode expands `@path` mentions in the prompt, including stdin: in Claude Code 2.1.284, the named local file is attached before inference, even inside a JSON string and with `--tools ""`. Before passing untrusted text such as a transcript, web page, or issue body, replace each `@`; inside a JSON string, the escape `\u0040` keeps the character for the model without the mention.
 
 | Output format | Result |
 | --- | --- |
