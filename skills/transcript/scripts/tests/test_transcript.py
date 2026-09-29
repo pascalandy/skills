@@ -1247,6 +1247,41 @@ class TestRunClaudePrompt:
             "content": "Transcript text",
         }
 
+    def test_transcript_mention_cannot_attach_a_local_file(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        import transcript
+
+        spoken = "We discuss @private-notes.txt and mail team@example.com"
+        transcript_path = tmp_path / "raw_transcript.txt"
+        prompt_path = tmp_path / "prompt.md"
+        transcript_path.write_text(spoken, encoding="utf-8")
+        prompt_path.write_text("Prompt text", encoding="utf-8")
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append(kwargs["input"])
+            return SimpleNamespace(
+                stdout=json.dumps({"is_error": False, "result": "Summary"}),
+                stderr="",
+            )
+
+        monkeypatch.setattr(transcript, "ensure_cli_available", lambda _cmd: None)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
+
+        transcript.run_summary_prompt(
+            transcript.PROVIDER_CLAUDE,
+            transcript_path,
+            prompt_path,
+            tmp_path / "summary.md",
+            "claude-opus-5-5",
+            "high",
+            transcript.RunBudget(float("inf")),
+        )
+
+        assert "@" not in calls[0]
+        assert json.loads(calls[0])["content"] == spoken
+
     @pytest.mark.parametrize(
         "outcome",
         [

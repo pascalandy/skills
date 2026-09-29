@@ -48,7 +48,7 @@ When a user asks to use or change a model, show `list profiles` first. Reframe t
 
 Use the low-level `--provider`, `--model`, and `--effort` flags only to diagnose or test a custom target.
 
-The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, slash commands, saved session, settings files, or `CLAUDE.md`. The profile's effort overrides any `CLAUDE_CODE_EFFORT_LEVEL`. Claude accepts only the efforts `low`, `medium`, `high`, `xhigh`, and `max`; the CLI rejects any other level, which Claude Code would silently replace with its default. The `codex` and `openrouter` providers run through `pi`.
+The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, slash commands, saved session, settings files, or `CLAUDE.md`. Hooks from an administrator's managed settings still run, because no command-line option disables them. The transcript's `@` characters reach Claude as the JSON escape `\u0040`, so an `@path` in a transcript cannot attach a local file. The profile's effort overrides any `CLAUDE_CODE_EFFORT_LEVEL`. Claude accepts only the efforts `low`, `medium`, `high`, `xhigh`, and `max`; the CLI rejects any other level, which Claude Code would silently replace with its default. The `codex` and `openrouter` providers run through `pi`.
 
 ## Run commands
 
