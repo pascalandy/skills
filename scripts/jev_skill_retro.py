@@ -174,6 +174,8 @@ RELATION = {
     },
 }
 SKILL_SIDE = ("contradicted", "incomplete", "ambiguous")
+# HTTP statuses that mean TypeSafe refused a request without running it
+REJECTED = frozenset({400, 401, 403, 404, 409, 413, 422, 429, 503, 529})
 TOOL_UNAVAILABLE = {
     "type": "noul",
     "instructions": (
@@ -953,6 +955,10 @@ class Jev:
                 f"the scan stopped at its budget of {self.budget} requests; answers so far are saved",
                 "rerun with a larger --max-requests; saved answers are reused",
             )
+        if not fits(body):
+            raise ScriptError(
+                f"request {op} exceeds Jev's limits; this is a bug in {PROG}"
+            )
         self.check(op, body)
         request_path = self.directory / "requests" / f"{op}.json"
         write_json(request_path, body)
@@ -1014,14 +1020,20 @@ class Jev:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 reply = json.load(response)
         except urllib.error.HTTPError as error:
-            # TypeSafe answered, so nothing is pending; the request may be resent
+            if error.code not in REJECTED:
+                # A gateway error may come after TypeSafe ran and billed the request
+                raise ScriptError(
+                    f"TypeSafe answered HTTP {error.code} for request {op}; it may have "
+                    "run and been billed",
+                    f"rerun with --retry {op} to send it again",
+                ) from error
             write_json(path, {"state": "failed", "status": error.code})
             if error.code in (429, 503, 529):
                 raise TemporaryError(
                     f"TypeSafe answered HTTP {error.code}; saved answers are reused on a rerun"
                 ) from error
             raise ScriptError(
-                f"TypeSafe answered HTTP {error.code} for request {op}"
+                f"TypeSafe refused request {op} with HTTP {error.code}"
             ) from error
         except urllib.error.URLError as error:
             write_json(path, {"state": "failed", "reason": str(error.reason)})
@@ -1162,11 +1174,15 @@ def event_state(session: Session, index: int) -> dict[str, Any]:
 
 
 def locate_request(
-    session: Session, index: int, load: Load, others: list[Load]
+    session: Session,
+    index: int,
+    load: Load,
+    others: list[Load],
+    files: list[SkillFile],
 ) -> tuple[dict[str, Any], list[Window]]:
     """B1: which line of each file the agent followed, and whether any line of
     each loaded skill covers the step."""
-    shown = windows(load.skill, load.files)
+    shown = windows(load.skill, files)
     for other in others:
         shown += windows(other.skill, other.files[:1])
     questions: dict[str, Any] = {}
@@ -1220,6 +1236,7 @@ def decide(
     relation: dict[str, float] | None = None,
     tool: float | None = None,
     conflict: float | None = None,
+    located: bool = True,
 ) -> tuple[str, str]:
     """Rules 2–8 of #177 for one event and line: an outcome and its category."""
     if conflict is not None and conflict >= YES:
@@ -1242,24 +1259,48 @@ def decide(
             return "review", "relation_unclear"
     if any(uncertain(v) for v in read):
         return "review", "uncertain_answer"
+    if not located:
+        return "review", "location_unclear"
     if not complete:
         return "review", "partial_skill_text"
     return "nothing", "no_rule_matched"
 
 
 def examine(
-    session: Session, load: Load, skills: list[Load], index: int, jev: Jev
+    session: Session, first: Load, skills: list[Load], index: int, jev: Jev
 ) -> dict[str, Any]:
     """Locate and qualify one flagged event, then decide it."""
-    others = [s for s in skills if s.skill != load.skill and s.after <= index]
-    body, shown = locate_request(session, index, load, others)
+    load = version_at(session, first.skill, index)
+    others = [
+        version_at(session, s.skill, index)
+        for s in skills
+        if s.skill != load.skill and s.after <= index
+    ]
+    item: dict[str, Any] = {"event": index}
+    # Shrink the evidence until it fits: other skills first, then references
+    tries = [(load.files, others), (load.files, []), (load.files[:1], [])]
+    planned = [locate_request(session, index, load, o, f) for f, o in tries]
+    fitting = next(
+        ((b, w, f) for (b, w), (f, _) in zip(planned, tries) if fits(b)), None
+    )
+    if fitting is None:
+        return {
+            **item,
+            "outcome": "review",
+            "category": "evidence_too_large",
+            "line": None,
+        }
+    body, shown, files = fitting
     located = jev.ask("locate", body)
     covered = noul(located, f"covered::{load.skill}")
-    complete = not any(file.partial for file in load.files)
+    complete = len(files) == len(load.files) and not any(f.partial for f in files)
     lines: list[dict[str, Any]] = []
     other: dict[str, Any] | None = None
+    clear = True
     for number, window in enumerate(shown):
         option, p = top(choice(located, f"where::{number}"))
+        if window.skill == load.skill and p < TOP:
+            clear = False
         if option == "none" or p < TOP:
             continue
         found = window.around(int(option[1:]))
@@ -1267,11 +1308,18 @@ def examine(
             lines.append(found)
         elif other is None and noul(located, f"covered::{window.skill}") >= YES:
             other = found
-    item: dict[str, Any] = {"event": index, "covered": covered}
+    item["covered"] = covered
     if not lines:
-        answers = jev.ask("qualify", qualify_request(session, index, None, load, None))
-        recurs = noul(answers, "recurs")
-        outcome, category = decide(covered, complete, recurs)
+        request = qualify_request(session, index, None, load, None)
+        if not fits(request):
+            return {
+                **item,
+                "outcome": "review",
+                "category": "evidence_too_large",
+                "line": None,
+            }
+        recurs = noul(jev.ask("qualify", request), "recurs")
+        outcome, category = decide(covered, complete, recurs, located=clear)
         return {
             **item,
             "outcome": outcome,
@@ -1295,6 +1343,7 @@ def examine(
             relation,
             scores["tool_unavailable"],
             scores["conflict"],
+            located=clear,
         )
         judged.append(
             {
@@ -1338,8 +1387,10 @@ def judge(
             if found["skill"] == load.skill
         ]
         scores = friction[load.skill]
+        decided = {item["event"] for item in items}
         flagged = sorted(
-            (i for i, p in scores.items() if p > NO), key=lambda i: -scores[i]
+            (i for i, p in scores.items() if p > NO and i not in decided),
+            key=lambda i: -scores[i],
         )
         for index in flagged[:RETAINED]:
             items.append(

@@ -724,6 +724,7 @@ class FakeJev:
     tool: float = 0.05
     conflict: float = 0.1
     hint: str = "alpha-cli"
+    where_p: float = 0.9
     model: str = "jev-1.13.0"
     status: int = 200
     delay: float = 0.0
@@ -744,7 +745,9 @@ class FakeJev:
             hit = next(
                 (line.split(":")[0] for line in lines if self.hint in line), None
             )
-            chosen = {hit: 0.9, "none": 0.1} if hit else {"none": 0.95}
+            chosen = (
+                {hit: self.where_p, "none": 1 - self.where_p} if hit else {"none": 0.95}
+            )
             return {
                 "type": "choice",
                 "choice": max(chosen, key=chosen.__getitem__),
@@ -1064,6 +1067,112 @@ def test_an_answer_from_another_model_fails_the_scan(live: Live) -> None:
 
     assert result.returncode == 1
     assert "was answered by 'jev-9.0.0', not the pinned jev-1.13.0" in result.stderr
+
+
+def test_an_ambiguous_server_error_is_resent_only_with_retry(live: Live) -> None:
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.fake.status = 504
+    failed = live.run(transcript)
+    live.fake.status = 200
+    blocked = live.run(transcript)
+
+    assert failed.returncode == blocked.returncode == 1
+    assert "answered HTTP 504 for request triage-" in failed.stderr
+    assert "may have run and been billed" in failed.stderr
+    assert "was sent but its answer never arrived" in blocked.stderr
+    assert len(live.fake.bodies) == 1
+
+
+def test_the_version_read_before_an_event_is_the_one_located(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha")
+    live.fake.friction = {1: 0.9}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .load(alpha, "Old: run `alpha-cli --all`.")
+        .say("first try")
+        .load(alpha, ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    live.scan(transcript)
+    located = next(
+        body for body in live.fake.bodies if "covered::alpha" in body["questions"]
+    )
+
+    assert (
+        located["state"]["files"][0]["lines"][0]
+        == "L1: Use `alpha-cli` to list things."
+    )
+
+
+def test_an_unclear_location_keeps_the_event_in_review(live: Live) -> None:
+    live.fake.friction = {1: 0.9}
+    live.fake.where_p = 0.55
+    live.fake.recurs = 0.1
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert [(i["outcome"], i["category"]) for i in outcome(report)["items"]] == [
+        ("review", "location_unclear")
+    ]
+
+
+def test_an_event_a_hard_failure_decided_is_not_examined_again(live: Live) -> None:
+    live.fake.friction = {1: 0.95}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .user("go")
+        .load(live.sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli"},
+            "bash: alpha-cli: command not found",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    report = live.scan(transcript)
+
+    assert [(i["event"], i["category"]) for i in outcome(report)["items"]] == [
+        (1, "tool_unavailable")
+    ]
+    assert live.fake.kinds() == ["friction"]
+
+
+def test_a_locate_request_too_large_keeps_only_the_skills_own_text(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha")
+    huge = "\n".join(f"{n:6}\tReference line {n} " + "x" * 80 for n in range(1, 2001))
+    live.fake.friction = {2: 0.9}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .user("go")
+        .load(alpha, ALPHA)
+        .tool("t0", "Read", {"file_path": f"{alpha}/references/huge.md"}, huge)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    report = live.scan(transcript)
+    located = next(
+        body for body in live.fake.bodies if "covered::alpha" in body["questions"]
+    )
+
+    assert [file["path"] for file in located["state"]["files"]] == [f"{alpha}/SKILL.md"]
+    assert outcome(report)["items"][0]["event"] == 2
 
 
 def test_without_a_key_nothing_is_sent(live: Live) -> None:
