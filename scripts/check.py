@@ -228,7 +228,7 @@ def verdict(args: argparse.Namespace) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         prog="just check",
-        description="Run the CI verdict: the same checks GitHub Actions runs",
+        description="Run the CI verdict: the checks `just signoff` requires before it signs off",
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )

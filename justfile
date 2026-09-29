@@ -41,10 +41,15 @@ flatten-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
-# Run the same CI verdict as GitHub Actions; --list names each check, --only NAME reruns one
+# Run every check, the verdict `just signoff` posts; --list names each check, --only NAME reruns one
 [group('checks')]
 check *args:
     @uv run --quiet scripts/check.py "$@"
+
+# Run just check, then mark the pushed HEAD green on GitHub with gh signoff; push first
+[group('checks')]
+signoff: check
+    @gh signoff
 
 # Check SKILL.md frontmatter quoting; lefthook runs it when a SKILL.md is staged
 [group('checks')]
