@@ -116,7 +116,7 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
         "repo-ran",
     ]
 
-    assert verdict(monkeypatch, capfd, checks, "--all") == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks, "--sweep") == (0, "", "")
     assert (root / "beta-ran").exists()
 
 
@@ -402,7 +402,7 @@ def test_failed_batch_names_an_executable_rerun_and_continues(
     checks.append(Check("later", MARK))
     monkeypatch.setenv("FAKE_PYTEST_EXIT", "1")
 
-    code, stdout, stderr = verdict(monkeypatch, capfd, checks, "--all")
+    code, stdout, stderr = verdict(monkeypatch, capfd, checks, "--sweep")
 
     assert (code, stdout) == (1, "")
     assert "batch boom" in stderr

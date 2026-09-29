@@ -5,3 +5,7 @@ ts	phase	decision	why	evidence	result
 2026-09-29T15:09:42Z	routing	Registered every repository test and scoped command suites by owner	Unrelated skill edits should skip fleet and installer integration tests	scripts/check.py; scripts/tests/test_check.py	24 focused tests passed
 2026-09-29T15:09:42Z	verification	Ran the complete check set on the routing layer	The first PR must preserve every existing verdict	just check --all --debug	passed in 19.64 seconds
 2026-09-29T15:09:42Z	docs	Updated the check and test-placement instructions	Agents need a clear rule for new tests	AGENTS.md; docs/maintainer/references/checks.md	wiki postflight passed
+2026-09-29T15:16:32Z	pr	Opened the routing layer as a ready PR	The behavior and its verification stand alone	PR #191; commit 79fcda6	signoff passed
+2026-09-29T15:16:32Z	cli	Rename the rare full run to --sweep	--all sounds like the normal safe choice	scripts/check.py; .github/workflows/ci.yml	implementation in progress
+2026-09-29T15:22:49Z	verification	Ran every check with the new --sweep command	The renamed mode must preserve the full verdict	just check --sweep --debug	passed in 18.97 seconds
+2026-09-29T15:22:49Z	verification	Confirmed --all now returns a usage error	The old label must not remain a tempting alias	just check --all	exited 2

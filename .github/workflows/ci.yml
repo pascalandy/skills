@@ -27,7 +27,7 @@ jobs:
         with:
           version: "0.12.19"
       - name: Check
-        run: uvx --from "rust-just@$JUST_VERSION" just check --all
+        run: uvx --from "rust-just@$JUST_VERSION" just check --sweep
       - name: Check release
         if: startsWith(github.ref, 'refs/tags/')
         run: uvx --from "rust-just@$JUST_VERSION" just release-check "$GITHUB_REF_NAME" --notes "$RUNNER_TEMP/notes.md"

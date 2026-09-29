@@ -41,7 +41,7 @@ flatten-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
-# Run repo checks and tests scoped to changed inputs; signoff posts the verdict; --all runs every check, --only NAME forces named checks
+# Run the routine checks for changed inputs; signoff posts the verdict; --sweep runs every check, --only NAME forces named checks
 [group('checks')]
 check *args:
     @uv run --quiet scripts/check.py "$@"
