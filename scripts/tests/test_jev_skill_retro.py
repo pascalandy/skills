@@ -577,6 +577,7 @@ class FakeJev:
     recurs: float = 0.9
     tool: float = 0.05
     conflict: float = 0.1
+    same: dict[int, float] = field(default_factory=dict)
     hint: str = "alpha-cli"
     model: str = "jev-1.13.0"
     status: int = 200
@@ -604,6 +605,8 @@ class FakeJev:
                 "choice": max(chosen, key=chosen.__getitem__),
                 "probabilities": chosen,
             }
+        if kind == "same":
+            return {"type": "noul", "noul": self.same.get(int(rest), 0.05)}
         if kind == "covered":
             return {"type": "noul", "noul": self.covered.get(rest, 0.9)}
         if kind == "relation":
@@ -1182,3 +1185,295 @@ def test_a_flag_another_step_owns_is_a_usage_error(
 
     assert (result.returncode, result.stdout) == (2, "")
     assert f"{step} takes no {flag}" in result.stderr
+
+
+# --- Publish: issues and comments against a fake gh -----------------------------------
+
+LABELS = ["1-needs-triage", "2-type:postmortem", "3-pty:p2"]
+FAKE_GH = """#!{python}
+import json, pathlib, sys
+path = pathlib.Path({state!r})
+state = json.loads(path.read_text())
+args = sys.argv[1:]
+def value(flag):
+    return args[args.index(flag) + 1] if flag in args else None
+def issue(number):
+    return next(found for found in state["issues"] if found["number"] == number)
+def save():
+    path.write_text(json.dumps(state))
+if args[:2] == ["label", "list"]:
+    print(json.dumps([{{"name": name}} for name in state["labels"]]))
+elif args[:2] == ["repo", "view"]:
+    print(state["visibility"].get(args[2], "PUBLIC"))
+elif args[:2] == ["issue", "list"]:
+    found = [i for i in state["issues"] if value("--state") != "open" or i["state"] == "OPEN"]
+    print(json.dumps(found))
+elif args[:2] == ["issue", "view"]:
+    print(json.dumps(issue(int(args[2]))))
+elif args[:2] == ["issue", "create"]:
+    number = 100 + len(state["issues"])
+    url = "https://github.com/" + value("-R") + "/issues/" + str(number)
+    labels = [args[i + 1] for i, arg in enumerate(args) if arg == "--label"]
+    state["issues"].append({{"number": number, "title": value("--title"), "body": sys.stdin.read(),
+                            "url": url, "state": "OPEN", "labels": labels, "comments": []}})
+    state["calls"].append(["create", number])
+    save()
+    print(url)
+elif args[:2] == ["issue", "comment"]:
+    target = issue(int(args[2]))
+    url = target["url"] + "#issuecomment-" + str(len(state["calls"]))
+    target["comments"].append({{"body": sys.stdin.read(), "url": url}})
+    state["calls"].append(["comment", target["number"]])
+    save()
+    print(url)
+else:
+    sys.exit("fake gh: unexpected " + " ".join(args))
+"""
+
+
+@dataclass
+class GitHub:
+    path: Path
+
+    def state(self) -> dict[str, Any]:
+        return json.loads(self.path.read_text())
+
+    def update(self, **values: Any) -> None:
+        self.path.write_text(json.dumps({**self.state(), **values}))
+
+
+def fake_github(sandbox: Sandbox, **state: Any) -> GitHub:
+    path = sandbox.home / "github.json"
+    path.write_text(
+        json.dumps(
+            {"labels": LABELS, "issues": [], "visibility": {}, "calls": [], **state}
+        )
+    )
+    gh = sandbox.bin / "gh"
+    gh.write_text(FAKE_GH.format(python=sys.executable, state=str(path)))
+    gh.chmod(0o755)
+    return GitHub(path)
+
+
+def open_issue(number: int, title: str) -> dict[str, Any]:
+    return {
+        "number": number,
+        "title": title,
+        "body": "An older retro story",
+        "url": f"https://github.com/{PUBLIC}/issues/{number}",
+        "state": "OPEN",
+        "labels": LABELS,
+        "comments": [],
+    }
+
+
+def stories_ready(
+    live: Live, cwd: Path | None = None, *scan_args: str, **fields: Any
+) -> Path:
+    """A scan with one candidate on alpha's first line, and the fork's story."""
+    live.fake.friction = {1: 0.92}
+    transcript = (
+        Claude(cwd or live.sandbox.repo)
+        .user("list the things")
+        .load(live.sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+    live.scan(transcript, *scan_args)
+    fake_agent(live.sandbox, "claude", story("alpha-e1", **fields))
+    assert written(live, transcript, "--yes").returncode == 0
+    return transcript
+
+
+def published(live: Live, target: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return live.sandbox.run(
+        "publish",
+        str(target),
+        *args,
+        TYPESAFE_API_KEY="test-key",
+        TYPESAFE_BASE_URL=live.url,
+    )
+
+
+def test_publish_dry_run_previews_a_new_issue_and_writes_nothing(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--dry-run", "--json")
+    action = json.loads(result.stdout)["actions"][0]
+
+    assert result.returncode == 0, result.stderr
+    assert (action["action"], action["repo"], action["target"], action["title"]) == (
+        "create",
+        PUBLIC,
+        None,
+        "alpha: Document the removed --all flag",
+    )
+    assert action["body"].startswith("Retro ")
+    assert "#### US-1 — `alpha`: Document the removed --all flag" in action["body"]
+    assert (
+        "- Anchor: `skills/alpha/SKILL.md`, line 1 of the loaded text (contradicted)"
+        in action["body"]
+    )
+    assert "11111111-2222" not in action["body"]
+    assert str(live.sandbox.home) not in action["body"]
+    assert github.state()["calls"] == []
+
+
+def test_publish_files_the_issue_with_its_labels_once(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+
+    first = published(live, transcript, "--yes")
+    again = published(live, transcript, "--yes")
+    filed = github.state()["issues"][0]
+
+    assert (first.returncode, first.stdout) == (
+        0,
+        f"create\t{PUBLIC}\talpha: Document the removed --all flag\n",
+    )
+    assert (again.returncode, again.stdout) == (0, "")
+    assert github.state()["calls"] == [["create", 100]]
+    assert filed["labels"] == LABELS
+    assert "<!-- jev-skill-retro:op=publish-" in filed["body"]
+
+
+def test_a_story_that_repeats_one_open_issue_becomes_a_comment(live: Live) -> None:
+    github = fake_github(live.sandbox, issues=[open_issue(7, "alpha: flags are stale")])
+    live.fake.same = {7: 0.91}
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, result.stdout) == (
+        0,
+        f"comment\t{PUBLIC}#7\talpha: Document the removed --all flag\n",
+    )
+    assert github.state()["calls"] == [["comment", 7]]
+    assert github.state()["issues"][0]["comments"][0]["body"].startswith("Seen again:")
+
+
+def test_an_unclear_duplicate_is_held_for_a_person(live: Live) -> None:
+    github = fake_github(live.sandbox, issues=[open_issue(7, "alpha: flags are stale")])
+    live.fake.same = {7: 0.5}
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, result.stdout, github.state()["calls"]) == (0, "", [])
+    assert (
+        "held alpha: Document the removed --all flag: it may repeat #7 (0.50)"
+        in result.stderr
+    )
+
+
+def test_a_story_whose_anchored_line_changed_is_held_as_stale(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    (live.sandbox.repo / "skills/alpha/SKILL.md").write_text(
+        "# alpha\n\nUse `alpha` now.\n"
+    )
+
+    result = published(live, transcript, "--yes", "--json")
+
+    assert json.loads(result.stdout)["held"] == [
+        {
+            "title": "alpha: Document the removed --all flag",
+            "reason": "stale: the anchored line of alpha-e1 changed since the session",
+        }
+    ]
+    assert github.state()["calls"] == []
+
+
+def test_a_missing_label_names_the_command_that_creates_it(live: Live) -> None:
+    github = fake_github(live.sandbox, labels=["1-needs-triage", "3-pty:p2"])
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (1, [])
+    assert f"run: gh label create 2-type:postmortem -R {PUBLIC}" in result.stderr
+
+
+def test_an_interrupted_publish_finds_its_marker_instead_of_filing_twice(
+    live: Live,
+) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    report = json.loads(published(live, transcript, "--yes", "--json").stdout)
+    op = report["actions"][0]["op"]
+    record = Path(report["run"], "ops", f"{op}.json")
+    record.write_text(json.dumps({"kind": "publish", "state": "sent"}))
+
+    again = json.loads(published(live, transcript, "--yes", "--json").stdout)
+
+    assert github.state()["calls"] == [["create", 100]]
+    assert again["actions"][0]["url"] == f"https://github.com/{PUBLIC}/issues/100"
+    assert json.loads(record.read_text())["state"] == "done"
+
+
+def test_publish_needs_yes_after_the_dry_run(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+
+    result = published(live, transcript)
+
+    assert (result.returncode, github.state()["calls"]) == (1, [])
+    assert "pass --yes" in result.stderr
+
+
+def test_publish_before_write_fails(live: Live) -> None:
+    fake_github(live.sandbox)
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+
+    result = published(live, transcript, "--yes")
+
+    assert result.returncode == 1
+    assert "has no written stories yet" in result.stderr
+
+
+def test_a_private_session_repo_is_named_nowhere_in_public_output(live: Live) -> None:
+    github = fake_github(live.sandbox, visibility={"o/secret-proj": "PRIVATE"})
+    live.sandbox.consent(
+        **{PUBLIC: "typesafe-2026-09-26", "o/secret-proj": "typesafe-2026-09-26"}
+    )
+    work = live.sandbox.home / "work"
+    work.mkdir()
+    transcript = stories_ready(
+        live,
+        work,
+        "--repo",
+        "o/secret-proj",
+        problem=f"alpha-cli failed in o/secret-proj at {live.sandbox.home}/work, as secret-proj notes",
+    )
+
+    result = published(live, transcript, "--yes")
+    body = github.state()["issues"][0]["body"]
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        "- Problem: alpha-cli failed in a private project at ~/work, as a private project notes"
+        in body
+    )
+    assert "secret-proj" not in body
+
+
+def test_a_secret_in_the_story_holds_it(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    live.sandbox.stub(
+        "gitleaks",
+        'cat > /dev/null\necho \'[{"RuleID": "github-pat", "StartLine": 12}]\'\nexit 3\n',
+    )
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "gitleaks reads a secret in it: github-pat at line 12" in result.stderr

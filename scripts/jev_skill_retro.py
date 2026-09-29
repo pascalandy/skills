@@ -23,6 +23,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Iterable, Iterator
@@ -50,8 +51,8 @@ EXIT_CODES = exit_codes(
     {
         1: "failure: an unreadable transcript, missing consent, a secret, a TypeSafe "
         "error, or a request that may have been billed without an answer",
-        75: "TypeSafe was unreachable or rate-limited, or another run holds this "
-        "session's lock; rerun later, and saved answers are reused",
+        75: "TypeSafe or GitHub was unreachable or rate-limited, or another run holds "
+        "this session's lock; rerun later, and saved answers are reused",
     }
 )
 EXAMPLES = f"""\
@@ -59,7 +60,8 @@ examples:
   {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run
   {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b
   {PROG} scan ~/.codex/sessions/2026/09/28/rollout-2026-09-28T12-53-45-01a0.jsonl --json
-  {PROG} write 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run"""
+  {PROG} write 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run
+  {PROG} publish 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run"""
 
 # Jev 1.13's limits: 32k tokens for state plus the longest question, 64k in all
 STATE_LIMIT = 32_000
@@ -1653,6 +1655,429 @@ def write_step(args: argparse.Namespace) -> dict[str, Any]:
     return report
 
 
+# --- Publish ---------------------------------------------------------------------
+
+LABELS = ("1-needs-triage", "2-type:postmortem", "3-pty:p2")
+DUPLICATE = {
+    "instructions": (
+        "Do `story` and `issues[{issue}]` describe the same underlying problem in the "
+        "same skill step, so that one fix resolves both?"
+    ),
+    "criteria": {
+        "true": "One fix to the skill would resolve both",
+        "false": (
+            "They describe different problems, or the same skill but a different line or step"
+        ),
+    },
+}
+# Characters of an open issue's body that the duplicate question sees
+ISSUE_EDGE = 3000
+
+
+def gh(*args: str, timeout: float, input: str | None = None) -> str:
+    if shutil.which("gh") is None:
+        raise ScriptError("gh is not installed", "install the GitHub CLI, then rerun")
+    try:
+        done = run(
+            ["gh", *args],
+            input=input,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise TemporaryError(
+            f"gh {' '.join(args[:2])} took longer than {timeout:g}s"
+        ) from None
+    if done.returncode != 0:
+        message = done.stderr.strip()
+        if "error connecting" in message or "timeout" in message.lower():
+            raise TemporaryError(f"GitHub is unreachable: {message}")
+        raise ScriptError(
+            f"gh {' '.join(args[:3])} failed: {message}", "gh auth status"
+        )
+    return done.stdout
+
+
+def gh_json(*args: str, timeout: float) -> Any:
+    return json.loads(gh(*args, timeout=timeout) or "null")
+
+
+def relative(item: dict[str, Any]) -> str | None:
+    """The anchored file's path inside its skill, such as SKILL.md."""
+    source = item.get("source")
+    if not source:
+        return None
+    return source["file"].split(f"/{item['skill']}/", 1)[-1]
+
+
+def current_file(item: dict[str, Any]) -> Path | None:
+    """Where the anchored file lives in this checkout or the private clone."""
+    inside = relative(item)
+    if inside is None:
+        return None
+    public = ROOT / "skills" / item["skill"]
+    if public.is_dir():
+        return public / inside
+    private = install_skills.private_packages(None).get(item["skill"])
+    return private / inside if private else None
+
+
+def display_path(item: dict[str, Any]) -> str | None:
+    inside = relative(item)
+    if inside is None:
+        return None
+    if (ROOT / "skills" / item["skill"]).is_dir():
+        return f"skills/{item['skill']}/{inside}"
+    return f"{item['skill']}/{inside}"
+
+
+def stale(item: dict[str, Any]) -> bool:
+    """Whether the anchored line changed or disappeared; never proof of a fix."""
+    source = item.get("source")
+    if not source or not source["text"].strip():
+        return False
+    path = current_file(item)
+    if path is None or not path.is_file():
+        return True
+    wanted = source["text"].strip()
+    return all(line.strip() != wanted for line in path.read_text().splitlines())
+
+
+def scrub(text: str, session_id: str, private_names: list[str]) -> str:
+    """Remove what public output must not carry: the session ID, the local home,
+    and the names of a private session repo."""
+    text = text.replace(session_id, "<session>").replace(str(Path.home()), "~")
+    for name in private_names:
+        text = re.sub(
+            rf"(?<![\w/-]){re.escape(name)}(?![\w-])", "a private project", text
+        )
+    return text
+
+
+def story_block(story: dict[str, Any]) -> str:
+    anchors = []
+    for item in story["items"]:
+        path = display_path(item)
+        where = (
+            f"`{path}`, line {item['source']['number']} of the loaded text"
+            if path
+            else "no line of the skill covers this step"
+        )
+        anchors.append(f"{where} ({item['category']})")
+    return "\n".join(
+        [
+            f"#### US-1 — `{story['items'][0]['skill']}`: {story['title']}",
+            "",
+            story["user_story"],
+            "",
+            f"- Wanted: {story['wanted']}",
+            f"- Problem: {story['problem']}",
+            f"- Workaround: {story['workaround']}",
+            f"- Fix: {story['fix']}",
+            f"- Evidence: {story['evidence']}",
+            *(f"- Anchor: {anchor}" for anchor in anchors),
+        ]
+    )
+
+
+def marker(op: str) -> str:
+    return f"<!-- jev-skill-retro:op={op} -->"
+
+
+def private_names(
+    session_repo: str | None, destination: str, timeout: float
+) -> list[str]:
+    if not session_repo or session_repo == destination:
+        return []
+    visibility = gh(
+        "repo",
+        "view",
+        session_repo,
+        "--json",
+        "visibility",
+        "-q",
+        ".visibility",
+        timeout=timeout,
+    )
+    if visibility.strip() == "PUBLIC":
+        return []
+    return [session_repo, session_repo.split("/", 1)[1]]
+
+
+def require_labels(repo: str, timeout: float) -> None:
+    names = {
+        label["name"]
+        for label in gh_json(
+            "label",
+            "list",
+            "-R",
+            repo,
+            "--limit",
+            "500",
+            "--json",
+            "name",
+            timeout=timeout,
+        )
+    }
+    missing = [label for label in LABELS if label not in names]
+    if missing:
+        raise ScriptError(
+            *(
+                f"{repo} has no label {label}; run: gh label create {shlex.quote(label)} -R {repo}"
+                for label in missing
+            )
+        )
+
+
+def duplicate_target(
+    story: dict[str, Any], skill: str, candidates: list[dict[str, Any]], jev: Jev
+) -> tuple[str, int | None, str]:
+    """new, comment on one issue, or hold, from one Noul per open issue."""
+    if not candidates:
+        return "create", None, ""
+    shown = {name: story[name] for name in ("title", "user_story", "problem", "fix")}
+    scores: dict[int, float] = {}
+    batch: list[dict[str, Any]] = []
+
+    def request(issues: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "state": {
+                "story": {"skill": skill, **shown},
+                "issues": [
+                    {
+                        "number": issue["number"],
+                        "title": issue["title"],
+                        "body": issue["body"][:ISSUE_EDGE],
+                    }
+                    for issue in issues
+                ],
+            },
+            "questions": {
+                f"same::{issue['number']}": {
+                    "type": "noul",
+                    "instructions": DUPLICATE["instructions"].format(issue=position),
+                    "criteria": DUPLICATE["criteria"],
+                }
+                for position, issue in enumerate(issues)
+            },
+        }
+
+    def ask(issues: list[dict[str, Any]]) -> None:
+        for key, answer in jev.ask("duplicate", request(issues)).items():
+            scores[int(key.split("::")[1])] = float(answer["noul"])
+
+    for issue in candidates:
+        if batch and not fits(request([*batch, issue])):
+            ask(batch)
+            batch = []
+        batch.append(issue)
+    ask(batch)
+    matches = [number for number, p in scores.items() if p >= YES]
+    if len(matches) == 1 and all(p <= NO or p >= YES for p in scores.values()):
+        return "comment", matches[0], ""
+    if all(p <= NO for p in scores.values()):
+        return "create", None, ""
+    unclear = ", ".join(f"#{n} ({p:.2f})" for n, p in sorted(scores.items()) if p > NO)
+    return "hold", None, f"it may repeat {unclear}; decide by hand"
+
+
+def reconcile(
+    repo: str, op: str, action: str, target: int | None, timeout: float
+) -> str | None:
+    """The URL of a write an interrupted run already made, found by its marker."""
+    if action == "comment" and target is not None:
+        issue = gh_json(
+            "issue",
+            "view",
+            str(target),
+            "-R",
+            repo,
+            "--json",
+            "comments",
+            timeout=timeout,
+        )
+        for comment in issue.get("comments") or []:
+            if marker(op) in comment.get("body", ""):
+                return (
+                    comment.get("url") or f"https://github.com/{repo}/issues/{target}"
+                )
+        return None
+    listed = gh_json(
+        "issue", "list", "-R", repo, "--state", "all", "--label", "2-type:postmortem",
+        "--limit", "200", "--json", "number,url,body", timeout=timeout,
+    )  # fmt: skip
+    return next(
+        (issue["url"] for issue in listed if marker(op) in issue.get("body", "")), None
+    )
+
+
+def publish_step(args: argparse.Namespace) -> dict[str, Any]:
+    session = read_session(locate(args.target))
+    directory = run_directory(session)
+    stories_path = directory / "stories.json"
+    if not stories_path.exists():
+        raise ScriptError(
+            f"{session.id} has no written stories yet",
+            f"{PROG} write {shlex.quote(args.target)} --dry-run",
+        )
+    if not args.dry_run and not args.yes:
+        raise ScriptError(
+            "publish writes issues and comments on GitHub; preview with "
+            f"`{PROG} publish {shlex.quote(args.target)} --dry-run` and pass --yes"
+        )
+    stories = json.loads(stories_path.read_text()).get("stories", [])
+    scanned = json.loads((directory / "scan.json").read_text())
+    session_repo = scanned["session"]["repo"]
+    homes = {
+        story["items"][0]["home"] for story in stories if story["items"][0]["home"]
+    }
+    jev = Jev(
+        directory, replay=False, retry=set(args.retry), timeout=args.timeout,
+        budget=args.max_requests, repos=set(homes),
+    )  # fmt: skip
+    actions: list[dict[str, Any]] = []
+    held: list[dict[str, Any]] = []
+    created: dict[str, list[dict[str, Any]]] = {}
+    date = time.strftime("%Y-%m-%d", time.gmtime())
+    with exclusive(directory / "lock", args.timeout):
+        for repo in sorted(homes):
+            require_labels(repo, args.timeout)
+        for story in stories:
+            skill = story["items"][0]["skill"]
+            repo = story["items"][0]["home"]
+            title = f"{skill}: {story['title']}"
+            if repo is None:
+                held.append(
+                    {"title": title, "reason": "the skill's home repo is unknown"}
+                )
+                continue
+            changed = [item["id"] for item in story["items"] if stale(item)]
+            if changed:
+                held.append(
+                    {
+                        "title": title,
+                        "reason": f"stale: the anchored line of {', '.join(changed)} changed since the session",
+                    }
+                )
+                continue
+            names = private_names(session_repo, repo, args.timeout)
+            block = scrub(story_block(story), session.id, names)
+            title = scrub(title, session.id, names)
+            listed = gh_json(
+                "issue", "list", "-R", repo, "--state", "open", "--label", "2-type:postmortem",
+                "--limit", "200", "--json", "number,title,body", timeout=args.timeout,
+            )  # fmt: skip
+            candidates = [
+                issue
+                for issue in [*listed, *created.get(repo, [])]
+                if issue["title"].startswith(f"{skill}:")
+            ]
+            action, target, reason = duplicate_target(story, skill, candidates, jev)
+            if action == "hold":
+                held.append({"title": title, "reason": reason})
+                continue
+            op = operation(
+                "publish",
+                {"repo": repo, "action": action, "target": target, "block": block},
+            )
+            if action == "create":
+                body = f"Retro {date}, story written by the session's agent. Found by `{PROG}`.\n\n{block}\n\n{marker(op)}\n"
+            else:
+                body = f"Seen again: retro {date}, story written by the session's agent.\n\n{block}\n\n{marker(op)}\n"
+            leaks = secrets(f"{title}\n{body}", args.timeout)
+            if leaks is None:
+                raise ScriptError(
+                    "gitleaks is not installed, so the issue text cannot be checked for secrets",
+                    "install gitleaks, then rerun",
+                )
+            if leaks:
+                held.append(
+                    {
+                        "title": title,
+                        "reason": f"gitleaks reads a secret in it: {'; '.join(leaks)}",
+                    }
+                )
+                continue
+            entry = {
+                "action": action,
+                "repo": repo,
+                "target": target,
+                "title": title,
+                "body": body,
+                "op": op,
+            }
+            record_path = directory / "ops" / f"{op}.json"
+            record = json.loads(record_path.read_text()) if record_path.exists() else {}
+            if record.get("state") == "done":
+                continue
+            if args.dry_run:
+                actions.append(entry)
+                if action == "create":
+                    created.setdefault(repo, []).append(
+                        {"number": 0, "title": title, "body": body}
+                    )
+                continue
+            url = (
+                reconcile(repo, op, action, target, args.timeout)
+                if record.get("state") == "sent"
+                else None
+            )
+            if url is None:
+                write_json(record_path, {"kind": "publish", "state": "sent"})
+                if action == "create":
+                    url = gh("issue", "create", "-R", repo, "--title", title, "--body-file", "-",
+                             *(part for label in LABELS for part in ("--label", label)),
+                             input=body, timeout=args.timeout).strip()  # fmt: skip
+                else:
+                    url = gh(
+                        "issue",
+                        "comment",
+                        str(target),
+                        "-R",
+                        repo,
+                        "--body-file",
+                        "-",
+                        input=body,
+                        timeout=args.timeout,
+                    ).strip()
+            write_json(record_path, {"kind": "publish", "state": "done", "url": url})
+            actions.append({**entry, "url": url})
+            if action == "create":
+                number = (
+                    int(url.rstrip("/").rsplit("/", 1)[-1])
+                    if url.rstrip("/").rsplit("/", 1)[-1].isdigit()
+                    else 0
+                )
+                created.setdefault(repo, []).append(
+                    {"number": number, "title": title, "body": body}
+                )
+        for entry in held:
+            log.warning("held %s: %s", entry["title"], entry["reason"])
+        report = {
+            "run": str(directory),
+            "actions": actions,
+            "held": held,
+            "usage": jev.summary(),
+        }
+        if not args.dry_run:
+            write_json(directory / "published.json", report)
+    return report
+
+
+def publish_lines(report: dict[str, Any]) -> str:
+    rows: list[str] = []
+    for entry in report["actions"]:
+        where = (
+            entry["repo"]
+            if entry["action"] == "create"
+            else f"{entry['repo']}#{entry['target']}"
+        )
+        rows.append(f"{entry['action']}\t{where}\t{entry['title']}")
+    return "\n".join(rows)
+
+
 # --- Steps -----------------------------------------------------------------------
 
 
@@ -1819,9 +2244,9 @@ def write_lines(report: dict[str, Any]) -> str:
 
 
 # How long each step waits, by default, for its lock and its slowest child
-TIMEOUTS = {"scan": 60.0, "write": 1200.0}
+TIMEOUTS = {"scan": 60.0, "write": 1200.0, "publish": 60.0}
 # Flags each step takes beyond the shared ones
-STEP_FLAGS = {"scan": {"replay", "repo"}, "write": {"yes"}}
+STEP_FLAGS = {"scan": {"replay", "repo"}, "write": {"yes"}, "publish": {"yes"}}
 
 
 def work(args: argparse.Namespace) -> str:
@@ -1833,12 +2258,15 @@ def work(args: argparse.Namespace) -> str:
             raise UsageError(f"{args.step} takes no --{name}")
     if args.dry_run and (args.replay or args.retry or args.yes):
         raise UsageError(
-            "--dry-run sends nothing, so it takes no --replay, --retry, or --yes"
+            "--dry-run writes nothing, so it takes no --replay, --retry, or --yes"
         )
     args.timeout = args.timeout or TIMEOUTS[args.step]
     if args.step == "write":
         report = write_step(args)
         render = write_lines
+    elif args.step == "publish":
+        report = publish_step(args)
+        render = publish_lines
     else:
         report = scan(args)
         render = lines
@@ -1859,15 +2287,18 @@ def build_parser() -> Parser:
             "locates and qualifies the flagged events, and decides each skill's outcome: "
             "candidate, review, or nothing. Every request needs recorded consent for the "
             "session's repo and each skill's home repo, and passes a gitleaks scan first. "
-            "write forks the session read-only, once, after Pascal approves its cost."
+            "write forks the session read-only, once, after Pascal approves its cost. "
+            "publish files each story in its skill's home repo, or comments on the open "
+            "retro issue it repeats, and holds stale or unclear ones."
         ),
         epilog=EXAMPLES,
     )
     parser.add_argument(
         "step",
-        choices=("scan", "write"),
+        choices=("scan", "write", "publish"),
         help="scan asks Jev about the session's skills; write forks the session so "
-        "its own agent writes a story for each flagged item",
+        "its own agent writes a story for each flagged item; publish files each story "
+        "as a retro issue, or comments on the open issue it repeats",
     )
     parser.add_argument(
         "target", metavar="SESSION", help="a session ID, or the path of its transcript"
@@ -1877,7 +2308,9 @@ def build_parser() -> Parser:
         "--dry-run",
         action="store_true",
         help="scan: plan and save the triage requests, sending nothing; "
-        "write: show the fork, its items, and its cost, and save its prompt",
+        "write: show the fork, its items, and its cost, and save its prompt; "
+        "publish: ask Jev about duplicates and show every title, body, and target, "
+        "writing nothing to GitHub",
     )
     parser.add_argument(
         "--replay",
@@ -1896,7 +2329,8 @@ def build_parser() -> Parser:
         "-y",
         "--yes",
         action="store_true",
-        help="write: approve the paid fork that --dry-run shows",
+        help="write: approve the paid fork --dry-run shows; publish: write the "
+        "issues and comments --dry-run shows",
     )
     parser.add_argument(
         "--repo",
@@ -1908,15 +2342,15 @@ def build_parser() -> Parser:
         type=int,
         default=50,
         metavar="N",
-        help="the most requests one scan may send (default: 50)",
+        help="the most TypeSafe requests one run may send (default: 50)",
     )
     parser.add_argument(
         "--timeout",
         type=duration,
         metavar="DURATION",
-        help="how long to wait for the session lock and the slowest child: one TypeSafe "
-        "answer or gitleaks for scan, the fork for write; 30s, 5m, or seconds "
-        "(default: 60s for scan, 20m for write)",
+        help="how long to wait for the session lock and the slowest child: a TypeSafe "
+        "answer, gitleaks, or gh, and the fork for write; 30s, 5m, or seconds "
+        "(default: 20m for write, 60s otherwise)",
     )
     parser.add_argument(
         "--json", action="store_true", help="print one JSON object on stdout"
