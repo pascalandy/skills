@@ -47,11 +47,18 @@ Command = tuple[str, ...]
 
 
 class Check:
-    """A named step whose commands run from the repository root and stop at the first failure."""
+    """A named step whose commands run from the repository root and stop at the first failure.
 
-    def __init__(self, name: str, *commands: Command) -> None:
+    `reads` names files or directories outside the check's skill package that it
+    depends on, so a change there runs it too.
+    """
+
+    def __init__(
+        self, name: str, *commands: Command, reads: tuple[str, ...] = ()
+    ) -> None:
         self.name = name
         self.commands = commands
+        self.reads = reads
 
     def skills(self) -> set[str]:
         """The skill packages the commands name; none means the check covers the repository."""
@@ -138,8 +145,14 @@ CHECKS = [
         "matt-mode",
         uv_run("authoring/mattpocock/matt-mode/scripts/check_matt_mode.py"),
         uv_run("authoring/mattpocock/matt-mode/scripts/update_matt_mode.py", "check"),
+        # It validates the upstream imports of every package in the bucket
+        reads=("authoring/mattpocock",),
     ),
-    Check("distill", pytest("authoring/knowledge/distill/scripts/tests")),
+    Check(
+        "distill",
+        pytest("authoring/knowledge/distill/scripts/tests"),
+        reads=("authoring/knowledge/distill-prompt",),
+    ),
     Check(
         "tavily",
         pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
@@ -147,6 +160,8 @@ CHECKS = [
     Check(
         "transcript",
         pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
+        # Its doc test checks the flags these files pass to transcript
+        reads=("justfile", "authoring/verify/verify-transcript/SKILL.md"),
     ),
     Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
     Check(
@@ -226,11 +241,14 @@ def changed() -> list[str] | None:
     base = run_git("merge-base", "HEAD", "origin/main", cwd=ROOT)
     if base.returncode != 0:
         return None
-    diff = run_git("diff", "--name-only", "--no-renames", base.stdout.strip(), cwd=ROOT)
-    untracked = run_git("ls-files", "--others", "--exclude-standard", cwd=ROOT)
+    # -z keeps git from quoting names with spaces or non-ASCII characters
+    diff = run_git(
+        "diff", "--name-only", "--no-renames", "-z", base.stdout.strip(), cwd=ROOT
+    )
+    untracked = run_git("ls-files", "-z", "--others", "--exclude-standard", cwd=ROOT)
     if diff.returncode != 0 or untracked.returncode != 0:
         return None
-    return [*diff.stdout.splitlines(), *untracked.stdout.splitlines()]
+    return [path for path in f"{diff.stdout}\0{untracked.stdout}".split("\0") if path]
 
 
 def in_scope(checks: list[Check]) -> list[Check]:
@@ -241,12 +259,13 @@ def in_scope(checks: list[Check]) -> list[Check]:
     scoped: list[Check] = []
     for check in checks:
         skills = check.skills()
-        if not skills or any(p.startswith(f"{s}/") for p in paths for s in skills):
+        watched = sorted({*skills, *check.reads})
+        if not skills or any(
+            path == w or path.startswith(f"{w}/") for path in paths for w in watched
+        ):
             scoped.append(check)
         else:
-            log.info(
-                "skip %s: no change under %s", check.name, ", ".join(sorted(skills))
-            )
+            log.info("skip %s: no change under %s", check.name, ", ".join(watched))
     return scoped
 
 
