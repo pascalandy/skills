@@ -1427,6 +1427,23 @@ def test_a_session_whose_directory_is_gone_is_reported_not_forked(live: Live) ->
     assert f"the session's working directory {gone} is gone" in result.stderr
 
 
+def test_write_dry_run_prints_tab_separated_lines_with_the_fork_estimate(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.scan(transcript)
+
+    result = live.sandbox.run("write", str(transcript), "--dry-run")
+    rows = [line.split("\t") for line in result.stdout.splitlines()]
+
+    assert result.returncode == 0, result.stderr
+    assert [row[0] for row in rows] == ["run", "fork", "item", "prompt"]
+    assert rows[1][4] == "claude-opus-5-5"
+    assert rows[1][7].startswith("fallback: about $40 per 600k tokens")
+    assert rows[2] == ["item", "alpha-e1", "candidate", "contradicted"]
+
+
 @pytest.mark.parametrize(
     ("step", "flag"), [("scan", "--yes"), ("write", "--replay")], ids=["scan", "write"]
 )

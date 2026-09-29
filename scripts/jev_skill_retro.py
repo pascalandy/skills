@@ -1521,8 +1521,8 @@ Answer with exactly one JSON object per line and nothing else, one per item:
 were trying to do>", "problem": "<the problem you hit>", "workaround": "<what you \
 did to work around it>", "fix": "<the smallest change to the skill that removes \
 it>", "evidence": "<a short quote, command, or error from this conversation>"}}
-Related items may share one story: write it once with "items": ["<id>", "<id>"] \
-in place of "item", and no other line for those items.
+Related items of the same skill may share one story: write it once with \
+"items": ["<id>", "<id>"] in place of "item", and no other line for those items.
 """
 
 
@@ -1535,9 +1535,15 @@ def flagged(scan_report: dict[str, Any], session: Session) -> list[dict[str, Any
                 continue
             event = session.events[item["event"]]
             line = item.get("line")
+            base = f"{outcome['skill']}-e{item['event']}"
+            taken = sum(
+                1
+                for seen in found
+                if seen["id"] == base or seen["id"].startswith(f"{base}-")
+            )
             found.append(
                 {
-                    "id": f"{outcome['skill']}-e{item['event']}",
+                    "id": base if not taken else f"{base}-{taken + 1}",
                     "skill": outcome["skill"],
                     "home": outcome["home"],
                     "outcome": item["outcome"],
@@ -1914,30 +1920,28 @@ def lines(report: dict[str, Any]) -> str:
 
 
 def write_lines(report: dict[str, Any]) -> str:
-    rows = [f"run\\t{report['run']}"]
+    rows = [f"run\t{report['run']}"]
     fork = report["fork"]
     if fork is None:
-        rows.append("skip\\tno skill in this session is a candidate or review")
-        return "\\n".join(rows)
+        rows.append("skip\tno skill in this session is a candidate or review")
+        return "\n".join(rows)
     low, high = fork["context_tokens"]
     cost_low, cost_high = fork["cost_usd"]
     session = report["session"]
     rows.append(
-        f"fork\\t{fork['op']}\\t{session['harness']}\\t{session['id']}"
-        f"\\t{low}-{high} tokens\\t${cost_low:.2f}-${cost_high:.2f}"
+        f"fork\t{fork['op']}\t{session['harness']}\t{session['id']}\t{session['model'] or '-'}"
+        f"\t{low}-{high} tokens\t${cost_low:.2f}-${cost_high:.2f}\t{fork['price']}"
     )
     rows += [
-        f"item\\t{item['id']}\\t{item['outcome']}\\t{item['category']}"
+        f"item\t{item['id']}\t{item['outcome']}\t{item['category']}"
         for item in report["items"]
     ]
-    rows.append(f"prompt\\t{fork['prompt']}")
+    rows.append(f"prompt\t{fork['prompt']}")
     for story in report.get("stories", []):
         items = ",".join(item["id"] for item in story["items"])
-        rows.append(
-            f"story\\t{story['items'][0]['skill']}\\t{items}\\t{story['title']}"
-        )
-    rows += [f"nothing\\t{item}" for item in report.get("nothing", [])]
-    return "\\n".join(rows)
+        rows.append(f"story\t{story['items'][0]['skill']}\t{items}\t{story['title']}")
+    rows += [f"nothing\t{item}" for item in report.get("nothing", [])]
+    return "\n".join(rows)
 
 
 # How long each step waits, by default, for its lock and its slowest child
