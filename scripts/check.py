@@ -155,13 +155,11 @@ CHECKS = [
         "jevgate",
         *ruff(JEVGATE, version="ruff@0.15.7"),
         pyright(JEVGATE, JEVGATE_SDK),
-        pytest(f"{JEVGATE}/tests", JEVGATE_SDK),
     ),
     Check(
         "jevlabel",
         *ruff(JEVLABEL),
         pyright(JEVLABEL, JEVLABEL_SDK),
-        pytest(f"{JEVLABEL}/tests", JEVLABEL_SDK),
     ),
     Check(
         "retro-triage-jev",

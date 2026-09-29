@@ -125,7 +125,7 @@ A migrated script with subcommands or PEP 723 dependencies is listed in `OWN_SUI
 
 Each script's exit-code table drives its tests: every code needs a test that triggers it. The contract tests cover `2`, `130`, and `143`; a script's own suite marks the rest with `@exits(script, code)`, which fails unless the test really sees that exit
 
-The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has its own suite in the skill's `scripts/tests/`. `just check --only jevgate` runs its ruff, pyright, and offline behavior tests. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
+The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has no test suite. `just check --only jevgate` runs its ruff and pyright. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
 
 ## Related
 

@@ -335,7 +335,6 @@ OWN_SUITE = {
 EXCLUDED = {
     "authoring/content/transcript/scripts/ytdlp_arc.py": "owner decision: out of scope",
     ".lefthook/pre-push/sync-skills.sh": "exec shim for just sync-hook",
-    "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/tests/proof_live_noul.py": "live proof against the TypeSafe API",
 }
 
 
