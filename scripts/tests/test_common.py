@@ -66,6 +66,16 @@ def test_under_json_a_bug_and_a_temporary_failure_are_one_object_each() -> None:
     }
 
 
+def test_under_json_a_usage_error_is_one_object_and_exits_2() -> None:
+    code, stdout, stderr = call(broken, "--json", "--bogus")
+
+    assert (code, stdout) == (2, "")
+    assert json.loads(stderr) == {
+        "errors": ["unrecognized arguments: --bogus"],
+        "help": "just tool --help",
+    }
+
+
 def test_under_json_and_debug_the_error_object_still_ends_stderr() -> None:
     code, stdout, stderr = call(broken, "--json", "--debug")
     lines = stderr.splitlines()
