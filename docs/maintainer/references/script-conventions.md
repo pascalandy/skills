@@ -117,7 +117,7 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 
 ## Tests
 
-Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and `just check` runs them only when the change touches that skill
+Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and [[checks]] says when they run
 
 `test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it in docs, hooks, CI, and `scripts/`. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
 

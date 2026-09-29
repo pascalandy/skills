@@ -3,11 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run the CI verdict: the checks in CHECKS, in order; success prints nothing.
-
-A check whose commands name a path under authoring/ belongs to that skill and
-runs only when the change touches the skill; every other check always runs.
-"""
+"""Run the CI verdict: the checks in CHECKS, in order; success prints nothing."""
 
 from __future__ import annotations
 

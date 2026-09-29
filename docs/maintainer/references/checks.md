@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-09-29
 ---
 
-`just check` is the verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check` only when started by hand
+`just check` is the verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --all` only when started by hand
 
 ## Sign off a PR
 
