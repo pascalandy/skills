@@ -41,7 +41,7 @@ flatten-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
-# Run the same CI verdict as GitHub Actions; --list names each check, --only NAME reruns one
+# Run every check, the verdict `just signoff` posts; --list names each check, --only NAME reruns one
 [group('checks')]
 check *args:
     @uv run --quiet scripts/check.py "$@"

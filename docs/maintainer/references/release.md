@@ -7,10 +7,10 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-28
+date_updated: 2026-09-29
 ---
 
-A pushed `vX.Y.Z` tag runs CI, which validates the tag and publishes a GitHub Release with that version's `CHANGELOG.md` notes
+A pushed `vX.Y.Z` tag publishes nothing by itself. From `main` on your machine, validate the tag and publish a GitHub Release with that version's `CHANGELOG.md` notes
 
 ## Steps
 
@@ -19,8 +19,9 @@ A pushed `vX.Y.Z` tag runs CI, which validates the tag and publishes a GitHub Re
 3. Write that version's `CHANGELOG.md` section and merge it to `main`
 4. On `main`, run `just check && just release-check vX.Y.Z`; both print nothing when HEAD is ready
 5. Run `git tag vX.Y.Z && git push origin vX.Y.Z`
-6. Never move or delete a pushed tag, or edit or replace a published release
-7. If the tag run fails, rerun it once only when the failure was transient; otherwise fix on `main` and release the next patch
+6. Publish from the same HEAD: `notes=$(mktemp) && just release-check vX.Y.Z --notes "$notes" && gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file "$notes"`
+7. Never move or delete a pushed tag, or edit or replace a published release
+8. If step 6 fails, rerun it once only when the failure was transient; otherwise fix on `main` and release the next patch
 
 ## Related
 
