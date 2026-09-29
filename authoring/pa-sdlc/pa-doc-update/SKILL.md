@@ -82,7 +82,7 @@ Default to a concise documentation brief that covers:
    - mark each non-local target `not applicable: no local filesystem Wiki Map surface`; if no local target remains, stop the postflight;
    - for each local target, compare its pre-write and current paths within the bounded root. Inspect the target itself only when it is `INDEX.md`, plus every ancestor `INDEX.md`. An inspected index is a candidate when its frontmatter contains `kind/wiki`, or when its frontmatter contains `schema_version` and either contains `wiki_type: collection` or its directory contains `references/`;
    - mark each local target without a candidate `skipped: no Wiki Map boundary`;
-   - if any candidate remains, load `references/WikiMapPostflight.md`, then use and reload `$wiki-map` for those candidates only. Do not load either one earlier.
+   - if any candidate remains, load `references/WikiMapPostflight.md` for those candidates only. Do not load it earlier.
    This step is complete when every changed target is accounted for and every candidate boundary has a result.
 8. Return the evidence used, files changed or proposed, Wiki Map postflight result, unresolved unknowns, and recommended next step.
 
