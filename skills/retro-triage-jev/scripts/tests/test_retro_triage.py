@@ -166,15 +166,17 @@ def test_a_temporary_failure_after_paid_answers_exits_1(tmp_path: Path, jev) -> 
 
 
 def test_an_unreachable_api_exits_75(tmp_path: Path) -> None:
+    # Bound but not listening, the port refuses connections, and no parallel
+    # test's server can take it before the client connects
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
-    done = run(
-        tmp_path,
-        [story("clear")],
-        TYPESAFE_API_KEY="k",
-        TYPESAFE_BASE_URL=f"http://127.0.0.1:{port}",
-    )
+        done = run(
+            tmp_path,
+            [story("clear")],
+            TYPESAFE_API_KEY="k",
+            TYPESAFE_BASE_URL=f"http://127.0.0.1:{port}",
+        )
 
     assert (done.returncode, done.stdout) == (75, "")
 
