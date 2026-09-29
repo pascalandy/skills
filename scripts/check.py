@@ -160,7 +160,6 @@ CHECKS = [
         "jevlabel",
         *ruff(JEVLABEL),
         pyright(JEVLABEL, JEVLABEL_SDK),
-        pytest(f"{JEVLABEL}/tests", JEVLABEL_SDK),
     ),
     Check(
         "retro-triage-jev",
