@@ -86,9 +86,11 @@ def with_deps(deps: tuple[str, ...]) -> list[str]:
 
 
 def ruff(path: str) -> tuple[Command, Command]:
+    # The repository has no ruff config; --isolated keeps a pyproject.toml above
+    # the checkout from setting the target Python and changing the verdict
     return (
-        ("uvx", RUFF, "check", "--quiet", path),
-        ("uvx", RUFF, "format", "--quiet", "--check", path),
+        ("uvx", RUFF, "check", "--isolated", "--quiet", path),
+        ("uvx", RUFF, "format", "--isolated", "--quiet", "--check", path),
     )
 
 
