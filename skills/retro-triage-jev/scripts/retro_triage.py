@@ -187,13 +187,30 @@ def require_consent(repos: set[str]) -> None:
         )
     config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     for repo in sorted(repos):
-        seen = subprocess.run(
-            ["gh", "repo", "view", repo, "--json", "visibility", "-q", ".visibility"],
-            capture_output=True,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            check=False,
-        )
+        try:
+            seen = subprocess.run(
+                [
+                    "gh",
+                    "repo",
+                    "view",
+                    repo,
+                    "--json",
+                    "visibility",
+                    "-q",
+                    ".visibility",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                stdin=subprocess.DEVNULL,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise Failure(
+                f"gh took over 30s to report the visibility of {repo}",
+                f"rerun {PROG} later",
+                TEMPORARY,
+            ) from error
         visibility = seen.stdout.strip()
         if seen.returncode != 0 or not visibility:
             raise Failure(
