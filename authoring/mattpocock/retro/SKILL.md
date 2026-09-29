@@ -24,6 +24,14 @@ Review the coding agent's **environment** so future runs go better. This is not 
 
 ## Publishing findings
 
-If the user wants issues, draft one per finding for the relevant repository in the language of the conversation. Keep each under about 40 lines. Use a Conventional Commit-style title such as `fix(commit): document non-interactive hunk staging`: `fix` for wrong instructions, `docs` for unclear ones, `feat` for a missing step. Include `## Why` (observation and evidence), `## Scope` (specific change), and `## Verification` (the scenario that should work afterward); add tradeoffs and blast radius only when material.
+If the user wants issues, draft one per finding in the repository that owns the change: the project for its `AGENTS.md`, checks, or scripts, or the upstream repository for a shared skill or tool. A finding whose target has no issue tracker, such as a personal global config, stays in the report as a proposed change.
 
-Before publishing, search open issues for duplicates and update the existing issue instead where appropriate. For a public repository, redact session IDs, local paths, hostnames, private project names, and unrelated conversation details. Run `2nd-pass` on the drafts. Publish only when authorized, using the repository's labels; link the finding to a PR if one exists. Read published issues back and return their links.
+Write each issue in the language of the conversation, under about 40 lines. Follow the repository's title convention; without one, use a Conventional Commit title naming the area and the change, such as `docs(agents-md): point to the fixture generator`. Pick the type from the change: `fix` for a wrong instruction or broken check, `docs` for an unclear instruction or missing pointer, `feat` for a new check, step, or tool. Build the body from the finding's fields in step 3:
+
+- `## Why`: the observation, its evidence, and the existing mechanism or gap. Link the session's PR or commit when the evidence lives there.
+- `## Scope`: the smallest proposed change, naming the files, checks, or tools it touches.
+- `## Verification`: the scenario that should work afterward.
+
+Add `## Tradeoffs` or `## Blast Radius` only when material.
+
+Before publishing, search the repository's open issues for duplicates; when one already reports the problem, draft a comment on it instead of a new issue. For a public repository, redact session IDs, absolute local paths, hostnames, private project names, and unrelated conversation details. Run `2nd-pass` on the drafts. Publish only when authorized, using the repository's labels, then read each issue back and return the links.
