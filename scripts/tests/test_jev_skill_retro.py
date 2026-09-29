@@ -1481,11 +1481,15 @@ elif args[:2] == ["issue", "list"]:
     found = [i for i in state["issues"] if value("--state") != "open" or i["state"] == "OPEN"]
     print(json.dumps(found))
 elif args[:2] == ["issue", "view"]:
-    print(json.dumps(issue(int(args[2]))))
+    shown = dict(issue(int(args[2])))
+    shown["labels"] = [{{"name": name}} for name in shown["labels"]]
+    if shown["number"] in state.get("closed_on_view", []):
+        shown["state"] = "CLOSED"
+    print(json.dumps(shown))
 elif args[:2] == ["issue", "create"]:
     number = 100 + len(state["issues"])
     url = "https://github.com/" + value("-R") + "/issues/" + str(number)
-    labels = [args[i + 1] for i, arg in enumerate(args) if arg == "--label"]
+    labels = [] if state.get("drop_labels") else [args[i + 1] for i, arg in enumerate(args) if arg == "--label"]
     state["issues"].append({{"number": number, "title": value("--title"), "body": sys.stdin.read(),
                             "url": url, "state": "OPEN", "labels": labels, "comments": []}})
     state["calls"].append(["create", number])
@@ -1651,13 +1655,14 @@ def test_a_story_whose_anchored_line_changed_is_held_as_stale(live: Live) -> Non
     (live.sandbox.repo / "skills/alpha/SKILL.md").write_text(
         "# alpha\n\nUse `alpha` now.\n"
     )
+    commit(live.sandbox.repo)
 
     result = published(live, transcript, "--yes", "--json")
 
     assert json.loads(result.stdout)["held"] == [
         {
             "title": "alpha: Document the removed --all flag",
-            "reason": "stale: the anchored line of alpha-e1 changed since the session",
+            "reason": "stale: the anchored line of alpha-e1 changed on main since the session",
         }
     ]
     assert github.state()["calls"] == []
@@ -1681,7 +1686,12 @@ def test_an_interrupted_publish_finds_its_marker_instead_of_filing_twice(
     report = json.loads(published(live, transcript, "--yes", "--json").stdout)
     op = report["actions"][0]["op"]
     record = Path(report["run"], "ops", f"{op}.json")
-    record.write_text(json.dumps({"kind": "publish", "state": "sent"}))
+    # As if the run stopped after gh created the issue, before it saved the receipt
+    record.write_text(
+        json.dumps(
+            {"kind": "publish", "state": "sent", "action": "create", "target": None}
+        )
+    )
 
     again = json.loads(published(live, transcript, "--yes", "--json").stdout)
 
@@ -1723,7 +1733,7 @@ def test_a_private_session_repo_is_named_nowhere_in_public_output(live: Live) ->
         work,
         "--repo",
         "o/secret-proj",
-        problem=f"alpha-cli failed in o/secret-proj at {live.sandbox.home}/work, as secret-proj notes",
+        problem=f"alpha-cli failed in o/secret-proj at {live.sandbox.home}/work and /tmp/secret-proj/config, as secret-proj notes",
     )
 
     result = published(live, transcript, "--yes")
@@ -1731,9 +1741,9 @@ def test_a_private_session_repo_is_named_nowhere_in_public_output(live: Live) ->
 
     assert result.returncode == 0, result.stderr
     assert (
-        "- Problem: alpha-cli failed in a private project at ~/work, as a private project notes"
-        in body
-    )
+        "- Problem: alpha-cli failed in a private project at <local path> and "
+        "<local path>, as a private project notes"
+    ) in body
     assert "secret-proj" not in body
 
 
@@ -1749,3 +1759,78 @@ def test_a_secret_in_the_story_holds_it(live: Live) -> None:
 
     assert (result.returncode, github.state()["calls"]) == (0, [])
     assert "gitleaks reads a secret in it: github-pat at line 12" in result.stderr
+
+
+def test_a_rerun_never_comments_on_the_issue_it_just_filed(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    published(live, transcript, "--yes")
+    live.fake.same = {100: 0.95}
+
+    again = published(live, transcript, "--yes")
+
+    assert (again.returncode, again.stdout) == (0, "")
+    assert github.state()["calls"] == [["create", 100]]
+
+
+def test_publish_needs_consent_for_the_sessions_repo_too(live: Live) -> None:
+    fake_github(
+        live.sandbox,
+        issues=[open_issue(7, "alpha: flags are stale")],
+        visibility={"o/secret-proj": "PRIVATE"},
+    )
+    live.sandbox.consent(
+        **{PUBLIC: "typesafe-2026-09-26", "o/secret-proj": "typesafe-2026-09-26"}
+    )
+    work = live.sandbox.home / "work"
+    work.mkdir()
+    transcript = stories_ready(live, work, "--repo", "o/secret-proj")
+    live.sandbox.consent(**{PUBLIC: "typesafe-2026-09-26"})
+    sent = len(live.fake.bodies)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, len(live.fake.bodies)) == (1, sent)
+    assert "o/secret-proj has no consent" in result.stderr
+
+
+def test_a_story_merging_items_of_several_skills_is_held(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    live.fake.friction = {2: 0.92}
+    live.fake.covered = {"alpha": 0.9, "beta": 0.1}
+    transcript = friction_session(
+        live.sandbox, ("alpha", ALPHA), ("beta", "Beta body\n")
+    )
+    live.scan(transcript)
+    fake_agent(live.sandbox, "claude", story("", items=["alpha-e2", "beta-e2"]))
+    assert written(live, transcript, "--yes").returncode == 0
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "it merges items of several skills; publish it by hand" in result.stderr
+
+
+def test_a_duplicate_closed_after_the_check_is_held(live: Live) -> None:
+    github = fake_github(
+        live.sandbox,
+        issues=[open_issue(7, "alpha: flags are stale")],
+        closed_on_view=[7],
+    )
+    live.fake.same = {7: 0.91}
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "#7 closed after the duplicate check; decide by hand" in result.stderr
+
+
+def test_a_write_that_does_not_read_back_fails(live: Live) -> None:
+    fake_github(live.sandbox, drop_labels=True)
+    transcript = stories_ready(live)
+
+    result = published(live, transcript, "--yes")
+
+    assert result.returncode == 1
+    assert f"{PUBLIC}#100 does not show what publish just wrote" in result.stderr

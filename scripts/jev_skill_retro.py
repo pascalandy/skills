@@ -1798,6 +1798,10 @@ DUPLICATE = {
         ),
     },
 }
+# A local absolute or home path, not a URL's path or a repository-relative one
+LOCAL_PATH = re.compile(
+    r"(?<![\w.:/~-])(?:~/|/)[^\s`'\"()<>\[\],;]*[^\s`'\"()<>\[\],;.:!?]"
+)
 # Characters of an open issue's body that the duplicate question sees
 ISSUE_EDGE = 3000
 
@@ -1840,48 +1844,111 @@ def relative(item: dict[str, Any]) -> str | None:
     return source["file"].split(f"/{item['skill']}/", 1)[-1]
 
 
-def current_file(item: dict[str, Any]) -> Path | None:
-    """Where the anchored file lives in this checkout or the private clone."""
+def git_show(repository: Path, path: str) -> str | None:
+    """A file as `main` has it, from origin/main when fetched, else local main."""
+    for ref in ("origin/main", "main"):
+        found = run(
+            ["git", "-C", str(repository), "show", f"{ref}:{path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=30,
+        )
+        if found.returncode == 0:
+            return found.stdout
+    return None
+
+
+def current_text(item: dict[str, Any]) -> str | None:
+    """The anchored file on `main`, in this repository or the private clone."""
     inside = relative(item)
     if inside is None:
         return None
-    public = ROOT / "skills" / item["skill"]
-    if public.is_dir():
-        return public / inside
-    private = install_skills.private_packages(None).get(item["skill"])
-    return private / inside if private else None
+    public = git_show(ROOT, f"skills/{item['skill']}/{inside}")
+    if public is not None:
+        return public
+    package = install_skills.private_packages(None).get(item["skill"])
+    if package is None:
+        return None
+    return git_show(
+        install_skills.PRIVATE,
+        f"{package.relative_to(install_skills.PRIVATE)}/{inside}",
+    )
 
 
 def display_path(item: dict[str, Any]) -> str | None:
     inside = relative(item)
     if inside is None:
         return None
-    if (ROOT / "skills" / item["skill"]).is_dir():
-        return f"skills/{item['skill']}/{inside}"
-    return f"{item['skill']}/{inside}"
+    if install_skills.private_packages(None).get(item["skill"]) is not None:
+        return f"{item['skill']}/{inside}"
+    return f"skills/{item['skill']}/{inside}"
 
 
 def stale(item: dict[str, Any]) -> bool:
-    """Whether the anchored line changed or disappeared; never proof of a fix."""
+    """Whether the anchored line changed or disappeared on `main`; never proof
+    of a fix. A line counts as still there only beside a neighbor it had."""
     source = item.get("source")
     if not source or not source["text"].strip():
         return False
-    path = current_file(item)
-    if path is None or not path.is_file():
+    text = current_text(item)
+    if text is None:
         return True
+    lines = [line.strip() for line in text.splitlines()]
     wanted = source["text"].strip()
-    return all(line.strip() != wanted for line in path.read_text().splitlines())
+    before, after = source["before"].strip(), source["after"].strip()
+    for index, line in enumerate(lines):
+        if line != wanted:
+            continue
+        above = lines[index - 1] if index > 0 else ""
+        below = lines[index + 1] if index + 1 < len(lines) else ""
+        if (not before or above == before) or (not after or below == after):
+            return False
+    return True
 
 
 def scrub(text: str, session_id: str, private_names: list[str]) -> str:
-    """Remove what public output must not carry: the session ID, the local home,
-    and the names of a private session repo."""
+    """Remove what public output must not carry: the session ID, every local
+    path, and the names of a private session repo."""
     text = text.replace(session_id, "<session>").replace(str(Path.home()), "~")
+    text = LOCAL_PATH.sub("<local path>", text)
     for name in private_names:
         text = re.sub(
-            rf"(?<![\w/-]){re.escape(name)}(?![\w-])", "a private project", text
+            rf"(?<![\w-]){re.escape(name)}(?![\w-])", "a private project", text
         )
     return text
+
+
+def leftover(text: str, session_id: str, private_names: list[str]) -> list[str]:
+    """What scrubbing missed, checked once more before anything is written."""
+    return [name for name in (session_id, *private_names) if name and name in text]
+
+
+def verify(repo: str, op: str, action: str, number: int, timeout: float) -> str:
+    """Read the write back: its marker, and for a new issue its labels."""
+    issue = gh_json(
+        "issue", "view", str(number), "-R", repo, "--json", "url,body,labels,comments",
+        timeout=timeout,
+    )  # fmt: skip
+    if action == "create":
+        labels = {label["name"] for label in issue.get("labels") or []}
+        if marker(op) in issue.get("body", "") and set(LABELS) <= labels:
+            return issue["url"]
+    else:
+        for comment in issue.get("comments") or []:
+            if marker(op) in comment.get("body", ""):
+                return comment.get("url") or issue["url"]
+    raise ScriptError(
+        f"{repo}#{number} does not show what publish just wrote",
+        f"gh issue view {number} -R {repo}",
+    )
+
+
+def issue_number(url: str) -> int:
+    tail = url.rstrip("/").rsplit("/", 1)[-1]
+    if not tail.isdigit():
+        raise ScriptError(f"gh returned {url!r}, not an issue URL")
+    return int(tail)
 
 
 def story_block(story: dict[str, Any]) -> str:
@@ -2041,6 +2108,10 @@ def reconcile(
     )
 
 
+def held_entry(title: str, reason: str) -> dict[str, str]:
+    return {"title": title, "reason": reason}
+
+
 def publish_step(args: argparse.Namespace) -> dict[str, Any]:
     session = read_session(locate(args.target))
     directory = run_directory(session)
@@ -2056,14 +2127,14 @@ def publish_step(args: argparse.Namespace) -> dict[str, Any]:
             f"`{PROG} publish {shlex.quote(args.target)} --dry-run` and pass --yes"
         )
     stories = json.loads(stories_path.read_text()).get("stories", [])
-    scanned = json.loads((directory / "scan.json").read_text())
-    session_repo = scanned["session"]["repo"]
+    session_repo = json.loads((directory / "scan.json").read_text())["session"]["repo"]
     homes = {
-        story["items"][0]["home"] for story in stories if story["items"][0]["home"]
+        item["home"] for story in stories for item in story["items"] if item["home"]
     }
+    # A story carries transcript text, so the session's repo needs consent too
     jev = Jev(
         directory, replay=False, retry=set(args.retry), timeout=args.timeout,
-        budget=args.max_requests, repos=set(homes),
+        budget=args.max_requests, repos={*homes, *([session_repo] if session_repo else [])},
     )  # fmt: skip
     actions: list[dict[str, Any]] = []
     held: list[dict[str, Any]] = []
@@ -2076,70 +2147,82 @@ def publish_step(args: argparse.Namespace) -> dict[str, Any]:
             skill = story["items"][0]["skill"]
             repo = story["items"][0]["home"]
             title = f"{skill}: {story['title']}"
-            if repo is None:
+
+            if len({(item["skill"], item["home"]) for item in story["items"]}) > 1:
                 held.append(
-                    {"title": title, "reason": "the skill's home repo is unknown"}
+                    held_entry(
+                        title, "it merges items of several skills; publish it by hand"
+                    )
                 )
                 continue
-            changed = [item["id"] for item in story["items"] if stale(item)]
-            if changed:
-                held.append(
-                    {
-                        "title": title,
-                        "reason": f"stale: the anchored line of {', '.join(changed)} changed since the session",
-                    }
-                )
+            if repo is None:
+                held.append(held_entry(title, "the skill's home repo is unknown"))
+                continue
+            # One operation per story, whatever the duplicate check decides
+            op = operation("publish", {"repo": repo, "story": story})
+            record_path = directory / "ops" / f"{op}.json"
+            record = json.loads(record_path.read_text()) if record_path.exists() else {}
+            if record.get("state") == "done":
                 continue
             names = private_names(session_repo, repo, args.timeout)
             block = scrub(story_block(story), session.id, names)
             title = scrub(title, session.id, names)
-            listed = gh_json(
-                "issue", "list", "-R", repo, "--state", "open", "--label", "2-type:postmortem",
-                "--limit", "200", "--json", "number,title,body", timeout=args.timeout,
-            )  # fmt: skip
-            candidates = [
-                issue
-                for issue in [*listed, *created.get(repo, [])]
-                if issue["title"].startswith(f"{skill}:")
-            ]
-            action, target, reason = duplicate_target(story, skill, candidates, jev)
-            if action == "hold":
-                held.append({"title": title, "reason": reason})
-                continue
-            op = operation(
-                "publish",
-                {"repo": repo, "action": action, "target": target, "block": block},
-            )
-            if action == "create":
-                body = f"Retro {date}, story written by the session's agent. Found by `{PROG}`.\n\n{block}\n\n{marker(op)}\n"
+            if record.get("state") == "sent":
+                action, target = record["action"], record["target"]
             else:
-                body = f"Seen again: retro {date}, story written by the session's agent.\n\n{block}\n\n{marker(op)}\n"
+                changed = [item["id"] for item in story["items"] if stale(item)]
+                if changed:
+                    held.append(
+                        held_entry(
+                            title,
+                            f"stale: the anchored line of {', '.join(changed)} "
+                            "changed on main since the session",
+                        )
+                    )
+                    continue
+                listed = gh_json(
+                    "issue", "list", "-R", repo, "--state", "open", "--label", "2-type:postmortem",
+                    "--limit", "200", "--json", "number,title,body", timeout=args.timeout,
+                )  # fmt: skip
+                candidates = [
+                    issue
+                    for issue in [*listed, *created.get(repo, [])]
+                    if issue["title"].startswith(f"{skill}:")
+                ]
+                action, target, reason = duplicate_target(story, skill, candidates, jev)
+                if action == "hold":
+                    held.append(held_entry(title, reason))
+                    continue
+            intro = (
+                f"Retro {date}, story written by the session's agent. Found by `{PROG}`."
+                if action == "create"
+                else f"Seen again: retro {date}, story written by the session's agent."
+            )
+            body = f"{intro}\n\n{block}\n\n{marker(op)}\n"
+            missed = leftover(f"{title}\n{body}", session.id, names)
             leaks = secrets(f"{title}\n{body}", args.timeout)
             if leaks is None:
                 raise ScriptError(
                     "gitleaks is not installed, so the issue text cannot be checked for secrets",
                     "install gitleaks, then rerun",
                 )
-            if leaks:
-                held.append(
-                    {
-                        "title": title,
-                        "reason": f"gitleaks reads a secret in it: {'; '.join(leaks)}",
-                    }
+            if missed or leaks:
+                reason = (
+                    f"it still names {', '.join(missed)}"
+                    if missed
+                    else f"gitleaks reads a secret in it: {'; '.join(leaks or [])}"
                 )
+                held.append(held_entry(title, reason))
                 continue
             entry = {
                 "action": action,
                 "repo": repo,
                 "target": target,
                 "title": title,
+                "labels": list(LABELS) if action == "create" else [],
                 "body": body,
                 "op": op,
             }
-            record_path = directory / "ops" / f"{op}.json"
-            record = json.loads(record_path.read_text()) if record_path.exists() else {}
-            if record.get("state") == "done":
-                continue
             if args.dry_run:
                 actions.append(entry)
                 if action == "create":
@@ -2153,33 +2236,57 @@ def publish_step(args: argparse.Namespace) -> dict[str, Any]:
                 else None
             )
             if url is None:
-                write_json(record_path, {"kind": "publish", "state": "sent"})
-                if action == "create":
-                    url = gh("issue", "create", "-R", repo, "--title", title, "--body-file", "-",
-                             *(part for label in LABELS for part in ("--label", label)),
-                             input=body, timeout=args.timeout).strip()  # fmt: skip
-                else:
-                    url = gh(
+                if action == "comment":
+                    state = gh_json(
                         "issue",
-                        "comment",
+                        "view",
                         str(target),
                         "-R",
                         repo,
-                        "--body-file",
-                        "-",
-                        input=body,
+                        "--json",
+                        "state",
                         timeout=args.timeout,
-                    ).strip()
-            write_json(record_path, {"kind": "publish", "state": "done", "url": url})
-            actions.append({**entry, "url": url})
-            if action == "create":
-                number = (
-                    int(url.rstrip("/").rsplit("/", 1)[-1])
-                    if url.rstrip("/").rsplit("/", 1)[-1].isdigit()
-                    else 0
+                    )
+                    if state.get("state") != "OPEN":
+                        held.append(
+                            held_entry(
+                                title,
+                                f"#{target} closed after the duplicate check; decide by hand",
+                            )
+                        )
+                        continue
+                write_json(
+                    record_path,
+                    {
+                        "kind": "publish",
+                        "state": "sent",
+                        "action": action,
+                        "target": target,
+                    },
                 )
+                if action == "create":
+                    written = gh("issue", "create", "-R", repo, "--title", title, "--body-file", "-",
+                                 *(part for label in LABELS for part in ("--label", label)),
+                                 input=body, timeout=args.timeout).strip()  # fmt: skip
+                    target = issue_number(written)
+                else:
+                    gh("issue", "comment", str(target), "-R", repo, "--body-file", "-", input=body, timeout=args.timeout)  # fmt: skip
+                assert target is not None
+                url = verify(repo, op, action, target, args.timeout)
+            write_json(
+                record_path,
+                {
+                    "kind": "publish",
+                    "state": "done",
+                    "action": action,
+                    "target": target,
+                    "url": url,
+                },
+            )
+            actions.append({**entry, "target": target, "url": url})
+            if action == "create":
                 created.setdefault(repo, []).append(
-                    {"number": number, "title": title, "body": body}
+                    {"number": target, "title": title, "body": body}
                 )
         for entry in held:
             log.warning("held %s: %s", entry["title"], entry["reason"])
