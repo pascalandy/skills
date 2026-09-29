@@ -65,6 +65,7 @@ CONSENT_FIX = (
 )
 
 SKILL_MARKER = "Base directory for this skill: "
+SKILL_START = re.compile(rf"(?m)^{re.escape(SKILL_MARKER)}")
 ARGUMENTS = re.compile(r"\n\nARGUMENTS: .*\Z", re.DOTALL)
 # A path that ends in <install directory>/<skill>/SKILL.md
 SKILL_FILE = re.compile(r"(?:~|/)[^\s'\"`;|&()]*?/([A-Za-z0-9][\w.-]*)/SKILL\.md")
@@ -77,6 +78,18 @@ MISSING_COMMAND = re.compile(
 GITHUB = re.compile(r"github\.com[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
 JS_COMMAND = re.compile(r"\bcmd\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)")
 EXIT_CODE = re.compile(r"\"exit_code\"\s*:\s*(-?\d+)")
+TEXT_EXIT = re.compile(r"(?m)^(?:Process exited with code|Exit code:?)\s*(-?\d+)")
+# Evidence that a fetch itself failed, not some other part of the command
+FETCH_FAILED = re.compile(
+    r"\b(?:40[34]|410|5\d\d)\b|(?<!command )not found|could not resolve"
+    r"|failed to (?:fetch|connect)|request failed|unable to (?:fetch|resolve)",
+    re.IGNORECASE,
+)
+# One command that prints one file: cat, rtk cat, nl -ba, or sed -n 'A,Bp'
+SINGLE_READ = re.compile(
+    r"^\s*(?:(?:rtk\s+)?cat|nl\s+-ba)\s+(?P<path>\S+)\s*$"
+    r"|^\s*sed\s+-n\s+'?(?P<first>\d+),\d+p'?\s+(?P<ranged>\S+)\s*$"
+)
 OUTPUT_FIELD = re.compile(r"\"output\"\s*:\s*\"")
 # Up to five frontmatter lines before `name:`, none of them the closing ---
 OPENER = r"(?:(?!---\n)[^\n]*\n){0,5}?"
@@ -256,6 +269,27 @@ def numbered_read(text: str) -> tuple[int, str] | None:
     return numbers[0], "\n".join(lines)
 
 
+def claude_text(session: Session, actor: str, text: str, after: int) -> None:
+    """Add `text` as an event, or split off the SKILL.md Claude Code injected
+    into it as a load that applies from event `after`."""
+    found = SKILL_START.search(text)
+    before = text if found is None else text[: found.start()]
+    if before.strip() and not before.startswith("<system-reminder>"):
+        session.add(actor, before)
+        after += 1
+    if found is None:
+        return
+    directory, body = skill_body(text[found.start() :])
+    session.loads.append(
+        Load(
+            Path(directory).name,
+            directory,
+            after,
+            [SkillFile(f"{directory}/SKILL.md", body, "excerpt")],
+        )
+    )
+
+
 def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
     first = next(item for item in items if "sessionId" in item)
     session = Session(
@@ -268,34 +302,20 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
             continue
         message = item.get("message") or {}
         content = message.get("content")
+        actor = "agent" if item["type"] == "assistant" else "user"
         if item["type"] == "assistant":
             model = message.get("model") or ""
             if model and not model.startswith("<"):
                 session.model = model
         if isinstance(content, str):
-            if content.strip():
-                session.add("user", content)
+            claude_text(session, actor, content, len(session.events))
             continue
         for block in content or []:
             if not isinstance(block, dict):
                 continue
             kind = block.get("type")
             if kind == "text":
-                text = block.get("text", "")
-                if text.startswith(SKILL_MARKER):
-                    directory, body = skill_body(text)
-                    session.loads.append(
-                        Load(
-                            Path(directory).name,
-                            directory,
-                            len(session.events),
-                            [SkillFile(f"{directory}/SKILL.md", body, "excerpt")],
-                        )
-                    )
-                elif text.strip() and not text.startswith("<system-reminder>"):
-                    session.add(
-                        "agent" if item["type"] == "assistant" else "user", text
-                    )
+                claude_text(session, actor, block.get("text", ""), len(session.events))
             elif kind == "tool_use":
                 name = str(block.get("name", ""))
                 arguments = block.get("input") or {}
@@ -308,9 +328,15 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
                 result = texts(block.get("content"))
                 error = bool(block.get("is_error"))
                 event = calls.get(call) or session.add("tool", "")
-                event.text = f"{event.text}\n{result}".lstrip("\n")
+                found = None if error else SKILL_START.search(result)
+                shown = result if found is None else result[: found.start()]
+                event.text = f"{event.text}\n{shown}".strip("\n")
                 event.error = event.error or error
                 event.call = call
+                if found is not None:
+                    claude_text(
+                        session, "tool", result[found.start() :], event.index + 1
+                    )
                 if call in reads and not error:
                     record_read(session, reads[call], result, event.index)
     return session
@@ -386,7 +412,7 @@ def outputs_of(output: Any) -> tuple[list[str], bool, bool]:
             continue
         if isinstance(value, str):
             found.append(value)
-    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text)
+    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text) + TEXT_EXIT.findall(text)
     failed = any(int(code) != 0 for code in codes) or (
         '"status":"rejected"' in f"{raw}{text}".replace(" ", "")
     )
@@ -485,6 +511,25 @@ def record_cats(
                     [SkillFile(target, text, "file", truncated)],
                 )
             )
+    if len(commands) != len(outputs):
+        return
+    for command, output in zip(commands, outputs):
+        read = SINGLE_READ.match(command)
+        if read is None:
+            continue
+        target = read["path"] or read["ranged"]
+        if target.endswith("/SKILL.md"):
+            continue
+        resolved = str(Path(target).expanduser())
+        for load in reversed(session.loads):
+            if resolved.startswith(str(Path(load.directory).expanduser()) + "/"):
+                shown = (
+                    numbered_read(output) if command.lstrip().startswith("nl") else None
+                )
+                first, text = shown or (int(read["first"] or 1), output.rstrip("\n"))
+                partial = truncated or read["first"] is not None
+                load.files.append(SkillFile(target, text, "file", partial, first))
+                break
 
 
 def installed(directory: Path) -> bool:
@@ -561,7 +606,7 @@ def facts(session: Session) -> list[dict[str, Any]]:
             if not event.error:
                 continue
             for url in sorted(urls):
-                if url in event.text:
+                if url in event.text and FETCH_FAILED.search(event.text):
                     found.append(fact(load, event, "broken_link", url))
             for match in MISSING_COMMAND.finditer(event.text):
                 command = Path(match[1] or match[2]).name
@@ -674,12 +719,32 @@ def triage_skills(session: Session) -> list[Load]:
     return sorted(first.values(), key=lambda load: load.after)
 
 
-def triage_request(events: list[Event], skills: list[Load]) -> dict[str, Any]:
-    """One A request: every loaded skill's text, the events, and one friction
-    question per skill and each event after that skill loaded."""
+def version_at(session: Session, skill: str, index: int) -> Load:
+    """The version of `skill` the agent had read by event `index`: its latest load."""
+    loaded = [
+        load
+        for load in session.loads
+        if load.skill == skill and load.status == "roster" and load.files
+    ]
+    before = [load for load in loaded if load.after <= index]
+    return (before or loaded)[-1]
+
+
+def triage_request(
+    session: Session, events: list[Event], skills: list[Load]
+) -> dict[str, Any]:
+    """One A request: the text of every skill loaded by its last event, in the
+    latest version read, the events, and one friction question per skill and
+    each event after that skill first loaded."""
     shown = [load for load in skills if load.after <= events[-1].index]
     state = {
-        "skills": [{"name": load.skill, "text": load.files[0].text} for load in shown],
+        "skills": [
+            {
+                "name": load.skill,
+                "text": version_at(session, load.skill, events[-1].index).files[0].text,
+            }
+            for load in shown
+        ],
         "events": [
             {
                 "id": event.index,
@@ -720,18 +785,18 @@ def plan_triage(session: Session) -> tuple[list[dict[str, Any]], list[int]]:
     oversized: list[int] = []
     chunk: list[Event] = []
     for event in session.events[start:]:
-        if fits(triage_request([*chunk, event], skills)):
+        if fits(triage_request(session, [*chunk, event], skills)):
             chunk.append(event)
             continue
         if chunk:
-            planned.append(triage_request(chunk, skills))
-        if fits(triage_request([event], skills)):
+            planned.append(triage_request(session, chunk, skills))
+        if fits(triage_request(session, [event], skills)):
             chunk = [event]
         else:
             oversized.append(event.index)
             chunk = []
     if chunk:
-        planned.append(triage_request(chunk, skills))
+        planned.append(triage_request(session, chunk, skills))
     return planned, oversized
 
 
@@ -749,15 +814,21 @@ def state_home() -> Path:
 
 
 def run_directory(session: Session) -> Path:
+    """The session's run directory, under a state folder only its owner can enter."""
+    root = state_home()
+    root.mkdir(parents=True, exist_ok=True)
+    root.chmod(0o700)
     name = re.sub(r"[^\w.-]", "_", f"{session.harness}-{session.id}")
-    return state_home() / "runs" / name
+    return root / "runs" / name
 
 
 def write_json(path: Path, value: Any) -> None:
     """Replace `path` atomically, so an interrupted write leaves the old record."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
 
 
