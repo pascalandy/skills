@@ -1134,15 +1134,18 @@ def test_an_answer_from_another_model_fails_the_scan(live: Live) -> None:
     assert "was answered by 'jev-9.0.0', not the pinned jev-1.13.0" in result.stderr
 
 
-def test_an_ambiguous_server_error_is_resent_only_with_retry(live: Live) -> None:
+@pytest.mark.parametrize("status", [503, 504])
+def test_an_ambiguous_server_error_is_resent_only_with_retry(
+    live: Live, status: int
+) -> None:
     transcript = friction_session(live.sandbox, ("alpha", ALPHA))
-    live.fake.status = 504
+    live.fake.status = status
     failed = live.run(transcript)
     live.fake.status = 200
     blocked = live.run(transcript)
 
     assert failed.returncode == blocked.returncode == 1
-    assert "answered HTTP 504 for request triage-" in failed.stderr
+    assert f"answered HTTP {status} for request triage-" in failed.stderr
     assert "may have run and been billed" in failed.stderr
     assert "was sent but its answer never arrived" in blocked.stderr
     assert len(live.fake.bodies) == 1
@@ -1188,7 +1191,9 @@ def test_an_unclear_location_keeps_the_event_in_review(live: Live) -> None:
     ]
 
 
-def test_an_event_a_hard_failure_decided_is_not_examined_again(live: Live) -> None:
+def test_a_hard_failure_and_jevs_reading_of_its_event_make_one_anchored_item(
+    live: Live,
+) -> None:
     live.fake.friction = {1: 0.95}
     transcript = (
         Claude(live.sandbox.repo)
@@ -1204,12 +1209,12 @@ def test_an_event_a_hard_failure_decided_is_not_examined_again(live: Live) -> No
         .write(live.sandbox.home / "session.jsonl")
     )
 
-    report = live.scan(transcript)
+    items = outcome(live.scan(transcript))["items"]
 
-    assert [(i["event"], i["category"]) for i in outcome(report)["items"]] == [
-        (1, "tool_unavailable")
+    assert [(i["event"], i["outcome"], i["category"]) for i in items] == [
+        (1, "candidate", "tool_unavailable")
     ]
-    assert live.fake.kinds() == ["friction"]
+    assert items[0]["line"]["text"] == "Use `alpha-cli` to list things."
 
 
 def test_a_locate_request_too_large_keeps_only_the_skills_own_text(live: Live) -> None:
@@ -1238,6 +1243,56 @@ def test_a_locate_request_too_large_keeps_only_the_skills_own_text(live: Live) -
 
     assert [file["path"] for file in located["state"]["files"]] == [f"{alpha}/SKILL.md"]
     assert outcome(report)["items"][0]["event"] == 2
+
+
+def test_a_reference_read_after_the_event_is_not_its_evidence(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha")
+    live.fake.friction = {1: 0.9}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .user("go")
+        .load(alpha, ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .tool(
+            "t2",
+            "Read",
+            {"file_path": f"{alpha}/references/later.md"},
+            "     1\tLater advice",
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    live.scan(transcript)
+    located = next(b for b in live.fake.bodies if "covered::alpha" in b["questions"])
+
+    assert [file["path"] for file in located["state"]["files"]] == [f"{alpha}/SKILL.md"]
+
+
+def test_a_cut_short_event_keeps_a_missing_step_in_review(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha", ".codex")
+    codex = Codex(live.sandbox.repo).exec(
+        "c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))]
+    )
+    codex.exec("c2", ["alpha-cli list --all"], [(2, "unknown flag --all")])
+    output = json.loads(codex.items[-1]["payload"]["output"])
+    output[0]["text"] += "Warning: truncated output (original token count: 9000)\n"
+    codex.items[-1]["payload"]["output"] = json.dumps(output)
+    transcript = codex.write(live.sandbox.home / "rollout.jsonl")
+    live.fake.friction = {1: 0.9}
+    live.fake.hint = "nothing matches this"
+    live.fake.covered = {"alpha": 0.1}
+
+    report = live.scan(transcript)
+
+    assert [(i["outcome"], i["category"]) for i in outcome(report)["items"]] == [
+        ("review", "partial_evidence")
+    ]
 
 
 def test_without_a_key_nothing_is_sent(live: Live) -> None:

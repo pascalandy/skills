@@ -177,7 +177,9 @@ RELATION = {
 }
 SKILL_SIDE = ("contradicted", "incomplete", "ambiguous")
 # HTTP statuses that mean TypeSafe refused a request without running it
-REJECTED = frozenset({400, 401, 403, 404, 409, 413, 422, 429, 503, 529})
+# 529 is TypeSafe's own overload answer, which its docs say to retry; a 503 may
+# come from a gateway after the request ran, so it stays pending
+REJECTED = frozenset({400, 401, 403, 404, 409, 413, 422, 429, 529})
 TOOL_UNAVAILABLE = {
     "type": "noul",
     "instructions": (
@@ -1008,18 +1010,19 @@ class Jev:
         return record["answers"]
 
     def check(self, op: str, body: dict[str, Any]) -> None:
-        """Consent before the first request, and a secret scan before each."""
-        if not self.key:
-            missing = [repo for repo, ok in consent(self.repos).items() if not ok]
-            if missing:
-                raise ScriptError(
-                    *(
-                        f"{repo} has no consent under {TERMS_NAME}; show Pascal the "
-                        "planned requests (scan --dry-run) and TypeSafe's terms, and "
-                        f"after he approves run: {CONSENT_FIX.format(repo=repo)}"
-                        for repo in missing
-                    )
+        """Consent and a secret scan before each request, so a consent revoked
+        mid-run stops the next one."""
+        missing = [repo for repo, ok in consent(self.repos).items() if not ok]
+        if missing:
+            raise ScriptError(
+                *(
+                    f"{repo} has no consent under {TERMS_NAME}; show Pascal the "
+                    "planned requests (scan --dry-run) and TypeSafe's terms, and "
+                    f"after he approves run: {CONSENT_FIX.format(repo=repo)}"
+                    for repo in missing
                 )
+            )
+        if not self.key:
             self.key = api_key()
         leaks = secrets(json.dumps(body, ensure_ascii=False, indent=2), self.timeout)
         if leaks is None:
@@ -1058,7 +1061,7 @@ class Jev:
                     f"rerun with --retry {op} to send it again",
                 ) from error
             write_json(path, {"state": "failed", "status": error.code})
-            if error.code in (429, 503, 529):
+            if error.code in (429, 529):
                 raise TemporaryError(
                     f"TypeSafe answered HTTP {error.code}; saved answers are reused on a rerun"
                 ) from error
@@ -1292,7 +1295,7 @@ def decide(
     if not located:
         return "review", "location_unclear"
     if not complete:
-        return "review", "partial_skill_text"
+        return "review", "partial_evidence"
     return "nothing", "no_rule_matched"
 
 
@@ -1306,9 +1309,11 @@ def examine(
         for s in skills
         if s.skill != load.skill and s.after <= index
     ]
-    item: dict[str, Any] = {"event": index}
+    item: dict[str, Any] = {"event": index, "version": load.files[0].digest()[:12]}
+    # Only what the agent had read by this event
+    read = [file for file in load.files if file.read_at <= index]
     # Shrink the evidence until it fits: other skills first, then references
-    tries = [(load.files, others), (load.files, []), (load.files[:1], [])]
+    tries = [(read, others), (read, []), (read[:1], [])]
     planned = [locate_request(session, index, load, o, f) for f, o in tries]
     fitting = next(
         ((b, w, f) for (b, w), (f, _) in zip(planned, tries) if fits(b)), None
@@ -1323,7 +1328,12 @@ def examine(
     body, shown, files = fitting
     located = jev.ask("locate", body)
     covered = noul(located, f"covered::{load.skill}")
-    complete = len(files) == len(load.files) and not any(f.partial for f in files)
+    # Dropped evidence or a cut-short event can hide a rule, so they keep it in review
+    complete = (
+        body is planned[0][0]
+        and not any(f.partial for f in files)
+        and not session.events[index].partial
+    )
     lines: list[dict[str, Any]] = []
     other: dict[str, Any] | None = None
     clear = True
@@ -1417,18 +1427,26 @@ def judge(
             if found["skill"] == load.skill
         ]
         scores = friction[load.skill]
-        decided = {item["event"] for item in items}
+        hard = {item["event"]: item for item in items}
         flagged = sorted(
-            (i for i, p in scores.items() if p > NO and i not in decided),
-            key=lambda i: -scores[i],
+            (i for i, p in scores.items() if p > NO), key=lambda i: -scores[i]
         )
         for index in flagged[:RETAINED]:
-            items.append(
-                {
-                    "friction": scores[index],
-                    **examine(session, load, skills, index, jev),
-                }
-            )
+            examined = {
+                "friction": scores[index],
+                **examine(session, load, skills, index, jev),
+            }
+            if index in hard:
+                # The hard failure decides; Jev's reading adds the line it rests on
+                hard[index].update(
+                    {
+                        k: v
+                        for k, v in examined.items()
+                        if k not in ("outcome", "category")
+                    }
+                )
+            else:
+                items.append(examined)
         items += [
             {
                 "event": index,
