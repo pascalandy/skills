@@ -32,7 +32,7 @@ examples:
   just check --all
   just check --list
   just check --only lint --only tavily
-  just check --only jevgate --verbose"""
+  just check --only jevlabel --verbose"""
 
 EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
@@ -85,10 +85,10 @@ def with_deps(deps: tuple[str, ...]) -> list[str]:
     return [flag for dep in deps for flag in ("--with", dep)]
 
 
-def ruff(path: str, version: str = RUFF) -> tuple[Command, Command]:
+def ruff(path: str) -> tuple[Command, Command]:
     return (
-        ("uvx", version, "check", "--quiet", path),
-        ("uvx", version, "format", "--quiet", "--check", path),
+        ("uvx", RUFF, "check", "--quiet", path),
+        ("uvx", RUFF, "format", "--quiet", "--check", path),
     )
 
 
@@ -129,8 +129,6 @@ def script_pin(script: str, package: str) -> str:
 VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
-JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts"
-JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
 JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
 RETRO_TRIAGE = "authoring/devtools/retro-triage-jev/scripts"
@@ -192,13 +190,6 @@ CHECKS = [
             "authoring/content/storytelling/tests/validate-package.py",
             "authoring/content/storytelling",
         ),
-    ),
-    # Ruff stays at 0.15.7: newer releases report findings whose fixes would
-    # change the engine's stamped hash
-    Check(
-        "jevgate",
-        *ruff(JEVGATE, version="ruff@0.15.7"),
-        pyright(JEVGATE, JEVGATE_SDK),
     ),
     Check(
         "jevlabel",
