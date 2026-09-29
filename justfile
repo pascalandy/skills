@@ -41,6 +41,12 @@ flatten-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
+# Find where the skills one finished Claude Code or Codex session loaded caused friction, with Jev
+[group('commands')]
+[no-exit-message]
+jev-skill-retro *args:
+    @uv run --quiet scripts/jev_skill_retro.py "$@"
+
 # Run the same CI verdict as GitHub Actions; --list names each check, --only NAME reruns one
 [group('checks')]
 check *args:

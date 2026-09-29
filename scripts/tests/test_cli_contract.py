@@ -234,7 +234,56 @@ def far_is_behind(sandbox: Sandbox) -> tuple[str, ...]:
     return ("--dry-run",)
 
 
+def retro_session(sandbox: Sandbox) -> None:
+    """A Claude Code transcript that loads the roster skill alpha, in a repo
+    whose origin is on GitHub."""
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/o/public.git"],
+        cwd=sandbox.repo,
+        check=True,
+    )
+    base = sandbox.home / ".claude/skills/alpha"
+    records = [
+        {"type": "user", "message": {"role": "user", "content": "go"}},
+        {
+            "type": "user",
+            "isMeta": True,
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Base directory for this skill: {base}\n\nold",
+                    }
+                ],
+            },
+        },
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "done"}],
+            },
+        },
+    ]
+    lines = (
+        json.dumps({**record, "sessionId": "s1", "cwd": str(sandbox.repo)})
+        for record in records
+    )
+    (sandbox.repo / "session.jsonl").write_text("\n".join(lines) + "\n")
+
+
 ENTRIES: dict[str, Entry] = {
+    # The scan blocks in the git lookup of the roster's home repo
+    "scripts/jev_skill_retro.py": Entry(
+        name="just jev-skill-retro",
+        block="git",
+        args=("--dry-run",),
+        prepare=retro_session,
+        safe=lambda _: ("scan", "session.jsonl", "--dry-run"),
+        positional=("scan", "session.jsonl"),
+        has_json=True,
+    ),
     # A preview blocks in the SSH step a worker thread runs
     "scripts/sync_fleet.py": Entry(
         name="just sync-fleet",
