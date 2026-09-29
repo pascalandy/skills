@@ -2,7 +2,7 @@
 
 Test runner for Python: plain `assert` statements, automatic discovery, and fixtures for setup.
 
-Run tests in the environment that owns the code, as [MetaSkill.md → Choose the environment](../MetaSkill.md#choose-the-environment) explains: `uv run --locked pytest` for project code, `uvx pytest scripts/tests` for an independent script.
+Run tests in the environment that owns the code, as [MetaSkill.md → Choose the environment](../MetaSkill.md#choose-the-environment) explains: `uv run --locked pytest` for project code, and the command in [Direct Tests](#direct-tests) for an independent script.
 
 ## Core Commands
 

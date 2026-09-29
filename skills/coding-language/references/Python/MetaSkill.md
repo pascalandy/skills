@@ -159,7 +159,7 @@ Keep tests in `scripts/tests/` next to the script. Test CLI behavior through the
 
 - Before writing or changing tests, read [pytest.md → Test structure](references/pytest.md#test-structure) for the subprocess helper
 - Then read [pytest.md → Proving behavior](references/pytest.md#proving-behavior) for what each test must assert
-- Run them with `uv run --locked pytest` for project code, or `uvx pytest scripts/tests` for an independent script
+- Run them with `uv run --locked pytest` for project code, or `uvx --with-requirements scripts/tool.py pytest -o pythonpath=scripts scripts/tests` for an independent script
 
 ## Secrets
 
