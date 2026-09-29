@@ -1,6 +1,6 @@
 # Codex exec flag lookup
 
-This table reflects `codex exec --help` in Codex CLI 0.157.1. Run the installed command's help before relying on a flag; the [official command reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) tracks current behavior.
+This table reflects `codex exec --help` in Codex CLI 0.158.0. Run the installed command's help before relying on a flag; the [official command reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) tracks current behavior.
 
 | Flag | Use |
 |---|---|
@@ -30,7 +30,9 @@ This table reflects `codex exec --help` in Codex CLI 0.157.1. Run the installed 
 | `--dangerously-bypass-hook-trust` | Run untrusted hooks; use only in automation that vets the hooks |
 | `-h`, `--help`; `-V`, `--version` | Show command help or the CLI version |
 
-For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. CLI 0.157.1 rejects the old `--full-auto` flag; use an explicit sandbox.
+For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. CLI 0.158.0 rejects the old `--full-auto` flag; use an explicit sandbox.
+
+For live web search, pass `-c 'web_search="live"'`. CLI 0.158.0 accepts `disabled`, `cached`, `indexed`, and `live`; add `--strict-config` to reject an unknown value.
 
 ## Help and model discovery
 

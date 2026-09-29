@@ -7,7 +7,7 @@ Use `codex exec` for a task that must finish without the interactive Codex UI. T
 1. Check `codex --version`, `codex exec --help`, and `codex login status`. On a runner without saved authentication, provide `CODEX_API_KEY` only to the Codex invocation through the runner's secret facility. Keep credentials out of prompts, logs, and repository files. For GitHub Actions, follow the [Codex GitHub Action guidance](https://learn.chatgpt.com/docs/non-interactive-mode#authenticate-in-automation)
 2. Set the target repository with `-C <path>`. Inspect its instructions and current changes before delegating edits. Codex normally requires a Git repository; use `--skip-git-repo-check` only for an intentionally trusted directory outside one
 3. Give concurrent editing runs separate worktrees or checkouts. State the task, permitted paths, expected result, and checks in the prompt. Use the caller's process API or an argument array when passing generated or untrusted text
-4. Choose `-s read-only` for inspection or `-s workspace-write` for edits. Set `-c 'approval_policy="never"'` for an unattended run. Broader access or approval bypass requires an authorized, isolated runner. Do not use `--full-auto`; CLI 0.157.1 rejects it
+4. Choose `-s read-only` for inspection or `-s workspace-write` for edits. Set `-c 'approval_policy="never"'` for an unattended run. Broader access or approval bypass requires an authorized, isolated runner. Do not use `--full-auto`; CLI 0.158.0 rejects it
 5. Close stdin with `< /dev/null` whenever the prompt is an argument. Codex reads piped stdin until EOF and appends it to the prompt, and an agent harness usually leaves stdin open, so the run prints `Reading additional input from stdin...` and hangs. Omit the redirect only when stdin carries the prompt or deliberate context
 
 ## Choose a run
@@ -18,26 +18,26 @@ For an inline inspection task, keep the workspace read-only and use the configur
 codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review src/auth.ts for race conditions. Report findings with file and line." < /dev/null
 ```
 
-For a dedicated diff review, use `codex exec review`. Confirm the checkout and branch, fetch the base if you need its latest remote state, and keep the checkout stable during the review. This example selects GPT-6 Sol at High reasoning:
+For a review, write the scope and criteria to a prompt file and run ordinary `codex exec`. This works for a plan, document, contract, or diff. For a diff, name the comparison in the prompt, such as `git diff origin/main...HEAD`; confirm the checkout and branch, and fetch the base if you need its latest remote state. This example selects GPT-6 Sol at High reasoning:
 
 ```bash
 repo="/absolute/path/to/repository"
+prompt_file="/absolute/path/to/reviewer-prompt.md"
 review_dir="$(mktemp -d /tmp/codex-review.XXXXXX)" || exit 1
 
 review_status=0
 codex exec \
   -C "$repo" \
-  review \
-  --base origin/main \
+  -s read-only \
   -m gpt-6-sol \
   -c 'model_reasoning_effort="high"' \
-  -c 'sandbox_mode="read-only"' \
   -c 'approval_policy="never"' \
   --ephemeral --json \
   -o "$review_dir/result.md" \
-  < /dev/null \
+  - \
+  2> "$review_dir/stderr.log" \
   > "$review_dir/events.jsonl" \
-  2> "$review_dir/stderr.log" || review_status=$?
+  < "$prompt_file" || review_status=$?
 
 if [ ! -s "$review_dir/result.md" ] ||
   grep -q '^Review was interrupted' "$review_dir/result.md"; then
@@ -48,7 +48,27 @@ printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the check above counts that as a failure. Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+Follow [Observe and verify](#observe-and-verify) before treating the review as complete.
+
+For a quick diff review with Codex's built-in criteria, replace the `codex exec` invocation in the recipe with `codex exec review`. It takes no prompt file, and it does not accept `-s`, so pin the sandbox through config:
+
+```bash
+codex exec \
+  -C "$repo" \
+  review \
+  --base origin/main \
+  -m gpt-6-sol \
+  -c 'model_reasoning_effort="high"' \
+  -c 'sandbox_mode="read-only"' \
+  -c 'approval_policy="never"' \
+  --ephemeral --json \
+  -o "$review_dir/result.md" \
+  2> "$review_dir/stderr.log" \
+  > "$review_dir/events.jsonl" \
+  < /dev/null || review_status=$?
+```
+
+When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the recipe's check counts that as a failure. Without criteria, a run can also answer in one line; the [review rules](../../SKILL.md#capture-a-review) treat that as weak evidence.
 
 Choose exactly one review target:
 
@@ -59,9 +79,9 @@ Choose exactly one review target:
 | `--commit <SHA>` | Changes introduced by one commit |
 | Custom prompt | Review instructions supplied as an argument or through `-` on stdin |
 
-These targets conflict with one another. For an audit with custom criteria and an explicit diff scope, use ordinary `codex exec` with a prompt file as shown below; put the comparison and criteria in that prompt.
+These targets conflict with one another. For custom criteria with an explicit diff scope, use the prompt-file recipe above.
 
-The review commands do not accept `-s` and otherwise inherit the configured sandbox, which can be `workspace-write`. Pin `sandbox_mode` as shown. Read-only mode can block tests that write build artifacts; run those separately or use an explicitly authorized writable checkout. On CLI 0.157.1, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
+Without the `sandbox_mode` pin, the review commands inherit the configured sandbox, which can be `workspace-write`. On CLI 0.158.0, `codex exec review` accepts `-m`, `--json`, and `-o`, while `codex review` accepts none of them. Use `codex review` for a simple terminal report with the configured review model. Check both commands' `--help` on the installed version.
 
 For file edits, use `workspace-write`. The first command keeps the configured model; the second selects Astra and High reasoning:
 
@@ -70,10 +90,9 @@ codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' "Fix
 codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' -m gpt-6-astra -c 'model_reasoning_effort="high"' "Refactor src/auth.ts. Limit edits to that file and run the relevant tests." < /dev/null
 ```
 
-To pass the complete prompt from a Markdown file, use `-` for stdin. Change the sandbox to `workspace-write` if that prompt authorizes edits. To add context to an inline prompt, pipe it in; Codex appends it as a `<stdin>` block:
+For a whole prompt in a file, pass `-` as in the review recipe, with `workspace-write` if the prompt authorizes edits. To add context to an inline prompt, pipe it in; Codex appends it as a `<stdin>` block:
 
 ```bash
-codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' --json - < prompt.md
 git -C /path/to/repo diff main | codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review this diff for regressions."
 ```
 
@@ -83,13 +102,13 @@ Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for 
 
 Add `-o result.md` when the caller needs the final message in a file. `--json` emits JSONL events on stdout; without it, stdout contains the final message and progress goes to stderr. No PTY is needed. Retain stderr and the exit status for diagnosis. Without `--json`, the stderr header names the effective `model`, `sandbox`, and `approval`; `--json` omits that header.
 
-Watch the process until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded; a read-only run asked to edit still exits 0. Inspect the actual diff and run relevant checks before reporting completion.
+[Wait for the process](../../SKILL.md#wait-for-a-run) until it exits or the caller's deadline expires. With `--json`, capture the `thread_id` from `thread.started`, inspect `turn.completed`, `turn.failed`, and `error`, and read the final agent message. A started thread or zero exit code alone does not prove the task succeeded; a read-only run asked to edit still exits 0. Inspect the actual diff and run relevant checks before reporting completion.
 
 If Codex fails or asks for unavailable access, report the error and unmet task. Retry only after changing the cause; do not silently widen the sandbox or repeat a write task whose result is uncertain. Terminate a timed-out child and inspect partial changes before another attempt.
 
 ## Continue or structure a task
 
-- Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>" < /dev/null`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. Check `codex exec resume --help` for the installed version's options
+- Resume a persisted run by its captured ID rather than `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. On CLI 0.158.0, `resume` accepts `-m`, `--json`, and `-o` but not `-s` or `--add-dir`, so pin the sandbox through config: `codex exec resume <SESSION_ID> -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -o followup.md "<follow-up>" < /dev/null`. Check `codex exec resume --help` for the installed version's options
 - Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
 
 For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).

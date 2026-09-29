@@ -62,6 +62,8 @@ Choose an explicit permission strategy. `dontAsk` denies calls that would prompt
 
 Use [permission documentation](https://code.claude.com/docs/en/permissions) for rule syntax. Diagnose denied tools before retrying; do not default to bypass.
 
+To bound writes, allow an `Edit` path rule such as `--allowedTools "Edit(//abs/path/**)"`. `Edit` rules cover every built-in file-editing tool; Claude Code never consults a `Write(path)` rule. `//path` is absolute, while `/path` is relative to the settings source.
+
 Permission mode and allow rules still govern calls when prompts are disabled. `--tools` restricts built-in tools, not startup hooks or configured MCP servers. Use `--strict-mcp-config` with an explicit MCP configuration when the run must limit those servers.
 
 ## Input and output
@@ -86,6 +88,8 @@ Add `--include-partial-messages` when the consumer needs token deltas. Use `--ou
 ## Verify completion
 
 Preserve the process exit status and inspect the final result. Invalid flags fail on stderr; failures during a run can appear on stdout. Check `is_error` and `permission_denials` in the JSON result or the stream's final `result` record. Use one of these formats when automation must detect denied tools; text has no structured denial record. If required plugins or MCP servers are missing or failed in `system/init`, report that limitation even when the process exits 0.
+
+`claude -p` terminates background Bash tasks about five seconds after its final result. When the run delegates to a child process, such as `codex exec`, the prompt must keep Claude's turn open until that child exits. Before trusting the run, confirm the child's answer is non-empty and its expected artifacts exist.
 
 ## Models, limits, and context
 
