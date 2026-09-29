@@ -102,16 +102,6 @@
       "exclude": [
         "agents/openai.yaml"
       ]
-    },
-    {
-      "name": "writing-for-agents",
-      "kind": "shared",
-      "source": "skills/productivity/writing-for-agents",
-      "destination": "writing-for-agents/references/upstream",
-      "entry": "writing-for-agents.md",
-      "exclude": [
-        "agents/openai.yaml"
-      ]
     }
   ],
   "handoffs": {
@@ -213,18 +203,6 @@
       "destination": "research/references/upstream/research.md",
       "source_sha256": "985569f15739c713d6784887c3d186d4ef9ac85bec5ad9c068d25bf0739928e4",
       "rendered_sha256": "24ad336b28f61d2ac49f31531fadd45047b8682a15b30825cafac886d3543cb9"
-    },
-    {
-      "source": "skills/productivity/writing-for-agents/SKILL-MECHANICS.md",
-      "destination": "writing-for-agents/references/upstream/SKILL-MECHANICS.md",
-      "source_sha256": "c768e6307c7c10728c401c213f2c4ba71c542127eeb7ad2956aabd15a0fa0059",
-      "rendered_sha256": "2d1caa036590965f44bd2e448213bde31bee5053766119994c6fe1f4c39847b3"
-    },
-    {
-      "source": "skills/productivity/writing-for-agents/SKILL.md",
-      "destination": "writing-for-agents/references/upstream/writing-for-agents.md",
-      "source_sha256": "551adca942227b44192edba88acd4e8db911f0121ce58ad16944ccf6a896a74a",
-      "rendered_sha256": "393d286f6500fb39fd69b3102680f3591df85257c3f9faf2818d75bd2d77f565"
     }
   ]
 }
