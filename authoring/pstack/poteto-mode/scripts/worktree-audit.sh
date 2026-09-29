@@ -26,7 +26,7 @@ git fetch origin main --quiet 2>/dev/null || echo "warn: could not fetch origin/
 # PR state by branch, fetched once. Empty if gh is unavailable.
 prs=$(mktemp)
 gh pr list --author "@me" --state all --limit 1000 \
-	--json number,state,headRefName 2>/dev/null >"$prs" || echo "[]" >"$prs"
+	--json number,state,headRefName,headRefOid 2>/dev/null >"$prs" || echo "[]" >"$prs"
 
 transcripts="${2:-${PSTACK_TRANSCRIPTS_DIR:-}}"
 now=$(date +%s)
@@ -42,9 +42,11 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 	head_ts=$(git -C "$wt" log -1 --format='%ct' HEAD 2>/dev/null || echo 0)
 	age=$([ "$head_ts" -gt 0 ] 2>/dev/null && echo "$(((now - head_ts) / 86400))d" || echo "?")
 
-	# Squash-merged branches are not ancestors of main, so PR state is the
-	# real signal; merge-base only catches fast-forward/rebase merges.
-	git merge-base --is-ancestor "$head" origin/main 2>/dev/null && merged=YES || merged=no
+	# GitHub squash and rebase merges rewrite SHAs, so HEAD also counts as
+	# merged when it is the head commit of a merged PR.
+	{ git merge-base --is-ancestor "$head" origin/main ||
+		jq -e --arg h "$head" 'any(.[]; .state == "MERGED" and .headRefOid == $h)' "$prs"; } >/dev/null 2>&1 &&
+		merged=YES || merged=no
 
 	# Distinguish real WIP (tracked edits) from disposable untracked scratch.
 	porcelain=$(git -C "$wt" status --porcelain 2>/dev/null)
