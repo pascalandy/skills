@@ -1384,6 +1384,7 @@ def test_write_dry_run_shows_the_fork_and_saves_a_prompt_without_raw_mentions(
     ]
     assert report["fork"]["cost_usd"][0] <= report["fork"]["cost_usd"][1]
     assert prompt.startswith("[jev-skill-retro fork] End-of-session skill feedback")
+    assert Path(report["fork"]["prompt"]).stat().st_mode & 0o777 == 0o600
     assert "@" not in prompt
     assert "see \\u0040notes.txt" in prompt
 
@@ -1442,11 +1443,12 @@ def test_write_forks_codex_with_a_read_only_sandbox(live: Live) -> None:
     report = json.loads(written(live, transcript, "--yes").stdout)
     argv = (calls(agent)[0] / "argv").read_text().split("\n")[:-1]
 
-    assert argv[:12] == [
+    assert argv[:13] == [
         "exec", "fork", "01a0e8ef-0000-7000-8000-000000000000", "-", "--ephemeral",
-        "--skip-git-repo-check", "-c", 'sandbox_mode="read-only"', "-c",
-        'approval_policy="never"', "-o", argv[11],
+        "--skip-git-repo-check", "--ignore-user-config", "-c", 'sandbox_mode="read-only"',
+        "-c", 'approval_policy="never"', "-o", argv[12],
     ]  # fmt: skip
+    assert Path(argv[12]).stat().st_mode & 0o777 == 0o600
     assert [s["items"][0]["id"] for s in report["stories"]] == ["alpha-e2"]
 
 

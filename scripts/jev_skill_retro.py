@@ -1656,6 +1656,8 @@ def fork_command(session: Session, output: Path) -> list[str]:
         "-",
         "--ephemeral",
         "--skip-git-repo-check",
+        # No config.toml, so no MCP server or app can write outside the sandbox
+        "--ignore-user-config",
         "-c",
         'sandbox_mode="read-only"',
         "-c",
@@ -1758,7 +1760,9 @@ def fork(session: Session, prompt: str, path: Path, raw: Path, timeout: float) -
             message = str(json.loads(done.stdout).get("result") or "")
         except (json.JSONDecodeError, AttributeError):
             message = done.stdout
-        raw.write_text(message, encoding="utf-8")
+        write_private(raw, message)
+    elif raw.exists():
+        raw.chmod(0o600)
     message = raw.read_text(encoding="utf-8") if raw.exists() else ""
     write_json(
         path, {"kind": "fork", "state": "done", "command": command, "raw": str(raw)}
@@ -1792,8 +1796,7 @@ def write_step(args: argparse.Namespace) -> dict[str, Any]:
     report["fork"] = {"op": op, **estimate(session)}
     with exclusive(directory / "lock", args.timeout):
         prompt_path = directory / "write" / f"{op}.prompt.txt"
-        prompt_path.parent.mkdir(parents=True, exist_ok=True)
-        prompt_path.write_text(prompt, encoding="utf-8")
+        write_private(prompt_path, prompt)
         report["fork"]["prompt"] = str(prompt_path)
         if args.dry_run:
             return report
