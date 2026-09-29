@@ -23,6 +23,8 @@ Language-agnostic coding disciplines: what good design looks like, regardless of
 
 Load `references/ROUTER.md` to dispatch request to correct sub-skill.
 
+When the user or project supplies its own CLI contract, follow it; use these sub-skills only for what it leaves open.
+
 ## Sub-skills
 
 | Sub-skill | Purpose |
