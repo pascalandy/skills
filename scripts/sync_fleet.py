@@ -11,8 +11,8 @@ SSH, fast-forwards its checkout to it, saves and pulls its own private clone
 from GitHub, and runs `just install-skills`. A machine whose checkout is off
 main, has uncommitted changes under authoring/, skills/, scripts/, or justfile,
 has commits GitHub lacks, or whose _skills_private is not a clone is left
-untouched. A machine that is offline or fails gets one retry, and any later
-sync catches it up.
+untouched. A machine that is offline or fails waits for the next sync, which
+catches it up.
 
 The registry is the one fleet.toml in the private repository, so every machine
 has it and hosts stay out of this public one; the private-network skill ships
@@ -94,7 +94,7 @@ NEEDS_YOU = 11
 UNREACHABLE = 255
 TEMPORARY = 75
 TIMEOUT = 600
-RETRY_DELAY = 3
+POLL_DELAY = 3
 FINE = ("synced", "ready", "converged")
 # What a remote step prints for each change it makes
 CHANGE = re.compile(r"(clone|commit|pull|push|add|update|remove)\t")
@@ -565,19 +565,10 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
 
 
 def attempt(machine: Machine, source: Source, mode: str) -> Outcome:
-    """Every step is safe to repeat, so an offline or failed machine gets a retry."""
-
-    def once() -> Outcome:
-        try:
-            return sync_machine(machine, source, mode)
-        except subprocess.TimeoutExpired:
-            return Outcome(machine.name, "failed", "timed out", temporary=True)
-
-    outcome = once()
-    # An interrupt ends the wait at once and skips the retry
-    if outcome.status in ("offline", "failed") and not STOPPING.wait(RETRY_DELAY):
-        log.debug("%s: %s; retrying", machine.name, outcome.detail)
-        outcome = once()
+    try:
+        outcome = sync_machine(machine, source, mode)
+    except subprocess.TimeoutExpired:
+        outcome = Outcome(machine.name, "failed", "timed out", temporary=True)
     log.info("%s: %s: %s", machine.name, outcome.status, outcome.detail)
     for change in outcome.changes:
         log.info("%s: %s", machine.name, change)
@@ -637,7 +628,7 @@ def wait_for_push(sha: str, timeout: float) -> None:
             raise TemporaryError(
                 f"GitHub's main did not reach {sha[:7]} in time; the push has not landed"
             )
-        time.sleep(RETRY_DELAY)
+        time.sleep(POLL_DELAY)
 
 
 def pushed_main(lines: list[str]) -> str:
