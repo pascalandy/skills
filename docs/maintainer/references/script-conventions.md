@@ -12,7 +12,7 @@ date_updated: 2026-09-29
 
 Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
 
-`authoring/commands/cli-contract.md` carries the Baseline and Opt-in sections below word for word, so the contract travels to a project that does not have this doc. `just check --only test` fails when the two drift; edit this doc and copy the sections across
+`authoring/commands/cli-contract.md` carries the Baseline and Opt-in sections below word for word, so the contract travels to a project that does not have this doc. `just check --only test-cli-contract` fails when the two drift; edit this doc and copy the sections across
 
 `<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
 
@@ -117,7 +117,7 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 
 ## Tests
 
-Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and [[checks]] says when they run. `just check` runs every suite on all cores, so a test must not share files, ports, or locks with another test
+Repository test modules live in `scripts/tests/` as `test_<stem>.py`. Each module has one `test-<stem>` check in `scripts/check.py`, with underscores in the stem written as hyphens in the check name. The registry must cover every module. A skill's tests live inside its `authoring/` package and run when that package changes. [[checks]] explains root test selection, batching, and reruns
 
 `test_cli.py` and `test_common.py` test the shared contract code once. `test_cli_contract.py` fails on a `scripts/` entry point missing from its `ENTRIES`, and runs each script's `--help` once: the help must come from the shared parser, and every doc line that runs the script, in docs, hooks, CI, and `scripts/`, may use only flags the help lists. A script's own tests cover what it does, not the shared contract again
 

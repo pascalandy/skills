@@ -1,0 +1,7 @@
+ts	phase	decision	why	evidence	result
+2026-09-29T14:38:51Z	frame	Scope repository tests by owner before parallelizing checks	The MacBook run spent 10.3 seconds of 13.2 seconds in pytest	scripts/check.py:133	baseline confirmed
+2026-09-29T14:38:51Z	design	Keep two reviewable stack layers for routing and CLI wording	Each layer can pass on its own	gh stack view --json	stack initialized
+2026-09-29T14:38:51Z	design	Batch selected repository test files in one pytest process	Sixteen separate worker startups would make a full sweep slower	scripts/check.py:107	architecture review accepted
+2026-09-29T15:09:42Z	routing	Registered every repository test and scoped command suites by owner	Unrelated skill edits should skip fleet and installer integration tests	scripts/check.py; scripts/tests/test_check.py	24 focused tests passed
+2026-09-29T15:09:42Z	verification	Ran the complete check set on the routing layer	The first PR must preserve every existing verdict	just check --all --debug	passed in 19.64 seconds
+2026-09-29T15:09:42Z	docs	Updated the check and test-placement instructions	Agents need a clear rule for new tests	AGENTS.md; docs/maintainer/references/checks.md	wiki postflight passed
