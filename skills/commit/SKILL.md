@@ -36,7 +36,7 @@ If commit cannot be described in 1 sentence without "and", split it
 3. Group changes by logical purpose
 4. Split by purpose, feature, type, or rollback boundary
 5. Run validation proportional to the current group
-6. Stage only 1 group paths: `git add <paths>`
+6. Stage only 1 group paths: `git add <paths>`; for a file that mixes groups, `git apply --cached` a patch holding only this group's hunks
 7. Verify the exact staged content with `git diff --cached --check` and `git diff --cached`
 8. Commit each group in order and let configured hooks run
 9. Verify the created commits with `git log -n <count> --oneline` and report their hashes and subjects
