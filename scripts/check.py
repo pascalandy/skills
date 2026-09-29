@@ -13,6 +13,7 @@ import shlex
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
@@ -31,7 +32,7 @@ examples:
   just check --all
   just check --list
   just check --only lint --only tavily
-  just check --only test --verbose"""
+  just check --only test-check --verbose"""
 
 EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
@@ -54,11 +55,18 @@ class Check:
     """
 
     def __init__(
-        self, name: str, *commands: Command, reads: tuple[str, ...] = ()
+        self,
+        name: str,
+        *commands: Command,
+        reads: tuple[str, ...] = (),
+        test_path: str | None = None,
+        cheap: bool = False,
     ) -> None:
         self.name = name
         self.commands = commands
         self.reads = reads
+        self.test_path = test_path
+        self.cheap = cheap
 
     def skills(self) -> set[str]:
         """The skill packages the commands name; none means the check covers the repository."""
@@ -104,17 +112,24 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
     )
 
 
-def pytest(path: str, *deps: str) -> Command:
-    """Run a suite on every core; script-conventions.md says what that asks of a test."""
+def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Command:
     return (
         "uvx",
         "--from",
         f"pytest@{PYTEST}",
-        *with_deps((XDIST, *deps)),
+        *with_deps(((XDIST,) if parallel else ()) + deps),
         "pytest",
-        "-n",
-        "auto",
-        path,
+        *(("-n", "auto") if parallel else ()),
+        *(path if isinstance(path, tuple) else (path,)),
+    )
+
+
+def repo_test(stem: str, *reads: str, cheap: bool = False) -> Check:
+    return Check(
+        f"test-{stem.replace('_', '-')}",
+        test_path=f"scripts/tests/test_{stem}.py",
+        reads=reads,
+        cheap=cheap,
     )
 
 
@@ -130,7 +145,53 @@ CHECKS = [
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
-    Check("test", pytest("scripts/tests")),
+    repo_test("check"),
+    repo_test("check_cli_block", "scripts/check_cli_block.py"),
+    repo_test("check_frontmatter", "scripts/check_frontmatter.py"),
+    repo_test("cli"),
+    repo_test(
+        "cli_contract",
+        "scripts",
+        "docs",
+        "authoring",
+        "justfile",
+        "README.md",
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "lefthook.yml",
+        ".lefthook",
+        ".github",
+    ),
+    repo_test("commands", "authoring", cheap=True),
+    repo_test("common"),
+    repo_test(
+        "discover_skills",
+        "scripts/discover_skills.py",
+        "scripts/flatten_skills.py",
+        "scripts/install_skills.py",
+    ),
+    repo_test("flatten_skills", "scripts/flatten_skills.py"),
+    repo_test(
+        "install_skills", "scripts/install_skills.py", "scripts/flatten_skills.py"
+    ),
+    repo_test("justfile", "justfile"),
+    repo_test("release_check", "scripts/release_check.py"),
+    repo_test("skill_invocation", "authoring", cheap=True),
+    repo_test(
+        "sync",
+        "scripts/sync.py",
+        "scripts/flatten_skills.py",
+        "scripts/install_skills.py",
+        "scripts/sync_private.py",
+    ),
+    repo_test(
+        "sync_fleet",
+        "scripts/sync_fleet.py",
+        "scripts/sync_private.py",
+        "scripts/flatten_skills.py",
+        "scripts/install_skills.py",
+    ),
+    repo_test("sync_private", "scripts/sync_private.py"),
     # Optional local linters stay off so every machine agrees
     Check(
         "workflows",
@@ -188,6 +249,36 @@ CHECKS = [
     ),
 ]
 
+SHARED_TEST_READS = {
+    "scripts/_cli.py",
+    "scripts/_common.py",
+    "pytest.ini",
+    "scripts/tests/conftest.py",
+}
+
+
+def validate_repo_tests(checks: list[Check]) -> None:
+    """Require one named check for every repository test module."""
+    discovered = {
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / "scripts/tests").glob("test_*.py")
+    }
+    registered = Counter(check.test_path for check in checks if check.test_path)
+    missing = sorted(discovered - registered.keys())
+    stale = sorted(registered.keys() - discovered)
+    duplicate = sorted(path for path, count in registered.items() if count != 1)
+    if missing or stale or duplicate:
+        details = "; ".join(
+            f"{label}: {', '.join(paths)}"
+            for label, paths in (
+                ("unregistered repository tests", missing),
+                ("missing repository tests", stale),
+                ("duplicate repository tests", duplicate),
+            )
+            if paths
+        )
+        raise ScriptError(f"test check registry is incomplete; {details}")
+
 
 def passes(check: Check, verbose: bool) -> bool:
     """Run one check; verbose runs stream each command's output to stderr, and
@@ -236,8 +327,27 @@ def in_scope(checks: list[Check]) -> list[Check]:
     paths = changed()
     if paths is None or "scripts/check.py" in paths:
         return checks
+    all_repo_tests = bool(SHARED_TEST_READS.intersection(paths)) or any(
+        path.startswith("scripts/tests/") and not Path(path).name.startswith("test_")
+        for path in paths
+    )
     scoped: list[Check] = []
     for check in checks:
+        if check.test_path:
+            watched = (check.test_path, *check.reads)
+            if (
+                check.cheap
+                or all_repo_tests
+                or any(
+                    path == item or path.startswith(f"{item}/")
+                    for path in paths
+                    for item in watched
+                )
+            ):
+                scoped.append(check)
+            else:
+                log.info("skip %s: no change under %s", check.name, ", ".join(watched))
+            continue
         skills = check.skills()
         watched = sorted({*skills, *check.reads})
         if not skills or any(
@@ -249,10 +359,21 @@ def in_scope(checks: list[Check]) -> list[Check]:
     return scoped
 
 
+def repo_batch(checks: list[Check]) -> Command:
+    paths = tuple(check.test_path for check in checks if check.test_path)
+    return pytest(paths, parallel=any(not check.cheap for check in checks))
+
+
 def verdict(args: argparse.Namespace) -> str:
+    validate_repo_tests(CHECKS)
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
+        repo_tests = [check for check in selected if check.test_path]
+        if repo_tests:
+            log.info("repository-tests: %s", shlex.join(repo_batch(repo_tests)))
         for check in selected:
+            if check.test_path:
+                continue
             for command in check.commands:
                 log.info("%s: %s", check.name, shlex.join(command))
         return "\n".join(check.name for check in selected)
@@ -260,13 +381,31 @@ def verdict(args: argparse.Namespace) -> str:
         selected = in_scope(selected)
 
     failed: list[str] = []
+    repo_tests = [check for check in selected if check.test_path]
+    ran_repo_tests = False
     for check in selected:
+        if check.test_path:
+            if ran_repo_tests:
+                continue
+            ran_repo_tests = True
+            names = [test.name for test in repo_tests]
+            if not passes(
+                Check("repository-tests", repo_batch(repo_tests)), args.verbose
+            ):
+                rerun = " ".join(f"--only {name}" for name in names)
+                failed.append(f"repository-tests failed; rerun: just check {rerun}")
+            continue
         if not passes(check, args.verbose):
             failed.append(check.name)
 
     if failed:
         raise ScriptError(
-            *(f"{name} failed; rerun: just check --only {name}" for name in failed)
+            *(
+                name
+                if name.startswith("repository-tests failed;")
+                else f"{name} failed; rerun: just check --only {name}"
+                for name in failed
+            )
         )
     return ""
 

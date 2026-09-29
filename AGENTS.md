@@ -29,7 +29,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 ## Checks
 
 - `just signoff` runs `just check`; the manual CI workflow runs `just check --all`. A failure names the `just check --only NAME` to rerun
-- `just check` always runs the repository checks, and runs a skill's own checks only when the branch or working tree changes that skill. Test a skill while working on it with `just check --only NAME`
+- `just check` always runs direct repository validators and two cheap project-rule tests, then selects other root tests and skill checks by changed inputs. Root tests use named `test-<stem>` checks; skill tests belong in their authoring package. See [checks](docs/maintainer/references/checks.md) and [script conventions](docs/maintainer/references/script-conventions.md) for routing details
 - `main` merges a PR only when its head commit carries a green `signoff` status; GitHub Actions runs only when started by hand. After pushing a PR branch, run `just signoff` and leave the checkout untouched until it finishes. Merge only a signed-off head, never with `gh pr merge --admin`
 - Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
 - When `just` is not installed, use `uvx --from rust-just just <recipe>`
