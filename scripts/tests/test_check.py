@@ -91,21 +91,27 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-    skill(root / "authoring/content", "alpha")
-    skill(root / "authoring/content", "beta")
+    for name in ("alpha", "beta", "gamma"):
+        skill(root / "authoring/content", name)
     commit(root)
     subprocess.run(
         ["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=root, check=True
     )
     (root / "authoring/content/alpha/SKILL.md").write_text("# alpha\n\nnew\n")
+    (root / "authoring/content/gamma/résumé.md").write_text("new\n")
     checks = [
         Check("repo", touch("repo-ran")),
         Check("alpha", touch("alpha-ran", "authoring/content/alpha/scripts/tests")),
         Check("beta", touch("beta-ran", "authoring/content/beta")),
+        Check("gamma", touch("gamma-ran", "authoring/content/gamma")),
     ]
 
     assert verdict(monkeypatch, capfd, checks) == (0, "", "")
-    assert sorted(p.name for p in root.glob("*-ran")) == ["alpha-ran", "repo-ran"]
+    assert sorted(p.name for p in root.glob("*-ran")) == [
+        "alpha-ran",
+        "gamma-ran",
+        "repo-ran",
+    ]
 
     assert verdict(monkeypatch, capfd, checks, "--all") == (0, "", "")
     assert (root / "beta-ran").exists()

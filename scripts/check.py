@@ -226,11 +226,14 @@ def changed() -> list[str] | None:
     base = run_git("merge-base", "HEAD", "origin/main", cwd=ROOT)
     if base.returncode != 0:
         return None
-    diff = run_git("diff", "--name-only", "--no-renames", base.stdout.strip(), cwd=ROOT)
-    untracked = run_git("ls-files", "--others", "--exclude-standard", cwd=ROOT)
+    # -z keeps git from quoting names with spaces or non-ASCII characters
+    diff = run_git(
+        "diff", "--name-only", "--no-renames", "-z", base.stdout.strip(), cwd=ROOT
+    )
+    untracked = run_git("ls-files", "-z", "--others", "--exclude-standard", cwd=ROOT)
     if diff.returncode != 0 or untracked.returncode != 0:
         return None
-    return [*diff.stdout.splitlines(), *untracked.stdout.splitlines()]
+    return [path for path in f"{diff.stdout}\0{untracked.stdout}".split("\0") if path]
 
 
 def in_scope(checks: list[Check]) -> list[Check]:
