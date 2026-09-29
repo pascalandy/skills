@@ -25,7 +25,9 @@ If the deeper comparison disproves every prefilter candidate, report `skipped: n
 
 ## 3. Load Wiki Map after the documentation update
 
-Follow the `pa-doc-update postflight` route in Wiki Map's `references/ROUTER.md`, then read its `references/SCHEMA.md` as the conformance contract. This file remains the execution workflow. Do not load a generic Wiki Map sub-skill or operational workflow.
+When the job only changes the body and `date_updated` of existing pages, skip this load; the section 5 rules that such a diff touches need no schema.
+
+Use and reload `$wiki-map`, follow the `pa-doc-update postflight` route in its `references/ROUTER.md`, then read its `references/SCHEMA.md` as the conformance contract. This file remains the execution workflow. Do not load a generic Wiki Map sub-skill or operational workflow.
 
 For each detected boundary:
 
