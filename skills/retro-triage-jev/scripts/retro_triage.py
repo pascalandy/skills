@@ -140,6 +140,10 @@ def read_stories(source: str) -> list[dict[str, str]]:
             raise Failure(
                 f"{where} is not JSON: {error.msg}", "write one JSON object per line"
             ) from error
+        if not isinstance(story, dict):
+            raise Failure(
+                f"{where} is not a JSON object", "write one JSON object per line"
+            )
         missing = [
             key
             for key in FIELDS

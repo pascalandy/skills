@@ -165,6 +165,7 @@ def test_an_unreachable_api_exits_75(tmp_path: Path) -> None:
     ("lines", "message"),
     [
         (["not json"], "stories.jsonl:1 is not JSON"),
+        (["[]"], "stories.jsonl:1 is not a JSON object"),
         ([json.dumps({"id": "a"})], "stories.jsonl:1 lacks repo, story, evidence, fix"),
         ([story("clear"), story("clear")], "stories.jsonl:2 repeats id 'clear'"),
     ],
