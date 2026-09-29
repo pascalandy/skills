@@ -7,10 +7,10 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-28
+date_updated: 2026-09-29
 ---
 
-Every CLI in `scripts/` follows this contract. Skill-local scripts adopt it one wave at a time; `PENDING` in `scripts/tests/test_cli_contract.py` is the migration backlog, and a script leaves it once it meets the contract and `just check` passes
+Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
 
 `authoring/commands/cli-contract.md` carries the Baseline and Opt-in sections below word for word, so the contract travels to a project that does not have this doc. `just check --only test` fails when the two drift; edit this doc and copy the sections across
 
@@ -119,11 +119,7 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 
 Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and [[checks]] says when they run
 
-`test_cli_contract.py` registers every entry point. It fails on an unlisted script, runs the Baseline checks on each migrated one in an isolated repository and home, and checks doc lines that run it in docs, hooks, CI, and `scripts/`. Signal tests block the script on a stub command or a FIFO, then check the exit code and that no child outlives it
-
-A migrated script with subcommands or PEP 723 dependencies is listed in `OWN_SUITE` with the suite that runs the same probes where those dependencies are installed, such as `transcript`'s `test_contract.py`, run by `just check --only transcript`
-
-Each script's exit-code table drives its tests: every code needs a test that triggers it. The contract tests cover `2`, `130`, and `143`; a script's own suite marks the rest with `@exits(script, code)`, which fails unless the test really sees that exit
+`test_cli.py` and `test_common.py` test the shared contract code once. `test_cli_contract.py` fails on a `scripts/` entry point missing from its `ENTRIES`, and runs each script's `--help` once: the help must come from the shared parser, and every doc line that runs the script, in docs, hooks, CI, and `scripts/`, may use only flags the help lists. A script's own tests cover what it does, not the shared contract again
 
 The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has no test suite. `just check --only jevgate` runs its ruff and pyright. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
 
