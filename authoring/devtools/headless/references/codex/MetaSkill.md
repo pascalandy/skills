@@ -63,9 +63,9 @@ codex exec \
   -c 'approval_policy="never"' \
   --ephemeral --json \
   -o "$review_dir/result.md" \
-  < /dev/null \
+  2> "$review_dir/stderr.log" \
   > "$review_dir/events.jsonl" \
-  2> "$review_dir/stderr.log" || review_status=$?
+  < /dev/null || review_status=$?
 ```
 
 When the model returns no review, CLI 0.157.1 still exits 0 and writes `Review was interrupted. Please re-run /review…` to `result.md`; the recipe's check counts that as a failure. Without criteria, a run can also answer in one line; the [review rules](../../SKILL.md#capture-a-review) treat that as weak evidence.
@@ -108,7 +108,7 @@ If Codex fails or asks for unavailable access, report the error and unmet task. 
 
 ## Continue or structure a task
 
-- Resume a persisted run with `codex exec resume <SESSION_ID> "<follow-up>" < /dev/null`. Prefer the captured ID over `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. On CLI 0.158.0, `resume` accepts `-m`, `--json`, and `-o` but not `-s` or `--add-dir`, so pin the sandbox through config: `codex exec resume <SESSION_ID> -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -o "$review_dir/result.md" "<follow-up>" < /dev/null`. Check `codex exec resume --help` for the installed version's options
+- Resume a persisted run by its captured ID rather than `--last` when other runs may exist. An `--ephemeral` run has no saved session to resume. On CLI 0.158.0, `resume` accepts `-m`, `--json`, and `-o` but not `-s` or `--add-dir`, so pin the sandbox through config: `codex exec resume <SESSION_ID> -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -o followup.md "<follow-up>" < /dev/null`. Check `codex exec resume --help` for the installed version's options
 - Use `--output-schema <schema.json>` when downstream code needs a validated final JSON shape; use `--json` when it needs the execution event stream
 
 For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).
