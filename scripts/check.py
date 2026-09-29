@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
 import shlex
 import subprocess
 import sys
@@ -32,7 +31,7 @@ examples:
   just check --all
   just check --list
   just check --only lint --only tavily
-  just check --only jevlabel --verbose"""
+  just check --only test --verbose"""
 
 EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
@@ -119,21 +118,9 @@ def pytest(path: str, *deps: str) -> Command:
     )
 
 
-def script_pin(script: str, package: str) -> str:
-    """Read `package==version` from a script's PEP 723 block, so a check cannot drift from it."""
-    source = (ROOT / script).read_text(encoding="utf-8")
-    match = re.search(rf'"({re.escape(package)}==[^"]+)"', source)
-    if match is None:
-        raise ValueError(f"{script} does not pin {package}")
-    return match.group(1)
-
-
 VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
-JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
-JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
-RETRO_TRIAGE = "authoring/devtools/retro-triage-jev/scripts"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
 
 CHECKS = [
@@ -192,17 +179,6 @@ CHECKS = [
             "authoring/content/storytelling/tests/validate-package.py",
             "authoring/content/storytelling",
         ),
-    ),
-    Check(
-        "jevlabel",
-        *ruff(JEVLABEL),
-        pyright(JEVLABEL, JEVLABEL_SDK),
-    ),
-    Check(
-        "retro-triage-jev",
-        *ruff(RETRO_TRIAGE),
-        pyright(RETRO_TRIAGE),
-        pytest(f"{RETRO_TRIAGE}/tests"),
     ),
     Check(
         "image-creator",

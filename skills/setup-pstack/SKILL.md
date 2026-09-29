@@ -27,4 +27,4 @@ Read back the matrix and confirm the requested roles, models, and reasoning leve
 
 ### 5. Offer verification when useful
 
-If the project has no way to drive its real app for proof, offer `/create-verification-skill` once. If it makes merge decisions that advisory Jev gates could inform, offer `/create-a-jev-cli-decision-wrapped-in-a-skill` once. Run either only if requested.
+If the project has no way to drive its real app for proof, offer `/create-verification-skill` once. Run it only if requested.

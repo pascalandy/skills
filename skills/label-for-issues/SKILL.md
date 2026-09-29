@@ -10,8 +10,6 @@ a decision comment is opt-in, as Ticket comments defines.
 Apply this vocabulary to issues, not PRs. Keep one state and one priority
 per open triaged issue, one type except for epic parents, at most one epic role, and
 optional impediments.
-For many issues at once, such as every open issue, run `label-for-issues-jev` first:
-it labels the clear cases and queues the rest for this workflow.
 
 ## Workflow
 
