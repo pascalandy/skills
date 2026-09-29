@@ -306,6 +306,7 @@ PENDING = {
     "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/jevgate.py",
     "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py",
     "authoring/devtools/label-for-issues-jev/scripts/jevlabel.py",
+    "authoring/devtools/retro-triage-jev/scripts/retro_triage.py",
     "authoring/knowledge/distill/scripts/distill.py",
     "authoring/mattpocock/matt-mode/scripts/check_matt_mode.py",
     "authoring/mattpocock/matt-mode/scripts/check_meta_skill_layout.py",

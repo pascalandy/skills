@@ -97,6 +97,7 @@ JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scrip
 JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
 JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
+RETRO_TRIAGE = "authoring/devtools/retro-triage-jev/scripts"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
 
 CHECKS = [
@@ -161,6 +162,12 @@ CHECKS = [
         *ruff(JEVLABEL),
         pyright(JEVLABEL, JEVLABEL_SDK),
         pytest(f"{JEVLABEL}/tests", JEVLABEL_SDK),
+    ),
+    Check(
+        "retro-triage-jev",
+        *ruff(RETRO_TRIAGE),
+        pyright(RETRO_TRIAGE),
+        pytest(f"{RETRO_TRIAGE}/tests"),
     ),
     Check(
         "image-creator",
