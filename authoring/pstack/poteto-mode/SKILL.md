@@ -1,6 +1,6 @@
 ---
 name: "poteto-mode"
-description: "Use when the user invokes `poteto` or `poteto-mode`."
+description: "Use only when explicitly invoked as `poteto` or `poteto-mode`."
 ---
 
 # Poteto mode

@@ -1,6 +1,6 @@
 ---
 name: "wiki-map"
-description: "Explicitly triggered when the user mentions `wiki-map`"
+description: "Use only when explicitly invoked as `wiki-map`."
 ---
 
 # Wiki Map

@@ -1,6 +1,6 @@
 ---
 name: "recall"
-description: "Use only when the user explicitly invokes `recall`."
+description: "Use only when explicitly invoked as `recall`."
 ---
 
 # Recall

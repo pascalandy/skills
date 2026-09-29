@@ -1,6 +1,6 @@
 ---
 name: "writer-sk"
-description: "Explicitly triggered when the user mentions `writer-sk`."
+description: "Use only when explicitly invoked as `writer-sk`."
 ---
 
 # Writing Clearly and Concisely

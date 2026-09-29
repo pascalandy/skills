@@ -1,6 +1,6 @@
 ---
 name: "pa-qa"
-description: "Use when the user mentions `pa-qa` for post-implementation validation or a reported user-facing problem."
+description: "Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem."
 ---
 
 # PA QA Session

@@ -1,6 +1,6 @@
 ---
 name: "cass"
-description: "Use only when the user explicitly mentions `cass` to search local coding-agent history"
+description: "Use only when explicitly invoked as `cass` to search local coding-agent history"
 ---
 
 # CASS

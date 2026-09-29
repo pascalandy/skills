@@ -1,6 +1,6 @@
 ---
 name: "think"
-description: "Use only when the user explicitly invokes `$think` to improve the model of a situation before judging, deciding, or acting."
+description: "Use only when explicitly invoked as `$think` to improve the model of a situation before judging, deciding, or acting."
 ---
 
 # Think

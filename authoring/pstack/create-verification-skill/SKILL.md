@@ -1,6 +1,6 @@
 ---
 name: "create-verification-skill"
-description: "Use only when the user explicitly invokes `create-verification-skill`."
+description: "Use only when explicitly invoked as `create-verification-skill`."
 ---
 
 # Create a verification skill

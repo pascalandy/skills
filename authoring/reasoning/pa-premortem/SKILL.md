@@ -1,6 +1,6 @@
 ---
 name: "pa-premortem"
-description: "Explicitly triggered when the user mentions `pa-premortem`."
+description: "Use only when explicitly invoked as `pa-premortem`."
 ---
 
 # Premortem

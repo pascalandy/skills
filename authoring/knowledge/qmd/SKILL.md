@@ -1,6 +1,6 @@
 ---
 name: "qmd"
-description: "Use only when the user explicitly mentions `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections."
+description: "Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections."
 compatibility: "Requires qmd CLI >= 2.8.3."
 allowed-tools: "Bash(qmd:*)"
 license: "MIT"

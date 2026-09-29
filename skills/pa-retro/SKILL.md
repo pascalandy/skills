@@ -1,6 +1,6 @@
 ---
 name: "pa-retro"
-description: "Use only when the user explicitly mentions `pa-retro`."
+description: "Use only when explicitly invoked as `pa-retro`."
 ---
 
 Post-mortem on the skills you loaded in this conversation.

@@ -1,6 +1,6 @@
 ---
 name: "pa-scope"
-description: "Use when the user mentions `pa-scope`."
+description: "Use only when explicitly invoked as `pa-scope`."
 keywords: ["pa-scope", "scope", "scoping", "change-surface", "touch-surface", "blast-radius", "impact", "affected-areas", "validation-surfaces", "bounded-context"]
 ---
 

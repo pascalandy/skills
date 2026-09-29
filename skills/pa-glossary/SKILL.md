@@ -1,6 +1,6 @@
 ---
 name: "pa-glossary"
-description: "Use only when the user explicitly mentions `pa-glossary`."
+description: "Use only when explicitly invoked as `pa-glossary`."
 metadata:
   version: "1.2.0"
   author: "user"

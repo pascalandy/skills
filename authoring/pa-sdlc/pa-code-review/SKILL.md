@@ -1,6 +1,6 @@
 ---
 name: "pa-code-review"
-description: "Use when the user mentions `pa-code-review` after implementation and before user-facing QA."
+description: "Use only when explicitly invoked as `pa-code-review` after implementation and before user-facing QA."
 keywords: ["pa-code-review", "code-review", "review", "implementation-quality", "readiness", "diff-review", "evidence-review"]
 ---
 

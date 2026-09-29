@@ -1,6 +1,6 @@
 ---
 name: "simple-editor"
-description: "Explicitly triggered when the user mentions `simple-editor`."
+description: "Use only when explicitly invoked as `simple-editor`."
 ---
 
 # Edit Note (notes personnelles)
