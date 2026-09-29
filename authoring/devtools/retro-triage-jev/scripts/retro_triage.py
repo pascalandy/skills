@@ -45,9 +45,9 @@ GOAL = (
 QUESTIONS = {
     "skill_causes": {
         "type": "noul",
-        "instructions": "Did the skill's own text cause the failure described in `story`, according to `evidence`?",
+        "instructions": "Did the skill's own text or bundled code cause the failure described in `story`, according to `evidence`?",
         "criteria": {
-            "true": "The skill states something false, contradicts another rule, gives a command that fails, triggers when it should not, or omits a step that every agent on this path needs.",
+            "true": "The skill states something false, contradicts another rule, gives a command that fails, has a bug in its bundled code, triggers when it should not, or omits a step that every agent on this path needs.",
             "false": "The failure came from agent error, an environment or upstream bug, content that lives outside the skill, or a situation the skill already handles.",
         },
     },
@@ -70,9 +70,10 @@ QUESTIONS = {
 }
 
 # Accept when every answer is yes. On the 21 public stories of the 2026-09-28
-# skill-feedback retro, repeat runs moved scores by up to 0.05 and matched the
-# final decision on 19 or 20; every miss had a lowest score within 0.05 of 0.5.
-# So a lowest score inside the band is a close call for a person to make.
+# skill-feedback retro, repeat runs moved scores by up to 0.05. These questions
+# matched the final decision on all 21; earlier wording matched 19 or 20, and
+# each miss had a lowest score within 0.05 of 0.5. So a lowest score inside the
+# band is a close call for a person to make.
 ACCEPT_AT = 0.5
 CONTESTED = (0.35, 0.65)
 
