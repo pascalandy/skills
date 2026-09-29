@@ -13,7 +13,11 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+import threading
+import time
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -532,14 +536,6 @@ def test_a_file_that_is_not_a_transcript_fails(sandbox: Sandbox) -> None:
     )
 
 
-@exits(SCRIPT, 1)
-def test_a_live_scan_is_refused_before_reading_anything(sandbox: Sandbox) -> None:
-    result = sandbox.run("scan", "missing-session")
-
-    assert (result.returncode, result.stdout) == (1, "")
-    assert "a live scan is not available yet" in result.stderr
-
-
 @exits(SCRIPT, 75)
 def test_another_run_holding_the_session_lock_exits_75(sandbox: Sandbox) -> None:
     transcript = (
@@ -556,3 +552,380 @@ def test_another_run_holding_the_session_lock_exits_75(sandbox: Sandbox) -> None
 
     assert (result.returncode, result.stdout) == (75, "")
     assert "another run still holds" in result.stderr
+
+
+# --- Live scans against a fake TypeSafe --------------------------------------------------
+
+
+@dataclass
+class FakeJev:
+    """A fake /v1/systemone. Tests set the answers per question; `hint` picks
+    the line a `where` Choice lands on."""
+
+    friction: dict[int, float] = field(default_factory=dict)
+    covered: dict[str, float] = field(default_factory=dict)
+    relation: dict[str, float] = field(
+        default_factory=lambda: {
+            "contradicted": 0.85,
+            "incomplete": 0.05,
+            "ambiguous": 0.03,
+            "not_followed": 0.03,
+            "unrelated": 0.02,
+            "cannot-tell": 0.02,
+        }
+    )
+    recurs: float = 0.9
+    tool: float = 0.05
+    conflict: float = 0.1
+    hint: str = "alpha-cli"
+    model: str = "jev-1.13.0"
+    status: int = 200
+    delay: float = 0.0
+    bodies: list[dict[str, Any]] = field(default_factory=list)
+
+    def kinds(self) -> list[str]:
+        return [next(iter(body["questions"])).split("::")[0] for body in self.bodies]
+
+    def answer(self, key: str, state: dict[str, Any]) -> dict[str, Any]:
+        kind, _, rest = key.partition("::")
+        if kind == "friction":
+            return {
+                "type": "noul",
+                "noul": self.friction.get(int(rest.split("::")[1]), 0.05),
+            }
+        if kind == "where":
+            lines = state["files"][int(rest)]["lines"]
+            hit = next(
+                (line.split(":")[0] for line in lines if self.hint in line), None
+            )
+            chosen = {hit: 0.9, "none": 0.1} if hit else {"none": 0.95}
+            return {
+                "type": "choice",
+                "choice": max(chosen, key=chosen.__getitem__),
+                "probabilities": chosen,
+            }
+        if kind == "covered":
+            return {"type": "noul", "noul": self.covered.get(rest, 0.9)}
+        if kind == "relation":
+            return {
+                "type": "choice",
+                "choice": max(self.relation, key=self.relation.__getitem__),
+                "probabilities": self.relation,
+            }
+        value = {
+            "tool_unavailable": self.tool,
+            "recurs": self.recurs,
+            "conflict": self.conflict,
+        }[kind]
+        return {"type": "noul", "noul": value}
+
+
+@pytest.fixture
+def jev() -> Iterator[tuple[FakeJev, str]]:
+    fake = FakeJev()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            fake.bodies.append(body)
+            time.sleep(fake.delay)
+            if fake.status != 200:
+                self.send_response(fake.status)
+                self.end_headers()
+                return
+            answers = {
+                key: fake.answer(key, body["state"]) for key in body["questions"]
+            }
+            reply = json.dumps(
+                {
+                    "model": fake.model,
+                    "answers": answers,
+                    "usage": {"input_tokens": 1000},
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(reply)))
+            self.end_headers()
+            self.wfile.write(reply)
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield fake, f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+
+
+@dataclass
+class Live:
+    sandbox: Sandbox
+    fake: FakeJev
+    url: str
+
+    def run(self, target: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
+        return self.sandbox.run(
+            "scan",
+            str(target),
+            "--json",
+            *args,
+            TYPESAFE_API_KEY="test-key",
+            TYPESAFE_BASE_URL=self.url,
+        )
+
+    def scan(self, target: Path | str, *args: str) -> dict[str, Any]:
+        result = self.run(target, *args)
+        assert result.returncode == 0, result.stderr
+        return json.loads(result.stdout)
+
+
+@pytest.fixture
+def live(sandbox: Sandbox, jev: tuple[FakeJev, str]) -> Live:
+    """Consent for the public repo, a gitleaks that finds nothing, and a chezmoi
+    that has no key, so no real credential can reach the fake."""
+    sandbox.consent(**{PUBLIC: "typesafe-2026-09-26"})
+    sandbox.stub("gitleaks", "cat > /dev/null\necho '[]'\n")
+    sandbox.stub("chezmoi", "exit 1\n")
+    return Live(sandbox, *jev)
+
+
+def friction_session(sandbox: Sandbox, *skills: tuple[str, str]) -> Path:
+    """Load each skill, then one failing alpha-cli call: event 1 after one skill."""
+    session = Claude(sandbox.repo).user("list the things")
+    for name, body in skills:
+        session.load(sandbox.installed(name), body)
+    session.tool(
+        "t1", "Bash", {"command": "alpha-cli list --all"}, "unknown flag --all", True
+    )
+    session.say("I will try without --all.")
+    return session.write(sandbox.home / "session.jsonl")
+
+
+def outcome(report: dict[str, Any], skill: str = "alpha") -> dict[str, Any]:
+    return next(found for found in report["outcomes"] if found["skill"] == skill)
+
+
+def test_a_contradicted_line_makes_the_skill_a_candidate_anchored_on_that_line(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.92}
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA)))
+    alpha = outcome(report)
+    item = alpha["items"][0]
+
+    assert (alpha["outcome"], len(alpha["items"])) == ("candidate", 1)
+    assert (item["event"], item["outcome"], item["category"]) == (
+        1,
+        "candidate",
+        "contradicted",
+    )
+    assert item["line"] == {
+        "skill": "alpha",
+        "file": f"{live.sandbox.installed('alpha')}/SKILL.md",
+        "anchor": "excerpt",
+        "number": 1,
+        "text": "Use `alpha-cli` to list things.",
+        "before": "",
+        "after": "Read https://example.com/alpha-guide first.",
+    }
+    assert live.fake.kinds() == ["friction", "where", "relation"]
+    assert report["usage"] == {
+        "model": "jev-1.13.0",
+        "sent": 3,
+        "reused": 0,
+        "input_tokens": 3000,
+        "cost_usd": 0.000126,
+    }
+
+
+def test_a_skill_without_friction_ends_as_nothing_after_triage_alone(
+    live: Live,
+) -> None:
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert (outcome(report)["outcome"], outcome(report)["items"]) == ("nothing", [])
+    assert live.fake.kinds() == ["friction"]
+
+
+def test_a_step_no_line_covers_is_missing_information_when_it_recurs(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.9}
+    live.fake.hint = "nothing matches this"
+    live.fake.covered = {"alpha": 0.1}
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert [
+        (i["outcome"], i["category"], i["line"]) for i in outcome(report)["items"]
+    ] == [("candidate", "missing_information", None)]
+    assert live.fake.bodies[-1]["state"]["line"] == {
+        "skill": "alpha",
+        "text": ALPHA.rstrip("\n"),
+    }
+    assert list(live.fake.bodies[-1]["questions"]) == ["recurs"]
+
+
+def test_a_line_another_loaded_skill_contradicts_is_a_conflict(live: Live) -> None:
+    live.fake.friction = {2: 0.9}
+    live.fake.conflict = 0.88
+    beta = "Never pass flags to `alpha-cli`.\n"
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA), ("beta", beta)))
+    item = outcome(report)["items"][0]
+
+    assert (item["outcome"], item["category"]) == ("candidate", "conflict")
+    assert item["other_line"]["skill"] == "beta"
+    assert "conflict" in live.fake.bodies[-1]["questions"]
+
+
+@pytest.mark.parametrize(
+    ("relation", "expected"),
+    [
+        ({"not_followed": 0.8, "contradicted": 0.2}, ("nothing", "not_followed")),
+        ({"cannot-tell": 0.7, "contradicted": 0.3}, ("review", "relation_unclear")),
+        (
+            {"contradicted": 0.4, "incomplete": 0.35, "unrelated": 0.25},
+            ("candidate", "skill_side_unclear"),
+        ),
+    ],
+    ids=["agent-error", "cannot-tell", "skill-side-but-unclear"],
+)
+def test_the_relation_decides_between_candidate_review_and_nothing(
+    live: Live, relation: dict[str, float], expected: tuple[str, str]
+) -> None:
+    live.fake.friction = {1: 0.9}
+    live.fake.relation = relation
+    report = live.scan(friction_session(live.sandbox, ("alpha", ALPHA)))
+    item = outcome(report)["items"][0]
+
+    assert (item["outcome"], item["category"]) == expected
+    assert outcome(report)["outcome"] == expected[0]
+
+
+def test_a_hard_failure_is_a_candidate_even_without_friction(live: Live) -> None:
+    transcript = (
+        Claude(live.sandbox.repo)
+        .load(live.sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli"},
+            "bash: alpha-cli: command not found",
+            True,
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    item = outcome(live.scan(transcript))["items"][0]
+
+    assert (item["outcome"], item["category"], item["detail"]) == (
+        "candidate",
+        "tool_unavailable",
+        "alpha-cli",
+    )
+
+
+@exits(SCRIPT, 1)
+def test_missing_consent_stops_before_anything_is_sent(live: Live) -> None:
+    (live.sandbox.home / ".config/label-for-issues-jev/consent.toml").unlink()
+
+    result = live.run(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert (result.returncode, result.stdout, live.fake.bodies) == (1, "", [])
+    assert f"{PUBLIC} has no consent under typesafe-2026-09-26" in result.stderr
+    assert f"consent add {PUBLIC}" in result.stderr
+
+
+def test_a_secret_in_a_request_stops_it_before_it_is_sent(live: Live) -> None:
+    live.sandbox.stub(
+        "gitleaks",
+        'cat > /dev/null\necho \'[{"RuleID": "github-pat", "StartLine": 9}]\'\nexit 3\n',
+    )
+
+    result = live.run(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert (result.returncode, live.fake.bodies) == (1, [])
+    assert (
+        "holds what gitleaks reads as a secret: github-pat at line 9" in result.stderr
+    )
+
+
+def test_a_rerun_reuses_saved_answers_and_replay_sends_nothing(live: Live) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    first = live.scan(transcript)
+    again = live.scan(transcript)
+    replayed = live.scan(transcript, "--replay")
+
+    assert len(live.fake.bodies) == 3
+    assert (again["usage"]["sent"], again["usage"]["reused"]) == (0, 3)
+    assert again["outcomes"] == first["outcomes"] == replayed["outcomes"]
+
+
+def test_replay_without_saved_answers_fails(live: Live) -> None:
+    result = live.run(friction_session(live.sandbox, ("alpha", ALPHA)), "--replay")
+
+    assert (result.returncode, live.fake.bodies) == (1, [])
+    assert "has no saved answer, so --replay cannot decide" in result.stderr
+
+
+@exits(SCRIPT, 75)
+def test_a_rate_limit_exits_75_and_a_rerun_sends_again(live: Live) -> None:
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.fake.status = 429
+    limited = live.run(transcript)
+    live.fake.status = 200
+    rerun = live.scan(transcript)
+
+    assert (limited.returncode, limited.stdout) == (75, "")
+    assert rerun["usage"]["sent"] == 1
+
+
+def test_a_request_whose_answer_never_came_is_resent_only_with_retry(
+    live: Live,
+) -> None:
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    live.fake.delay = 1.5
+    lost = live.run(transcript, "--timeout", "0.5")
+    live.fake.delay = 0
+    blocked = live.run(transcript)
+    op = next(word for word in blocked.stderr.split() if word.startswith("triage-"))
+    retried = live.scan(transcript, "--retry", op)
+
+    assert lost.returncode == 1
+    assert "no answer came back within 0.5s; TypeSafe may have billed it" in lost.stderr
+    assert (blocked.returncode, len(live.fake.bodies)) == (1, 2)
+    assert f"rerun with --retry {op}" in blocked.stderr
+    assert retried["usage"]["sent"] == 1
+
+
+def test_the_request_budget_stops_the_scan_and_a_rerun_reuses_its_answers(
+    live: Live,
+) -> None:
+    live.fake.friction = {1: 0.92}
+    transcript = friction_session(live.sandbox, ("alpha", ALPHA))
+    stopped = live.run(transcript, "--max-requests", "1")
+    finished = live.scan(transcript)
+
+    assert stopped.returncode == 1
+    assert "the scan stopped at its budget of 1 requests" in stopped.stderr
+    assert (finished["usage"]["sent"], finished["usage"]["reused"]) == (2, 1)
+
+
+def test_an_answer_from_another_model_fails_the_scan(live: Live) -> None:
+    live.fake.model = "jev-9.0.0"
+
+    result = live.run(friction_session(live.sandbox, ("alpha", ALPHA)))
+
+    assert result.returncode == 1
+    assert "was answered by 'jev-9.0.0', not the pinned jev-1.13.0" in result.stderr
+
+
+def test_without_a_key_nothing_is_sent(live: Live) -> None:
+    result = live.sandbox.run(
+        "scan",
+        str(friction_session(live.sandbox, ("alpha", ALPHA))),
+        TYPESAFE_BASE_URL=live.url,
+    )
+
+    assert (result.returncode, live.fake.bodies) == (1, [])
+    assert "no TypeSafe API key" in result.stderr

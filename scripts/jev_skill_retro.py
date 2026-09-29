@@ -23,6 +23,8 @@ import re
 import shlex
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,7 +32,14 @@ from typing import Any
 
 import install_skills
 import tomllib
-from _cli import Parser, ScriptError, UsageError, duration, exit_codes
+from _cli import (
+    Parser,
+    ScriptError,
+    TemporaryError,
+    UsageError,
+    duration,
+    exit_codes,
+)
 from _common import exclusive, run, run_script
 
 log = logging.getLogger("jev-skill-retro")
@@ -39,15 +48,18 @@ PROG = "just jev-skill-retro"
 ROOT = install_skills.ROOT
 EXIT_CODES = exit_codes(
     {
-        1: "failure: an unreadable transcript, missing consent, or a TypeSafe or GitHub error",
-        75: "another run holds this session's lock; rerun later",
+        1: "failure: an unreadable transcript, missing consent, a secret, a TypeSafe "
+        "error, or a request that may have been billed without an answer",
+        75: "TypeSafe was unreachable or rate-limited, or another run holds this "
+        "session's lock; rerun later, and saved answers are reused",
     }
 )
 EXAMPLES = f"""\
 examples:
   {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run
-  {PROG} scan ~/.codex/sessions/2026/09/28/rollout-2026-09-28T12-53-45-01a0.jsonl --dry-run --json
-  {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --dry-run --repo pascalandy/skills"""
+  {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b
+  {PROG} scan ~/.codex/sessions/2026/09/28/rollout-2026-09-28T12-53-45-01a0.jsonl --json
+  {PROG} scan 6d88c057-abeb-41cc-ab08-195310f0b63b --replay"""
 
 # Jev 1.13's limits: 32k tokens for state plus the longest question, 64k in all
 STATE_LIMIT = 32_000
@@ -92,6 +104,91 @@ TRIAGE = {
             "concerning an instruction of that skill"
         ),
         "false": "Normal progress, or difficulty unrelated to that skill's instructions",
+    },
+}
+
+MODEL = "jev-1.13.0"
+BASE_URL = "https://api.typesafe.ai"
+KEYRING = ("secret", "keyring", "get", "--service=typesafe_ai", "--user=api_key")
+# Dollars per input token for jev-1.13.0; output tokens are free
+PRICE = 0.042 / 1_000_000
+
+# Starting guesses from TypeSafe's self-consistency cookbooks, not measurements.
+# A Noul counts as no at or below NO and as yes at or above YES; a Choice counts
+# only when its top probability reaches TOP.
+CALIBRATION = (
+    "uncalibrated: milestone 3 of issue #177 measures these on the 2026-09-28 retro"
+)
+NO = 0.30
+YES = 0.70
+TOP = 0.60
+# The most flagged events per skill that go on to locate and qualify
+RETAINED = 5
+# A Choice holds at most 255 options: a window of lines leaves room for `none`
+WINDOW = 240
+
+LOCATE = (
+    "Which line of `files[{file}]` gives the instruction the agent was carrying "
+    "out in `event`?"
+)
+COVERED = {
+    "instructions": (
+        "Does any line of {files} address the step the agent was carrying out in `event`?"
+    ),
+    "criteria": {
+        "true": "At least one line states how to do this step",
+        "false": "No line addresses this step",
+    },
+}
+RELATION = {
+    "type": "choice",
+    "instructions": "How does what happened in `event` relate to the instruction in `line`?",
+    "criteria": {
+        "contradicted": (
+            "What the agent found (a file, command output, flag, path, or behavior) "
+            "differs from what `line` states"
+        ),
+        "incomplete": "`line` covers this step but leaves out a detail the agent needed",
+        "ambiguous": (
+            "`line` can be read more than one way, and the agent's reading led to the problem"
+        ),
+        "not_followed": "The agent did something other than what `line` says",
+        "unrelated": (
+            "The problem came from outside `line`: the machine, the network, a service, "
+            "or a change in the request"
+        ),
+        "cannot-tell": "`event` does not show enough to tell",
+    },
+}
+SKILL_SIDE = ("contradicted", "incomplete", "ambiguous")
+TOOL_UNAVAILABLE = {
+    "type": "noul",
+    "instructions": (
+        "Does `event` show that a program, API, credential, or permission that `line` "
+        "relies on was unavailable?"
+    ),
+    "criteria": {
+        "true": "Something `line` needs was missing or refused",
+        "false": "Everything `line` needs was available",
+    },
+}
+RECURS = {
+    "type": "noul",
+    "instructions": (
+        "Would another agent following `line` as written likely hit the problem in "
+        "`event` again in ordinary use?"
+    ),
+    "criteria": {
+        "true": "The problem sits on a common path of the skill",
+        "false": "The problem needs rare or one-off circumstances of this session",
+    },
+}
+CONFLICT = {
+    "type": "noul",
+    "instructions": "Do `line` and `other_line` tell the agent to do opposite things for this step?",
+    "criteria": {
+        "true": "Following one breaks the other",
+        "false": "They agree or cover different things",
     },
 }
 
@@ -740,6 +837,482 @@ def operation(kind: str, body: Any) -> str:
     return f"{kind}-{digest[:12]}"
 
 
+# --- Jev -------------------------------------------------------------------------
+
+
+class Jev:
+    """Sends each request at most once: its answer is saved by operation ID and
+    reused on a rerun, and a request whose answer never arrived is resent only
+    with --retry, because TypeSafe may have billed it."""
+
+    def __init__(
+        self,
+        directory: Path,
+        *,
+        replay: bool,
+        retry: set[str],
+        timeout: float,
+        budget: int,
+        repos: set[str],
+    ) -> None:
+        self.directory = directory
+        self.replay = replay
+        self.retry = retry
+        self.timeout = timeout
+        self.budget = budget
+        self.repos = repos
+        self.key = ""
+        self.sent: list[str] = []
+        self.reused: list[str] = []
+        self.tokens = 0
+
+    def ask(self, kind: str, body: dict[str, Any]) -> dict[str, Any]:
+        op = operation(kind, body)
+        path = self.directory / "ops" / f"{op}.json"
+        record = json.loads(path.read_text()) if path.exists() else {}
+        if record.get("state") == "done":
+            self.reused.append(op)
+            return record["answers"]
+        if self.replay:
+            raise ScriptError(
+                f"request {op} has no saved answer, so --replay cannot decide",
+                f"run {PROG} scan without --replay",
+            )
+        if record.get("state") == "sent" and op not in self.retry:
+            raise ScriptError(
+                f"request {op} was sent but its answer never arrived; TypeSafe may have billed it",
+                f"rerun with --retry {op} to send it again",
+            )
+        if len(self.sent) >= self.budget:
+            raise ScriptError(
+                f"the scan stopped at its budget of {self.budget} requests; answers so far are saved",
+                "rerun with a larger --max-requests; saved answers are reused",
+            )
+        self.check(op, body)
+        request_path = self.directory / "requests" / f"{op}.json"
+        write_json(request_path, body)
+        write_json(path, {"kind": kind, "state": "sent", "request": str(request_path)})
+        reply = self.send(op, path, body)
+        record = {
+            "kind": kind,
+            "state": "done",
+            "request": str(request_path),
+            "model": reply["model"],
+            "answers": reply["answers"],
+            "usage": reply.get("usage") or {},
+        }
+        write_json(path, record)
+        self.sent.append(op)
+        self.tokens += int(record["usage"].get("input_tokens") or 0)
+        return record["answers"]
+
+    def check(self, op: str, body: dict[str, Any]) -> None:
+        """Consent before the first request, and a secret scan before each."""
+        if not self.key:
+            missing = [repo for repo, ok in consent(self.repos).items() if not ok]
+            if missing:
+                raise ScriptError(
+                    *(
+                        f"{repo} has no consent under {TERMS_NAME}; show Pascal the "
+                        "planned requests (scan --dry-run) and TypeSafe's terms, and "
+                        f"after he approves run: {CONSENT_FIX.format(repo=repo)}"
+                        for repo in missing
+                    )
+                )
+            self.key = api_key()
+        leaks = secrets(json.dumps(body, ensure_ascii=False, indent=2), self.timeout)
+        if leaks is None:
+            raise ScriptError(
+                "gitleaks is not installed, so the payload cannot be checked for secrets",
+                "install gitleaks, then rerun",
+            )
+        if leaks:
+            raise ScriptError(
+                f"request {op} holds what gitleaks reads as a secret: {'; '.join(leaks)}",
+                "remove the secret from the session or scan it with --dry-run to inspect the payload",
+            )
+
+    def send(self, op: str, path: Path, body: dict[str, Any]) -> dict[str, Any]:
+        url = (
+            os.environ.get("TYPESAFE_BASE_URL", BASE_URL).rstrip("/") + "/v1/systemone"
+        )
+        request = urllib.request.Request(
+            url,
+            data=json.dumps({**body, "model": MODEL}).encode(),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                reply = json.load(response)
+        except urllib.error.HTTPError as error:
+            # TypeSafe answered, so nothing is pending; the request may be resent
+            write_json(path, {"state": "failed", "status": error.code})
+            if error.code in (429, 503, 529):
+                raise TemporaryError(
+                    f"TypeSafe answered HTTP {error.code}; saved answers are reused on a rerun"
+                ) from error
+            raise ScriptError(
+                f"TypeSafe answered HTTP {error.code} for request {op}"
+            ) from error
+        except urllib.error.URLError as error:
+            write_json(path, {"state": "failed", "reason": str(error.reason)})
+            raise TemporaryError(
+                f"TypeSafe is unreachable at {url}: {error.reason}"
+            ) from error
+        except (TimeoutError, ConnectionError) as error:
+            raise ScriptError(
+                f"request {op} was sent but no answer came back within {self.timeout:g}s; "
+                "TypeSafe may have billed it",
+                f"rerun with --retry {op} to send it again",
+            ) from error
+        except (ValueError, UnicodeDecodeError) as error:
+            raise ScriptError(
+                f"TypeSafe sent an unreadable answer to request {op}"
+            ) from error
+        if reply.get("model") != MODEL or not isinstance(reply.get("answers"), dict):
+            raise ScriptError(
+                f"request {op} was answered by {reply.get('model')!r}, not the pinned {MODEL}",
+                f"check TypeSafe's models page; this script pins {MODEL}",
+            )
+        return reply
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "model": MODEL,
+            "sent": len(self.sent),
+            "reused": len(self.reused),
+            "input_tokens": self.tokens,
+            "cost_usd": round(self.tokens * PRICE, 6),
+        }
+
+
+def api_key() -> str:
+    key = os.environ.get("TYPESAFE_API_KEY", "").strip()
+    chezmoi = shutil.which("chezmoi")
+    if not key and chezmoi:
+        try:
+            found = run(
+                [chezmoi, *KEYRING],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=15,
+            )
+            key = found.stdout.strip() if found.returncode == 0 else ""
+        except subprocess.TimeoutExpired:
+            key = ""
+    if not key:
+        raise ScriptError(
+            "no TypeSafe API key: TYPESAFE_API_KEY is unset and the chezmoi keyring has none",
+            "export TYPESAFE_API_KEY, or run: chezmoi secret keyring set --service=typesafe_ai --user=api_key",
+        )
+    return key
+
+
+def noul(answers: dict[str, Any], key: str) -> float:
+    return float(answers[key]["noul"])
+
+
+def choice(answers: dict[str, Any], key: str) -> dict[str, float]:
+    return {option: float(p) for option, p in answers[key]["probabilities"].items()}
+
+
+def top(probabilities: dict[str, float]) -> tuple[str, float]:
+    option = max(probabilities, key=lambda name: probabilities[name])
+    return option, probabilities[option]
+
+
+def uncertain(value: float) -> bool:
+    return NO < value < YES
+
+
+# --- Locate and qualify ------------------------------------------------------------
+
+
+@dataclass
+class Window:
+    """Consecutive lines of one skill file, small enough for one Choice."""
+
+    skill: str
+    file: SkillFile
+    lines: list[tuple[int, str]]
+
+    def state(self) -> dict[str, Any]:
+        return {
+            "skill": self.skill,
+            "path": self.file.path,
+            "lines": [f"L{number}: {text}" for number, text in self.lines],
+        }
+
+    def options(self) -> dict[str, Any]:
+        found: dict[str, Any] = {
+            f"L{number}": None for number, text in self.lines if text.strip()
+        }
+        found["none"] = "No line of this file gives that instruction"
+        return found
+
+    def around(self, number: int) -> dict[str, Any]:
+        numbered = dict(self.lines)
+        return {
+            "skill": self.skill,
+            "file": self.file.path,
+            "anchor": self.file.anchor,
+            "number": number,
+            "text": numbered.get(number, ""),
+            "before": numbered.get(number - 1, ""),
+            "after": numbered.get(number + 1, ""),
+        }
+
+
+def windows(skill: str, files: list[SkillFile]) -> list[Window]:
+    found: list[Window] = []
+    for file in files:
+        numbered = list(enumerate(file.text.splitlines(), file.first_line))
+        for start in range(0, len(numbered), WINDOW):
+            found.append(Window(skill, file, numbered[start : start + WINDOW]))
+    return found
+
+
+def event_state(session: Session, index: int) -> dict[str, Any]:
+    def shown(event: Event) -> dict[str, Any]:
+        return {
+            "id": event.index,
+            "actor": event.actor,
+            "text": shorten(event.text),
+            "error": event.error,
+        }
+
+    return {
+        "event": shown(session.events[index]),
+        "context": [
+            shown(session.events[i])
+            for i in (index - 1, index + 1)
+            if 0 <= i < len(session.events)
+        ],
+    }
+
+
+def locate_request(
+    session: Session, index: int, load: Load, others: list[Load]
+) -> tuple[dict[str, Any], list[Window]]:
+    """B1: which line of each file the agent followed, and whether any line of
+    each loaded skill covers the step."""
+    shown = windows(load.skill, load.files)
+    for other in others:
+        shown += windows(other.skill, other.files[:1])
+    questions: dict[str, Any] = {}
+    for number, window in enumerate(shown):
+        questions[f"where::{number}"] = {
+            "type": "choice",
+            "instructions": LOCATE.format(file=number),
+            "criteria": window.options(),
+        }
+    for skill in [load, *others]:
+        indices = [n for n, window in enumerate(shown) if window.skill == skill.skill]
+        paths = ", ".join(f"`files[{n}]`" for n in indices)
+        questions[f"covered::{skill.skill}"] = {
+            "type": "noul",
+            "instructions": COVERED["instructions"].format(files=paths),
+            "criteria": COVERED["criteria"],
+        }
+    state = {**event_state(session, index), "files": [w.state() for w in shown]}
+    return {"state": state, "questions": questions}, shown
+
+
+def qualify_request(
+    session: Session,
+    index: int,
+    line: dict[str, Any] | None,
+    load: Load,
+    other: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """B2: how the event relates to one line; without a line, only whether the
+    problem would recur, judged against the skill's whole SKILL.md."""
+    state: dict[str, Any] = event_state(session, index)
+    if line is None:
+        state["line"] = {"skill": load.skill, "text": load.files[0].text}
+        return {"state": state, "questions": {"recurs": RECURS}}
+    state["line"] = line
+    questions: dict[str, Any] = {
+        "relation": RELATION,
+        "tool_unavailable": TOOL_UNAVAILABLE,
+        "recurs": RECURS,
+    }
+    if other is not None:
+        state["other_line"] = other
+        questions["conflict"] = CONFLICT
+    return {"state": state, "questions": questions}
+
+
+def decide(
+    covered: float,
+    complete: bool,
+    recurs: float,
+    relation: dict[str, float] | None = None,
+    tool: float | None = None,
+    conflict: float | None = None,
+) -> tuple[str, str]:
+    """Rules 2–8 of #177 for one event and line: an outcome and its category."""
+    if conflict is not None and conflict >= YES:
+        return "candidate", "conflict"
+    if covered <= NO and complete and recurs >= YES:
+        return "candidate", "missing_information"
+    read = [covered, recurs, *(v for v in (tool, conflict) if v is not None)]
+    if relation is not None:
+        option, p = top(relation)
+        if sum(relation.get(name, 0.0) for name in SKILL_SIDE) >= YES and recurs >= YES:
+            typed = (
+                option if option in SKILL_SIDE and p >= TOP else "skill_side_unclear"
+            )
+            return "candidate", typed
+        if tool is not None and tool >= YES and recurs >= YES:
+            return "candidate", "tool_unavailable"
+        if option in ("not_followed", "unrelated") and p >= TOP:
+            return "nothing", option
+        if p < TOP or option == "cannot-tell":
+            return "review", "relation_unclear"
+    if any(uncertain(v) for v in read):
+        return "review", "uncertain_answer"
+    if not complete:
+        return "review", "partial_skill_text"
+    return "nothing", "no_rule_matched"
+
+
+def examine(
+    session: Session, load: Load, skills: list[Load], index: int, jev: Jev
+) -> dict[str, Any]:
+    """Locate and qualify one flagged event, then decide it."""
+    others = [s for s in skills if s.skill != load.skill and s.after <= index]
+    body, shown = locate_request(session, index, load, others)
+    located = jev.ask("locate", body)
+    covered = noul(located, f"covered::{load.skill}")
+    complete = not any(file.partial for file in load.files)
+    lines: list[dict[str, Any]] = []
+    other: dict[str, Any] | None = None
+    for number, window in enumerate(shown):
+        option, p = top(choice(located, f"where::{number}"))
+        if option == "none" or p < TOP:
+            continue
+        found = window.around(int(option[1:]))
+        if window.skill == load.skill:
+            lines.append(found)
+        elif other is None and noul(located, f"covered::{window.skill}") >= YES:
+            other = found
+    item: dict[str, Any] = {"event": index, "covered": covered}
+    if not lines:
+        answers = jev.ask("qualify", qualify_request(session, index, None, load, None))
+        recurs = noul(answers, "recurs")
+        outcome, category = decide(covered, complete, recurs)
+        return {
+            **item,
+            "outcome": outcome,
+            "category": category,
+            "line": None,
+            "recurs": recurs,
+        }
+    judged: list[dict[str, Any]] = []
+    for line in lines:
+        answers = jev.ask("qualify", qualify_request(session, index, line, load, other))
+        relation = choice(answers, "relation")
+        scores = {
+            "recurs": noul(answers, "recurs"),
+            "tool_unavailable": noul(answers, "tool_unavailable"),
+            "conflict": noul(answers, "conflict") if "conflict" in answers else None,
+        }
+        outcome, category = decide(
+            covered,
+            complete,
+            scores["recurs"],
+            relation,
+            scores["tool_unavailable"],
+            scores["conflict"],
+        )
+        judged.append(
+            {
+                **item,
+                "outcome": outcome,
+                "category": category,
+                "line": line,
+                "other_line": other if category == "conflict" else None,
+                "relation": relation,
+                **scores,
+            }
+        )
+    return max(judged, key=lambda found: STRENGTH[found["outcome"]])
+
+
+def judge(
+    session: Session,
+    report: dict[str, Any],
+    requests: list[dict[str, Any]],
+    oversized: list[int],
+    jev: Jev,
+) -> list[dict[str, Any]]:
+    """Every roster skill's outcome: its strongest event decides."""
+    skills = triage_skills(session)
+    friction: dict[str, dict[int, float]] = {load.skill: {} for load in skills}
+    for body in requests:
+        for key, answer in jev.ask("triage", body).items():
+            _, skill, index = key.split("::")
+            friction[skill][int(index)] = float(answer["noul"])
+    outcomes: list[dict[str, Any]] = []
+    for load in skills:
+        items = [
+            {
+                "event": found["event"],
+                "outcome": "candidate",
+                "category": found["kind"],
+                "detail": found["detail"],
+                "line": None,
+            }
+            for found in report["facts"]
+            if found["skill"] == load.skill
+        ]
+        scores = friction[load.skill]
+        flagged = sorted(
+            (i for i, p in scores.items() if p > NO), key=lambda i: -scores[i]
+        )
+        for index in flagged[:RETAINED]:
+            items.append(
+                {
+                    "friction": scores[index],
+                    **examine(session, load, skills, index, jev),
+                }
+            )
+        items += [
+            {
+                "event": index,
+                "outcome": "review",
+                "category": "event_too_large",
+                "line": None,
+            }
+            for index in oversized
+            if index >= load.after
+        ]
+        outcome = max(
+            (item["outcome"] for item in items),
+            key=lambda name: STRENGTH[name],
+            default="nothing",
+        )
+        outcomes.append(
+            {
+                "skill": load.skill,
+                "home": load.home,
+                "outcome": outcome,
+                "flagged": len(flagged),
+                "items": sorted(items, key=lambda item: item["event"]),
+            }
+        )
+    return outcomes
+
+
+STRENGTH = {"nothing": 0, "review": 1, "candidate": 2}
+
+
 # --- Runs ------------------------------------------------------------------------
 
 
@@ -785,11 +1358,6 @@ def load_summary(load: Load) -> dict[str, Any]:
 
 
 def scan(args: argparse.Namespace) -> dict[str, Any]:
-    if not args.dry_run:
-        raise ScriptError(
-            "a live scan is not available yet; this version only plans requests",
-            f"{PROG} scan {shlex.quote(args.target)} --dry-run",
-        )
     session = read_session(locate(args.target))
     classify(session)
     repo = session_repo(session, args.repo)
@@ -815,7 +1383,39 @@ def scan(args: argparse.Namespace) -> dict[str, Any]:
         return report
     report["facts"] = facts(session)
     requests, oversized = plan_triage(session)
-    planned = [
+    homes = {
+        load.home for load in session.loads if load.status == "roster" and load.home
+    }
+    report["consent"] = consent({repo, *homes})
+    report["oversized_events"] = oversized
+    with exclusive(directory / "lock", args.timeout):
+        if args.dry_run:
+            return preview(report, requests, directory, args)
+        jev = Jev(
+            directory,
+            replay=args.replay,
+            retry=set(args.retry),
+            timeout=args.timeout,
+            budget=args.max_requests,
+            repos={repo, *homes},
+        )
+        try:
+            report["outcomes"] = judge(session, report, requests, oversized, jev)
+        finally:
+            report["usage"] = jev.summary()
+        report["calibration"] = CALIBRATION
+        write_json(directory / "scan.json", report)
+    return report
+
+
+def preview(
+    report: dict[str, Any],
+    requests: list[dict[str, Any]],
+    directory: Path,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Save the triage requests and check them for secrets, sending nothing."""
+    report["requests"] = [
         {
             "op": operation("triage", body),
             "tokens": tokens(body),
@@ -823,29 +1423,22 @@ def scan(args: argparse.Namespace) -> dict[str, Any]:
         }
         for body in requests
     ]
-    homes = {
-        load.home for load in session.loads if load.status == "roster" and load.home
-    }
-    report["consent"] = consent({repo, *homes})
-    report["requests"] = planned
-    report["oversized_events"] = oversized
     report["budget"] = {
         "max_requests": args.max_requests,
-        "within": len(planned) <= args.max_requests,
+        "within": len(requests) <= args.max_requests,
     }
-    with exclusive(directory / "lock", args.timeout):
-        found: dict[str, list[str]] = {}
-        unchecked = False
-        for body, entry in zip(requests, planned):
-            saved = directory / "planned" / f"{entry['op']}.json"
-            write_json(saved, body)
-            leaks = secrets(saved.read_text(encoding="utf-8"), args.timeout)
-            if leaks is None:
-                unchecked = True
-            elif leaks:
-                found[entry["op"]] = leaks
-        report["secrets"] = "unchecked" if unchecked else found or "clean"
-        write_json(directory / "scan-plan.json", report)
+    found: dict[str, list[str]] = {}
+    unchecked = False
+    for body, entry in zip(requests, report["requests"]):
+        saved = directory / "planned" / f"{entry['op']}.json"
+        write_json(saved, body)
+        leaks = secrets(saved.read_text(encoding="utf-8"), args.timeout)
+        if leaks is None:
+            unchecked = True
+        elif leaks:
+            found[entry["op"]] = leaks
+    report["secrets"] = "unchecked" if unchecked else found or "clean"
+    write_json(directory / "scan-plan.json", report)
     return report
 
 
@@ -865,30 +1458,47 @@ def lines(report: dict[str, Any]) -> str:
         rows.append(
             f"fact\t{item['skill']}\t{item['kind']}\tevent {item['event']}\t{item['detail']}"
         )
-    for entry in report["requests"]:
+    for entry in report.get("requests", []):
         rows.append(
             f"request\t{entry['op']}\t{entry['tokens']} tokens\t{entry['questions']} questions"
         )
+    for outcome in report.get("outcomes", []):
+        rows.append(f"outcome\t{outcome['skill']}\t{outcome['outcome']}")
+        for item in outcome["items"]:
+            line = item.get("line")
+            where = f"{line['file']}:{line['number']}" if line else "-"
+            rows.append(
+                f"item\t{outcome['skill']}\t{item['outcome']}\t{item['category']}"
+                f"\tevent {item['event']}\t{where}"
+            )
     for index in report["oversized_events"]:
         rows.append(f"oversized\tevent {index}")
     for repo, ok in report["consent"].items():
+        state = "ok" if ok else "missing: " + CONSENT_FIX.format(repo=repo)
+        rows.append(f"consent\t{repo}\t{state}")
+    if "secrets" in report:
+        found = report["secrets"]
+        if isinstance(found, dict):
+            rows += [f"secret\t{op}\t{'; '.join(leaks)}" for op, leaks in found.items()]
+        else:
+            rows.append(f"secrets\t{found}")
+    if "usage" in report:
+        usage = report["usage"]
         rows.append(
-            f"consent\t{repo}\t{'ok' if ok else 'missing: ' + CONSENT_FIX.format(repo=repo)}"
+            f"usage\t{usage['sent']} sent\t{usage['reused']} reused"
+            f"\t{usage['input_tokens']} tokens\t${usage['cost_usd']:.4f}"
         )
-    secrets_found = report["secrets"]
-    if isinstance(secrets_found, dict):
-        for op, leaks in secrets_found.items():
-            rows.append(f"secret\t{op}\t{'; '.join(leaks)}")
-    else:
-        rows.append(f"secrets\t{secrets_found}")
-    for note in report["notes"]:
-        rows.append(f"note\t{note}")
+    rows += [f"note\t{note}" for note in report["notes"]]
     return "\n".join(rows)
 
 
 def work(args: argparse.Namespace) -> str:
     if args.max_requests < 1:
         raise UsageError("--max-requests must be at least 1")
+    if args.dry_run and (args.replay or args.retry):
+        raise UsageError(
+            "--dry-run sends nothing, so it takes neither --replay nor --retry"
+        )
     report = scan(args)
     return (
         json.dumps(report, indent=2, ensure_ascii=False) if args.json else lines(report)
@@ -901,8 +1511,10 @@ def build_parser() -> Parser:
         exit_codes=EXIT_CODES,
         description=(
             "Find where the skills a finished Claude Code or Codex session loaded caused "
-            "friction. scan plans the triage requests Jev will answer, saves them under "
-            "the run directory, and checks consent and secrets; it sends nothing."
+            "friction. scan asks Jev one friction question per loaded skill and event, "
+            "locates and qualifies the flagged events, and decides each skill's outcome: "
+            "candidate, review, or nothing. Every request needs recorded consent for the "
+            "session's repo and each skill's home repo, and passes a gitleaks scan first."
         ),
         epilog=EXAMPLES,
     )
@@ -914,7 +1526,19 @@ def build_parser() -> Parser:
         "-n",
         "--dry-run",
         action="store_true",
-        help="plan and save the requests without sending them; needs no key or consent",
+        help="plan and save the triage requests without sending them; needs no key or consent",
+    )
+    parser.add_argument(
+        "--replay",
+        action="store_true",
+        help="decide again from saved answers only, sending nothing",
+    )
+    parser.add_argument(
+        "--retry",
+        action="append",
+        default=[],
+        metavar="OP",
+        help="resend a request whose answer never arrived; it may be billed twice",
     )
     parser.add_argument(
         "--repo",
@@ -926,14 +1550,15 @@ def build_parser() -> Parser:
         type=int,
         default=50,
         metavar="N",
-        help="the most triage requests one scan may send (default: 50)",
+        help="the most requests one scan may send (default: 50)",
     )
     parser.add_argument(
         "--timeout",
         type=duration,
-        default=30.0,
+        default=60.0,
         metavar="DURATION",
-        help="how long to wait for the session lock or a child command: 30s, 5m, or seconds (default: 30s)",
+        help="how long to wait for the session lock, gitleaks, or one TypeSafe answer: "
+        "30s, 5m, or seconds (default: 60s)",
     )
     parser.add_argument(
         "--json", action="store_true", help="print one JSON object on stdout"
