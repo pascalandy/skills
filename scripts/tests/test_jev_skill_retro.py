@@ -1607,6 +1607,8 @@ elif args[:2] == ["issue", "view"]:
     shown["labels"] = [{{"name": name}} for name in shown["labels"]]
     if shown["number"] in state.get("closed_on_view", []):
         shown["state"] = "CLOSED"
+    if shown["number"] in state.get("changed_on_view", []):
+        shown["body"] += " (edited)"
     print(json.dumps(shown))
 elif args[:2] == ["issue", "create"]:
     number = 100 + len(state["issues"])
@@ -1806,12 +1808,19 @@ def test_an_interrupted_publish_finds_its_marker_instead_of_filing_twice(
     github = fake_github(live.sandbox)
     transcript = stories_ready(live)
     report = json.loads(published(live, transcript, "--yes", "--json").stdout)
-    op = report["actions"][0]["op"]
-    record = Path(report["run"], "ops", f"{op}.json")
-    # As if the run stopped after gh created the issue, before it saved the receipt
+    filed = github.state()["issues"][0]
+    record = Path(report["run"], "ops", f"{report['actions'][0]['op']}.json")
+    # As if the run stopped after gh created the issue, before it read it back
     record.write_text(
         json.dumps(
-            {"kind": "publish", "state": "sent", "action": "create", "target": None}
+            {
+                "kind": "publish",
+                "state": "sent",
+                "action": "create",
+                "target": None,
+                "title": filed["title"],
+                "body": filed["body"],
+            }
         )
     )
 
@@ -1819,7 +1828,10 @@ def test_an_interrupted_publish_finds_its_marker_instead_of_filing_twice(
 
     assert github.state()["calls"] == [["create", 100]]
     assert again["actions"][0]["url"] == f"https://github.com/{PUBLIC}/issues/100"
-    assert json.loads(record.read_text())["state"] == "done"
+    assert (
+        json.loads(record.read_text())["state"],
+        json.loads(record.read_text())["target"],
+    ) == ("done", 100)
 
 
 def test_publish_needs_yes_after_the_dry_run(live: Live) -> None:
@@ -1855,7 +1867,11 @@ def test_a_private_session_repo_is_named_nowhere_in_public_output(live: Live) ->
         work,
         "--repo",
         "o/secret-proj",
-        problem=f"alpha-cli failed in o/secret-proj at {live.sandbox.home}/work and /tmp/secret-proj/config, as secret-proj notes",
+        problem=(
+            f"alpha-cli failed in o/secret-proj at {live.sandbox.home}/work and "
+            "/tmp/secret-proj/config, as secret-proj notes; cwd:/srv/app, "
+            "file:///srv/app/a.txt, $HOME/work"
+        ),
     )
 
     result = published(live, transcript, "--yes")
@@ -1864,7 +1880,8 @@ def test_a_private_session_repo_is_named_nowhere_in_public_output(live: Live) ->
     assert result.returncode == 0, result.stderr
     assert (
         "- Problem: alpha-cli failed in a private project at <local path> and "
-        "<local path>, as a private project notes"
+        "<local path>, as a private project notes; cwd:<local path>, "
+        "<local path>, <local path>"
     ) in body
     assert "secret-proj" not in body
 
@@ -1948,11 +1965,62 @@ def test_a_duplicate_closed_after_the_check_is_held(live: Live) -> None:
     assert "#7 closed after the duplicate check; decide by hand" in result.stderr
 
 
-def test_a_write_that_does_not_read_back_fails(live: Live) -> None:
-    fake_github(live.sandbox, drop_labels=True)
+def test_a_write_that_does_not_read_back_fails_again_on_a_rerun(live: Live) -> None:
+    github = fake_github(live.sandbox, drop_labels=True)
+    transcript = stories_ready(live)
+
+    first = published(live, transcript, "--yes")
+    again = published(live, transcript, "--yes")
+
+    assert first.returncode == again.returncode == 1
+    assert f"{PUBLIC}#100 does not show what publish wrote for publish-" in first.stderr
+    assert f"{PUBLIC}#100 does not show what publish wrote for publish-" in again.stderr
+    assert github.state()["calls"] == [["create", 100]]
+
+
+def test_a_file_deleted_on_origin_main_is_stale_even_if_local_main_has_it(
+    live: Live,
+) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    repo = live.sandbox.repo
+    (repo / "skills/alpha/SKILL.md").unlink()
+    commit(repo)
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=repo, check=True
+    )
+    subprocess.run(["git", "reset", "-q", "--hard", "HEAD~1"], cwd=repo, check=True)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "stale: the anchored line of alpha-e1 changed on main" in result.stderr
+
+
+def test_a_line_that_lost_its_neighbors_on_main_is_stale(live: Live) -> None:
+    github = fake_github(live.sandbox)
+    transcript = stories_ready(live)
+    (live.sandbox.repo / "skills/alpha/SKILL.md").write_text(
+        "# alpha\n\nIntro\nUse `alpha-cli` to list things.\nSomething else\n"
+    )
+    commit(live.sandbox.repo)
+
+    result = published(live, transcript, "--yes")
+
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "stale: the anchored line of alpha-e1 changed on main" in result.stderr
+
+
+def test_a_duplicate_edited_after_the_check_is_held(live: Live) -> None:
+    github = fake_github(
+        live.sandbox,
+        issues=[open_issue(7, "alpha: flags are stale")],
+        changed_on_view=[7],
+    )
+    live.fake.same = {7: 0.91}
     transcript = stories_ready(live)
 
     result = published(live, transcript, "--yes")
 
-    assert result.returncode == 1
-    assert f"{PUBLIC}#100 does not show what publish just wrote" in result.stderr
+    assert (result.returncode, github.state()["calls"]) == (0, [])
+    assert "#7 changed after the duplicate check; decide by hand" in result.stderr
