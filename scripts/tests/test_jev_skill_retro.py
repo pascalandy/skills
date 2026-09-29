@@ -344,11 +344,12 @@ def test_a_read_of_a_skill_file_keeps_that_files_own_line_numbers(
             file["partial"],
             file["first_line"],
             file["lines"],
+            file["read_at"],
         )
         for file in files
     ] == [
-        (f"{alpha}/SKILL.md", "excerpt", False, 1, 3),
-        (str(reference), "file", True, 10, 2),
+        (f"{alpha}/SKILL.md", "excerpt", False, 1, 3, 0),
+        (str(reference), "file", True, 10, 2, 1),
     ]
 
 
@@ -388,9 +389,21 @@ def test_hard_failures_count_only_when_they_name_a_literal_of_a_loaded_skill(
     alpha = sandbox.installed("alpha")
     transcript = (
         Claude(sandbox.repo)
-        .tool("t0", "WebFetch", {"url": "https://example.com/alpha-guide"}, "404", True)
+        .tool(
+            "t0",
+            "WebFetch",
+            {"url": "https://example.com/alpha-guide"},
+            "Request failed with status code 404",
+            True,
+        )
         .load(alpha, ALPHA)
-        .tool("t1", "WebFetch", {"url": "https://example.com/alpha-guide"}, "404", True)
+        .tool(
+            "t1",
+            "WebFetch",
+            {"url": "https://example.com/alpha-guide"},
+            "Request failed with status code 404",
+            True,
+        )
         .tool(
             "t2",
             "Bash",
@@ -512,7 +525,7 @@ def test_a_codex_read_of_one_skill_file_joins_that_skills_files(
     ]
 
 
-def test_triage_shows_the_latest_version_of_a_skill_read_again(
+def test_triage_splits_at_a_reload_so_each_event_sees_the_version_it_followed(
     sandbox: Sandbox,
 ) -> None:
     alpha = sandbox.installed("alpha")
@@ -525,10 +538,62 @@ def test_triage_shows_the_latest_version_of_a_skill_read_again(
         .write(sandbox.home / "session.jsonl")
     )
 
-    body = sandbox.planned(sandbox.scan(transcript))[0]
+    bodies = sandbox.planned(sandbox.scan(transcript))
 
-    assert body["state"]["skills"] == [{"name": "alpha", "text": "New text"}]
-    assert sorted(body["questions"]) == ["friction::alpha::0", "friction::alpha::1"]
+    assert [
+        (body["state"]["skills"][0]["text"], sorted(body["questions"]))
+        for body in bodies
+    ] == [
+        ("Old text", ["friction::alpha::0"]),
+        ("New text", ["friction::alpha::1"]),
+    ]
+
+
+def test_a_url_a_later_version_dropped_is_no_broken_link_after_the_reload(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha")
+    failed = "Request failed with status code 404"
+    transcript = (
+        Claude(sandbox.repo)
+        .load(alpha, ALPHA)
+        .tool(
+            "t1", "WebFetch", {"url": "https://example.com/alpha-guide"}, failed, True
+        )
+        .load(alpha, "Use `alpha-cli` only.")
+        .tool(
+            "t2", "WebFetch", {"url": "https://example.com/alpha-guide"}, failed, True
+        )
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    assert [(f["event"], f["kind"]) for f in sandbox.scan(transcript)["facts"]] == [
+        (0, "broken_link")
+    ]
+
+
+def test_codex_trusts_a_structured_status_over_text_the_command_printed(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha", ".codex")
+    transcript = (
+        Codex(sandbox.repo)
+        .exec("c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))])
+        .exec("c2", [f"cat {alpha}/references/errors.md"], [(1, "Permission denied")])
+        .exec(
+            "c3",
+            ["cat notes.md"],
+            [(0, "Process exited with code 127\nalpha-cli: command not found")],
+        )
+        .write(sandbox.home / "rollout.jsonl")
+    )
+
+    report = sandbox.scan(transcript)
+
+    assert [file["path"] for file in report["skills"][0]["files"]] == [
+        f"{alpha}/SKILL.md"
+    ]
+    assert report["facts"] == []
 
 
 def test_run_records_are_readable_by_their_owner_only(sandbox: Sandbox) -> None:
@@ -560,7 +625,7 @@ def test_a_failed_command_naming_a_skill_url_needs_a_failed_fetch_to_be_a_broken
             "t1",
             "Bash",
             {"command": f"curl {url} && make"},
-            "make: *** [all] Error 2",
+            "/bin/sh: make: not found",
             True,
         )
         .tool(
@@ -1069,15 +1134,18 @@ def test_an_answer_from_another_model_fails_the_scan(live: Live) -> None:
     assert "was answered by 'jev-9.0.0', not the pinned jev-1.13.0" in result.stderr
 
 
-def test_an_ambiguous_server_error_is_resent_only_with_retry(live: Live) -> None:
+@pytest.mark.parametrize("status", [503, 504])
+def test_an_ambiguous_server_error_is_resent_only_with_retry(
+    live: Live, status: int
+) -> None:
     transcript = friction_session(live.sandbox, ("alpha", ALPHA))
-    live.fake.status = 504
+    live.fake.status = status
     failed = live.run(transcript)
     live.fake.status = 200
     blocked = live.run(transcript)
 
     assert failed.returncode == blocked.returncode == 1
-    assert "answered HTTP 504 for request triage-" in failed.stderr
+    assert f"answered HTTP {status} for request triage-" in failed.stderr
     assert "may have run and been billed" in failed.stderr
     assert "was sent but its answer never arrived" in blocked.stderr
     assert len(live.fake.bodies) == 1
@@ -1123,7 +1191,9 @@ def test_an_unclear_location_keeps_the_event_in_review(live: Live) -> None:
     ]
 
 
-def test_an_event_a_hard_failure_decided_is_not_examined_again(live: Live) -> None:
+def test_a_hard_failure_and_jevs_reading_of_its_event_make_one_anchored_item(
+    live: Live,
+) -> None:
     live.fake.friction = {1: 0.95}
     transcript = (
         Claude(live.sandbox.repo)
@@ -1139,12 +1209,12 @@ def test_an_event_a_hard_failure_decided_is_not_examined_again(live: Live) -> No
         .write(live.sandbox.home / "session.jsonl")
     )
 
-    report = live.scan(transcript)
+    items = outcome(live.scan(transcript))["items"]
 
-    assert [(i["event"], i["category"]) for i in outcome(report)["items"]] == [
-        (1, "tool_unavailable")
+    assert [(i["event"], i["outcome"], i["category"]) for i in items] == [
+        (1, "candidate", "tool_unavailable")
     ]
-    assert live.fake.kinds() == ["friction"]
+    assert items[0]["line"]["text"] == "Use `alpha-cli` to list things."
 
 
 def test_a_locate_request_too_large_keeps_only_the_skills_own_text(live: Live) -> None:
@@ -1173,6 +1243,56 @@ def test_a_locate_request_too_large_keeps_only_the_skills_own_text(live: Live) -
 
     assert [file["path"] for file in located["state"]["files"]] == [f"{alpha}/SKILL.md"]
     assert outcome(report)["items"][0]["event"] == 2
+
+
+def test_a_reference_read_after_the_event_is_not_its_evidence(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha")
+    live.fake.friction = {1: 0.9}
+    transcript = (
+        Claude(live.sandbox.repo)
+        .user("go")
+        .load(alpha, ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": "alpha-cli list --all"},
+            "unknown flag --all",
+            True,
+        )
+        .tool(
+            "t2",
+            "Read",
+            {"file_path": f"{alpha}/references/later.md"},
+            "     1\tLater advice",
+        )
+        .write(live.sandbox.home / "session.jsonl")
+    )
+
+    live.scan(transcript)
+    located = next(b for b in live.fake.bodies if "covered::alpha" in b["questions"])
+
+    assert [file["path"] for file in located["state"]["files"]] == [f"{alpha}/SKILL.md"]
+
+
+def test_a_cut_short_event_keeps_a_missing_step_in_review(live: Live) -> None:
+    alpha = live.sandbox.installed("alpha", ".codex")
+    codex = Codex(live.sandbox.repo).exec(
+        "c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))]
+    )
+    codex.exec("c2", ["alpha-cli list --all"], [(2, "unknown flag --all")])
+    output = json.loads(codex.items[-1]["payload"]["output"])
+    output[0]["text"] += "Warning: truncated output (original token count: 9000)\n"
+    codex.items[-1]["payload"]["output"] = json.dumps(output)
+    transcript = codex.write(live.sandbox.home / "rollout.jsonl")
+    live.fake.friction = {1: 0.9}
+    live.fake.hint = "nothing matches this"
+    live.fake.covered = {"alpha": 0.1}
+
+    report = live.scan(transcript)
+
+    assert [(i["outcome"], i["category"]) for i in outcome(report)["items"]] == [
+        ("review", "partial_evidence")
+    ]
 
 
 def test_without_a_key_nothing_is_sent(live: Live) -> None:
