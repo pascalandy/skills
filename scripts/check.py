@@ -97,7 +97,7 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
 
 
 def pytest(path: str, *deps: str) -> Command:
-    """Run a suite on every core; its tests must not share files, ports, or locks."""
+    """Run a suite on every core; script-conventions.md says what that asks of a test."""
     return (
         "uvx",
         "--from",
