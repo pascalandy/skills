@@ -14,13 +14,13 @@ date_updated: 2026-09-29
 
 ## Sign off a PR
 
-Push the branch, then run `just signoff`. It runs `just check`, and only when every check passes, `gh signoff` posts a green `signoff` commit status on HEAD. The status belongs to that one commit, so each push needs a new signoff. Each machine needs the extension once: `gh extension install basecamp/gh-signoff`
+Push the branch, then run `just signoff`. It runs `just check`, and only when every check passes, `gh signoff` posts a green `signoff` commit status on HEAD. The status belongs to that one commit, so each push needs a new signoff. `gh signoff` signs whatever HEAD is when the check ends, so leave the checkout untouched until `just signoff` finishes, and run it again after any commit, checkout, or rebase in between. Each machine needs the extension once: `gh extension install basecamp/gh-signoff`
 
 `gh signoff` refuses and posts nothing when the working tree has uncommitted or untracked files, or when HEAD is not pushed. Fix the cause and continue:
 
 | Situation | Do |
 |---|---|
-| Refused: HEAD not pushed | `git push`, or `git push -u origin HEAD` for a new branch, then `gh signoff`; the passing check already covers this HEAD |
+| Refused: HEAD not pushed | `git push`, or `git push -u origin HEAD` for a new branch, then `gh signoff`, provided nothing changed since the check passed |
 | Refused: uncommitted or untracked files | Commit or remove them, then `just signoff` |
 | A check failed | Fix it, commit, push, then `just signoff` |
 | Pushed more commits | `just signoff` again |

@@ -29,7 +29,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 ## Checks
 
 - `just check` is exactly what `just signoff` and the manual CI workflow run; a failure names the `just check --only NAME` to rerun
-- `main` merges a PR only when its head commit carries a green `signoff` status; GitHub Actions runs only when started by hand. After pushing a PR branch, run `just signoff`, and merge only a signed-off head, never with `gh pr merge --admin`
+- `main` merges a PR only when its head commit carries a green `signoff` status; GitHub Actions runs only when started by hand. After pushing a PR branch, run `just signoff` and leave the checkout untouched until it finishes. Merge only a signed-off head, never with `gh pr merge --admin`
 - Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
 - When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
