@@ -34,9 +34,10 @@ codex exec \
   -c 'approval_policy="never"' \
   --ephemeral --json \
   -o "$review_dir/result.md" \
-  - < "$prompt_file" \
+  - \
+  2> "$review_dir/stderr.log" \
   > "$review_dir/events.jsonl" \
-  2> "$review_dir/stderr.log" || review_status=$?
+  < "$prompt_file" || review_status=$?
 
 if [ ! -s "$review_dir/result.md" ] ||
   grep -q '^Review was interrupted' "$review_dir/result.md"; then
@@ -89,10 +90,9 @@ codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' "Fix
 codex exec -C /path/to/repo -s workspace-write -c 'approval_policy="never"' -m gpt-6-astra -c 'model_reasoning_effort="high"' "Refactor src/auth.ts. Limit edits to that file and run the relevant tests." < /dev/null
 ```
 
-To pass the complete prompt from a Markdown file, use `-` for stdin. Change the sandbox to `workspace-write` if that prompt authorizes edits. To add context to an inline prompt, pipe it in; Codex appends it as a `<stdin>` block:
+For a whole prompt in a file, pass `-` as in the review recipe, with `workspace-write` if the prompt authorizes edits. To add context to an inline prompt, pipe it in; Codex appends it as a `<stdin>` block:
 
 ```bash
-codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' --json - < prompt.md
 git -C /path/to/repo diff main | codex exec -C /path/to/repo -s read-only -c 'approval_policy="never"' "Review this diff for regressions."
 ```
 
