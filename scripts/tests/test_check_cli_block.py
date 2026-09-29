@@ -8,7 +8,7 @@ from pathlib import Path
 
 import check_cli_block
 import pytest
-from conftest import SCRIPTS, exits, observe
+from conftest import SCRIPTS
 
 CANONICAL = (SCRIPTS / "_cli.py").read_text(encoding="utf-8")
 BLOCK = CANONICAL[CANONICAL.index(check_cli_block.BEGIN) :]
@@ -38,10 +38,9 @@ def run(*argv: str) -> tuple[int, str, str]:
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
         code = check_cli_block.main(list(argv))
-    return observe("check_cli_block", code), stdout.getvalue(), stderr.getvalue()
+    return code, stdout.getvalue(), stderr.getvalue()
 
 
-@exits("check_cli_block", 0, 1)
 def test_a_stale_copy_fails_until_fix_rewrites_only_its_block(repo: Path) -> None:
     current = paste(repo, "current", BLOCK)
     stale = paste(repo, "stale", BLOCK.replace("USAGE = 2", "USAGE = 64"))
@@ -61,7 +60,6 @@ def test_a_stale_copy_fails_until_fix_rewrites_only_its_block(repo: Path) -> Non
     assert run() == (0, "", "")
 
 
-@exits("check_cli_block", 1)
 def test_a_copy_without_its_end_marker_is_named(repo: Path) -> None:
     paste(repo, "cut", BLOCK.replace(check_cli_block.END, ""))
 

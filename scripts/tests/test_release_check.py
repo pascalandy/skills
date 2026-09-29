@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import release_check
-from conftest import exits, observe
 
 CHANGELOG = """# Changelog
 
@@ -57,7 +56,7 @@ class ReleaseCheckTests(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            result = observe("release_check", release_check.main(list(args)))
+            result = release_check.main(list(args))
         return result, stdout.getvalue(), stderr.getvalue()
 
     def commit(self, root: Path, message: str) -> None:
@@ -65,7 +64,6 @@ class ReleaseCheckTests(unittest.TestCase):
         git(root, "commit", "-qm", message)
         git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
 
-    @exits("release_check", 0)
     def test_valid_first_release_with_existing_tag_at_head_prints_nothing(
         self,
     ) -> None:
@@ -85,7 +83,6 @@ class ReleaseCheckTests(unittest.TestCase):
         )
         self.assertTrue(stderr.endswith("run 'just release-check --help'\n"))
 
-    @exits("release_check", 1)
     def test_version_must_exceed_other_tags(self) -> None:
         with self.repository() as root:
             git(root, "tag", "v0.2.0")

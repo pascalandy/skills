@@ -9,7 +9,7 @@ from pathlib import Path
 import check
 import pytest
 from check import Check
-from conftest import commit, exits, observe, skill
+from conftest import commit, skill
 
 FAIL = (sys.executable, "-c", "print('boom'); raise SystemExit(3)")
 MARK = (sys.executable, "-c", "open('ran', 'w').close()")
@@ -30,12 +30,11 @@ def verdict(
 ) -> tuple[int, str, str]:
     """Run main() over `checks`; children write straight to the captured descriptors."""
     monkeypatch.setattr(check, "CHECKS", checks)
-    code = observe("check", check.main(list(argv)))
+    code = check.main(list(argv))
     stdout, stderr = capfd.readouterr()
     return code, stdout, stderr
 
 
-@exits("check", 1)
 def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
@@ -49,7 +48,6 @@ def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
     assert (root / "ran").exists(), "the later check must still run"
 
 
-@exits("check", 0)
 def test_only_runs_the_named_checks_and_success_prints_nothing(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
@@ -58,7 +56,6 @@ def test_only_runs_the_named_checks_and_success_prints_nothing(
     assert verdict(monkeypatch, capfd, checks, "--only", "fine") == (0, "", "")
 
 
-@exits("check", 0)
 def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_empty(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
@@ -69,7 +66,6 @@ def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_empty(
     assert stderr.endswith("child says hi\n")
 
 
-@exits("check", 0)
 def test_list_prints_names_and_verbose_adds_commands_on_stderr(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
@@ -86,7 +82,6 @@ def touch(marker: str, *paths: str) -> tuple[str, ...]:
     return (sys.executable, "-c", f"open({marker!r}, 'w').close()", *paths)
 
 
-@exits("check", 0)
 def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:

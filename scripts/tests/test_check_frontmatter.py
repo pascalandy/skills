@@ -8,7 +8,6 @@ from pathlib import Path
 
 import check_frontmatter
 import pytest
-from conftest import exits, observe
 
 
 @pytest.fixture
@@ -28,10 +27,9 @@ def run(*argv: str) -> tuple[int, str, str]:
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
         code = check_frontmatter.main(list(argv))
-    return observe("check_frontmatter", code), stdout.getvalue(), stderr.getvalue()
+    return code, stdout.getvalue(), stderr.getvalue()
 
 
-@exits("check_frontmatter", 0)
 def test_quoted_frontmatter_passes_silently(authoring: Path) -> None:
     write(authoring, "example", 'name: "example"\nkeywords: ["foo, bar", 3]\n')
 
@@ -39,7 +37,6 @@ def test_quoted_frontmatter_passes_silently(authoring: Path) -> None:
     assert run("--verbose") == (0, "", "check authoring/devtools/example/SKILL.md\n")
 
 
-@exits("check_frontmatter", 1)
 def test_commas_inside_quoted_inline_items_keep_their_quotes(authoring: Path) -> None:
     write(
         authoring,

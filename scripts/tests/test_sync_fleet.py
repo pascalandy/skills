@@ -15,15 +15,7 @@ from pathlib import Path
 import pytest
 import sync_fleet
 from _cli import TemporaryError
-from conftest import (
-    GIT_IDENTITY,
-    SCRIPTS,
-    commit,
-    exits,
-    observe,
-    private_remote,
-    skill,
-)
+from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
 # Where the private-network skill ships the registry; the seed's .gitignore keeps
 # it untracked, so it never reaches another machine's clone.
@@ -165,11 +157,9 @@ def run(
         text=True,
         timeout=120,
     )
-    observe("sync_fleet", result.returncode)
     return result
 
 
-@exits("sync_fleet", 1)
 def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -262,7 +252,6 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert "add\t~/.claude/skills/secret" in behind_changes
 
 
-@exits("sync_fleet", 0)
 def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -422,7 +411,6 @@ def test_brings_the_machine_it_runs_on_to_github_main(
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
 
 
-@exits("sync_fleet", 75)
 def test_a_run_whose_only_failures_are_offline_machines_exits_75(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -450,7 +438,6 @@ def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> 
     assert result.stderr.endswith("run 'just sync-fleet --help'\n")
 
 
-@exits("sync_fleet", 1)
 def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -475,7 +462,6 @@ def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
     }
 
 
-@exits("sync_fleet", 75)
 def test_a_check_that_loses_the_machine_midway_exits_75(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -507,7 +493,6 @@ def test_a_fetch_that_times_out_without_a_known_main_exits_75(
         sync_fleet.github_main()
 
 
-@exits("sync_fleet", 1)
 def test_a_failed_install_step_reports_the_installers_own_error(
     fleet: tuple[Path, Path, Path],
 ) -> None:
