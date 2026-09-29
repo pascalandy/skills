@@ -121,8 +121,6 @@ Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks
 
 `test_cli.py` and `test_common.py` test the shared contract code once. `test_cli_contract.py` fails on a `scripts/` entry point missing from its `ENTRIES`, and runs each script's `--help` once: the help must come from the shared parser, and every doc line that runs the script, in docs, hooks, CI, and `scripts/`, may use only flags the help lists. A script's own tests cover what it does, not the shared contract again
 
-The `jevgate` engine in `create-a-jev-cli-decision-wrapped-in-a-skill` has no test suite. `just check --only jevgate` runs its ruff and pyright. After editing the engine, run `uvx ruff format` on it, then `uv run authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts/stamp_engine.py`, so vendored copies can detect local edits
-
 ## Related
 
 - [[checks]]

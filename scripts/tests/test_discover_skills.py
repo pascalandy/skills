@@ -130,7 +130,7 @@ def test_an_agent_that_times_out_exits_75(
     home.mkdir()
     binary = tmp_path / "bin/opencode"
     binary.parent.mkdir()
-    binary.write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    binary.write_text("#!/bin/sh\nexec /bin/sleep 30\n", encoding="utf-8")
     binary.chmod(0o755)
 
     slow = run(home, binary, "--profile", "mac", "--agent", "opencode", "--timeout=1s")

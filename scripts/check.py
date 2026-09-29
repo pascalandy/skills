@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
 import shlex
 import subprocess
 import sys
@@ -32,7 +31,7 @@ examples:
   just check --all
   just check --list
   just check --only lint --only tavily
-  just check --only jevgate --verbose"""
+  just check --only test --verbose"""
 
 EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
@@ -85,10 +84,12 @@ def with_deps(deps: tuple[str, ...]) -> list[str]:
     return [flag for dep in deps for flag in ("--with", dep)]
 
 
-def ruff(path: str, version: str = RUFF) -> tuple[Command, Command]:
+def ruff(path: str) -> tuple[Command, Command]:
+    # The repository has no ruff config; --isolated keeps a pyproject.toml above
+    # the checkout from setting the target Python and changing the verdict
     return (
-        ("uvx", version, "check", "--quiet", path),
-        ("uvx", version, "format", "--quiet", "--check", path),
+        ("uvx", RUFF, "check", "--isolated", "--quiet", path),
+        ("uvx", RUFF, "format", "--isolated", "--quiet", "--check", path),
     )
 
 
@@ -117,23 +118,9 @@ def pytest(path: str, *deps: str) -> Command:
     )
 
 
-def script_pin(script: str, package: str) -> str:
-    """Read `package==version` from a script's PEP 723 block, so a check cannot drift from it."""
-    source = (ROOT / script).read_text(encoding="utf-8")
-    match = re.search(rf'"({re.escape(package)}==[^"]+)"', source)
-    if match is None:
-        raise ValueError(f"{script} does not pin {package}")
-    return match.group(1)
-
-
 VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
-JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts"
-JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
-JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
-JEVLABEL_SDK = script_pin(f"{JEVLABEL}/jevlabel.py", "typesafe-sdk")
-RETRO_TRIAGE = "authoring/devtools/retro-triage-jev/scripts"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
 
 CHECKS = [
@@ -192,24 +179,6 @@ CHECKS = [
             "authoring/content/storytelling/tests/validate-package.py",
             "authoring/content/storytelling",
         ),
-    ),
-    # Ruff stays at 0.15.7: newer releases report findings whose fixes would
-    # change the engine's stamped hash
-    Check(
-        "jevgate",
-        *ruff(JEVGATE, version="ruff@0.15.7"),
-        pyright(JEVGATE, JEVGATE_SDK),
-    ),
-    Check(
-        "jevlabel",
-        *ruff(JEVLABEL),
-        pyright(JEVLABEL, JEVLABEL_SDK),
-    ),
-    Check(
-        "retro-triage-jev",
-        *ruff(RETRO_TRIAGE),
-        pyright(RETRO_TRIAGE),
-        pytest(f"{RETRO_TRIAGE}/tests"),
     ),
     Check(
         "image-creator",
