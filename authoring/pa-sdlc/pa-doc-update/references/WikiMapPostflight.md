@@ -25,7 +25,7 @@ If the deeper comparison disproves every prefilter candidate, report `skipped: n
 
 ## 3. Load Wiki Map after the documentation update
 
-When the job only changes the body and `date_updated` of existing pages, skip this load; the section 5 rules that such a diff touches need no schema.
+When the job only edits prose in existing pages and their `date_updated`, adding or removing no wikilink or heading, skip this load; the section 5 rules such a diff touches need no schema.
 
 Use and reload `$wiki-map`, follow the `pa-doc-update postflight` route in its `references/ROUTER.md`, then read its `references/SCHEMA.md` as the conformance contract. This file remains the execution workflow. Do not load a generic Wiki Map sub-skill or operational workflow.
 
