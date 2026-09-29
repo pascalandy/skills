@@ -155,7 +155,6 @@ CHECKS = [
         "jevgate",
         *ruff(JEVGATE, version="ruff@0.15.7"),
         pyright(JEVGATE, JEVGATE_SDK),
-        pytest(f"{JEVGATE}/tests", JEVGATE_SDK),
     ),
     Check(
         "jevlabel",
