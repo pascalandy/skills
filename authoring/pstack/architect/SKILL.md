@@ -1,6 +1,6 @@
 ---
 name: "architect"
-description: "Use when the user invokes `architect` or requests software architecture design, or when non-trivial implementation requires choosing types, interfaces, or module boundaries first."
+description: "Use when the user invokes `architect` or requests software architecture design."
 ---
 
 # Architect
