@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
 import check
 import pytest
 from check import Check
-from conftest import exits, observe
+from conftest import commit, exits, observe, skill
 
 FAIL = (sys.executable, "-c", "print('boom'); raise SystemExit(3)")
 MARK = (sys.executable, "-c", "open('ran', 'w').close()")
@@ -78,3 +79,33 @@ def test_list_prints_names_and_verbose_adds_commands_on_stderr(
 
     assert (code, stdout) == (0, "fine\ntalk\n")
     assert stderr.splitlines()[0].startswith(f"fine: {sys.executable} -c ")
+
+
+def touch(marker: str, *paths: str) -> tuple[str, ...]:
+    """A command that leaves `marker` behind and names `paths` the way a check names its skill."""
+    return (sys.executable, "-c", f"open({marker!r}, 'w').close()", *paths)
+
+
+@exits("check", 0)
+def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    skill(root / "authoring/content", "alpha")
+    skill(root / "authoring/content", "beta")
+    commit(root)
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=root, check=True
+    )
+    (root / "authoring/content/alpha/SKILL.md").write_text("# alpha\n\nnew\n")
+    checks = [
+        Check("repo", touch("repo-ran")),
+        Check("alpha", touch("alpha-ran", "authoring/content/alpha/scripts/tests")),
+        Check("beta", touch("beta-ran", "authoring/content/beta")),
+    ]
+
+    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert sorted(p.name for p in root.glob("*-ran")) == ["alpha-ran", "repo-ran"]
+
+    assert verdict(monkeypatch, capfd, checks, "--all") == (0, "", "")
+    assert (root / "beta-ran").exists()
