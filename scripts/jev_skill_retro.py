@@ -1427,6 +1427,8 @@ def flagged(scan_report: dict[str, Any], session: Session) -> list[dict[str, Any
                         if line
                         else "no line of the skill covers this step"
                     ),
+                    # The anchor itself, so publish can tell a changed line
+                    "source": line,
                 }
             )
     return found
