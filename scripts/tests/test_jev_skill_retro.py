@@ -428,6 +428,152 @@ def test_hard_failures_count_only_when_they_name_a_literal_of_a_loaded_skill(
     ]
 
 
+def test_claude_skill_text_counts_in_a_plain_message_and_in_a_skill_result(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha")
+    beta = sandbox.installed("beta")
+    transcript = (
+        Claude(sandbox.repo)
+        .user(f"/alpha go\nBase directory for this skill: {alpha}\n\n{ALPHA}")
+        .tool(
+            "t1",
+            "Skill",
+            {"skill": "beta"},
+            f"Base directory for this skill: {beta}\n\nBeta body",
+        )
+        .say("done")
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    report = sandbox.scan(transcript)
+
+    assert [(load["skill"], load["after_event"]) for load in report["skills"]] == [
+        ("alpha", 1),
+        ("beta", 2),
+    ]
+    assert report["session"]["events"] == 3
+
+
+def test_a_codex_textual_exit_status_marks_the_call_failed(sandbox: Sandbox) -> None:
+    alpha = sandbox.installed("alpha", ".codex")
+    transcript = (
+        Codex(sandbox.repo)
+        .exec("c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))])
+        .item(
+            {
+                "type": "function_call",
+                "call_id": "f1",
+                "name": "shell",
+                "arguments": json.dumps({"cmd": "alpha-cli"}),
+            }
+        )
+        .item(
+            {
+                "type": "function_call_output",
+                "call_id": "f1",
+                "output": "Process exited with code 127\nbash: alpha-cli: command not found",
+            }
+        )
+        .write(sandbox.home / "rollout.jsonl")
+    )
+
+    assert sandbox.scan(transcript)["facts"] == [
+        {
+            "skill": "alpha",
+            "event": 1,
+            "kind": "tool_unavailable",
+            "detail": "alpha-cli",
+        }
+    ]
+
+
+def test_a_codex_read_of_one_skill_file_joins_that_skills_files(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha", ".codex")
+    transcript = (
+        Codex(sandbox.repo)
+        .exec("c1", [f"cat {alpha}/SKILL.md"], [(0, skill_md("alpha", ALPHA))])
+        .exec(
+            "c2",
+            [f"sed -n '3,4p' {alpha}/references/deep.md"],
+            [(0, "Step three\nStep four\n")],
+        )
+        .exec("c3", [f"cat {alpha}/a.md {alpha}/b.md"], [(0, "two files at once")])
+        .write(sandbox.home / "rollout.jsonl")
+    )
+
+    files = sandbox.scan(transcript)["skills"][0]["files"]
+
+    assert [(f["path"], f["partial"], f["first_line"], f["lines"]) for f in files] == [
+        (f"{alpha}/SKILL.md", False, 1, 8),
+        (f"{alpha}/references/deep.md", True, 3, 2),
+    ]
+
+
+def test_triage_shows_the_latest_version_of_a_skill_read_again(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha")
+    transcript = (
+        Claude(sandbox.repo)
+        .load(alpha, "Old text")
+        .say("first")
+        .load(alpha, "New text")
+        .say("second")
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    body = sandbox.planned(sandbox.scan(transcript))[0]
+
+    assert body["state"]["skills"] == [{"name": "alpha", "text": "New text"}]
+    assert sorted(body["questions"]) == ["friction::alpha::0", "friction::alpha::1"]
+
+
+def test_run_records_are_readable_by_their_owner_only(sandbox: Sandbox) -> None:
+    transcript = (
+        Claude(sandbox.repo)
+        .load(sandbox.installed("alpha"), ALPHA)
+        .say("hi")
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    report = sandbox.scan(transcript)
+    root = sandbox.home / ".local/state/jev-skill-retro"
+    planned = Path(report["run"], "planned", f"{report['requests'][0]['op']}.json")
+
+    assert (root.stat().st_mode & 0o777, planned.stat().st_mode & 0o777) == (
+        0o700,
+        0o600,
+    )
+
+
+def test_a_failed_command_naming_a_skill_url_needs_a_failed_fetch_to_be_a_broken_link(
+    sandbox: Sandbox,
+) -> None:
+    url = "https://example.com/alpha-guide"
+    transcript = (
+        Claude(sandbox.repo)
+        .load(sandbox.installed("alpha"), ALPHA)
+        .tool(
+            "t1",
+            "Bash",
+            {"command": f"curl {url} && make"},
+            "make: *** [all] Error 2",
+            True,
+        )
+        .tool(
+            "t2", "WebFetch", {"url": url}, "Request failed with status code 404", True
+        )
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    assert [(f["event"], f["kind"]) for f in sandbox.scan(transcript)["facts"]] == [
+        (1, "broken_link")
+    ]
+
+
 def test_a_session_outside_git_is_skipped_unless_repo_names_it(
     sandbox: Sandbox,
 ) -> None:
