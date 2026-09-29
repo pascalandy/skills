@@ -1,6 +1,6 @@
 ---
 name: "pa-doc-cleaner"
-description: "Use when the user mentions `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`."
+description: "Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`."
 keywords: ["pa-doc-cleaner", "doc-cleaner", "drift-refresh", "consolidation", "structure-governance", "frontmatter", "routing"]
 ---
 

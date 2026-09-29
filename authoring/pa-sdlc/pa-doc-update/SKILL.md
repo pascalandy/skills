@@ -1,6 +1,6 @@
 ---
 name: "pa-doc-update"
-description: "Use only when the user explicitly mentions `pa-doc-update`."
+description: "Use only when explicitly invoked as `pa-doc-update`."
 ---
 
 # PA Doc Update Session

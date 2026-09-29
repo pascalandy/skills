@@ -1,6 +1,6 @@
 ---
 name: "no-comments"
-description: "Use only when the user explicitly invokes `no-comments`, including `No comments` as an instruction."
+description: "Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction."
 ---
 
 # No comments

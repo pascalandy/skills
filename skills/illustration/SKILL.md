@@ -1,6 +1,6 @@
 ---
 name: "illustration"
-description: "Use only when the user invokes `illustration`."
+description: "Use only when explicitly invoked as `illustration`."
 ---
 
 # Illustration

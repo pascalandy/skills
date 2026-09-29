@@ -1,6 +1,6 @@
 ---
 name: "distill"
-description: "Explicitly triggered when the user mentions `distill`."
+description: "Use only when explicitly invoked as `distill`."
 keywords: ["distill", "local-file", "summarize", "notes", "follow-along", "claude", "codex", "llm-cli", "prompt"]
 ---
 

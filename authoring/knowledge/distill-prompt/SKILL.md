@@ -1,6 +1,6 @@
 ---
 name: "distill-prompt"
-description: "Explicitly triggered when the user mentions `distill-prompt`."
+description: "Use only when explicitly invoked as `distill-prompt`."
 keywords: ["distill", "distill-prompt", "prompt-library", "summary", "notes", "follow-along", "short-summary", "quotes", "extract-wisdom", "wisdom", "insights", "transcript", "article"]
 ---
 

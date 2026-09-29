@@ -1,6 +1,6 @@
 ---
 name: "reflect"
-description: "Use when the user invokes `reflect`."
+description: "Use only when explicitly invoked as `reflect`."
 ---
 
 # Reflect

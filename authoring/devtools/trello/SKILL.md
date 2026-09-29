@@ -1,6 +1,6 @@
 ---
 name: "trello"
-description: "Explicitly triggered when the user mentions `trello`."
+description: "Use only when explicitly invoked as `trello`."
 homepage: "https://developer.atlassian.com/cloud/trello/rest/"
 ---
 

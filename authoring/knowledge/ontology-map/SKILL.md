@@ -1,6 +1,6 @@
 ---
 name: "ontology-map"
-description: "Explicitly triggered when the user mentions `ontology-map`."
+description: "Use only when explicitly invoked as `ontology-map`."
 ---
 
 # Ontology Map

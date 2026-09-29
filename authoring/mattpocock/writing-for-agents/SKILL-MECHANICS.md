@@ -11,6 +11,8 @@ Two choices, trading the two loads:
 
 Pick model-invocation only when the agent must reach the skill on its own, or another skill must. If it only ever fires by hand, make it user-invoked and pay no context load.
 
+In this repo every skill stays model-invocable (see `AGENTS.md`), so a skill that only fires by hand keeps its description and says so: ``Use only when explicitly invoked as `<name>`.`` plus an optional tail for what it does. Write _invoked_, since a mention also fires on talk about the skill. Name no actor: "the user" makes the agent judge who is speaking, and a delegated prompt or another skill's call gets refused.
+
 Shared reference that two user-invoked skills both need can live in neither: with no descriptions, neither can fire the other. Push it to a plain file outside the skill system: external reference any skill can point at.
 
 ## Splitting by invocation

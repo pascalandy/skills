@@ -1,6 +1,6 @@
 ---
 name: "tdd"
-description: "Use only when the user explicitly invokes `tdd`."
+description: "Use only when explicitly invoked as `tdd`."
 ---
 
 # TDD Bug Fix

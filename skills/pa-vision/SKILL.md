@@ -1,6 +1,6 @@
 ---
 name: "pa-vision"
-description: "Use when the user mentions `pa-vision` before planning."
+description: "Use only when explicitly invoked as `pa-vision` before planning."
 keywords: ["pa-vision", "vision", "direction", "alignment", "brief", "prd", "direction-check"]
 ---
 

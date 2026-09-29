@@ -1,6 +1,6 @@
 ---
 name: "storytelling"
-description: "Use when the user explicitly mentions `storytelling`."
+description: "Use only when explicitly invoked as `storytelling`."
 ---
 
 # Storytelling

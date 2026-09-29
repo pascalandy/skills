@@ -1,6 +1,6 @@
 ---
 name: "sparring"
-description: "Use when the user explicitly mentions `sparring`."
+description: "Use only when explicitly invoked as `sparring`."
 metadata:
   version: "1.0.0"
   author: "user"
