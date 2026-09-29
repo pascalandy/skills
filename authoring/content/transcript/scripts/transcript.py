@@ -409,9 +409,21 @@ CHROME_BROWSER_PROFILE = Path(
 ARC_ADAPTER_PATH = SCRIPT_DIR / "ytdlp_arc.py"
 YTDLP_MODULE_COMMAND = (sys.executable, "-m", "yt_dlp")
 
+PROVIDER_CLAUDE = "claude"
 PROVIDER_CODEX = "codex"
 PROVIDER_OPENROUTER = "openrouter"
-VALID_PROVIDERS = (PROVIDER_CODEX, PROVIDER_OPENROUTER)
+VALID_PROVIDERS = (PROVIDER_CLAUDE, PROVIDER_CODEX, PROVIDER_OPENROUTER)
+PROVIDER_LABELS = {
+    PROVIDER_CLAUDE: "Claude",
+    PROVIDER_CODEX: "Codex",
+    PROVIDER_OPENROUTER: "OpenRouter",
+}
+# The command that runs each provider's summary
+PROVIDER_RUNNERS = {
+    PROVIDER_CLAUDE: "claude",
+    PROVIDER_CODEX: "pi",
+    PROVIDER_OPENROUTER: "pi",
+}
 VALID_REASONING_EFFORTS = (
     "off",
     "minimal",
@@ -421,6 +433,13 @@ VALID_REASONING_EFFORTS = (
     "xhigh",
     "max",
 )
+# Claude Code ignores any other level and silently uses its default effort
+CLAUDE_REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+PROVIDER_EFFORTS = {
+    PROVIDER_CLAUDE: CLAUDE_REASONING_EFFORTS,
+    PROVIDER_CODEX: VALID_REASONING_EFFORTS,
+    PROVIDER_OPENROUTER: VALID_REASONING_EFFORTS,
+}
 
 
 @dataclass(frozen=True)
@@ -433,22 +452,13 @@ class InferenceProfile:
 
 
 INFERENCE_PROFILES = {
+    "opus": InferenceProfile(PROVIDER_CLAUDE, "claude-opus-5-5", "high"),
     "astra": InferenceProfile(PROVIDER_CODEX, "gpt-6-astra", "low"),
     "sol": InferenceProfile(PROVIDER_CODEX, "gpt-5.6-sol", "medium"),
     "glm": InferenceProfile(PROVIDER_OPENROUTER, "z-ai/glm-5.3-flash", "medium"),
 }
-DEFAULT_PROFILE = "astra"
+DEFAULT_PROFILE = "opus"
 DEFAULT_PROVIDER = INFERENCE_PROFILES[DEFAULT_PROFILE].provider
-CODEX_SUGGESTED_MODELS = tuple(
-    profile.model
-    for profile in INFERENCE_PROFILES.values()
-    if profile.provider == PROVIDER_CODEX
-)
-OPENROUTER_SUGGESTED_MODELS = tuple(
-    profile.model
-    for profile in INFERENCE_PROFILES.values()
-    if profile.provider == PROVIDER_OPENROUTER
-)
 PROVIDER_PI_PREFIXES = {
     PROVIDER_CODEX: "openai-codex/",
     PROVIDER_OPENROUTER: "openrouter/",
@@ -1490,12 +1500,14 @@ def resolve_prompt(prompts: list[PromptSpec], name: str) -> PromptSpec:
 
 
 def get_models_for_provider(provider: str) -> tuple[str, ...]:
-    """Return available model names for a summary provider."""
-    if provider == PROVIDER_CODEX:
-        return CODEX_SUGGESTED_MODELS
-    if provider == PROVIDER_OPENROUTER:
-        return OPENROUTER_SUGGESTED_MODELS
-    raise ValueError(f"Unknown summary provider: {provider}")
+    """Return the models the profiles suggest for a summary provider."""
+    if provider not in VALID_PROVIDERS:
+        raise ValueError(f"Unknown summary provider: {provider}")
+    return tuple(
+        profile.model
+        for profile in INFERENCE_PROFILES.values()
+        if profile.provider == provider
+    )
 
 
 def is_valid_model(provider: str, model_name: str) -> bool:
@@ -1515,31 +1527,35 @@ def run_summary_prompt(
     budget: RunBudget,
 ) -> dict:
     """Run provider-specific summary generation."""
-    try:
-        pi_prefix = PROVIDER_PI_PREFIXES[provider]
-    except KeyError as error:
+    system_prompt, user_message = _summary_messages(prompt_path, transcript_path)
+    if provider == PROVIDER_CLAUDE:
+        output_text = _run_claude_text_prompt(
+            model_name, effort, system_prompt, user_message, budget
+        )
+    elif provider in PROVIDER_PI_PREFIXES:
+        output_text = _run_pi_text_prompt(
+            f"{PROVIDER_PI_PREFIXES[provider]}{model_name}",
+            effort,
+            system_prompt,
+            user_message,
+            budget,
+        )
+    else:
         raise SummaryCLIError(
             f"Provider '{provider}' is not available in safe text-only mode."
-        ) from error
-    return _run_pi_text_prompt(
-        provider=provider,
-        pi_model=f"{pi_prefix}{model_name}",
-        transcript_path=transcript_path,
-        prompt_path=prompt_path,
-        output_path=output_path,
-        model_name=model_name,
-        effort=effort,
-        budget=budget,
-    )
+        )
+    write_text_atomic(output_path, f"{output_text}\n")
+    return {
+        "provider": provider,
+        "model": model_name,
+        "reasoning_effort": effort,
+    }
 
 
 def format_summary_meta(usage_stats: dict | None) -> str:
     """Format summary details saved in meta.txt."""
     if usage_stats and usage_stats.get("provider") in VALID_PROVIDERS:
-        label = {
-            PROVIDER_CODEX: "Codex",
-            PROVIDER_OPENROUTER: "OpenRouter",
-        }[usage_stats["provider"]]
+        label = PROVIDER_LABELS[usage_stats["provider"]]
         return (
             f"{label}: {usage_stats['model']} "
             f"(reasoning: {usage_stats['reasoning_effort']})"
@@ -1547,19 +1563,8 @@ def format_summary_meta(usage_stats: dict | None) -> str:
     return "No AI summary"
 
 
-def _run_pi_text_prompt(
-    *,
-    provider: str,
-    pi_model: str,
-    transcript_path: Path,
-    prompt_path: Path,
-    output_path: Path,
-    model_name: str,
-    effort: str,
-    budget: RunBudget,
-) -> dict[str, str]:
-    """Transform untrusted transcript text with an ephemeral, tool-free Pi run."""
-    ensure_cli_available("pi")
+def _summary_messages(prompt_path: Path, transcript_path: Path) -> tuple[str, str]:
+    """The system prompt and the JSON user message that quotes the transcript."""
     prompt_content = prompt_path.read_text(encoding="utf-8").strip()
     transcript_content = transcript_path.read_text(encoding="utf-8")
     system_prompt = (
@@ -1572,6 +1577,61 @@ def _run_pi_text_prompt(
         {"kind": "untrusted_transcript", "content": transcript_content},
         ensure_ascii=False,
     )
+    return system_prompt, user_message
+
+
+def _run_summary_cli(
+    command: Sequence[str], user_message: str, budget: RunBudget
+) -> str:
+    """Run one summary command on the transcript message and return its stdout."""
+    runner = command[0]
+    ensure_cli_available(runner)
+
+    def invoke() -> subprocess.CompletedProcess[str]:
+        return run_child(
+            command,
+            input=user_message,
+            check=True,
+            timeout=budget.remaining(f"{runner} summary", SUMMARY_ATTEMPT_TIMEOUT),
+        )
+
+    try:
+        result = retry_request(
+            invoke, max_attempts=SUMMARY_MAX_RETRIES, deadline=budget.deadline
+        )
+    except (subprocess.TimeoutExpired, WorkflowTimeoutError, TimeoutError) as error:
+        raise SummaryCLIError(
+            f"{runner} CLI exceeded the remaining workflow time budget"
+        ) from error
+    except subprocess.CalledProcessError as error:
+        # Claude Code reports a failed run as a JSON result on stdout
+        details = (
+            _claude_result(error.stdout)
+            or (error.stderr or error.stdout or str(error)).strip()
+        )
+        raise SummaryCLIError(f"{runner} CLI failed: {details}") from error
+    return result.stdout or ""
+
+
+def _claude_result(stdout: str | None) -> str | None:
+    """The `result` text of Claude Code's JSON output, or None when absent."""
+    try:
+        payload = json.loads(stdout or "")
+    except ValueError:
+        return None
+    if isinstance(payload, dict) and isinstance(payload.get("result"), str):
+        return payload["result"].strip()
+    return None
+
+
+def _run_pi_text_prompt(
+    pi_model: str,
+    effort: str,
+    system_prompt: str,
+    user_message: str,
+    budget: RunBudget,
+) -> str:
+    """Transform untrusted transcript text with an ephemeral, tool-free Pi run."""
     command = [
         "pi",
         "--model",
@@ -1589,36 +1649,65 @@ def _run_pi_text_prompt(
         "--no-extensions",
         "--no-approve",
     ]
-
-    def invoke() -> subprocess.CompletedProcess[str]:
-        return run_child(
-            command,
-            input=user_message,
-            check=True,
-            timeout=budget.remaining("Pi summary", SUMMARY_ATTEMPT_TIMEOUT),
-        )
-
-    try:
-        result = retry_request(
-            invoke, max_attempts=SUMMARY_MAX_RETRIES, deadline=budget.deadline
-        )
-    except (subprocess.TimeoutExpired, WorkflowTimeoutError, TimeoutError) as error:
-        raise SummaryCLIError(
-            "pi CLI exceeded the remaining workflow time budget"
-        ) from error
-    except subprocess.CalledProcessError as error:
-        details = (error.stderr or error.stdout or str(error)).strip()
-        raise SummaryCLIError(f"pi CLI failed: {details}") from error
-
-    output_text = (result.stdout or "").strip()
+    output_text = _run_summary_cli(command, user_message, budget).strip()
     if not output_text:
         raise SummaryCLIError("pi CLI returned empty output")
-    write_text_atomic(output_path, f"{output_text}\n")
-    return {
-        "provider": provider,
-        "model": model_name,
-        "reasoning_effort": effort,
-    }
+    return output_text
+
+
+def _run_claude_text_prompt(
+    model_name: str,
+    effort: str,
+    system_prompt: str,
+    user_message: str,
+    budget: RunBudget,
+) -> str:
+    """Transform untrusted transcript text with an ephemeral, tool-free Claude run."""
+    command = [
+        "claude",
+        "--print",
+        "--model",
+        model_name,
+        "--effort",
+        effort,
+        # Skip user, project, and local settings and every CLAUDE.md
+        "--setting-sources",
+        "",
+        # CLAUDE_CODE_EFFORT_LEVEL from the environment overrides --effort;
+        # this settings value overrides both
+        "--settings",
+        json.dumps(
+            {"disableAllHooks": True, "env": {"CLAUDE_CODE_EFFORT_LEVEL": effort}}
+        ),
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--mcp-config",
+        '{"mcpServers":{}}',
+        "--disable-slash-commands",
+        "--no-session-persistence",
+        "--permission-mode",
+        "dontAsk",
+        "--system-prompt",
+        system_prompt,
+        "--output-format",
+        "json",
+    ]
+    stdout = _run_summary_cli(command, user_message, budget)
+    try:
+        payload = json.loads(stdout)
+    except ValueError as error:
+        raise SummaryCLIError("claude CLI returned output that is not JSON") from error
+    if not isinstance(payload, dict):
+        raise SummaryCLIError("claude CLI returned output that is not a JSON object")
+    output_text = _claude_result(stdout)
+    if payload.get("is_error") is not False:
+        raise SummaryCLIError(
+            f"claude CLI failed: {output_text or 'no result was returned'}"
+        )
+    if not output_text:
+        raise SummaryCLIError("claude CLI returned empty output")
+    return output_text
 
 
 def _help_formatter(prog: str) -> argparse.HelpFormatter:
@@ -2103,10 +2192,10 @@ def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
             f"{PROG} list models --provider {provider}",
         )
 
-    if effort not in VALID_REASONING_EFFORTS:
+    if effort not in PROVIDER_EFFORTS[provider]:
         raise ConfigurationError(
             f"Invalid {provider} effort: {effort}. "
-            f"Valid: {', '.join(VALID_REASONING_EFFORTS)}",
+            f"Valid: {', '.join(PROVIDER_EFFORTS[provider])}",
             f"{PROG} list profiles",
         )
 
@@ -2361,19 +2450,40 @@ def _doctor_report(*, source: str, summarize: bool) -> dict:
         )
 
     if summarize:
-        pi_path = shutil.which("pi")
-        checks.append(
-            _doctor_check(
-                "pi",
-                "pass" if pi_path else "fail",
-                f"pi is available at {pi_path}"
-                if pi_path
-                else "pi was not found on PATH",
-                None
-                if pi_path
-                else f"Install pi, or skip summary checks: {PROG} doctor --no-summary",
-            )
-        )
+        # The default profile's runner is required; another runner only warns
+        for runner in dict.fromkeys(PROVIDER_RUNNERS.values()):
+            runner_path = shutil.which(runner)
+            if runner_path:
+                checks.append(
+                    _doctor_check(
+                        runner, "pass", f"{runner} is available at {runner_path}"
+                    )
+                )
+            elif runner == PROVIDER_RUNNERS[DEFAULT_PROVIDER]:
+                checks.append(
+                    _doctor_check(
+                        runner,
+                        "fail",
+                        f"{runner} was not found on PATH",
+                        f"Install {runner}, or skip summary checks: "
+                        f"{PROG} doctor --no-summary",
+                    )
+                )
+            else:
+                profiles = [
+                    name
+                    for name, profile in INFERENCE_PROFILES.items()
+                    if PROVIDER_RUNNERS[profile.provider] == runner
+                ]
+                checks.append(
+                    _doctor_check(
+                        runner,
+                        "warn",
+                        f"{runner} was not found on PATH; only the "
+                        f"{', '.join(profiles)} profiles need it",
+                        f"Install {runner} to use --profile {profiles[0]}",
+                    )
+                )
 
     if source in {"all", "youtube"}:
         for command in ("ffmpeg", "ffprobe"):
@@ -2514,7 +2624,7 @@ def _run_result_payload(
 def _preflight(plan: RunPlan, budget: RunBudget) -> str:
     """Validate required executables and retrieve secrets before mutations."""
     if plan.summarize:
-        ensure_cli_available("pi")
+        ensure_cli_available(PROVIDER_RUNNERS[plan.provider])
     return validate_env(budget)
 
 

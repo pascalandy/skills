@@ -38,16 +38,16 @@ class TestHelp:
         stdout, _stderr, code = run_script("run", "youtube", "--help")
         assert code == 0
         assert "--profile" in stdout
+        assert "opus" in stdout
         assert "astra" in stdout
         assert "sol" in stdout
         assert "glm" in stdout
-        assert "--provider {codex,openrouter}" in stdout
+        assert "--provider {claude,codex,openrouter}" in stdout
         assert "--preview" in stdout
         assert "Render the saved Markdown summary after publication" in " ".join(
             stdout.split()
         )
         assert "opencode" not in stdout.lower()
-        assert "claude" not in stdout.lower()
         assert "(default: follow_along_note)" in " ".join(stdout.split())
 
     def test_help_marks_zoom_summary_as_conditional(self) -> None:
@@ -87,10 +87,7 @@ class TestListModels:
     def test_default_provider_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models")
         assert code == 0
-        assert stdout.strip().splitlines() == [
-            "gpt-6-astra",
-            "gpt-5.6-sol",
-        ]
+        assert stdout.strip().splitlines() == ["claude-opus-5-5"]
 
     def test_openrouter_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "openrouter")
@@ -116,8 +113,14 @@ class TestProfiles:
         assert payload == {
             "ok": True,
             "command": "list profiles",
-            "default": "astra",
+            "default": "opus",
             "profiles": [
+                {
+                    "name": "opus",
+                    "provider": "claude",
+                    "model": "claude-opus-5-5",
+                    "effort": "high",
+                },
                 {
                     "name": "astra",
                     "provider": "codex",
@@ -210,7 +213,7 @@ class TestPureDiscovery:
 
 
 class TestRunPlan:
-    def test_youtube_default_is_codex_astra_low(self) -> None:
+    def test_youtube_default_is_claude_opus_high(self) -> None:
         import transcript
 
         args = transcript.parse_args(
@@ -219,23 +222,23 @@ class TestRunPlan:
         plan = transcript.resolve_run_plan(args)
 
         assert plan.source_kind == "youtube"
-        assert plan.provider == "codex"
-        assert plan.profile == "astra"
-        assert plan.model == "gpt-6-astra"
-        assert plan.effort == "low"
+        assert plan.provider == "claude"
+        assert plan.profile == "opus"
+        assert plan.model == "claude-opus-5-5"
+        assert plan.effort == "high"
         assert plan.preview is False
 
-    def test_zoom_default_is_codex_astra_low(self) -> None:
+    def test_zoom_default_is_claude_opus_high(self) -> None:
         import transcript
 
         args = transcript.parse_args(["run", "zoom", "--latest"])
         plan = transcript.resolve_run_plan(args)
 
         assert plan.source_kind == "zoom"
-        assert plan.provider == "codex"
-        assert plan.profile == "astra"
-        assert plan.model == "gpt-6-astra"
-        assert plan.effort == "low"
+        assert plan.provider == "claude"
+        assert plan.profile == "opus"
+        assert plan.model == "claude-opus-5-5"
+        assert plan.effort == "high"
         assert plan.preview is False
 
     def test_preview_is_opt_in(self) -> None:
@@ -553,8 +556,8 @@ class TestProgressReporting:
             (
                 ["run", "youtube", "--url", "https://youtu.be/abc"],
                 (
-                    "Run: source=YouTube | profile=astra | provider=codex | "
-                    "model=gpt-6-astra | effort=low | prompt=follow_along_note"
+                    "Run: source=YouTube | profile=opus | provider=claude | "
+                    "model=claude-opus-5-5 | effort=high | prompt=follow_along_note"
                 ),
             ),
             (
@@ -1028,6 +1031,16 @@ class TestFormatSummaryMeta:
         assert "z-ai/glm-5.3-flash" in result
         assert "medium" in result
 
+    def test_claude_stats(self) -> None:
+        from transcript import PROVIDER_CLAUDE, format_summary_meta
+
+        stats = {
+            "provider": PROVIDER_CLAUDE,
+            "model": "claude-opus-5-5",
+            "reasoning_effort": "high",
+        }
+        assert format_summary_meta(stats) == "Claude: claude-opus-5-5 (reasoning: high)"
+
     def test_none_stats(self) -> None:
         from transcript import format_summary_meta
 
@@ -1165,6 +1178,134 @@ class TestRunCodexPrompt:
         )
 
 
+class TestRunClaudePrompt:
+    def run_claude(self, tmp_path, monkeypatch, fake_run):
+        import transcript
+
+        transcript_path = tmp_path / "raw_transcript.txt"
+        prompt_path = tmp_path / "prompt.md"
+        output_path = tmp_path / "summary.md"
+        transcript_path.write_text("Transcript text", encoding="utf-8")
+        prompt_path.write_text("Prompt text", encoding="utf-8")
+        monkeypatch.setattr(transcript, "ensure_cli_available", lambda _cmd: None)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
+        result = transcript.run_summary_prompt(
+            transcript.PROVIDER_CLAUDE,
+            transcript_path,
+            prompt_path,
+            output_path,
+            "claude-opus-5-5",
+            "high",
+            transcript.RunBudget(float("inf")),
+        )
+        return result, output_path
+
+    def test_runs_isolated_tool_free_claude(self, tmp_path, monkeypatch) -> None:
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append((command, kwargs))
+            return SimpleNamespace(
+                stdout=json.dumps({"is_error": False, "result": "Summary output\n"}),
+                stderr="",
+            )
+
+        result, output_path = self.run_claude(tmp_path, monkeypatch, fake_run)
+
+        assert output_path.read_text(encoding="utf-8") == "Summary output\n"
+        assert result == {
+            "provider": "claude",
+            "model": "claude-opus-5-5",
+            "reasoning_effort": "high",
+        }
+        command, kwargs = calls[0]
+
+        def value(option: str) -> str:
+            return command[command.index(option) + 1]
+
+        assert command[:2] == ["claude", "--print"]
+        assert value("--model") == "claude-opus-5-5"
+        assert value("--effort") == "high"
+        assert value("--setting-sources") == ""
+        assert value("--tools") == ""
+        assert json.loads(value("--settings")) == {
+            "disableAllHooks": True,
+            "env": {"CLAUDE_CODE_EFFORT_LEVEL": "high"},
+        }
+        assert value("--mcp-config") == '{"mcpServers":{}}'
+        assert value("--output-format") == "json"
+        for flag in (
+            "--strict-mcp-config",
+            "--disable-slash-commands",
+            "--no-session-persistence",
+        ):
+            assert flag in command
+        assert value("--system-prompt").startswith("Prompt text\n")
+        assert "untrusted transcript data" in value("--system-prompt")
+        assert json.loads(kwargs["input"]) == {
+            "kind": "untrusted_transcript",
+            "content": "Transcript text",
+        }
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            subprocess.CalledProcessError(
+                1,
+                ["claude"],
+                output=json.dumps(
+                    {"is_error": True, "result": "Claude usage limit reached"}
+                ),
+                stderr="[claude-code:usage_limit] {}",
+            ),
+            SimpleNamespace(
+                stdout=json.dumps(
+                    {"is_error": True, "result": "Claude usage limit reached"}
+                ),
+                stderr="",
+            ),
+        ],
+        ids=["nonzero-exit", "zero-exit"],
+    )
+    def test_reports_claude_error_result(self, tmp_path, monkeypatch, outcome) -> None:
+        import transcript
+
+        def fake_run(_command, **_kwargs):
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        with pytest.raises(transcript.SummaryCLIError) as caught:
+            self.run_claude(tmp_path, monkeypatch, fake_run)
+
+        assert str(caught.value) == "claude CLI failed: Claude usage limit reached"
+        assert not (tmp_path / "summary.md").exists()
+
+    @pytest.mark.parametrize(
+        "stdout,message",
+        [
+            ("not json", "claude CLI returned output that is not JSON"),
+            (
+                json.dumps({"is_error": False, "result": "  "}),
+                "claude CLI returned empty output",
+            ),
+        ],
+    )
+    def test_rejects_unusable_output(
+        self, tmp_path, monkeypatch, stdout, message
+    ) -> None:
+        import transcript
+
+        with pytest.raises(transcript.SummaryCLIError) as caught:
+            self.run_claude(
+                tmp_path,
+                monkeypatch,
+                lambda _command, **_kwargs: SimpleNamespace(stdout=stdout, stderr=""),
+            )
+
+        assert str(caught.value) == message
+
+
 class TestRuntimeMetadata:
     def test_pep723_declares_required_python(self) -> None:
         source = SCRIPT_PATH.read_text(encoding="utf-8")
@@ -1173,7 +1314,7 @@ class TestRuntimeMetadata:
 
 
 class TestUnsupportedSummaryProviders:
-    @pytest.mark.parametrize("provider", ["claude", "opencode"])
+    @pytest.mark.parametrize("provider", ["opencode"])
     def test_run_plan_rejects_provider_before_execution(self, provider) -> None:
         stdout, stderr, code = run_script(
             "run",
@@ -1196,6 +1337,33 @@ class TestUnsupportedSummaryProviders:
         assert error["code"] == "invalid_usage"
         assert "argument --provider: invalid choice" in error["message"]
         assert provider in error["message"]
+
+
+class TestProviderEfforts:
+    @pytest.mark.parametrize("effort", ["off", "minimal"])
+    def test_claude_rejects_an_effort_it_would_ignore(self, effort) -> None:
+        stdout, stderr, code = run_script(
+            "run",
+            "youtube",
+            "--url",
+            "https://youtu.be/abc",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-opus-5-5",
+            "--effort",
+            effort,
+            "--dry-run",
+            "--json",
+        )
+
+        assert code == 2
+        assert stdout == ""
+        error = json.loads(stderr)["error"]
+        assert error["code"] == "invalid_configuration"
+        assert error["message"] == (
+            f"Invalid claude effort: {effort}. Valid: low, medium, high, xhigh, max"
+        )
 
 
 class TestPromptContracts:
@@ -1446,13 +1614,13 @@ class TestRetryPolicy:
             transcript.retry_request(invalid_call)
         assert attempts == 1
 
-    def test_pipeline_budget_consumed_before_pi_limits_its_timeout(
+    def test_pipeline_budget_consumed_before_summary_limits_its_timeout(
         self, tmp_path, monkeypatch
     ) -> None:
         import transcript
 
         now = [0.0]
-        observed_pi_timeouts = []
+        observed_summary_timeouts = []
 
         monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
         monkeypatch.setattr(transcript, "validate_env", lambda _budget: "secret")
@@ -1477,9 +1645,13 @@ class TestRetryPolicy:
             return deepgram_response()
 
         def fake_subprocess_run(command, **kwargs):
-            assert command[0] == "pi"
-            observed_pi_timeouts.append(kwargs["timeout"])
-            return SimpleNamespace(stdout="# Summary\n", stderr="", returncode=0)
+            assert command[0] == "claude"
+            observed_summary_timeouts.append(kwargs["timeout"])
+            return SimpleNamespace(
+                stdout=json.dumps({"is_error": False, "result": "# Summary"}),
+                stderr="",
+                returncode=0,
+            )
 
         monkeypatch.setattr(transcript, "get_video_info", fake_video_info)
         monkeypatch.setattr(transcript, "download_audio", fake_download)
@@ -1498,7 +1670,7 @@ class TestRetryPolicy:
         )
 
         assert code == 0
-        assert observed_pi_timeouts == [pytest.approx(50)]
+        assert observed_summary_timeouts == [pytest.approx(50)]
 
     def test_subprocess_is_not_started_without_remaining_budget(
         self, monkeypatch
@@ -2265,7 +2437,7 @@ class TestPreflightAndCleanup:
         )
 
         assert code == 1
-        assert "Required CLI 'pi' was not found" in capsys.readouterr().err
+        assert "Required CLI 'claude' was not found" in capsys.readouterr().err
         assert not list(tmp_path.iterdir())
 
     def test_download_failure_cleans_temporary_audio(

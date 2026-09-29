@@ -1,6 +1,6 @@
 # YouTube
 
-YouTube mode validates a public video URL, resolves a summary plan, attempts a browser-authenticated download before an anonymous fallback, transcribes audio with Deepgram, and can summarize it through Pi.
+YouTube mode validates a public video URL, resolves a summary plan, attempts a browser-authenticated download before an anonymous fallback, transcribes audio with Deepgram, and can summarize it through `claude` or `pi`.
 
 ## Sub-features
 
@@ -21,7 +21,7 @@ YouTube mode validates a public video URL, resolves a summary plan, attempts a b
 Preconditions:
 
 - `verify-transcript doctor --json` locates `transcript` and `uv`
-- A real run has a valid Deepgram credential, pinned yt-dlp, `ffmpeg`, `ffprobe`, and Pi summary provider
+- A real run has a valid Deepgram credential, pinned yt-dlp, `ffmpeg`, `ffprobe`, and a signed-in `claude` for the default summary profile
 - The user explicitly authorized the paid real flow
 
 - **Free plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require exit `0`, `side_effects: []`, the canonical URL, the configured summary plan, and a planned output path that remains absent

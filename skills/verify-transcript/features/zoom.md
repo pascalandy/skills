@@ -23,7 +23,7 @@ Preconditions:
 - The dry run creates its meeting fixture only under the eval scratch directory
 
 - **Diagnostics.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.zoom --json`. Require a consistent JSON report and inspect `readiness_ok`
-- **Source plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run --json`. Require the disposable folder and `.m4a` path, the Codex `synthese-rencontre` summary plan, `side_effects: []`, and a planned output path that remains absent
+- **Source plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run --json`. Require the disposable folder and `.m4a` path, the `opus` `synthese-rencontre` summary plan, `side_effects: []`, and a planned output path that remains absent
 - **Transcript-only plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require the disposable source, disabled summary fields, a timeout override, and no output creation
 
 ## Gotchas

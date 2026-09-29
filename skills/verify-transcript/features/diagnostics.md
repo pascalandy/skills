@@ -27,7 +27,7 @@ Preconditions:
 ## Gotchas
 
 - A failed readiness check does not mean the doctor behavior is broken
-- `diagnostics.zoom` includes the Pi check to match the command in `transcript`
+- Both diagnostics include the `claude` and `pi` checks; a missing `pi` only warns, because only non-default profiles need it
 - Diagnostics can read default browser and Zoom paths but do not mutate them
 - Inspect `readiness_ok` before attempting the paid feature
 - Doctor does not measure upload bandwidth or prove that an audio file reached Deepgram

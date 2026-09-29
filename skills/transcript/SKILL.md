@@ -5,7 +5,7 @@ description: "Use when the user invokes `transcript` or asks to transcribe a You
 
 # Transcript
 
-Transcribe YouTube or Zoom audio with Deepgram, then optionally create a Markdown summary through a named inference profile and Pi's tool-free, session-free mode.
+Transcribe YouTube or Zoom audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
 
 Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Give a real run a 600-second process timeout. The CLI enforces its own 570-second workflow deadline by default.
 
@@ -61,7 +61,7 @@ uv run <skill_dir>/scripts/transcript.py doctor --source youtube --json
 uv run <skill_dir>/scripts/transcript.py doctor --source zoom --json
 ```
 
-`doctor` checks local dependencies and credentials without calling Deepgram, Pi, or another paid API.
+`doctor` checks local dependencies and credentials without calling Deepgram, a summary model, or another paid API.
 
 Before a run with a non-default profile, prompt, output, or source setting, resolve the plan without secrets, network calls, or writes:
 
@@ -74,6 +74,7 @@ Discover valid values through the command tree:
 ```bash
 uv run <skill_dir>/scripts/transcript.py list prompts --json
 uv run <skill_dir>/scripts/transcript.py list profiles --json
+uv run <skill_dir>/scripts/transcript.py list models --provider claude --json
 uv run <skill_dir>/scripts/transcript.py list models --provider codex --json
 uv run <skill_dir>/scripts/transcript.py list models --provider openrouter --json
 uv run <skill_dir>/scripts/transcript.py --help
@@ -91,7 +92,7 @@ The canonical transport fixture is:
 https://www.youtube.com/watch?v=EIEc43CxIvY
 ```
 
-Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check. The transport check requires Arc and pinned `yt-dlp` `2026.7.4`; it skips anonymous access, validates temporary audio with `ffprobe`, and never calls Deepgram or Pi.
+Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check. The transport check requires Arc and pinned `yt-dlp` `2026.7.4`; it skips anonymous access, validates temporary audio with `ffprobe`, and never calls Deepgram or a summary model.
 
 Arc's `Default` profile must have a valid YouTube session. If it expires, sign in again. Arc can remain open. YouTube Premium does not replace browser authentication. The normal run tries Arc, or Chrome when Arc is absent. If browser authentication fails, it retries anonymously.
 

@@ -750,6 +750,10 @@ def build_commands(
     if feature.probe == "models":
         return (
             CommandPlan(
+                "models-claude",
+                ("list", "models", "--provider", "claude", "--json"),
+            ),
+            CommandPlan(
                 "models-codex",
                 ("list", "models", "--provider", "codex", "--json"),
             ),
@@ -1053,6 +1057,7 @@ def _validate_doctor(
         expected_summary = True
         expected_checks = {
             "deepgram_credential",
+            "claude",
             "pi",
             "ffmpeg",
             "ffprobe",
@@ -1062,7 +1067,7 @@ def _validate_doctor(
     else:
         expected_source = "zoom"
         expected_summary = True
-        expected_checks = {"deepgram_credential", "pi", "zoom_recordings"}
+        expected_checks = {"deepgram_credential", "claude", "pi", "zoom_recordings"}
     _require(payload.get("source") == expected_source, "doctor source is invalid")
     _require(
         payload.get("summary") is expected_summary, "doctor summary mode is invalid"
@@ -1138,10 +1143,14 @@ def _validate_dry_run(
             "Zoom dry-run audio is invalid",
         )
         _require(summary.get("enabled") is True, "Zoom summary plan is disabled")
-        _require(summary.get("profile") == "astra", "Zoom summary profile is invalid")
-        _require(summary.get("provider") == "codex", "Zoom summary provider is invalid")
-        _require(summary.get("model") == "gpt-6-astra", "Zoom summary model is invalid")
-        _require(summary.get("effort") == "low", "Zoom summary effort is invalid")
+        _require(summary.get("profile") == "opus", "Zoom summary profile is invalid")
+        _require(
+            summary.get("provider") == "claude", "Zoom summary provider is invalid"
+        )
+        _require(
+            summary.get("model") == "claude-opus-5-5", "Zoom summary model is invalid"
+        )
+        _require(summary.get("effort") == "high", "Zoom summary effort is invalid")
         _require(
             summary.get("prompt") == "synthese-rencontre",
             "Zoom summary prompt is invalid",
@@ -1431,22 +1440,26 @@ def validate_feature(
             _require(process.exit_code == 0, "model discovery failed")
             provider = payload.get("provider")
             models = payload.get("models")
-            _require(provider in {"codex", "openrouter"}, "model provider is invalid")
+            _require(
+                provider in {"claude", "codex", "openrouter"},
+                "model provider is invalid",
+            )
             _require(isinstance(models, list) and bool(models), "model list is empty")
             _require(payload.get("default") in models, "default model is not suggested")
             providers.append(provider)
         _require(
-            set(providers) == {"codex", "openrouter"},
+            set(providers) == {"claude", "codex", "openrouter"},
             "provider coverage is incomplete",
         )
         return {"providers": sorted(providers)}
     if feature.probe == "profiles":
         process, payload = captures[0]
         _require(process.exit_code == 0, "profile discovery failed")
-        _require(payload.get("default") == "astra", "default profile is invalid")
+        _require(payload.get("default") == "opus", "default profile is invalid")
         profiles = payload.get("profiles")
         _require(isinstance(profiles, list), "profile list is missing")
         expected = [
+            ("opus", "claude", "claude-opus-5-5", "high"),
             ("astra", "codex", "gpt-6-astra", "low"),
             ("sol", "codex", "gpt-5.6-sol", "medium"),
             ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
@@ -1462,7 +1475,7 @@ def validate_feature(
             if isinstance(profile, dict)
         ]
         _require(actual == expected, "profile registry is invalid")
-        return {"default": "astra", "profiles": [item[0] for item in expected]}
+        return {"default": "opus", "profiles": [item[0] for item in expected]}
     if feature.probe in {"doctor-youtube", "doctor-zoom"}:
         return _validate_doctor(feature, *captures[0])
     if feature.probe in {"youtube-dry-run-summary", "zoom-dry-run"}:

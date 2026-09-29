@@ -265,6 +265,7 @@ class TestDoctor:
         assert "deepgram-secret-value" not in serialized
         assert {check["name"] for check in report["checks"]} >= {
             "deepgram_credential",
+            "claude",
             "pi",
             "ffmpeg",
             "ffprobe",
@@ -272,6 +273,52 @@ class TestDoctor:
             "youtube_browser",
             "zoom_recordings",
         }
+
+    @pytest.mark.parametrize(
+        "missing,expected",
+        [
+            (
+                "claude",
+                {
+                    "name": "claude",
+                    "status": "fail",
+                    "message": "claude was not found on PATH",
+                    "hint": "Install claude, or skip summary checks: "
+                    "transcript doctor --no-summary",
+                },
+            ),
+            (
+                "pi",
+                {
+                    "name": "pi",
+                    "status": "warn",
+                    "message": "pi was not found on PATH; "
+                    "only the astra, sol, glm profiles need it",
+                    "hint": "Install pi to use --profile astra",
+                },
+            ),
+        ],
+    )
+    def test_only_the_default_summary_runner_is_required(
+        self, monkeypatch, tmp_path, missing, expected
+    ) -> None:
+        import transcript
+
+        monkeypatch.setattr(transcript, "ZOOM_ROOT", tmp_path)
+        monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
+        monkeypatch.setattr(
+            transcript.shutil,
+            "which",
+            lambda name: None if name == missing else f"/bin/{name}",
+        )
+
+        report = transcript._doctor_report(source="zoom", summarize=True)
+
+        runner_check = next(
+            check for check in report["checks"] if check["name"] == missing
+        )
+        assert runner_check == expected
+        assert report["ok"] is (expected["status"] != "fail")
 
     def test_doctor_failure_is_actionable_json(self, monkeypatch, capsys) -> None:
         import transcript

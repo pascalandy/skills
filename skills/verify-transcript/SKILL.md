@@ -26,7 +26,7 @@ Check the verifier before a run when the layout or local tools look wrong.
 uv run "$VERIFY_DIR/scripts/verify_transcript.py" doctor --json
 ```
 
-`doctor` checks `uv`, all seven Feature Map pages, and the adjacent `transcript` public script. It does not call Deepgram, Pi, YouTube, or Zoom.
+`doctor` checks `uv`, all seven Feature Map pages, and the adjacent `transcript` public script. It does not call Deepgram, a summary model, YouTube, or Zoom.
 
 ## Drive
 

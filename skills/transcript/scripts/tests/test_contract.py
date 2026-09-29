@@ -578,7 +578,7 @@ def test_a_failed_summary_leaves_stdout_empty_and_names_the_saved_transcript(
     assert failure["error"] == {
         "code": "summary_failed",
         "message": f"Summary generation failed: quota. The transcript is saved in {result}",
-        "hint": shlex.join(["transcript", *argv, "--profile", "sol"]),
+        "hint": shlex.join(["transcript", *argv, "--profile", "astra"]),
     }
 
 

@@ -1,6 +1,6 @@
 # Transcript CLI
 
-`scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free Pi process.
+`scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free `claude` or `pi` process.
 
 The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/maintainer/references/script-conventions.md` of the `pascalandy/skills` repository.
 
@@ -9,7 +9,7 @@ The CLI uses subcommands, validates source input before execution, returns struc
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
 - Zoom recordings under `~/Documents/Zoom` for Zoom mode
-- `pi` on `PATH` when summary generation is enabled
+- When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - Deepgram API key in the macOS keyring
 - The `distill-prompt` skill installed beside this one for Zoom summaries, which use its `synthese-rencontre` prompt
@@ -47,6 +47,8 @@ The registry lists profiles in preference order. The order does not define a fal
 When a user asks to use or change a model, show `list profiles` first. Reframe the choice as selecting an existing profile, updating one, or creating one. Add or change profiles in the `INFERENCE_PROFILES` registry in `scripts/transcript.py`; no other file lists them.
 
 Use the low-level `--provider`, `--model`, and `--effort` flags only to diagnose or test a custom target.
+
+The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, slash commands, saved session, settings files, or `CLAUDE.md`. The profile's effort overrides any `CLAUDE_CODE_EFFORT_LEVEL`. Claude accepts only the efforts `low`, `medium`, `high`, `xhigh`, and `max`; the CLI rejects any other level, which Claude Code would silently replace with its default. The `codex` and `openrouter` providers run through `pi`.
 
 ## Run commands
 
@@ -86,10 +88,10 @@ A successful run payload includes:
   "output_dir": "/absolute/result/path",
   "summary": {
     "status": "succeeded",
-    "profile": "astra",
-    "provider": "codex",
-    "model": "gpt-6-astra",
-    "effort": "low",
+    "profile": "opus",
+    "provider": "claude",
+    "model": "claude-opus-5-5",
+    "effort": "high",
     "error": null
   },
   "artifacts": {
@@ -175,7 +177,7 @@ Run the free transport check:
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass prints nothing and exits `0`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram, Pi, Codex, or OpenRouter. A pass proves the Arc adapter ran. It does not prove the full user flow.
+The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass prints nothing and exits `0`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the Arc adapter ran. It does not prove the full user flow.
 
 ## Validation model
 
@@ -200,6 +202,7 @@ uv run <skill_dir>/scripts/transcript.py run youtube --help
 uv run <skill_dir>/scripts/transcript.py run zoom --help
 uv run <skill_dir>/scripts/transcript.py list prompts --json
 uv run <skill_dir>/scripts/transcript.py list profiles --json
+uv run <skill_dir>/scripts/transcript.py list models --provider claude --json
 uv run <skill_dir>/scripts/transcript.py list models --provider codex --json
 uv run <skill_dir>/scripts/transcript.py doctor --source youtube --json
 ```
