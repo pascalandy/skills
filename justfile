@@ -46,6 +46,11 @@ transcript-cli *args:
 check *args:
     @uv run --quiet scripts/check.py "$@"
 
+# Run just check, then mark the pushed HEAD green on GitHub with gh signoff; push first
+[group('checks')]
+signoff: check
+    @gh signoff
+
 # Check SKILL.md frontmatter quoting; lefthook runs it when a SKILL.md is staged
 [group('checks')]
 check-frontmatter *args:
