@@ -117,7 +117,7 @@ Use only the standard library unless a dependency earns its place. Each `justfil
 
 ## Tests
 
-Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and [[checks]] says when they run
+Tests live in `scripts/tests/`. `just check --only test` runs them, and [[checks]] explains how they join CI. A skill's own tests live in its package, and [[checks]] says when they run. `just check` runs every suite on all cores, so a test must not share files, ports, or locks with another test
 
 `test_cli.py` and `test_common.py` test the shared contract code once. `test_cli_contract.py` fails on a `scripts/` entry point missing from its `ENTRIES`, and runs each script's `--help` once: the help must come from the shared parser, and every doc line that runs the script, in docs, hooks, CI, and `scripts/`, may use only flags the help lists. A script's own tests cover what it does, not the shared contract again
 

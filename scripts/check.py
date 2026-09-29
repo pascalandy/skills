@@ -39,6 +39,7 @@ EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
 PYTEST = "9.1.1"
+XDIST = "pytest-xdist==3.8.0"
 ACTIONLINT = "actionlint-py@1.7.12.25"
 
 log = logging.getLogger("check")
@@ -96,7 +97,17 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
 
 
 def pytest(path: str, *deps: str) -> Command:
-    return ("uvx", "--from", f"pytest@{PYTEST}", *with_deps(deps), "pytest", path)
+    """Run a suite on every core; its tests must not share files, ports, or locks."""
+    return (
+        "uvx",
+        "--from",
+        f"pytest@{PYTEST}",
+        *with_deps((XDIST, *deps)),
+        "pytest",
+        "-n",
+        "auto",
+        path,
+    )
 
 
 def script_pin(script: str, package: str) -> str:
@@ -125,7 +136,7 @@ CHECKS = [
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
-    Check("test", ("uvx", f"pytest@{PYTEST}")),
+    Check("test", pytest("scripts/tests")),
     # Optional local linters stay off so every machine agrees
     Check(
         "workflows",
