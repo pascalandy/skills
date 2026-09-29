@@ -79,6 +79,7 @@ CONSENT_FIX = (
 )
 
 SKILL_MARKER = "Base directory for this skill: "
+SKILL_START = re.compile(rf"(?m)^{re.escape(SKILL_MARKER)}")
 ARGUMENTS = re.compile(r"\n\nARGUMENTS: .*\Z", re.DOTALL)
 # A path that ends in <install directory>/<skill>/SKILL.md
 SKILL_FILE = re.compile(r"(?:~|/)[^\s'\"`;|&()]*?/([A-Za-z0-9][\w.-]*)/SKILL\.md")
@@ -91,6 +92,18 @@ MISSING_COMMAND = re.compile(
 GITHUB = re.compile(r"github\.com[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
 JS_COMMAND = re.compile(r"\bcmd\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)")
 EXIT_CODE = re.compile(r"\"exit_code\"\s*:\s*(-?\d+)")
+TEXT_EXIT = re.compile(r"(?m)^(?:Process exited with code|Exit code:?)\s*(-?\d+)")
+# Evidence that a fetch itself failed, not some other part of the command
+FETCH_FAILED = re.compile(
+    r"\b(?:40[34]|410|5\d\d)\b|(?<!command )not found|could not resolve"
+    r"|failed to (?:fetch|connect)|request failed|unable to (?:fetch|resolve)",
+    re.IGNORECASE,
+)
+# One command that prints one file: cat, rtk cat, nl -ba, or sed -n 'A,Bp'
+SINGLE_READ = re.compile(
+    r"^\s*(?:(?:rtk\s+)?cat|nl\s+-ba)\s+(?P<path>\S+)\s*$"
+    r"|^\s*sed\s+-n\s+'?(?P<first>\d+),\d+p'?\s+(?P<ranged>\S+)\s*$"
+)
 OUTPUT_FIELD = re.compile(r"\"output\"\s*:\s*\"")
 # Up to five frontmatter lines before `name:`, none of them the closing ---
 OPENER = r"(?:(?!---\n)[^\n]*\n){0,5}?"
@@ -163,6 +176,8 @@ RELATION = {
     },
 }
 SKILL_SIDE = ("contradicted", "incomplete", "ambiguous")
+# HTTP statuses that mean TypeSafe refused a request without running it
+REJECTED = frozenset({400, 401, 403, 404, 409, 413, 422, 429, 503, 529})
 TOOL_UNAVAILABLE = {
     "type": "noul",
     "instructions": (
@@ -355,6 +370,27 @@ def numbered_read(text: str) -> tuple[int, str] | None:
     return numbers[0], "\n".join(lines)
 
 
+def claude_text(session: Session, actor: str, text: str, after: int) -> None:
+    """Add `text` as an event, or split off the SKILL.md Claude Code injected
+    into it as a load that applies from event `after`."""
+    found = SKILL_START.search(text)
+    before = text if found is None else text[: found.start()]
+    if before.strip() and not before.startswith("<system-reminder>"):
+        session.add(actor, before)
+        after += 1
+    if found is None:
+        return
+    directory, body = skill_body(text[found.start() :])
+    session.loads.append(
+        Load(
+            Path(directory).name,
+            directory,
+            after,
+            [SkillFile(f"{directory}/SKILL.md", body, "excerpt")],
+        )
+    )
+
+
 def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
     first = next(item for item in items if "sessionId" in item)
     session = Session(
@@ -367,34 +403,20 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
             continue
         message = item.get("message") or {}
         content = message.get("content")
+        actor = "agent" if item["type"] == "assistant" else "user"
         if item["type"] == "assistant":
             model = message.get("model") or ""
             if model and not model.startswith("<"):
                 session.model = model
         if isinstance(content, str):
-            if content.strip():
-                session.add("user", content)
+            claude_text(session, actor, content, len(session.events))
             continue
         for block in content or []:
             if not isinstance(block, dict):
                 continue
             kind = block.get("type")
             if kind == "text":
-                text = block.get("text", "")
-                if text.startswith(SKILL_MARKER):
-                    directory, body = skill_body(text)
-                    session.loads.append(
-                        Load(
-                            Path(directory).name,
-                            directory,
-                            len(session.events),
-                            [SkillFile(f"{directory}/SKILL.md", body, "excerpt")],
-                        )
-                    )
-                elif text.strip() and not text.startswith("<system-reminder>"):
-                    session.add(
-                        "agent" if item["type"] == "assistant" else "user", text
-                    )
+                claude_text(session, actor, block.get("text", ""), len(session.events))
             elif kind == "tool_use":
                 name = str(block.get("name", ""))
                 arguments = block.get("input") or {}
@@ -407,9 +429,15 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
                 result = texts(block.get("content"))
                 error = bool(block.get("is_error"))
                 event = calls.get(call) or session.add("tool", "")
-                event.text = f"{event.text}\n{result}".lstrip("\n")
+                found = None if error else SKILL_START.search(result)
+                shown = result if found is None else result[: found.start()]
+                event.text = f"{event.text}\n{shown}".strip("\n")
                 event.error = event.error or error
                 event.call = call
+                if found is not None:
+                    claude_text(
+                        session, "tool", result[found.start() :], event.index + 1
+                    )
                 if call in reads and not error:
                     record_read(session, reads[call], result, event.index)
     return session
@@ -485,7 +513,7 @@ def outputs_of(output: Any) -> tuple[list[str], bool, bool]:
             continue
         if isinstance(value, str):
             found.append(value)
-    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text)
+    codes = EXIT_CODE.findall(raw) + EXIT_CODE.findall(text) + TEXT_EXIT.findall(text)
     failed = any(int(code) != 0 for code in codes) or (
         '"status":"rejected"' in f"{raw}{text}".replace(" ", "")
     )
@@ -584,6 +612,25 @@ def record_cats(
                     [SkillFile(target, text, "file", truncated)],
                 )
             )
+    if len(commands) != len(outputs):
+        return
+    for command, output in zip(commands, outputs):
+        read = SINGLE_READ.match(command)
+        if read is None:
+            continue
+        target = read["path"] or read["ranged"]
+        if target.endswith("/SKILL.md"):
+            continue
+        resolved = str(Path(target).expanduser())
+        for load in reversed(session.loads):
+            if resolved.startswith(str(Path(load.directory).expanduser()) + "/"):
+                shown = (
+                    numbered_read(output) if command.lstrip().startswith("nl") else None
+                )
+                first, text = shown or (int(read["first"] or 1), output.rstrip("\n"))
+                partial = truncated or read["first"] is not None
+                load.files.append(SkillFile(target, text, "file", partial, first))
+                break
 
 
 def installed(directory: Path) -> bool:
@@ -660,7 +707,7 @@ def facts(session: Session) -> list[dict[str, Any]]:
             if not event.error:
                 continue
             for url in sorted(urls):
-                if url in event.text:
+                if url in event.text and FETCH_FAILED.search(event.text):
                     found.append(fact(load, event, "broken_link", url))
             for match in MISSING_COMMAND.finditer(event.text):
                 command = Path(match[1] or match[2]).name
@@ -773,12 +820,32 @@ def triage_skills(session: Session) -> list[Load]:
     return sorted(first.values(), key=lambda load: load.after)
 
 
-def triage_request(events: list[Event], skills: list[Load]) -> dict[str, Any]:
-    """One A request: every loaded skill's text, the events, and one friction
-    question per skill and each event after that skill loaded."""
+def version_at(session: Session, skill: str, index: int) -> Load:
+    """The version of `skill` the agent had read by event `index`: its latest load."""
+    loaded = [
+        load
+        for load in session.loads
+        if load.skill == skill and load.status == "roster" and load.files
+    ]
+    before = [load for load in loaded if load.after <= index]
+    return (before or loaded)[-1]
+
+
+def triage_request(
+    session: Session, events: list[Event], skills: list[Load]
+) -> dict[str, Any]:
+    """One A request: the text of every skill loaded by its last event, in the
+    latest version read, the events, and one friction question per skill and
+    each event after that skill first loaded."""
     shown = [load for load in skills if load.after <= events[-1].index]
     state = {
-        "skills": [{"name": load.skill, "text": load.files[0].text} for load in shown],
+        "skills": [
+            {
+                "name": load.skill,
+                "text": version_at(session, load.skill, events[-1].index).files[0].text,
+            }
+            for load in shown
+        ],
         "events": [
             {
                 "id": event.index,
@@ -819,18 +886,18 @@ def plan_triage(session: Session) -> tuple[list[dict[str, Any]], list[int]]:
     oversized: list[int] = []
     chunk: list[Event] = []
     for event in session.events[start:]:
-        if fits(triage_request([*chunk, event], skills)):
+        if fits(triage_request(session, [*chunk, event], skills)):
             chunk.append(event)
             continue
         if chunk:
-            planned.append(triage_request(chunk, skills))
-        if fits(triage_request([event], skills)):
+            planned.append(triage_request(session, chunk, skills))
+        if fits(triage_request(session, [event], skills)):
             chunk = [event]
         else:
             oversized.append(event.index)
             chunk = []
     if chunk:
-        planned.append(triage_request(chunk, skills))
+        planned.append(triage_request(session, chunk, skills))
     return planned, oversized
 
 
@@ -889,6 +956,10 @@ class Jev:
             raise ScriptError(
                 f"the scan stopped at its budget of {self.budget} requests; answers so far are saved",
                 "rerun with a larger --max-requests; saved answers are reused",
+            )
+        if not fits(body):
+            raise ScriptError(
+                f"request {op} exceeds Jev's limits; this is a bug in {PROG}"
             )
         self.check(op, body)
         request_path = self.directory / "requests" / f"{op}.json"
@@ -951,14 +1022,20 @@ class Jev:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 reply = json.load(response)
         except urllib.error.HTTPError as error:
-            # TypeSafe answered, so nothing is pending; the request may be resent
+            if error.code not in REJECTED:
+                # A gateway error may come after TypeSafe ran and billed the request
+                raise ScriptError(
+                    f"TypeSafe answered HTTP {error.code} for request {op}; it may have "
+                    "run and been billed",
+                    f"rerun with --retry {op} to send it again",
+                ) from error
             write_json(path, {"state": "failed", "status": error.code})
             if error.code in (429, 503, 529):
                 raise TemporaryError(
                     f"TypeSafe answered HTTP {error.code}; saved answers are reused on a rerun"
                 ) from error
             raise ScriptError(
-                f"TypeSafe answered HTTP {error.code} for request {op}"
+                f"TypeSafe refused request {op} with HTTP {error.code}"
             ) from error
         except urllib.error.URLError as error:
             write_json(path, {"state": "failed", "reason": str(error.reason)})
@@ -1099,11 +1176,15 @@ def event_state(session: Session, index: int) -> dict[str, Any]:
 
 
 def locate_request(
-    session: Session, index: int, load: Load, others: list[Load]
+    session: Session,
+    index: int,
+    load: Load,
+    others: list[Load],
+    files: list[SkillFile],
 ) -> tuple[dict[str, Any], list[Window]]:
     """B1: which line of each file the agent followed, and whether any line of
     each loaded skill covers the step."""
-    shown = windows(load.skill, load.files)
+    shown = windows(load.skill, files)
     for other in others:
         shown += windows(other.skill, other.files[:1])
     questions: dict[str, Any] = {}
@@ -1157,6 +1238,7 @@ def decide(
     relation: dict[str, float] | None = None,
     tool: float | None = None,
     conflict: float | None = None,
+    located: bool = True,
 ) -> tuple[str, str]:
     """Rules 2–8 of #177 for one event and line: an outcome and its category."""
     if conflict is not None and conflict >= YES:
@@ -1179,24 +1261,48 @@ def decide(
             return "review", "relation_unclear"
     if any(uncertain(v) for v in read):
         return "review", "uncertain_answer"
+    if not located:
+        return "review", "location_unclear"
     if not complete:
         return "review", "partial_skill_text"
     return "nothing", "no_rule_matched"
 
 
 def examine(
-    session: Session, load: Load, skills: list[Load], index: int, jev: Jev
+    session: Session, first: Load, skills: list[Load], index: int, jev: Jev
 ) -> dict[str, Any]:
     """Locate and qualify one flagged event, then decide it."""
-    others = [s for s in skills if s.skill != load.skill and s.after <= index]
-    body, shown = locate_request(session, index, load, others)
+    load = version_at(session, first.skill, index)
+    others = [
+        version_at(session, s.skill, index)
+        for s in skills
+        if s.skill != load.skill and s.after <= index
+    ]
+    item: dict[str, Any] = {"event": index}
+    # Shrink the evidence until it fits: other skills first, then references
+    tries = [(load.files, others), (load.files, []), (load.files[:1], [])]
+    planned = [locate_request(session, index, load, o, f) for f, o in tries]
+    fitting = next(
+        ((b, w, f) for (b, w), (f, _) in zip(planned, tries) if fits(b)), None
+    )
+    if fitting is None:
+        return {
+            **item,
+            "outcome": "review",
+            "category": "evidence_too_large",
+            "line": None,
+        }
+    body, shown, files = fitting
     located = jev.ask("locate", body)
     covered = noul(located, f"covered::{load.skill}")
-    complete = not any(file.partial for file in load.files)
+    complete = len(files) == len(load.files) and not any(f.partial for f in files)
     lines: list[dict[str, Any]] = []
     other: dict[str, Any] | None = None
+    clear = True
     for number, window in enumerate(shown):
         option, p = top(choice(located, f"where::{number}"))
+        if window.skill == load.skill and p < TOP:
+            clear = False
         if option == "none" or p < TOP:
             continue
         found = window.around(int(option[1:]))
@@ -1204,11 +1310,18 @@ def examine(
             lines.append(found)
         elif other is None and noul(located, f"covered::{window.skill}") >= YES:
             other = found
-    item: dict[str, Any] = {"event": index, "covered": covered}
+    item["covered"] = covered
     if not lines:
-        answers = jev.ask("qualify", qualify_request(session, index, None, load, None))
-        recurs = noul(answers, "recurs")
-        outcome, category = decide(covered, complete, recurs)
+        request = qualify_request(session, index, None, load, None)
+        if not fits(request):
+            return {
+                **item,
+                "outcome": "review",
+                "category": "evidence_too_large",
+                "line": None,
+            }
+        recurs = noul(jev.ask("qualify", request), "recurs")
+        outcome, category = decide(covered, complete, recurs, located=clear)
         return {
             **item,
             "outcome": outcome,
@@ -1232,6 +1345,7 @@ def examine(
             relation,
             scores["tool_unavailable"],
             scores["conflict"],
+            located=clear,
         )
         judged.append(
             {
@@ -1275,8 +1389,10 @@ def judge(
             if found["skill"] == load.skill
         ]
         scores = friction[load.skill]
+        decided = {item["event"] for item in items}
         flagged = sorted(
-            (i for i, p in scores.items() if p > NO), key=lambda i: -scores[i]
+            (i for i, p in scores.items() if p > NO and i not in decided),
+            key=lambda i: -scores[i],
         )
         for index in flagged[:RETAINED]:
             items.append(
@@ -1324,15 +1440,21 @@ def state_home() -> Path:
 
 
 def run_directory(session: Session) -> Path:
+    """The session's run directory, under a state folder only its owner can enter."""
+    root = state_home()
+    root.mkdir(parents=True, exist_ok=True)
+    root.chmod(0o700)
     name = re.sub(r"[^\w.-]", "_", f"{session.harness}-{session.id}")
-    return state_home() / "runs" / name
+    return root / "runs" / name
 
 
 def write_json(path: Path, value: Any) -> None:
     """Replace `path` atomically, so an interrupted write leaves the old record."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
 
 
@@ -1401,8 +1523,8 @@ Answer with exactly one JSON object per line and nothing else, one per item:
 were trying to do>", "problem": "<the problem you hit>", "workaround": "<what you \
 did to work around it>", "fix": "<the smallest change to the skill that removes \
 it>", "evidence": "<a short quote, command, or error from this conversation>"}}
-Related items may share one story: write it once with "items": ["<id>", "<id>"] \
-in place of "item", and no other line for those items.
+Related items of the same skill may share one story: write it once with \
+"items": ["<id>", "<id>"] in place of "item", and no other line for those items.
 """
 
 
@@ -1415,9 +1537,15 @@ def flagged(scan_report: dict[str, Any], session: Session) -> list[dict[str, Any
                 continue
             event = session.events[item["event"]]
             line = item.get("line")
+            base = f"{outcome['skill']}-e{item['event']}"
+            taken = sum(
+                1
+                for seen in found
+                if seen["id"] == base or seen["id"].startswith(f"{base}-")
+            )
             found.append(
                 {
-                    "id": f"{outcome['skill']}-e{item['event']}",
+                    "id": base if not taken else f"{base}-{taken + 1}",
                     "skill": outcome["skill"],
                     "home": outcome["home"],
                     "outcome": item["outcome"],
@@ -2217,30 +2345,28 @@ def lines(report: dict[str, Any]) -> str:
 
 
 def write_lines(report: dict[str, Any]) -> str:
-    rows = [f"run\\t{report['run']}"]
+    rows = [f"run\t{report['run']}"]
     fork = report["fork"]
     if fork is None:
-        rows.append("skip\\tno skill in this session is a candidate or review")
-        return "\\n".join(rows)
+        rows.append("skip\tno skill in this session is a candidate or review")
+        return "\n".join(rows)
     low, high = fork["context_tokens"]
     cost_low, cost_high = fork["cost_usd"]
     session = report["session"]
     rows.append(
-        f"fork\\t{fork['op']}\\t{session['harness']}\\t{session['id']}"
-        f"\\t{low}-{high} tokens\\t${cost_low:.2f}-${cost_high:.2f}"
+        f"fork\t{fork['op']}\t{session['harness']}\t{session['id']}\t{session['model'] or '-'}"
+        f"\t{low}-{high} tokens\t${cost_low:.2f}-${cost_high:.2f}\t{fork['price']}"
     )
     rows += [
-        f"item\\t{item['id']}\\t{item['outcome']}\\t{item['category']}"
+        f"item\t{item['id']}\t{item['outcome']}\t{item['category']}"
         for item in report["items"]
     ]
-    rows.append(f"prompt\\t{fork['prompt']}")
+    rows.append(f"prompt\t{fork['prompt']}")
     for story in report.get("stories", []):
         items = ",".join(item["id"] for item in story["items"])
-        rows.append(
-            f"story\\t{story['items'][0]['skill']}\\t{items}\\t{story['title']}"
-        )
-    rows += [f"nothing\\t{item}" for item in report.get("nothing", [])]
-    return "\\n".join(rows)
+        rows.append(f"story\t{story['items'][0]['skill']}\t{items}\t{story['title']}")
+    rows += [f"nothing\t{item}" for item in report.get("nothing", [])]
+    return "\n".join(rows)
 
 
 # How long each step waits, by default, for its lock and its slowest child
