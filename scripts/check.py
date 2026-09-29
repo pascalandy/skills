@@ -29,7 +29,7 @@ A failing check does not stop the others; its output is replayed on stderr.
 
 examples:
   just check
-  just check --all
+  just check --sweep
   just check --list
   just check --only lint --only tavily
   just check --only test-check --verbose"""
@@ -377,7 +377,7 @@ def verdict(args: argparse.Namespace) -> str:
             for command in check.commands:
                 log.info("%s: %s", check.name, shlex.join(command))
         return "\n".join(check.name for check in selected)
-    if not args.only and not args.all:
+    if not args.only and not args.sweep:
         selected = in_scope(selected)
 
     failed: list[str] = []
@@ -413,7 +413,7 @@ def verdict(args: argparse.Namespace) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         prog="just check",
-        description="Run the CI verdict: the checks `just signoff` requires before it signs off",
+        description="Run the checks required for current changes and PR signoff",
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )
@@ -423,12 +423,12 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         choices=[check.name for check in CHECKS],
         metavar="NAME",
-        help="run only this check, even when the change does not touch its skill; repeat for more (see --list)",
+        help="run only this named check, even when its inputs did not change; repeat for more (see --list)",
     )
     scope.add_argument(
-        "--all",
+        "--sweep",
         action="store_true",
-        help="run every check, including skill checks the change does not touch",
+        help="run every check, including unrelated skill and command tests; use for release or diagnosis",
     )
     parser.add_argument(
         "--list",
