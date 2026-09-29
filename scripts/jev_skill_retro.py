@@ -302,6 +302,7 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
         "claude", str(first["sessionId"]), path, str(first.get("cwd", ""))
     )
     calls: dict[str, Event] = {}
+    names: dict[str, str] = {}
     reads: dict[str, dict[str, Any]] = {}
     for item in items:
         if item.get("isSidechain") or item.get("type") not in ("user", "assistant"):
@@ -320,13 +321,19 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
             if not isinstance(block, dict):
                 continue
             kind = block.get("type")
-            if kind == "text":
+            if kind == "text" and actor == "agent":
+                # The agent may quote the marker; only Claude Code injects a skill
+                text = block.get("text", "")
+                if text.strip():
+                    session.add(actor, text)
+            elif kind == "text":
                 claude_text(session, actor, block.get("text", ""), len(session.events))
             elif kind == "tool_use":
                 name = str(block.get("name", ""))
                 arguments = block.get("input") or {}
                 event = session.add("tool", f"{name}: {json.dumps(arguments)}")
                 calls[str(block.get("id"))] = event
+                names[str(block.get("id"))] = name
                 if name == "Read" and isinstance(arguments, dict):
                     reads[str(block.get("id"))] = arguments
             elif kind == "tool_result":
@@ -334,7 +341,9 @@ def read_claude(path: Path, items: list[dict[str, Any]]) -> Session:
                 result = texts(block.get("content"))
                 error = bool(block.get("is_error"))
                 event = calls.get(call) or session.add("tool", "")
-                found = None if error else SKILL_START.search(result)
+                # Only the Skill tool delivers a skill; any other tool may print the marker
+                skill_call = names.get(call) == "Skill"
+                found = SKILL_START.search(result) if skill_call and not error else None
                 shown = result if found is None else result[: found.start()]
                 event.text = f"{event.text}\n{shown}".strip("\n")
                 event.error = event.error or error

@@ -464,6 +464,21 @@ def test_claude_skill_text_counts_in_a_plain_message_and_in_a_skill_result(
     assert report["session"]["events"] == 3
 
 
+def test_a_tool_or_the_agent_quoting_the_skill_marker_loads_nothing(
+    sandbox: Sandbox,
+) -> None:
+    alpha = sandbox.installed("alpha")
+    marker = f"Base directory for this skill: {alpha}"
+    transcript = (
+        Claude(sandbox.repo)
+        .tool("t1", "Bash", {"command": "grep -r 'Base directory' ."}, f"{marker}\n")
+        .say(f"The transcript shows:\n{marker}")
+        .write(sandbox.home / "session.jsonl")
+    )
+
+    assert sandbox.scan(transcript)["skills"] == []
+
+
 def test_a_codex_textual_exit_status_marks_the_call_failed(sandbox: Sandbox) -> None:
     alpha = sandbox.installed("alpha", ".codex")
     transcript = (
