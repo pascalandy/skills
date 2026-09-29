@@ -13,7 +13,7 @@ description: Distill a local text file by running distill.py with a chosen promp
 - A prompt from the sibling `distill-prompt` skill has already been chosen (or the agent picks one)
 - The user has `claude` or `codex` CLI installed
 
-Do **not** use this for YouTube URLs -- use `$transcript-sk` instead. URL and media inputs are deferred to future sub-skills.
+Do **not** use this for YouTube URLs -- use `$transcript` instead. URL and media inputs are deferred to future sub-skills.
 
 ## Prerequisites
 

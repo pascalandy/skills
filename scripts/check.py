@@ -91,8 +91,8 @@ def script_pin(script: str, package: str) -> str:
 
 
 VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
-TRANSCRIPT = "authoring/content/transcript-sk"
-VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript-sk"
+TRANSCRIPT = "authoring/content/transcript"
+VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
 JEVGATE = "authoring/devtools/create-a-jev-cli-decision-wrapped-in-a-skill/scripts"
 JEVGATE_SDK = script_pin(f"{JEVGATE}/jevgate.py", "typesafe-sdk")
 JEVLABEL = "authoring/devtools/label-for-issues-jev/scripts"
@@ -126,10 +126,10 @@ CHECKS = [
         pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
     ),
     Check(
-        "transcript-sk",
+        "transcript",
         pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
     ),
-    Check("verify-transcript-sk", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
+    Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
     Check(
         "poteto-mode",
         pytest("authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py"),

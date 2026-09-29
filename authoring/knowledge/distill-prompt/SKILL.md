@@ -57,12 +57,12 @@ A consumer (like the `distill` tool) receives the path to a specific `prompt.md`
 | short-summary | `references/short-summary/` | Concise 2-3 sentence overview with key bullet points |
 | summary-with-quotes | `references/summary-with-quotes/` | Structured outline with the best verbatim quotes |
 | extract-wisdom | `references/extract-wisdom/` | Content-adaptive wisdom report with dynamic sections and depth levels |
-| synthese-rencontre | `references/synthese-rencontre/prompt.md` | Zoom meeting summary prompt used by `transcript-sk` |
+| synthese-rencontre | `references/synthese-rencontre/prompt.md` | Zoom meeting summary prompt used by `transcript` |
 
 **Summary:**
 - **Prompts:** 5 (four agent-routed styles and the Zoom meeting summary prompt)
 - **Dependencies:** None (works standalone)
-- **Consumers:** `distill` (local files), `transcript-sk` (Zoom summaries), and any future skill that needs a prompt by name
+- **Consumers:** `distill` (local files), `transcript` (Zoom summaries), and any future skill that needs a prompt by name
 
 ---
 
@@ -95,7 +95,7 @@ uv run <distill_dir>/scripts/distill.py <input-file> \
     --prompt follow_along_note
 ```
 
-`transcript-sk` selects `references/synthese-rencontre/prompt.md` for Zoom summaries. Its YouTube prompts remain bundled in `transcript-sk`.
+`transcript` selects `references/synthese-rencontre/prompt.md` for Zoom summaries. Its YouTube prompts remain bundled in `transcript`.
 
 ---
 
@@ -118,4 +118,4 @@ No configuration required. The library is a static collection of prompt files.
 ## Related Work
 
 - **`distill`** -- the sibling processor that applies these prompts to local files
-- **`transcript-sk`** -- YouTube uses bundled prompts; Zoom summaries use this library's `synthese-rencontre` prompt
+- **`transcript`** -- YouTube uses bundled prompts; Zoom summaries use this library's `synthese-rencontre` prompt

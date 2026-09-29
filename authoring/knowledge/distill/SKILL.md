@@ -98,7 +98,7 @@ For dry-run, alternate providers, or custom output locations, read `help.md` via
 | "summarize this file with short-summary" | Routes to from-file -- invokes distill-prompt to choose `short_summary`, then passes it via `--prompt` |
 | "distill with codex max effort" | Routes to from-file -- same flow with `--provider codex --effort max` |
 | "what distill options exist" | Run `distill.py --help` to see full flag reference |
-| URL or YouTube link | Out of scope in v1. Use `$transcript-sk` for YouTube. |
+| URL or YouTube link | Out of scope in v1. Use `$transcript` for YouTube. |
 
 ---
 
@@ -119,7 +119,7 @@ All defaults are overridable via flags. See `help.md` via `--help`.
 ## Related Work
 
 - **`distill-prompt`** -- sibling prompt library `distill` reads from
-- **`transcript-sk`** -- separate YouTube and Zoom transcription workflow. YouTube uses bundled prompts; Zoom summaries use `synthese-rencontre` from `distill-prompt`
+- **`transcript`** -- separate YouTube and Zoom transcription workflow. YouTube uses bundled prompts; Zoom summaries use `synthese-rencontre` from `distill-prompt`
 
 ---
 

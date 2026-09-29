@@ -17,7 +17,7 @@ alias ttr := transcript
 # Transcribe one YouTube URL; extra flags go to `transcript.py run youtube`
 [group('commands')]
 transcript url *args:
-    @uv run --quiet authoring/content/transcript-sk/scripts/transcript.py run youtube --url "$@"
+    @uv run --quiet authoring/content/transcript/scripts/transcript.py run youtube --url "$@"
 
 # From any machine, sync every machine in the fleet registry, or named ones, to GitHub's main; --check compares them
 [group('commands')]
@@ -36,10 +36,10 @@ install-skills *args:
 flatten-skills *args:
     @uv run --quiet scripts/flatten_skills.py "$@"
 
-# Run any transcript-sk command, such as `--help`, `list prompts`, or `doctor --source all`
+# Run any transcript command, such as `--help`, `list prompts`, or `doctor --source all`
 [group('commands')]
 transcript-cli *args:
-    @uv run --quiet authoring/content/transcript-sk/scripts/transcript.py "$@"
+    @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
 
 # Run the same CI verdict as GitHub Actions; --list names each check, --only NAME reruns one
 [group('checks')]
