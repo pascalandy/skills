@@ -18,7 +18,7 @@ A request names its route after the mode, as in `andy-mode ; qa`. Compare names 
 
 Run one route per request. Load another route only when the running route calls for it.
 
-A path that starts with `playbooks/`, `references/`, or `scripts/` resolves from this directory. Links and other paths resolve from the file that names them. Load a route's references only when its playbook points to them.
+A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names a file in this skill and resolves from this directory. Links and other paths resolve from the file that names them. A route's own inputs and outputs, such as a wiki's `references/` folder, keep the meaning the route gives them. Load a route's references only when its playbook points to them.
 
 ## Routes
 
