@@ -25,7 +25,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
 | meta-sc | Use only when explicitly invoked as `$meta-sc` to create or refactor a skill with several internal branches behind one entry point. |
 | ontology-map | Use only when explicitly invoked as `ontology-map`. |
-| pa-brainstorm | Use when the user wants to brainstorm an idea, feature, design, product decision, workflow change, or improvement. |
 | pa-doc-update | Use only when explicitly invoked as `pa-doc-update`. |
 | pa-glossary | Use only when explicitly invoked as `pa-glossary`. |
 | pa-idea | Use only when explicitly invoked as `pa-idea`. |

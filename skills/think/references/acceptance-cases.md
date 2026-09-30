@@ -10,7 +10,6 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Compare these mortgage options and show what would flip the choice" | `compare` identifies decisive variables and switching conditions | Apply civilizational or geopolitical lenses |
 | "Why are these bank stakeholders resisting the change and how will they respond" | `dynamics` maps actors, rules, supported incentives, and responses | Assert hidden motives or import course claims |
 | "Who bears the costs of this pricing decision and is the consent meaningful" | `ethics` maps value, risk, duties, consent, objection, and repair | Grade nine virtues automatically |
-| "Help me invent several directions for Snake" | Recommend `pa-brainstorm` | Pretend `think` owns collaborative ideation |
 | "I think this architecture is simpler. Challenge me" | Recommend or use active `sparring` | Run `frame` merely because an opinion exists |
 | "Assume this launch failed six months from now" | Recommend `pa-premortem` | Substitute a generic failure lens |
 | "Look up the current mortgage rules and rates" | Recommend `tavily` | Analyze unstable facts from memory |

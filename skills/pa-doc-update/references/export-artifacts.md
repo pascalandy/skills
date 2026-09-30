@@ -98,7 +98,6 @@ For every exporting skill:
 | Skill | Exports? | `artifact_kind` | Export behavior |
 |---|---:|---|---|
 | `pa-idea` | Always | `idea` | Captures rough idea with minimal editing |
-| `pa-brainstorm` | Conditional | `brainstorm` | Exports when requirements, options, scope boundaries, product-shape, or product-diagnostic decisions must survive handoff |
 | `pa-vision` | Mandatory for vision artifacts | `vision` | Defines target state and decision direction |
 | `figure-it-out` in planning-only mode | Optional | `impl-plan` | Use this local profile when a durable slice plan is requested; execution trails remain governed by pstack |
 | `pa-postmortem` | Mandatory for postmortem artifacts | `postmortem` | Captures lessons, incident review, or session review |
