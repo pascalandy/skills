@@ -138,6 +138,7 @@ TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
+COREY_MODE = "authoring/coreyhaines/corey-mode/scripts"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -216,6 +217,13 @@ CHECKS = [
         pytest(f"{ANDY_MODE}/scripts/tests"),
         # A shared route links to its sibling package
         reads=("authoring/andy/2nd-pass",),
+    ),
+    Check(
+        "corey-mode",
+        *ruff(COREY_MODE),
+        pyright(COREY_MODE),
+        pytest(f"{COREY_MODE}/tests"),
+        uv_run(f"{COREY_MODE}/update_corey_mode.py", "check"),
     ),
     Check("distill", pytest(f"{ANDY_MODE}/scripts/distill/tests")),
     Check(

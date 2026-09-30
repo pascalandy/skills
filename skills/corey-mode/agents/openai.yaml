@@ -1,0 +1,4 @@
+interface:
+  display_name: "Corey Mode"
+  short_description: "Run Corey Haines' marketing playbooks"
+  default_prompt: "Use $corey-mode for this marketing task."
