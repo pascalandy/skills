@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import io
-import re
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import remote_skills
@@ -26,6 +27,11 @@ def skill(root: Path, name: str, text: str) -> None:
     path = root / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True)
     path.write_text(text, encoding="utf-8")
+
+
+def clock(monkeypatch: pytest.MonkeyPatch, day: str) -> None:
+    moment = datetime.fromisoformat(f"{day}T12:00:00")
+    monkeypatch.setattr(remote_skills, "datetime", SimpleNamespace(now=lambda: moment))
 
 
 def run(*argv: str) -> tuple[int, str, str]:
@@ -54,12 +60,28 @@ def test_run_writes_the_url_pattern_and_one_row_per_skill(
         "| zeta | Use for z. |\n"
     )
     assert run() == (0, "", "")
-    dated = re.compile(r"^date_updated: \d{4}-\d{2}-\d{2}$", re.MULTILINE)
-    assert len(dated.findall(page)) == 1
-    (root / PATH).write_text(
-        dated.sub("date_updated: 2000-01-01", page), encoding="utf-8"
-    )
+
+
+def test_the_date_moves_only_with_the_table(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    skill(root, "alpha", '---\nname: "alpha"\ndescription: "Use for a."\n---\n')
+    clock(monkeypatch, "2026-01-01")
+    assert run() == (0, f"add\t{PATH}\n", "")
+    page = (root / PATH).read_text(encoding="utf-8")
+    assert "\ndate_updated: 2026-01-01\n" in page
+
+    clock(monkeypatch, "2026-01-02")
     assert run("--check") == (0, "", "")
+    assert run() == (0, "", "")
+    assert (root / PATH).read_text(encoding="utf-8") == page
+
+    skill_file = root / "skills" / "alpha" / "SKILL.md"
+    skill_file.write_text(
+        '---\nname: "alpha"\ndescription: "Use for b."\n---\n', encoding="utf-8"
+    )
+    assert run() == (0, f"update\t{PATH}\n", "")
+    assert "\ndate_updated: 2026-01-02\n" in (root / PATH).read_text(encoding="utf-8")
 
 
 def test_check_reports_a_stale_table_and_leaves_it_alone(root: Path) -> None:
