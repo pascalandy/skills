@@ -1,6 +1,7 @@
 ---
 name: "meta-sc"
 description: "Use only when explicitly invoked as `$meta-sc` to create or refactor a skill with several internal branches behind one entry point."
+kind: "general"
 ---
 
 # Meta-skill creator

@@ -1,6 +1,7 @@
 ---
 name: "swarm"
 description: "Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration."
+kind: "dev"
 ---
 
 # Swarm

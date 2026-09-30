@@ -1,6 +1,7 @@
 ---
 name: "setup-pstack"
 description: "Use for /setup-pstack, configure pstack models, or changing pstack's model choices."
+kind: "dev"
 ---
 
 # Setup pstack

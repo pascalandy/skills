@@ -1,6 +1,7 @@
 ---
 name: "ontology-map"
 description: "Use only when explicitly invoked as `ontology-map`."
+kind: "general"
 ---
 
 # Ontology Map

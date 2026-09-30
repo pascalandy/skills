@@ -1,6 +1,7 @@
 ---
 name: "think"
 description: "Use only when explicitly invoked as `$think` to improve the model of a situation before judging, deciding, or acting."
+kind: "general"
 ---
 
 # Think

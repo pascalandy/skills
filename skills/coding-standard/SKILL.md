@@ -1,6 +1,7 @@
 ---
 name: "coding-standard"
 description: "Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior."
+kind: "dev"
 keywords: ["cli", "cli-spec", "cli-design", "cli-implementation", "cli-audit", "agent-friendly", "composability", "idempotent", "retry-safe"]
 ---
 

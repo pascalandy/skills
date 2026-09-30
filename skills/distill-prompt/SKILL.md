@@ -1,6 +1,7 @@
 ---
 name: "distill-prompt"
 description: "Use only when explicitly invoked as `distill-prompt`."
+kind: "general"
 keywords: ["distill", "distill-prompt", "prompt-library", "summary", "notes", "follow-along", "short-summary", "quotes", "extract-wisdom", "wisdom", "insights", "transcript", "article"]
 ---
 

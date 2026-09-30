@@ -1,6 +1,7 @@
 ---
 name: "make-bot-ui"
 description: "Use when building a custom UI that starts agent tasks through a webhook or local runner."
+kind: "dev"
 ---
 
 # Make a bot UI

@@ -1,6 +1,7 @@
 ---
 name: "verify-video-archive"
 description: "Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery."
+kind: "dev"
 ---
 
 # Verify video archive

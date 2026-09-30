@@ -1,6 +1,7 @@
 ---
 name: "writer-sk"
 description: "Use only when explicitly invoked as `writer-sk`."
+kind: "general"
 ---
 
 # Writing Clearly and Concisely

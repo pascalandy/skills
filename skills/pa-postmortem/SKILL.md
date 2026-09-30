@@ -1,6 +1,7 @@
 ---
 name: "pa-postmortem"
 description: "Use only when explicitly invoked as `pa-postmortem` after completed work or an incident."
+kind: "general"
 keywords: ["pa-postmortem", "postmortem", "lessons-learned", "session-review", "incident-review", "feedback-capture", "reverse-engineer", "blameless", "five-whys", "root-cause"]
 ---
 

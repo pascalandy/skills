@@ -1,6 +1,7 @@
 ---
 name: "pa-premortem"
 description: "Use only when explicitly invoked as `pa-premortem`."
+kind: "general"
 ---
 
 # Premortem

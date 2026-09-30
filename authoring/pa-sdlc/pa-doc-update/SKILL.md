@@ -1,6 +1,7 @@
 ---
 name: "pa-doc-update"
 description: "Use only when explicitly invoked as `pa-doc-update`."
+kind: "general"
 ---
 
 # PA Doc Update Session

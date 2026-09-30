@@ -1,6 +1,7 @@
 ---
 name: "pa-doc-cleaner"
 description: "Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`."
+kind: "dev"
 keywords: ["pa-doc-cleaner", "doc-cleaner", "drift-refresh", "consolidation", "structure-governance", "frontmatter", "routing"]
 ---
 

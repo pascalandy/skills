@@ -1,6 +1,7 @@
 ---
 name: "illustration"
 description: "Use only when explicitly invoked as `illustration`."
+kind: "general"
 ---
 
 # Illustration

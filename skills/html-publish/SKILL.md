@@ -1,6 +1,7 @@
 ---
 name: "html-publish"
 description: "Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review."
+kind: "general"
 ---
 
 # HTML publish

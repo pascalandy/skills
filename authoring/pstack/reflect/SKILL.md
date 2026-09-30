@@ -1,6 +1,7 @@
 ---
 name: "reflect"
 description: "Use only when explicitly invoked as `reflect`."
+kind: "dev"
 ---
 
 # Reflect

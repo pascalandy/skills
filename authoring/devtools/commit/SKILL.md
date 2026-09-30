@@ -1,6 +1,7 @@
 ---
 name: "commit"
 description: "Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages."
+kind: "dev"
 ---
 
 # Skill: Commit

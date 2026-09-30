@@ -1,6 +1,7 @@
 ---
 name: "unslop"
 description: "Use when communicating directly with the user or writing and editing documents."
+kind: "general"
 ---
 
 # unslop (english version)

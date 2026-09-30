@@ -1,6 +1,7 @@
 ---
 name: "coding-eng-laws"
 description: "Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned."
+kind: "dev"
 ---
 
 # Software Engineering Laws — Thinking Lens

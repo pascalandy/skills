@@ -1,6 +1,7 @@
 ---
 name: "architect"
 description: "Use when the user invokes `architect` or requests software architecture design."
+kind: "dev"
 ---
 
 # Architect

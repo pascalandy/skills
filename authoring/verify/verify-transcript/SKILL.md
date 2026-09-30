@@ -1,6 +1,7 @@
 ---
 name: "verify-transcript"
 description: "Use when validating transcript CLI behavior or locating its verification features. Use for paid YouTube end-to-end checks only when explicitly authorized."
+kind: "dev"
 ---
 
 # Verify transcript

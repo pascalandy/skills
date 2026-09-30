@@ -1,6 +1,7 @@
 ---
 name: "no-comments"
 description: "Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction."
+kind: "dev"
 ---
 
 # No comments

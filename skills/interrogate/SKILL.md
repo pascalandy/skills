@@ -1,6 +1,7 @@
 ---
 name: "interrogate"
 description: "Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots."
+kind: "dev"
 ---
 
 # Interrogate

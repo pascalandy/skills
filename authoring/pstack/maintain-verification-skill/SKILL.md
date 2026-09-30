@@ -1,6 +1,7 @@
 ---
 name: "maintain-verification-skill"
 description: "Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill."
+kind: "dev"
 ---
 
 # Maintain a verification skill

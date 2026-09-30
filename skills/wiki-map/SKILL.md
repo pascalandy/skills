@@ -1,6 +1,7 @@
 ---
 name: "wiki-map"
 description: "Use only when explicitly invoked as `wiki-map`."
+kind: "general"
 ---
 
 # Wiki Map

@@ -1,6 +1,7 @@
 ---
 name: "coding-language"
 description: "Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code."
+kind: "dev"
 keywords: ["bash", "shell", "shellcheck", "shfmt", "python", "uv", "pep-723", "pyright", "ruff", "pytest", "typescript", "javascript", "tsconfig", "node", "vite", "react", "vue", "nestjs", "starlette", "asgi", "fastapi", "middleware", "websocket", "uvicorn"]
 ---
 

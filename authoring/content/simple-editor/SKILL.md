@@ -1,6 +1,7 @@
 ---
 name: "simple-editor"
 description: "Use only when explicitly invoked as `simple-editor`."
+kind: "general"
 ---
 
 # Edit Note (notes personnelles)

@@ -1,6 +1,7 @@
 ---
 name: "pa-qa"
 description: "Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem."
+kind: "dev"
 ---
 
 # PA QA Session

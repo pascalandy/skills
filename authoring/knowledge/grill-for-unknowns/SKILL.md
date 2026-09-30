@@ -1,6 +1,7 @@
 ---
 name: "grill-for-unknowns"
 description: "Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria."
+kind: "dev"
 ---
 
 # Evidence-grounded unknowns grill
