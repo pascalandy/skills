@@ -17,5 +17,11 @@ Run each request in a fresh headless session. Use a throwaway Git project with c
 | `marketing: add FAQ schema to index.html` | `SKILL.md`, then `schema` | Opens with `Route: schema`. `index.html` gains `FAQPage` JSON-LD |
 | `marketing: write a marketing plan for my client, Acme Notes` | `SKILL.md`, then `marketing-plan` | Opens with `Route: marketing-plan` |
 | `Peux-tu m'aider avec le marketing de mon app ? Je manque d'idées pour la faire connaître.` | `SKILL.md`, then `marketing-ideas` | Opens with `Route: marketing-ideas` |
+| `$corey-mode rewrite the hero section of index.html` | `SKILL.md`, then `copywriting` | Opens with `Route: copywriting` |
+| `marketing ; Copy Editing: tighten the FAQ answers in index.html` | `SKILL.md`, then `copy-editing` | Opens with `Route: copy-editing` |
+| `$matt-mode grill me: should Acme Notes do its marketing through a podcast?` | At most `SKILL.md` and one playbook as a reference | Matt-mode's interview, with no route line |
+| `marketing: set up social listening for Acme Notes` | `SKILL.md`, then `social` | Opens with `Route: social`. The source list starts from `playbooks/social/references/listening-sources-template.md` |
 
 A playbook may load the routes it calls for after the expected ones, as `copywriting` loads `copy-editing` and `marketing-plan` loads `product-marketing`.
+
+Codex's `workspace-write` sandbox blocks writes to `.agents/`, so a playbook that saves `.agents/product-marketing.md` or `.agents/listening-sources.md` writes elsewhere and says so. Judge those cases by the files read and the answer, not by that path.
