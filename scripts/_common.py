@@ -56,9 +56,8 @@ def is_network_failure(message: str) -> bool:
     return NETWORK_FAILURE.search(message) is not None
 
 
-# A SKILL.md or command file's header, and the description line inside it
+# A SKILL.md or command file's header
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
-DESCRIPTION = re.compile(r"^description:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 
 
 def unquote(value: str) -> str:
@@ -73,11 +72,18 @@ def unquote(value: str) -> str:
     return "" if value.startswith(("|", ">")) else value
 
 
+def frontmatter_value(text: str, key: str) -> str | None:
+    """A top-level key's one-line value in a file's frontmatter, or None when the
+    key is absent."""
+    header = FRONTMATTER.match(text)
+    pattern = rf"^{re.escape(key)}:[ \t]*(.*?)[ \t]*$"
+    found = re.search(pattern, header.group(1), re.MULTILINE) if header else None
+    return unquote(found.group(1)) if found else None
+
+
 def frontmatter_description(text: str) -> str:
     """The description in a file's frontmatter, or "" when it has none."""
-    header = FRONTMATTER.match(text)
-    found = DESCRIPTION.search(header.group(1)) if header else None
-    return unquote(found.group(1)) if found else ""
+    return frontmatter_value(text, "description") or ""
 
 
 # How long a child may clean up after SIGTERM before SIGKILL

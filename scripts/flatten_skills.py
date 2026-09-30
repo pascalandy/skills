@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import run, run_script, swap
+from _common import FRONTMATTER, frontmatter_value, run, run_script, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
@@ -128,6 +128,28 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
     return files
 
 
+def render(source: Path) -> bytes:
+    """The bytes skills/ publishes for a source file. A package's SKILL.md
+    without a kind gains `kind: "unknown"` at the end of its frontmatter, so a
+    skill nobody classified shows up without failing a check."""
+    data = source.read_bytes()
+    if source.name != "SKILL.md" or source.parent.parent.parent != AUTHORING:
+        return data
+    # Match CRLF sources too; a copy that gains the kind is published with LF
+    text = data.decode("utf-8").replace("\r\n", "\n")
+    header = FRONTMATTER.match(text)
+    if header is None or frontmatter_value(text, "kind") is not None:
+        return data
+    end = header.end(1)
+    return f'{text[:end]}\nkind: "unknown"{text[end:]}'.encode()
+
+
+def publish(source: Path, destination: Path) -> None:
+    """Write the bytes and executable bits skills/ publishes for a source file."""
+    destination.write_bytes(render(source))
+    shutil.copymode(source, destination)
+
+
 def build_expected() -> dict[Path, Path]:
     """Map each generated path to the source file that supplies its bytes and mode."""
     return {
@@ -155,7 +177,7 @@ def changes(expected: dict[Path, Path]) -> list[str]:
             if parent.is_relative_to(OUTPUT)
         ):
             reason = "symlink"
-        elif source.read_bytes() != destination.read_bytes():
+        elif render(source) != destination.read_bytes():
             reason = "changed content"
         elif (stat.S_IMODE(source.stat().st_mode) & 0o111) != (
             stat.S_IMODE(destination.stat().st_mode) & 0o111
@@ -200,7 +222,7 @@ def flatten(*, dry_run: bool = False) -> list[str]:
         for relative, source in expected.items():
             destination = staging / relative.relative_to("skills")
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
+            publish(source, destination)
         swap(staging, OUTPUT, Path(temporary) / "previous")
     return lines
 

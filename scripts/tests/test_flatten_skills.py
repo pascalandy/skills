@@ -138,6 +138,51 @@ class FlattenSkillsTests(unittest.TestCase):
             "error: skills/ differs from authoring/; run: just flatten-skills\n",
         )
 
+    def test_a_skill_without_a_kind_publishes_kind_unknown(self) -> None:
+        untagged = '---\nname: "example"\ndescription: "Use for x."\n---\n# Example\n'
+        with self.repository() as (root, source, _):
+            source.write_text(untagged, encoding="utf-8")
+            nested = source.parent / "sub" / "SKILL.md"
+            nested.parent.mkdir()
+            nested.write_text('---\nname: "sub"\n---\n', encoding="utf-8")
+            tagged = root / "authoring/devtools/tagged/SKILL.md"
+            tagged.parent.mkdir()
+            tagged.write_text(
+                '---\nname: "tagged"\nkind: "dev"\n---\n', encoding="utf-8"
+            )
+            crlf = root / "authoring/devtools/crlf/SKILL.md"
+            crlf.parent.mkdir()
+            crlf.write_bytes(b'---\r\nname: "crlf"\r\n---\r\n# Crlf\r\n')
+            subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
+
+            self.assertEqual(
+                self.cli(),
+                (
+                    0,
+                    "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/tagged\n",
+                    "",
+                ),
+            )
+            self.assertEqual(
+                (root / "skills/crlf/SKILL.md").read_bytes(),
+                b'---\nname: "crlf"\nkind: "unknown"\n---\n# Crlf\n',
+            )
+            self.assertEqual(
+                (root / "skills/example/SKILL.md").read_text(encoding="utf-8"),
+                '---\nname: "example"\ndescription: "Use for x."\n'
+                'kind: "unknown"\n---\n# Example\n',
+            )
+            self.assertEqual(
+                (root / "skills/example/sub/SKILL.md").read_text(encoding="utf-8"),
+                '---\nname: "sub"\n---\n',
+            )
+            self.assertEqual(
+                (root / "skills/tagged/SKILL.md").read_text(encoding="utf-8"),
+                '---\nname: "tagged"\nkind: "dev"\n---\n',
+            )
+            self.assertEqual(source.read_text(encoding="utf-8"), untagged)
+            self.assertEqual(self.check(), (0, "", ""))
+
     def test_interrupt_after_moving_output_restores_previous_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
