@@ -20,7 +20,7 @@ Draft one issue per finding for https://github.com/pascalandy/skills. Write in t
 
 **Title.** Use Conventional Commits in the form `type(skill): subject`. Use `fix` when the skill is wrong or contradictory, `docs` when it is only unclear, and `feat` when a step is missing. Write the subject as the behavior the skill should have, in plain words and the imperative, for example `fix(commit): keep a move and its pointer updates in one commit`. Do not add a trailing period.
 
-**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. Letter the Decision options as in Approaches considered, so the end user can answer with one letter.
+**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. Letter the Decision options as in Approaches considered, so the end user can answer with one letter. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
 
 ````md
 ## CMO: The problem, simply
