@@ -34,7 +34,6 @@ This step is complete when one uncertainty can be named whose reduction would ch
 |---|---|
 | Challenge a stated opinion or argument | `sparring` |
 | Pressure-test through focused questions | `grilling` |
-| Work backward from an imagined failure | `pa-premortem` |
 | Design software structure | `architect` in design-only mode |
 | Plan non-software structure or a macro-roadmap | `figure-it-out`, framing and planning only |
 | Design a module interface, seam, or abstraction depth | `matt-mode ; codebase-design` |

@@ -28,7 +28,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | pa-doc-update | Use only when explicitly invoked as `pa-doc-update`. |
 | pa-glossary | Use only when explicitly invoked as `pa-glossary`. |
 | pa-idea | Use only when explicitly invoked as `pa-idea`. |
-| pa-premortem | Use only when explicitly invoked as `pa-premortem`. |
 | qmd | Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | simple-editor | Use only when explicitly invoked as `simple-editor`. |
