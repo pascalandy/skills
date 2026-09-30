@@ -13,6 +13,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | andy-mode | Use only when explicitly invoked as `andy-mode ; <route>`, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`. |
 | bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
+| corey-mode | Use only when a request contains the word marketing, or invokes corey-mode, to run Corey Haines' marketing playbooks. |
 | grilling | Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`. |
 | handoff | Use when the user asks to prepare a handoff for another agent. |
 | html-mode | Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes. |
