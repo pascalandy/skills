@@ -35,7 +35,3 @@ MEMORY TYPE: What type of memory is this?
 - the fix
 - feedback for the agent 
 - feedback for the user 
-
-## Export it
-
-Use (and reload) `$pa-postmortem` to export the postmortem artifact.
