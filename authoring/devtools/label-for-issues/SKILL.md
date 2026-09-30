@@ -22,7 +22,8 @@ optional impediments.
    specifications, or modify other skills as a labeling side effect
    For setup-only requests, go directly to Reconcile
 2. **Inspect.** Read the label catalog once per run with
-   `gh label list --limit 200 --json name,color,description`. Read each issue with
+   `gh label list --limit 200 --json name,color,description`, raising the limit if
+   it returns 200 rows. Read each issue with
    `gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
    then relevant review records and linked issue and PR states. Follow evidence that
    could change the decision; do not audit unrelated code or tickets. Prefer current
@@ -50,14 +51,14 @@ optional impediments.
    writing; revise the assessment if relevant evidence changed. Apply targeted
    label and relationship changes with `gh issue edit`, following GitHub CLI.
    Replace only canonical labels in the same family. Read back changed labels,
-   review records, and parent links; check family exclusivity and epic membership.
+   review records, and relationships; check family exclusivity and epic membership.
    Publish a requested decision comment using verified results, then read it back.
    Report each issue's label changes and summary, issue and comment links, conflicts,
    and partial failures. Without a comment request, flag an existing managed comment
    that the new labels contradict as stale and leave it unedited. If a write times
    out or fails, reread before retrying and perform only missing operations. Continue
-   independent issues; report triage as complete only when its labels and any
-   requested comment are verified
+   independent issues; report triage as complete only when all requested changes
+   are verified
 
 ## Ticket comments
 
@@ -203,11 +204,12 @@ This JSON owns exact names, colors, and descriptions.
 ## GitHub CLI
 
 `gh` 2.94 and later manages issue relationships. On an older version, report it
-and use `gh api` for relationships. Set them with `gh issue create --parent`, `--blocked-by`, or `--blocking`,
-and with `gh issue edit --parent`, `--remove-parent`, `--add-sub-issue`,
-`--remove-sub-issue`, `--add-blocked-by`, `--remove-blocked-by`, `--add-blocking`,
-or `--remove-blocking`, using URLs for issues in other repositories. Keep `gh api`
-for what `gh` lacks, such as editing a comment by ID or reading timeline events.
+and use `gh api` for relationships. Set them with `gh issue create --parent`,
+`--blocked-by`, or `--blocking`, and with `gh issue edit --parent`, `--remove-parent`,
+`--add-sub-issue`, `--remove-sub-issue`, `--add-blocked-by`, `--remove-blocked-by`,
+`--add-blocking`, or `--remove-blocking`, using URLs for issues in other
+repositories. Keep `gh api` for what `gh` lacks, such as editing a comment by ID or
+reading timeline events.
 
 - `--parent` and `--add-sub-issue` silently replace an existing parent. Read
   `parent` first; moving an issue to another epic detaches it from the old one
