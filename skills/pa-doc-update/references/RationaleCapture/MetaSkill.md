@@ -42,7 +42,7 @@ Entry condition: the decision already exists. `RationaleCapture` documents it af
 1. Clarify whether this is a decision record, incident review, or lessons-learned capture.
 2. Gather the evidence baseline before drafting: inspect the decision context, existing docs, `git status --short`, `git diff --stat`, and the relevant `git diff` when the decision is tied to repository changes; include staged diff when staged changes matter.
 3. Check for an existing relevant `postmortem-*.md` artifact, especially under the resolved `sdlc-pa` export root beside related lifecycle artifacts; use it to preserve already-captured lessons, causes, consequences, and follow-ups without turning this mode into a new postmortem.
-4. Run the scope gate: if the decision surface, affected artifacts, downstream impact, or canonical placement is unclear, use (and reload) `$pa-scope` first and carry its judgment into this rationale capture.
+4. Run the scope gate: if the decision surface, affected artifacts, downstream impact, or canonical placement is unclear, use (and reload) `$blast-radius` first and carry its judgment into this rationale capture.
 5. Separate facts from interpretation.
 6. Make alternatives, causes, and consequences explicit.
 7. Produce the rationale artifact in a durable, reviewable form.
@@ -71,7 +71,7 @@ Within `Key Content To Capture`, emphasize context, alternatives, rationale, and
 - Keep the focus on why, not on documenting every changed surface.
 - Run git diff when the work is in a git workspace; if no diff exists, say so and use other explicit evidence.
 - Consider existing `postmortem-*.md` artifacts as evidence when they exist; do not create or rewrite postmortems in this mode.
-- Use (and reload) `$pa-scope` when the decision surface, downstream impact, validation surface, or doc placement is unclear; do not guess.
+- Use (and reload) `$blast-radius` when the decision surface, downstream impact, validation surface, or doc placement is unclear; do not guess.
 - Do not collapse into a changelog or release-note style summary.
 - Do not produce generic artifact reference docs unless the user is actually asking for current-state documentation.
 - Do not drift into long-term governance or documentation-system maintenance.

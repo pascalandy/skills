@@ -43,7 +43,7 @@ Tie-break rule: if the request is about what changed recently, stay in `ChangeCa
 1. Clarify what changed and why this documentation is needed now.
 2. Gather the evidence baseline before drafting: inspect the changed artifact, existing docs, `git status --short`, `git diff --stat`, and the relevant `git diff`; include staged diff when staged changes matter.
 3. Check for an existing relevant `postmortem-*.md` artifact, especially under the resolved `sdlc-pa` export root beside related lifecycle artifacts; use it to preserve lessons, risks, follow-ups, and cross-references without turning this mode into a new postmortem.
-4. Run the scope gate: if affected surfaces, blast radius, validation needs, or canonical doc placement are unclear, use (and reload) `$pa-scope` first and carry its judgment into this change capture.
+4. Run the scope gate: if affected surfaces, blast radius, validation needs, or canonical doc placement are unclear, use (and reload) `$blast-radius` first and carry its judgment into this change capture.
 5. Identify the most appropriate canonical target.
 6. Capture only the meaningful change, not every surrounding detail.
 7. Produce the update in a form that can be applied or handed off directly.
@@ -74,7 +74,7 @@ When useful, represent `Key Content To Capture`, `Canonical Placement Or Output 
 - Stay tied to a concrete recent change.
 - Run git diff when the work is in a git workspace; if no diff exists, say so and use other explicit evidence.
 - Consider existing `postmortem-*.md` artifacts as evidence when they exist; do not create or rewrite postmortems in this mode.
-- Use (and reload) `$pa-scope` when the touched surface, downstream impact, validation surface, or doc placement is unclear; do not guess.
+- Use (and reload) `$blast-radius` when the touched surface, downstream impact, validation surface, or doc placement is unclear; do not guess.
 - Do not turn this into a full rationale artifact unless the why is the main job.
 - Do not turn this into a current-state reference for one artifact unless that deeper artifact documentation is actually needed.
 - Do not drift into cleanup, deduplication, or documentation-system maintenance.

@@ -103,7 +103,6 @@ For every exporting skill:
 | `figure-it-out` in planning-only mode | Optional | `impl-plan` | Use this local profile when a durable slice plan is requested; execution trails remain governed by pstack |
 | `pa-postmortem` | Mandatory for postmortem artifacts | `postmortem` | Captures lessons, incident review, or session review |
 | `pa-premortem` | Mandatory for premortem artifacts | `premortem` | Captures failure scenarios, hidden assumption, revised plan, and pre-launch checklist |
-| `pa-scope` | Rare / optional | `scope` | Export only when the user needs a reusable scope map, blast-radius artifact, or validation/risk artifact |
 | Separate `poteto-mode` delivery session | No by default | n/a | Implements and verifies through the matching playbook; recommends documentation or postmortem capture when needed |
 | `pa-code-review` | Rare / optional | `code-review` | Export only when the user asks for a reusable review artifact |
 | `interrogate` | Rare / optional | `code-quality-audit` | Export only when the user asks for a reusable deep code-quality audit artifact |

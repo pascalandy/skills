@@ -31,7 +31,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | pa-idea | Use only when explicitly invoked as `pa-idea`. |
 | pa-postmortem | Use only when explicitly invoked as `pa-postmortem` after completed work or an incident. |
 | pa-premortem | Use only when explicitly invoked as `pa-premortem`. |
-| pa-scope | Use only when explicitly invoked as `pa-scope`. |
 | pa-vision | Use only when explicitly invoked as `pa-vision` before planning. |
 | qmd | Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
