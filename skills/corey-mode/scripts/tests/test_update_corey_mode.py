@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +49,8 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
         [sys.executable, str(SCRIPT), *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        timeout=30,
         check=False,
     )
 
@@ -257,3 +260,93 @@ def test_update_without_revision_is_a_usage_error(upstream: Path) -> None:
 
     assert result.returncode == 2
     assert result.stderr.splitlines()[-1] == "run 'update_corey_mode.py update --help'"
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "{",
+        "null",
+        "[]",
+        {"schema_version": 2},
+        {"repository": "https://example.com/other"},
+        {"revision": "5b2c000"},
+        {"files": []},
+        {"files": {"playbooks/alpha/alpha.md": None}},
+        {
+            "files": {
+                "playbooks/alpha/alpha.md": {
+                    "source": "skills/alpha/SKILL.md",
+                    "sha256": "bad",
+                }
+            }
+        },
+    ],
+)
+def test_invalid_lock_stops_update_without_writes(
+    upstream: Path, package: Path, damage: str | dict[str, object]
+) -> None:
+    update(upstream, package)
+    if isinstance(damage, dict):
+        lock = json.loads((package / "upstream-lock.json").read_text(encoding="utf-8"))
+        lock.update(damage)
+        document = json.dumps(lock)
+    else:
+        document = damage
+    write(package / "upstream-lock.json", document)
+    before = {name: (package / name).read_bytes() for name in files(package)}
+
+    result = update(upstream, package)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "invalid lock" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert {name: (package / name).read_bytes() for name in files(package)} == before
+
+
+@pytest.mark.parametrize(
+    ("dest", "source"),
+    [
+        ("SKILL.md", "skills/alpha/SKILL.md"),
+        ("../outside.md", "skills/alpha/SKILL.md"),
+        ("absolute", "skills/alpha/SKILL.md"),
+        ("playbooks/alpha/../alpha/alpha.md", "skills/alpha/SKILL.md"),
+        ("playbooks/../../outside.md", "skills/../../outside.md"),
+    ],
+)
+def test_lock_cannot_claim_paths_outside_generated_files(
+    upstream: Path, package: Path, dest: str, source: str
+) -> None:
+    update(upstream, package)
+    outside = package.parent / "outside.md"
+    write(outside, "handwritten outside the package\n")
+    if dest == "absolute":
+        dest = str(outside)
+    lock = json.loads((package / "upstream-lock.json").read_text(encoding="utf-8"))
+    entry = lock["files"].pop("playbooks/alpha/alpha.md")
+    lock["files"][dest] = {**entry, "source": source}
+    write(package / "upstream-lock.json", json.dumps(lock))
+    before = {name: (package / name).read_bytes() for name in files(package)}
+
+    result = update(upstream, package)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "invalid lock" in result.stderr
+    assert {name: (package / name).read_bytes() for name in files(package)} == before
+    assert outside.read_text(encoding="utf-8") == "handwritten outside the package\n"
+
+
+def test_missing_handwritten_file_is_a_clean_failure(
+    upstream: Path, package: Path
+) -> None:
+    update(upstream, package)
+    (package / "SKILL.md").unlink()
+
+    result = run("check", "--package", str(package))
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "SKILL.md" in result.stderr
+    assert "Traceback" not in result.stderr

@@ -27,6 +27,7 @@ uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py update --up
 uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision"
 uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py check --upstream "$upstream"
 just flatten-skills
+just remote-skills
 just check
 ```
 

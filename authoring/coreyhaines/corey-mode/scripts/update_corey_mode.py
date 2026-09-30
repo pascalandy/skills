@@ -22,6 +22,7 @@ REPOSITORY = "https://github.com/coreyhaines31/marketingskills"
 LOCK = PurePosixPath("upstream-lock.json")
 PLAYBOOKS = PurePosixPath("playbooks")
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
+FULL_HASH = re.compile(r"[0-9a-f]{64}")
 LINK = re.compile(r"(?P<head>\]\()(?P<target>[^)\s]+)(?P<tail>(?:\s+[^)]*)?\))")
 ROUTE = re.compile(r"^\|\s*\[`(?P<name>[^`]+)`\]\((?P<target>[^)]+)\)\s*\|")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
@@ -53,6 +54,12 @@ class Rendered:
 
 
 Plan = dict[PurePosixPath, Rendered]
+
+
+@dataclass(frozen=True)
+class Locked:
+    revision: str
+    hashes: dict[PurePosixPath, str]
 
 
 def destination(source: PurePosixPath) -> PurePosixPath | None:
@@ -157,26 +164,57 @@ def lock_document(plan: Plan, revision: str) -> bytes:
     return (json.dumps(document, indent=2) + "\n").encode("utf-8")
 
 
-def read_lock(package: Path) -> dict[str, object] | None:
+def read_lock(package: Path) -> Locked | None:
+    """Parse the lock, refusing any path the importer would not write itself."""
     path = package / LOCK
-    if not path.is_file():
-        return None
+
+    def invalid(reason: str) -> NoReturn:
+        raise Failure(
+            f"{path}: invalid lock: {reason}",
+            f"restore a valid {LOCK}, then run "
+            f"'update_corey_mode.py check --package {package}'",
+        )
+
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        raw: object = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
     except json.JSONDecodeError as error:
-        raise Failure(f"{path}: invalid JSON: {error}") from None
+        invalid(str(error))
+    if not isinstance(raw, dict):
+        invalid("expected a JSON object")
+    if raw.get("schema_version") != 1:
+        invalid("schema_version must be 1")
+    if raw.get("repository") != REPOSITORY:
+        invalid(f"repository must be {REPOSITORY}")
+    revision = raw.get("revision")
+    if not isinstance(revision, str) or not FULL_SHA.fullmatch(revision):
+        invalid("revision must be a full 40-character SHA")
+    files = raw.get("files")
+    if not isinstance(files, dict) or not files:
+        invalid("files must be a non-empty object")
+    hashes: dict[PurePosixPath, str] = {}
+    for dest, entry in files.items():
+        if not isinstance(entry, dict):
+            invalid(f"invalid file record: {dest!r}")
+        source, digest = entry.get("source"), entry.get("sha256")
+        target = PurePosixPath(dest)
+        if (
+            not isinstance(source, str)
+            or ".." in target.parts
+            or str(target) != dest
+            or destination(PurePosixPath(source)) != target
+        ):
+            invalid(f"{dest!r} is not where the importer writes {source!r}")
+        if not isinstance(digest, str) or not FULL_HASH.fullmatch(digest):
+            invalid(f"{dest}: sha256 must be a 64-character hash")
+        hashes[target] = digest
+    return Locked(revision, hashes)
 
 
-def locked_files(lock: dict[str, object] | None) -> dict[str, dict[str, str]]:
-    files = (lock or {}).get("files", {})
-    if not isinstance(files, dict):
-        raise Failure(f"{LOCK}: files must be an object")
-    return files
-
-
-def owned(package: Path, lock: dict[str, object] | None) -> set[PurePosixPath]:
+def owned(package: Path, lock: Locked | None) -> set[PurePosixPath]:
     """Files the importer writes: everything in the lock and under playbooks/."""
-    paths = {PurePosixPath(path) for path in locked_files(lock)}
+    paths = set(lock.hashes) if lock else set()
     if (package / PLAYBOOKS).is_dir():
         paths |= {
             PurePosixPath(path.relative_to(package).as_posix())
@@ -258,14 +296,14 @@ def check(package: Path, upstream: Path | None) -> None:
             "import upstream with: update_corey_mode.py update --upstream DIR --revision SHA",
         )
     problems: list[str] = []
-    entries = locked_files(lock)
-    for dest, entry in sorted(entries.items()):
+    entries = lock.hashes
+    for dest, digest in sorted(entries.items()):
         path = package / dest
         if not path.is_file():
             problems.append(f"missing: {dest}")
-        elif sha256(path.read_bytes()) != entry.get("sha256"):
+        elif sha256(path.read_bytes()) != digest:
             problems.append(f"changed: {dest}")
-    for dest in sorted(owned(package, lock) - {PurePosixPath(d) for d in entries}):
+    for dest in sorted(owned(package, lock) - entries.keys()):
         problems.append(f"not in the lock: {dest}")
     for path in sorted(package.rglob("SKILL.md")):
         if path != package / "SKILL.md":
@@ -275,14 +313,14 @@ def check(package: Path, upstream: Path | None) -> None:
     problems += routes
     for path in sorted(package.rglob("*.md")):
         relative = PurePosixPath(path.relative_to(package).as_posix())
-        if str(relative) in entries:
+        if relative in entries:
             continue
         for target in markdown_links(path.read_text(encoding="utf-8")):
             link = target.partition("#")[0]
             if link and not SCHEME.match(link) and not (path.parent / link).exists():
                 problems.append(f"broken link in {relative}: {target}")
     if upstream is not None:
-        revision = str(lock.get("revision", ""))
+        revision = lock.revision
         plan = render(upstream, revision)
         if lock_document(plan, revision) != (package / LOCK).read_bytes():
             problems.append(f"{LOCK} differs from a fresh render of {upstream}")
@@ -384,6 +422,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Failure as failure:
         for message in failure.args:
             print(message, file=sys.stderr)
+        return 1
+    except (OSError, UnicodeError) as error:
+        print(error, file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130
