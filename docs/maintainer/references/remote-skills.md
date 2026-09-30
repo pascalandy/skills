@@ -1,6 +1,6 @@
 ---
 name: remote-skills
-description: Use andy's skill remotly
+description: Use andy's skills remotely
 ---
 
 <!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
