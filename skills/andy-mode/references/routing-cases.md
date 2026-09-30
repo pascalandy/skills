@@ -26,3 +26,8 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; I think this architecture is simpler. Challenge me` | `playbooks/sparring.md` |
 | `andy-mode ; simple editor` | `playbooks/simple-editor.md` |
 | `andy-mode ; storytelling ; style modeler` | `playbooks/storytelling.md`, then its style modeler reference |
+| `andy-mode ; meta skill creator` | `playbooks/meta-skill-creator.md` |
+| `andy-mode ; meta-sc` | The route tables and a question. No route runs |
+| `andy-mode ; profile routing matrix` | `playbooks/profile-routing-matrix.md` |
+| `andy-mode ; headless` | `playbooks/headless.md` |
+| `andy-mode ; search the web for the current Codex release notes` | `playbooks/tavily.md` |

@@ -1,9 +1,3 @@
----
-name: "profile-routing-matrix"
-description: "Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level."
-kind: "dev"
----
-
 # Profile Routing Matrix
 
 Delegate when a bounded task benefits from a separate agent. Keep trivial work local. Choose only the roles the task needs.

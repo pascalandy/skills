@@ -683,7 +683,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Validate meta-sc anatomy, routing, portability, links, exclusivity, "
+            "Validate meta-skill anatomy, routing, portability, links, exclusivity, "
             "and asset modes."
         )
     )

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Meta-skill creator"
-  short_description: "Design one entry point with lean internal branches"
-  default_prompt: "Use $meta-sc to design a skill with several internal branches behind one entry point."
