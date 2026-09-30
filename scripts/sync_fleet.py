@@ -482,15 +482,6 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     _, _, head, _ = lines[-1].split()
     problems: list[str] = []
     behind = head == "-" or (head != source.sha and source.contains(head))
-    newer = (
-        head != "-"
-        and head != source.sha
-        and git("merge-base", "--is-ancestor", source.sha, head).returncode == 0
-    )
-    if head != source.sha and not behind and not newer:
-        problems.append("published checkout has a divergent or unknown revision")
-    if newer:
-        source = Source(head, source.private, source.saves)
     if mode == "check":
         if behind:
             problems.append(f"published checkout is behind GitHub at {head[:7]}")
@@ -506,23 +497,13 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
             found[1],
             sha=found[2],
         )
-    if problems:
-        return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
-        if head != source.sha:
-            return Outcome(
-                machine.name,
-                "ready",
-                f"ready to move {head[:7]} to {source.sha[:7]}",
-                changes=[f"move {head[:7]} to {source.sha[:7]}"],
-                sha=source.sha,
-            )
-        # At GitHub's main already, a sync would still save and pull the
-        # private clone and install what differs
         found = installed(machine, source)
         if isinstance(found, Outcome):
             return found
         pending, targets, actual = found
+        if head != actual:
+            pending.insert(0, f"move {head[:7]} to {actual[:7]}")
         if source.saves:
             pending.append("pull the private edits this sync saves first")
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
@@ -550,7 +531,7 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 f"git push failed: {detail}",
                 temporary=is_network_failure(pushed.stderr),
             )
-    code, lines = remote(machine, APPLY, machine.path, head, source.sha)
+    code, lines = remote(machine, APPLY, machine.path, head, source.sha, f"{TIMEOUT:g}")
     if code:
         return failure(machine.name, code, lines)
     deployed = next(
@@ -918,8 +899,8 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         "--dry-run",
         action="store_true",
-        help="run every check and print each machine a sync would change, "
-        "without transferring, moving, or installing",
+        help="preview each machine's changes without touching authoring, "
+        "private, or installed skills; may refresh cached deployment code",
     )
     mode.add_argument(
         "--check",

@@ -259,7 +259,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert "add\t~/.claude/skills/secret" in behind_changes
 
 
-def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
+def test_dry_run_refreshes_code_without_touching_authoring_or_installs(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
@@ -271,7 +271,6 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     assert run(hub, homes, bin_dir).returncode == 0
     head = change(hub)
     before = git(behind, "rev-parse", "HEAD")
-    # Their authoring checkouts are irrelevant to the published cache.
     for checkout in (current, stale):
         git(checkout, "pull", "-q")
     # stale is at GitHub's main, but lost an installed skill
@@ -286,7 +285,7 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
         "",
     )
     assert preview["machines"][2]["changes"] == [
-        f"move {git(stale / '.git/published-deployment', 'rev-parse', '--short=7', 'HEAD')} to {head[:7]}"
+        "~/.claude/skills has 1 of 2 current (add 1)"
     ]
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (homes / "stale/.claude/skills/alpha").exists()
@@ -506,8 +505,9 @@ def test_published_deletion_removes_owned_copies_but_keeps_private_and_foreign(
     assert (foreign / "SKILL.md").is_file()
 
 
+@pytest.mark.parametrize("preview", [False, True])
 def test_unknown_deployment_path_is_not_deleted_and_other_machine_continues(
-    fleet: tuple[Path, Path, Path],
+    fleet: tuple[Path, Path, Path], preview: bool
 ) -> None:
     hub, homes, bin_dir = fleet
     blocked = machine(homes, "blocked", hub.parent / "skills.git")
@@ -516,13 +516,14 @@ def test_unknown_deployment_path_is_not_deleted_and_other_machine_continues(
     marker.parent.mkdir()
     marker.write_text("unknown path\n")
     register(hub, "blocked", "good")
-    result = run(hub, homes, bin_dir, "--json")
+    change(hub)
+    result = run(hub, homes, bin_dir, "--json", *(["--dry-run"] if preview else []))
     assert result.returncode == 1
     outcomes = {
         entry["machine"]: entry["status"]
         for entry in json.loads(result.stderr)["machines"]
     }
-    assert outcomes == {"blocked": "failed", "good": "synced"}
+    assert outcomes == {"blocked": "failed", "good": "ready" if preview else "synced"}
     assert marker.read_text() == "unknown path\n"
     assert (good / ".git/published-deployment/skills/alpha/SKILL.md").is_file()
 
