@@ -31,6 +31,6 @@ just remote-skills
 just check
 ```
 
-`check` fails with `playbook without a route` when upstream adds a skill, and with `route without a playbook` when it removes one. Add or remove the row in `SKILL.md`, then read the new playbook's description for tie-breakers against its neighbors.
+`check` fails with `playbook without a route` when upstream adds a skill, and with `route without a playbook` when it removes one. Add or remove the row in `SKILL.md`, reading the new playbook's description for tie-breakers against its neighbors. Then replay the [routing cases](routing-cases.md).
 
 Offline, `check` compares every generated file with the lock, requires one route per playbook, rejects a nested `SKILL.md`, and resolves the links in handwritten files. With `--upstream`, it also rebuilds every file from that folder and compares bytes. Neither proves how an agent routes a request.
