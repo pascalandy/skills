@@ -74,6 +74,8 @@ def sandbox(tmp_path: Path) -> tuple[Path, Path]:
     for name in (
         "_cli.py",
         "_common.py",
+        "_launch_sync.py",
+        "_published_checkout.py",
         "flatten_skills.py",
         "install_skills.py",
         "discover_skills.py",

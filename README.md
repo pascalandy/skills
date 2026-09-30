@@ -51,14 +51,14 @@ To update, repeat with a fresh clone after moving or removing your previous copy
 
 ### Maintainer bulk install
 
-The repository's installer handles multiple agent directories. Preview its work before running it; both commands print one line per change:
+The repository's installer handles multiple agent directories. These commands use local `authoring/` for explicit testing and may include uncommitted edits. Preview its work before applying; both commands print one line per change:
 
 ```sh
 just install-skills --dry-run
 just install-skills
 ```
 
-Run `just install-skills --help` for the current targets and ownership rules.
+Run `just install-skills --help` for targets and ownership. Maintainers use `just sync` or `just sync-fleet` to install GitHub-published `main` without changing their authoring checkout. See [install skills](docs/references/install-skills.md) for the one-time launcher upgrade and bootstrap procedure.
 
 ## Releases
 

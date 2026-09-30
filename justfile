@@ -6,11 +6,11 @@ set positional-arguments
 default:
     @{{ just_executable() }} --justfile {{ quote(justfile()) }} --list --unsorted
 
-# Pull main, save and pull the private clone, then install skills here
+# Fetch published main, save the original private clone, and install here
 [group('commands')]
 [no-exit-message]
 sync *args:
-    @uv run --quiet scripts/sync.py "$@"
+    @uv run --quiet scripts/_launch_sync.py sync "$@"
 
 alias ttr := transcript
 
@@ -19,13 +19,13 @@ alias ttr := transcript
 transcript url *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py run youtube --url "$@"
 
-# Bring every fleet machine, or the named ones, to GitHub's main
+# Deploy published main to every fleet machine, or named machines
 [group('commands')]
 [no-exit-message]
 sync-fleet *args:
-    @uv run --quiet scripts/sync_fleet.py "$@"
+    @uv run --quiet scripts/_launch_sync.py fleet "$@"
 
-# Install skills/ into the agent skill directories
+# Install local authoring/ into the agent skill directories for explicit testing
 [group('commands')]
 [no-exit-message]
 install-skills *args:
@@ -76,8 +76,8 @@ skills-discover *args:
 release-check version *args:
     @uv run --quiet scripts/release_check.py "$@"
 
-# Lefthook's sync entry point; it acts only in a main checkout with the private clone
+# Lefthook deploys published main after pull or push, never an unpushed commit
 [private]
 [no-exit-message]
 sync-hook *args:
-    @uv run --quiet scripts/sync_fleet.py --hook "$@"
+    @uv run --quiet scripts/_launch_sync.py hook "$@"
