@@ -12,12 +12,14 @@ Corey-mode does marketing work with Corey Haines' playbooks, from strategy to th
 
 A request can name its route, as in `marketing ; cro`. Compare names with case, spaces, hyphens, and underscores ignored.
 
-- **A name matches.** Read that route's playbook and follow it to its result.
-- **No name, one clear owner.** Run the route whose "Use when" owns the request, and say which route you chose in one line.
+- **A name matches.** Run that route.
+- **No name, one clear owner.** Run the route whose "Use when" owns the request.
 - **Two routes fit.** Name the candidates with their "Use when" and ask which one. Run nothing.
-- **No route fits.** Say that corey-mode has no playbook for the request, then handle it without the mode.
+- **No route fits.** Handle the request without the mode.
 
-A request with several deliverables runs one route per deliverable, in the order the work needs. Load another route only when the request or the running playbook calls for it.
+To run a route, read its playbook and follow it to its result. Open the reply with the route line, as in `Route: cro`, so the reader knows which playbook shaped the answer. Open it with `Route: none` when no route fits.
+
+A request with several deliverables runs one route per deliverable, in the order the work needs, as in `Route: launch, then emails and copywriting`. Load another route only when the request or the running playbook calls for it.
 
 ## Read a playbook
 
@@ -121,3 +123,5 @@ A skill or mode outside corey-mode reaches one route by reading its playbook in 
 ## Maintenance
 
 Read [lineage and updating](references/lineage.md) to refresh the playbooks from upstream. Change `playbooks/` only through its importer.
+
+Use [routing cases](references/routing-cases.md) when changing the description, a route, its "Use when", or these routing rules.
