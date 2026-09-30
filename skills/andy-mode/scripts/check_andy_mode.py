@@ -17,8 +17,9 @@ from urllib.parse import unquote
 EPILOG = """\
 Checks that each route in SKILL.md names one playbook, that route names stay
 unique once case, spaces, hyphens, and underscores are ignored, that SKILL.md
-exists only at the root, and that every relative link, anchor, and bundled
-path in the package resolves. Success prints nothing.
+exists only at the root, that every relative link and anchor outside code
+resolves, and that every bundled path resolves, in code blocks too. A link
+inside a code block is an example, not a link. Success prints nothing.
 
 exit codes:
   0  the package is valid
