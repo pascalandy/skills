@@ -29,6 +29,7 @@ ENTRIES = {
     "scripts/flatten_skills.py": "just flatten-skills",
     "scripts/install_skills.py": "just install-skills",
     "scripts/release_check.py": "just release-check",
+    "scripts/remote_skills.py": "just remote-skills",
     "scripts/sync.py": "just sync",
     "scripts/sync_fleet.py": "just sync-fleet",
     "scripts/sync_private.py": "scripts/sync_private.py",

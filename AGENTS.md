@@ -9,7 +9,7 @@ Load `writing-great-skills` before creating, changing, or refactoring a skill. I
 Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow_implicit_invocation: false` in Codex metadata. Agents may invoke skills when relevant
 
 1. For skill content, edit only `authoring/<category>/<skill-name>/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
-2. Run `just flatten-skills`; if it fails, rerun `just flatten-skills --debug`
+2. Run `just flatten-skills`, then `just remote-skills`; if flattening fails, rerun `just flatten-skills --debug`
 3. Review and commit the source and generated output together
 
 The flattening script maps each package with a root `SKILL.md` to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names or files outside a package with a `SKILL.md`
