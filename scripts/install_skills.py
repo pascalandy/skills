@@ -253,18 +253,23 @@ def private_packages(root: Path | None) -> dict[str, Path]:
 
 
 def skill_sources(
-    stage: Path, private_root: Path | None, profile: str
+    stage: Path, private_root: Path | None, profile: str, snapshot: bool = False
 ) -> dict[str, Source]:
     """Stage public packages under `stage`, add every private package, and drop
     the profile's exclusions."""
     sources: dict[str, Source] = {}
-    for name, entries in flatten_skills.collect().items():
-        package = stage / name
-        for source, relative in entries:
-            destination = package / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            flatten_skills.publish(source, destination)
-        sources[name] = Source(package, "public", digest(package))
+    if snapshot:
+        for package in sorted((ROOT / "skills").iterdir()):
+            if package.is_dir() and (package / "SKILL.md").is_file():
+                sources[package.name] = Source(package, "public", digest(package))
+    else:
+        for name, entries in flatten_skills.collect().items():
+            package = stage / name
+            for source, relative in entries:
+                destination = package / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                flatten_skills.publish(source, destination)
+            sources[name] = Source(package, "public", digest(package))
     duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
         if name in sources:
@@ -284,9 +289,20 @@ def skill_sources(
     }
 
 
-def command_sources() -> dict[str, Source]:
+def command_sources(snapshot: bool = False) -> dict[str, Source]:
     sources: dict[str, Source] = {}
-    for relative in flatten_skills.git_files("authoring/commands"):
+    files = (
+        [
+            Path(os.fsdecode(path))
+            for path in flatten_skills.git(
+                "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "authoring/commands"
+            ).split(b"\0")
+            if path
+        ]
+        if snapshot
+        else flatten_skills.git_files("authoring/commands")
+    )
+    for relative in files:
         if len(relative.parts) != 3 or relative.suffix != ".md":
             continue
         path = ROOT / relative
@@ -568,8 +584,10 @@ def install(args: argparse.Namespace) -> str:
         tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
     ):
         stage = Path(temporary)
-        sources = skill_sources(stage / "skills", args.private_root, args.profile)
-        commands = command_sources()
+        sources = skill_sources(
+            stage / "skills", args.private_root, args.profile, args.snapshot
+        )
+        commands = command_sources(args.snapshot)
         codex = command_skills(stage / "commands", commands)
         clashes = sorted(sources.keys() & codex.keys())
         if clashes:
@@ -630,7 +648,8 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
-        flatten_skills.flatten()
+        if not args.snapshot:
+            flatten_skills.flatten()
         execute(home, {**sources, **codex}, commands, actions)
         return output
 
@@ -641,6 +660,11 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__,
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
+    )
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="install committed skills/ and commands from this detached published checkout without flattening",
     )
     parser.add_argument(
         "--profile",
