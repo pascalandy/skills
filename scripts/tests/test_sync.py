@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from conftest import commit, private_remote, skill
+from conftest import GIT_IDENTITY, commit, private_remote, skill
 
 
 def git(repo: Path, *args: str) -> str:
@@ -27,6 +27,7 @@ def run(
         check=False,
         env={
             **os.environ,
+            **GIT_IDENTITY,
             "HOME": str(home),
             "UV_CACHE_DIR": str(home.parent / "uv-cache"),
             **(env or {}),

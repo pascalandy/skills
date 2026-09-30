@@ -66,9 +66,9 @@ def step(*command: str, cwd: Path) -> list[str]:
         command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     if result.returncode:
-        error = (result.stderr or result.stdout).strip()
+        error = (result.stderr or result.stdout).strip().removeprefix("error: ")
         raise (TemporaryError if result.returncode == 75 else ScriptError)(
-            f"{error}; rerun just sync"
+            error or f"published step exited {result.returncode}; rerun just sync"
         )
     if result.stderr and ("--verbose" in command or "--debug" in command):
         sys.stderr.write(result.stderr)
