@@ -12,7 +12,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | Skill | Description |
 |---|---|
 | 2nd-pass | Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts. |
-| andy-mode | Use only when explicitly invoked as `andy-mode`, including dictated forms such as `Andy mode`, `ND mode`, or `indie mode`. |
+| andy-mode | Use only when explicitly invoked as `andy-mode`, where `ND` and `indie` are dictated synonyms of `andy`. |
 | bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
 | distill | Use only when explicitly invoked as `distill`. |
