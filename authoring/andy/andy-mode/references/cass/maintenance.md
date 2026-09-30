@@ -1,6 +1,6 @@
 # CASS maintenance and recovery
 
-Resolve this file relative to the CASS skill directory. The installed binary remains authoritative. Recheck the relevant command in `cass capabilities --json` and `cass robot-docs` before acting
+The installed binary remains authoritative. Recheck the relevant command in `cass capabilities --json` and `cass robot-docs` before acting
 
 ## Installation and upgrades
 
