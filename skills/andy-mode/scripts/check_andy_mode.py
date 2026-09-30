@@ -37,6 +37,10 @@ EXTERNAL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 ROUTE_CELL_RE = re.compile(r"^\[`([^`]+)`\]\(([^)\s]+)\)$")
 ALIAS_RE = re.compile(r"`([^`]+)`")
 PLACEHOLDER_CHARS = set("<>*{}$")
+# A bundled path stands alone or follows a placeholder such as `<skill_dir>/`
+BUNDLED_RE = re.compile(
+    r"(?:(?<![\w/.<>-])|(?<=>/))((?:playbooks|scripts|references)/[\w./-]*[\w/])"
+)
 
 
 @dataclass(frozen=True)
@@ -52,9 +56,10 @@ def normalize(name: str) -> str:
     return re.sub(r"[\s_-]+", "", name).lower()
 
 
-def prose_lines(text: str) -> list[str]:
-    """Return the lines outside fenced code blocks."""
-    lines: list[str] = []
+def split_blocks(text: str) -> tuple[list[str], list[str]]:
+    """Return the lines outside fenced code blocks, then the lines inside them."""
+    prose: list[str] = []
+    fenced: list[str] = []
     fence: str | None = None
     for line in text.splitlines():
         match = FENCE_RE.match(line)
@@ -65,12 +70,18 @@ def prose_lines(text: str) -> list[str]:
                 and len(match.group(1)) >= len(fence)
             ):
                 fence = None
+            else:
+                fenced.append(line)
             continue
         if match:
             fence = match.group(1)
             continue
-        lines.append(line)
-    return lines
+        prose.append(line)
+    return prose, fenced
+
+
+def prose_lines(text: str) -> list[str]:
+    return split_blocks(text)[0]
 
 
 def split_code(line: str) -> tuple[str, list[str]]:
@@ -162,7 +173,7 @@ def in_sibling_skill(target: Path, parent: Path) -> bool:
 
 
 def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
-    """Resolve relative links, their anchors, and bundled paths named in code spans."""
+    """Resolve relative links, their anchors, and the bundled paths code names."""
     home = root.resolve()
     anchor_cache: dict[Path, set[str]] = {}
     bundled = (
@@ -170,9 +181,16 @@ def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
         "scripts/",
         *(f"references/{name}/" for name in route_names),
     )
+
+    def check_code(label: str, text: str) -> None:
+        for token in BUNDLED_RE.findall(text):
+            if token.startswith(bundled) and not (root / token).exists():
+                errors.append(f"{label}: unresolved bundled path: {token}")
+
     for path in sorted(root.rglob("*.md")):
         label = path.relative_to(root).as_posix()
-        for line in prose_lines(path.read_text(encoding="utf-8")):
+        prose_part, fenced = split_blocks(path.read_text(encoding="utf-8"))
+        for line in prose_part:
             prose, spans = split_code(line)
             for raw in LINK_RE.findall(prose):
                 if raw.startswith("//") or EXTERNAL_RE.match(raw):
@@ -196,11 +214,9 @@ def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
                     if anchor_slug(anchor) not in anchor_cache[target]:
                         errors.append(f"{label}: unresolved anchor: {raw}")
             for span in spans:
-                token = span.partition("#")[0]
-                if " " in token or PLACEHOLDER_CHARS & set(token):
-                    continue
-                if token.startswith(bundled) and not (root / token).exists():
-                    errors.append(f"{label}: unresolved bundled path: {span}")
+                check_code(label, span)
+        for line in fenced:
+            check_code(label, line)
 
 
 def validate(root: Path) -> list[str]:

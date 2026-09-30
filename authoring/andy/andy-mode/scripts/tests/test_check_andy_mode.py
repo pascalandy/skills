@@ -85,7 +85,10 @@ def test_broken_anchor_and_bundled_path_fail(tmp_path: Path) -> None:
     (root / "playbooks/retro-skill.md").write_text(
         "Read [it](../references/retro-skill/template.md#missing) "
         "and `references/retro-skill/old.md`.\n\n"
-        "```\n`references/retro-skill/in-fence.md` stays unchecked\n```\n",
+        "```bash\n"
+        "uv run <skill_dir>/scripts/gone.py\n"
+        "cat references/retro-skill/template.md references/wiki-page.md\n"
+        "```\n",
         encoding="utf-8",
     )
     assert checker.validate(root) == [
@@ -97,6 +100,7 @@ def test_broken_anchor_and_bundled_path_fail(tmp_path: Path) -> None:
             "playbooks/retro-skill.md: unresolved bundled path: "
             "references/retro-skill/old.md"
         ),
+        "playbooks/retro-skill.md: unresolved bundled path: scripts/gone.py",
     ]
 
 
