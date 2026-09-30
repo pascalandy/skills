@@ -1,6 +1,7 @@
 ---
 name: "label-for-issues"
 description: "Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue."
+kind: "dev"
 ---
 
 # Label for issues

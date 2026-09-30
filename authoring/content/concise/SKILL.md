@@ -1,6 +1,7 @@
 ---
 name: "concise"
 description: "Use when the user requests to be more concise."
+kind: "general"
 ---
 
 # Less Token

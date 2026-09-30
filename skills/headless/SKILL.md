@@ -1,6 +1,7 @@
 ---
 name: "headless"
 description: "Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them."
+kind: "dev"
 ---
 
 # Headless CLI agents

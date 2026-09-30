@@ -1,6 +1,7 @@
 ---
 name: "poteto-mode"
 description: "Use only when explicitly invoked as `poteto` or `poteto-mode`."
+kind: "dev"
 ---
 
 # Poteto mode

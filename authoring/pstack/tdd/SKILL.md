@@ -1,6 +1,7 @@
 ---
 name: "tdd"
 description: "Use only when explicitly invoked as `tdd`."
+kind: "dev"
 ---
 
 # TDD Bug Fix

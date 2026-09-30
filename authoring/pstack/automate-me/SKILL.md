@@ -1,6 +1,7 @@
 ---
 name: "automate-me"
 description: "Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow."
+kind: "dev"
 ---
 
 # Automate me

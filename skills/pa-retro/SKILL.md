@@ -1,6 +1,7 @@
 ---
 name: "pa-retro"
 description: "Use only when explicitly invoked as `pa-retro`."
+kind: "dev"
 ---
 
 Post-mortem on the skills the agent loaded in this conversation.

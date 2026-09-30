@@ -1,6 +1,7 @@
 ---
 name: "pi-workflow"
 description: "Use when the user mentions `turk` or requests subagent execution workflows in Pi."
+kind: "dev"
 ---
 
 If the user's request leverages subagents, orchestrate them with the `subagent` tool and `workflowScript`. Read the `pi-subagents` skill for the execution model; only the model routing below is turk-specific.

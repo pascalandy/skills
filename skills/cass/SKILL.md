@@ -1,6 +1,7 @@
 ---
 name: "cass"
 description: "Use only when explicitly invoked as `cass` to search local coding-agent history"
+kind: "dev"
 ---
 
 # CASS

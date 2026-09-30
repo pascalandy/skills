@@ -1,6 +1,7 @@
 ---
 name: "blast-radius"
 description: "Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust."
+kind: "dev"
 ---
 
 # Blast radius

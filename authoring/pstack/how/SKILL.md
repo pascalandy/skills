@@ -1,6 +1,7 @@
 ---
 name: "how"
 description: "Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation."
+kind: "dev"
 ---
 
 # How

@@ -1,6 +1,7 @@
 ---
 name: "storytelling"
 description: "Use only when explicitly invoked as `storytelling`."
+kind: "general"
 ---
 
 # Storytelling

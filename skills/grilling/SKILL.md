@@ -1,6 +1,7 @@
 ---
 name: "grilling"
 description: "Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`."
+kind: "general"
 ---
 
 Read and follow the complete [upstream interview procedure](references/upstream/grilling.md).

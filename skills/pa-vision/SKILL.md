@@ -1,6 +1,7 @@
 ---
 name: "pa-vision"
 description: "Use only when explicitly invoked as `pa-vision` before planning."
+kind: "general"
 keywords: ["pa-vision", "vision", "direction", "alignment", "brief", "prd", "direction-check"]
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: "mermaid"
 description: "Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data."
+kind: "general"
 ---
 
 # Mermaid

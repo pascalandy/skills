@@ -1,6 +1,7 @@
 ---
 name: "distill"
 description: "Use only when explicitly invoked as `distill`."
+kind: "general"
 keywords: ["distill", "local-file", "summarize", "notes", "follow-along", "claude", "codex", "llm-cli", "prompt"]
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: "profile-routing-matrix"
 description: "Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level."
+kind: "dev"
 ---
 
 # Profile Routing Matrix

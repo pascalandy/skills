@@ -1,6 +1,7 @@
 ---
 name: "handoff"
 description: "Use when the user asks to prepare a handoff for another agent."
+kind: "general"
 argument-hint: "What will the next session be used for?"
 ---
 

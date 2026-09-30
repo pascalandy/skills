@@ -1,6 +1,7 @@
 ---
 name: "html-mode"
 description: "Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes."
+kind: "general"
 ---
 
 # HTML mode

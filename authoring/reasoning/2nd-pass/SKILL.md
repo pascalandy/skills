@@ -1,6 +1,7 @@
 ---
 name: "2nd-pass"
 description: "Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts."
+kind: "general"
 ---
 
 # 2nd Pass

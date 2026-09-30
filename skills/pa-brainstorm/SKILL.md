@@ -1,6 +1,7 @@
 ---
 name: "pa-brainstorm"
 description: "Use when the user wants to brainstorm an idea, feature, design, product decision, workflow change, or improvement."
+kind: "general"
 ---
 
 # PA Brainstorm Session
