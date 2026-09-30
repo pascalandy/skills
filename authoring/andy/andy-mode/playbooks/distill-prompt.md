@@ -77,7 +77,7 @@ A consumer (like the `distill` tool) receives the path to a specific `prompt.md`
 The four agent-routed prompt styles each have two files:
 
 ```
-references/<prompt-name>/
+references/distill-prompt/<prompt-name>/
 ├── MetaSkill.md  # intent, when to use, expected output shape
 └── prompt.md     # raw prompt text, piped to LLMs as-is
 ```
