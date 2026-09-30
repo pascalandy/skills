@@ -29,17 +29,17 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 ## Checks
 
 - Use plain `just check` for routine work and signoff. The manual CI workflow uses `just check --sweep` to run unrelated suites too. A failure names the `just check --only NAME` to rerun
-- `just check` always runs direct repository validators and two cheap project-rule tests, then selects other root tests and skill checks by changed inputs. Root tests use named `test-<stem>` checks; skill tests belong in their authoring package. See [checks](docs/maintainer/references/checks.md) and [script conventions](docs/maintainer/references/script-conventions.md) for routing details
+- `just check` always runs direct repository validators and two cheap project-rule tests, then selects other root tests and skill checks by changed inputs. Root tests use named `test-<stem>` checks; skill tests belong in their authoring package. See [checks](docs/references/checks.md) and [script conventions](docs/references/script-conventions.md) for routing details
 - `main` merges a PR only when its head commit carries a green `signoff` status; GitHub Actions runs only when started by hand. After pushing a PR branch, run `just signoff` and leave the checkout untouched until it finishes. Merge only a signed-off head, never with `gh pr merge --admin`
 - Run `lefthook install` once per clone. To reproduce a pre-commit failure, run its `just` recipe
 - When `just` is not installed, use `uvx --from rust-just just <recipe>`
 
 ## Install skills
 
-`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `authoring/commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/maintainer/references/install-skills.md)
+`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `authoring/commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 
 ## Read on demand
 
-- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/maintainer/references/script-conventions.md). `authoring/commands/cli-contract.md` carries the same contract to other projects
-- Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/maintainer/references/checks.md)
-- To release, follow [release](docs/maintainer/references/release.md). Never move or delete a pushed tag
+- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md). `authoring/commands/cli-contract.md` carries the same contract to other projects
+- Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/references/checks.md)
+- To release, follow [release](docs/references/release.md). Never move or delete a pushed tag

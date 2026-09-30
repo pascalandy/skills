@@ -16,7 +16,7 @@ from _common import frontmatter_description, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
-TABLE = ROOT / "docs" / "maintainer" / "references" / "remote-skills.md"
+TABLE = ROOT / "docs" / "references" / "remote-skills.md"
 # Stated once above the table, so each row spends no tokens on a link
 URL = (
     "https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md"
@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         prog="just remote-skills",
         description="Write the name and description of every skill in skills/ to "
-        "docs/maintainer/references/remote-skills.md",
+        "docs/references/remote-skills.md",
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )

@@ -1,7 +1,7 @@
 name: CI
 
 # Manual only: `just signoff` is the PR gate. Started on a vX.Y.Z tag, the run
-# also publishes that release; see docs/maintainer/references/checks.md
+# also publishes that release; see docs/references/checks.md
 on:
   workflow_dispatch:
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import remote_skills
 
-PATH = "docs/maintainer/references/remote-skills.md"
+PATH = "docs/references/remote-skills.md"
 
 
 @pytest.fixture

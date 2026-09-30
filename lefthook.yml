@@ -13,7 +13,7 @@ pre-commit:
       glob: "{authoring,skills}/**/*"
       run: just flatten-skills --check
     remote-skills:
-      glob: "{skills/**/SKILL.md,docs/maintainer/references/remote-skills.md}"
+      glob: "{skills/**/SKILL.md,docs/references/remote-skills.md}"
       run: just remote-skills --check
 
 # In a main checkout with the private clone, a commit installs this machine, a pull

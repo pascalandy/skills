@@ -1,4 +1,4 @@
-"""The CLI contract in docs/maintainer/references/script-conventions.md, as code.
+"""The CLI contract in docs/references/script-conventions.md, as code.
 
 Everything below the cli-block marker is the block a skill script may paste
 whole. `just check --only cli-block` fails when a pasted copy differs from this
