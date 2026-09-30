@@ -1,6 +1,6 @@
 ---
 name: RationaleCapture
-description: Capture lightweight rationale for a settled decision across code, content, workflow, or knowledge systems. USE WHEN the user wants an ADR, a decision record, tradeoff documentation, or another artifact centered on decision rationale and consequences. For postmortems, lessons learned, incident reviews, retrospectives, and durable feedback capture, hand off to `pa-postmortem`.
+description: Capture lightweight rationale for a settled decision across code, content, workflow, or knowledge systems. USE WHEN the user wants an ADR, a decision record, tradeoff documentation, or another artifact centered on decision rationale and consequences. Not for postmortems, lessons learned, incident reviews, retrospectives, or durable feedback capture.
 ---
 
 # RationaleCapture
@@ -16,9 +16,9 @@ Typical triggers:
 - Why did we choose this?
 - Capture the tradeoffs and consequences
 
-This mode should produce rationale-rich documentation, not a release summary, generic current-state reference, postmortem, incident review, or durable lessons capture. If the durable object is a lesson from execution -- what happened, what it revealed, and what should change next time -- route to `pa-postmortem/FeedbackCapture`.
+This mode should produce rationale-rich documentation, not a release summary, generic current-state reference, postmortem, incident review, or durable lessons capture.
 
-Entry condition: the decision already exists. `RationaleCapture` documents it after the fact. If the user is still deciding what to do, route to the earlier SDLC phase that owns product definition, planning, or problem-solving. If the request is about lessons, incidents, retrospectives, or completed-session feedback, route to `pa-postmortem`.
+Entry condition: the decision already exists. `RationaleCapture` documents it after the fact. If the user is still deciding what to do, route to the earlier SDLC phase that owns product definition, planning, or problem-solving.
 
 ## Core Method
 
@@ -35,7 +35,7 @@ Entry condition: the decision already exists. `RationaleCapture` documents it af
 - For websites or content systems, prioritize content strategy decisions and UX rationale.
 - For PM systems, prioritize process changes and automation decisions.
 - For knowledge systems, prioritize taxonomy decisions, routing choices, and note-structure rationale; do not perform index or routing maintenance as part of this mode.
-- For personal workflows, prioritize habit decisions, planning tradeoffs, and missed expectations when they explain a settled choice. Route transferable lessons from execution to `pa-postmortem/FeedbackCapture`.
+- For personal workflows, prioritize habit decisions, planning tradeoffs, and missed expectations when they explain a settled choice.
 
 ## Workflow
 
@@ -75,5 +75,5 @@ Within `Key Content To Capture`, emphasize context, alternatives, rationale, and
 - Do not collapse into a changelog or release-note style summary.
 - Do not produce generic artifact reference docs unless the user is actually asking for current-state documentation.
 - Do not drift into long-term governance or documentation-system maintenance.
-- Do not use this mode for postmortems, lessons learned, incident reviews, retrospectives, or durable feedback capture; hand those to `pa-postmortem`.
+- Do not use this mode for postmortems, lessons learned, incident reviews, retrospectives, or durable feedback capture.
 - Do not use this mode to make the decision, redesign the process, or run the planning work itself.
