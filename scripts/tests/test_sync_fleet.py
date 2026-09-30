@@ -53,7 +53,8 @@ if [ "$host" = flaky ]; then
     fi
 fi
 cd "$FLEET_HOMES/$host" || exit 255
-HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
+shell=${FLEET_TEST_SHELL:-/bin/sh}
+HOME="$FLEET_HOMES/$host" SHELL="$shell" exec "$shell" -c "$*"
 """
 # Logs the recipe, then runs the machine's real installer like the justfile.
 FAKE_JUST = """#!/bin/sh
