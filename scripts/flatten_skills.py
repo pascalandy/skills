@@ -135,7 +135,8 @@ def render(source: Path) -> bytes:
     data = source.read_bytes()
     if source.name != "SKILL.md" or source.parent.parent.parent != AUTHORING:
         return data
-    text = data.decode("utf-8")
+    # Match CRLF sources too; a copy that gains the kind is published with LF
+    text = data.decode("utf-8").replace("\r\n", "\n")
     header = FRONTMATTER.match(text)
     if header is None or frontmatter_value(text, "kind") is not None:
         return data

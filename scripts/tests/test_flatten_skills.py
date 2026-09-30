@@ -150,10 +150,22 @@ class FlattenSkillsTests(unittest.TestCase):
             tagged.write_text(
                 '---\nname: "tagged"\nkind: "dev"\n---\n', encoding="utf-8"
             )
+            crlf = root / "authoring/devtools/crlf/SKILL.md"
+            crlf.parent.mkdir()
+            crlf.write_bytes(b'---\r\nname: "crlf"\r\n---\r\n# Crlf\r\n')
             subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
 
             self.assertEqual(
-                self.cli(), (0, "update\tskills/example\nadd\tskills/tagged\n", "")
+                self.cli(),
+                (
+                    0,
+                    "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/tagged\n",
+                    "",
+                ),
+            )
+            self.assertEqual(
+                (root / "skills/crlf/SKILL.md").read_bytes(),
+                b'---\nname: "crlf"\nkind: "unknown"\n---\n# Crlf\n',
             )
             self.assertEqual(
                 (root / "skills/example/SKILL.md").read_text(encoding="utf-8"),
