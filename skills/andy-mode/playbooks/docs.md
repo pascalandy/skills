@@ -85,7 +85,7 @@ Use this loop for the selected documentation target:
 2. **Draft:** Write the smallest update that captures the current change, rationale, or artifact state.
 3. **Fit:** Preserve the target's existing structure, voice, headings, links, and metadata conventions.
 4. **Ground:** Keep claims tied to collected evidence or explicit assumptions; do not invent context to make the document feel complete.
-5. **Polish:** Use (and reload) `$writer-sk` for a light clarity and concision pass without changing documented facts, rationale, scope, or canonical placement.
+5. **Polish:** Use (and reload) the `writer-sk` route for a light clarity and concision pass without changing documented facts, rationale, scope, or canonical placement.
 6. **Verify:** Check that the update is placed correctly, does not duplicate another canonical source, and leaves cross-references consistent.
 
 ## Documentation Discipline

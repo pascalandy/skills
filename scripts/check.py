@@ -137,6 +137,7 @@ VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
+ANDY_MODE = "authoring/andy/andy-mode"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -211,12 +212,12 @@ CHECKS = [
     ),
     Check(
         "andy-mode",
-        uv_run("authoring/andy/andy-mode/scripts/check_andy_mode.py"),
-        pytest("authoring/andy/andy-mode/scripts/tests"),
+        uv_run(f"{ANDY_MODE}/scripts/check_andy_mode.py"),
+        pytest(f"{ANDY_MODE}/scripts/tests"),
         # A shared route links to its sibling package
         reads=("authoring/andy/2nd-pass",),
     ),
-    Check("distill", pytest("authoring/andy/andy-mode/scripts/distill/tests")),
+    Check("distill", pytest(f"{ANDY_MODE}/scripts/distill/tests")),
     Check(
         "tavily",
         pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
@@ -238,14 +239,7 @@ CHECKS = [
         pyright(VIDEO_ARCHIVE),
         pytest(f"{VIDEO_ARCHIVE}/tests"),
     ),
-    Check(
-        "storytelling",
-        pytest("authoring/content/storytelling/tests/test_validate_package.py"),
-        uv_run(
-            "authoring/content/storytelling/tests/validate-package.py",
-            "authoring/content/storytelling",
-        ),
-    ),
+    Check("storytelling", pytest(f"{ANDY_MODE}/scripts/storytelling/tests")),
     Check(
         "image-creator",
         *ruff(IMAGE_CREATOR),

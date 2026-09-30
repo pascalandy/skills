@@ -1,4 +1,0 @@
-interface:
-  display_name: "Illustration"
-  short_description: "Draw sparse Xiaohei article illustrations"
-  default_prompt: "Use $illustration to plan and generate Xiaohei illustrations for this article."

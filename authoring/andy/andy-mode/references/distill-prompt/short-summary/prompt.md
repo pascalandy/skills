@@ -2,7 +2,7 @@
 
 Quick high-level summary to help decide if this video is worth watching in full.
 
-Use (and reload) `$writer-sk` to get the tone right in your final answer.
+Use (and reload) `andy-mode ; writer-sk` to get the tone right in your final answer.
 
 ## Task
 

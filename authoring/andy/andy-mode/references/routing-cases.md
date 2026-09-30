@@ -24,3 +24,5 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; Wiki Map` | `playbooks/wiki-map.md` |
 | `andy-mode ; think` | `playbooks/think.md` |
 | `andy-mode ; I think this architecture is simpler. Challenge me` | `playbooks/sparring.md` |
+| `andy-mode ; simple editor` | `playbooks/simple-editor.md` |
+| `andy-mode ; storytelling ; style modeler` | `playbooks/storytelling.md`, then its style modeler reference |
