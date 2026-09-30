@@ -172,12 +172,12 @@ distill --dry-run --prompt summary_with_quotes ~/Documents/article.md
 
 **opencode**
 ```bash
-uv run <skill_dir>/scripts/distill.py --provider opencode --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
+uv run <skill_dir>/scripts/distill/distill.py --provider opencode --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
 ```
 
 **claude**
 ```bash
-uv run <skill_dir>/scripts/distill.py --provider claude --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
+uv run <skill_dir>/scripts/distill/distill.py --provider claude --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
 ```
 
 ## See also

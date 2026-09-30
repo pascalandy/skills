@@ -27,7 +27,7 @@ Do **not** use this for YouTube URLs -- use `$transcript` instead. URL and media
 Resolve `../../../scripts/distill/distill.py` relative to this sub-skill directory (`dirname MetaSkill.md`) and run that absolute path.
 
 ```bash
-uv run <sub_skill_dir>/../../scripts/distill.py \
+uv run <sub_skill_dir>/../../../scripts/distill/distill.py \
     <input-file> \
     --prompt <prompt-stem>
 ```
@@ -39,7 +39,7 @@ Everything else defaults sensibly (claude provider, opus model, medium effort, o
 Instead of duplicating flag documentation here, run:
 
 ```bash
-uv run <sub_skill_dir>/../../scripts/distill.py --help
+uv run <sub_skill_dir>/../../../scripts/distill/distill.py --help
 ```
 
 This renders `references/distill/help.md` via `glow` (or plain markdown fallback) and covers:

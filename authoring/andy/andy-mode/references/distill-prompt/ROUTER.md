@@ -13,7 +13,7 @@ description: Routes requests to the right distill prompt sub-skill based on the 
 | short summary, tl;dr, quick overview, high-level summary, skim, 30 second summary, is this worth reading, is this worth watching | `short-summary/MetaSkill.md` |
 | summary with quotes, include quotes, quote-based outline, verbatim quotes, timestamped sections, best quotes | `summary-with-quotes/MetaSkill.md` |
 | extract wisdom, analyze video, analyze podcast, extract insights, what's interesting, key takeaways, what did I miss, content analysis, insight report | `extract-wisdom/MetaSkill.md` |
-| list prompts, what prompts exist, which distill prompts, available styles | List all sub-folders under `references/` |
+| list prompts, what prompts exist, which distill prompts, available styles | List all sub-folders under `references/distill-prompt/` |
 
 ## Default
 

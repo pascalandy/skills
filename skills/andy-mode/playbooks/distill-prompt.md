@@ -68,7 +68,7 @@ A consumer (like the `distill` tool) receives the path to a specific `prompt.md`
 | "short summary" / "TL;DR" / "quick overview" | Routes to `short-summary/MetaSkill.md` |
 | "summary with quotes" / "include quotes" / "quote-based outline" | Routes to `summary-with-quotes/MetaSkill.md` |
 | "extract wisdom" / "what's interesting" / "key takeaways" / "analyze this video" | Routes to `extract-wisdom/MetaSkill.md` |
-| "list available distill prompts" | Lists all sub-skills under `references/` |
+| "list available distill prompts" | Lists all sub-skills under `references/distill-prompt/` |
 
 ---
 

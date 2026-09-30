@@ -48,11 +48,11 @@ Fundamental issue: applying distill prompt to local file should be one cmd, not 
 1. **Pick prompt.** Read the `distill-prompt` playbook to choose the prompt that fits the user's need. Use that prompt's stem with `--prompt`
 2. **Read CLI help.** Resolve `scripts/distill/distill.py` from the andy-mode directory and run `--help` to see flags, defaults, and exit codes:
    ```
-   uv run <skill_dir>/scripts/distill.py --help
+   uv run <skill_dir>/scripts/distill/distill.py --help
    ```
 3. **Invoke with chosen prompt:**
     ```
-    uv run <skill_dir>/scripts/distill.py \
+    uv run <skill_dir>/scripts/distill/distill.py \
         ~/Documents/article.md \
         --prompt follow_along_note
     ```
