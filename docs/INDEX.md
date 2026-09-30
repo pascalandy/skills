@@ -1,8 +1,7 @@
 ---
 name: Docs
-description: Maintainer documentation for this repository, read on demand from AGENTS.md
+description: Script conventions, checks, installs, releases, and the remote skill table, read on demand from AGENTS.md
 schema_version: 3
-wiki_type: collection
 tags:
   - area/ea
   - kind/wiki
@@ -13,15 +12,19 @@ date_updated: 2026-09-30
 
 # Docs
 
-> Wiki collection. Choose a child wiki from this index, then read that child's `INDEX.md`
-> **Child wikis:** 1 | **Last updated:** 2026-09-30
+> Content catalog. Read this first to find relevant pages
+> **Total pages:** 5 | **Last updated:** 2026-09-30
 
-`AGENTS.md` holds what every session needs. This collection holds procedures that only some tasks need
+`AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need
 
 ## Wiki Map
 
-### kind/wiki
+### kind/doc
 
 | File | Description |
 |------|-------------|
-| `maintainer/INDEX.md` | Script conventions, checks, installs, releases, and the remote skill table for maintaining this repository |
+| `references/checks.md` | How `just check`, signoff, commit hooks, and the manual CI workflow fit together, and how to change them |
+| `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
+| `references/release.md` | Steps to publish a tagged release |
+| `references/remote-skills.md` | Generated name and description of every skill in `skills/`, for agents that cannot load these skills |
+| `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |

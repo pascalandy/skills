@@ -2,7 +2,7 @@
 
 `scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free `claude` or `pi` process.
 
-The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/maintainer/references/script-conventions.md` of the `pascalandy/skills` repository.
+The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/references/script-conventions.md` of the `pascalandy/skills` repository.
 
 ## Runtime requirements
 

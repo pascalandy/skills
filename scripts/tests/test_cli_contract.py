@@ -2,7 +2,7 @@
 
 test_cli.py tests the parser and the contract behavior once; this suite checks
 each script is wired to it, and that doc lines running a script use only flags
-its help lists. The contract is in docs/maintainer/references/script-conventions.md.
+its help lists. The contract is in docs/references/script-conventions.md.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ def doc_flags(path: str) -> Iterator[tuple[str, str]]:
                     yield flag, f"{source.relative_to(ROOT)}:{number}"
 
 
-CONTRACT_DOC = ROOT / "docs/maintainer/references/script-conventions.md"
+CONTRACT_DOC = ROOT / "docs/references/script-conventions.md"
 
 CONTRACT_COMMAND = ROOT / "authoring/commands/cli-contract.md"
 
