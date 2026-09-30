@@ -32,7 +32,7 @@ List proof of work from previous steps plus a completion audit.
 
 Include this section only if input is needed.
 
-If you need user input, use and reload `$sparring` for each unresolved decision or unapplied fix requiring user judgment.
+If you need user input, use and reload `andy-mode ; sparring` for each unresolved decision or unapplied fix requiring user judgment.
 
 For each unresolved decision, include:
 

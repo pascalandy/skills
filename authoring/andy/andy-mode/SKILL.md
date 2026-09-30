@@ -54,6 +54,8 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 
 | Route | Aliases | Use when |
 |---|---|---|
+| [`sparring`](playbooks/sparring.md) | | Challenge an opinion or an argument |
+| [`think`](playbooks/think.md) | | Improve the model of a situation before judging, deciding, or acting |
 | [`2nd-pass`](../2nd-pass/SKILL.md) | `2pass` | Review finished work with fresh eyes. It also runs alone as the `2nd-pass` skill |
 
 ## Callers

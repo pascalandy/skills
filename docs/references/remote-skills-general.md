@@ -23,10 +23,8 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | meta-sc | Use only when explicitly invoked as `$meta-sc` to create or refactor a skill with several internal branches behind one entry point. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | simple-editor | Use only when explicitly invoked as `simple-editor`. |
-| sparring | Use only when explicitly invoked as `sparring`. |
 | storytelling | Use only when explicitly invoked as `storytelling`. |
 | tavily | Use when the user explicitly requests Tavily, or for basic or current external web search and URL discovery. Do not select automatically for advanced research, extraction, schema-constrained output, or cited synthesis. |
-| think | Use only when explicitly invoked as `$think` to improve the model of a situation before judging, deciding, or acting. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | trello | Use only when explicitly invoked as `trello`. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |

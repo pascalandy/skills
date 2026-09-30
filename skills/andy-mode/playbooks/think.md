@@ -1,9 +1,3 @@
----
-name: "think"
-description: "Use only when explicitly invoked as `$think` to improve the model of a situation before judging, deciding, or acting."
-kind: "general"
----
-
 # Think
 
 Use the smallest reasoning method that can reduce the uncertainty blocking the user. Depth comes from following the decisive uncertainty, not from applying many lenses.
@@ -32,7 +26,7 @@ This step is complete when one uncertainty can be named whose reduction would ch
 
 | Actual request | Better owner |
 |---|---|
-| Challenge a stated opinion or argument | `sparring` |
+| Challenge a stated opinion or argument | the `sparring` route |
 | Pressure-test through focused questions | `grilling` |
 | Design software structure | `architect` in design-only mode |
 | Plan non-software structure or a macro-roadmap | `figure-it-out`, framing and planning only |
@@ -48,16 +42,16 @@ This step is complete when `think` either owns the remaining uncertainty or has 
 
 ## Step 3: choose one method
 
-Resolve paths relative to this `SKILL.md`. Read only the selected method.
+Read only the selected method.
 
 | Blocking uncertainty | Method to read |
 |---|---|
-| The question, criterion, or frame may be wrong | `references/frame.md` |
-| Constraints, assumptions, and conventions are mixed together | `references/decompose.md` |
-| Several explanations could account for the observations | `references/diagnose.md` |
-| Options must be judged against decision-relevant criteria | `references/compare.md` |
-| Actors may respond strategically to rules, incentives, or one another | `references/dynamics.md` |
-| Benefits, burdens, duties, consent, or harm may be misallocated | `references/ethics.md` |
+| The question, criterion, or frame may be wrong | `references/think/frame.md` |
+| Constraints, assumptions, and conventions are mixed together | `references/think/decompose.md` |
+| Several explanations could account for the observations | `references/think/diagnose.md` |
+| Options must be judged against decision-relevant criteria | `references/think/compare.md` |
+| Actors may respond strategically to rules, incentives, or one another | `references/think/dynamics.md` |
+| Benefits, burdens, duties, consent, or harm may be misallocated | `references/think/ethics.md` |
 
 ### Tie-breakers for mixed requests
 
@@ -73,7 +67,7 @@ Choose the method that settles the earliest dependency in the reasoning, then fi
 
 If the first method removes the need for the rest, stop. A mixed prompt does not authorize automatic composition.
 
-If the selected method stalls or the user explicitly requests another angle, read `references/techniques.md` and select one targeted technique. Never run the whole bank by default.
+If the selected method stalls or the user explicitly requests another angle, read `references/think/techniques.md` and select one targeted technique. Never run the whole bank by default.
 
 This step is complete when the chosen method has produced a material update to the model or made the irreducible uncertainty explicit.
 
@@ -94,4 +88,4 @@ The run is complete when the user can make a better judgment, request the missin
 
 ## Maintenance
 
-When evaluating or changing this skill, read `references/acceptance-cases.md`. Do not load those cases during normal use.
+When evaluating or changing this skill, read `references/think/acceptance-cases.md`. Do not load those cases during normal use.

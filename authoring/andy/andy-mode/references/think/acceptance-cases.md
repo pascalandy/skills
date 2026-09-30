@@ -10,7 +10,7 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Compare these mortgage options and show what would flip the choice" | `compare` identifies decisive variables and switching conditions | Apply civilizational or geopolitical lenses |
 | "Why are these bank stakeholders resisting the change and how will they respond" | `dynamics` maps actors, rules, supported incentives, and responses | Assert hidden motives or import course claims |
 | "Who bears the costs of this pricing decision and is the consent meaningful" | `ethics` maps value, risk, duties, consent, objection, and repair | Grade nine virtues automatically |
-| "I think this architecture is simpler. Challenge me" | Recommend or use active `sparring` | Run `frame` merely because an opinion exists |
+| "I think this architecture is simpler. Challenge me" | Recommend or use the `sparring` route | Run `frame` merely because an opinion exists |
 | "Look up the current mortgage rules and rates" | Recommend `tavily` | Analyze unstable facts from memory |
 | "Research the primary sources and preserve the findings in this repository" | Gather primary sources and save cited findings as Markdown in the repository's existing notes location, delegating if requested | Substitute an unfiled web summary |
 | "Teach me the corpus's Law of Proximity" | Recommend `game-theory-corpus` | Present the course concept as canonical game theory |
