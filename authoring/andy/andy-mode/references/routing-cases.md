@@ -13,3 +13,6 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; pa-retro` | The route tables and a question. No route runs |
 | `ND mode ; retro` | `playbooks/retro-skill.md` |
 | `indie mode ; retro general` | `playbooks/retro-general.md` |
+| `andy-mode ; QA` | `playbooks/qa.md` |
+| `andy-mode ; pa-qa` | The route tables and a question. No route runs |
+| `andy-mode ; note this idea: a shared inbox for agent feedback` | `playbooks/idea.md` |

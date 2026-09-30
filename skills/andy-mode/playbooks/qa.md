@@ -1,10 +1,4 @@
----
-name: "pa-qa"
-description: "Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem."
-kind: "dev"
----
-
-# PA QA Session
+# QA Session
 
 Run post-implementation QA after the selected implementation workflow or before closing a change. Validate accepted user-facing behavior when no problem is reported. When the user reports problems conversationally, clarify lightly, inspect enough context, and produce durable QA findings or follow-ups in project domain language.
 
@@ -36,7 +30,7 @@ Use `ValidationPass` first when the goal is final E2E validation and there is no
 Apply these rules during validation and finding capture:
 
 - **Simplicity first:** use the smallest proof loop that can validate the accepted behavior or clarify the finding. Do not turn QA into broad debugging or implementation.
-- **Surgical changes:** if diagnosis requires temporary probes, tag and remove them. Do not clean, refactor, or fix adjacent implementation from `pa-qa`.
+- **Surgical changes:** if diagnosis requires temporary probes, tag and remove them. Do not clean, refactor, or fix adjacent implementation from the `qa` route.
 - **Surface conflicts, don't average them:** when accepted behavior, docs, implementation, and observed behavior disagree, report the conflict and route the decision; do not soften it into a vague partial pass.
 - **Read before you validate:** inspect the user-facing contract, docs, CLI/help/API surface, workflow, or artifact before deciding what should happen.
 - **Tests verify intent:** proof signals must exercise the user-facing reason the behavior matters, not only a nearby implementation path.
@@ -90,7 +84,7 @@ If the user-facing behavior is already clear enough, skip diagnosis and validate
 
 ## Bounded Diagnosis Loop
 
-Diagnosis exists to clarify the QA finding, not to silently turn `/pa-qa` into implementation.
+Diagnosis exists to clarify the QA finding, not to silently turn the `qa` route into implementation.
 
 ### Phase 1 — Build or identify a feedback loop
 

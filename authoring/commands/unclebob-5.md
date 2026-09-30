@@ -1088,7 +1088,7 @@ Before spawning QA:
 - Provide safety prohibitions
 - Do not provide implementation rationale or prior quality conclusions
 
-If `$pa-qa` is available, QA must load it just in time and use `ValidationPass`. If validation finds a defect, use `FindingCapture` only to structure the in-thread finding. Do not export an artifact or write to the repository.
+If the `andy-mode` skill is available, QA must load its `qa` route just in time and use `ValidationPass`. If validation finds a defect, use `FindingCapture` only to structure the in-thread finding. Do not export an artifact or write to the repository.
 
 ### Mission
 

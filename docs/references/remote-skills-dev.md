@@ -32,7 +32,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | matt-mode | Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets. |
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
 | pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
-| pa-qa | Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem. |
 | pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-attack-the-premise | Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it. |

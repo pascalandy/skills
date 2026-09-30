@@ -153,7 +153,7 @@ user request → plan → build → CI/QA → reviewer → doc → commit
 
 This is the default workflow for this workspace command. Use the matching `$poteto-mode` playbook for delivery or `$figure-it-out` when a tailored workflow is needed. If requirements are ambiguous, return to the relevant idea skill before building.
 
-Pre-build work in `pa-idea` is outside this command's build sequence.
+Pre-build work in `andy-mode ; idea` is outside this command's build sequence.
 
 ---
 
@@ -182,7 +182,7 @@ Send a structured brief with:
 - User request, constraints, and acceptance criteria.
 - Canonical **Role Assignments** roster and profile tiers.
 - Current agent states (launched/idle vs standby).
-- Applicable skills per role: Planner (`$figure-it-out`), Builders (`$poteto-mode`), QA (`$pa-qa`), Docs (`$pa-doc-update`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
+- Applicable skills per role: Planner (`$figure-it-out`), Builders (`$poteto-mode`), QA (`andy-mode ; qa`), Docs (`$pa-doc-update`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
 - Explicit requirements: subtasks with deliverables, acceptance criteria, dynamic pane names (`<phase>/<total>-<prefix>-<keyword>`), dependency order, parallel lanes, and shared-file conflict prevention.
 
 **Delegation preamble (included in all delegated prompts):**
@@ -232,7 +232,7 @@ Send a structured brief with:
 - Run automated verification: test suites, linters, typecheckers, and build scripts (e.g., `just ci`). Report structured pass/fail logs.
 
 #### QA
-- Perform hands-on functional and user-journey validation against acceptance criteria. Inspect web/UI flows with browser automation and screenshots (requires vision). Skill: `$pa-qa`.
+- Perform hands-on functional and user-journey validation against acceptance criteria. Inspect web/UI flows with browser automation and screenshots (requires vision). Skill: `andy-mode ; qa`.
 
 #### Docs
 - Update affected documentation, specs, and CLI reference notes when behavior or configuration changes. Skill: `$pa-doc-update`.
