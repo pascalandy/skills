@@ -1,6 +1,6 @@
 ---
 name: "andy-mode"
-description: "Use only when explicitly invoked as `andy-mode`, where `ND` and `indie` are dictated synonyms of `andy`."
+description: "Use only when explicitly invoked as `andy-mode ; <route>`, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`."
 kind: "general"
 ---
 
