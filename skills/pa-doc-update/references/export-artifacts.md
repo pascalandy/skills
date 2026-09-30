@@ -100,7 +100,6 @@ For every exporting skill:
 | `pa-idea` | Always | `idea` | Captures rough idea with minimal editing |
 | `pa-vision` | Mandatory for vision artifacts | `vision` | Defines target state and decision direction |
 | `figure-it-out` in planning-only mode | Optional | `impl-plan` | Use this local profile when a durable slice plan is requested; execution trails remain governed by pstack |
-| `pa-postmortem` | Mandatory for postmortem artifacts | `postmortem` | Captures lessons, incident review, or session review |
 | `pa-premortem` | Mandatory for premortem artifacts | `premortem` | Captures failure scenarios, hidden assumption, revised plan, and pre-launch checklist |
 | `pa-scope` | Rare / optional | `scope` | Export only when the user needs a reusable scope map, blast-radius artifact, or validation/risk artifact |
 | Separate `poteto-mode` delivery session | No by default | n/a | Implements and verifies through the matching playbook; recommends documentation or postmortem capture when needed |
@@ -119,7 +118,6 @@ Examples:
 - `pa-vision` must write the vision artifact before handing off to `architect`.
 - A requested architecture artifact must be delivered before handing off to implementation; `architect` owns its design-package format.
 - `figure-it-out` may hand off to a separate `poteto-mode` delivery session without export when the user wants to implement directly from `pa-vision` or `architect`.
-- `pa-postmortem` must write the retrospective artifact before returning lessons as complete.
 
 ## Skill-local export sections
 

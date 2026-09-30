@@ -39,14 +39,13 @@ Load `references/ROUTER.md`.
 | Mode | Owns | Use when |
 |---|---|---|
 | `ChangeCapture` | Recent change documentation | The anchor is what changed and where that update belongs |
-| `RationaleCapture` | Lightweight decision rationale | The durable object is a decision: what was chosen, why it was chosen, and which alternatives were rejected; deeper lessons, incidents, and retrospectives belong to `pa-postmortem` |
+| `RationaleCapture` | Lightweight decision rationale | The durable object is a decision: what was chosen, why it was chosen, and which alternatives were rejected |
 | `ArtifactDocumenter` | One current-state artifact | The anchor is one module, page, workflow, board, or note set as it exists now |
 
 ## Boundaries
 
 | If the real need is... | Use instead |
 |---|---|
-| retrospectives, incident reviews, or durable lesson capture | `pa-postmortem` |
 | stale-doc review, deduplication, frontmatter, routing, or doc governance | `pa-doc-cleaner` |
 | bounded current-state evidence before scoping | `pa-scope` |
 | scoping the change surface | `pa-scope` |

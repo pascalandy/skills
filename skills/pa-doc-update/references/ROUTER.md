@@ -14,13 +14,13 @@ Before drafting any in-scope documentation update, build an evidence baseline:
 3. Check for an existing relevant `postmortem-*.md` artifact, especially under the resolved `sdlc-pa` export root beside related lifecycle artifacts. If it exists, use it as context for lessons, risks, rationale, follow-ups, and cross-references.
 4. If the documentation target, affected surface, blast radius, validation surface, or artifact relevance is unclear, use (and reload) `$pa-scope` first and feed its scope judgment back into this doc update.
 
-Do not create or rewrite postmortems here; route new postmortem work to `pa-postmortem`.
+Do not create or rewrite postmortems here.
 
 ## Routing
 
 | Request Pattern | Route To |
 |---|---|
-| postmortem, lessons learned, incident review, retrospective, session review, durable feedback capture, what happened, what did this reveal, what should we remember or change next time | out of scope -> hand off to `pa-postmortem`; if unavailable, state that the request is outside `pa-doc-update` |
+| postmortem, lessons learned, incident review, retrospective, session review, durable feedback capture, what happened, what did this reveal, what should we remember or change next time | out of scope -> state that the request is outside `pa-doc-update` |
 | clean up docs, deduplicate docs, refresh stale docs across the repo, audit documentation, reorganize docs, fix frontmatter, repair routing tables, documentation governance | out of scope -> hand off to `pa-doc-cleaner`; if unavailable, state that the request is outside `pa-doc-update` |
 | explore this project, figure out what needs to change, define the feature, write the implementation plan, implement the change | out of scope -> hand off to `pa-scope`, `pa-vision`, `architect`, `figure-it-out`, or a separate `poteto-mode` delivery session as appropriate; if unavailable, state that the request is outside `pa-doc-update` |
 | update the docs for this change, capture what changed, document this fix, release notes, changelog, sync docs after shipping, post-ship docs, capture the shipped changes, document what we just changed | `ChangeCapture/MetaSkill.md` |
