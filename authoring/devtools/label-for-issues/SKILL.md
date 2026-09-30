@@ -202,8 +202,8 @@ This JSON owns exact names, colors, and descriptions.
 
 ## GitHub CLI
 
-`gh` 2.94 and later manages issue relationships; report an older version as a
-blocker. Set them with `gh issue create --parent`, `--blocked-by`, or `--blocking`,
+`gh` 2.94 and later manages issue relationships. On an older version, report it
+and use `gh api` for relationships. Set them with `gh issue create --parent`, `--blocked-by`, or `--blocking`,
 and with `gh issue edit --parent`, `--remove-parent`, `--add-sub-issue`,
 `--remove-sub-issue`, `--add-blocked-by`, `--remove-blocked-by`, `--add-blocking`,
 or `--remove-blocking`, using URLs for issues in other repositories. Keep `gh api`
