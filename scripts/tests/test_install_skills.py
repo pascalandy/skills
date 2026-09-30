@@ -263,6 +263,21 @@ def test_uncommitted_public_skill_is_removed_after_its_source_goes(
     assert not any((home / target / "draft").exists() for target in MAC)
 
 
+def test_a_skill_without_a_kind_installs_the_flattened_kind_unknown(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    source = repo / "authoring/content/alpha/SKILL.md"
+    source.write_text('---\nname: "alpha"\n---\nnew\n', encoding="utf-8")
+    assert run(repo, home).returncode == 0
+    published = '---\nname: "alpha"\nkind: "unknown"\n---\nnew\n'
+    assert (repo / "skills/alpha/SKILL.md").read_text(encoding="utf-8") == published
+    assert all(
+        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8") == published
+        for target in MAC
+    )
+
+
 def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     shallow = repo.parent / "shallow"
