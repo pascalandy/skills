@@ -6,7 +6,7 @@ kind: "general"
 
 # Corey mode
 
-Corey-mode does marketing work with Corey Haines' playbooks, from strategy to the pages, emails, ads, and site changes they produce. Poteto-mode runs engineering work, and matt-mode prepares it.
+Corey-mode does marketing work with Corey Haines' playbooks, from strategy to the pages, emails, ads, and site changes they produce. Poteto-mode runs engineering work, matt-mode prepares it, and andy-mode carries the tools Pascal wrote.
 
 ## Pick the route
 
