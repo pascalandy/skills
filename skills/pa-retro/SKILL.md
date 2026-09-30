@@ -3,15 +3,15 @@ name: "pa-retro"
 description: "Use only when explicitly invoked as `pa-retro`."
 ---
 
-Post-mortem on the skills you loaded in this conversation.
+Post-mortem on the skills the agent loaded in this conversation.
 
-Find where a skill was wrong, contradictory, or confusing enough to cost you a detour: a missing detail, a step that failed, an instruction that sent you in circles. Keep a finding only if:
-- it would recur in another task using the same skill (skip one-offs, your own mistakes, and outside failures), and
+Find where a skill was wrong, contradictory, or confusing enough to cost the agent a detour: a missing detail, a step that failed, an instruction that sent the agent in circles. Keep a finding only if:
+- it would recur in another task using the same skill (skip one-offs, the agent's own mistakes, and outside failures), and
 - the fix fits in one sentence or one changed line of the skill.
 
 Include every finding that passes. If none do, say so and stop.
 
-Cite evidence for each finding: the skill file and line (or section) you followed, and the step where it went wrong. If you can't point to it, drop it.
+Cite evidence for each finding: the skill file and line (or section) the agent followed, and the step where it went wrong. If the agent can't point to it, drop it.
 
 Draft one issue per finding for https://github.com/pascalandy/skills. Write in the language of the conversation and keep the template's headings.
 
