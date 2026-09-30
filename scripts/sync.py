@@ -70,7 +70,7 @@ def step(*command: str, cwd: Path) -> list[str]:
         raise (TemporaryError if result.returncode == 75 else ScriptError)(
             error or f"published step exited {result.returncode}; rerun just sync"
         )
-    if result.stderr and ("--verbose" in command or "--debug" in command):
+    if result.stderr:
         sys.stderr.write(result.stderr)
     return result.stdout.splitlines()
 

@@ -126,16 +126,22 @@ def test_launcher_executes_newer_published_installer_code_without_upgrading_auth
     text = new_installer.read_text()
     assert '"mac": frozenset(),' in text
     new_installer.write_text(
-        text.replace('"mac": frozenset(),', '"mac": frozenset({"alpha"}),').replace(
+        text.replace('"mac": frozenset(),', '"mac": frozenset({"alpha"}),')
+        .replace(
             '"om1": frozenset({"apple-mail"})',
             '"om1": frozenset({"apple-mail", "alpha"})',
+        )
+        .replace(
+            'if __name__ == "__main__":\n',
+            'if __name__ == "__main__":\n'
+            '    print("published installer warning", file=sys.stderr)\n',
         )
     )
     commit(seed)
     git(seed, "push", "-q", str(repo.parent / "skills.git"), "main")
     author_head = git(repo, "rev-parse", "HEAD")
     result = run(repo, home)
-    assert result.returncode == 0, result.stderr
+    assert (result.returncode, result.stderr) == (0, "published installer warning\n")
     assert "remove\t~/.claude/skills/alpha" in result.stdout
     assert not (home / ".claude/skills/alpha").exists()
     assert (repo / "scripts/install_skills.py").read_bytes() == original
