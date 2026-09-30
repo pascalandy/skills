@@ -37,6 +37,6 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 
 ## Callers
 
-A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill.md`. It keeps its own task and loads no other route.
+A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill.md`. It keeps its own task and loads another route only when that playbook calls for it.
 
 Use [routing cases](references/routing-cases.md) when changing a route name, an alias, or this file's routing rules.

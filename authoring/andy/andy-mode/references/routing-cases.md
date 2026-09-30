@@ -1,6 +1,6 @@
 # Routing cases
 
-Run each request in a fresh session that has andy-mode installed. A case passes when the agent reads the expected file and no other route file.
+Run each request in a fresh session that has andy-mode installed. A case passes when the first route file the agent reads is the expected one. A route that the chosen playbook calls for may load after it.
 
 | Request | Expected |
 |---|---|
