@@ -253,6 +253,14 @@ def private_packages(root: Path | None) -> dict[str, Path]:
     return packages
 
 
+def committed_files(directory: str) -> list[Path]:
+    """List the paths HEAD tracks in a repository directory."""
+    listed = flatten_skills.git(
+        "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", directory
+    )
+    return [Path(os.fsdecode(path)) for path in listed.split(b"\0") if path]
+
+
 def skill_sources(
     stage: Path, private_root: Path | None, profile: str, snapshot: bool = False
 ) -> dict[str, Source]:
@@ -260,13 +268,7 @@ def skill_sources(
     the profile's exclusions."""
     sources: dict[str, Source] = {}
     if snapshot:
-        paths = flatten_skills.git(
-            "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "skills"
-        ).split(b"\0")
-        for raw in paths:
-            if not raw:
-                continue
-            relative = Path(os.fsdecode(raw))
+        for relative in committed_files("skills"):
             if len(relative.parts) < 3:
                 continue
             original = ROOT / relative
@@ -310,13 +312,7 @@ def skill_sources(
 def command_sources(snapshot: bool = False) -> dict[str, Source]:
     sources: dict[str, Source] = {}
     files = (
-        [
-            Path(os.fsdecode(path))
-            for path in flatten_skills.git(
-                "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "authoring/commands"
-            ).split(b"\0")
-            if path
-        ]
+        committed_files("authoring/commands")
         if snapshot
         else flatten_skills.git_files("authoring/commands")
     )
