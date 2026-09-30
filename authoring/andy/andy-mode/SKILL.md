@@ -58,6 +58,15 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | [`think`](playbooks/think.md) | | Improve the model of a situation before judging, deciding, or acting |
 | [`2nd-pass`](../2nd-pass/SKILL.md) | `2pass` | Review finished work with fresh eyes. It also runs alone as the `2nd-pass` skill |
 
+### Writing and visuals
+
+| Route | Aliases | Use when |
+|---|---|---|
+| [`writer-sk`](playbooks/writer-sk.md) | | Edit prose for clarity and concision |
+| [`simple-editor`](playbooks/simple-editor.md) | | Clean personal notes while keeping the author's raw voice |
+| [`storytelling`](playbooks/storytelling.md) | | Discover, write, diagnose, adapt, or explain a narrative |
+| [`illustration`](playbooks/illustration.md) | | Design and generate a 16:9 inline illustration |
+
 ## Callers
 
 A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill.md`. It keeps its own task and loads another route only when that playbook calls for it.

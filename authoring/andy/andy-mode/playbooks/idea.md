@@ -12,8 +12,8 @@ Read `references/docs/export-artifacts.md` and follow its `idea` export profile.
 2. Resolve `entry_slug`, `export_dir`, `export_file`, and `export_path` before editing any text.
 3. Start from the raw text.
 4. If the idea is very short, output a simple bullet-point list — do not expand or embellish.
-5. Otherwise, use (and reload) `$simple-editor` for a light pass that preserves the user's voice while cleaning obvious rough edges.
-6. Then use (and reload) `$writer-sk` for clarity and concision without adding analysis, advice, new sections, or changing the original language/voice.
+5. Otherwise, use (and reload) the `simple-editor` route for a light pass that preserves the user's voice while cleaning obvious rough edges.
+6. Then use (and reload) the `writer-sk` route for clarity and concision without adding analysis, advice, new sections, or changing the original language/voice.
 7. Write the final text to the resolved `export_path`.
 8. Return the folder path, file path, and final slug.
 

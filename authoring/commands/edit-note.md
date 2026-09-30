@@ -13,5 +13,5 @@ In other words, do not try to anticipate all the jobs in advance. Go one by one.
 
 ## Jobs
 
-1. Use (and reload) `$simple-editor` to edit the note.
-2. Use (and reload) `$writer-sk` to edit the note.
+1. Use (and reload) `andy-mode ; simple-editor` to edit the note.
+2. Use (and reload) `andy-mode ; writer-sk` to edit the note.
