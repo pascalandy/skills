@@ -172,14 +172,14 @@ step() {
     else
         head=-
     fi
-    echo "checkout published $head clean"
+    echo "checkout $head"
 }
 """
 # After bootstrap, the cached launcher works even on old authoring branches.
 APPLY = """
 step() {
     enter "$1" || return
-    published_step --machine-step apply --revision "$3" --timeout "$4"
+    published_step --machine-step apply --revision "$2" --timeout "$3"
 }
 """
 # Prints private state and a preview of the published install.
@@ -486,11 +486,10 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     code, lines = remote(machine, INSPECT, machine.path)
     if code or not lines or not lines[-1].startswith("checkout "):
         return failure(machine.name, code, lines)
-    _, _, head, _ = lines[-1].split()
-    problems: list[str] = []
-    behind = head == "-" or (head != source.sha and source.contains(head))
+    head = lines[-1].split()[1]
     if mode == "check":
-        if behind:
+        problems: list[str] = []
+        if head == "-" or (head != source.sha and source.contains(head)):
             problems.append(f"published checkout is behind GitHub at {head[:7]}")
         found = installed(machine, source)
         if isinstance(found, Outcome):
@@ -538,7 +537,7 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 f"git push failed: {detail}",
                 temporary=is_network_failure(pushed.stderr),
             )
-    code, lines = remote(machine, APPLY, machine.path, head, source.sha, f"{TIMEOUT:g}")
+    code, lines = remote(machine, APPLY, machine.path, source.sha, f"{TIMEOUT:g}")
     if code:
         return failure(machine.name, code, lines)
     deployed = next(
@@ -786,7 +785,6 @@ def work(args: argparse.Namespace) -> str:
             str(ROOT),
         ]
         os.execv(sys.executable, command)
-        raise AssertionError("exec returned")
     if args.author_root is None:
         raise UsageError("--worker needs --author-root")
     ROOT = author_root(args.author_root)

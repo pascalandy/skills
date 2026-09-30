@@ -77,61 +77,52 @@ def step(*command: str, cwd: Path) -> list[str]:
 
 def sync(args: argparse.Namespace) -> str:
     root = author_root(args.author_root or ROOT)
-    if args.worker:
-        levels = [
-            *(["--verbose"] if args.verbose else []),
-            *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
-        ]
-        flags = (
-            ["--dry-run" if args.dry_run else "--check"]
-            if args.dry_run or args.check
-            else []
-        )
-        lines: list[str] = []
-        if not flags:
-            lines += step(
-                sys.executable,
-                str(ROOT / "scripts/sync_private.py"),
-                "--root",
-                str(root),
-                "--timeout",
-                f"{args.timeout:g}",
-                *levels,
-                cwd=ROOT,
+    flags = ["--dry-run"] if args.dry_run else ["--check"] if args.check else []
+    levels = [
+        "--timeout",
+        f"{args.timeout:g}",
+        *(["--verbose"] if args.verbose else []),
+        *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
+    ]
+    if not args.worker:
+        sha = github(root, args.timeout)
+        with published(root, sha, args.timeout) as checkout:
+            return "\n".join(
+                step(
+                    sys.executable,
+                    str(checkout / "scripts/sync.py"),
+                    "--worker",
+                    "--author-root",
+                    str(root),
+                    *flags,
+                    *levels,
+                    cwd=checkout,
+                )
             )
+    lines: list[str] = []
+    if not flags:
         lines += step(
             sys.executable,
-            str(ROOT / "scripts/install_skills.py"),
-            "--snapshot",
-            *(
-                ["--private-root", str(root / "_skills_private")]
-                if (root / "_skills_private").exists()
-                else []
-            ),
-            *flags,
-            "--timeout",
-            f"{args.timeout:g}",
+            str(ROOT / "scripts/sync_private.py"),
+            "--root",
+            str(root),
             *levels,
             cwd=ROOT,
         )
-        return "\n".join(lines)
-    sha = github(root, args.timeout)
-    with published(root, sha, args.timeout) as checkout:
-        return "\n".join(
-            step(
-                sys.executable,
-                str(checkout / "scripts/sync.py"),
-                "--worker",
-                "--author-root",
-                str(root),
-                *(["--dry-run"] if args.dry_run else ["--check"] if args.check else []),
-                "--timeout",
-                f"{args.timeout:g}",
-                *(["--verbose"] if args.verbose else []),
-                *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
-                cwd=checkout,
-            )
-        )
+    lines += step(
+        sys.executable,
+        str(ROOT / "scripts/install_skills.py"),
+        "--snapshot",
+        *(
+            ["--private-root", str(root / "_skills_private")]
+            if (root / "_skills_private").exists()
+            else []
+        ),
+        *flags,
+        *levels,
+        cwd=ROOT,
+    )
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
