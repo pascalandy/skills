@@ -151,9 +151,9 @@ Work in progress (stop if the user actually assigns any agent to this harness).
 
 user request → plan → build → CI/QA → reviewer → doc → commit
 
-This is the default workflow for this workspace command. Use the matching `$poteto-mode` playbook for delivery or `$figure-it-out` when a tailored workflow is needed. If requirements are ambiguous, return to the relevant idea or vision skill before building.
+This is the default workflow for this workspace command. Use the matching `$poteto-mode` playbook for delivery or `$figure-it-out` when a tailored workflow is needed. If requirements are ambiguous, return to the relevant idea skill before building.
 
-Pre-build work in `pa-idea` or `pa-vision` is outside this command's build sequence.
+Pre-build work in `pa-idea` is outside this command's build sequence.
 
 ---
 

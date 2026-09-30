@@ -16,7 +16,6 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Research the primary sources and preserve the findings in this repository" | Gather primary sources and save cited findings as Markdown in the repository's existing notes location, delegating if requested | Substitute an unfiled web summary |
 | "Teach me the corpus's Law of Proximity" | Recommend `game-theory-corpus` | Present the course concept as canonical game theory |
 | "Grill me with focused questions until this plan's weak point is clear" | Recommend `grilling` | Substitute an essay or silent analysis |
-| "Package this settled direction as a durable decision brief" | Recommend `pa-vision` | Treat artifact authoring as an internal method |
 | "Turn this settled direction into an execution architecture and macro-roadmap" | Recommend `architect` for software design or `figure-it-out` for macro-roadmap planning, without implementation | Implement before planning is accepted or force non-software work into module-interface design |
 | "Decide where this module's seam belongs and how deep its interface should be" | Recommend `matt-mode ; codebase-design` | Route to execution architecture |
 | "Reproduce this bug, diagnose it, and repair it" | Recommend the `poteto-mode` Bug fix playbook | Stop after a hypothetical diagnosis |

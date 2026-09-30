@@ -47,7 +47,6 @@ Load `references/ROUTER.md`.
 | If the real need is... | Use instead |
 |---|---|
 | stale-doc review, deduplication, frontmatter, routing, or doc governance | `pa-doc-cleaner` |
-| defining the direction | `pa-vision` |
 | planning or implementation | `architect`, `figure-it-out`, or a separate `poteto-mode` delivery session |
 
 ## Documentation Update Summary

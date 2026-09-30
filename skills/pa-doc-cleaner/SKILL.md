@@ -51,7 +51,7 @@ Use this table for step 2 of the maintenance workflow. Choose one primary mode b
 | If the real need is... | Use instead |
 |---|---|
 | documenting one concrete change, decision, or artifact | `pa-doc-update` |
-| defining direction or planning execution | `pa-vision` or `architect` |
+| defining direction or planning execution | `architect` |
 | applying a change or fixing a bug | a separate `poteto-mode` delivery session using the matching Feature or Bug fix playbook |
 | creating a glossary or resolving canonical terminology | `pa-glossary` |
 
@@ -93,7 +93,7 @@ Before applying or recommending cleanup, decide whether the request is safe to c
 
 - fresh documentation needs to be authored from a completed change, decision, or artifact → `pa-doc-update`
 - the current state or affected surface is unclear → `blast-radius`
-- product direction, architecture, or implementation plan is unresolved → `pa-vision`, `architect`, or `figure-it-out`
+- product direction, architecture, or implementation plan is unresolved → `architect` or `figure-it-out`
 - terminology ownership or canonical vocabulary is unclear → `pa-glossary`
 
 ## Maintenance Discipline
