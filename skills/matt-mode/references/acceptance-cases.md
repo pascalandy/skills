@@ -29,7 +29,7 @@ Use fresh independent sessions and isolated writable workspaces. Give each sessi
 | Planning followed by implementation | Request a local spec then ask Matt-mode to implement through subagents | Produces the planning artifact, points to Poteto-mode, and stops before application or test-code changes |
 | Wayfinder | Resume a map whose next question requires executable evidence | Preserves the unresolved decision and missing evidence without performing prerequisite implementation |
 | Invalid frontier | Missing blocker, cycle, exclusion, or another worker's claim | Reports the impediment without stealing the claim or inventing a resolution |
-| GitHub frontier | Resume a map on GitHub and ask for the next ticket | Reads sub-issues, blockers, and assignees through native `gh` commands, using `gh api` only to page a truncated connection |
+| GitHub frontier | Resume a map on GitHub and ask for the next ticket | Reads sub-issues, blockers, and assignees through native `gh` commands, using `gh api` only to page a truncated connection or on `gh` older than 2.94 |
 | Shared research | Request facts outside a Matt-mode session | Shared skill remains available and cites primary sources within the requested output scope |
 | PStack caller | Ask figure-it-out for delivery tickets | Reads Matt-mode's entry contract and to-tickets while retaining implementation workflow ownership |
 | Fresh implementation session | Supply only a generated ticket, spec, and linked evidence | Recovers required behavior, vocabulary, design/testing decisions, exclusions, and blockers |
