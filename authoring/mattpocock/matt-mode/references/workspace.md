@@ -22,7 +22,7 @@ Append a resolution section to the decision file, close its status, and add the 
 
 ## GitHub Wayfinder operations
 
-On GitHub, the map is an issue labelled `wayfinder:map` and each ticket is its sub-issue. Create a ticket with `gh issue create --parent <map>`. Wire a blocking edge with `--blocked-by` when the blocker already exists, otherwise with `gh issue edit <ticket> --add-blocked-by <blocker>` in the second pass. A frontier ticket is open, unassigned, and has only closed blockers; take the oldest first. List the open, unassigned tickets, then drop those with an open blocker using the filter in `label-for-issues`' GitHub CLI section:
+On GitHub, the map is an issue labelled `wayfinder:map` and each ticket is its sub-issue. Pass the map's repository as `--repo OWNER/REPO` to every command. Create a ticket with `gh issue create --parent <map>`. Wire a blocking edge with `--blocked-by` when the blocker already exists, otherwise with `gh issue edit <ticket> --add-blocked-by <blocker>` in the second pass. A frontier ticket is open, unassigned, and has only closed blockers; take the oldest first. List the open, unassigned tickets, then drop those with an open blocker using the filter in `label-for-issues`' GitHub CLI section:
 
 ```sh
 gh issue list --repo OWNER/REPO --limit 200 \
