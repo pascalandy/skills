@@ -19,13 +19,15 @@ alias ttr := transcript
 transcript url *args:
     @uv run --quiet authoring/content/transcript/scripts/transcript.py run youtube --url "$@"
 
+alias deploy := sync-fleet
+
 # Bring every fleet machine, or the named ones, to GitHub's main
 [group('commands')]
 [no-exit-message]
 sync-fleet *args:
     @uv run --quiet scripts/sync_fleet.py "$@"
 
-# Sign off this branch's PR head if needed, then squash-merge exactly that commit
+# Sign off this branch's PR head if needed, squash-merge that commit, then deploy
 [group('commands')]
 [no-exit-message]
 merge *args:

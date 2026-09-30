@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-09-30
 ---
 
-`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, then squash-merges exactly that commit. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
+`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
 
 ## Sign off a PR
 
@@ -42,16 +42,19 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
 4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
 5. It reads the PR back, then warns when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
+6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout, since a worktree lacks the private clone that holds the fleet registry. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync; the run warns and still exits 0, since the merge landed
 
-`just merge --dry-run` runs step 1 and prints what a run would do. A rerun on a merged PR prints nothing. It never deletes the branch
+`just merge --dry-run` runs step 1 and prints what a run would do, without deploying. A rerun on a merged PR runs only the deploy. It never deletes the branch
 
 | Situation | Do |
 |---|---|
 | Refused: the branch lacks the tip of `main` | `git merge origin/main`, `git push`, then `just merge` |
-| Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, then `gh stack merge <stack> --yes --squash` |
+| Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, run `gh stack merge <stack> --yes --squash`, then `just deploy` |
 | GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
-| Interrupted | `just merge` again; a merged PR ends the run |
-| Warning: `main` holds a tree the checks did not run on | `just check` on an up-to-date `main` |
+| Interrupted | `just merge` again; on a merged PR it only deploys |
+| Warning: `just deploy` did not reach every machine | Fix what it names, then `just deploy` |
+| Warning: `main` holds a tree the checks did not run on | `just check` on an up-to-date `main`, then `just deploy` |
+| Warning: the main checkout holds code `main` never had | Put it back on a commit of `main`, with no changes under `scripts/` or the justfile, then `just deploy` there |
 
 ## The signoff rule
 
