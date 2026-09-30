@@ -1,13 +1,13 @@
 # Codex exec flag lookup
 
-This table reflects `codex exec --help` in Codex CLI 0.158.0. Run the installed command's help before relying on a flag; the [official command reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) tracks current behavior.
+This table reflects `codex exec --help` in installed Codex CLI 0.159.0. Run the installed command's help before relying on a flag; the [official command reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) tracks current behavior.
 
 | Flag | Use |
 |---|---|
 | `PROMPT` or `-` | Pass inline instructions or read the whole prompt from stdin; with an inline prompt, piped stdin is appended as a `<stdin>` block, so close it with `< /dev/null` when unused |
 | `-C`, `--cd` | Set the target repository |
 | `-s`, `--sandbox` | Set `read-only`, `workspace-write`, or `danger-full-access` |
-| `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, and `sandbox_mode` for review commands that lack `-s` |
+| `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, `web_search`, `tools.view_image`, and `sandbox_mode` for subcommands that lack `-s` |
 | `-m`, `--model` | Select a model available to the account |
 | `-p`, `--profile` | Load a named config profile |
 | `--worktree` | Start in a new managed Git worktree |
@@ -30,9 +30,9 @@ This table reflects `codex exec --help` in Codex CLI 0.158.0. Run the installed 
 | `--dangerously-bypass-hook-trust` | Run untrusted hooks; use only in automation that vets the hooks |
 | `-h`, `--help`; `-V`, `--version` | Show command help or the CLI version |
 
-For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. CLI 0.158.0 rejects the old `--full-auto` flag; use an explicit sandbox.
+For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. Use explicit sandbox flags as described in [Prepare the run](../MetaSkill.md#prepare-the-run).
 
-For live web search, pass `-c 'web_search="live"'`. CLI 0.158.0 accepts `disabled`, `cached`, `indexed`, and `live`; add `--strict-config` to reject an unknown value.
+For the default and opt-in web search and image settings, follow [Choose optional tools](../MetaSkill.md#choose-optional-tools). Add `--strict-config` to reject unrecognized configuration keys.
 
 ## Help and model discovery
 
@@ -43,9 +43,10 @@ codex exec --help
 codex review --help
 codex exec review --help
 codex exec resume --help
+codex exec fork --help
 codex login status
 codex debug models --help
 codex debug models | jq -r '.models[] | [.slug, ([.supported_reasoning_levels[].effort] | join(","))] | @tsv'
 ```
 
-`codex debug models` is experimental. Its output shows the catalog visible to this CLI, while model access still depends on the account and runner. Use `codex exec review --help` for review-specific flags such as `--base`, `--commit`, and `--uncommitted`; use `codex exec resume --help` for resume-specific options.
+`codex debug models` is experimental. Its output shows the catalog visible to this CLI, while model access still depends on the account and runner. Use each subcommand's help for its supported options. Installed 0.159.0 supports `exec fork`; the official command page may lag that installation.
