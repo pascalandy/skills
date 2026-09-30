@@ -12,6 +12,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | Skill | Description |
 |---|---|
 | 2nd-pass | Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts. |
+| andy-mode | Use only when explicitly invoked as `andy-mode ; <route>`, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`. |
 | bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
 | distill | Use only when explicitly invoked as `distill`. |
@@ -71,7 +72,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
 | pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
 | pa-qa | Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem. |
-| pa-retro | Use only when explicitly invoked as `pa-retro`. |
 | pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-attack-the-premise | Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it. |
@@ -100,7 +100,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | profile-routing-matrix | Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level. |
 | recall | Use only when explicitly invoked as `recall`. |
 | reflect | Use only when explicitly invoked as `reflect`. |
-| retro | Review a coding session for evidence-backed improvements to agent navigation, instructions, checks, or tools. |
 | setup-pstack | Use for /setup-pstack, configure pstack models, or changing pstack's model choices. |
 | show-me-your-work | Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away. |
 | swarm | Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration. |

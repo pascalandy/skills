@@ -210,6 +210,13 @@ CHECKS = [
         reads=("authoring/mattpocock",),
     ),
     Check(
+        "andy-mode",
+        uv_run("authoring/andy/andy-mode/scripts/check_andy_mode.py"),
+        pytest("authoring/andy/andy-mode/scripts/tests"),
+        # A shared route links to its sibling package
+        reads=("authoring/andy/2nd-pass",),
+    ),
+    Check(
         "distill",
         pytest("authoring/knowledge/distill/scripts/tests"),
         reads=("authoring/knowledge/distill-prompt",),
