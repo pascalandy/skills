@@ -9,6 +9,9 @@ import pytest
 SCRIPT = Path(__file__).parent.parent / "update_corey_mode.py"
 SHA = "5b2c0007766c6a1cf1d53fd8fc73e979e0821022"
 BLOB = f"https://github.com/coreyhaines31/marketingskills/blob/{SHA}"
+REGENERATE = (
+    "regenerate with: update_corey_mode.py update --upstream DIR --revision SHA"
+)
 
 ALPHA = """---
 name: alpha
@@ -176,11 +179,12 @@ def test_check_reports_hand_edits_and_extra_files(
     result = run("check", "--package", str(package))
 
     assert result.returncode == 1
-    assert result.stderr.splitlines()[:4] == [
+    assert result.stderr.splitlines() == [
         "changed: playbooks/alpha/alpha.md",
         "not in the lock: playbooks/alpha/notes.md",
         "not in the lock: playbooks/beta/SKILL.md",
         "nested SKILL.md: playbooks/beta/SKILL.md",
+        REGENERATE,
     ]
 
 
@@ -198,12 +202,15 @@ def test_check_requires_one_route_per_playbook(upstream: Path, package: Path) ->
     result = run("check", "--package", str(package))
 
     assert result.returncode == 1
-    assert result.stderr.splitlines()[:5] == [
+    assert result.stderr.splitlines() == [
         "duplicate route: gamma",
         "route beta links to playbooks/beta.md, not playbooks/beta/beta.md",
         "route without a playbook: gamma",
         "playbook without a route: alpha",
         "broken link in SKILL.md: playbooks/beta.md",
+        "broken link in SKILL.md: playbooks/gamma/gamma.md",
+        "broken link in SKILL.md: playbooks/gamma/gamma.md",
+        "give each folder in playbooks/ exactly one row in SKILL.md",
     ]
 
 
@@ -216,9 +223,10 @@ def test_check_with_upstream_reports_a_stale_import(
     result = run("check", "--package", str(package), "--upstream", str(upstream))
 
     assert result.returncode == 1
-    assert result.stderr.splitlines()[:2] == [
+    assert result.stderr.splitlines() == [
         "upstream-lock.json differs from a fresh render of " + str(upstream),
         "differs from upstream: playbooks/beta/beta.md",
+        REGENERATE,
     ]
 
 

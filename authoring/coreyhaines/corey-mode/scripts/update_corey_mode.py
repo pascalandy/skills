@@ -30,7 +30,7 @@ SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 EPILOG = """\
 examples:
   update_corey_mode.py check
-  update_corey_mode.py check --upstream ~/opensrc/repos/github.com/coreyhaines31/marketingskills/main
+  update_corey_mode.py check --upstream DIR
   update_corey_mode.py update --upstream DIR --revision SHA --dry-run
   update_corey_mode.py update --upstream DIR --revision SHA
 
@@ -72,7 +72,8 @@ def upstream_files(upstream: Path) -> set[PurePosixPath]:
     if not (upstream / "skills").is_dir() or not (upstream / "LICENSE").is_file():
         raise Failure(
             f"{upstream} is not a marketingskills checkout: it needs skills/ and LICENSE",
-            "refresh the cache with: just opensrc-sync coreyhaines31/marketingskills",
+            "pass --upstream the snapshot folder, such as "
+            "$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main",
         )
     return {
         PurePosixPath(path.relative_to(upstream).as_posix())
@@ -271,7 +272,9 @@ def check(package: Path, upstream: Path | None) -> None:
     for path in sorted(package.rglob("SKILL.md")):
         if path != package / "SKILL.md":
             problems.append(f"nested SKILL.md: {path.relative_to(package)}")
-    problems += check_routes(package)
+    stale = bool(problems)
+    routes = check_routes(package)
+    problems += routes
     for path in sorted(package.rglob("*.md")):
         relative = PurePosixPath(path.relative_to(package).as_posix())
         if str(relative) in entries:
@@ -285,13 +288,20 @@ def check(package: Path, upstream: Path | None) -> None:
         plan = render(upstream, revision)
         if lock_document(plan, revision) != (package / LOCK).read_bytes():
             problems.append(f"{LOCK} differs from a fresh render of {upstream}")
+            stale = True
         for dest, item in sorted(plan.items()):
             path = package / dest
             if not path.is_file() or path.read_bytes() != item.content:
                 problems.append(f"differs from upstream: {dest}")
+                stale = True
+    if stale:
+        problems.append(
+            "regenerate with: update_corey_mode.py update --upstream DIR --revision SHA"
+        )
+    if routes:
+        problems.append("give each folder in playbooks/ exactly one row in SKILL.md")
     if problems:
-        fix = "rerun: update_corey_mode.py update --upstream DIR --revision SHA"
-        raise Failure(*problems, fix)
+        raise Failure(*problems)
 
 
 class Parser(argparse.ArgumentParser):
