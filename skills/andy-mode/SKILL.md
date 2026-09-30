@@ -6,7 +6,7 @@ kind: "general"
 
 # Andy mode
 
-Andy-mode carries the tools Pascal wrote himself, one route per tool. Poteto-mode runs engineering work with PStack, and matt-mode prepares it with Matt Pocock's procedures.
+Andy-mode carries the tools Pascal wrote, one route per tool. Poteto-mode runs engineering work with PStack, and matt-mode prepares it with Matt Pocock's procedures.
 
 ## Pick the route
 
