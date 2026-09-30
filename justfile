@@ -51,10 +51,11 @@ transcript-cli *args:
 check *args:
     @uv run --quiet scripts/check.py "$@"
 
-# Run just check, then mark the pushed HEAD green on GitHub
+# Run just check on the pushed HEAD, then mark that commit green on GitHub
 [group('checks')]
-signoff: check
-    @gh signoff
+[no-exit-message]
+signoff *args:
+    @uv run --quiet scripts/signoff.py "$@"
 
 # Check SKILL.md frontmatter quoting
 [group('checks')]
