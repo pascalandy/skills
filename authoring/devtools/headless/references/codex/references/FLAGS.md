@@ -7,7 +7,7 @@ This table reflects `codex exec --help` in installed Codex CLI 0.159.0. Run the 
 | `PROMPT` or `-` | Pass inline instructions or read the whole prompt from stdin; with an inline prompt, piped stdin is appended as a `<stdin>` block, so close it with `< /dev/null` when unused |
 | `-C`, `--cd` | Set the target repository |
 | `-s`, `--sandbox` | Set `read-only`, `workspace-write`, or `danger-full-access` |
-| `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, `web_search`, `tools.view_image`, and `sandbox_mode` for subcommands that lack `-s` |
+| `-c`, `--config` | Override a config key, including `approval_policy`, `model_reasoning_effort`, `web_search`, `features.view_image`, and `sandbox_mode` for subcommands that lack `-s` |
 | `-m`, `--model` | Select a model available to the account |
 | `-p`, `--profile` | Load a named config profile |
 | `--worktree` | Start in a new managed Git worktree |

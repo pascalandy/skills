@@ -34,7 +34,7 @@ codex exec \
   -m "$model" \
   -c "model_reasoning_effort=\"$reasoning\"" \
   -c "web_search=\"$web_search\"" \
-  -c "tools.view_image=$view_image" \
+  -c "features.view_image=$view_image" \
   -c 'approval_policy="never"' \
   --ephemeral --json \
   -o "$review_dir/result.md" \
@@ -69,18 +69,18 @@ Set the recipe's capability variables before the invocation. For current externa
 
 For example, to review a design screenshot against current requirements, set `web_search="live"` and `view_image=true`, add `-i`, and supply both the requirements URL and review criteria in the prompt.
 
-`tools.view_image` lets the child inspect local images during the task. `-i` supplies an image directly and does not require that tool. Neither option enables image generation. The [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference) owns these tool settings.
+`features.view_image` lets the child inspect local images during the task. `-i` supplies an image directly and does not require that tool. Neither option enables image generation. Installed CLI 0.159.0 ignores the `tools.view_image` setting still shown in the configuration reference. Its [feature registry](https://github.com/openai/codex/blob/rust-v0.159.0/codex-rs/features/src/lib.rs) defines `features.view_image`. Confirm the effective value with `codex -c 'features.view_image=false' features list` or the same command with `true`.
 
 ## Delegate another task
 
-Use the same prompt and capture pattern for research, analysis, or implementation. For a task without a requested model, omit the recipe's `-m` and reasoning override to use the configured defaults. Keep optional tools disabled unless the calling agent chooses them for that task.
+Use the same prompt and capture pattern for research, analysis, or implementation. Omit each model or reasoning override that the request does not specify to use its configured default. Keep optional tools disabled unless the calling agent chooses them for that task.
 
 For file edits, use `workspace-write` and inspect the resulting diff. This inline example keeps the configured model:
 
 ```bash
 codex exec -C /path/to/repo -s workspace-write \
   -c 'approval_policy="never"' \
-  -c 'web_search="disabled"' -c 'tools.view_image=false' \
+  -c 'web_search="disabled"' -c 'features.view_image=false' \
   "Fix the bug in src/auth.ts. Limit edits to that file. Run the relevant tests and report results." \
   < /dev/null
 ```
@@ -109,7 +109,7 @@ For example, after a persisted analysis run, continue it with explicit permissio
 ```bash
 codex exec resume "$session_id" \
   -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' \
-  -c 'web_search="disabled"' -c 'tools.view_image=false' \
+  -c 'web_search="disabled"' -c 'features.view_image=false' \
   -o followup.md "Explain the tradeoff you identified." < /dev/null
 ```
 
@@ -119,6 +119,6 @@ Replace `resume` with `fork` to preserve the original session while starting a c
 
 Ordinary `exec` remains the standard delegation path. `codex exec review` and `codex review` offer code-review shortcuts with built-in criteria. Choose one of `--base`, `--uncommitted`, `--commit`, or a custom prompt. A custom prompt can be an argument or `-` on stdin; it conflicts with those target flags.
 
-Installed CLI 0.159.0 supports `-m`, `--json`, and `-o` on `exec review`, while standalone `review` supports none of them. Set the sandbox through `-c 'sandbox_mode="read-only"'` because these commands lack `-s`. A configured `review_model` can select a different model from the parent session. Use ordinary `exec` for the explicit review model and optional tools described above. The [0.159.0 review thread](https://github.com/openai/codex/blob/rust-v0.159.0/codex-rs/core/src/session/review.rs) disables web search and local image viewing.
+Installed CLI 0.159.0 supports `-m`, `--json`, and `-o` on `exec review`, while standalone `review` supports none of them. Set the sandbox through `-c 'sandbox_mode="read-only"'` because these commands lack `-s`. A configured `review_model` can select a different model from the parent session. Use ordinary `exec` for the explicit review model and optional tools described above. The [0.159.0 review thread](https://github.com/openai/codex/blob/rust-v0.159.0/codex-rs/core/src/session/review.rs) disables web search.
 
 For the complete `codex exec` flag map and help commands, read [flag lookup](references/FLAGS.md). For maintenance, follow the [update checklist](../UPDATE.md).
