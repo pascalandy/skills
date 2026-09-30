@@ -205,7 +205,7 @@ Pass / Needs follow-up / Not fully verified.
 [Unverified paths, skipped checks, environment limits, or none.]
 
 **Recommended next phase**
-Stop / `pa-doc-update` / a separate `poteto-mode` delivery session using the matching Feature or Bug fix playbook / another QA pass.
+Stop / the `docs` route / a separate `poteto-mode` delivery session using the matching Feature or Bug fix playbook / another QA pass.
 ```
 
 If validation discovers a user-facing issue, produce a QA finding instead of hiding it in the validation summary.

@@ -36,6 +36,20 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | [`idea`](playbooks/idea.md) | | Write down a rough idea in its author's voice and export it |
 | [`qa`](playbooks/qa.md) | | Validate a finished change, or capture a problem someone reports |
 
+### Docs and knowledge
+
+| Route | Aliases | Use when |
+|---|---|---|
+| [`docs`](playbooks/docs.md) | | Document a change, decision, or artifact that already exists |
+| [`docs-cleaner`](playbooks/docs-cleaner.md) | `docs-reorg` | Maintain existing docs: drift, duplicates, frontmatter, or structure |
+| [`wiki-map`](playbooks/wiki-map.md) | | Build or maintain a Markdown knowledge base with provenance and indexes |
+| [`glossary`](playbooks/glossary.md) | | Create or revise a canonical glossary |
+| [`ontology`](playbooks/ontology.md) | | Generate the five-file ontology of a folder of text |
+| [`qmd`](playbooks/qmd.md) | | Search, retrieve from, or maintain local QMD collections |
+| [`cass`](playbooks/cass.md) | | Search local coding-agent session history |
+| [`distill`](playbooks/distill.md) | | Apply a distill prompt to a local text file |
+| [`distill-prompt`](playbooks/distill-prompt.md) | | List, choose, or add a distill prompt |
+
 ### Reasoning
 
 | Route | Aliases | Use when |

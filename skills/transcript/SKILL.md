@@ -49,7 +49,7 @@ For Zoom, `--path` names the meeting folder, not its `audio*.m4a` file. A plain 
 
 Each YouTube prompt is a Markdown file in `references/prompts/`, and its file name without `.md` is the `--prompt` value. Edit a file there to change a prompt, or add a `.md` file to create one; `list prompts` shows it. In a managed installation, edit the source package, because the next install overwrites installed copies.
 
-Only `summary_with_quotes` receives the timestamped transcript; every other prompt receives plain text. Zoom summaries use the `synthese-rencontre` prompt from `distill-prompt`.
+Only `summary_with_quotes` receives the timestamped transcript; every other prompt receives plain text. Zoom summaries use the `synthese-rencontre` prompt from andy-mode's `distill-prompt` route.
 
 ## Agent operation
 

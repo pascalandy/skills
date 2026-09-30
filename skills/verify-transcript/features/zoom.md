@@ -29,6 +29,6 @@ Preconditions:
 ## Gotchas
 
 - The eval does not upload a private Zoom recording
-- The Zoom default prompt must exist in the categorized source or flat applied `distill-prompt` skill
+- The Zoom default prompt must exist in the `distill-prompt` route of the categorized source or flat applied `andy-mode` skill
 - `doctor --no-summary` still checks the Deepgram credential
 - Scratch cleanup removes the empty Zoom fixture after evidence is written
