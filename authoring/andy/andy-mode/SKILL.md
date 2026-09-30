@@ -1,6 +1,6 @@
 ---
 name: "andy-mode"
-description: "Use only when explicitly invoked as `andy-mode`."
+description: "Use only when explicitly invoked as `andy-mode`, including dictated forms such as `Andy mode`, `ND mode`, or `indie mode`."
 kind: "general"
 ---
 

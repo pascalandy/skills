@@ -11,3 +11,5 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; 2nd-pass` | `../2nd-pass/SKILL.md` |
 | `andy-mode ; 2nd pass` | `../2nd-pass/SKILL.md` |
 | `andy-mode ; pa-retro` | The route tables and a question. No route runs |
+| `ND mode ; retro` | `playbooks/retro-skill.md` |
+| `indie mode ; retro general` | `playbooks/retro-general.md` |
