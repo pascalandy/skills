@@ -29,6 +29,13 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | [`retro-skill`](playbooks/retro-skill.md) | `retro` | A skill loaded this session was wrong or confusing enough to cost a detour |
 | [`retro-general`](playbooks/retro-general.md) | | The agent's environment could serve the next run better: navigation, checks, steering files, or tools |
 
+### Ideas and quality
+
+| Route | Aliases | Use when |
+|---|---|---|
+| [`idea`](playbooks/idea.md) | | Write down a rough idea in its author's voice and export it |
+| [`qa`](playbooks/qa.md) | | Validate a finished change, or capture a problem someone reports |
+
 ### Reasoning
 
 | Route | Aliases | Use when |

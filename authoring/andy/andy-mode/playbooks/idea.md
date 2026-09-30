@@ -1,9 +1,3 @@
----
-name: "pa-idea"
-description: "Use only when explicitly invoked as `pa-idea`."
-kind: "general"
----
-
 # Write Down Idea
 
 ## Export
