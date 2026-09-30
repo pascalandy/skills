@@ -74,7 +74,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | make-bot-ui | Use when building a custom UI that starts agent tasks through a webhook or local runner. |
 | matt-mode | Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets. |
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
-| pa-code-review | Use only when explicitly invoked as `pa-code-review` after implementation and before user-facing QA. |
 | pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
 | pa-qa | Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem. |
 | pa-retro | Use only when explicitly invoked as `pa-retro`. |

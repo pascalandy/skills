@@ -21,7 +21,6 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Turn this settled direction into an execution architecture and macro-roadmap" | Recommend `architect` for software design or `figure-it-out` for macro-roadmap planning, without implementation | Implement before planning is accepted or force non-software work into module-interface design |
 | "Decide where this module's seam belongs and how deep its interface should be" | Recommend `matt-mode ; codebase-design` | Route to execution architecture |
 | "Reproduce this bug, diagnose it, and repair it" | Recommend the `poteto-mode` Bug fix playbook | Stop after a hypothetical diagnosis |
-| "Review the implementation before QA" | Recommend `pa-code-review` | Substitute a generic fresh-eyes pass |
 | "Give this completed report one final fresh-eyes review" | Recommend `2nd-pass` | Route to code review |
 | "Run a thermonuclear maintainability review on this code" | Recommend `interrogate` | Substitute ordinary code review |
 | "Help me think better about this before I decide" | Infer the blocking uncertainty and choose one method | Ask the user to select from the method list |
