@@ -56,6 +56,30 @@ def is_network_failure(message: str) -> bool:
     return NETWORK_FAILURE.search(message) is not None
 
 
+# A SKILL.md or command file's header, and the description line inside it
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
+DESCRIPTION = re.compile(r"^description:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+
+
+def unquote(value: str) -> str:
+    """Read a one-line YAML scalar; a block scalar or broken quoting reads as empty."""
+    if value.startswith('"'):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return ""
+    if value.startswith("'"):
+        return value[1:-1].replace("''", "'") if value.endswith("'") else ""
+    return "" if value.startswith(("|", ">")) else value
+
+
+def frontmatter_description(text: str) -> str:
+    """The description in a file's frontmatter, or "" when it has none."""
+    header = FRONTMATTER.match(text)
+    found = DESCRIPTION.search(header.group(1)) if header else None
+    return unquote(found.group(1)) if found else ""
+
+
 # How long a child may clean up after SIGTERM before SIGKILL
 GRACE = 10.0
 
