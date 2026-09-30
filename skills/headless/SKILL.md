@@ -15,18 +15,25 @@ Load only the reference for the requested path:
 
 Read the [glossary](references/GLOSSARY.md) only when its terminology is needed. For current CLI behavior, check the installed command's `--help` and its official documentation. Delegation policy belongs to the calling workflow, not this skill.
 
+## Delegate a task
+
+1. Give the child agent the task, scope, relevant files or supplied context, expected result, and completion criteria. Use an inline prompt or prompt file according to the runner's reference
+2. Start an independent review in a fresh session. Resume or fork only when the task intentionally continues earlier work
+3. Choose permissions and optional tools for the task before launch. The calling agent decides whether external facts or images need inspection
+4. Capture the result with the runner's recipe, wait for the child to exit, and inspect its answer or changed artifacts before reporting completion
+
 ## Capture a review
 
 Each reference's review recipe applies these rules:
 
-- Give every run its own `mktemp -d` directory, with the answer, events, and stderr in separate files
+- Give every run its own `mktemp -d` directory, with the answer, stderr, and any event stream in separate files
 - Record the exit status with `|| review_status=$?`, which also works under `set -e`. A standalone script ends with `exit "$review_status"` after inspecting the answer
 - Count an empty answer as a failure even when the process exits 0
 - Read the complete answer before deciding whether the review succeeded; a zero exit or an event log alone proves nothing
-- The recipes pin a model and reasoning level as examples. Keep a pin only when the task or runner policy requires it; otherwise omit both options to use configured defaults
+- Apply the selected runner's review defaults unless the request explicitly chooses another model or reasoning level. Other example pins apply only when the task or runner policy requires them
 - Leave the reviewed artifact and checkout unchanged until the review exits, whether it covers a diff, plan, or document; otherwise the answer describes a stale revision
-- A read-only reviewer cannot run commands that write caches or build output, such as `uv`, `uvx`, and pytest. Run the tests yourself and include their output in the prompt
-- Treat a one-line "no findings" answer from a run without explicit criteria or test output as weak evidence; rerun with both
+- Run checks that write caches or build output in the calling workflow. Include relevant test results in the review prompt
+- Treat a one-line "no findings" answer without explicit criteria as weak evidence. Supply the missing criteria and relevant check results before retrying
 
 RTK leaves commands that redirect their output to a file unchanged, so the recipes capture everything. To read JSON output under RTK, use `rtk proxy jq ...`; `rtk jq` shortens long answers.
 
