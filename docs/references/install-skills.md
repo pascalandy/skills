@@ -82,19 +82,19 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 
 The old `just sync`, `just sync-fleet`, and hooks cannot run code that was not present when their authoring checkout was created. Before the first live deployment, get approval for each machine. Upgrade its authoring checkout to the launcher version with an ordinary no-clobber Git fast-forward, only when Git can do so without overwriting local work. On `main`, the no-clobber upgrade is `git -C "$root" fetch origin main` followed by `git -C "$root" merge --ff-only origin/main`, with `root` set to the original checkout path. A dirty checkout that blocks that upgrade is a migration blocker; do not reset, stash, or overwrite it. Once the launcher version is present, later syncs leave the authoring HEAD, branch, index, and files unchanged even if that checkout falls behind or becomes dirty
 
-If the old dirty-gated sync cannot perform the first deployment, bootstrap directly from the repository's published detached worktree. Set `root` to the original checkout's absolute path and `registry` to the actual `fleet.toml` under its existing `_skills_private/`. This does not use the old sync or write the authoring checkout. Run these commands only after the old writers are stopped and live deployment is approved:
+If the old dirty-gated sync cannot perform the first local deployment, bootstrap each machine individually from the repository's published detached worktree. Set `root` to that machine's original checkout path: `~/projects/skills` on om1 and `~/Documents/github_local/skills` on mbp and mini. This does not use the old sync or write the authoring checkout. Stop old writers and obtain approval before creating the deployment worktree:
 
 ```sh
 root="$HOME/Documents/github_local/skills"
-registry="$root/_skills_private/integrations/private-network/references/fleet.toml"
 git -C "$root" fetch origin main
 common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)
 git -C "$root" -c core.hooksPath=/dev/null worktree add --detach "$common/published-deployment" origin/main
-uv run "$common/published-deployment/scripts/sync.py" --worker --author-root "$root"
-uv run "$common/published-deployment/scripts/sync_fleet.py" --worker --author-root "$root" --fleet "$registry" --dry-run
+uv run "$common/published-deployment/scripts/sync.py" --author-root "$root" --dry-run
 ```
 
-The worktree-add command is for a missing deployment worktree only. If one exists, do not overwrite it: run the new launcher, which checks ownership and reconciles a missing registered tool worktree. Inspect the dry run before applying `just sync-fleet`. On a machine without a private clone, the local `sync.py` bootstrap creates the single original `_skills_private/` first. The `registry` path varies by machine; locate the one file in that clone before setting it
+Inspect the preview. With installation approval, repeat the last command without `--dry-run`. A missing private clone is then created once at the original checkout, not in the deployment worktree. The worktree-add command is for an absent, unregistered deployment worktree only. If a Git-registered one is missing, run the new launcher from a separate published worktree so it can reconcile its own cache; never overwrite an unknown directory
+
+Bootstrapping one machine does not upgrade the old launchers on the others. Fleet deployment requires the launcher version in every selected authoring checkout. Once those one-time upgrades are complete, preview `just sync-fleet --dry-run` before the approved apply. Daily syncs no longer update authoring checkouts
 
 ## Cutover
 

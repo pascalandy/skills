@@ -776,6 +776,8 @@ def work(args: argparse.Namespace) -> str:
     if args.hook:
         return hook(args.hook)
     if not args.worker:
+        ROOT = (args.author_root or ROOT).resolve()
+        sync_private.set_root(ROOT)
         revision = args.revision or github_main().sha
         with published(ROOT, revision, args.timeout) as checkout:
             script = checkout / "scripts/sync_fleet.py"

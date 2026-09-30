@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -118,23 +117,21 @@ def sync(args: argparse.Namespace) -> str:
         return "\n".join(lines)
     sha = github(root, args.timeout)
     with published(root, sha, args.timeout) as checkout:
-        script = checkout / "scripts/sync.py"
-    os.execv(
-        sys.executable,
-        [
-            sys.executable,
-            str(script),
-            "--worker",
-            "--author-root",
-            str(root),
-            *(["--dry-run"] if args.dry_run else ["--check"] if args.check else []),
-            "--timeout",
-            f"{args.timeout:g}",
-            *(["--verbose"] if args.verbose else []),
-            *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
-        ],
-    )
-    raise AssertionError("exec returned")
+        return "\n".join(
+            step(
+                sys.executable,
+                str(checkout / "scripts/sync.py"),
+                "--worker",
+                "--author-root",
+                str(root),
+                *(["--dry-run"] if args.dry_run else ["--check"] if args.check else []),
+                "--timeout",
+                f"{args.timeout:g}",
+                *(["--verbose"] if args.verbose else []),
+                *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
+                cwd=checkout,
+            )
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -16,7 +18,9 @@ def git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(
+    repo: Path, home: Path, *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["uv", "run", str(repo / "scripts/sync.py"), *args],
         cwd=repo,
@@ -25,6 +29,7 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
             **os.environ,
             "HOME": str(home),
             "UV_CACHE_DIR": str(home.parent / "uv-cache"),
+            **(env or {}),
         },
         capture_output=True,
         text=True,
@@ -84,6 +89,9 @@ def test_sync_preserves_authoring_and_installs_published_skills_and_private_edit
     assert git(repo, "branch", "--show-current") == "feature"
     assert run(repo, home).stdout == ""
     assert run(repo, home, "--check").returncode == 0
+    cache = repo / ".git/published-deployment"
+    assert run(cache, home, "--author-root", str(repo)).returncode == 0
+    assert not (cache / "_skills_private").exists()
     assert git(repo / "_skills_private", "status", "--porcelain") == ""
 
 
@@ -138,6 +146,65 @@ def test_preview_and_check_compare_published_content_without_writing_installs(
     assert check.returncode == 1 and "add\t~/.claude/skills/alpha" in check.stderr
     assert not (home / ".claude").exists()
     assert git(repo, "status", "--porcelain", "-uall") == before
+
+
+def test_overlapping_local_syncs_pin_the_source_until_install_finishes(
+    deployed: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    repo, home, seed = deployed
+    marker = tmp_path / "private-started"
+    resume = tmp_path / "resume"
+    private = seed / "scripts/sync_private.py"
+    private.write_text(
+        private.read_text().replace(
+            'if __name__ == "__main__":\n',
+            'if __name__ == "__main__":\n'
+            "    import os, time\n"
+            '    if os.environ.get("SYNC_TEST_PAUSE"):\n'
+            '        Path(os.environ["SYNC_TEST_PAUSE"]).touch()\n'
+            '        while not Path(os.environ["SYNC_TEST_RESUME"]).exists():\n'
+            "            time.sleep(0.05)\n",
+        ),
+        encoding="utf-8",
+    )
+    commit(seed)
+    git(seed, "push", "-q", str(repo.parent / "skills.git"), "main")
+    before = git(repo, "rev-parse", "HEAD")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        older = pool.submit(
+            run,
+            repo,
+            home,
+            env={"SYNC_TEST_PAUSE": str(marker), "SYNC_TEST_RESUME": str(resume)},
+        )
+        try:
+            deadline = time.monotonic() + 20
+            while not marker.exists():
+                assert not older.done(), older.result().stderr if older.done() else ""
+                assert time.monotonic() < deadline, (
+                    "older sync did not reach private save"
+                )
+                time.sleep(0.05)
+            skill(seed / "authoring/content", "alpha", "new")
+            skill(seed / "skills", "alpha", "new")
+            commit(seed)
+            newest = git(seed, "rev-parse", "HEAD")
+            git(seed, "push", "-q", str(repo.parent / "skills.git"), "main")
+            newer = pool.submit(run, repo, home)
+            deadline = time.monotonic() + 20
+            while git(repo, "rev-parse", "refs/remotes/origin/main") != newest:
+                assert time.monotonic() < deadline, "newer sync did not fetch main"
+                time.sleep(0.05)
+            with pytest.raises(TimeoutError):
+                newer.result(timeout=2)
+        finally:
+            resume.touch()
+        previous = older.result(timeout=30)
+        latest = newer.result(timeout=30)
+    assert previous.returncode == 0, previous.stderr
+    assert latest.returncode == 0, latest.stderr
+    assert (home / ".claude/skills/alpha/SKILL.md").read_text() == "# alpha\n\nnew\n"
+    assert git(repo, "rev-parse", "HEAD") == before
 
 
 def test_missing_origin_is_failure_without_install(sandbox: tuple[Path, Path]) -> None:
