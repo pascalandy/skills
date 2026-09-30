@@ -139,8 +139,21 @@ plain() {
 }
 published_step() {
     common=$(git rev-parse --path-format=absolute --git-common-dir) || return 11
-    script="$common/published-deployment/scripts/sync_fleet.py"
-    [ -f "$script" ] || script="$PWD/scripts/sync_fleet.py"
+    cache="$common/published-deployment"
+    script="$cache/scripts/sync_fleet.py"
+    if [ -f "$script" ]; then
+        if [ -L "$cache" ] || ! git worktree list --porcelain | grep -Fxq "worktree $cache"; then
+            echo "error: $cache is not the owned worktree; move it aside"
+            return 1
+        fi
+        changes=$(git -C "$cache" status --porcelain) || return 1
+        if [ -n "$changes" ]; then
+            echo "error: published worktree $cache has edits; inspect them"
+            return 1
+        fi
+    else
+        script="$PWD/scripts/sync_fleet.py"
+    fi
     uv run --quiet "$script" --author-root "$PWD" "$@" 2>&1
 }
 """

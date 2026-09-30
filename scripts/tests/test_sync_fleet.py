@@ -592,6 +592,9 @@ def test_unknown_deployment_path_is_not_deleted_and_other_machine_continues(
     marker = blocked / ".git/published-deployment/keep.txt"
     marker.parent.mkdir()
     marker.write_text("unknown path\n")
+    cached_script = marker.parent / "scripts/sync_fleet.py"
+    cached_script.parent.mkdir()
+    cached_script.write_text('raise RuntimeError("UNKNOWN_CACHE_EXECUTED")\n')
     register(hub, "blocked", "good")
     change(hub)
     result = run(hub, homes, bin_dir, "--json", *(["--dry-run"] if preview else []))
@@ -602,7 +605,31 @@ def test_unknown_deployment_path_is_not_deleted_and_other_machine_continues(
     }
     assert outcomes == {"blocked": "failed", "good": "ready" if preview else "synced"}
     assert marker.read_text() == "unknown path\n"
+    assert "UNKNOWN_CACHE_EXECUTED" not in result.stderr
+    assert "is not the owned worktree; move it aside" in result.stderr
     assert (good / ".git/published-deployment/skills/alpha/SKILL.md").is_file()
+
+
+def test_remote_cache_edits_are_rejected_before_executing_published_code(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    target = machine(homes, "target", hub.parent / "skills.git")
+    register(hub, "target")
+    assert run(hub, homes, bin_dir).returncode == 0
+    cache = target / ".git/published-deployment"
+    cached_script = cache / "scripts/sync_fleet.py"
+    cached_script.write_text('raise RuntimeError("DIRTY_CACHE_EXECUTED")\n')
+
+    result = run(hub, homes, bin_dir, "--json")
+
+    assert result.returncode == 1
+    [outcome] = json.loads(result.stderr)["machines"]
+    assert (outcome["status"], outcome["detail"]) == (
+        "failed",
+        f"published worktree {cache} has edits; inspect them",
+    )
+    assert cached_script.read_text() == 'raise RuntimeError("DIRTY_CACHE_EXECUTED")\n'
 
 
 def test_deleted_owned_deployment_worktree_recovers_without_touching_authoring(
