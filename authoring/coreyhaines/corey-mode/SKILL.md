@@ -24,7 +24,7 @@ A request with several deliverables runs one route per deliverable, in the order
 Each playbook is one of Corey's skills, copied from a pinned upstream revision. Follow it in full.
 
 - A playbook names its neighbors as skills, as in "see signup", "the `ads` skill", or `/marketing-plan`. Each name is the route of that name here. A name with no route, such as `positioning`, has no playbook.
-- `SKILL.md` inside a playbook means that playbook's own file.
+- A path into another copy of a skill, such as `.agents/skills/social/`, `.claude/skills/social/`, or `skills/social/` in the `marketingskills` repo, means that route's folder in this skill, `playbooks/social/`. Its `SKILL.md` means the playbook's own file, `playbooks/social/social.md`.
 - Links resolve from the file that holds them. Links into upstream `tools/` and `evals/` open on GitHub at the pinned revision. A command such as `node tools/clis/<tool>.js` needs a checkout of that repository.
 
 ## Routes
@@ -116,7 +116,7 @@ Each playbook is one of Corey's skills, copied from a pinned upstream revision. 
 
 ## Callers
 
-A skill or mode outside corey-mode reaches one route by reading its playbook in the active `corey-mode` skill directory, such as `playbooks/copywriting/copywriting.md`. It keeps its own task and loads no other route.
+A skill or mode outside corey-mode reaches one route by reading its playbook in the active `corey-mode` skill directory, such as `playbooks/copywriting/copywriting.md`. It keeps its own task and loads another route only when that playbook calls for it. When a request invokes another mode and also says marketing, that mode keeps the task and reaches corey-mode this way.
 
 ## Maintenance
 

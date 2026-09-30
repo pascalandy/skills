@@ -230,7 +230,7 @@ def test_check_with_upstream_reports_a_stale_import(
     ]
 
 
-def test_update_rejects_a_short_revision(upstream: Path, package: Path) -> None:
+def test_a_short_revision_is_a_usage_error(upstream: Path, package: Path) -> None:
     result = run(
         "update",
         "--upstream",
@@ -241,10 +241,14 @@ def test_update_rejects_a_short_revision(upstream: Path, package: Path) -> None:
         str(package),
     )
 
-    assert result.returncode == 1
-    assert (
-        result.stderr == "--revision must be a full 40-character SHA, got '5b2c000'\n"
-    )
+    assert result.returncode == 2
+    assert result.stderr.splitlines()[-2:] == [
+        (
+            "update_corey_mode.py update: error: argument --revision: "
+            "must be a full 40-character SHA, got '5b2c000'"
+        ),
+        "run 'update_corey_mode.py update --help'",
+    ]
     assert files(package) == {"SKILL.md"}
 
 

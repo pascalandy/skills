@@ -187,8 +187,6 @@ def owned(package: Path, lock: dict[str, object] | None) -> set[PurePosixPath]:
 
 
 def update(package: Path, upstream: Path, revision: str, dry_run: bool) -> str:
-    if not FULL_SHA.fullmatch(revision):
-        raise Failure(f"--revision must be a full 40-character SHA, got {revision!r}")
     plan = render(upstream, revision)
     lock = read_lock(package)
     files = {dest: item.content for dest, item in plan.items()}
@@ -304,6 +302,14 @@ def check(package: Path, upstream: Path | None) -> None:
         raise Failure(*problems)
 
 
+def full_sha(value: str) -> str:
+    if not FULL_SHA.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            f"must be a full 40-character SHA, got {value!r}"
+        )
+    return value
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
@@ -351,7 +357,10 @@ def parser() -> Parser:
         "--upstream", type=Path, required=True, help="upstream folder to import"
     )
     update_command.add_argument(
-        "--revision", required=True, help="full commit SHA of that folder"
+        "--revision",
+        type=full_sha,
+        required=True,
+        help="full commit SHA of that folder",
     )
     update_command.add_argument(
         "-n", "--dry-run", action="store_true", help="print the changes, write nothing"
