@@ -12,7 +12,7 @@ The CLI uses subcommands, validates source input before execution, returns struc
 - When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - Deepgram API key in the macOS keyring
-- The `distill-prompt` skill installed beside this one for Zoom summaries, which use its `synthese-rencontre` prompt
+- The `andy-mode` skill installed beside this one for Zoom summaries, which use the `synthese-rencontre` prompt of its `distill-prompt` route
 
 Set the Deepgram key with:
 

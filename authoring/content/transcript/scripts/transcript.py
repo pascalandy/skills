@@ -470,20 +470,15 @@ DEFAULT_PROMPT = "follow_along_note"
 ZOOM_ROOT = Path("~/Documents/Zoom").expanduser()
 ZOOM_EXPORT_DIR = Path("~/Desktop/Travail/Mandats").expanduser()
 ZOOM_DEFAULT_PROMPT_NAME = "synthese-rencontre"
-# Skills are siblings when deployed to agent homes, but source skills are grouped
-# under categories. Support both layouts so `run zoom` works from source.
-ZOOM_DEFAULT_PROMPT_PATHS = (
-    SCRIPT_DIR.parent.parent
-    / "distill-prompt"
-    / "references"
-    / ZOOM_DEFAULT_PROMPT_NAME
-    / "prompt.md",
-    SCRIPT_DIR.parent.parent.parent
-    / "knowledge"
-    / "distill-prompt"
-    / "references"
-    / ZOOM_DEFAULT_PROMPT_NAME
-    / "prompt.md",
+# The prompt lives in andy-mode's distill-prompt route. andy-mode is a sibling
+# when deployed to agent homes, but source skills are grouped under categories.
+# Support both layouts so `run zoom` works from source.
+ZOOM_DEFAULT_PROMPT_PATHS = tuple(
+    root / "references" / "distill-prompt" / ZOOM_DEFAULT_PROMPT_NAME / "prompt.md"
+    for root in (
+        SCRIPT_DIR.parent.parent / "andy-mode",
+        SCRIPT_DIR.parent.parent.parent / "andy" / "andy-mode",
+    )
 )
 ZOOM_DEFAULT_PROMPT_PATH = next(
     (path for path in ZOOM_DEFAULT_PROMPT_PATHS if path.exists()),

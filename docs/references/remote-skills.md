@@ -15,8 +15,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | andy-mode | Use only when explicitly invoked as `andy-mode ; <route>`, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`. |
 | bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
-| distill | Use only when explicitly invoked as `distill`. |
-| distill-prompt | Use only when explicitly invoked as `distill-prompt`. |
 | grilling | Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`. |
 | handoff | Use when the user asks to prepare a handoff for another agent. |
 | html-mode | Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes. |
@@ -25,10 +23,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | image-creator | Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter. |
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
 | meta-sc | Use only when explicitly invoked as `$meta-sc` to create or refactor a skill with several internal branches behind one entry point. |
-| ontology-map | Use only when explicitly invoked as `ontology-map`. |
-| pa-doc-update | Use only when explicitly invoked as `pa-doc-update`. |
-| pa-glossary | Use only when explicitly invoked as `pa-glossary`. |
-| qmd | Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | simple-editor | Use only when explicitly invoked as `simple-editor`. |
 | sparring | Use only when explicitly invoked as `sparring`. |
@@ -38,7 +32,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | trello | Use only when explicitly invoked as `trello`. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
-| wiki-map | Use only when explicitly invoked as `wiki-map`. |
 | writer-sk | Use only when explicitly invoked as `writer-sk`. |
 | writing-for-agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. |
 | writing-great-skills | Use when creating, modifying, evaluating a skill. |
@@ -51,7 +44,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | arena | Use when the user invokes `arena`, or when competing designs or implementations should be compared before choosing an approach for a non-trivial artifact. |
 | automate-me | Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow. |
 | blast-radius | Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust. |
-| cass | Use only when explicitly invoked as `cass` to search local coding-agent history |
 | coding-eng-laws | Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned. |
 | coding-language | Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code. |
 | coding-standard | Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior. |
@@ -69,7 +61,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | make-bot-ui | Use when building a custom UI that starts agent tasks through a webhook or local runner. |
 | matt-mode | Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets. |
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
-| pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
 | pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-attack-the-premise | Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it. |

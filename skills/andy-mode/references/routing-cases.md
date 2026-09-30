@@ -16,3 +16,9 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; QA` | `playbooks/qa.md` |
 | `andy-mode ; pa-qa` | The route tables and a question. No route runs |
 | `andy-mode ; note this idea: a shared inbox for agent feedback` | `playbooks/idea.md` |
+| `andy-mode ; docs reorg` | `playbooks/docs-cleaner.md` |
+| `andy-mode ; docs cleaner` | `playbooks/docs-cleaner.md` |
+| `andy-mode ; document the change we just shipped` | `playbooks/docs.md` |
+| `andy-mode ; fix our docs` | The route tables and a question, since `docs` and `docs-cleaner` both fit |
+| `andy-mode ; ontology-map` | The route tables and a question. No route runs |
+| `andy-mode ; Wiki Map` | `playbooks/wiki-map.md` |

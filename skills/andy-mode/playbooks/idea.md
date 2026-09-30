@@ -2,7 +2,7 @@
 
 ## Export
 
-Read `references/export-artifacts.md` from the active `pa-doc-update` skill directory and follow its `pa-idea` export profile.
+Read `references/docs/export-artifacts.md` and follow its `idea` export profile.
 
 - Mandatory on every run.
 

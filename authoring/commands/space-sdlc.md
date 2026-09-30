@@ -165,7 +165,7 @@ Split horizontally (50/50): `Chat (launched)` | `Planner (launched)`.
 
 Chat is the SDLC Orchestrator and Gatekeeper.
 
-Chat follows the selected delivery workflow. When a brief needs a durable artifact or scored evaluation, read `references/export-artifacts.md` or `references/eval-rubric.md` from the active `pa-doc-update` skill directory. These references provide artifact conventions without starting another workflow.
+Chat follows the selected delivery workflow. When a brief needs a durable artifact or scored evaluation, read `references/docs/export-artifacts.md` or `references/docs/eval-rubric.md` from the active `andy-mode` skill directory. These references provide artifact conventions without starting another workflow.
 
 **SDLC Workflow & Cost-Optimized Gates:**
 1. **Implementation**: Chat briefs Builder(s) → Builders implement code and run local unit tests.
@@ -182,7 +182,7 @@ Send a structured brief with:
 - User request, constraints, and acceptance criteria.
 - Canonical **Role Assignments** roster and profile tiers.
 - Current agent states (launched/idle vs standby).
-- Applicable skills per role: Planner (`$figure-it-out`), Builders (`$poteto-mode`), QA (`andy-mode ; qa`), Docs (`$pa-doc-update`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
+- Applicable skills per role: Planner (`$figure-it-out`), Builders (`$poteto-mode`), QA (`andy-mode ; qa`), Docs (`andy-mode ; docs`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
 - Explicit requirements: subtasks with deliverables, acceptance criteria, dynamic pane names (`<phase>/<total>-<prefix>-<keyword>`), dependency order, parallel lanes, and shared-file conflict prevention.
 
 **Delegation preamble (included in all delegated prompts):**
@@ -235,7 +235,7 @@ Send a structured brief with:
 - Perform hands-on functional and user-journey validation against acceptance criteria. Inspect web/UI flows with browser automation and screenshots (requires vision). Skill: `andy-mode ; qa`.
 
 #### Docs
-- Update affected documentation, specs, and CLI reference notes when behavior or configuration changes. Skill: `$pa-doc-update`.
+- Update affected documentation, specs, and CLI reference notes when behavior or configuration changes. Skill: `andy-mode ; docs`.
 
 #### Committer
 - Stage approved atomic commits with clean messages and push to branch. Skill: `$commit`.

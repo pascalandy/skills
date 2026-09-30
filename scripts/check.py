@@ -216,11 +216,7 @@ CHECKS = [
         # A shared route links to its sibling package
         reads=("authoring/andy/2nd-pass",),
     ),
-    Check(
-        "distill",
-        pytest("authoring/knowledge/distill/scripts/tests"),
-        reads=("authoring/knowledge/distill-prompt",),
-    ),
+    Check("distill", pytest("authoring/andy/andy-mode/scripts/distill/tests")),
     Check(
         "tavily",
         pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),

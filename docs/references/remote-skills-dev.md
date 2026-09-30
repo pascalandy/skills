@@ -13,7 +13,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | arena | Use when the user invokes `arena`, or when competing designs or implementations should be compared before choosing an approach for a non-trivial artifact. |
 | automate-me | Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow. |
 | blast-radius | Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust. |
-| cass | Use only when explicitly invoked as `cass` to search local coding-agent history |
 | coding-eng-laws | Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned. |
 | coding-language | Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code. |
 | coding-standard | Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior. |
@@ -31,7 +30,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | make-bot-ui | Use when building a custom UI that starts agent tasks through a webhook or local runner. |
 | matt-mode | Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets. |
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
-| pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
 | pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-attack-the-premise | Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it. |

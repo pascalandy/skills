@@ -13,8 +13,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | andy-mode | Use only when explicitly invoked as `andy-mode ; <route>`, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`. |
 | bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
-| distill | Use only when explicitly invoked as `distill`. |
-| distill-prompt | Use only when explicitly invoked as `distill-prompt`. |
 | grilling | Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`. |
 | handoff | Use when the user asks to prepare a handoff for another agent. |
 | html-mode | Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes. |
@@ -23,10 +21,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | image-creator | Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter. |
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
 | meta-sc | Use only when explicitly invoked as `$meta-sc` to create or refactor a skill with several internal branches behind one entry point. |
-| ontology-map | Use only when explicitly invoked as `ontology-map`. |
-| pa-doc-update | Use only when explicitly invoked as `pa-doc-update`. |
-| pa-glossary | Use only when explicitly invoked as `pa-glossary`. |
-| qmd | Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | simple-editor | Use only when explicitly invoked as `simple-editor`. |
 | sparring | Use only when explicitly invoked as `sparring`. |
@@ -36,7 +30,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | trello | Use only when explicitly invoked as `trello`. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
-| wiki-map | Use only when explicitly invoked as `wiki-map`. |
 | writer-sk | Use only when explicitly invoked as `writer-sk`. |
 | writing-for-agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. |
 | writing-great-skills | Use when creating, modifying, evaluating a skill. |
