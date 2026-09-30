@@ -211,7 +211,7 @@ def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
                 if anchor and target.suffix == ".md":
                     if target not in anchor_cache:
                         anchor_cache[target] = anchors(target)
-                    if anchor_slug(anchor) not in anchor_cache[target]:
+                    if anchor not in anchor_cache[target]:
                         errors.append(f"{label}: unresolved anchor: {raw}")
             for span in spans:
                 check_code(label, span)

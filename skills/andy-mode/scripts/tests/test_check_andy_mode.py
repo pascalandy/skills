@@ -80,10 +80,11 @@ def test_unrouted_playbook_and_nested_skill_fail(tmp_path: Path) -> None:
     ]
 
 
-def test_broken_anchor_and_bundled_path_fail(tmp_path: Path) -> None:
+@pytest.mark.parametrize("anchor", ["missing", "Body", "body!"])
+def test_broken_anchor_and_bundled_path_fail(tmp_path: Path, anchor: str) -> None:
     root = package(tmp_path)
     (root / "playbooks/retro-skill.md").write_text(
-        "Read [it](../references/retro-skill/template.md#missing) "
+        f"Read [it](../references/retro-skill/template.md#{anchor}) "
         "and `references/retro-skill/old.md`.\n\n"
         "```bash\n"
         "uv run <skill_dir>/scripts/gone.py\n"
@@ -94,7 +95,7 @@ def test_broken_anchor_and_bundled_path_fail(tmp_path: Path) -> None:
     assert checker.validate(root) == [
         (
             "playbooks/retro-skill.md: unresolved anchor: "
-            "../references/retro-skill/template.md#missing"
+            f"../references/retro-skill/template.md#{anchor}"
         ),
         (
             "playbooks/retro-skill.md: unresolved bundled path: "
