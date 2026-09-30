@@ -65,9 +65,11 @@ Set the recipe's capability variables before the invocation. For current externa
 | Review local code or supplied text | Keep `web_search="disabled"` and `view_image=false` |
 | Verify a claim against current official documentation | Set `web_search="live"` and ask for source links |
 | Inspect local screenshots or diagrams | Set `view_image=true` and name the image paths in the prompt |
-| Supply an image with the initial prompt | Add `-i /absolute/path/screenshot.png` to the invocation |
+| Supply an image with the initial prompt | Add `-i /absolute/path/screenshot.png` before `-s read-only` |
 
 For example, to review a design screenshot against current requirements, set `web_search="live"` and `view_image=true`, add `-i`, and supply both the requirements URL and review criteria in the prompt.
+
+`-i` accepts multiple paths. Put another option after its paths so an inline prompt is not consumed as an image path.
 
 `features.view_image` lets the child inspect local images during the task. `-i` supplies an image directly and does not require that tool. Neither option enables image generation. Installed CLI 0.159.0 ignores the `tools.view_image` setting still shown in the configuration reference. Its [feature registry](https://github.com/openai/codex/blob/rust-v0.159.0/codex-rs/features/src/lib.rs) defines `features.view_image`. Confirm the effective value with `codex -c 'features.view_image=false' features list` or the same command with `true`.
 
