@@ -24,7 +24,7 @@ date_updated: 2026-09-30
 | File | Description |
 |------|-------------|
 | `references/checks.md` | How `just check`, signoff, commit hooks, and the manual CI workflow fit together, and how to change them |
-| `references/install-skills.md` | Profiles, private packages, ownership, and cutover for `just install-skills` |
+| `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
 | `references/release.md` | Steps to publish a tagged release |
 | `references/remote-skills.md` | Generated name and description of every skill in `skills/`, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |
