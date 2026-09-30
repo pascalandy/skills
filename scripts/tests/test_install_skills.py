@@ -65,6 +65,86 @@ def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
     return json.loads(result.stdout)["actions"]
 
 
+def test_published_snapshot_installs_committed_content_without_touching_authoring(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    command(repo, "greet", "published command")
+    commit(repo)
+    snapshot = repo.parent / "published"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "--detach", str(snapshot), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "authoring/content/alpha/SKILL.md").write_text("working edit\n")
+    (repo / "skills/alpha/SKILL.md").write_text("unstaged generated edit\n")
+    command(repo, "greet", "working command")
+    staged = command(repo, "staged", "staged command")
+    subprocess.run(["git", "add", str(staged)], cwd=repo, check=True)
+    extra = skill(repo / "authoring/content", "untracked", "not published")
+    before = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-uall"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    ).stdout
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, check=True
+    ).stdout
+
+    (repo / ".git/info/exclude").write_text("ignored.txt\n")
+    (snapshot / "skills/alpha/ignored.txt").write_text("not published\n")
+    private = repo / "_skills_private"
+    subprocess.run(["git", "init", "-q", str(private)], check=True)
+    skill(private / "content", "secret", "private")
+    commit(private)
+    applied = run(snapshot, home, "--snapshot", "--private-root", str(private))
+    assert applied.returncode == 0, applied.stderr
+    assert "add\t~/.claude/skills/alpha" in applied.stdout
+    assert (home / ".claude/skills/alpha/SKILL.md").read_text() == "# alpha\n\nold\n"
+    assert (home / ".claude/commands/greet.md").read_text() == "published command\n"
+    assert not (home / ".claude/commands/staged.md").exists()
+    assert (
+        home / ".claude/skills/secret/SKILL.md"
+    ).read_text() == "# secret\n\nprivate\n"
+    assert not (home / ".claude/skills/alpha/ignored.txt").exists()
+    assert not (home / ".claude/skills/untracked").exists()
+    assert (extra / "SKILL.md").read_text() == "# untracked\n\nnot published\n"
+    assert (
+        subprocess.run(
+            ["git", "status", "--porcelain=v1", "-uall"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        ).stdout
+        == before
+    )
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, check=True
+        ).stdout
+        == revision
+    )
+    assert (
+        run(
+            snapshot, home, "--snapshot", "--private-root", str(private), "--check"
+        ).returncode
+        == 0
+    )
+    assert not subprocess.run(
+        ["git", "status", "--porcelain"], cwd=snapshot, capture_output=True, check=True
+    ).stdout
+
+
+def test_snapshot_refuses_mutable_source(sandbox: tuple[Path, Path]) -> None:
+    repo, home = sandbox
+    result = run(repo, home, "--snapshot")
+    assert result.returncode == 1
+    assert "clean detached checkout" in result.stderr
+    assert not home.exists()
+
+
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "alpha", "new")

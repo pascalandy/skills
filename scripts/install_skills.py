@@ -35,6 +35,7 @@ from _common import (
     exclusive,
     frontmatter_description,
     run,
+    run_git,
     run_script,
     swap,
 )
@@ -252,19 +253,43 @@ def private_packages(root: Path | None) -> dict[str, Path]:
     return packages
 
 
+def committed_files(directory: str) -> list[Path]:
+    """List the paths HEAD tracks in a repository directory."""
+    listed = flatten_skills.git(
+        "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", directory
+    )
+    return [Path(os.fsdecode(path)) for path in listed.split(b"\0") if path]
+
+
 def skill_sources(
-    stage: Path, private_root: Path | None, profile: str
+    stage: Path, private_root: Path | None, profile: str, snapshot: bool = False
 ) -> dict[str, Source]:
     """Stage public packages under `stage`, add every private package, and drop
     the profile's exclusions."""
     sources: dict[str, Source] = {}
-    for name, entries in flatten_skills.collect().items():
-        package = stage / name
-        for source, relative in entries:
-            destination = package / relative
+    if snapshot:
+        for relative in committed_files("skills"):
+            if len(relative.parts) < 3:
+                continue
+            original = ROOT / relative
+            if original.is_symlink() or not original.is_file():
+                raise ScriptError(
+                    f"published skill file {relative} must be a regular file"
+                )
+            destination = stage / Path(*relative.parts[1:])
             destination.parent.mkdir(parents=True, exist_ok=True)
-            flatten_skills.publish(source, destination)
-        sources[name] = Source(package, "public", digest(package))
+            shutil.copy2(original, destination)
+        for package in sorted(stage.iterdir()):
+            if package.is_dir() and (package / "SKILL.md").is_file():
+                sources[package.name] = Source(package, "public", digest(package))
+    else:
+        for name, entries in flatten_skills.collect().items():
+            package = stage / name
+            for source, relative in entries:
+                destination = package / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                flatten_skills.publish(source, destination)
+            sources[name] = Source(package, "public", digest(package))
     duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
         if name in sources:
@@ -284,9 +309,14 @@ def skill_sources(
     }
 
 
-def command_sources() -> dict[str, Source]:
+def command_sources(snapshot: bool = False) -> dict[str, Source]:
     sources: dict[str, Source] = {}
-    for relative in flatten_skills.git_files("authoring/commands"):
+    files = (
+        committed_files("authoring/commands")
+        if snapshot
+        else flatten_skills.git_files("authoring/commands")
+    )
+    for relative in files:
         if len(relative.parts) != 3 or relative.suffix != ".md":
             continue
         path = ROOT / relative
@@ -558,6 +588,13 @@ def report(
 
 
 def install(args: argparse.Namespace) -> str:
+    if args.snapshot and (
+        run_git("symbolic-ref", "-q", "HEAD", cwd=ROOT).returncode == 0
+        or flatten_skills.git("status", "--porcelain").strip()
+    ):
+        raise ScriptError(
+            "published source must be a clean detached checkout; use the published deployment worktree"
+        )
     home = Path.home()
     preview = args.dry_run or args.check
     # An apply waits for any other one before it reads the working tree, so
@@ -568,8 +605,10 @@ def install(args: argparse.Namespace) -> str:
         tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
     ):
         stage = Path(temporary)
-        sources = skill_sources(stage / "skills", args.private_root, args.profile)
-        commands = command_sources()
+        sources = skill_sources(
+            stage / "skills", args.private_root, args.profile, args.snapshot
+        )
+        commands = command_sources(args.snapshot)
         codex = command_skills(stage / "commands", commands)
         clashes = sorted(sources.keys() & codex.keys())
         if clashes:
@@ -609,8 +648,9 @@ def install(args: argparse.Namespace) -> str:
             for action in actions
             if action.kind in CHANGES
         )
+        retry = "just sync" if args.snapshot else "just install-skills"
         conflicts = [
-            f"{action.detail}; move it aside, then rerun: just install-skills"
+            f"{action.detail}; move it aside, then rerun: {retry}"
             for action in actions
             if action.kind == "conflict"
         ]
@@ -620,7 +660,7 @@ def install(args: argparse.Namespace) -> str:
             raise ScriptError(
                 *conflicts,
                 f"{len(pending)} installed entries differ from the checkout; "
-                "run: just install-skills",
+                f"run: {retry}",
                 detail=changes,
                 report=summary,
             )
@@ -630,7 +670,8 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
-        flatten_skills.flatten()
+        if not args.snapshot:
+            flatten_skills.flatten()
         execute(home, {**sources, **codex}, commands, actions)
         return output
 
@@ -641,6 +682,11 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__,
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
+    )
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="install committed skills/ and commands from this detached published checkout without flattening",
     )
     parser.add_argument(
         "--profile",
