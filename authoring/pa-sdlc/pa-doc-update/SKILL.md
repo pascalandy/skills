@@ -39,17 +39,14 @@ Load `references/ROUTER.md`.
 | Mode | Owns | Use when |
 |---|---|---|
 | `ChangeCapture` | Recent change documentation | The anchor is what changed and where that update belongs |
-| `RationaleCapture` | Lightweight decision rationale | The durable object is a decision: what was chosen, why it was chosen, and which alternatives were rejected; deeper lessons, incidents, and retrospectives belong to `pa-postmortem` |
+| `RationaleCapture` | Lightweight decision rationale | The durable object is a decision: what was chosen, why it was chosen, and which alternatives were rejected |
 | `ArtifactDocumenter` | One current-state artifact | The anchor is one module, page, workflow, board, or note set as it exists now |
 
 ## Boundaries
 
 | If the real need is... | Use instead |
 |---|---|
-| retrospectives, incident reviews, or durable lesson capture | `pa-postmortem` |
 | stale-doc review, deduplication, frontmatter, routing, or doc governance | `pa-doc-cleaner` |
-| bounded current-state evidence before scoping | `pa-scope` |
-| scoping the change surface | `pa-scope` |
 | planning or implementation | `architect`, `figure-it-out`, or a separate `poteto-mode` delivery session |
 
 ## Documentation Update Summary
@@ -58,7 +55,7 @@ Default to a concise documentation brief that covers:
 
 1. documentation objective
 2. primary target
-3. evidence used, including git diff, existing docs, relevant postmortem, and `pa-scope` judgment when available
+3. evidence used, including git diff, existing docs, relevant postmortem, and `blast-radius` judgment when available
 4. key content to capture
 5. canonical placement or output shape
 6. dependencies and unknowns
@@ -74,7 +71,7 @@ Default to a concise documentation brief that covers:
    - in a git workspace, run `git status --short`, `git diff --stat`, and the relevant `git diff` for changed paths; include staged diff when staged changes matter;
    - record whether the target is a local filesystem path and, when it is, the bounded documentation or workspace root plus the pre-write paths and ancestor indexes needed to recognize later moves or deletions;
    - check whether a relevant `postmortem-*.md` artifact already exists, especially beside related lifecycle artifacts under the resolved `sdlc-pa` export root; if found, treat it as required context for lessons, rationale, risks, follow-ups, and cross-references.
-4. Run the scope gate: if the documentation target, affected surface, blast radius, validation surface, or artifact relevance is unclear, use (and reload) `$pa-scope` first and feed its scope judgment back into this doc update; otherwise continue inline.
+4. Run the scope gate: if the documentation target, affected surface, blast radius, validation surface, or artifact relevance is unclear, use (and reload) `$blast-radius` first and feed its scope judgment back into this doc update; otherwise continue inline.
 5. Run the documentation update loop.
 6. Apply or export the final documentation update according to the selected mode.
 7. Only after the update passes its own verification, run the Wiki Map prefilter against the exact documentation targets changed in this job:

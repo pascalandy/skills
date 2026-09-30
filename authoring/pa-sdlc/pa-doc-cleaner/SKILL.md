@@ -51,12 +51,9 @@ Use this table for step 2 of the maintenance workflow. Choose one primary mode b
 | If the real need is... | Use instead |
 |---|---|
 | documenting one concrete change, decision, or artifact | `pa-doc-update` |
-| bounded current-state evidence before scoping | `pa-scope` |
-| scoping a requested change | `pa-scope` |
 | defining direction or planning execution | `architect` |
 | applying a change or fixing a bug | a separate `poteto-mode` delivery session using the matching Feature or Bug fix playbook |
 | creating a glossary or resolving canonical terminology | `pa-glossary` |
-| capturing lessons, incidents, or retrospective feedback | `pa-postmortem` |
 
 ## Maintenance Workflow
 
@@ -95,10 +92,9 @@ Before applying or recommending cleanup, decide whether the request is safe to c
 ### Hand off when
 
 - fresh documentation needs to be authored from a completed change, decision, or artifact → `pa-doc-update`
-- the current state or affected surface is unclear → `pa-scope`
+- the current state or affected surface is unclear → `blast-radius`
 - product direction, architecture, or implementation plan is unresolved → `architect` or `figure-it-out`
 - terminology ownership or canonical vocabulary is unclear → `pa-glossary`
-- the cleanup reveals lessons, incident causes, or retrospective feedback → `pa-postmortem`
 
 ## Maintenance Discipline
 

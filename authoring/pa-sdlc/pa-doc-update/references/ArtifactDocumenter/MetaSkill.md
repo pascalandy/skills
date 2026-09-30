@@ -43,7 +43,7 @@ Tie-break rule: if the request is primarily about a recent change or shipped upd
 2. Determine whether an existing doc should be updated or a new one should be created.
 3. Gather the evidence baseline before drafting: inspect the artifact, directly related docs, `git status --short`, `git diff --stat`, and the relevant `git diff` when repository changes affect the artifact; include staged diff when staged changes matter.
 4. Check for an existing relevant `postmortem-*.md` artifact, especially under the resolved `sdlc-pa` export root beside related lifecycle artifacts; use it to capture stable lessons, constraints, caveats, and cross-references without turning this mode into a new postmortem.
-5. Run the scope gate: if artifact boundaries, dependencies, downstream impact, validation needs, or doc placement are unclear, use (and reload) `$pa-scope` first and carry its judgment into this artifact documentation.
+5. Run the scope gate: if artifact boundaries, dependencies, downstream impact, validation needs, or doc placement are unclear, use (and reload) `$blast-radius` first and carry its judgment into this artifact documentation.
 6. Capture the most stable and useful current-state details.
 7. Produce the documentation in a grounded, reference-friendly form.
 
@@ -73,7 +73,7 @@ When useful, represent responsibilities, dependencies, interfaces, or workflow s
 - Stay focused on one concrete artifact or tightly related artifact set.
 - Run git diff when the work is in a git workspace; if no diff exists, say so and use other explicit evidence.
 - Consider existing `postmortem-*.md` artifacts as evidence when they exist; do not create or rewrite postmortems in this mode.
-- Use (and reload) `$pa-scope` when artifact boundaries, dependencies, downstream impact, validation surface, or doc placement are unclear; do not guess.
+- Use (and reload) `$blast-radius` when artifact boundaries, dependencies, downstream impact, validation surface, or doc placement are unclear; do not guess.
 - Do not broaden into whole-system discovery.
 - Do not turn this into a release-note summary unless the request is really about a recent change.
 - Do not turn this into a rationale artifact unless the why is the real missing piece.
