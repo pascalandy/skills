@@ -33,7 +33,6 @@ This step is complete when one uncertainty can be named whose reduction would ch
 | Actual request | Better owner |
 |---|---|
 | Challenge a stated opinion or argument | `sparring` |
-| Explore or develop an idea interactively | `pa-brainstorm` |
 | Pressure-test through focused questions | `grilling` |
 | Work backward from an imagined failure | `pa-premortem` |
 | Package a durable direction or decision brief | `pa-vision` |
