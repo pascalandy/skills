@@ -24,4 +24,4 @@ Run each request in a fresh headless session. Use a throwaway Git project with c
 
 A playbook may load the routes it calls for after the expected ones, as `copywriting` loads `copy-editing` and `marketing-plan` loads `product-marketing`.
 
-Codex's `workspace-write` sandbox blocks writes to `.agents/`, so a playbook that saves `.agents/product-marketing.md` or `.agents/listening-sources.md` writes elsewhere and says so. Judge those cases by the files read and the answer, not by that path.
+In the recorded Codex replays, the `workspace-write` sandbox blocked writes to `.agents/`. Playbooks saved `.agents/product-marketing.md` and `.agents/listening-sources.md` elsewhere and reported the new paths. When replay permissions require another path, judge the case by the files read and the answer.
