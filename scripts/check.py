@@ -183,6 +183,7 @@ CHECKS = [
     repo_test(
         "sync",
         "scripts/sync.py",
+        "scripts/_published_checkout.py",
         "scripts/flatten_skills.py",
         "scripts/install_skills.py",
         "scripts/sync_private.py",
@@ -190,6 +191,7 @@ CHECKS = [
     repo_test(
         "sync_fleet",
         "scripts/sync_fleet.py",
+        "scripts/_published_checkout.py",
         "scripts/sync_private.py",
         "scripts/flatten_skills.py",
         "scripts/install_skills.py",

@@ -1,4 +1,4 @@
-"""just sync through its CLI, with a bare repository standing in for GitHub."""
+"""Published local sync through its CLI and real isolated Git repositories."""
 
 from __future__ import annotations
 
@@ -7,35 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import commit, skill
-
-# The commit waiting on GitHub edits the skill alpha and swaps the private sync
-# for this stub, so a test sees whether the sync ran the code the pull brought
-PULLED_PRIVATE_SYNC = """from pathlib import Path
-
-(Path(__file__).resolve().parent.parent / "pulled-private-sync-ran").touch()
-"""
-
-
-def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    env = {
-        **os.environ,
-        "HOME": str(home),
-        "UV_CACHE_DIR": str(home.parent / "uv-cache"),
-        "GIT_CONFIG_NOSYSTEM": "1",
-    }
-    # Keep the caller's git settings, such as pull.rebase, out of the pull
-    env.pop("XDG_CONFIG_HOME", None)
-    result = subprocess.run(
-        ["uv", "run", str(repo / "scripts/sync.py"), *args],
-        check=False,
-        cwd=repo,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return result
+from conftest import commit, private_remote, skill
 
 
 def git(repo: Path, *args: str) -> str:
@@ -44,106 +16,132 @@ def git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def on_feature_branch(repo: Path) -> None:
-    subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=repo, check=True)
+def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", str(repo / "scripts/sync.py"), *args],
+        cwd=repo,
+        check=False,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "UV_CACHE_DIR": str(home.parent / "uv-cache"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
 
 
 @pytest.fixture
-def behind(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path]:
-    """A main checkout one commit behind its origin; that commit changes alpha and the private sync."""
+def deployed(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path, Path]:
     seed, home = sandbox
-    subprocess.run(["git", "branch", "-q", "-M", "main"], cwd=seed, check=True)
+    git(seed, "branch", "-M", "main")
     origin = tmp_path / "skills.git"
-    subprocess.run(["git", "clone", "-q", "--bare", str(seed), str(origin)], check=True)
+    git(tmp_path, "clone", "-q", "--bare", str(seed), str(origin))
+    private_remote(tmp_path)
     repo = tmp_path / "machine"
-    subprocess.run(["git", "clone", "-q", str(origin), str(repo)], check=True)
-    (seed / "scripts/sync_private.py").write_text(PULLED_PRIVATE_SYNC)
-    skill(seed / "authoring/content", "alpha", "pulled")
-    commit(seed)
-    subprocess.run(["git", "push", "-q", str(origin), "main"], cwd=seed, check=True)
-    return repo, home
+    git(tmp_path, "clone", "-q", str(origin), str(repo))
+    return repo, home, seed
 
 
-def test_pulls_then_runs_the_pulled_private_sync_and_installs(
-    behind: tuple[Path, Path],
+def test_sync_preserves_authoring_and_installs_published_skills_and_private_edits(
+    deployed: tuple[Path, Path, Path],
 ) -> None:
-    repo, home = behind
-    before = git(repo, "rev-parse", "--short=7", "HEAD")
+    repo, home, seed = deployed
+    skill(seed / "authoring/content", "alpha", "published")
+    skill(seed / "skills", "alpha", "published")
+    (seed / "authoring/commands").mkdir(parents=True)
+    (seed / "authoring/commands/hello.md").write_text("published command\n")
+    commit(seed)
+    git(seed, "push", "-q", str(repo.parent / "skills.git"), "main")
+    git(repo, "switch", "-c", "feature")
+    (repo / "authoring/content/alpha/SKILL.md").write_text("local draft\n")
+    (repo / "skills/alpha/SKILL.md").write_text("local generated draft\n")
+    (repo / "authoring/commands").mkdir(exist_ok=True)
+    (repo / "authoring/commands/hello.md").write_text("untracked hello\n")
+    skill(repo / "authoring/content", "new", "local only")
+    git(repo, "add", "skills/alpha/SKILL.md")
+    before = (
+        git(repo, "rev-parse", "HEAD"),
+        git(repo, "status", "--porcelain", "-uall"),
+    )
+    git(repo, "clone", "-q", str(repo.parent / "skills-private.git"), "_skills_private")
+    skill(repo / "_skills_private/content", "mine", "unsaved")
 
     result = run(repo, home)
 
-    lines = result.stdout.splitlines()
     assert (result.returncode, result.stderr) == (0, "")
     assert (
-        lines[0]
-        == f"pull\tmain\t{before}..{git(repo, 'rev-parse', '--short=7', 'HEAD')}"
-    )
-    assert "add\t~/.claude/skills/alpha" in lines
-    assert (repo / "pulled-private-sync-ran").is_file()
-    installed = home / ".claude/skills/alpha/SKILL.md"
-    assert installed.read_text() == "# alpha\n\npulled\n"
+        home / ".claude/skills/alpha/SKILL.md"
+    ).read_text() == "# alpha\n\npublished\n"
+    assert (home / ".claude/skills/mine/SKILL.md").read_text() == "# mine\n\nunsaved\n"
+    assert (home / ".claude/commands/hello.md").read_text() == "published command\n"
+    assert not (home / ".claude/skills/new").exists()
+    assert (
+        git(repo, "rev-parse", "HEAD"),
+        git(repo, "status", "--porcelain", "-uall"),
+    ) == before
+    assert git(repo, "branch", "--show-current") == "feature"
+    assert run(repo, home).stdout == ""
+    assert run(repo, home, "--check").returncode == 0
+    assert git(repo / "_skills_private", "status", "--porcelain") == ""
 
 
-def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
-    behind: tuple[Path, Path],
+def test_launcher_executes_newer_published_installer_code_without_upgrading_authoring(
+    deployed: tuple[Path, Path, Path],
 ) -> None:
-    repo, home = behind
-    (repo / "authoring/content/alpha/SKILL.md").write_text("an uncommitted edit\n")
-
-    result = run(repo, home)
-
-    assert (result.returncode, result.stdout) == (1, "")
-    assert "authoring/content/alpha/SKILL.md" in result.stderr
-    assert result.stderr.endswith("then rerun just sync\n")
-    assert not (repo / "pulled-private-sync-ran").exists()
-    assert not (home / ".claude").exists()
-
-
-def test_refuses_a_checkout_off_main_before_pulling_or_installing(
-    sandbox: tuple[Path, Path],
-) -> None:
-    repo, home = sandbox
-    on_feature_branch(repo)
-
-    result = run(repo, home)
-
-    assert (result.returncode, result.stdout, result.stderr) == (
-        1,
-        "",
-        "error: this checkout is on feature; switch to main, then rerun just sync\n",
+    repo, home, seed = deployed
+    assert run(repo, home).returncode == 0
+    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+    original = (repo / "scripts/install_skills.py").read_bytes()
+    new_installer = seed / "scripts/install_skills.py"
+    text = new_installer.read_text()
+    assert '"mac": frozenset(),' in text
+    new_installer.write_text(
+        text.replace('"mac": frozenset(),', '"mac": frozenset({"alpha"}),').replace(
+            '"om1": frozenset({"apple-mail"})',
+            '"om1": frozenset({"apple-mail", "alpha"})',
+        )
     )
-    assert not (repo / "_skills_private").exists()
-    assert not (home / ".claude").exists()
+    commit(seed)
+    git(seed, "push", "-q", str(repo.parent / "skills.git"), "main")
+    author_head = git(repo, "rev-parse", "HEAD")
+    result = run(repo, home)
+    assert result.returncode == 0, result.stderr
+    assert "remove\t~/.claude/skills/alpha" in result.stdout
+    assert not (home / ".claude/skills/alpha").exists()
+    assert (repo / "scripts/install_skills.py").read_bytes() == original
+    assert git(repo, "rev-parse", "HEAD") == author_head
 
 
-def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> None:
-    repo, home = sandbox
-    # Off main and without a remote, any pull would fail
-    on_feature_branch(repo)
+def test_detached_authoring_head_stays_detached_after_sync(
+    deployed: tuple[Path, Path, Path],
+) -> None:
+    repo, home, _ = deployed
+    git(repo, "switch", "--detach")
+    before = git(repo, "rev-parse", "HEAD")
+    result = run(repo, home)
+    assert result.returncode == 0, result.stderr
+    assert (home / ".claude/skills/alpha/SKILL.md").read_text() == "# alpha\n\nold\n"
+    assert git(repo, "rev-parse", "HEAD") == before
+    assert git(repo, "branch", "--show-current") == ""
 
+
+def test_preview_and_check_compare_published_content_without_writing_installs(
+    deployed: tuple[Path, Path, Path],
+) -> None:
+    repo, home, _ = deployed
+    before = git(repo, "status", "--porcelain", "-uall")
     preview = run(repo, home, "--dry-run")
     check = run(repo, home, "--check")
-
-    assert (preview.returncode, preview.stderr) == (0, "")
-    # The profile, and so the target list, depends on the host
-    assert "add\t~/.claude/skills/alpha" in preview.stdout.splitlines()
-    # Nothing is installed yet, so the check lists the work on stderr
-    assert (check.returncode, check.stdout) == (1, "")
-    assert check.stderr.startswith(preview.stdout)
-    assert not (repo / "_skills_private").exists()
+    assert preview.returncode == 0 and "add\t~/.claude/skills/alpha" in preview.stdout
+    assert check.returncode == 1 and "add\t~/.claude/skills/alpha" in check.stderr
     assert not (home / ".claude").exists()
+    assert git(repo, "status", "--porcelain", "-uall") == before
 
 
-def test_a_fetch_that_cannot_reach_origin_exits_75_before_installing(
-    behind: tuple[Path, Path],
-) -> None:
-    repo, home = behind
-    # Nothing listens on port 9, so git reports a refused connection
-    git(repo, "remote", "set-url", "origin", "http://127.0.0.1:9/skills.git")
-
-    result = run(repo, home, "--timeout", "30s")
-
-    assert (result.returncode, result.stdout) == (75, "")
-    assert result.stderr.startswith("error: could not fetch main: ")
-    assert result.stderr.endswith("retry: just sync --timeout 30s\n")
+def test_missing_origin_is_failure_without_install(sandbox: tuple[Path, Path]) -> None:
+    repo, home = sandbox
+    result = run(repo, home)
+    assert result.returncode == 1 and "could not fetch main" in result.stderr
     assert not (home / ".claude").exists()

@@ -16,10 +16,9 @@ pre-commit:
       glob: "{skills/**/SKILL.md,docs/references/remote-skills*.md}"
       run: just remote-skills --check
 
-# In a main checkout with the private clone, a commit installs this machine, a pull
-# also syncs the other machines in the background, and a push of main syncs
-# them once GitHub has it. sync-hook exits early everywhere else, including
-# worktrees and other branches
+# In a main checkout with the private clone, a local commit installs nothing.
+# A pull or a push of main starts background deployment of published main to
+# every machine, including this one. Worktrees and other branches skip it
 post-commit:
   commands:
     sync-skills:
@@ -35,8 +34,8 @@ post-rewrite:
     sync-skills:
       run: just sync-hook post-rewrite {1}
 
-# A script, not a command: lefthook skips a pre-push command whose push only
-# deletes files, and that push must still reach the fleet
+# Lefthook skips a pre-push command whose push only deletes files. Keep a script
+# so a deletion pushed to main still starts published fleet deployment
 pre-push:
   scripts:
     "sync-skills.sh":

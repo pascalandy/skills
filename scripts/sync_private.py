@@ -3,11 +3,11 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Save, pull, and push the private skills repository cloned at _skills_private/.
+"""Save, pull, and push the original checkout's _skills_private/ clone.
 
-The private repository's URL is this checkout's origin with skills renamed to
+The private repository's URL is the selected checkout's origin with skills renamed to
 skills-private, and the public .gitignore keeps the clone out of the public
-repository. A missing clone is cloned. Uncommitted edits are committed and
+repository. A missing clone is cloned at that checkout. Uncommitted edits are committed and
 pushed, so no machine loses them. A folder that is not a clone or a clone off
 main stops the run untouched; edits that conflict with GitHub stay committed
 here and stop the run.
@@ -15,6 +15,7 @@ here and stop the run.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import re
 import socket
@@ -48,9 +49,16 @@ log = logging.getLogger("sync-private")
 
 
 def git(
-    *args: str, cwd: Path = PRIVATE, timeout: float | None = None
+    *args: str, cwd: Path | None = None, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
-    return run_git(*args, cwd=cwd, timeout=timeout)
+    return run_git(*args, cwd=cwd or PRIVATE, timeout=timeout)
+
+
+def set_root(root: Path) -> None:
+    """Use the author's existing private clone, never a deployment worktree clone."""
+    global ROOT, PRIVATE
+    ROOT = root.resolve()
+    PRIVATE = ROOT / "_skills_private"
 
 
 def last_line(result: subprocess.CompletedProcess[str]) -> str:
@@ -216,9 +224,20 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long to wait for another sync, and for each clone, pull, or push (default: 5m)",
     )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        help="authoring checkout that holds the existing _skills_private/ clone (default: this checkout)",
+    )
+
+    def work(args: argparse.Namespace) -> str:
+        if args.root:
+            set_root(args.root)
+        return "\n".join(sync(args.dry_run, args.timeout))
+
     return run_script(
         parser,
-        lambda args: "\n".join(sync(args.dry_run, args.timeout)),
+        work,
         argv,
         debug="SYNC_PRIVATE_DEBUG",
     )

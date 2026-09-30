@@ -81,6 +81,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     for name in (
         "_cli.py",
         "_common.py",
+        "_published_checkout.py",
         "flatten_skills.py",
         "install_skills.py",
         "sync_fleet.py",
@@ -208,10 +209,10 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         for entry in report["machines"]
     ] == [
         ("behind", "synced", f"synced at {head[:7]}"),
-        ("dirty", "needs-you", "checkout has uncommitted skill changes"),
+        ("dirty", "synced", f"synced at {head[:7]}"),
         ("editor", "synced", f"synced at {head[:7]}"),
-        ("branch", "needs-you", "checkout is on feature, not main"),
-        ("ahead", "needs-you", "checkout has commits GitHub lacks; push them"),
+        ("branch", "synced", f"synced at {head[:7]}"),
+        ("ahead", "synced", f"synced at {head[:7]}"),
         ("plain", "needs-you", not_a_clone),
         ("linked", "needs-you", not_a_clone),
         (
@@ -220,8 +221,8 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
             "ssh: connect to host down port 22: Connection refused",
         ),
     ]
-    assert git(behind, "rev-parse", "HEAD") == head
-    assert git(editor, "rev-parse", "HEAD") == head
+    assert git(behind, "rev-parse", "HEAD") == before
+    assert git(editor, "rev-parse", "HEAD") == before
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
     assert git(origin, "rev-parse", "main") == head
     assert not (behind / "unpushed.txt").exists()
@@ -229,13 +230,14 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
     assert not (behind / REGISTRY).exists()
-    assert (homes / "behind/just.log").read_text() == "install-skills\n"
+    assert not (homes / "behind/just.log").exists()
     installed = homes / "behind/.claude/skills/secret/SKILL.md"
     assert installed.read_text() == "from the hub\n"
     assert (homes / "editor/.claude/skills/mine/SKILL.md").is_file()
     for name, checkout in (("dirty", dirty), ("branch", branch), ("ahead", ahead)):
-        assert not (checkout / "_skills_private").exists()
+        assert (checkout / "_skills_private/.git").is_dir()
         assert not (homes / name / "just.log").exists()
+        assert git(checkout, "rev-parse", "HEAD") != head
     assert git(dirty, "rev-parse", "HEAD") == before
     assert kept.read_text() == "# kept\n\nold\n"
     assert not (plain / "_skills_private/.git").exists()
@@ -243,12 +245,16 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
     assert (
-        "dirty needs-you: checkout has uncommitted skill changes; "
-        "fix it on dirty, then rerun just sync-fleet dirty"
-    ) in report["errors"]
+        dirty / "authoring/content/draft/SKILL.md"
+    ).read_text() == "# draft\n\nold\n"
+    assert (
+        branch / "authoring/content/alpha/SKILL.md"
+    ).read_text() == "# alpha\n\nold\n"
+    assert git(branch, "branch", "--show-current") == "feature"
+    assert (ahead / "local.txt").read_text() == "only here\n"
     assert any(error.startswith("down offline:") for error in report["errors"])
     behind_changes = report["machines"][0]["changes"]
-    assert behind_changes[0] == f"move {before[:7]} to {head[:7]}"
+    assert behind_changes[0] == f"move - to {head[:7]}"
     assert "add\t~/.claude/skills/secret" in behind_changes
 
 
@@ -264,6 +270,7 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     assert run(hub, homes, bin_dir).returncode == 0
     head = change(hub)
     before = git(behind, "rev-parse", "HEAD")
+    # Their authoring checkouts are irrelevant to the published cache.
     for checkout in (current, stale):
         git(checkout, "pull", "-q")
     # stale is at GitHub's main, but lost an installed skill
@@ -274,11 +281,11 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
 
     assert (result.returncode, result.stdout, result.stderr) == (
         0,
-        f"ready\tbehind\t{head[:7]}\nready\tstale\t{head[:7]}\n",
+        f"ready\tbehind\t{head[:7]}\nready\tcurrent\t{head[:7]}\nready\tstale\t{head[:7]}\n",
         "",
     )
     assert preview["machines"][2]["changes"] == [
-        "~/.claude/skills has 1 of 2 current (add 1)"
+        f"move {git(stale / '.git/published-deployment', 'rev-parse', '--short=7', 'HEAD')} to {head[:7]}"
     ]
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (homes / "stale/.claude/skills/alpha").exists()
@@ -325,7 +332,9 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     )
     assert len(errors) == 2
     lagging_error, synced_error = errors
-    assert lagging_error.startswith("error: lagging drift: checkout is behind ")
+    assert lagging_error.startswith(
+        "error: lagging drift: published checkout is behind "
+    )
     assert "private repo has uncommitted edits" in lagging_error
     assert f", GitHub at {github[:7]}" in lagging_error
     assert "~/.claude/skills has 1 of 2 current (update 1)" in lagging_error
@@ -333,7 +342,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
         f"error: synced drift: private repo is at {git(hub / '_skills_private', 'rev-parse', 'HEAD')[:7]}, "
         f"GitHub at {github[:7]}"
     )
-    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+    assert git(synced, "rev-parse", "HEAD") != git(hub, "rev-parse", "HEAD")
 
 
 def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
@@ -342,8 +351,11 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     hub, homes, bin_dir = fleet
     behind = machine(homes, "behind", hub.parent / "skills.git")
     before = git(behind, "rev-parse", "HEAD")
-    register(hub, "behind")
+    here = socket.gethostname().split(".")[0].lower()
+    register(hub, "behind", here)
     home = hub.parent / "hub-home"
+    (home / "projects").mkdir(parents=True)
+    (home / "projects/skills").symlink_to(hub)
     fleet_log = home / ".local/state/skills-sync/fleet.log"
 
     git(hub, "switch", "-q", "-c", "feature")
@@ -357,7 +369,7 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     head = change(hub, push=False)
     committed = run(hub, homes, bin_dir, "--hook", "post-commit")
     assert (committed.returncode, committed.stdout, committed.stderr) == (0, "", "")
-    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+    assert not (home / ".claude/skills/alpha/SKILL.md").exists()
     assert not fleet_log.exists()
 
     refs = f"refs/heads/main {head} refs/heads/main {before}\n"
@@ -365,11 +377,19 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
     git(hub, "push", "-q", "origin", "main")
 
-    deadline = time.monotonic() + 60
-    while "behind: synced" not in (fleet_log.read_text() if fleet_log.exists() else ""):
-        assert time.monotonic() < deadline, "background sync did not finish"
+    deadline = time.monotonic() + 90
+    while not all(
+        f"{name}: synced" in (fleet_log.read_text() if fleet_log.exists() else "")
+        for name in ("behind", here)
+    ):
+        assert time.monotonic() < deadline, "background sync did not finish: " + (
+            fleet_log.read_text() if fleet_log.exists() else "no log"
+        )
         time.sleep(0.2)
-    assert git(behind, "rev-parse", "HEAD") == head != before
+    assert git(behind, "rev-parse", "HEAD") == before != head
+    assert git(behind / ".git/published-deployment", "rev-parse", "HEAD") == head
+    assert git(hub / ".git/published-deployment", "rev-parse", "HEAD") == head
+    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
 
 
 def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
@@ -406,9 +426,141 @@ def test_brings_the_machine_it_runs_on_to_github_main(
         f"synced\t{here}\t{github[:7]}\n",
         "",
     )
-    assert git(hub, "rev-parse", "HEAD") == github != before
-    assert (home / "just.log").read_text() == "install-skills\n"
+    assert git(hub, "rev-parse", "HEAD") == before != github
+    assert git(hub / ".git/published-deployment", "rev-parse", "HEAD") == github
+    assert not (home / "just.log").exists()
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
+
+
+def test_private_conflict_stays_saved_while_another_machine_continues(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    conflict = machine(homes, "conflict", hub.parent / "skills.git")
+    machine(homes, "good", hub.parent / "skills.git")
+    register(hub, "conflict", "good")
+    assert run(hub, homes, bin_dir).returncode == 0
+    (conflict / "_skills_private/content/secret/SKILL.md").write_text(
+        "local unsaved edit\n"
+    )
+    other = hub.parent / "other-private"
+    git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(other))
+    (other / "content/secret/SKILL.md").write_text("remote competing edit\n")
+    commit(other)
+    git(other, "push", "-q", "origin", "main")
+    result = run(hub, homes, bin_dir, "--json")
+    assert result.returncode == 1
+    outcomes = {
+        entry["machine"]: entry["status"]
+        for entry in json.loads(result.stderr)["machines"]
+    }
+    assert outcomes == {"conflict": "failed", "good": "synced"}
+    assert "private edits" in result.stderr
+    assert git(conflict / "_skills_private", "status", "--porcelain") == ""
+    assert "local unsaved edit" in git(
+        conflict / "_skills_private", "show", "HEAD:content/secret/SKILL.md"
+    )
+    assert (
+        homes / "good/.claude/skills/secret/SKILL.md"
+    ).read_text() == "remote competing edit\n"
+
+
+def test_published_deletion_removes_owned_copies_but_keeps_private_and_foreign(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "target", hub.parent / "skills.git")
+    register(hub, "target")
+    skill(hub / "authoring/content", "retired", "published")
+    skill(hub / "skills", "retired", "published")
+    commands = hub / "authoring/commands"
+    commands.mkdir()
+    (commands / "farewell.md").write_text("published command\n")
+    commit(hub)
+    git(hub, "push", "-q", "origin", "main")
+    assert run(hub, homes, bin_dir).returncode == 0
+    foreign = skill(homes / "target/.claude/skills", "foreign")
+    assert (homes / "target/.claude/skills/retired/SKILL.md").is_file()
+    assert (homes / "target/.claude/commands/farewell.md").is_file()
+    git(
+        hub,
+        "rm",
+        "-qr",
+        "authoring/content/retired",
+        "skills/retired",
+        "authoring/commands/farewell.md",
+    )
+    commit(hub)
+    git(hub, "push", "-q", "origin", "main")
+    assert run(hub, homes, bin_dir).returncode == 0
+    assert not (homes / "target/.claude/skills/retired").exists()
+    assert not (homes / "target/.claude/commands/farewell.md").exists()
+    assert (homes / "target/.claude/skills/secret/SKILL.md").is_file()
+    assert (foreign / "SKILL.md").is_file()
+
+
+def test_unknown_deployment_path_is_not_deleted_and_other_machine_continues(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    blocked = machine(homes, "blocked", hub.parent / "skills.git")
+    good = machine(homes, "good", hub.parent / "skills.git")
+    marker = blocked / ".git/published-deployment/keep.txt"
+    marker.parent.mkdir()
+    marker.write_text("unknown path\n")
+    register(hub, "blocked", "good")
+    result = run(hub, homes, bin_dir, "--json")
+    assert result.returncode == 1
+    outcomes = {
+        entry["machine"]: entry["status"]
+        for entry in json.loads(result.stderr)["machines"]
+    }
+    assert outcomes == {"blocked": "failed", "good": "synced"}
+    assert marker.read_text() == "unknown path\n"
+    assert (good / ".git/published-deployment/skills/alpha/SKILL.md").is_file()
+
+
+def test_deleted_owned_deployment_worktree_recovers_without_touching_authoring(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    remote = machine(homes, "target", hub.parent / "skills.git")
+    register(hub, "target")
+    assert run(hub, homes, bin_dir).returncode == 0
+    cache = remote / ".git/published-deployment"
+    published_sha = git(cache, "rev-parse", "HEAD")
+    original_sha = git(remote, "rev-parse", "HEAD")
+    shutil.rmtree(cache)
+    assert run(hub, homes, bin_dir).returncode == 0
+    assert git(cache, "rev-parse", "HEAD") == published_sha
+    assert git(remote, "rev-parse", "HEAD") == original_sha
+
+
+def test_cached_newer_published_revision_does_not_roll_back_on_stale_remote(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    remote = machine(homes, "target", hub.parent / "skills.git")
+    register(hub, "target")
+    assert run(hub, homes, bin_dir).returncode == 0
+    old = git(hub, "rev-parse", "HEAD")
+    skill(hub / "authoring/content", "alpha", "new published")
+    skill(hub / "skills", "alpha", "new published")
+    new = change(hub)
+    assert run(hub, homes, bin_dir).returncode == 0
+    cache = remote / ".git/published-deployment"
+    assert git(cache, "rev-parse", "HEAD") == new
+    older = run(hub, homes, bin_dir, "--machine-step", "apply", "--revision", old)
+    assert older.returncode == 0 and f"deployment {new}" in older.stdout
+    assert git(cache, "rev-parse", "HEAD") == new
+    git(hub, "push", "-q", "--force", "origin", f"{old}:main")
+    assert run(hub, homes, bin_dir).returncode == 0
+    assert run(hub, homes, bin_dir, "--check").returncode == 0
+    assert git(cache, "rev-parse", "HEAD") == new
+    assert git(remote, "rev-parse", "HEAD") == old
+    assert (
+        homes / "target/.claude/skills/alpha/SKILL.md"
+    ).read_text() == "# alpha\n\nnew published\n"
 
 
 def test_a_run_whose_only_failures_are_offline_machines_exits_75(
@@ -424,7 +576,7 @@ def test_a_run_whose_only_failures_are_offline_machines_exits_75(
         result.stderr.splitlines()[0]
         == f"offline\tdown\t{git(hub, 'rev-parse', '--short=7', 'HEAD')}"
     )
-    assert result.stderr.endswith("retry: just sync-fleet --dry-run\n")
+    assert "down offline:" in result.stderr
 
 
 def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> None:
@@ -459,6 +611,7 @@ def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
         "targets": [],
         "changes": [],
         "temporary": False,
+        "sha": "",
     }
 
 

@@ -3,16 +3,13 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Sync skills from GitHub's main to every machine in the fleet, from any of them.
+"""Deploy GitHub's published main to the fleet without moving authoring HEAD.
 
-The machine running this fetches GitHub's main and saves and pulls its private
-clone. Then every selected machine, itself included, receives that commit over
-SSH, fast-forwards its checkout to it, saves and pulls its own private clone
-from GitHub, and runs `just install-skills`. A machine whose checkout is off
-main, has uncommitted changes under authoring/, skills/, scripts/, or justfile,
-has commits GitHub lacks, or whose _skills_private is not a clone is left
-untouched. A machine that is offline or fails waits for the next sync, which
-catches it up.
+The launcher fetches main, then runs the code from a reusable detached Git
+worktree. Each machine receives the published commit through Git, updates its
+own deployment worktree, saves and pulls its existing private clone, and
+installs committed public sources. A malformed private clone is left alone;
+other machines continue. An offline machine catches up on the next run.
 
 The registry is the one fleet.toml in the private repository, so every machine
 has it and hosts stay out of this public one; the private-network skill ships
@@ -64,10 +61,9 @@ from _common import (
     send,
     stop,
 )
-from sync_private import PRIVATE
+from _published_checkout import published
 
 ROOT = Path(__file__).resolve().parent.parent
-INSTALLER = ROOT / "scripts" / "install_skills.py"
 STATE = (
     Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
     / "skills-sync"
@@ -129,20 +125,14 @@ class Stopped(Exception):
     """The run was interrupted, so a worker thread starts no new child."""
 
 
-# Each step runs in the machine's login shell, so `just` and `uv` are on PATH
-# over SSH. The body is one function called with stdin closed: the shell parses
-# it whole before git or just could read the rest from stdin. Only changes to
-# what the install reads count as edits; an editor setting does not block a
-# machine, and a fast-forward that would overwrite it fails on its own.
+# Each step runs in the machine's login shell, with uv on PATH over SSH.
+# The body is one function called with stdin closed so Git cannot consume it.
 ENTER = """
 enter() {
     cd "$HOME/$1" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || {
         echo "no skills checkout at ~/$1"
         return 11
     }
-}
-edited() {
-    [ -n "$(git status --porcelain -- authoring skills scripts justfile)" ]
 }
 plain() {
     [ -L _skills_private ] || { [ -e _skills_private ] && [ ! -d _skills_private/.git ]; }
@@ -153,41 +143,27 @@ plain() {
 INSPECT = """
 step() {
     enter "$1" || return
-    command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
     if plain; then
         echo "~/$1/_skills_private is not a clone of the private repo; move it aside, then rerun"
         return 11
     fi
-    branch=$(git symbolic-ref --short -q HEAD) || branch=-
-    head=$(git rev-parse -q --verify HEAD) || head=-
-    if edited; then state=dirty; else state=clean; fi
-    echo "checkout $branch $head $state"
+    common=$(git rev-parse --path-format=absolute --git-common-dir) || return 11
+    if [ -d "$common/published-deployment" ]; then
+        head=$(git -C "$common/published-deployment" rev-parse -q --verify HEAD) || return 11
+    else
+        head=-
+    fi
+    echo "checkout published $head clean"
 }
 """
-# Rechecks the checkout, since it may have moved after the inspection; a sync
-# started elsewhere may already have brought it to the same commit. Hooks stay
-# off so the merge cannot start another sync from this machine.
+# The machine launcher selects and locks its own published worktree.
 APPLY = """
 step() {
     enter "$1" || return
-    now=$(git rev-parse HEAD)
-    if [ "$(git symbolic-ref --short -q HEAD)" != main ] || edited ||
-        { [ "$now" != "$2" ] && [ "$now" != "$3" ]; }; then
-        echo "checkout changed during the sync"
-        return 11
-    fi
-    if [ "$now" != "$3" ]; then
-        LEFTHOOK=0 git merge --quiet --ff-only "$3" >/dev/null 2>&1 || {
-            echo "main did not fast-forward to GitHub's commit"
-            return 12
-        }
-    fi
-    uv run --quiet scripts/sync_private.py 2>&1 || return
-    just install-skills 2>&1
+    uv run --quiet scripts/sync_fleet.py --machine-step apply --revision "$3" 2>&1
 }
 """
-# Prints the private clone's state as sync_private.state() reports it, then the
-# installer's preview, from which installed() finds the drift.
+# Prints private state and a preview of the published install.
 CHECK = """
 step() {
     enter "$1" || return
@@ -203,7 +179,12 @@ step() {
             echo "private $head clean"
         fi
     fi
-    just install-skills --dry-run --json 2>&1
+    git fetch --quiet origin main 2>/dev/null || :
+    git cat-file -e "$2^{commit}" 2>/dev/null || {
+        echo "published revision $2 is unavailable; reconnect to GitHub and rerun"
+        return 75
+    }
+    uv run --quiet scripts/sync_fleet.py --machine-step check --revision "$2" 2>&1
 }
 """
 
@@ -225,7 +206,7 @@ class Machine:
         }
 
     def address(self) -> str:
-        """Where git sends the commit: a path here, an SSH address elsewhere."""
+        """Where git sends the published commit: a local path or SSH address."""
         if self.is_local():
             return str(Path.home() / self.path)
         return f"{self.ssh}:{PurePosixPath(self.path)}"
@@ -233,8 +214,7 @@ class Machine:
 
 @dataclass(frozen=True)
 class Source:
-    """GitHub's main, the private repository's main in a check or a preview, and
-    in a preview the private changes this machine saves before others pull."""
+    """Published Git revision and private main in a check or preview."""
 
     sha: str
     private: str = ""
@@ -252,24 +232,26 @@ class Outcome:
     targets: list[dict] = field(default_factory=list)
     changes: list[str] = field(default_factory=list)
     temporary: bool = False
+    sha: str = ""
 
 
 def registry() -> Path:
     """The one fleet.toml in the private clone, wherever the skill that ships it lives."""
+    private = sync_private.PRIVATE
     found = sorted(
         path
-        for path in PRIVATE.rglob("fleet.toml")
-        if ".git" not in path.relative_to(PRIVATE).parts
+        for path in private.rglob("fleet.toml")
+        if ".git" not in path.relative_to(private).parts
     )
     if len(found) > 1:
         raise ScriptError(
-            f"{len(found)} fleet registries in {PRIVATE}: "
-            + ", ".join(str(path.relative_to(PRIVATE)) for path in found)
+            f"{len(found)} fleet registries in {private}: "
+            + ", ".join(str(path.relative_to(private)) for path in found)
             + "; keep one"
         )
     if not found:
         raise ScriptError(
-            f"no fleet.toml in {PRIVATE}; the private-network skill keeps it in references/"
+            f"no fleet.toml in {private}; the private-network skill keeps it in references/"
         )
     return found[0]
 
@@ -454,10 +436,10 @@ def report_in(lines: list[str]) -> dict | None:
 
 def installed(
     machine: Machine, source: Source
-) -> Outcome | tuple[list[str], list[dict]]:
+) -> Outcome | tuple[list[str], list[dict], str]:
     """Run the CHECK step: what differs on the machine, from its private clone
     to each install target, with the targets' counts; an Outcome when it fails."""
-    code, lines = remote(machine, CHECK, machine.path)
+    code, lines = remote(machine, CHECK, machine.path, source.sha)
     report = report_in(lines)
     if code:
         outcome = failure(machine.name, code, lines)
@@ -486,32 +468,44 @@ def installed(
                 + ", ".join(f"{kind} {count}" for kind, count in other.items())
                 + ")"
             )
-    return problems, report["targets"]
+    actual = next(
+        (line.split()[1] for line in lines if line.startswith("deployment ")),
+        source.sha,
+    )
+    return problems, report["targets"], actual
 
 
 def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     code, lines = remote(machine, INSPECT, machine.path)
     if code or not lines or not lines[-1].startswith("checkout "):
         return failure(machine.name, code, lines)
-    _, branch, head, state = lines[-1].split()
+    _, _, head, _ = lines[-1].split()
     problems: list[str] = []
-    if branch != "main":
-        where = "a detached HEAD" if branch == "-" else branch
-        problems.append(f"checkout is on {where}, not main")
-    if state == "dirty":
-        problems.append("checkout has uncommitted skill changes")
-    behind = head != source.sha and source.contains(head)
-    if head != source.sha and not behind:
-        problems.append("checkout has commits GitHub lacks; push them")
+    behind = head == "-" or (head != source.sha and source.contains(head))
+    newer = (
+        head != "-"
+        and head != source.sha
+        and git("merge-base", "--is-ancestor", source.sha, head).returncode == 0
+    )
+    if head != source.sha and not behind and not newer:
+        problems.append("published checkout has a divergent or unknown revision")
+    if newer:
+        source = Source(head, source.private, source.saves)
     if mode == "check":
         if behind:
-            problems.append(f"checkout is behind GitHub at {head[:7]}")
+            problems.append(f"published checkout is behind GitHub at {head[:7]}")
         found = installed(machine, source)
         if isinstance(found, Outcome):
             return found
         problems += found[0]
         status = "drift" if problems else "converged"
-        return Outcome(machine.name, status, "; ".join(problems) or status, found[1])
+        return Outcome(
+            machine.name,
+            status,
+            "; ".join(problems) or status,
+            found[1],
+            sha=found[2],
+        )
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
@@ -521,17 +515,20 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 "ready",
                 f"ready to move {head[:7]} to {source.sha[:7]}",
                 changes=[f"move {head[:7]} to {source.sha[:7]}"],
+                sha=source.sha,
             )
         # At GitHub's main already, a sync would still save and pull the
         # private clone and install what differs
         found = installed(machine, source)
         if isinstance(found, Outcome):
             return found
-        pending, targets = found
+        pending, targets, actual = found
         if source.saves:
             pending.append("pull the private edits this sync saves first")
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
-        return Outcome(machine.name, "ready", detail, targets, changes=pending)
+        return Outcome(
+            machine.name, "ready", detail, targets, changes=pending, sha=actual
+        )
     if head != source.sha:
         pushed = call(
             [
@@ -556,11 +553,19 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     code, lines = remote(machine, APPLY, machine.path, head, source.sha)
     if code:
         return failure(machine.name, code, lines)
+    deployed = next(
+        (line.split()[1] for line in lines if line.startswith("deployment ")),
+        source.sha,
+    )
     changes = [line for line in lines if CHANGE.match(line)]
-    if head != source.sha:
-        changes.insert(0, f"move {head[:7]} to {source.sha[:7]}")
+    if head != deployed:
+        changes.insert(0, f"move {head[:7]} to {deployed[:7]}")
     return Outcome(
-        machine.name, "synced", f"synced at {source.sha[:7]}", changes=changes
+        machine.name,
+        "synced",
+        f"synced at {deployed[:7]}",
+        changes=changes,
+        sha=deployed,
     )
 
 
@@ -603,11 +608,25 @@ def github_main() -> Source:
     """Fetch GitHub's main; when GitHub is unreachable, use the last one fetched."""
     try:
         fetched = call(["git", "fetch", "--quiet", "origin", "main"])
+        if (
+            fetched.returncode
+            and "cannot lock ref 'refs/remotes/origin/main'" in fetched.stderr
+        ):
+            time.sleep(0.1)
+            fetched = call(["git", "fetch", "--quiet", "origin", "main"])
         why = reason(fetched.stderr.splitlines(), fetched.returncode)
-        failed, temporary = fetched.returncode != 0, is_network_failure(fetched.stderr)
+        failed = fetched.returncode != 0
+        temporary = (
+            is_network_failure(fetched.stderr)
+            or "cannot lock ref 'refs/remotes/origin/main'" in fetched.stderr
+        )
     except subprocess.TimeoutExpired:
         why, failed, temporary = f"git fetch took longer than {TIMEOUT}s", True, True
     if failed:
+        if not temporary:
+            raise ScriptError(
+                f"could not fetch GitHub's main: {why}; fix origin, then rerun just sync-fleet"
+            )
         log.info("could not fetch GitHub's main: %s", why)
     sha = git("rev-parse", "-q", "--verify", f"{GITHUB_MAIN}^{{commit}}").stdout.strip()
     if not sha:
@@ -616,6 +635,14 @@ def github_main() -> Source:
         raise ScriptError(
             f"GitHub's main is unknown here: {why}; fix origin, then rerun just sync-fleet"
         )
+    common = git(
+        "rev-parse", "--path-format=absolute", "--git-common-dir"
+    ).stdout.strip()
+    cache = Path(common) / "published-deployment"
+    if cache.is_dir():
+        current = run_git("rev-parse", "HEAD", cwd=cache).stdout.strip()
+        if current and git("merge-base", "--is-ancestor", sha, current).returncode == 0:
+            sha = current
     return Source(sha)
 
 
@@ -623,7 +650,15 @@ def wait_for_push(sha: str, timeout: float) -> None:
     """Return once GitHub's main is `sha`; a push that has not landed in time
     exits 75."""
     deadline = time.monotonic() + min(PUSH_WAIT, timeout)
-    while github_main().sha != sha:
+    while True:
+        try:
+            github_main()
+        except TemporaryError:
+            if time.monotonic() > deadline:
+                raise
+        remote_head = git("rev-parse", "-q", "--verify", GITHUB_MAIN).stdout.strip()
+        if git("merge-base", "--is-ancestor", sha, remote_head).returncode == 0:
+            return
         if time.monotonic() > deadline:
             raise TemporaryError(
                 f"GitHub's main did not reach {sha[:7]} in time; the push has not landed"
@@ -645,7 +680,7 @@ def pushed_main(lines: list[str]) -> str:
 
 
 def background(*flags: str) -> None:
-    """Sync the other machines in the background, so git never waits on a sleeping laptop."""
+    """Sync the fleet in the background so git never waits on a sleeping laptop."""
     STATE.mkdir(parents=True, exist_ok=True)
     logfile = STATE / "fleet.log"
     if logfile.exists() and logfile.stat().st_size > 1_000_000:
@@ -655,7 +690,6 @@ def background(*flags: str) -> None:
             [
                 sys.executable,
                 str(Path(__file__).resolve()),
-                "--others",
                 "--notify",
                 "-v",
                 *flags,
@@ -669,13 +703,10 @@ def background(*flags: str) -> None:
 
 
 def hook(event: list[str]) -> str:
-    """Install after a commit or a pull, and sync the fleet once GitHub has it.
+    """Queue published deployment after a pull or a successful push.
 
-    Lefthook runs this in every checkout; it acts only in a main checkout that
-    has the private clone, never in a worktree. A pull that brings commits
-    installs here and syncs the other machines. A commit installs here; the
-    other machines sync once a push lands it on GitHub. Without the registry,
-    an event that would act warns and never blocks git.
+    A local commit is not published and installs nothing. The pre-push job
+    waits for GitHub before deploying, including the initiating machine.
     """
     name, *rest = event
     if not sync_private.is_clone():
@@ -699,20 +730,73 @@ def hook(event: list[str]) -> str:
         return ""
     if not has_registry():
         return ""
-    installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
-    if installed.returncode:
-        lines = (installed.stderr + installed.stdout).splitlines()
-        raise ScriptError(
-            f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose"
-        )
     return ""
 
 
+def machine_step(args: argparse.Namespace) -> str:
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve().parent / "install_skills.py"),
+        "--snapshot",
+    ]
+    if args.machine_step == "apply":
+        changes = sync_private.sync(timeout=args.timeout)
+        install = call([*command, "--private-root", str(sync_private.PRIVATE)])
+        if install.returncode:
+            raise (TemporaryError if install.returncode == 75 else ScriptError)(
+                f"{reason(install.stderr.splitlines(), install.returncode)}; rerun just sync-fleet"
+            )
+        return "\n".join([*changes, *install.stdout.splitlines()])
+    head, status = sync_private.state()
+    install = call(
+        [
+            *command,
+            *(
+                ["--private-root", str(sync_private.PRIVATE)]
+                if sync_private.is_clone()
+                else []
+            ),
+            "--dry-run",
+            "--json",
+        ]
+    )
+    if install.returncode:
+        try:
+            details = "; ".join(json.loads(install.stderr).get("errors", []))
+        except json.JSONDecodeError:
+            details = reason(install.stderr.splitlines(), install.returncode)
+        raise ScriptError(f"{details}; rerun just sync-fleet")
+    return f"private {head} {status}\n{install.stdout}"
+
+
 def work(args: argparse.Namespace) -> str:
+    global ROOT
     if args.hook:
         return hook(args.hook)
+    if not args.worker:
+        revision = args.revision or github_main().sha
+        with published(ROOT, revision, args.timeout) as checkout:
+            script = checkout / "scripts/sync_fleet.py"
+        command = [
+            sys.executable,
+            str(script),
+            *(sys.argv[1:]),
+            "--worker",
+            "--author-root",
+            str(ROOT),
+        ]
+        os.execv(sys.executable, command)
+        raise AssertionError("exec returned")
+    if args.author_root is None:
+        raise UsageError("--worker needs --author-root")
+    ROOT = args.author_root.resolve()
+    sync_private.set_root(ROOT)
+    if args.machine_step:
+        with published(ROOT, args.revision, args.timeout) as checkout:
+            actual = run_git("rev-parse", "HEAD", cwd=checkout).stdout.strip()
+            return f"deployment {actual}\n{machine_step(args)}"
     try:
         return sync(args)
     except ScriptError as error:
@@ -730,8 +814,11 @@ def sync(args: argparse.Namespace) -> str:
     local = next((machine.name for machine in fleet if machine.is_local()), None)
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
-    # Queue behind any other sync from here, so each run sends the newest commit.
-    with exclusive(STATE / "fleet.lock", args.timeout):
+    # One machine's private clone and fleet source are serialized locally.
+    common = Path(
+        git("rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+    )
+    with exclusive(common / "fleet.lock", args.timeout):
         source = github_main()
         # This machine pushes its private edits before any machine pulls, even
         # when it is not selected.
@@ -777,7 +864,7 @@ def sync(args: argparse.Namespace) -> str:
         "machines": [asdict(outcome) for outcome in outcomes],
     }
     lines = "\n".join(
-        f"{outcome.status}\t{outcome.machine}\t{source.sha[:7]}"
+        f"{outcome.status}\t{outcome.machine}\t{(outcome.sha or source.sha)[:7]}"
         for outcome in outcomes
         if problems or outcome.changes
     )
@@ -815,11 +902,26 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="compare each machine's checkout and private clone with GitHub and "
-        "its installed skills with its sources; exit 1 on any difference",
+        help="compare published worktrees, private clones, and installed copies; exit 1 on drift",
     )
     parser.add_argument(
         "--others", action="store_true", help="skip the machine this runs on"
+    )
+    parser.add_argument(
+        "--worker", action="store_true", help="run published deployment logic"
+    )
+    parser.add_argument(
+        "--author-root",
+        type=Path,
+        help="original checkout with the existing private clone",
+    )
+    parser.add_argument(
+        "--revision", help="published revision already present in this repository"
+    )
+    parser.add_argument(
+        "--machine-step",
+        choices=("apply", "check"),
+        help="run one local machine step for fleet transport",
     )
     parser.add_argument(
         "--notify",
@@ -830,7 +932,7 @@ def main(argv: list[str] | None = None) -> int:
         "--hook",
         nargs="+",
         metavar="EVENT",
-        help="run as the lefthook EVENT hook; acts only in a main checkout with the private clone",
+        help="run as the lefthook EVENT hook; deploys published main after pull or push",
     )
     parser.add_argument(
         "--after-push",
