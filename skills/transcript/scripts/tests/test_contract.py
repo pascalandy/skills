@@ -1,4 +1,4 @@
-"""The CLI contract in docs/maintainer/references/script-conventions.md, for
+"""The CLI contract in docs/references/script-conventions.md, for
 transcript.py and youtube_smoke.py.
 
 scripts/tests/test_cli_contract.py probes the flat scripts in scripts/; these two
