@@ -582,6 +582,8 @@ def attempt(machine: Machine, source: Source, mode: str) -> Outcome:
 
 def advice(outcome: Outcome) -> str:
     name = outcome.machine
+    if name == "<here>":
+        return f"initiating private sync failed: {outcome.detail}; fix it here, then rerun just sync-fleet"
     hint = {
         "offline": f"it catches up at the next sync, or rerun just sync-fleet {name}",
         "needs-you": f"fix it on {name}, then rerun just sync-fleet {name}",
@@ -816,7 +818,7 @@ def sync(args: argparse.Namespace) -> str:
     local = next((machine.name for machine in fleet if machine.is_local()), None)
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
-    # One machine's private clone and fleet source are serialized locally.
+    # Serialize coordination for this Git repository, across its worktrees.
     common = Path(
         git("rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
     )
@@ -824,9 +826,18 @@ def sync(args: argparse.Namespace) -> str:
         source = github_main()
         # This machine pushes its private edits before any machine pulls, even
         # when it is not selected.
+        source_failure: Outcome | None = None
         if mode == "apply":
-            for change in sync_private.sync(timeout=args.timeout):
-                log.info("%s", change)
+            try:
+                for change in sync_private.sync(timeout=args.timeout):
+                    log.info("%s", change)
+            except ScriptError as error:
+                source_failure = Outcome(
+                    local or "<here>",
+                    "failed",
+                    "; ".join(str(message) for message in error.args),
+                    temporary=isinstance(error, TemporaryError),
+                )
         # A check needs the private clone; a preview compares with it when here,
         # and counts the edits a sync would save from it before others pull
         if mode == "check" or (mode == "preview" and sync_private.is_clone()):
@@ -845,11 +856,20 @@ def sync(args: argparse.Namespace) -> str:
         with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
             try:
                 outcomes = list(
-                    pool.map(lambda machine: attempt(machine, source, mode), machines)
+                    pool.map(
+                        lambda machine: (
+                            source_failure
+                            if source_failure and machine.is_local()
+                            else attempt(machine, source, mode)
+                        ),
+                        machines,
+                    )
                 )
             except KeyboardInterrupt:
                 stop_children()
                 raise
+        if source_failure and source_failure not in outcomes:
+            outcomes.insert(0, source_failure)
     problems = [outcome for outcome in outcomes if outcome.status not in FINE]
     if args.notify:
         notify(

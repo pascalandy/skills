@@ -433,13 +433,19 @@ def test_brings_the_machine_it_runs_on_to_github_main(
     assert (home / ".claude/skills/secret/SKILL.md").is_file()
 
 
+@pytest.mark.parametrize("initiating", [False, True])
 def test_private_conflict_stays_saved_while_another_machine_continues(
-    fleet: tuple[Path, Path, Path],
+    fleet: tuple[Path, Path, Path], initiating: bool
 ) -> None:
     hub, homes, bin_dir = fleet
-    conflict = machine(homes, "conflict", hub.parent / "skills.git")
+    name = socket.gethostname().split(".")[0] if initiating else "conflict"
+    conflict = hub if initiating else machine(homes, name, hub.parent / "skills.git")
+    if initiating:
+        source_home = hub.parent / "hub-home/projects"
+        source_home.mkdir(parents=True)
+        (source_home / "skills").symlink_to(hub)
     machine(homes, "good", hub.parent / "skills.git")
-    register(hub, "conflict", "good")
+    register(hub, name, "good")
     assert run(hub, homes, bin_dir).returncode == 0
     (conflict / "_skills_private/content/secret/SKILL.md").write_text(
         "local unsaved edit\n"
@@ -455,7 +461,7 @@ def test_private_conflict_stays_saved_while_another_machine_continues(
         entry["machine"]: entry["status"]
         for entry in json.loads(result.stderr)["machines"]
     }
-    assert outcomes == {"conflict": "failed", "good": "synced"}
+    assert outcomes == {name: "failed", "good": "synced"}
     assert "private edits" in result.stderr
     assert git(conflict / "_skills_private", "status", "--porcelain") == ""
     assert "local unsaved edit" in git(
