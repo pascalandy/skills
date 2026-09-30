@@ -1,6 +1,6 @@
 ---
 name: Maintainer
-description: Script conventions, checks, installs, and releases for maintaining this repository
+description: Script conventions, checks, installs, releases, and the remote skill table for maintaining this repository
 schema_version: 3
 tags:
   - area/ea
@@ -24,5 +24,5 @@ date_updated: 2026-09-30
 | `references/checks.md` | How `just check`, signoff, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, private packages, ownership, and cutover for `just install-skills` |
 | `references/release.md` | Steps to publish a tagged release |
-| `references/remote-skills.md` | Generated table of every skill's name and description, for agents that cannot load these skills |
+| `references/remote-skills.md` | Generated name and description of every skill in `skills/`, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |

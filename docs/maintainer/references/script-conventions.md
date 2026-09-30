@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-29
+date_updated: 2026-09-30
 ---
 
 Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
