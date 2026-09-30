@@ -15,14 +15,14 @@ and an integration decision supported by the available evidence.
 
 | Request | Mode sequence | Initial load | Mutation |
 | --- | --- | --- | --- |
-| "I like this style. Add the pasted example to storytelling" | Evolve | Evolution only | Allowed after admission |
-| "Use storytelling to tell me how this source could improve the skill" | Evolve | Evolution only | None |
-| "Use storytelling and this reference for the paragraph I want revised" | Practice → Diagnose | Shared model, then Diagnose | No skill edit |
-| "Use storytelling to explain why this scene works" | Practice → Diagnose | Shared model, then Diagnose | No skill edit |
-| "Use storytelling to add this lesson, then use it in a new story" | Evolve → Practice | Evolution first | Validate before Practice |
-| "Use storytelling to add this famous writer's style" with no example or valued effect | Evolve | Evolution only | Blocked on source evidence |
-| "Use storytelling; style modeler. Create a reusable editor from these works" | Style Modeler | Style Modeler only | New package; storytelling unchanged |
-| Pasted admired prose without invoking storytelling | Skill not invoked | None | None |
+| "andy-mode ; storytelling. I like this style. Add the pasted example to storytelling" | Evolve | Evolution only | Allowed after admission |
+| "andy-mode ; storytelling. Tell me how this source could improve the skill" | Evolve | Evolution only | None |
+| "andy-mode ; storytelling. Use this reference for the paragraph I want revised" | Practice → Diagnose | Shared model, then Diagnose | No skill edit |
+| "andy-mode ; storytelling. Explain why this scene works" | Practice → Diagnose | Shared model, then Diagnose | No skill edit |
+| "andy-mode ; storytelling. Add this lesson, then use it in a new story" | Evolve → Practice | Evolution first | Validate before Practice |
+| "andy-mode ; storytelling. Add this famous writer's style" with no example or valued effect | Evolve | Evolution only | Blocked on source evidence |
+| "andy-mode ; storytelling ; style modeler. Create a reusable editor from these works" | Style Modeler | Style Modeler only | New package; storytelling unchanged |
+| Pasted admired prose without invoking andy-mode | Skill not invoked | None | None |
 
 For every evolution run:
 
