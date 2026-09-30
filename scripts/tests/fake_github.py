@@ -1,8 +1,9 @@
-"""A throwaway GitHub for the tests of just signoff: a bare origin, a pushed
-checkout, and a fake gh.
+"""A throwaway GitHub for the tests of just signoff and just merge: a bare
+origin, a pushed checkout, and a fake gh.
 
 Run as a program, this file is gh. It answers from the JSON state that
-FAKE_GITHUB names: the commit statuses, and one-shot hooks that change GitHub
+FAKE_GITHUB names: the commit statuses, the pull requests, whose open heads
+follow their branch in the bare origin, and one-shot hooks that change GitHub
 mid-run or fail a call.
 """
 
@@ -67,7 +68,7 @@ class Sandbox:
             "FAKE_GITHUB": str(self.state_path),
             "FAKE_CHECKS": str(self.checks_log),
         }
-        self.save({"origin": str(self.origin), "statuses": {}, "hooks": {}})
+        self.save({"origin": str(self.origin), "statuses": {}, "prs": [], "hooks": {}})
         scripts_dir = self.main / "scripts"
         scripts_dir.mkdir(parents=True)
         for name in ("_cli.py", "_common.py", *scripts):
@@ -152,6 +153,28 @@ class Sandbox:
         state["statuses"][sha] = "success"
         self.save(state)
 
+    def open_pr(self, **fields: object) -> None:
+        """Open PR #7 from feature into main; `fields` override gh's JSON fields."""
+        state = self.state()
+        state["prs"].append(
+            {
+                "number": 7,
+                "title": "✨ feat: add feature",
+                "state": "OPEN",
+                "isDraft": False,
+                "baseRefName": "main",
+                "headRefName": "feature",
+                "headRefOid": "",
+                **fields,
+            }
+        )
+        self.save(state)
+
+    def main_subject(self) -> str:
+        return self.git(
+            "--git-dir", str(self.origin), "log", "-1", "--format=%s", "main"
+        )
+
     def checks_run(self) -> int:
         return len(self.checked())
 
@@ -162,18 +185,63 @@ class Sandbox:
         return self.checks_log.read_text().splitlines()
 
 
-def on_origin(state: dict, sha: str) -> bool:
-    found = subprocess.run(
-        ["git", "--git-dir", state["origin"], "for-each-ref", "--contains", sha],
+def origin(state: dict, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "--git-dir", state["origin"], *args],
         capture_output=True,
         text=True,
         check=False,
     )
-    return found.returncode == 0 and found.stdout.strip() != ""
+
+
+def squash_tree(state: dict, base: str, head: str) -> str | None:
+    """The tree a squash of `head` onto `base` lands, or None on a conflict."""
+    merged = origin(state, "merge-tree", "--write-tree", base, head)
+    return merged.stdout.split()[0] if merged.returncode == 0 else None
+
+
+def pull_request(state: dict, number: str) -> dict:
+    """The PR as gh pr view --json prints it; an open PR's head follows its branch."""
+    pr = next(pr for pr in state["prs"] if str(pr["number"]) == number)
+    status = "UNKNOWN"
+    if pr["state"] == "OPEN":
+        head = origin(state, "rev-parse", f"refs/heads/{pr['headRefName']}")
+        pr["headRefOid"] = head.stdout.strip()
+        if pr["isDraft"]:
+            status = "DRAFT"
+        elif squash_tree(state, pr["baseRefName"], pr["headRefOid"]) is None:
+            status = "DIRTY"
+        elif state["statuses"].get(pr["headRefOid"]) != "success":
+            status = "BLOCKED"
+        else:
+            status = "CLEAN"
+    url = f"https://github.com/pascalandy/skills/pull/{number}"
+    return {**pr, "url": url, "mergeStateStatus": status}
+
+
+def merge(state: dict, number: str, sha: str, subject: str) -> tuple[int, str]:
+    pr = pull_request(state, number)
+    if pr["headRefOid"] != sha:
+        return 1, "Head branch was modified. Review and try the merge again."
+    if pr["mergeStateStatus"] != "CLEAN":
+        return 1, "the base branch policy prohibits the merge"
+    base = origin(state, "rev-parse", pr["baseRefName"]).stdout.strip()
+    tree = squash_tree(state, base, sha) or ""
+    commit = origin(state, "commit-tree", tree, "-p", base, "-m", subject)
+    origin(
+        state, "update-ref", f"refs/heads/{pr['baseRefName']}", commit.stdout.strip()
+    )
+    stored = next(pr for pr in state["prs"] if str(pr["number"]) == number)
+    stored["state"] = "MERGED"
+    return 0, ""
 
 
 def gh(state: dict, args: list[str]) -> tuple[int, str]:
     """Answer one gh call; return its exit code and output."""
+
+    def option(name: str) -> str:
+        return args[args.index(name) + 1]
+
     # A hook runs once, before the first call its key starts; a failing hook
     # fails that call with its stderr, as a lost connection would
     for key in [key for key in state["hooks"] if " ".join(args).startswith(key)]:
@@ -193,11 +261,19 @@ def gh(state: dict, args: list[str]) -> tuple[int, str]:
         statuses = [{"context": "signoff", "state": state_of}] if state_of else []
         return 0, json.dumps({"statuses": statuses})
     if args[0] == "signoff":
-        sha = args[args.index("--commit") + 1]
-        if not on_origin(state, sha):
+        sha = option("--commit")
+        if not origin(state, "for-each-ref", "--contains", sha).stdout.strip():
             return 1, f"{sha} is not on a remote"
         state["statuses"][sha] = "success"
         return 0, f"✓ Signed off on {sha[:7]}"
+    if args[:2] == ["pr", "list"]:
+        head = option("--head")
+        prs = [pr for pr in reversed(state["prs"]) if pr["headRefName"] == head]
+        return 0, json.dumps([pull_request(state, str(pr["number"])) for pr in prs])
+    if args[:2] == ["pr", "view"]:
+        return 0, json.dumps(pull_request(state, args[2]))
+    if args[:2] == ["pr", "merge"] and "--squash" in args:
+        return merge(state, args[2], option("--match-head-commit"), option("--subject"))
     return 1, f"fake gh cannot answer: gh {' '.join(args)}"
 
 

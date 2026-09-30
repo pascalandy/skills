@@ -23,7 +23,7 @@ date_updated: 2026-09-30
 
 | File | Description |
 |------|-------------|
-| `references/checks.md` | How `just check`, signoff, commit hooks, and the manual CI workflow fit together, and how to change them |
+| `references/checks.md` | How `just check`, signoff, merge, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
 | `references/release.md` | Steps to publish a tagged release |
 | `references/remote-skills-dev.md` | Generated table of the `dev` skills only |
