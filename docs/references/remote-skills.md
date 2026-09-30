@@ -31,6 +31,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | pa-idea | Use only when explicitly invoked as `pa-idea`. |
 | pa-postmortem | Use only when explicitly invoked as `pa-postmortem` after completed work or an incident. |
 | pa-premortem | Use only when explicitly invoked as `pa-premortem`. |
+| pa-scope | Use only when explicitly invoked as `pa-scope`. |
 | pa-vision | Use only when explicitly invoked as `pa-vision` before planning. |
 | qmd | Use only when explicitly invoked as `qmd` to search, retrieve, diagnose, maintain, or configure local QMD collections. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
@@ -77,7 +78,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | pa-doc-cleaner | Use only when explicitly invoked as `pa-doc-cleaner` for maintenance of existing documentation. For documenting a new change or decision, use `pa-doc-update`. |
 | pa-qa | Use only when explicitly invoked as `pa-qa` for post-implementation validation or a reported user-facing problem. |
 | pa-retro | Use only when explicitly invoked as `pa-retro`. |
-| pa-scope | Use only when explicitly invoked as `pa-scope`. |
 | pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-attack-the-premise | Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it. |
