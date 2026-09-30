@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-29
+date_updated: 2026-09-30
 ---
 
 Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
@@ -94,8 +94,8 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 
 - `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
 - Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
-- `just check-frontmatter`, `just flatten-skills`: no `-r`; each walks one fixed tree
-- `just flatten-skills`, `just install-skills`: no `-o` or `-`; they write fixed trees, `skills/` and the agent directories
+- `just check-frontmatter`, `just flatten-skills`, `just remote-skills`: no `-r`; each walks one fixed tree
+- `just flatten-skills`, `just install-skills`, `just remote-skills`: no `-o` or `-`; they write fixed paths: `skills/`, the agent directories, and the skill table
 - `just install-skills`: no `--force`; it would delete entries the installer does not own
 - `just install-skills`: accepts a hidden `-q/--quiet` and ignores it, because a `just sync` or `just sync-fleet` started before this contract passes it; remove it once every machine has synced
 - `just release-check`: `--notes FILE` names what `-o` would write; `--notes -` writes to stdout

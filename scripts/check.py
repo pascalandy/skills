@@ -141,6 +141,7 @@ IMAGE_CREATOR = "authoring/content/image-creator/scripts"
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
     Check("flatten", uv_run("scripts/flatten_skills.py", "--check")),
+    Check("remote-skills", uv_run("scripts/remote_skills.py", "--check")),
     Check("cli-block", uv_run("scripts/check_cli_block.py")),
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
@@ -176,6 +177,7 @@ CHECKS = [
     ),
     repo_test("justfile", "justfile"),
     repo_test("release_check", "scripts/release_check.py"),
+    repo_test("remote_skills", "scripts/remote_skills.py"),
     repo_test("skill_invocation", "authoring", cheap=True),
     repo_test(
         "sync",

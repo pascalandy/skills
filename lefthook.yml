@@ -12,6 +12,9 @@ pre-commit:
     flattened-skills:
       glob: "{authoring,skills}/**/*"
       run: just flatten-skills --check
+    remote-skills:
+      glob: "{skills/**/SKILL.md,docs/maintainer/references/remote-skills.md}"
+      run: just remote-skills --check
 
 # In a main checkout with the private clone, a commit installs this machine, a pull
 # also syncs the other machines in the background, and a push of main syncs

@@ -8,13 +8,13 @@ tags:
   - kind/wiki
   - status/open
 date_created: 2026-09-26
-date_updated: 2026-09-26
+date_updated: 2026-09-30
 ---
 
 # Docs
 
 > Wiki collection. Choose a child wiki from this index, then read that child's `INDEX.md`
-> **Child wikis:** 1 | **Last updated:** 2026-09-26
+> **Child wikis:** 1 | **Last updated:** 2026-09-30
 
 `AGENTS.md` holds what every session needs. This collection holds procedures that only some tasks need
 
@@ -24,4 +24,4 @@ date_updated: 2026-09-26
 
 | File | Description |
 |------|-------------|
-| `maintainer/INDEX.md` | Script conventions, checks, installs, and releases for maintaining this repository |
+| `maintainer/INDEX.md` | Script conventions, checks, installs, releases, and the remote skill table for maintaining this repository |

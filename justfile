@@ -37,6 +37,11 @@ install-skills *args:
 flatten-skills *args:
     @uv run --quiet scripts/flatten_skills.py "$@"
 
+# Rebuild the skill table that agents without these skills read on GitHub
+[group('commands')]
+remote-skills *args:
+    @uv run --quiet scripts/remote_skills.py "$@"
+
 # Run any transcript command, such as `--help` or `doctor`
 [group('commands')]
 transcript-cli *args:

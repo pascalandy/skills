@@ -17,7 +17,6 @@ import hashlib
 import json
 import logging
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -31,7 +30,14 @@ from pathlib import Path
 
 import flatten_skills
 from _cli import Parser, ScriptError, duration, exit_codes
-from _common import exclusive, run, run_script, swap
+from _common import (
+    FRONTMATTER,
+    exclusive,
+    frontmatter_description,
+    run,
+    run_script,
+    swap,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "_skills_private"
@@ -58,8 +64,6 @@ COMMAND_TARGETS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/co
 CODEX_SKILLS = ".codex/skills"
 # Codex and Amp stopped reading these; each run removes the commands put there
 RETIRED_COMMAND_TARGETS = (".codex/prompts", ".config/agents/commands")
-FRONTMATTER = re.compile(r"\A---\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
-DESCRIPTION = re.compile(r"^description:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 RUNTIME_NAMES = frozenset(
     {
         "node_modules",
@@ -294,18 +298,6 @@ def command_sources() -> dict[str, Source]:
     return sources
 
 
-def unquote(value: str) -> str:
-    """Read a one-line YAML scalar; a block scalar or broken quoting reads as empty."""
-    if value.startswith('"'):
-        try:
-            return json.loads(value)
-        except ValueError:
-            return ""
-    if value.startswith("'"):
-        return value[1:-1].replace("''", "'") if value.endswith("'") else ""
-    return "" if value.startswith(("|", ">")) else value
-
-
 def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source]:
     """Stage each command under `stage` as a Codex skill: its name, its
     description, then its body unchanged."""
@@ -314,8 +306,7 @@ def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source
         name = Path(filename).stem
         text = command.path.read_text(encoding="utf-8")
         header = FRONTMATTER.match(text)
-        found = DESCRIPTION.search(header.group(1)) if header else None
-        description = unquote(found.group(1)) if found else ""
+        description = frontmatter_description(text)
         body = text[header.end() :] if header else text
         package = stage / name
         package.mkdir(parents=True)
