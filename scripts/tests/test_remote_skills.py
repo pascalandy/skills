@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -35,7 +36,7 @@ def run(*argv: str) -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def test_run_writes_one_linked_row_per_skill_then_a_rerun_is_silent(
+def test_run_writes_one_linked_row_per_skill_and_only_the_date_may_differ(
     root: Path,
 ) -> None:
     skill(root, "zeta", '---\nname: "zeta"\ndescription: "Use for z."\n---\n# Z\n')
@@ -54,6 +55,12 @@ def test_run_writes_one_linked_row_per_skill_then_a_rerun_is_silent(
         f"| [zeta]({RAW}/zeta/SKILL.md) | Use for z. |",
     ]
     assert run() == (0, "", "")
+    table = (root / PATH).read_text(encoding="utf-8")
+    dated = re.compile(r"^date_updated: \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+    assert len(dated.findall(table)) == 1
+    (root / PATH).write_text(
+        dated.sub("date_updated: 2000-01-01", table), encoding="utf-8"
+    )
     assert run("--check") == (0, "", "")
 
 

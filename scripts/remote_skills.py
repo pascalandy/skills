@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
+from datetime import datetime
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
@@ -23,12 +25,13 @@ RAW = "https://raw.githubusercontent.com/pascalandy/skills/main/skills"
 HEADER = """\
 ---
 name: Remote skills
-description: The name and description of every skill in skills/, for agents that cannot load these skills
+description: Generated name and description of every skill in skills/, for agents that cannot load these skills
 tags:
   - area/ea
   - kind/doc
   - status/stable
 date_created: 2026-09-30
+date_updated: {date}
 ---
 
 <!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
@@ -38,6 +41,15 @@ To use a skill, open its link and follow that SKILL.md. Its supporting files sit
 | Skill | Description |
 |---|---|
 """
+
+FOOTER = """
+## Related
+
+- [[install-skills]]
+- [[checks]]
+"""
+# The date changes only with the table, so a stale date alone is no change
+DATE_UPDATED = re.compile(r"^date_updated: .*$", re.MULTILINE)
 
 EPILOG = """\
 The table reads skills/, so run just flatten-skills first. A run that changes
@@ -60,8 +72,8 @@ EXIT_CODES = exit_codes(
 log = logging.getLogger("remote-skills")
 
 
-def render() -> str:
-    """The table text: one row per skills/<name>/SKILL.md, in name order."""
+def render(updated: str) -> str:
+    """The page text: one row per skills/<name>/SKILL.md, in name order."""
     rows: list[str] = []
     errors: list[str] = []
     for path in sorted(SKILLS.glob("*/SKILL.md")):
@@ -82,13 +94,15 @@ def render() -> str:
         raise ScriptError(
             "no skills found at skills/<name>/SKILL.md; run: just flatten-skills"
         )
-    return HEADER + "\n".join(rows) + "\n"
+    return HEADER.replace("{date}", updated) + "\n".join(rows) + "\n" + FOOTER
 
 
 def work(args: argparse.Namespace) -> str:
-    table = render()
+    table = render(f"{datetime.now().astimezone():%F}")
     current = TABLE.read_text(encoding="utf-8") if TABLE.is_file() else None
-    if current == table:
+    if current is not None and DATE_UPDATED.sub("", current) == DATE_UPDATED.sub(
+        "", table
+    ):
         return ""
     line = f"{'add' if current is None else 'update'}\t{TABLE.relative_to(ROOT)}"
     if args.check:
