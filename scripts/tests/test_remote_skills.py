@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import io
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import remote_skills
@@ -29,11 +27,6 @@ def skill(root: Path, name: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def clock(monkeypatch: pytest.MonkeyPatch, day: str) -> None:
-    moment = datetime.fromisoformat(f"{day}T12:00:00")
-    monkeypatch.setattr(remote_skills, "datetime", SimpleNamespace(now=lambda: moment))
-
-
 def run(*argv: str) -> tuple[int, str, str]:
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -51,7 +44,7 @@ def test_run_writes_the_url_pattern_and_one_row_per_skill(
     assert not (root / PATH).exists()
     assert run() == (0, f"add\t{PATH}\n", "")
     page = (root / PATH).read_text(encoding="utf-8")
-    assert page[page.index("URL: ") : page.index("\n## Related")] == (
+    assert page[page.index("URL: ") :] == (
         "URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md\n"
         "\n"
         "| Skill | Description |\n"
@@ -60,28 +53,6 @@ def test_run_writes_the_url_pattern_and_one_row_per_skill(
         "| zeta | Use for z. |\n"
     )
     assert run() == (0, "", "")
-
-
-def test_the_date_moves_only_with_the_table(
-    root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    skill(root, "alpha", '---\nname: "alpha"\ndescription: "Use for a."\n---\n')
-    clock(monkeypatch, "2026-01-01")
-    assert run() == (0, f"add\t{PATH}\n", "")
-    page = (root / PATH).read_text(encoding="utf-8")
-    assert "\ndate_updated: 2026-01-01\n" in page
-
-    clock(monkeypatch, "2026-01-02")
-    assert run("--check") == (0, "", "")
-    assert run() == (0, "", "")
-    assert (root / PATH).read_text(encoding="utf-8") == page
-
-    skill_file = root / "skills" / "alpha" / "SKILL.md"
-    skill_file.write_text(
-        '---\nname: "alpha"\ndescription: "Use for b."\n---\n', encoding="utf-8"
-    )
-    assert run() == (0, f"update\t{PATH}\n", "")
-    assert "\ndate_updated: 2026-01-02\n" in (root / PATH).read_text(encoding="utf-8")
 
 
 def test_check_reports_a_stale_table_and_leaves_it_alone(root: Path) -> None:

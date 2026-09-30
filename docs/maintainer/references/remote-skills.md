@@ -1,12 +1,6 @@
 ---
-name: Remote skills
-description: Generated name and description of every skill in skills/, for agents that cannot load these skills
-tags:
-  - area/ea
-  - kind/doc
-  - status/stable
-date_created: 2026-09-30
-date_updated: 2026-09-30
+name: remote-skills
+description: Use andy's skills remotely
 ---
 
 <!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
@@ -119,8 +113,3 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | writer-sk | Use only when explicitly invoked as `writer-sk`. |
 | writing-for-agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. |
 | writing-great-skills | Use when creating, modifying, evaluating a skill. |
-
-## Related
-
-- [[install-skills]]
-- [[checks]]

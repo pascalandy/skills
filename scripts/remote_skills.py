@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
-from datetime import datetime
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
@@ -26,14 +24,8 @@ URL = (
 
 HEADER = """\
 ---
-name: Remote skills
-description: Generated name and description of every skill in skills/, for agents that cannot load these skills
-tags:
-  - area/ea
-  - kind/doc
-  - status/stable
-date_created: 2026-09-30
-date_updated: {date}
+name: remote-skills
+description: Use andy's skills remotely
 ---
 
 <!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
@@ -43,15 +35,6 @@ URL: {url}
 | Skill | Description |
 |---|---|
 """
-
-FOOTER = """
-## Related
-
-- [[install-skills]]
-- [[checks]]
-"""
-# The date changes only with the table, so a stale date alone is no change
-DATE_UPDATED = re.compile(r"^date_updated: .*$", re.MULTILINE)
 
 EPILOG = """\
 The table reads skills/, so run just flatten-skills first. A run that changes
@@ -74,7 +57,7 @@ EXIT_CODES = exit_codes(
 log = logging.getLogger("remote-skills")
 
 
-def render(updated: str) -> str:
+def render() -> str:
     """The page text: one row per skills/<name>/SKILL.md, in name order."""
     rows: list[str] = []
     errors: list[str] = []
@@ -104,16 +87,13 @@ def render(updated: str) -> str:
         raise ScriptError(
             "no skills found at skills/<name>/SKILL.md; run: just flatten-skills"
         )
-    header = HEADER.replace("{date}", updated).replace("{url}", URL)
-    return header + "\n".join(rows) + "\n" + FOOTER
+    return HEADER.replace("{url}", URL) + "\n".join(rows) + "\n"
 
 
 def work(args: argparse.Namespace) -> str:
-    table = render(f"{datetime.now().astimezone():%F}")
+    table = render()
     current = TABLE.read_text(encoding="utf-8") if TABLE.is_file() else None
-    if current is not None and DATE_UPDATED.sub("", current) == DATE_UPDATED.sub(
-        "", table
-    ):
+    if current == table:
         return ""
     line = f"{'add' if current is None else 'update'}\t{TABLE.relative_to(ROOT)}"
     if args.check:
