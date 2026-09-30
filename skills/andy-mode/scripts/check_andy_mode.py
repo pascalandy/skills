@@ -153,9 +153,17 @@ def check_routes(root: Path, routes: list[Route], errors: list[str]) -> None:
             errors.append(f"playbooks/{playbook.name}: no route in SKILL.md reaches it")
 
 
+def in_sibling_skill(target: Path, parent: Path) -> bool:
+    """Whether a path sits inside a skill package next to andy-mode."""
+    if not target.is_relative_to(parent):
+        return False
+    top = target.relative_to(parent).parts[:1]
+    return bool(top) and (parent / top[0] / "SKILL.md").is_file()
+
+
 def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
     """Resolve relative links, their anchors, and bundled paths named in code spans."""
-    siblings = root.resolve().parent
+    home = root.resolve()
     anchor_cache: dict[Path, set[str]] = {}
     bundled = (
         "playbooks/",
@@ -169,26 +177,23 @@ def check_paths(root: Path, route_names: set[str], errors: list[str]) -> None:
             for raw in LINK_RE.findall(prose):
                 if raw.startswith("//") or EXTERNAL_RE.match(raw):
                     continue
+                # Quoted examples, such as chat-export artifacts, are not paths
+                if PLACEHOLDER_CHARS & set(raw) or '"' in raw:
+                    continue
                 part, _, anchor = unquote(raw).partition("#")
                 target = (path.parent / part).resolve() if part else path.resolve()
-                if not target.is_relative_to(root.resolve()):
-                    sibling = (
-                        target.relative_to(siblings).parts[:1]
-                        if target.is_relative_to(siblings)
-                        else ()
-                    )
-                    if (
-                        not sibling
-                        or not (siblings / sibling[0] / "SKILL.md").is_file()
-                    ):
-                        errors.append(f"{label}: link leaves andy-mode: {raw}")
-                        continue
+                if not target.is_relative_to(home) and not in_sibling_skill(
+                    target, home.parent
+                ):
+                    errors.append(f"{label}: link leaves andy-mode: {raw}")
+                    continue
                 if not target.exists():
                     errors.append(f"{label}: unresolved link: {raw}")
                     continue
                 if anchor and target.suffix == ".md":
-                    known = anchor_cache.setdefault(target, anchors(target))
-                    if anchor_slug(anchor) not in known:
+                    if target not in anchor_cache:
+                        anchor_cache[target] = anchors(target)
+                    if anchor_slug(anchor) not in anchor_cache[target]:
                         errors.append(f"{label}: unresolved anchor: {raw}")
             for span in spans:
                 token = span.partition("#")[0]

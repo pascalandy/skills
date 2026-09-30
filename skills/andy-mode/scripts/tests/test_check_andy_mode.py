@@ -28,7 +28,8 @@ def package(tmp_path: Path, skill: str = SKILL) -> Path:
     (root / "SKILL.md").write_text(skill, encoding="utf-8")
     (root / "playbooks/retro-skill.md").write_text(
         "Read [the template](../references/retro-skill/template.md#body) "
-        "and `references/retro-skill/template.md`.\n",
+        "and `references/retro-skill/template.md`. "
+        'A quoted artifact: [claim]({"attribution":{"index":"1"}}).\n',
         encoding="utf-8",
     )
     (root / "references/retro-skill/template.md").write_text(
