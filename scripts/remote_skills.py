@@ -19,8 +19,10 @@ from _common import frontmatter_description, run_script
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 TABLE = ROOT / "docs" / "maintainer" / "references" / "remote-skills.md"
-# Absolute links, because an agent's web tool may refuse a URL it built itself
-RAW = "https://raw.githubusercontent.com/pascalandy/skills/main/skills"
+# Stated once above the table, so each row spends no tokens on a link
+URL = (
+    "https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md"
+)
 
 HEADER = """\
 ---
@@ -36,7 +38,7 @@ date_updated: {date}
 
 <!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
 
-To use a skill, open its link and follow that SKILL.md. Its supporting files sit in the same folder.
+URL: {url}
 
 | Skill | Description |
 |---|---|
@@ -87,14 +89,15 @@ def render(updated: str) -> str:
             )
             continue
         cell = description.replace("|", "\\|")
-        rows.append(f"| [{name}]({RAW}/{name}/SKILL.md) | {cell} |")
+        rows.append(f"| {name} | {cell} |")
     if errors:
         raise ScriptError(*errors)
     if not rows:
         raise ScriptError(
             "no skills found at skills/<name>/SKILL.md; run: just flatten-skills"
         )
-    return HEADER.replace("{date}", updated) + "\n".join(rows) + "\n" + FOOTER
+    header = HEADER.replace("{date}", updated).replace("{url}", URL)
+    return header + "\n".join(rows) + "\n" + FOOTER
 
 
 def work(args: argparse.Namespace) -> str:

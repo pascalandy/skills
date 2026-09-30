@@ -11,7 +11,6 @@ import pytest
 import remote_skills
 
 PATH = "docs/maintainer/references/remote-skills.md"
-RAW = "https://raw.githubusercontent.com/pascalandy/skills/main/skills"
 
 
 @pytest.fixture
@@ -36,7 +35,7 @@ def run(*argv: str) -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def test_run_writes_one_linked_row_per_skill_and_only_the_date_may_differ(
+def test_run_writes_the_url_pattern_and_one_row_per_skill(
     root: Path,
 ) -> None:
     skill(root, "zeta", '---\nname: "zeta"\ndescription: "Use for z."\n---\n# Z\n')
@@ -45,21 +44,20 @@ def test_run_writes_one_linked_row_per_skill_and_only_the_date_may_differ(
     assert run("--dry-run") == (0, f"add\t{PATH}\n", "")
     assert not (root / PATH).exists()
     assert run() == (0, f"add\t{PATH}\n", "")
-    rows = [
-        line
-        for line in (root / PATH).read_text(encoding="utf-8").splitlines()
-        if line.startswith("| [")
-    ]
-    assert rows == [
-        f"| [alpha]({RAW}/alpha/SKILL.md) | Use for a \\| b. |",
-        f"| [zeta]({RAW}/zeta/SKILL.md) | Use for z. |",
-    ]
+    page = (root / PATH).read_text(encoding="utf-8")
+    assert page[page.index("URL: ") : page.index("\n## Related")] == (
+        "URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md\n"
+        "\n"
+        "| Skill | Description |\n"
+        "|---|---|\n"
+        "| alpha | Use for a \\| b. |\n"
+        "| zeta | Use for z. |\n"
+    )
     assert run() == (0, "", "")
-    table = (root / PATH).read_text(encoding="utf-8")
     dated = re.compile(r"^date_updated: \d{4}-\d{2}-\d{2}$", re.MULTILINE)
-    assert len(dated.findall(table)) == 1
+    assert len(dated.findall(page)) == 1
     (root / PATH).write_text(
-        dated.sub("date_updated: 2000-01-01", table), encoding="utf-8"
+        dated.sub("date_updated: 2000-01-01", page), encoding="utf-8"
     )
     assert run("--check") == (0, "", "")
 
