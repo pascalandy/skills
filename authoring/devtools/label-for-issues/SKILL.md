@@ -21,11 +21,13 @@ optional impediments.
    authoring to the caller. Do not start implementation, rewrite
    specifications, or modify other skills as a labeling side effect
    For setup-only requests, go directly to Reconcile
-2. **Inspect.** Use `gh` to read the repository label catalog once per run, then each
-   issue's body, comments, review records, parent links, and relevant linked issue
-   and PR states. Paginate lists. Follow evidence that could change the decision;
-   do not audit unrelated code or tickets. Prefer current object states over stale
-   prose, but retain explicit human decisions unless new evidence warrants revisiting
+2. **Inspect.** Read the label catalog once per run with
+   `gh label list --limit 200 --json name,color,description`. Read each issue with
+   `gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
+   then relevant review records and linked issue and PR states. Follow evidence that
+   could change the decision; do not audit unrelated code or tickets. Prefer current
+   object states over stale prose, but retain explicit human decisions unless new
+   evidence warrants revisiting
 3. **Assess.** Form one assessment per issue: desired labels, evidence, unresolved
    decision or input, recommendation, next actor, and start conditions. Derive label
    edits, a one-line summary naming the next actor, recommendation, and any blocker,
@@ -45,16 +47,17 @@ optional impediments.
    labels alone need no migration approval. Read-only setup returns proposed metadata
    without writes. Setup-only requests end after label metadata is verified and reported
 5. **Apply and verify.** Reread the issue, labels, comments, and relationships before
-   writing; revise the assessment if relevant evidence changed. Apply
-   targeted additions and removals with `gh issue edit`. Replace only canonical
-   labels in the same family. Read back changed labels, review records, and parent
-   links; check family exclusivity and epic membership. Publish a requested decision
-   comment using verified results, then read it back. Report each issue's label
-   changes and summary, issue and comment links, conflicts, and partial failures.
-   Without a comment request, flag an existing managed comment that the new labels
-   contradict as stale and leave it unedited. If a write times out or fails, reread
-   before retrying and perform only missing operations. Continue independent issues;
-   report triage as complete only when its labels and any requested comment are verified
+   writing; revise the assessment if relevant evidence changed. Apply targeted
+   label and relationship changes with `gh issue edit`, following GitHub CLI.
+   Replace only canonical labels in the same family. Read back changed labels,
+   review records, and parent links; check family exclusivity and epic membership.
+   Publish a requested decision comment using verified results, then read it back.
+   Report each issue's label changes and summary, issue and comment links, conflicts,
+   and partial failures. Without a comment request, flag an existing managed comment
+   that the new labels contradict as stale and leave it unedited. If a write times
+   out or fails, reread before retrying and perform only missing operations. Continue
+   independent issues; report triage as complete only when its labels and any
+   requested comment are verified
 
 ## Ticket comments
 
@@ -72,7 +75,12 @@ ones; a partial failure must not produce a prompt claiming prerequisites are met
 In read-only previews, describe label edits as proposed, never completed.
 
 Mark the managed comment with `<!-- label-for-issues:decision -->` and retain its
-comment ID. Edit that exact comment only when its provenance establishes it as an
+comment ID. `gh issue comment <n> --body-file <file>` prints the new comment's URL,
+which ends in `#issuecomment-<id>`; `gh issue view <n> --json comments` lists the
+same URLs. Edit by that ID with
+`gh api --method PATCH repos/OWNER/REPO/issues/comments/<id> -F body=@<file>`,
+because `gh issue comment --edit-last` picks the account's newest comment, which can
+be a human's. Edit that exact comment only when its provenance establishes it as an
 agent-managed triage comment through a recorded prior write or an explicit agent
 signature consistent with its triage content. A marker or shared GitHub account
 alone is insufficient.
@@ -192,10 +200,34 @@ This JSON owns exact names, colors, and descriptions.
 ]
 ```
 
+## GitHub CLI
+
+`gh` 2.94 and later manages issue relationships; report an older version as a
+blocker. Set them with `gh issue create --parent`, `--blocked-by`, or `--blocking`,
+and with `gh issue edit --parent`, `--remove-parent`, `--add-sub-issue`,
+`--remove-sub-issue`, `--add-blocked-by`, `--remove-blocked-by`, `--add-blocking`,
+or `--remove-blocking`, using URLs for issues in other repositories. Keep `gh api`
+for what `gh` lacks, such as editing a comment by ID or reading timeline events.
+
+- `--parent` and `--add-sub-issue` silently replace an existing parent. Read
+  `parent` first; moving an issue to another epic detaches it from the old one
+- `subIssues`, `blockedBy`, and `blocking` are objects: iterate `.nodes[]` and count
+  `.totalCount`. Nodes carry number, state, title, and URL, not labels. They stop at
+  100, 50, and 50 nodes; page the rest with `gh api --paginate` when `totalCount` is
+  higher
+- Search qualifiers need full references, as in `parent-issue:OWNER/REPO#N` and
+  `blocked-by:OWNER/REPO#N`; a bare number matches nothing. `has:blocked-by` also
+  matches issues whose blockers are closed. To drop issues with an open blocker, add
+  `--json number,title,blockedBy --jq '[.[] | select(all(.blockedBy.nodes[]; .state == "CLOSED"))]'`
+- `gh issue list` and `gh label list` return 30 rows unless given `--limit`
+
 ## Issue-list filters
 
 - Overview: `is:issue is:open -label:4-epic:member`
 - Epics: `is:issue is:open label:4-epic:parent`
 - Members: `is:issue is:open label:4-epic:member`
-- Agent candidates: `is:issue is:open label:1-ready-for-agent -label:0-impediment` (check prerequisites)
+- One epic's members: `is:issue parent-issue:OWNER/REPO#N`
+- Members missing a parent: `is:issue is:open label:4-epic:member -has:parent-issue`
+- Agent candidates: `is:issue is:open label:1-ready-for-agent -label:0-impediment`,
+  then drop open blockers as GitHub CLI shows and check prerequisites in issue content
 - Agent WIP: `is:issue is:open label:1-wip-by-agent`
