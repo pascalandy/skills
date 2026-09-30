@@ -351,7 +351,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     assert git(synced, "rev-parse", "HEAD") != git(hub, "rev-parse", "HEAD")
 
 
-def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
+def test_hooks_skip_other_branches_and_sync_the_fleet_once_a_push_lands(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
@@ -365,21 +365,16 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     fleet_log = home / ".local/state/skills-sync/fleet.log"
 
     git(hub, "switch", "-q", "-c", "feature")
-    change(hub, push=False)
-    assert run(hub, homes, bin_dir, "--hook", "post-commit").returncode == 0
+    assert run(hub, homes, bin_dir, "post-merge", mode="hook").returncode == 0
     git(hub, "switch", "-q", "main")
-    assert run(hub, homes, bin_dir, "--hook", "post-rewrite", "amend").returncode == 0
+    amended = run(hub, homes, bin_dir, "post-rewrite", "amend", mode="hook")
+    assert amended.returncode == 0
     assert not (home / ".local/state").exists()
     assert not (home / ".claude").exists()
 
     head = change(hub, push=False)
-    committed = run(hub, homes, bin_dir, "--hook", "post-commit")
-    assert (committed.returncode, committed.stdout, committed.stderr) == (0, "", "")
-    assert not (home / ".claude/skills/alpha/SKILL.md").exists()
-    assert not fleet_log.exists()
-
     refs = f"refs/heads/main {head} refs/heads/main {before}\n"
-    pushing = run(hub, homes, bin_dir, "--hook", "pre-push", stdin=refs)
+    pushing = run(hub, homes, bin_dir, "pre-push", mode="hook", stdin=refs)
     assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
     git(hub, "push", "-q", "origin", "main")
 
@@ -437,7 +432,7 @@ def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
 ) -> None:
     hub, homes, bin_dir = fleet
 
-    result = run(hub, homes, bin_dir, "--hook", "post-commit")
+    result = run(hub, homes, bin_dir, "post-merge", mode="hook")
 
     assert result.returncode == 0
     assert "no fleet.toml" in result.stderr

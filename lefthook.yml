@@ -16,14 +16,9 @@ pre-commit:
       glob: "{skills/**/SKILL.md,docs/references/remote-skills*.md}"
       run: just remote-skills --check
 
-# In a main checkout with the private clone, a local commit installs nothing.
-# A pull or a push of main starts background deployment of published main to
-# every machine, including this one. Worktrees and other branches skip it
-post-commit:
-  commands:
-    sync-skills:
-      run: just sync-hook post-commit
-
+# In a main checkout with the private clone, a pull or a push of main starts
+# background deployment of published main to every machine, including this
+# one. Worktrees and other branches skip it; a local commit starts nothing
 post-merge:
   commands:
     sync-skills:

@@ -696,8 +696,9 @@ def background(*flags: str) -> None:
 def hook(event: list[str]) -> str:
     """Queue published deployment after a pull or a successful push.
 
-    A local commit is not published and installs nothing. The pre-push job
-    waits for GitHub before deploying, including the initiating machine.
+    Lefthook runs this in every checkout; it acts only on main in a checkout
+    with the private clone. The pre-push job waits for GitHub before
+    deploying, including the initiating machine.
     """
     name, *rest = event
     if not sync_private.is_clone():
@@ -706,22 +707,10 @@ def hook(event: list[str]) -> str:
         if (sha := pushed_main(sys.stdin.read().splitlines())) and has_registry():
             background("--after-push", sha)
         return ""
+    # A pull that rebases fires post-rewrite once at the end; an amend is local
+    rebased = name == "post-rewrite" and rest[:1] == ["rebase"]
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
-    if branch != "main":
-        return ""
-    in_rebase = any(
-        (ROOT / git("rev-parse", "--git-path", part).stdout.strip()).exists()
-        for part in ("rebase-merge", "rebase-apply")
-    )
-    # A pull that rebases fires post-commit for each replayed commit, then
-    # post-rewrite once at the end; amend already fired post-commit.
-    if (name == "post-commit" and in_rebase) or (
-        name == "post-rewrite" and rest[:1] != ["rebase"]
-    ):
-        return ""
-    if not has_registry():
-        return ""
-    if name != "post-commit":
+    if (name == "post-merge" or rebased) and branch == "main" and has_registry():
         background()
     return ""
 
