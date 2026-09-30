@@ -101,7 +101,6 @@ For every exporting skill:
 | `pa-vision` | Mandatory for vision artifacts | `vision` | Defines target state and decision direction |
 | `figure-it-out` in planning-only mode | Optional | `impl-plan` | Use this local profile when a durable slice plan is requested; execution trails remain governed by pstack |
 | `pa-premortem` | Mandatory for premortem artifacts | `premortem` | Captures failure scenarios, hidden assumption, revised plan, and pre-launch checklist |
-| `pa-scope` | Rare / optional | `scope` | Export only when the user needs a reusable scope map, blast-radius artifact, or validation/risk artifact |
 | Separate `poteto-mode` delivery session | No by default | n/a | Implements and verifies through the matching playbook; recommends documentation or postmortem capture when needed |
 | `interrogate` | Rare / optional | `code-quality-audit` | Export only when the user asks for a reusable deep code-quality audit artifact |
 | `pa-qa` | No by default | n/a | Validates user-facing behavior and files durable issues; loops back to scope or TDD when follow-up work is found |

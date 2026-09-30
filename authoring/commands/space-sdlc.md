@@ -151,9 +151,9 @@ Work in progress (stop if the user actually assigns any agent to this harness).
 
 user request → plan → build → CI/QA → reviewer → doc → commit
 
-This is the default workflow for this workspace command. Use the matching `$poteto-mode` playbook for delivery or `$figure-it-out` when a tailored workflow is needed. If requirements are ambiguous, return to the relevant idea, vision, or scope skill before building.
+This is the default workflow for this workspace command. Use the matching `$poteto-mode` playbook for delivery or `$figure-it-out` when a tailored workflow is needed. If requirements are ambiguous, return to the relevant idea or vision skill before building.
 
-Pre-build work in `pa-idea`, `pa-vision`, or `pa-scope` is outside this command's build sequence.
+Pre-build work in `pa-idea` or `pa-vision` is outside this command's build sequence.
 
 ---
 
@@ -182,7 +182,7 @@ Send a structured brief with:
 - User request, constraints, and acceptance criteria.
 - Canonical **Role Assignments** roster and profile tiers.
 - Current agent states (launched/idle vs standby).
-- Applicable skills per role: Planner (`$figure-it-out`, `$pa-scope`), Builders (`$poteto-mode`), QA (`$pa-qa`), Docs (`$pa-doc-update`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
+- Applicable skills per role: Planner (`$figure-it-out`), Builders (`$poteto-mode`), QA (`$pa-qa`), Docs (`$pa-doc-update`), Committer (`$commit`), Reviewers (`$interrogate`, `2nd-pass`).
 - Explicit requirements: subtasks with deliverables, acceptance criteria, dynamic pane names (`<phase>/<total>-<prefix>-<keyword>`), dependency order, parallel lanes, and shared-file conflict prevention.
 
 **Delegation preamble (included in all delegated prompts):**
