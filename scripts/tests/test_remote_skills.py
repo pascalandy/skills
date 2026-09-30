@@ -57,7 +57,7 @@ def test_run_writes_each_kind_to_its_section_and_its_own_page(root: Path) -> Non
     written = f"add\t{MAIN}\nadd\t{GENERAL}\nadd\t{DEV}\n"
 
     assert run("--dry-run") == (0, written, "")
-    assert not (root / MAIN).exists()
+    assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))
     assert run() == (0, written, "")
     assert table(root, MAIN) == (
         f"{URL}## General\n\n{HEAD}"
@@ -114,7 +114,7 @@ def test_check_reports_each_stale_table_and_leaves_them_alone(root: Path) -> Non
         ),
     )
     assert (root / MAIN).read_text(encoding="utf-8") == "stale\n"
-    assert not (root / GENERAL).exists()
+    assert not any((root / path).exists() for path in (GENERAL, DEV))
 
 
 @pytest.mark.parametrize(
@@ -141,4 +141,4 @@ def test_a_skill_without_a_one_line_description_fails_before_writing(
             "fix its source in authoring/, then run: just flatten-skills\n"
         ),
     )
-    assert not (root / MAIN).exists()
+    assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))

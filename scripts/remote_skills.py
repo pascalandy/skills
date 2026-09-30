@@ -101,9 +101,9 @@ def render() -> dict[Path, str]:
     """Each page's path and text."""
     rows = rows_by_kind()
     sections = [
-        f"## {kind.capitalize()}\n\n{TABLE_HEAD}{''.join(rows[kind])}"
-        for kind in (*KINDS, UNKNOWN)
-        if kind != UNKNOWN or rows[kind]
+        f"## {kind.capitalize()}\n\n{TABLE_HEAD}{''.join(kind_rows)}"
+        for kind, kind_rows in rows.items()
+        if kind != UNKNOWN or kind_rows
     ]
     pages = {
         DOCS / "remote-skills.md": page(
