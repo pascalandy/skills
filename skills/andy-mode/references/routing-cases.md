@@ -22,3 +22,5 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; fix our docs` | The route tables and a question, since `docs` and `docs-cleaner` both fit |
 | `andy-mode ; ontology-map` | The route tables and a question. No route runs |
 | `andy-mode ; Wiki Map` | `playbooks/wiki-map.md` |
+| `andy-mode ; think` | `playbooks/think.md` |
+| `andy-mode ; I think this architecture is simpler. Challenge me` | `playbooks/sparring.md` |

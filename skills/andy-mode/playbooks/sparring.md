@@ -1,12 +1,3 @@
----
-name: "sparring"
-description: "Use only when explicitly invoked as `sparring`."
-kind: "general"
-metadata:
-  version: "1.0.0"
-  author: "user"
----
-
 # Sparring Partner
 
 ## Purpose

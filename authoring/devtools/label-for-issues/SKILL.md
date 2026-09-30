@@ -66,9 +66,10 @@ optional impediments.
 Write or update an issue comment only when the user explicitly asks for one.
 Triage, issue creation, PR links, and label changes do not imply a comment.
 
-When preparing a requested comment, load and apply `$sparring` from the active skill
-catalog once per run, including for read-only previews. If unavailable, withhold the
-comment and report the missing dependency; the requested comment remains incomplete.
+When preparing a requested comment, read and apply the `sparring` playbook of the
+active `andy-mode` skill once per run, including for read-only previews. If
+unavailable, withhold the comment and report the missing dependency; the requested
+comment remains incomplete.
 Use its reasoning discipline to help the human decide or act; keep the comment
 proportional to the decision, without manufacturing a debate.
 
