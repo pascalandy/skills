@@ -41,7 +41,6 @@ This step is complete when one uncertainty can be named whose reduction would ch
 | Design a module interface, seam, or abstraction depth | `matt-mode ; codebase-design` |
 | Reproduce, diagnose, or repair software behavior | the `poteto-mode` Bug fix playbook |
 | Review any completed deliverable with fresh eyes | `2nd-pass` |
-| Review code correctness and readiness before QA | `pa-code-review` |
 | Run an unusually harsh maintainability review | `interrogate` |
 | Work with the opinionated Game Theory lecture corpus | `game-theory-corpus` |
 
