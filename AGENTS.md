@@ -16,7 +16,7 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
-`SKILL.md` frontmatter sets `kind: "general"` when someone who never writes code would ask for the skill, and `kind: "dev"` otherwise. A `general` skill must not need a `dev` skill to run. When `kind` is missing, flattening publishes `kind: "unknown"` and no check fails
+`SKILL.md` frontmatter sets `kind: "general"` when someone who never writes code would ask for the skill, and `kind: "dev"` otherwise. A `general` skill must not need a `dev` skill to run. When `kind` is missing, flattening publishes `kind: "unknown"` and no check fails; `docs/references/remote-skills.md` lists those skills under Unknown
 
 `scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 

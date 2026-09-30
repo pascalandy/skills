@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Write the skill table that agents without these skills read on GitHub."""
+"""Write the skill tables that agents without these skills read on GitHub."""
 
 from __future__ import annotations
 
@@ -12,35 +12,31 @@ import logging
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import frontmatter_description, run_script
+from _common import frontmatter_description, frontmatter_value, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
-TABLE = ROOT / "docs" / "references" / "remote-skills.md"
-# Stated once above the table, so each row spends no tokens on a link
+DOCS = ROOT / "docs" / "references"
+# Stated once per page, so each row spends no tokens on a link
 URL = (
     "https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md"
 )
-
-HEADER = """\
----
-name: remote-skills
-description: Use andy's skills remotely
----
-
-<!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
-
-URL: {url}
-
-| Skill | Description |
-|---|---|
-"""
+# Each kind gets a section of remote-skills.md and a page of its own. A skill
+# with any other kind, or none, is listed under Unknown on remote-skills.md only
+KINDS = ("general", "dev")
+UNKNOWN = "unknown"
+TABLE_HEAD = "| Skill | Description |\n|---|---|\n"
 
 EPILOG = """\
-The table reads skills/, so run just flatten-skills first. A run that changes
-the table prints one line: add or update, then a tab and the table's path. A
-dry run prints the same line and changes nothing; a run with nothing to change
+The tables read skills/, so run just flatten-skills first. A run prints one
+line per page it changes: add or update, then a tab and the page's path. A dry
+run prints the same lines and changes nothing; a run with nothing to change
 prints nothing.
+
+pages:
+  docs/references/remote-skills.md          every skill, one section per kind
+  docs/references/remote-skills-general.md  general skills only
+  docs/references/remote-skills-dev.md      dev skills only
 
 examples:
   just remote-skills
@@ -49,22 +45,22 @@ examples:
 
 EXIT_CODES = exit_codes(
     {
-        0: "the table matches skills/, or now does",
-        1: "a skill has no description, or --check found the table stale",
+        0: "the tables match skills/, or now do",
+        1: "a skill has no description, or --check found a table stale",
     }
 )
 
 log = logging.getLogger("remote-skills")
 
 
-def render() -> str:
-    """The page text: one row per skills/<name>/SKILL.md, in name order."""
-    rows: list[str] = []
+def rows_by_kind() -> dict[str, list[str]]:
+    """One table row per skills/<name>/SKILL.md, in name order, keyed by kind."""
+    rows: dict[str, list[str]] = {kind: [] for kind in (*KINDS, UNKNOWN)}
     errors: list[str] = []
     for path in sorted(SKILLS.glob("*/SKILL.md")):
-        name = path.parent.name
         log.info("read %s", path.relative_to(ROOT))
-        description = frontmatter_description(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        description = frontmatter_description(text)
         # A quoted "\n" decodes to a real line break, which would split the row
         problem = (
             "has no description"
@@ -79,38 +75,74 @@ def render() -> str:
                 "fix its source in authoring/, then run: just flatten-skills"
             )
             continue
+        kind = frontmatter_value(text, "kind")
         cell = description.replace("|", "\\|")
-        rows.append(f"| {name} | {cell} |")
+        rows[kind if kind in KINDS else UNKNOWN].append(
+            f"| {path.parent.name} | {cell} |\n"
+        )
     if errors:
         raise ScriptError(*errors)
-    if not rows:
+    if not any(rows.values()):
         raise ScriptError(
             "no skills found at skills/<name>/SKILL.md; run: just flatten-skills"
         )
-    return HEADER.replace("{url}", URL) + "\n".join(rows) + "\n"
+    return rows
+
+
+def page(name: str, description: str, body: str) -> str:
+    return (
+        f"---\nname: {name}\ndescription: {description}\n---\n\n"
+        "<!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->\n\n"
+        f"URL: {URL}\n\n{body}"
+    )
+
+
+def render() -> dict[Path, str]:
+    """Each page's path and text."""
+    rows = rows_by_kind()
+    sections = [
+        f"## {kind.capitalize()}\n\n{TABLE_HEAD}{''.join(rows[kind])}"
+        for kind in (*KINDS, UNKNOWN)
+        if kind != UNKNOWN or rows[kind]
+    ]
+    pages = {
+        DOCS / "remote-skills.md": page(
+            "remote-skills", "Use andy's skills remotely", "\n".join(sections)
+        )
+    }
+    for kind in KINDS:
+        pages[DOCS / f"remote-skills-{kind}.md"] = page(
+            f"remote-skills-{kind}",
+            f"Use andy's {kind} skills remotely",
+            TABLE_HEAD + "".join(rows[kind]),
+        )
+    return pages
 
 
 def work(args: argparse.Namespace) -> str:
-    table = render()
-    current = TABLE.read_text(encoding="utf-8") if TABLE.is_file() else None
-    if current == table:
-        return ""
-    line = f"{'add' if current is None else 'update'}\t{TABLE.relative_to(ROOT)}"
-    if args.check:
-        raise ScriptError(
-            f"{TABLE.relative_to(ROOT)} differs from skills/; run: just remote-skills",
-            detail=line,
+    lines: list[str] = []
+    for path, text in render().items():
+        current = path.read_text(encoding="utf-8") if path.is_file() else None
+        if current == text:
+            continue
+        lines.append(
+            f"{'add' if current is None else 'update'}\t{path.relative_to(ROOT)}"
         )
-    if not args.dry_run:
-        TABLE.write_text(table, encoding="utf-8")
-    return line
+        if not (args.check or args.dry_run):
+            path.write_text(text, encoding="utf-8")
+    if args.check and lines:
+        raise ScriptError(
+            "the skill tables differ from skills/; run: just remote-skills",
+            detail="\n".join(lines),
+        )
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         prog="just remote-skills",
         description="Write the name and description of every skill in skills/ to "
-        "docs/references/remote-skills.md",
+        "docs/references/remote-skills.md, grouped by kind, and one page per kind",
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )
@@ -119,12 +151,12 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         "--dry-run",
         action="store_true",
-        help="print the change a run would make without making it",
+        help="print the changes a run would make without making them",
     )
     mode.add_argument(
         "--check",
         action="store_true",
-        help="dry run that exits 1 when the table differs, printing the change on stderr",
+        help="dry run that exits 1 when a table differs, printing the changes on stderr",
     )
     return run_script(parser, work, argv)
 
