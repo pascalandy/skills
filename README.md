@@ -2,7 +2,7 @@
 
 This is Pascal Andy's collection of reusable instructions for coding agents. It is for people who want to add a focused workflow to an agent without adopting the whole collection.
 
-Each skill is maintained in `authoring/<category>/<skill>/` and published in [`skills/`](skills/). Contributors should read [`AGENTS.md`](AGENTS.md) before changing the source. Browse [`skills/`](skills/) for the full list.
+Each skill is maintained in `authoring/<category>/<skill>/` and published in [`skills/`](skills/). Contributors should read [`AGENTS.md`](AGENTS.md) before changing the source. Browse [`skills/`](skills/) for the full list, or read [`remote-skills.md`](docs/maintainer/references/remote-skills.md) for every name and description on one page.
 
 ## Examples
 

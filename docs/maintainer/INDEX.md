@@ -7,13 +7,13 @@ tags:
   - kind/wiki
   - status/open
 date_created: 2026-09-26
-date_updated: 2026-09-29
+date_updated: 2026-09-30
 ---
 
 # Maintainer
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 4 | **Last updated:** 2026-09-29
+> **Total pages:** 5 | **Last updated:** 2026-09-30
 
 ## Wiki Map
 
@@ -24,4 +24,5 @@ date_updated: 2026-09-29
 | `references/checks.md` | How `just check`, signoff, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, private packages, ownership, and cutover for `just install-skills` |
 | `references/release.md` | Steps to publish a tagged release |
+| `references/remote-skills.md` | Generated table of every skill's name and description, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |
