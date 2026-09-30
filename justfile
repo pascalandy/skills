@@ -1,5 +1,6 @@
 # Bare `just` lists these in file order: the commands you run most, then checks.
 # Each recipe is one line that calls one script or tool; logic lives in scripts/
+set dotenv-load := true
 set positional-arguments
 
 [private]
