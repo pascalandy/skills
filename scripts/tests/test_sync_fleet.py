@@ -142,7 +142,12 @@ def change(hub: Path, name: str = "change.txt", push: bool = True) -> str:
 
 
 def run(
-    hub: Path, homes: Path, bin_dir: Path, *args: str, stdin: str = ""
+    hub: Path,
+    homes: Path,
+    bin_dir: Path,
+    *args: str,
+    stdin: str = "",
+    mode: str = "fleet",
 ) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, **GIT_IDENTITY}
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
@@ -151,7 +156,7 @@ def run(
     env["HOME"] = str(hub.parent / "hub-home")
     env.pop("XDG_STATE_HOME", None)
     result = subprocess.run(
-        ["uv", "run", str(hub / "scripts/_launch_sync.py"), "fleet", *args],
+        ["uv", "run", str(hub / "scripts/_launch_sync.py"), mode, *args],
         check=False,
         cwd=hub,
         env=env,
@@ -391,6 +396,40 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     assert git(behind / ".git/published-deployment", "rev-parse", "HEAD") == head
     assert git(hub / ".git/published-deployment", "rev-parse", "HEAD") == head
     assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+
+
+@pytest.mark.parametrize("owned", [True, False], ids=["dirty", "unregistered"])
+def test_hooks_warn_without_blocking_git_when_the_published_cache_is_unsafe(
+    fleet: tuple[Path, Path, Path], owned: bool
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "target")
+    cache = hub / ".git/published-deployment"
+    if owned:
+        git(hub, "worktree", "add", "-q", "--detach", str(cache))
+        problem = f"published worktree {cache} has edits; inspect them"
+    else:
+        shutil.copytree(hub / "scripts", cache / "scripts")
+        problem = f"{cache} is not the owned worktree; move it aside"
+    (cache / "stray.txt").write_text("unsaved\n")
+    head = git(hub, "rev-parse", "HEAD")
+    refs = f"refs/heads/main {head} refs/heads/main {head}\n"
+
+    pushing = run(hub, homes, bin_dir, "pre-push", mode="hook", stdin=refs)
+    syncing = run(hub, homes, bin_dir)
+
+    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (
+        0,
+        "",
+        f"warning: {problem}; the fleet does not sync\n",
+    )
+    assert not (hub.parent / "hub-home/.local/state").exists()
+    assert (syncing.returncode, syncing.stdout, syncing.stderr) == (
+        1,
+        "",
+        f"error: {problem}\n",
+    )
+    assert (cache / "stray.txt").read_text() == "unsaved\n"
 
 
 def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
