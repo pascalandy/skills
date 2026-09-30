@@ -36,7 +36,6 @@ This step is complete when one uncertainty can be named whose reduction would ch
 | Explore or develop an idea interactively | `pa-brainstorm` |
 | Pressure-test through focused questions | `grilling` |
 | Work backward from an imagined failure | `pa-premortem` |
-| Package a durable direction or decision brief | `pa-vision` |
 | Design software structure | `architect` in design-only mode |
 | Plan non-software structure or a macro-roadmap | `figure-it-out`, framing and planning only |
 | Design a module interface, seam, or abstraction depth | `matt-mode ; codebase-design` |

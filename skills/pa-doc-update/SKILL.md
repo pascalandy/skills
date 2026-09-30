@@ -50,7 +50,6 @@ Load `references/ROUTER.md`.
 | stale-doc review, deduplication, frontmatter, routing, or doc governance | `pa-doc-cleaner` |
 | bounded current-state evidence before scoping | `pa-scope` |
 | scoping the change surface | `pa-scope` |
-| defining the direction | `pa-vision` |
 | planning or implementation | `architect`, `figure-it-out`, or a separate `poteto-mode` delivery session |
 
 ## Documentation Update Summary
