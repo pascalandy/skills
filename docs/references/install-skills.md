@@ -66,7 +66,7 @@ Run `lefthook install` once in each machine's main checkout. On `main` in a chec
 
 - A local commit installs nothing. Pushing `main` starts a background job that waits for the push to reach GitHub, then deploys every registry machine, including the initiating machine
 - A pull that brings commits starts the same background deployment of published `main`. A pull with nothing new fires no hook
-- Worktrees, other branches, and checkouts without the private clone skip all of it. A clone without the registry warns and skips it too, without blocking git. Fleet sync moves only detached worktrees and never triggers authoring hooks
+- Worktrees, other branches, and checkouts without the private clone skip all of it. A clone without the registry warns and skips it too, without blocking git. A dirty or unregistered published cache never blocks git either; hooks in any checkout deploy nothing until it is fixed. Fleet sync moves only detached worktrees and never triggers authoring hooks
 
 Background runs never make git wait on a sleeping laptop. They log to `~/.local/state/skills-sync/fleet.log` and send a desktop notification, `notify-send` on Linux or Notification Center on macOS, only when a machine needs you or fails; an offline machine waits for the next sync
 
@@ -103,7 +103,7 @@ uv run "$common/published-deployment/scripts/sync.py" --author-root "$root" --dr
 uv run "$common/published-deployment/scripts/sync_fleet.py" --author-root "$root" --dry-run
 ```
 
-Repeat either command without `--dry-run` only with approval to install. A bootstrapped recipient may keep its old authoring branch while receiving fleet deployment; the original main checkout needs the launcher upgrade only to make its own bare `just` commands work. If published Git history diverges from the cached checkout, restore forward history or obtain approval to replace the repository-owned cache. The main signoff ruleset normally prevents non-fast-forward rewinds; sync never discards a cached checkout automatically
+Repeat either command without `--dry-run` only with approval to install. If published Git history diverges from the cached checkout, restore forward history or obtain approval to replace the repository-owned cache. The main signoff ruleset normally prevents non-fast-forward rewinds; sync never discards a cached checkout automatically
 
 ## Cutover
 
