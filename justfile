@@ -10,7 +10,7 @@ default:
 [group('commands')]
 [no-exit-message]
 sync *args:
-    @uv run --quiet scripts/sync.py "$@"
+    @uv run --quiet scripts/_launch_sync.py sync "$@"
 
 alias ttr := transcript
 
@@ -23,7 +23,7 @@ transcript url *args:
 [group('commands')]
 [no-exit-message]
 sync-fleet *args:
-    @uv run --quiet scripts/sync_fleet.py "$@"
+    @uv run --quiet scripts/_launch_sync.py fleet "$@"
 
 # Install local authoring/ into the agent skill directories for explicit testing
 [group('commands')]
@@ -80,4 +80,4 @@ release-check version *args:
 [private]
 [no-exit-message]
 sync-hook *args:
-    @uv run --quiet scripts/sync_fleet.py --hook "$@"
+    @uv run --quiet scripts/_launch_sync.py hook "$@"

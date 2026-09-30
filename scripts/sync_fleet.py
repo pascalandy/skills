@@ -61,7 +61,7 @@ from _common import (
     send,
     stop,
 )
-from _published_checkout import published
+from _published_checkout import author_root, published
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE = (
@@ -137,6 +137,12 @@ enter() {
 plain() {
     [ -L _skills_private ] || { [ -e _skills_private ] && [ ! -d _skills_private/.git ]; }
 }
+published_step() {
+    common=$(git rev-parse --path-format=absolute --git-common-dir) || return 11
+    script="$common/published-deployment/scripts/sync_fleet.py"
+    [ -f "$script" ] || script="$PWD/scripts/sync_fleet.py"
+    uv run --quiet "$script" --author-root "$PWD" "$@" 2>&1
+}
 """
 # A private folder that is not a clone may hold edits the sync cannot save, so
 # it stops the machine before anything is sent.
@@ -148,7 +154,7 @@ step() {
         return 11
     fi
     common=$(git rev-parse --path-format=absolute --git-common-dir) || return 11
-    if [ -d "$common/published-deployment" ]; then
+    if [ -f "$common/published-deployment/.git" ]; then
         head=$(git -C "$common/published-deployment" rev-parse -q --verify HEAD) || return 11
     else
         head=-
@@ -156,35 +162,23 @@ step() {
     echo "checkout published $head clean"
 }
 """
-# The machine launcher selects and locks its own published worktree.
+# After bootstrap, the cached launcher works even on old authoring branches.
 APPLY = """
 step() {
     enter "$1" || return
-    uv run --quiet scripts/sync_fleet.py --machine-step apply --revision "$3" 2>&1
+    published_step --machine-step apply --revision "$3" --timeout "$4"
 }
 """
 # Prints private state and a preview of the published install.
 CHECK = """
 step() {
     enter "$1" || return
-    if plain; then
-        echo "private - plain"
-    elif [ ! -e _skills_private ]; then
-        echo "private - missing"
-    else
-        head=$(git -C _skills_private rev-parse -q --verify HEAD) || head=-
-        if [ -n "$(git -C _skills_private status --porcelain)" ]; then
-            echo "private $head dirty"
-        else
-            echo "private $head clean"
-        fi
-    fi
     git fetch --quiet origin main 2>/dev/null || :
     git cat-file -e "$2^{commit}" 2>/dev/null || {
         echo "published revision $2 is unavailable; reconnect to GitHub and rerun"
         return 75
     }
-    uv run --quiet scripts/sync_fleet.py --machine-step check --revision "$2" 2>&1
+    published_step --machine-step check --revision "$2" --timeout "$3"
 }
 """
 
@@ -439,7 +433,7 @@ def installed(
 ) -> Outcome | tuple[list[str], list[dict], str]:
     """Run the CHECK step: what differs on the machine, from its private clone
     to each install target, with the targets' counts; an Outcome when it fails."""
-    code, lines = remote(machine, CHECK, machine.path, source.sha)
+    code, lines = remote(machine, CHECK, machine.path, source.sha, f"{TIMEOUT:g}")
     report = report_in(lines)
     if code:
         outcome = failure(machine.name, code, lines)
@@ -674,6 +668,8 @@ def background(*flags: str) -> None:
                 sys.executable,
                 str(Path(__file__).resolve()),
                 "--notify",
+                "--author-root",
+                str(ROOT),
                 "-v",
                 *flags,
             ],
@@ -723,6 +719,8 @@ def machine_step(args: argparse.Namespace) -> str:
         sys.executable,
         str(Path(__file__).resolve().parent / "install_skills.py"),
         "--snapshot",
+        "--timeout",
+        f"{args.timeout:g}",
     ]
     if args.machine_step == "apply":
         changes = sync_private.sync(timeout=args.timeout)
@@ -757,9 +755,11 @@ def machine_step(args: argparse.Namespace) -> str:
 def work(args: argparse.Namespace) -> str:
     global ROOT
     if args.hook:
+        ROOT = (args.author_root or ROOT).resolve()
+        sync_private.set_root(ROOT)
         return hook(args.hook)
     if not args.worker:
-        ROOT = (args.author_root or ROOT).resolve()
+        ROOT = author_root(args.author_root or ROOT)
         sync_private.set_root(ROOT)
         revision = args.revision or github_main().sha
         with published(ROOT, revision, args.timeout) as checkout:
@@ -776,7 +776,7 @@ def work(args: argparse.Namespace) -> str:
         raise AssertionError("exec returned")
     if args.author_root is None:
         raise UsageError("--worker needs --author-root")
-    ROOT = args.author_root.resolve()
+    ROOT = author_root(args.author_root)
     sync_private.set_root(ROOT)
     if args.machine_step:
         with published(ROOT, args.revision, args.timeout) as checkout:

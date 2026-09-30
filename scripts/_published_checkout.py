@@ -23,6 +23,12 @@ def git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def author_root(root: Path) -> Path:
+    """The original checkout owns private edits, not disposable linked worktrees."""
+    first = git(root, "worktree", "list", "--porcelain", "-z").split("\0", 1)[0]
+    return Path(first.removeprefix("worktree ")).resolve()
+
+
 @contextmanager
 def published(root: Path, revision: str, timeout: float) -> Iterator[Path]:
     """Pin a published revision without touching the authoring worktree.
@@ -61,7 +67,9 @@ def published(root: Path, revision: str, timeout: float) -> Iterator[Path]:
                 "merge-base", "--is-ancestor", current, sha, cwd=root
             ).returncode:
                 raise ScriptError(
-                    f"published revision {sha} diverges from {current}; inspect origin/main, then rerun"
+                    f"published revision {sha} diverges from {current}; "
+                    "restore a forward main history, or get approval to replace "
+                    f"the owned worktree at {checkout}"
                 )
             if current != sha:
                 git(

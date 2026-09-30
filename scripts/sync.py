@@ -15,7 +15,7 @@ from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
 from _common import is_network_failure, run, run_git, run_script
-from _published_checkout import published
+from _published_checkout import author_root, published
 
 ROOT = Path(__file__).resolve().parent.parent
 EXIT_CODES = exit_codes(
@@ -76,7 +76,7 @@ def step(*command: str, cwd: Path) -> list[str]:
 
 
 def sync(args: argparse.Namespace) -> str:
-    root = (args.author_root or ROOT).resolve()
+    root = author_root(args.author_root or ROOT)
     if args.worker:
         levels = [
             *(["--verbose"] if args.verbose else []),

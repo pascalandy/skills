@@ -22,7 +22,7 @@ def run(
     repo: Path, home: Path, *args: str, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["uv", "run", str(repo / "scripts/sync.py"), *args],
+        ["uv", "run", str(repo / "scripts/_launch_sync.py"), "sync", *args],
         cwd=repo,
         check=False,
         env={
@@ -50,8 +50,9 @@ def deployed(sandbox: tuple[Path, Path], tmp_path: Path) -> tuple[Path, Path, Pa
     return repo, home, seed
 
 
+@pytest.mark.parametrize("linked", [False, True])
 def test_sync_preserves_authoring_and_installs_published_skills_and_private_edits(
-    deployed: tuple[Path, Path, Path],
+    deployed: tuple[Path, Path, Path], linked: bool
 ) -> None:
     repo, home, seed = deployed
     skill(seed / "authoring/content", "alpha", "published")
@@ -73,8 +74,17 @@ def test_sync_preserves_authoring_and_installs_published_skills_and_private_edit
     )
     git(repo, "clone", "-q", str(repo.parent / "skills-private.git"), "_skills_private")
     skill(repo / "_skills_private/content", "mine", "unsaved")
+    launcher = repo
+    if linked:
+        launcher = repo.parent / "linked"
+        git(repo, "worktree", "add", "-q", "-b", "task", str(launcher))
+        skill(launcher / "authoring/content", "linked-draft", "not published")
+    launcher_before = (
+        git(launcher, "rev-parse", "HEAD"),
+        git(launcher, "status", "--porcelain", "-uall"),
+    )
 
-    result = run(repo, home)
+    result = run(launcher, home)
 
     assert (result.returncode, result.stderr) == (0, "")
     assert (
@@ -88,6 +98,12 @@ def test_sync_preserves_authoring_and_installs_published_skills_and_private_edit
         git(repo, "status", "--porcelain", "-uall"),
     ) == before
     assert git(repo, "branch", "--show-current") == "feature"
+    assert (
+        git(launcher, "rev-parse", "HEAD"),
+        git(launcher, "status", "--porcelain", "-uall"),
+    ) == launcher_before
+    if linked:
+        assert not (launcher / "_skills_private").exists()
     assert run(repo, home).stdout == ""
     assert run(repo, home, "--check").returncode == 0
     cache = repo / ".git/published-deployment"
@@ -103,6 +119,9 @@ def test_launcher_executes_newer_published_installer_code_without_upgrading_auth
     assert run(repo, home).returncode == 0
     assert (home / ".claude/skills/alpha/SKILL.md").is_file()
     original = (repo / "scripts/install_skills.py").read_bytes()
+    (repo / "scripts/sync.py").write_text(
+        'raise SystemExit("unfinished launcher draft")\n'
+    )
     new_installer = seed / "scripts/install_skills.py"
     text = new_installer.read_text()
     assert '"mac": frozenset(),' in text

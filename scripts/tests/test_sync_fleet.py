@@ -82,6 +82,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     for name in (
         "_cli.py",
         "_common.py",
+        "_launch_sync.py",
         "_published_checkout.py",
         "flatten_skills.py",
         "install_skills.py",
@@ -150,7 +151,7 @@ def run(
     env["HOME"] = str(hub.parent / "hub-home")
     env.pop("XDG_STATE_HOME", None)
     result = subprocess.run(
-        ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],
+        ["uv", "run", str(hub / "scripts/_launch_sync.py"), "fleet", *args],
         check=False,
         cwd=hub,
         env=env,
@@ -335,7 +336,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     assert lagging_error.startswith(
         "error: lagging drift: published checkout is behind "
     )
-    assert "private repo has uncommitted edits" in lagging_error
+    assert lagging_error.count("private repo has uncommitted edits") == 1
     assert f", GitHub at {github[:7]}" in lagging_error
     assert "~/.claude/skills has 1 of 2 current (update 1)" in lagging_error
     assert synced_error.startswith(
@@ -469,6 +470,43 @@ def test_private_conflict_stays_saved_while_another_machine_continues(
     assert (
         homes / "good/.claude/skills/secret/SKILL.md"
     ).read_text() == "remote competing edit\n"
+
+
+@pytest.mark.parametrize("linked", [False, True])
+def test_cached_dispatch_survives_old_authoring_and_reuses_original_private_clone(
+    fleet: tuple[Path, Path, Path], linked: bool
+) -> None:
+    hub, homes, bin_dir = fleet
+    target = machine(homes, "target", hub.parent / "skills.git")
+    register(hub, "target")
+    assert run(hub, homes, bin_dir).returncode == 0
+    git(target, "switch", "-q", "-c", "old-tooling")
+    (target / "scripts/sync_fleet.py").write_text(
+        'raise SystemExit("old authoring launcher must not run")\n'
+    )
+    git(target, "rm", "-q", "scripts/_published_checkout.py")
+    commit(target)
+    before = git(target, "rev-parse", "HEAD")
+    head = change(hub)
+    (hub / "_skills_private/content/secret/SKILL.md").write_text("from original\n")
+    launcher = hub
+    if linked:
+        launcher = hub.parent / "linked"
+        git(hub, "worktree", "add", "-q", "-b", "task", str(launcher))
+
+    result = run(launcher, homes, bin_dir)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        homes / "target/.claude/skills/secret/SKILL.md"
+    ).read_text() == "from original\n"
+    assert git(target / ".git/published-deployment", "rev-parse", "HEAD") == head
+    assert git(target, "rev-parse", "HEAD") == before
+    assert git(target, "branch", "--show-current") == "old-tooling"
+    if linked:
+        assert not (launcher / "_skills_private").exists()
+    checked = run(launcher, homes, bin_dir, "--check")
+    assert (checked.returncode, checked.stdout, checked.stderr) == (0, "", "")
 
 
 def test_published_deletion_removes_owned_copies_but_keeps_private_and_foreign(
