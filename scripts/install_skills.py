@@ -35,6 +35,7 @@ from _common import (
     exclusive,
     frontmatter_description,
     run,
+    run_git,
     run_script,
     swap,
 )
@@ -259,7 +260,24 @@ def skill_sources(
     the profile's exclusions."""
     sources: dict[str, Source] = {}
     if snapshot:
-        for package in sorted((ROOT / "skills").iterdir()):
+        paths = flatten_skills.git(
+            "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "skills"
+        ).split(b"\0")
+        for raw in paths:
+            if not raw:
+                continue
+            relative = Path(os.fsdecode(raw))
+            if len(relative.parts) < 3:
+                continue
+            original = ROOT / relative
+            if original.is_symlink() or not original.is_file():
+                raise ScriptError(
+                    f"published skill file {relative} must be a regular file"
+                )
+            destination = stage / Path(*relative.parts[1:])
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(original, destination)
+        for package in sorted(stage.iterdir()):
             if package.is_dir() and (package / "SKILL.md").is_file():
                 sources[package.name] = Source(package, "public", digest(package))
     else:
@@ -574,6 +592,13 @@ def report(
 
 
 def install(args: argparse.Namespace) -> str:
+    if args.snapshot and (
+        run_git("symbolic-ref", "-q", "HEAD", cwd=ROOT).returncode == 0
+        or flatten_skills.git("status", "--porcelain").strip()
+    ):
+        raise ScriptError(
+            "published source must be a clean detached checkout; use the published deployment worktree"
+        )
     home = Path.home()
     preview = args.dry_run or args.check
     # An apply waits for any other one before it reads the working tree, so
@@ -627,8 +652,9 @@ def install(args: argparse.Namespace) -> str:
             for action in actions
             if action.kind in CHANGES
         )
+        retry = "just sync" if args.snapshot else "just install-skills"
         conflicts = [
-            f"{action.detail}; move it aside, then rerun: just install-skills"
+            f"{action.detail}; move it aside, then rerun: {retry}"
             for action in actions
             if action.kind == "conflict"
         ]
@@ -638,7 +664,7 @@ def install(args: argparse.Namespace) -> str:
             raise ScriptError(
                 *conflicts,
                 f"{len(pending)} installed entries differ from the checkout; "
-                "run: just install-skills",
+                f"run: {retry}",
                 detail=changes,
                 report=summary,
             )

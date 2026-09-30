@@ -93,6 +93,8 @@ def test_published_snapshot_installs_committed_content_without_touching_authorin
         ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, check=True
     ).stdout
 
+    (repo / ".git/info/exclude").write_text("ignored.txt\n")
+    (snapshot / "skills/alpha/ignored.txt").write_text("not published\n")
     private = repo / "_skills_private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "content", "secret", "private")
@@ -106,6 +108,7 @@ def test_published_snapshot_installs_committed_content_without_touching_authorin
     assert (
         home / ".claude/skills/secret/SKILL.md"
     ).read_text() == "# secret\n\nprivate\n"
+    assert not (home / ".claude/skills/alpha/ignored.txt").exists()
     assert not (home / ".claude/skills/untracked").exists()
     assert (extra / "SKILL.md").read_text() == "# untracked\n\nnot published\n"
     assert (
@@ -132,6 +135,14 @@ def test_published_snapshot_installs_committed_content_without_touching_authorin
     assert not subprocess.run(
         ["git", "status", "--porcelain"], cwd=snapshot, capture_output=True, check=True
     ).stdout
+
+
+def test_snapshot_refuses_mutable_source(sandbox: tuple[Path, Path]) -> None:
+    repo, home = sandbox
+    result = run(repo, home, "--snapshot")
+    assert result.returncode == 1
+    assert "clean detached checkout" in result.stderr
+    assert not home.exists()
 
 
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
