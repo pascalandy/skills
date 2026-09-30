@@ -1,10 +1,3 @@
----
-name: "trello"
-description: "Use only when explicitly invoked as `trello`."
-kind: "general"
-homepage: "https://developer.atlassian.com/cloud/trello/rest/"
----
-
 # Trello Skill
 
 Manage Trello boards, lists, and cards.

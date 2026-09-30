@@ -67,6 +67,16 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | [`storytelling`](playbooks/storytelling.md) | | Discover, write, diagnose, adapt, or explain a narrative |
 | [`illustration`](playbooks/illustration.md) | | Design and generate a 16:9 inline illustration |
 
+### Agents and tools
+
+| Route | Aliases | Use when |
+|---|---|---|
+| [`meta-skill-creator`](playbooks/meta-skill-creator.md) | | Create or refactor a skill with several internal branches behind one entry point |
+| [`tavily`](playbooks/tavily.md) | | Search the web or discover URLs through Tavily |
+| [`headless`](playbooks/headless.md) | | Run Codex, Claude Code, OpenCode, or Pi non-interactively |
+| [`profile-routing-matrix`](playbooks/profile-routing-matrix.md) | | Pick the role, model, and reasoning level for a subagent |
+| [`trello`](playbooks/trello.md) | | Manage Trello boards, lists, and cards |
+
 ## Callers
 
 A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill.md`. It keeps its own task and loads another route only when that playbook calls for it.
