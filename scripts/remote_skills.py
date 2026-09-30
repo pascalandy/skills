@@ -82,10 +82,18 @@ def render(updated: str) -> str:
         name = path.parent.name
         log.info("read %s", path.relative_to(ROOT))
         description = frontmatter_description(path.read_text(encoding="utf-8"))
-        if not description:
+        # A quoted "\n" decodes to a real line break, which would split the row
+        problem = (
+            "has no description"
+            if not description
+            else "has a line break in its description"
+            if "\n" in description or "\r" in description
+            else ""
+        )
+        if problem:
             errors.append(
-                f"{path.relative_to(ROOT)} has no description; "
-                "add one to its source in authoring/, then run: just flatten-skills"
+                f"{path.relative_to(ROOT)} {problem}; "
+                "fix its source in authoring/, then run: just flatten-skills"
             )
             continue
         cell = description.replace("|", "\\|")

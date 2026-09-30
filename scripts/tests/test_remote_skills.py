@@ -77,16 +77,28 @@ def test_check_reports_a_stale_table_and_leaves_it_alone(root: Path) -> None:
     assert (root / PATH).read_text(encoding="utf-8") == "stale\n"
 
 
-def test_a_skill_without_a_description_fails_before_writing(root: Path) -> None:
+@pytest.mark.parametrize(
+    ("text", "problem"),
+    [
+        ("# Bare\n", "has no description"),
+        (
+            '---\nname: "bare"\ndescription: "Use for a\\nthen b."\n---\n',
+            "has a line break in its description",
+        ),
+    ],
+)
+def test_a_skill_without_a_one_line_description_fails_before_writing(
+    root: Path, text: str, problem: str
+) -> None:
     skill(root, "alpha", '---\nname: "alpha"\ndescription: "Use for a."\n---\n')
-    skill(root, "bare", "# Bare\n")
+    skill(root, "bare", text)
 
     assert run() == (
         1,
         "",
         (
-            "error: skills/bare/SKILL.md has no description; "
-            "add one to its source in authoring/, then run: just flatten-skills\n"
+            f"error: skills/bare/SKILL.md {problem}; "
+            "fix its source in authoring/, then run: just flatten-skills\n"
         ),
     )
     assert not (root / PATH).exists()
