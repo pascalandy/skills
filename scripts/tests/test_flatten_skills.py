@@ -153,15 +153,25 @@ class FlattenSkillsTests(unittest.TestCase):
             crlf = root / "authoring/devtools/crlf/SKILL.md"
             crlf.parent.mkdir()
             crlf.write_bytes(b'---\r\nname: "crlf"\r\n---\r\n# Crlf\r\n')
+            solo = root / "authoring/solo/SKILL.md"
+            solo.parent.mkdir()
+            solo.write_text('---\nname: "solo"\n---\n', encoding="utf-8")
             subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
 
             self.assertEqual(
                 self.cli(),
                 (
                     0,
-                    "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/tagged\n",
+                    (
+                        "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/solo\n"
+                        "add\tskills/tagged\n"
+                    ),
                     "",
                 ),
+            )
+            self.assertEqual(
+                (root / "skills/solo/SKILL.md").read_text(encoding="utf-8"),
+                '---\nname: "solo"\nkind: "unknown"\n---\n',
             )
             self.assertEqual(
                 (root / "skills/crlf/SKILL.md").read_bytes(),
@@ -182,6 +192,23 @@ class FlattenSkillsTests(unittest.TestCase):
             )
             self.assertEqual(source.read_text(encoding="utf-8"), untagged)
             self.assertEqual(self.check(), (0, "", ""))
+
+    def test_a_package_inside_another_package_fails(self) -> None:
+        with self.repository() as (root, _, _):
+            (root / "authoring/devtools/SKILL.md").write_text("# Devtools\n")
+            result = self.check()
+
+        self.assertEqual(
+            result,
+            (
+                1,
+                "",
+                (
+                    "error: authoring/devtools/example is a package inside the package "
+                    "authoring/devtools; move one of them\n"
+                ),
+            ),
+        )
 
     def test_interrupt_after_moving_output_restores_previous_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

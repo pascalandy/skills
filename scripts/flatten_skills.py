@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Flatten categorized authoring packages into the published skills directory."""
+"""Flatten authoring packages into the published skills directory."""
 
 from __future__ import annotations
 
@@ -71,13 +71,24 @@ def git_files(directory: str) -> list[Path]:
 
 
 def collect() -> dict[str, list[tuple[Path, Path]]]:
-    """Map each skill to the tracked source files that flattening would copy."""
+    """Map each skill to the tracked source files that flattening would copy.
+
+    A package is a folder holding a SKILL.md, either directly under authoring/
+    or inside a category folder there."""
     packages: dict[str, Path] = {}
-    for entry in sorted(AUTHORING.glob("*/*/SKILL.md")):
+    for entry in sorted(
+        [*AUTHORING.glob("*/SKILL.md"), *AUTHORING.glob("*/*/SKILL.md")]
+    ):
         package = entry.parent
         if package.parent.name == "commands":
             log.debug("skip %s (commands are not skills)", package.relative_to(ROOT))
             continue
+        # The inner folder could be a skill or part of the outer one, so refuse to guess
+        if package.parent != AUTHORING and (package.parent / "SKILL.md").is_file():
+            raise ScriptError(
+                f"{package.relative_to(ROOT)} is a package inside the package "
+                f"{package.parent.relative_to(ROOT)}; move one of them"
+            )
         if package.name in packages:
             raise ScriptError(
                 f"duplicate skill name {package.name!r}: "
@@ -88,30 +99,33 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
 
     if not packages:
         raise ScriptError(
-            "no skill packages found at authoring/<category>/<skill>/SKILL.md"
+            "no skill packages found at authoring/<skill>/SKILL.md "
+            "or authoring/<category>/<skill>/SKILL.md"
         )
     files: dict[str, list[tuple[Path, Path]]] = {name: [] for name in packages}
+    roots = set(packages.values())
     unpackaged: set[str] = set()
     for relative in git_files("authoring"):
-        if len(relative.parts) < 3 or relative.parts[1] == "commands":
+        if relative.parts[1] == "commands":
             continue
         source = ROOT / relative
         if not (source.is_file() or source.is_symlink()):
             log.debug("skip %s (not a file)", relative)
             continue
-        if len(relative.parts) == 3:
-            unpackaged.add(relative.as_posix())
-            continue
-        _, category, name, *inside = relative.parts
-        if packages.get(name) != AUTHORING / category / name:
-            unpackaged.add(f"authoring/{category}/{name}/")
+        package = next((parent for parent in source.parents if parent in roots), None)
+        if package is None:
+            unpackaged.add(
+                relative.as_posix()
+                if len(relative.parts) <= 3
+                else f"{Path(*relative.parts[:3]).as_posix()}/"
+            )
             continue
 
         if source.is_symlink():
             raise ScriptError(
                 f"skill source symlink is unsupported: {relative}; replace it with a file"
             )
-        files[name].append((source, Path(*inside)))
+        files[package.name].append((source, source.relative_to(package)))
 
     if unpackaged:
         raise ScriptError(
@@ -128,12 +142,12 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
     return files
 
 
-def render(source: Path) -> bytes:
-    """The bytes skills/ publishes for a source file. A package's SKILL.md
-    without a kind gains `kind: "unknown"` at the end of its frontmatter, so a
-    skill nobody classified shows up without failing a check."""
+def render(source: Path, inside: Path) -> bytes:
+    """The bytes skills/ publishes for the package file at `inside`. A package's
+    own SKILL.md without a kind gains `kind: "unknown"` at the end of its
+    frontmatter, so a skill nobody classified shows up without failing a check."""
     data = source.read_bytes()
-    if source.name != "SKILL.md" or source.parent.parent.parent != AUTHORING:
+    if inside != Path("SKILL.md"):
         return data
     # Match CRLF sources too; a copy that gains the kind is published with LF
     text = data.decode("utf-8").replace("\r\n", "\n")
@@ -144,9 +158,9 @@ def render(source: Path) -> bytes:
     return f'{text[:end]}\nkind: "unknown"{text[end:]}'.encode()
 
 
-def publish(source: Path, destination: Path) -> None:
+def publish(source: Path, inside: Path, destination: Path) -> None:
     """Write the bytes and executable bits skills/ publishes for a source file."""
-    destination.write_bytes(render(source))
+    destination.write_bytes(render(source, inside))
     shutil.copymode(source, destination)
 
 
@@ -177,7 +191,7 @@ def changes(expected: dict[Path, Path]) -> list[str]:
             if parent.is_relative_to(OUTPUT)
         ):
             reason = "symlink"
-        elif render(source) != destination.read_bytes():
+        elif render(source, Path(*relative.parts[2:])) != destination.read_bytes():
             reason = "changed content"
         elif (stat.S_IMODE(source.stat().st_mode) & 0o111) != (
             stat.S_IMODE(destination.stat().st_mode) & 0o111
@@ -222,7 +236,7 @@ def flatten(*, dry_run: bool = False) -> list[str]:
         for relative, source in expected.items():
             destination = staging / relative.relative_to("skills")
             destination.parent.mkdir(parents=True, exist_ok=True)
-            publish(source, destination)
+            publish(source, Path(*relative.parts[2:]), destination)
         swap(staging, OUTPUT, Path(temporary) / "previous")
     return lines
 
@@ -240,7 +254,10 @@ def work(args: argparse.Namespace) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         prog="just flatten-skills",
-        description="Flatten authoring/<category>/<skill>/ packages into skills/<skill>/",
+        description=(
+            "Flatten authoring/<skill>/ and authoring/<category>/<skill>/ "
+            "packages into skills/<skill>/"
+        ),
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )

@@ -8,11 +8,11 @@ Load `writing-great-skills` before creating, changing, or refactoring a skill. I
 
 Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow_implicit_invocation: false` in Codex metadata. Agents may invoke skills when relevant
 
-1. For skill content, edit only `authoring/<category>/<skill-name>/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
+1. For skill content, edit only the skill's package in `authoring/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
 2. Run `just flatten-skills`, then `just remote-skills`; if flattening fails, rerun `just flatten-skills --debug`
 3. Review and commit the source and generated output together
 
-The flattening script maps each package with a root `SKILL.md` to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names or files outside a package with a `SKILL.md`
+The flattening script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
@@ -22,7 +22,7 @@ The flattening script maps each package with a root `SKILL.md` to `skills/<skill
 
 If generated output is wrong, fix `authoring/` or the flattening script, then rerun `just flatten-skills`
 
-Repository-wide scripts live in `scripts/`; skill-specific scripts stay in `authoring/<category>/<skill-name>/scripts/` and travel with the skill. The `justfile` exposes routine operations
+Repository-wide scripts live in `scripts/`; skill-specific scripts stay in the package's `scripts/` and travel with the skill. The `justfile` exposes routine operations
 
 ## Python execution
 
