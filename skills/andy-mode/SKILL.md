@@ -27,7 +27,6 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | Route | Aliases | Use when |
 |---|---|---|
 | [`retro-skill`](playbooks/retro-skill.md) | `retro` | A skill loaded this session was wrong or confusing enough to cost a detour |
-| [`retro-general`](playbooks/retro-general.md) | | The agent's environment could serve the next run better: navigation, checks, steering files, or tools |
 
 ### Ideas and quality
 
@@ -72,9 +71,6 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | Route | Aliases | Use when |
 |---|---|---|
 | [`meta-skill-creator`](playbooks/meta-skill-creator.md) | | Create or refactor a skill with several internal branches behind one entry point |
-| [`tavily`](playbooks/tavily.md) | | Search the web or discover URLs through Tavily |
-| [`headless`](playbooks/headless.md) | | Run Codex, Claude Code, OpenCode, or Pi non-interactively |
-| [`profile-routing-matrix`](playbooks/profile-routing-matrix.md) | | Pick the role, model, and reasoning level for a subagent |
 | [`trello`](playbooks/trello.md) | | Manage Trello boards, lists, and cards |
 
 ## Callers

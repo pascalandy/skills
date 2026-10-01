@@ -1,14 +1,20 @@
+---
+name: "headless"
+description: "Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them."
+kind: "dev"
+---
+
 # Headless CLI agents
 
 Load only the reference for the requested path:
 
-- For `codex exec` or `headless-codex`, read [Run Codex headlessly](../references/headless/codex/MetaSkill.md)
-- For Claude Code or `headless-claude`, read [Claude Code](../references/headless/claude/MetaSkill.md)
-- For OpenCode or `headless-opencode`, read [OpenCode](../references/headless/opencode/MetaSkill.md)
-- For Pi or `headless-pi`, read [Pi](../references/headless/pi/MetaSkill.md)
-- For skill maintenance, follow the [update checklist](../references/headless/UPDATE.md)
+- For `codex exec` or `headless-codex`, read [Run Codex headlessly](references/codex/MetaSkill.md)
+- For Claude Code or `headless-claude`, read [Claude Code](references/claude/MetaSkill.md)
+- For OpenCode or `headless-opencode`, read [OpenCode](references/opencode/MetaSkill.md)
+- For Pi or `headless-pi`, read [Pi](references/pi/MetaSkill.md)
+- For skill maintenance, follow the [update checklist](references/UPDATE.md)
 
-Read the [glossary](../references/headless/GLOSSARY.md) only when its terminology is needed. For current CLI behavior, check the installed command's `--help` and its official documentation. Delegation policy belongs to the calling workflow, not this skill.
+Read the [glossary](references/GLOSSARY.md) only when its terminology is needed. For current CLI behavior, check the installed command's `--help` and its official documentation. Delegation policy belongs to the calling workflow, not this skill.
 
 ## Delegate a task
 

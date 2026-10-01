@@ -6,7 +6,7 @@ kind: "dev"
 
 # Setup pstack
 
-Update the `profile-routing-matrix` route of andy-mode, the shared source of delegation preferences. Resolve `playbooks/profile-routing-matrix.md` in the active `andy-mode` skill directory.
+Update the `profile-routing-matrix`, the shared source of delegation preferences. Resolve its SKILL.md through the active skill catalog.
 
 ## Steps
 
@@ -20,7 +20,7 @@ Apply choices already supplied by the user. Ask only about unresolved preference
 
 ### 3. Update the matrix
 
-Follow repository source-of-truth rules and edit the managed source of `andy-mode/playbooks/profile-routing-matrix.md`. Preserve unrelated roles and routing rules. These mappings also apply to delegation outside pstack.
+Follow repository source-of-truth rules and edit the managed source of `profile-routing-matrix/SKILL.md`. Preserve unrelated roles and routing rules. These mappings also apply to delegation outside pstack.
 
 ### 4. Verify and report
 

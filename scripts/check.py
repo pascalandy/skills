@@ -230,7 +230,7 @@ CHECKS = [
     Check("distill", pytest(f"{ANDY_MODE}/scripts/distill/tests")),
     Check(
         "tavily",
-        pytest(f"{ANDY_MODE}/scripts/tavily/tests", "httpx", "rich", "respx"),
+        pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
     ),
     Check(
         "transcript",

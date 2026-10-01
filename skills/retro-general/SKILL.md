@@ -1,4 +1,8 @@
-# Retro general
+---
+name: "retro-general"
+description: "Review a coding session for evidence-backed improvements to agent navigation, instructions, checks, or tools."
+kind: "dev"
+---
 
 Review the coding agent's **environment** so future runs go better. This is not an incident postmortem or a review limited to the skills loaded in the session.
 

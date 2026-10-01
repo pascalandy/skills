@@ -5,7 +5,7 @@ Update documentation without installing or upgrading CLIs or invoking billable m
 1. Read the affected CLI's installed help and official source below. Record version differences instead of claiming universal behavior
 2. Keep command flags and examples in that CLI's reference and definitions in the glossary. Leave delegation policy to the calling workflow
 3. Remove superseded recipes and stale model or local-agent lists. Discover availability at runtime instead of maintaining a second catalog
-4. Check routing from [the headless playbook](../../playbooks/headless.md), relative links, stdin handling, permissions, output separation, and exit status. Use parser or stub checks for shell examples; run live model calls only when behavioral evidence needs them and the task authorizes them
+4. Check routing from SKILL.md, relative links, stdin handling, permissions, output separation, and exit status. Use parser or stub checks for shell examples; run live model calls only when behavioral evidence needs them and the task authorizes them
 5. Run repository validators and regenerate distributed skills according to the repository's AGENTS.md. Commit source and generated output together
 
 | Reference | Local checks | Official source |

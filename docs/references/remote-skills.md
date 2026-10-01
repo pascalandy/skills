@@ -24,6 +24,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
 | oem | Load at the start of every session, before the first reply. Shared definitions and conventions for every task. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
+| tavily | Use when the user explicitly requests Tavily, or for basic or current external web search and URL discovery. Do not select automatically for advanced research, extraction, schema-constrained output, or cited synthesis. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
 | writing-for-agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. |
@@ -46,6 +47,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | gh-stack | Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out. |
 | git-local | Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries. |
 | grill-for-unknowns | Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria. |
+| headless | Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. |
 | how | Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation. |
 | interrogate | Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots. |
 | label-for-issues | Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue. |
@@ -78,8 +80,10 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | principle-subtract-before-you-add | Apply when sequencing an addition, refactor, or rewrite. Remove dead code, redundant validators, and stub references first, then build on the simpler base. |
 | principle-test-behavior-not-implementation | Apply when you write, change, or keep a test. Call the code the way its users do and assert the result they observe against a literal expected value. If the test would still pass when every imported function returns undefined, rewrite the assertion or delete the test. |
 | principle-type-system-discipline | Apply when designing types, reviewing a function signature, or writing code in any statically-typed language. Make illegal states unrepresentable, brand semantic primitives, parse external data at boundaries, refuse to lie to the compiler, exhaust variants, derive from authoritative schemas. |
+| profile-routing-matrix | Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level. |
 | recall | Use only when explicitly invoked as `recall`. |
 | reflect | Use only when explicitly invoked as `reflect`. |
+| retro-general | Review a coding session for evidence-backed improvements to agent navigation, instructions, checks, or tools. |
 | setup-pstack | Use for /setup-pstack, configure pstack models, or changing pstack's model choices. |
 | show-me-your-work | Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away. |
 | swarm | Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration. |
