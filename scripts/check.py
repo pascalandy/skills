@@ -178,6 +178,7 @@ CHECKS = [
         "install_skills", "scripts/install_skills.py", "scripts/flatten_skills.py"
     ),
     repo_test("justfile", "justfile"),
+    repo_test("merge", "scripts/merge.py", "scripts/signoff.py"),
     repo_test("release_check", "scripts/release_check.py"),
     repo_test("remote_skills", "scripts/remote_skills.py"),
     repo_test("signoff", "scripts/signoff.py"),

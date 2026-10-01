@@ -25,6 +25,12 @@ transcript url *args:
 sync-fleet *args:
     @uv run --quiet scripts/sync_fleet.py "$@"
 
+# Sign off this branch's PR head if needed, then squash-merge exactly that commit
+[group('commands')]
+[no-exit-message]
+merge *args:
+    @uv run --quiet scripts/merge.py "$@"
+
 # Install skills/ into the agent skill directories
 [group('commands')]
 [no-exit-message]

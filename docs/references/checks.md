@@ -1,6 +1,6 @@
 ---
 name: Checks
-description: How just check, signoff, commit hooks, and the manual CI workflow fit together, and how to change them
+description: How just check, signoff, merge, commit hooks, and the manual CI workflow fit together, and how to change them
 tags:
   - area/ea
   - kind/doc
@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-09-30
 ---
 
-`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
+`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, then squash-merges exactly that commit. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
 
 ## Sign off a PR
 
@@ -28,10 +28,30 @@ Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just
 | Pushed more commits | `just signoff` again |
 | Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
 | Did this commit get signed off? | `gh signoff status` |
-| Merge blocked on `signoff` | Sign off the PR head, then merge; never merge with `gh pr merge --admin` to skip the gate |
+| Merge blocked on `signoff` | `just merge` signs off the PR head, then merges it; never merge with `gh pr merge --admin` to skip the gate |
 | Want a run on a clean GitHub runner | `gh workflow run ci.yml --ref <branch>`, then `gh run watch` |
 
 Commit hooks never sign off: git has no hook after a push, and GitHub accepts a status only for a commit it already has
+
+## Merge a PR
+
+Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-merges exactly the commit the checks ran on:
+
+1. It refuses in seconds when the PR is a draft or targets another branch, when the working tree has changes, when HEAD is not the PR head on GitHub, or when the branch lacks the tip of `main`
+2. It reuses a green `signoff` on the head, or runs the `just signoff` steps once
+3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
+4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
+5. It reads the PR back, then warns when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
+
+`just merge --dry-run` runs step 1 and prints what a run would do. A rerun on a merged PR prints nothing. It never deletes the branch
+
+| Situation | Do |
+|---|---|
+| Refused: the branch lacks the tip of `main` | `git merge origin/main`, `git push`, then `just merge` |
+| Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, then `gh stack merge <stack> --yes --squash` |
+| GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
+| Interrupted | `just merge` again; a merged PR ends the run |
+| Warning: `main` holds a tree the checks did not run on | `just check` on an up-to-date `main` |
 
 ## The signoff rule
 
