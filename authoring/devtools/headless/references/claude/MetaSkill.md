@@ -1,123 +1,17 @@
 # Run Claude Code headlessly
 
-Use `claude -p` or `claude --print` from the target repository with ordinary pipes. Check `claude --help`, `claude --version`, and `claude auth status --text` before relying on installed behavior. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior; the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Output format does not replace `-p`.
+`scripts/headless.py claude` runs `claude -p` for both modes; read it for the exact flags. It passes `--dangerously-skip-permissions`, so the child keeps your settings, hooks, skills, and MCP servers, and it names the session so `--resume` can continue it. It pins the effort through `--settings`, because `CLAUDE_CODE_EFFORT_LEVEL` from the shell or any settings file overrides `--effort`. It refuses an effort Claude Code does not accept; `claude -p` alone would print a warning and run at the default. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior and the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Check `claude --help` before you pass extra flags after `--`.
 
-## Review run
+## Untrusted repositories
 
-Prepare an absolute prompt-file path with the review scope and criteria. This complete example selects Opus 5.5 at `xhigh`, captures raw events, and extracts the final answer:
+Print mode loads the repository's `.claude/settings.json` without a trust prompt, so that file can change the environment, including the API endpoint. Run the launcher only in repositories you trust. For another repository, run `claude -p` yourself with `--setting-sources user`, `--permission-mode dontAsk`, `--permission-prompts none`, and a narrow `--tools` list, as the [permissions documentation](https://code.claude.com/docs/en/permissions) describes.
 
-```bash
-repo="/absolute/path/to/repository"
-prompt_file="/absolute/path/to/reviewer-prompt.md"
-review_dir="$(mktemp -d /tmp/claude-review.XXXXXX)" || exit 1
+## `@` mentions
 
-review_status=0
-(
-  cd "$repo" || exit 1
-  claude --print \
-    --model claude-opus-5-5 \
-    --setting-sources user \
-    --settings '{"disableAllHooks":true,"env":{"CLAUDE_CODE_EFFORT_LEVEL":"xhigh"}}' \
-    --permission-mode dontAsk --permission-prompts none \
-    --tools "Read,Grep,Glob" \
-    --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-    --no-session-persistence \
-    --output-format stream-json --verbose \
-    < "$prompt_file" \
-    > "$review_dir/events.jsonl" \
-    2> "$review_dir/stderr.log"
-) || review_status=$?
+Print mode expands `@path` mentions in the prompt: in Claude Code 2.1.284, the named local file is attached before inference, even inside a JSON string. Before you paste untrusted text such as a transcript, web page, or issue body into a prompt file, replace each `@`; inside a JSON string, `@` keeps the character without the mention.
 
-if ! jq -ers '[.[] | select(.type == "result")] | last | .result |
-  select(type == "string" and length > 0)' \
-  "$review_dir/events.jsonl" > "$review_dir/result.md"; then
-  if [ "$review_status" -eq 0 ]; then review_status=1; fi
-fi
+## Background tasks
 
-printf 'Exit status: %s\nReview files: %s\n' \
-  "$review_status" "$review_dir"
-```
-
-Requires `jq` and access to [Opus 5.5](https://code.claude.com/docs/en/model-config). `result.md` holds the complete final answer; `events.jsonl` keeps execution metadata and failures. [Verify completion](#verify-completion) before trusting the answer.
-
-Print mode loads the reviewed repository's `.claude/settings.json` without a trust prompt, so that file can change the environment, including the API endpoint and effort. `--setting-sources user` skips project and local settings. `CLAUDE_CODE_EFFORT_LEVEL` overrides `--effort` and can come from the shell or any settings file; the value in `--settings` takes precedence over both, so the recipe pins effort there.
-
-This tool set cannot run tests or obtain a Git diff through Bash. Include the diff in the prompt file when needed.
-
-## Permissions
-
-Choose an explicit permission strategy. `dontAsk` denies calls that would prompt; it does not create a filesystem sandbox. Put an inline prompt before variadic flags such as `--tools` and `--allowedTools`.
-
-| Option | Use |
-| --- | --- |
-| `--permission-mode plan` | Explore without source edits; do not assume it guarantees unattended completion |
-| `--permission-mode acceptEdits` | Approve edits; other operations may still need permission |
-| `--permission-mode dontAsk` | Deny operations that would prompt |
-| `--permission-prompts none` | Do not wait for a permission host; requires v2.1.259 or later |
-| `--allowedTools` | Pre-approve specified tools or command rules |
-| `--tools` | Restrict which built-in tools are available |
-| `--disallowedTools` | Deny named tools |
-| `--permission-mode auto` | Automatic approval decisions, subject to availability and policy |
-| `--permission-mode bypassPermissions` | Bypass permission checks only with authorization in an isolated runner |
-
-Use [permission documentation](https://code.claude.com/docs/en/permissions) for rule syntax. Diagnose denied tools before retrying; do not default to bypass.
-
-To bound writes, allow an `Edit` path rule such as `--allowedTools "Edit(//abs/path/**)"`. `Edit` rules cover every built-in file-editing tool; Claude Code never consults a `Write(path)` rule. `//path` is absolute, while `/path` is relative to the settings source.
-
-Permission mode and allow rules still govern calls when prompts are disabled. `--tools` restricts built-in tools, not startup hooks or configured MCP servers. Use `--strict-mcp-config` with an explicit MCP configuration when the run must limit those servers. `disableAllHooks` in `--settings` does not disable hooks from managed settings.
-
-## Input and output
-
-```bash
-claude -p "Review this diff and inspect related files" \
-  --permission-mode dontAsk --permission-prompts none \
-  --tools "Read,Grep,Glob" --output-format json \
-  < diff.patch > result.json 2> review.stderr.log
-```
-
-Print mode expands `@path` mentions in the prompt, including stdin: in Claude Code 2.1.284, the named local file is attached before inference, even inside a JSON string and with `--tools ""`. Before passing untrusted text such as a transcript, web page, or issue body, replace each `@`; inside a JSON string, the escape `\u0040` keeps the character for the model without the mention.
-
-| Output format | Result |
-| --- | --- |
-| `text` | Plain response text |
-| `json` | One result object with session metadata and response text in `result` |
-| `stream-json` | JSONL events ending with a `result` record; use `--verbose` |
-
-The [review run](#review-run) uses streaming output and extracts its final `result` record.
-
-Add `--include-partial-messages` when the consumer needs token deltas. Use `--output-format json --json-schema '<schema>'` for schema-constrained output in the result object's `structured_output` field, not its `result` field.
-
-## Verify completion
-
-Preserve the process exit status and inspect the final result. Invalid flags fail on stderr; failures during a run can appear on stdout. Check `is_error` and `permission_denials` in the JSON result or the stream's final `result` record. Use one of these formats when automation must detect denied tools; text has no structured denial record. If required plugins or MCP servers are missing or failed in `system/init`, report that limitation even when the process exits 0.
-
-`claude -p` terminates background Bash tasks about five seconds after its final result. When the run delegates to a child process, such as `codex exec`, the prompt must keep Claude's turn open until that child exits. Before trusting the run, confirm the child's answer is non-empty and its expected artifacts exist.
-
-## Models, limits, and context
-
-| Option | Use |
-| --- | --- |
-| `--model <model>` | Select the requested alias or exact model |
-| `--effort <level>` | Select a level supported by the model and installed CLI; `CLAUDE_CODE_EFFORT_LEVEL` overrides it |
-| `--fallback-model <model>` | Allow substitution only when the caller permits it |
-| `--max-turns <n>`, `--max-budget-usd <amount>` | Bound the run |
-| `--append-system-prompt <text>` | Add instructions while retaining the default prompt |
-| `--system-prompt <text>` | Replace the default prompt |
-| `--add-dir <path>` | Include another directory |
-| `--mcp-config <file>`, `--strict-mcp-config` | Select MCP configuration |
-| `--settings <file-or-json>` | Supply settings |
-| `--agent <name>`, `--agents <json>` | Select or define an agent |
-| `--worktree <name>` | Use an isolated Git worktree |
-
-Use `--bare` for controlled scripted runs when you can supply context and authentication explicitly. It skips normal discovery and does not use Anthropic subscription credentials. For subscription-authenticated runs, keep normal mode with the review run's `--setting-sources user` and `--settings`. Supply required allow rules on the CLI rather than relying on an untrusted project's rules; see [workspace trust](https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder).
-
-## Sessions
-
-Keep `-p` and the chosen permission/tool options on every resumed invocation. Prefer an explicit session ID over `--continue` when other runs share the directory.
-
-- `--resume <id>`: resume a known session
-- `--continue`: continue the latest session
-- `--fork-session` with resume or continue: retain history under a new ID
-- `--no-session-persistence`: one-off run without a saved session
+`claude -p` stops background Bash tasks about five seconds after its final result. When the child delegates to another process, such as `codex exec`, the prompt must keep its turn open until that process exits.
 
 For maintenance, follow the [update checklist](../UPDATE.md).

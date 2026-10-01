@@ -30,7 +30,7 @@ This table reflects `codex exec --help` in installed Codex CLI 0.159.0. Run the 
 | `--dangerously-bypass-hook-trust` | Run untrusted hooks; use only in automation that vets the hooks |
 | `-h`, `--help`; `-V`, `--version` | Show command help or the CLI version |
 
-For unattended runs, `-c 'approval_policy="never"'` prevents approval requests; actions outside the sandbox fail. `approval_policy="on-request"` can ask for approval and belongs in a supervised run. Use explicit sandbox flags as described in [Prepare the run](../MetaSkill.md#prepare-the-run).
+`scripts/headless.py` already passes `-C`, `-m`, `-c model_reasoning_effort`, `--dangerously-bypass-approvals-and-sandbox`, `-o`, and the prompt as `-`. Pass any other flag after `--`. For a sandboxed run, call `codex exec -s read-only` yourself instead.
 
 For the default and opt-in web search and image settings, follow [Choose optional tools](../MetaSkill.md#choose-optional-tools). Add `--strict-config` to reject unrecognized configuration keys.
 

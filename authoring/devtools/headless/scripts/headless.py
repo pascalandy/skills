@@ -596,6 +596,8 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         ) from None
 
     reply = runner.reply(run)
+    if not (run / "answer.md").exists():
+        (run / "answer.md").write_text(reply.answer, encoding="utf-8")
     result = Result(
         target=args.target,
         mode=args.mode,

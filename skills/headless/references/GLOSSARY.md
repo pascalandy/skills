@@ -10,7 +10,7 @@ date_updated: 2026-09-27
 
 # Headless glossary
 
-Definitions only. [SKILL.md](../SKILL.md) selects the procedure; each CLI reference owns its flags.
+Definitions only. [SKILL.md](../SKILL.md) selects the procedure; `scripts/headless.py` owns the Codex and Claude flags, and each CLI reference owns the rest.
 
 | Term | Meaning |
 | --- | --- |

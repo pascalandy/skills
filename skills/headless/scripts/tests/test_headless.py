@@ -235,6 +235,7 @@ def test_json_prints_the_run_as_one_object(env, repo):
     assert run["answer"] == "No findings."
     assert run["changed"] == []
     assert (Path(run["run_dir"]) / "run.json").is_file()
+    assert (Path(run["run_dir"]) / "answer.md").read_text() == "No findings."
 
 
 def test_a_folder_outside_git_warns_and_skips_the_repository_check(env, tmp_path):
