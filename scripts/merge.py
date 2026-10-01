@@ -3,13 +3,15 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Merge this branch's PR into main: sign off its pushed head, then squash-merge that commit.
+"""Merge this branch's PR into main: sign off its pushed head, squash-merge that commit, then deploy.
 
 Run it on the PR branch, pushed, with a clean working tree. It reuses a green
 signoff on the head, or runs the just signoff steps first. It merges only when
 the branch contains main's tip, so the tree that lands is the tree the checks
-ran on, and warns when another PR lands in the same seconds. A rerun after an
-interruption finds the merged PR and stops there.
+ran on, and warns when another PR lands in the same seconds. Then, when main
+holds the tree the checks ran on, it runs just deploy, which brings every fleet
+machine to the new main. A rerun after an interruption finds the merged PR and
+deploys again.
 """
 
 from __future__ import annotations
@@ -17,11 +19,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import run_script
+from _common import run, run_git, run_script
 from signoff import (
     branch,
     check_and_sign,
@@ -35,16 +40,17 @@ from signoff import (
 )
 
 EPILOG = """\
-A run prints `signoff<TAB>SHA` when it signs off the head, then
-`merge<TAB>#N<TAB>SHA` for the commit it merges; a rerun on a merged PR prints
-nothing.
+A run prints `signoff<TAB>SHA` when it signs off the head,
+`merge<TAB>#N<TAB>SHA` for the commit it merges, then the change lines of just
+deploy. A deploy that fails or is withheld warns without failing the run: the
+merge landed.
 
 examples:
   just merge             # sign off this branch's PR head, then merge it
   just merge --dry-run   # check that the PR can merge, without changing anything"""
 EXIT_CODES = exit_codes(
     {
-        0: "the PR is merged",
+        0: "the PR is merged, even when the deploy failed",
         1: "the PR cannot merge as it is, or a check failed; the error says why",
         75: "GitHub did not make the PR mergeable in time, or the network failed; retry",
     }
@@ -218,11 +224,64 @@ def main_holds_tested_tree(sha: str, timeout: float) -> bool:
     if git("rev-parse", f"{main}^{{tree}}") == git("rev-parse", f"{sha}^{{tree}}"):
         return True
     log.warning(
-        "warning: main at %s holds a tree the checks did not run on; "
-        "run just check on an up-to-date main",
+        "warning: main at %s holds a tree the checks did not run on, so just merge "
+        "did not deploy it; run just check on an up-to-date main, then just deploy",
         main[:7],
     )
     return False
+
+
+def deploy(sha: str, args: argparse.Namespace) -> str:
+    """Run just deploy from the main checkout once main holds the tree the checks
+    ran on `sha`. A worktree lacks the private clone that holds the fleet
+    registry. The merge already landed, so expected failures only warn."""
+    try:
+        if not main_holds_tested_tree(sha, args.timeout):
+            return ""
+        checkout = Path(
+            git("worktree", "list", "--porcelain")
+            .splitlines()[0]
+            .removeprefix("worktree ")
+        )
+        # The deploy runs this checkout's code, which must be code main has held
+        held = run_git(
+            "merge-base", "--is-ancestor", "HEAD", "origin/main", cwd=checkout
+        )
+        changed = run_git(
+            "status", "--porcelain", "--", "scripts", "justfile", cwd=checkout
+        )
+        if held.returncode or changed.returncode or changed.stdout.strip():
+            log.warning(
+                "warning: just merge did not deploy: %s must hold a commit of main, "
+                "with no changes under scripts/ or the justfile; fix it, then run "
+                "just deploy there",
+                checkout,
+            )
+            return ""
+        levels = [
+            *(["--verbose"] if args.verbose else []),
+            *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
+        ]
+        log.info("run just deploy from %s", checkout)
+        deployed = run(
+            (sys.executable, str(checkout / "scripts/sync_fleet.py"), *levels),
+            cwd=checkout,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        if deployed.returncode:
+            log.warning(
+                "warning: the merge landed, but just deploy did not reach every "
+                "machine; fix what it names above, then run just deploy"
+            )
+        return deployed.stdout.rstrip()
+    except ScriptError as error:
+        log.warning(
+            "warning: the merge landed, but just deploy could not run: %s; "
+            "fix it, then run just deploy",
+            error,
+        )
+        return ""
 
 
 def merge(args: argparse.Namespace) -> str:
@@ -238,7 +297,7 @@ def merge(args: argparse.Namespace) -> str:
                 f"{head[:7]}; open a new PR for the new commits"
             )
         log.info("PR #%d is already merged: %s", pr.number, pr.url)
-        return ""
+        return "" if args.dry_run else deploy(pr.head, args)
     require_mergeable_as_is(pr)
     require_clean_tree()
     sha = pushed_head(args.timeout)
@@ -260,8 +319,7 @@ def merge(args: argparse.Namespace) -> str:
     # main can move while the checks run
     require_contains_main(sha, args.timeout)
     land(pr, sha, args.timeout)
-    main_holds_tested_tree(sha, args.timeout)
-    return "\n".join(lines)
+    return "\n".join(line for line in (*lines, deploy(sha, args)) if line)
 
 
 def main(argv: list[str] | None = None) -> int:
