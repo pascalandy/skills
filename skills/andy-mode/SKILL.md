@@ -72,7 +72,6 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | Route | Aliases | Use when |
 |---|---|---|
 | [`meta-skill-creator`](playbooks/meta-skill-creator.md) | | Create or refactor a skill with several internal branches behind one entry point |
-| [`profile-routing-matrix`](playbooks/profile-routing-matrix.md) | | Pick the role, model, and reasoning level for a subagent |
 | [`trello`](playbooks/trello.md) | | Manage Trello boards, lists, and cards |
 
 ## Callers

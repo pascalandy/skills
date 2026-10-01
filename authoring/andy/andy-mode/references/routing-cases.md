@@ -28,4 +28,3 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; storytelling ; style modeler` | `playbooks/storytelling.md`, then its style modeler reference |
 | `andy-mode ; meta skill creator` | `playbooks/meta-skill-creator.md` |
 | `andy-mode ; meta-sc` | The route tables and a question. No route runs |
-| `andy-mode ; profile routing matrix` | `playbooks/profile-routing-matrix.md` |

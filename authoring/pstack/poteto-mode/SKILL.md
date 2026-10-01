@@ -91,7 +91,7 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 ## Subagents
 
-When delegation helps, read the `profile-routing-matrix` playbook of the active `andy-mode` skill once for the current orchestration. It owns role selection, models, reasoning levels, and agent briefs. Apply it to every delegation in this task.
+When delegation helps, load `profile-routing-matrix` from the active skill catalog once for the current orchestration. It owns role selection, models, reasoning levels, and agent briefs. Apply it to every delegation in this task.
 
 Prefer asynchronous workers for independent tasks when the runtime supports them. Give reviewers the tools needed to inspect evidence and constrain them to read operations. Supply accessible file pointers or self-contained excerpts. Follow the runtime reference for supervision, nesting limits, shared checkouts, and remote execution.
 
