@@ -59,14 +59,14 @@ William Strunk Jr.'s *The Elements of Style* (1918) teaches you to write clearly
 
 Load only what you need.
 
-- **Default for most tasks:** `references/writer-sk/03-elementary-principles-of-composition.md`
+- **Default for most tasks:** `references/write-with-clarity/03-elementary-principles-of-composition.md`
   - Best for active voice, positive form, concrete language, concision, and sentence flow.
-- **Grammar and punctuation:** `references/writer-sk/02-elementary-rules-of-usage.md`
-- **Headings, quotations, and form:** `references/writer-sk/04-a-few-matters-of-form.md`
-- **Word choice and common misuses:** `references/writer-sk/05-words-and-expressions-commonly-misused.md`
-- **Diagnosing synthetic or overly generic prose:** `references/writer-sk/signs-of-ai-writing.md`
+- **Grammar and punctuation:** `references/write-with-clarity/02-elementary-rules-of-usage.md`
+- **Headings, quotations, and form:** `references/write-with-clarity/04-a-few-matters-of-form.md`
+- **Word choice and common misuses:** `references/write-with-clarity/05-words-and-expressions-commonly-misused.md`
+- **Diagnosing synthetic or overly generic prose:** `references/write-with-clarity/signs-of-ai-writing.md`
 
-Use `references/writer-sk/signs-of-ai-writing.md` to spot patterns, not to enforce a mechanical ban list.
+Use `references/write-with-clarity/signs-of-ai-writing.md` to spot patterns, not to enforce a mechanical ban list.
 
 ## AI Writing Patterns to Avoid
 
@@ -82,7 +82,7 @@ Be specific, not grandiose. Say what it actually does.
 
 ## Bottom Line
 
-Writing for humans? Load the relevant section from `references/writer-sk/` and apply the rules. For most tasks, `references/writer-sk/03-elementary-principles-of-composition.md` covers what matters most.
+Writing for humans? Load the relevant section from `references/write-with-clarity/` and apply the rules. For most tasks, `references/write-with-clarity/03-elementary-principles-of-composition.md` covers what matters most.
 
 ## Guardrails
 
