@@ -1,6 +1,6 @@
 ---
 name: "tavily"
-description: "Use when the user explicitly requests Tavily, or for basic or current external web search and URL discovery. Do not select automatically for advanced research, extraction, schema-constrained output, or cited synthesis."
+description: "Use when the user explicitly requests Tavily. Never run automatically."
 kind: "general"
 ---
 
@@ -8,14 +8,12 @@ kind: "general"
 
 ## Overview
 
-Tavily is the default external web tool for basic or current web search and URL discovery. It gives LLM-optimized search, content extraction, site mapping, and crawling via REST.
+Tavily gives LLM-optimized search, content extraction, site mapping, and crawling via REST. Use it only when the user asks for Tavily.
 
 ## Routing Policy
 
 | Situation | Tool | Rule |
 |---|---|---|
-| Basic/current external web search or URL discovery | Tavily | Use Tavily first. |
-| Complex semantic or multi-query research; specialized source categories; clean extraction or subpage crawling; schema-constrained output; cited synthesis | Exa | Escalate to Exa. |
 | Explicit user request for Tavily or Exa | Requested tool | Honor the request. |
 | Tavily fails to satisfy the request, or the user explicitly asks for corroboration | Exa after Tavily | Sequential escalation is allowed. |
 | Local filesystem or repository work | Local tools | Use neither Tavily nor Exa. |
@@ -34,16 +32,14 @@ Do not automatically use both tools.
 
 ## When to Use
 
-- Basic or current external web search
-- URL discovery or ordinary site mapping
 - An explicit user request for Tavily
 
 ## When NOT to Use
 
 - Local filesystem or repository work; use local tools
 - An explicit user request for Exa
-- Complex semantic or multi-query research, specialized source categories, clean extraction or subpage crawling, schema-constrained output, or cited synthesis; use Exa
-- A request to use both tools automatically; use Tavily first and escalate only after Tavily fails or the user asks for corroboration
+- A search the user did not ask Tavily for
+- A request to use both tools at once; escalate to Exa only after Tavily fails or the user asks for corroboration
 - API key is missing from keyring (check first)
 
 ## Authentication
