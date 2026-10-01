@@ -133,13 +133,13 @@ def repo_test(stem: str, *reads: str, cheap: bool = False) -> Check:
     )
 
 
-VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
-TRANSCRIPT = "authoring/content/transcript"
-VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
-IMAGE_CREATOR = "authoring/content/image-creator/scripts"
-HEADLESS = "authoring/devtools/headless/scripts"
+VIDEO_ARCHIVE = "authoring/verify-loops/verify-video-archive/scripts"
+TRANSCRIPT = "authoring/andy/transcript"
+VERIFY_TRANSCRIPT = "authoring/verify-loops/verify-transcript"
+IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
+HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
-COREY_MODE = "authoring/coreyhaines/corey-mode/scripts"
+COREY_MODE = "authoring/corey-mode/scripts"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -204,15 +204,13 @@ CHECKS = [
         "workflows",
         ("uvx", "--from", ACTIONLINT, "actionlint", "-shellcheck=", "-pyflakes="),
     ),
-    Check(
-        "html-mode", uv_run("authoring/content/html-mode/scripts/check_html_mode.py")
-    ),
+    Check("html-mode", uv_run("authoring/andy/html-mode/scripts/check_html_mode.py")),
     Check(
         "matt-mode",
-        uv_run("authoring/mattpocock/matt-mode/scripts/check_matt_mode.py"),
-        uv_run("authoring/mattpocock/matt-mode/scripts/update_matt_mode.py", "check"),
+        uv_run("authoring/matt/matt-mode/scripts/check_matt_mode.py"),
+        uv_run("authoring/matt/matt-mode/scripts/update_matt_mode.py", "check"),
         # It validates the upstream imports of every package in the bucket
-        reads=("authoring/mattpocock",),
+        reads=("authoring/matt",),
     ),
     Check(
         "andy-mode",
@@ -231,18 +229,18 @@ CHECKS = [
     Check("distill", pytest(f"{ANDY_MODE}/scripts/distill/tests")),
     Check(
         "tavily",
-        pytest("authoring/web-research/tavily/scripts/tests", "httpx", "rich", "respx"),
+        pytest("authoring/andy/tavily/scripts/tests", "httpx", "rich", "respx"),
     ),
     Check(
         "transcript",
         pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
         # Its doc test checks the flags these files pass to transcript
-        reads=("justfile", "authoring/verify/verify-transcript/SKILL.md"),
+        reads=("justfile", "authoring/verify-loops/verify-transcript/SKILL.md"),
     ),
     Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
     Check(
         "poteto-mode",
-        pytest("authoring/pstack/poteto-mode/scripts/tests/test_worktree_audit.py"),
+        pytest("authoring/poteto/poteto-mode/scripts/tests/test_worktree_audit.py"),
     ),
     Check(
         "verify-video-archive",

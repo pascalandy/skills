@@ -17,7 +17,7 @@ alias ttr := transcript
 # Transcribe one YouTube URL
 [group('commands')]
 transcript url *args:
-    @uv run --quiet authoring/content/transcript/scripts/transcript.py run youtube --url "$@"
+    @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"
 
 alias deploy := sync-fleet
 
@@ -52,7 +52,7 @@ remote-skills *args:
 # Run any transcript command, such as `--help` or `doctor`
 [group('commands')]
 transcript-cli *args:
-    @uv run --quiet authoring/content/transcript/scripts/transcript.py "$@"
+    @uv run --quiet authoring/andy/transcript/scripts/transcript.py "$@"
 
 # Run the checks that cover changed inputs
 [group('checks')]

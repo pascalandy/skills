@@ -26,7 +26,7 @@ Repository-wide scripts live in `scripts/`; skill-specific scripts stay in the p
 
 ## Python execution
 
-Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts. Never invoke `python3` or bare `python` directly. Scripts in `scripts/` have a PEP 723 block; run them with `uv run scripts/<name>.py`. See the [Python sub-skill](authoring/devtools/coding-language/references/Python/MetaSkill.md)
+Use `uv` for all Python runs, checks, and dependency changes, including skill-local scripts. Never invoke `python3` or bare `python` directly. Scripts in `scripts/` have a PEP 723 block; run them with `uv run scripts/<name>.py`. See the [Python sub-skill](authoring/andy-devtools/coding-language/references/Python/MetaSkill.md)
 
 ## Checks
 

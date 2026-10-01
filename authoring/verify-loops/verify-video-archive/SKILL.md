@@ -11,7 +11,7 @@ creates generated media and never reads the real archive or personal input
 folders.
 
 Load this skill from
-`authoring/verify/verify-video-archive/SKILL.md` in a skills repository
+`authoring/verify-loops/verify-video-archive/SKILL.md` in a skills repository
 checkout. After skill installation, you can invoke
 `$verify-video-archive` and resolve `VERIFY_DIR` from the loaded skill directory.
 
