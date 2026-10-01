@@ -32,7 +32,7 @@ RETIRED = (".codex/prompts", ".config/agents/commands")
 
 
 def command(repo: Path, name: str, body: str = "command") -> Path:
-    path = repo / "authoring/commands" / f"{name}.md"
+    path = repo / "commands" / f"{name}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body + "\n", encoding="utf-8")
     return path
@@ -387,6 +387,23 @@ def test_commands_install_and_only_published_ones_are_removed(
     assert foreign.read_text(encoding="utf-8") == "keep\n"
 
 
+def test_a_command_retired_from_authoring_commands_is_still_removed(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    old = repo / "authoring/commands/legacy.md"
+    old.parent.mkdir(parents=True)
+    old.write_text("legacy\n", encoding="utf-8")
+    commit(repo)
+    old.unlink()
+    commit(repo)
+    for target in COMMANDS:
+        (home / target).mkdir(parents=True)
+        (home / target / "legacy.md").write_text("legacy\n", encoding="utf-8")
+    assert run(repo, home).returncode == 0
+    assert not any((home / target / "legacy.md").exists() for target in COMMANDS)
+
+
 def test_om1_codex_directory_holds_skills_beside_commands(
     sandbox: tuple[Path, Path],
 ) -> None:
@@ -433,7 +450,7 @@ def test_retired_targets_reached_through_a_symlink_are_left_alone(
     command(repo, "review", "shared")
     commit(repo)
     # One links to a live target, the other to a checkout's command sources
-    checkout = home / "checkout/authoring/commands"
+    checkout = home / "checkout/commands"
     for directory in (home / ".claude/commands", checkout, home / ".codex"):
         directory.mkdir(parents=True)
     (checkout / "review.md").write_text("source\n", encoding="utf-8")
@@ -482,7 +499,7 @@ def test_a_command_named_like_a_skill_stops_before_writing(
     assert (result.returncode, result.stdout) == (1, "")
     assert result.stderr == (
         "error: command 'alpha' has the same name as a skill; rename "
-        "authoring/commands/alpha.md, then rerun: just install-skills\n"
+        "commands/alpha.md, then rerun: just install-skills\n"
     )
     assert not home.exists()
 

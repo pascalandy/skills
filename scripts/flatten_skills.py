@@ -80,9 +80,6 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
         [*AUTHORING.glob("*/SKILL.md"), *AUTHORING.glob("*/*/SKILL.md")]
     ):
         package = entry.parent
-        if package.parent.name == "commands":
-            log.debug("skip %s (commands are not skills)", package.relative_to(ROOT))
-            continue
         # The inner folder could be a skill or part of the outer one, so refuse to guess
         if package.parent != AUTHORING and (package.parent / "SKILL.md").is_file():
             raise ScriptError(
@@ -106,8 +103,6 @@ def collect() -> dict[str, list[tuple[Path, Path]]]:
     roots = set(packages.values())
     unpackaged: set[str] = set()
     for relative in git_files("authoring"):
-        if relative.parts[1] == "commands":
-            continue
         source = ROOT / relative
         if not (source.is_file() or source.is_symlink()):
             log.debug("skip %s (not a file)", relative)

@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-09-30
 ---
 
-`just install-skills` installs public skills, every package in the private tree, and `authoring/commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
+`just install-skills` installs public skills, every package in the private tree, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
 
 ## Run it
 
@@ -43,7 +43,7 @@ GitHub's `main` is the source. Every machine in the fleet runs the same commands
 
 - `just sync` pulls `main`, saves and pulls the private clone, and installs on the machine it runs on, without touching the others. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
 - `just sync-fleet`, or its alias `just deploy`, brings every machine in the fleet registry to GitHub's `main`, the machine it runs on included; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. It fetches GitHub's `main`, or uses the last one fetched when GitHub is unreachable, and saves and pulls its own private clone first. Each machine then receives that commit over SSH, fast-forwards its checkout to it, saves and pulls its own private clone from GitHub, and runs `just install-skills`. The machine running it takes the same steps in a local shell
-- A commit GitHub lacks reaches no other machine, so push it first. A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `skills/`, `scripts/`, or `justfile`, has commits GitHub lacks, or whose `_skills_private` is not a clone reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it
+- A commit GitHub lacks reaches no other machine, so push it first. A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `commands/`, `skills/`, `scripts/`, or `justfile`, has commits GitHub lacks, or whose `_skills_private` is not a clone reports `needs-you` and stays untouched. Other edits, such as editor settings, do not block it
 - An `offline` or `failed` machine waits for the next sync. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up. A run whose only failures are temporary, such as offline machines, exits 75 instead of 1
 - A run prints `synced<TAB>NAME<TAB>SHA` for each machine it changed, and nothing when none needed a change; `--dry-run` runs every check without changing anything and prints `ready<TAB>NAME<TAB>SHA` for each machine a sync would change: one behind GitHub, or one whose private clone or installed skills would change. A failure lists every machine's status on stderr. `--verbose` adds GitHub's commit, its public skill count, and each machine's outcome and changes; `--debug` adds the remote output
 - `just merge` runs `just deploy` from this machine's main checkout after it merges a PR, when `main` holds the tree its checks ran on, so the fleet gets the new `main` without a pull
@@ -73,10 +73,10 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 
 ## Ownership
 
-- The installer keeps no state. It owns every name git history ever added under `skills/` or `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
+- The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
 - It also owns every package name the private clone's history ever added, so deleting a private skill and letting `just sync` commit the deletion removes its installed copies on every machine the deletion reaches. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
-- Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/` or the private clone
+- Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or the private clone
 - To promote a private skill, move it into `authoring/`, delete the private copy, and rerun
 
 ## Cutover

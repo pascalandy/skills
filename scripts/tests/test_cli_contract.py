@@ -72,6 +72,7 @@ def doc_sources() -> Iterator[Path]:
         yield ROOT / name
     yield from (ROOT / "docs").rglob("*.md")
     yield from (ROOT / "authoring").rglob("*.md")
+    yield from (ROOT / "commands").rglob("*.md")
     yield from (ROOT / ".github").rglob("*.yml")
     yield from (path for path in (ROOT / ".lefthook").rglob("*") if path.is_file())
     yield from SCRIPTS.glob("*.py")
@@ -111,7 +112,7 @@ def doc_flags(path: str) -> Iterator[tuple[str, str]]:
 
 CONTRACT_DOC = ROOT / "docs/references/script-conventions.md"
 
-CONTRACT_COMMAND = ROOT / "authoring/commands/cli-contract.md"
+CONTRACT_COMMAND = ROOT / "commands/cli-contract.md"
 
 
 def headings(lines: Sequence[str]) -> Iterator[tuple[int, str]]:
@@ -147,7 +148,7 @@ def contract_sections(path: Path) -> str:
 
 
 def test_the_portable_command_copies_the_contract_word_for_word() -> None:
-    """authoring/commands/cli-contract.md carries the contract outside this repo."""
+    """commands/cli-contract.md carries the contract outside this repo."""
     doc = contract_sections(CONTRACT_DOC)
     command = contract_sections(CONTRACT_COMMAND)
 
