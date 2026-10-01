@@ -7,22 +7,24 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-29
+date_updated: 2026-09-30
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
 
 ## Sign off a PR
 
-Push the branch, then run `just signoff`. It runs `just check`, and only when every check passes, `gh signoff` posts a green `signoff` commit status on HEAD. The status belongs to that one commit, so each push needs a new signoff. `gh signoff` signs whatever HEAD is when the check ends, so leave the checkout untouched until `just signoff` finishes, and run it again after any commit, checkout, or rebase in between. Each machine needs the extension once: `gh extension install basecamp/gh-signoff`
+Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just check` on that commit in a temporary worktree, and only when every check passes posts a green `signoff` commit status on that commit. Edits or checkouts in your checkout during the checks cannot change what they test. The status belongs to that one commit, so each push needs a new signoff. When the branch on GitHub moves while the checks run, it signs nothing. A head that already carries a green signoff needs no new run, so a rerun prints nothing. `just signoff --dry-run` prints the commit a run would sign off, without checking. Each machine needs the extension once: `gh extension install basecamp/gh-signoff`
 
-`gh signoff` refuses and posts nothing when the working tree has uncommitted or untracked files, or when HEAD is not pushed. Fix the cause and continue:
+`just signoff` refuses and posts nothing when the working tree has uncommitted or untracked files, or when HEAD is not the commit GitHub holds for the branch. It compares HEAD with `origin/<branch>`, whatever the upstream: a branch made from `origin/main` tracks `main`, and `gh stack push` sets no upstream. Fix the cause and continue:
 
 | Situation | Do |
 |---|---|
-| Refused: HEAD not pushed | `git push`, or `git push -u origin HEAD` for a new branch, then `gh signoff`, provided nothing changed since the check passed |
-| Refused: uncommitted or untracked files | Commit or remove them, then `just signoff` |
+| Refused: HEAD is not on GitHub | Run the `git push` the message names, then `just signoff` |
+| Refused: GitHub has newer commits | Run the `git pull` the message names, then `just signoff` |
+| Refused: uncommitted or untracked files | Commit and push them, or remove them, then `just signoff` |
 | A check failed | Fix it, commit, push, then `just signoff` |
+| Refused: the branch on GitHub moved during the checks | `just signoff` again |
 | Pushed more commits | `just signoff` again |
 | Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
 | Did this commit get signed off? | `gh signoff status` |

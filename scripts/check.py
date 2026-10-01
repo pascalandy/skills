@@ -180,6 +180,7 @@ CHECKS = [
     repo_test("justfile", "justfile"),
     repo_test("release_check", "scripts/release_check.py"),
     repo_test("remote_skills", "scripts/remote_skills.py"),
+    repo_test("signoff", "scripts/signoff.py"),
     repo_test("skill_invocation", "authoring", cheap=True),
     repo_test(
         "sync",

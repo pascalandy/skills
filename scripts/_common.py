@@ -32,7 +32,8 @@ from _cli import (
 
 log = logging.getLogger(__name__)
 
-# git's messages when the network, not the repository or its credentials, failed
+# git's and gh's messages when the network, not the repository or its
+# credentials, failed
 NETWORK_FAILURE = re.compile(
     r"could not resolve (host|hostname)"
     r"|failed to connect"
@@ -46,13 +47,14 @@ NETWORK_FAILURE = re.compile(
     r"|broken pipe"
     r"|the remote end hung up unexpectedly"
     r"|early eof"
-    r"|returned error: (429|5\d\d)",
+    r"|(?:returned error: |HTTP )(429|5\d\d)\b"
+    r"|error connecting to",
     re.IGNORECASE,
 )
 
 
 def is_network_failure(message: str) -> bool:
-    """Whether git's error names a network failure that a later retry may fix."""
+    """Whether a git or gh error names a network failure that a later retry may fix."""
     return NETWORK_FAILURE.search(message) is not None
 
 
