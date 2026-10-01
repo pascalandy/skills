@@ -137,6 +137,7 @@ VIDEO_ARCHIVE = "authoring/verify/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/content/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify/verify-transcript"
 IMAGE_CREATOR = "authoring/content/image-creator/scripts"
+HEADLESS = "authoring/devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
 COREY_MODE = "authoring/coreyhaines/corey-mode/scripts"
 
@@ -250,6 +251,12 @@ CHECKS = [
         pytest(f"{VIDEO_ARCHIVE}/tests"),
     ),
     Check("storytelling", pytest(f"{ANDY_MODE}/scripts/storytelling/tests")),
+    Check(
+        "headless",
+        *ruff(HEADLESS),
+        pyright(HEADLESS),
+        pytest(f"{HEADLESS}/tests"),
+    ),
     Check(
         "image-creator",
         *ruff(IMAGE_CREATOR),
