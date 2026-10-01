@@ -10,12 +10,12 @@ Run Codex or Claude Code as a child agent with `scripts/headless.py`. It gives t
 
 1. Pick the mode the request asks for: **review** or **fix**
 2. Write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up
-3. Run the matching command below as one background command, and wait for it to exit
+3. Run the matching command below and wait for it to exit, as [Wait for a run](#wait-for-a-run) describes
 4. Read the result before you report
 
 ## Review
 
-The child reads, runs commands and checks, uses the network, skills, and subagents, and reports. It must leave the checkout unchanged: the run fails when a tracked or untracked file changed.
+The child reads, runs commands and checks, uses the network, skills, and subagents, and reports. It must leave the checkout unchanged: the run fails when a tracked or untracked file changed. Ignored files, such as caches and build output, don't count.
 
 Ask Codex for a review:
 

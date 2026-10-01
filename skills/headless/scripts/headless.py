@@ -458,12 +458,15 @@ def snapshot(cwd: Path) -> dict[str, str] | None:
         code, path = entry[:2], entry[3:]
         if code[0] in "RC":
             next(entries, None)
-        file = root / path
-        digest = (
-            hashlib.sha256(file.read_bytes()).hexdigest() if file.is_file() else "-"
-        )
-        state[path] = f"{code} {digest}"
+        state[path] = f"{code} {digest(root / path)}"
     return state
+
+
+def digest(file: Path) -> str:
+    if not file.is_file():
+        return "-"
+    with file.open("rb") as content:
+        return hashlib.file_digest(content, "sha256").hexdigest()
 
 
 def changes(before: dict[str, str] | None, after: dict[str, str] | None) -> list[str]:
