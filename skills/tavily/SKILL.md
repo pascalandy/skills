@@ -1,3 +1,9 @@
+---
+name: "tavily"
+description: "Use when the user explicitly requests Tavily, or for basic or current external web search and URL discovery. Do not select automatically for advanced research, extraction, schema-constrained output, or cited synthesis."
+kind: "general"
+---
+
 # Tavily REST API
 
 ## Overview
@@ -226,20 +232,18 @@ Use conservative defaults unless deeper recall needed:
 
 Domain-scoped search restricted to `grokipedia.com` and `grokxpedia.us` using Tavily's `include_domains` parameter. Equivalent to Google's `site:grokipedia.com` operator.
 
-Run these from the andy-mode directory:
-
 ```bash
 # Basic search
-uv run scripts/tavily/grokipedia.py "quantum computing"
+uv run <skill_dir>/scripts/grokipedia.py "quantum computing"
 
 # More results
-uv run scripts/tavily/grokipedia.py "Italian cuisine" -n 10
+uv run <skill_dir>/scripts/grokipedia.py "Italian cuisine" -n 10
 
 # Include raw page content
-uv run scripts/tavily/grokipedia.py "AI history" --raw
+uv run <skill_dir>/scripts/grokipedia.py "AI history" --raw
 
 # JSON output for piping
-uv run scripts/tavily/grokipedia.py "neural networks" --json | jq '.results[].url'
+uv run <skill_dir>/scripts/grokipedia.py "neural networks" --json | jq '.results[].url'
 ```
 
 | Flag | Description |

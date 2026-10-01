@@ -29,4 +29,3 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; meta skill creator` | `playbooks/meta-skill-creator.md` |
 | `andy-mode ; meta-sc` | The route tables and a question. No route runs |
 | `andy-mode ; profile routing matrix` | `playbooks/profile-routing-matrix.md` |
-| `andy-mode ; search the web for the current Codex release notes` | `playbooks/tavily.md` |
