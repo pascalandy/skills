@@ -22,6 +22,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | html-publish | Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review. |
 | image-creator | Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter. |
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
+| oem | Load at the start of every session, before the first reply. Shared definitions and conventions for every task. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
