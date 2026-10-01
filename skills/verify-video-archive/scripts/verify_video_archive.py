@@ -373,7 +373,7 @@ def verifier_identity() -> dict[str, object]:
         repository = Path(root.stdout.strip()).resolve()
         relative = package.relative_to(repository)
         if relative in (
-            Path("authoring/verify/verify-video-archive"),
+            Path("authoring/verify-loops/verify-video-archive"),
             Path("skills/verify-video-archive"),
         ):
             revision = subprocess.run(

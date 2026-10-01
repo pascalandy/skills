@@ -72,8 +72,8 @@ def make_context(tmp_path: Path, *, allow_paid: bool = False):
 
 
 def test_locates_categorized_source_layout(tmp_path: Path):
-    verify_dir = tmp_path / "skills" / "verify" / "verify-transcript"
-    transcript_dir = tmp_path / "skills" / "content" / "transcript"
+    verify_dir = tmp_path / "skills" / "verify-loops" / "verify-transcript"
+    transcript_dir = tmp_path / "skills" / "andy" / "transcript"
     verify_dir.mkdir(parents=True)
     make_transcript_skill(transcript_dir)
 
@@ -100,15 +100,15 @@ def test_locates_flat_applied_layout(tmp_path: Path, monkeypatch):
 
 
 def test_missing_layout_error_lists_both_candidates(tmp_path: Path):
-    verify_dir = tmp_path / "skills" / "verify" / "verify-transcript"
+    verify_dir = tmp_path / "skills" / "verify-loops" / "verify-transcript"
     verify_dir.mkdir(parents=True)
 
     with pytest.raises(verify_transcript.VerificationError) as caught:
         verify_transcript.locate_transcript_skill(verify_dir)
 
     assert caught.value.code == "transcript_skill_not_found"
-    assert "content/transcript" in caught.value.hint
-    assert "skills/verify/transcript" in caught.value.hint
+    assert "andy/transcript" in caught.value.hint
+    assert "skills/verify-loops/transcript" in caught.value.hint
 
 
 def test_paid_selection_requires_feature_and_gate():

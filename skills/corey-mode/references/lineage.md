@@ -23,9 +23,9 @@ The source is the opensrc cache that the `git-local` skill keeps current. Its sn
 ```sh
 upstream="$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main"
 revision="$(jq -r '.repos["github.com/coreyhaines31/marketingskills"].commitSha' "$OPENSRC_HOME/sync-state.json")"
-uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
-uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision"
-uv run authoring/coreyhaines/corey-mode/scripts/update_corey_mode.py check --upstream "$upstream"
+uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
+uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision"
+uv run authoring/corey-mode/scripts/update_corey_mode.py check --upstream "$upstream"
 just flatten-skills
 just remote-skills
 just check

@@ -579,7 +579,7 @@ def verify_skill_dir() -> Path:
 def locate_transcript_skill(skill_dir: Path) -> LocatedSkill:
     """Locate the transcript skill in categorized source or flat applied layouts."""
     candidates: tuple[tuple[Layout, Path], ...] = (
-        ("source", skill_dir.parent.parent / "content" / "transcript"),
+        ("source", skill_dir.parent.parent / "andy" / "transcript"),
         ("applied", skill_dir.parent / "transcript"),
     )
     attempted = []

@@ -1037,7 +1037,7 @@ DOCS = [
     SKILL_DIR / "SKILL.md",
     SKILL_DIR / "README.md",
     REPO_ROOT / "justfile",
-    REPO_ROOT / "authoring/verify/verify-transcript/SKILL.md",
+    REPO_ROOT / "authoring/verify-loops/verify-transcript/SKILL.md",
 ]
 # A doc line runs transcript through its path or a just recipe
 RUNS = re.compile(

@@ -8,7 +8,7 @@ The [upstream lock](../upstream-lock.json) records the imported Matt revision, s
 
 The initial pin is [Matt Pocock skills, 3cca18b](https://github.com/mattpocock/skills/tree/3cca18b368ae95cdbdebbff572ccafa662551015). Its source bodies were also compared with Pascal's supplied Mac checkout during planning. The lock, rather than this initial-history note, owns the current revision.
 
-The original mode packaging drew on [PStack, f5bdd68](https://github.com/cursor/plugins/tree/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack). Its [MIT license](https://github.com/cursor/plugins/blob/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack/LICENSE) permits redistribution with its copyright and permission notice. The single local PStack notice lives at `authoring/pstack/poteto-mode/references/LICENSE`; Matt's [license](LICENSE) stays with Matt-mode. `PSTACK-LICENSE` was removed from this package to keep one PStack copy. Before the correction, that file repeated Matt's license instead of PStack's notice.
+The original mode packaging drew on [PStack, f5bdd68](https://github.com/cursor/plugins/tree/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack). Its [MIT license](https://github.com/cursor/plugins/blob/f5bdd6826fd0a0d9cbc4347134c3a74a200b9d9d/pstack/LICENSE) permits redistribution with its copyright and permission notice. The single local PStack notice lives at `authoring/poteto/poteto-mode/references/LICENSE`; Matt's [license](LICENSE) stays with Matt-mode. `PSTACK-LICENSE` was removed from this package to keep one PStack copy. Before the correction, that file repeated Matt's license instead of PStack's notice.
 
 ## Planning ownership
 
@@ -31,10 +31,10 @@ Run these commands from the skills repository checkout. `MATT_SOURCE` points to 
 Use the upstream repository itself, not the enclosing Git repository of an `opensrc` snapshot. If the snapshot has no independent Git history, create a checkout with `git clone https://github.com/mattpocock/skills.git <destination>` and point `MATT_SOURCE` there.
 
 ```sh
-uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
-uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
-uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
-uv run authoring/mattpocock/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
+uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
+uv run authoring/matt/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION" --dry-run
+uv run authoring/matt/matt-mode/scripts/update_matt_mode.py update --upstream "$MATT_SOURCE" --revision "$MATT_REVISION"
+uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream "$MATT_SOURCE"
 just check
 ```
 
