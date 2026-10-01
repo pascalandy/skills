@@ -83,6 +83,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | profile-routing-matrix | Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level. |
 | recall | Use only when explicitly invoked as `recall`. |
 | reflect | Use only when explicitly invoked as `reflect`. |
+| retro-general | Review a coding session for evidence-backed improvements to agent navigation, instructions, checks, or tools. |
 | setup-pstack | Use for /setup-pstack, configure pstack models, or changing pstack's model choices. |
 | show-me-your-work | Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away. |
 | swarm | Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration. |
