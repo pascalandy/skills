@@ -9,10 +9,10 @@ The machine running this fetches GitHub's main and saves and pulls its private
 clone. Then every selected machine, itself included, receives that commit over
 SSH, fast-forwards its checkout to it, saves and pulls its own private clone
 from GitHub, and runs `just install-skills`. A machine whose checkout is off
-main, has uncommitted changes under authoring/, skills/, scripts/, or justfile,
-has commits GitHub lacks, or whose _skills_private is not a clone is left
-untouched. A machine that is offline or fails waits for the next sync, which
-catches it up.
+main, has uncommitted changes under authoring/, commands/, skills/, scripts/,
+or justfile, has commits GitHub lacks, or whose _skills_private is not a clone
+is left untouched. A machine that is offline or fails waits for the next sync,
+which catches it up.
 
 The registry is the one fleet.toml in the private repository, so every machine
 has it and hosts stay out of this public one; the private-network skill ships
@@ -142,7 +142,7 @@ enter() {
     }
 }
 edited() {
-    [ -n "$(git status --porcelain -- authoring skills scripts justfile)" ]
+    [ -n "$(git status --porcelain -- authoring commands skills scripts justfile)" ]
 }
 plain() {
     [ -L _skills_private ] || { [ -e _skills_private ] && [ ! -d _skills_private/.git ]; }
