@@ -109,7 +109,7 @@ def calls(env: dict[str, str]) -> list[dict]:
 
 
 def test_codex_review_runs_unsandboxed_and_prints_the_model_that_ran(env, repo):
-    done = launch(env, repo, "codex", "--mode", "review")
+    done = launch(env, repo, "codex", "--review-only")
 
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:4] == [
@@ -134,13 +134,13 @@ def test_codex_review_runs_unsandboxed_and_prints_the_model_that_ran(env, repo):
     ]
     assert call["argv"][-1] == "-"
     assert "--ephemeral" not in call["argv"] and "--json" not in call["argv"]
-    assert call["stdin"].startswith("Mode: review. Report your findings only.")
+    assert call["stdin"].startswith("Mode: review only. Report your findings only.")
     assert call["stdin"].endswith("\n\nReview README.md.")
 
 
 def test_claude_fix_may_edit_and_lists_the_changed_file(env, repo):
     done = launch(
-        env, repo, "claude", "--mode", "fix", STUB_TOUCH=str(repo / "README.md")
+        env, repo, "claude", "--review-fix", STUB_TOUCH=str(repo / "README.md")
     )
 
     assert done.returncode == 0, done.stderr
@@ -151,17 +151,17 @@ def test_claude_fix_may_edit_and_lists_the_changed_file(env, repo):
     assert "--dangerously-skip-permissions" in call["argv"]
     assert call["argv"][call["argv"].index("--output-format") + 1] == "json"
     assert "--session-id" in call["argv"]
-    assert call["stdin"].startswith("Mode: fix. You may edit files in")
+    assert call["stdin"].startswith("Mode: review and fix. You may edit files in")
 
 
 def test_a_review_that_edits_the_checkout_fails(env, repo):
     done = launch(
-        env, repo, "codex", "--mode", "review", STUB_TOUCH=str(repo / "README.md")
+        env, repo, "codex", "--review-only", STUB_TOUCH=str(repo / "README.md")
     )
 
     assert done.returncode == 1
     assert done.stdout == ""
-    assert "error: the review changed the checkout: README.md" in done.stderr
+    assert "error: the review-only run changed the checkout: README.md" in done.stderr
 
 
 @pytest.mark.parametrize(
@@ -178,7 +178,7 @@ def test_a_review_that_edits_the_checkout_fails(env, repo):
     ],
 )
 def test_an_unusable_answer_fails(env, repo, target, stub, message):
-    done = launch(env, repo, target, "--mode", "review", **stub)
+    done = launch(env, repo, target, "--review-only", **stub)
 
     assert done.returncode == 1
     assert done.stdout == ""
@@ -187,7 +187,7 @@ def test_an_unusable_answer_fails(env, repo, target, stub, message):
 
 
 def test_an_unknown_effort_is_refused_before_launch(env, repo):
-    done = launch(env, repo, "claude", "--mode", "review", "--effort", "minimal")
+    done = launch(env, repo, "claude", "--review-only", "--effort", "minimal")
 
     assert done.returncode == 2
     assert (
@@ -198,7 +198,7 @@ def test_an_unknown_effort_is_refused_before_launch(env, repo):
 
 
 def test_a_missing_login_names_the_command_that_fixes_it(env, repo):
-    done = launch(env, repo, "codex", "--mode", "review", STUB_AUTH_FAIL="1")
+    done = launch(env, repo, "codex", "--review-only", STUB_AUTH_FAIL="1")
 
     assert done.returncode == 1
     assert "error: codex is not logged in; run 'codex login', then rerun" in done.stderr
@@ -206,9 +206,7 @@ def test_a_missing_login_names_the_command_that_fixes_it(env, repo):
 
 
 def test_flags_after_double_dash_reach_the_child(env, repo):
-    done = launch(
-        env, repo, "codex", "--mode", "review", "--", "-c", 'web_search="live"'
-    )
+    done = launch(env, repo, "codex", "--review-only", "--", "-c", 'web_search="live"')
 
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
@@ -216,8 +214,8 @@ def test_flags_after_double_dash_reach_the_child(env, repo):
 
 
 def test_resume_continues_the_named_session(env, repo):
-    codex = launch(env, repo, "codex", "--mode", "fix", "--resume", "abc")
-    claude = launch(env, repo, "claude", "--mode", "fix", "--resume", "def")
+    codex = launch(env, repo, "codex", "--review-fix", "--resume", "abc")
+    claude = launch(env, repo, "claude", "--review-fix", "--resume", "def")
 
     assert codex.returncode == 0 and claude.returncode == 0
     codex_call, claude_call = calls(env)
@@ -227,7 +225,7 @@ def test_resume_continues_the_named_session(env, repo):
 
 
 def test_json_prints_the_run_as_one_object(env, repo):
-    done = launch(env, repo, "claude", "--mode", "review", "--json")
+    done = launch(env, repo, "claude", "--review-only", "--json")
 
     assert done.returncode == 0, done.stderr
     run = json.loads(done.stdout)
@@ -241,9 +239,28 @@ def test_json_prints_the_run_as_one_object(env, repo):
 def test_a_folder_outside_git_warns_and_skips_the_repository_check(env, tmp_path):
     folder = tmp_path / "notes"
     folder.mkdir()
-    done = launch(env, folder, "codex", "--mode", "review")
+    done = launch(env, folder, "codex", "--review-only")
 
     assert done.returncode == 0, done.stderr
     assert "is not a Git checkout, so file changes go unchecked" in done.stderr
     [call] = calls(env)
     assert "--skip-git-repo-check" in call["argv"]
+
+
+def test_claude_review_only_runs_without_its_file_editing_tools(env, repo):
+    review = launch(env, repo, "claude", "--review-only")
+    fix = launch(env, repo, "claude", "--review-fix")
+
+    assert review.returncode == 0 and fix.returncode == 0
+    review_call, fix_call = calls(env)
+    denied = review_call["argv"].index("--disallowedTools")
+    assert review_call["argv"][denied + 1] == "Edit,Write,NotebookEdit"
+    assert "--disallowedTools" not in fix_call["argv"]
+
+
+@pytest.mark.parametrize("access", [(), ("--review-only", "--review-fix")])
+def test_exactly_one_access_flag_is_required(env, repo, access):
+    done = launch(env, repo, "codex", *access)
+
+    assert done.returncode == 2
+    assert calls(env) == []

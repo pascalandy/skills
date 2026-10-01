@@ -1,6 +1,6 @@
 # Run Codex headlessly
 
-`scripts/headless.py codex` runs `codex exec` for both modes; read it for the exact flags. It passes `--dangerously-bypass-approvals-and-sandbox`, so the child keeps your config, skills, network, and subagents, and it saves the session for `--resume`. The prompt arrives on stdin, so no run waits on an open terminal. The [non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode) and the [`codex exec` reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) own current CLI behavior. Check `codex exec --help` on the installed version before you pass extra flags after `--`; the [flag lookup](references/FLAGS.md) maps them.
+`scripts/headless.py codex` runs `codex exec` with the same tools under `--review-only` and `--review-fix`; read it for the exact flags. It passes `--dangerously-bypass-approvals-and-sandbox`, so the child keeps your config, skills, network, and subagents, and it saves the session for `--resume`. The prompt arrives on stdin, so no run waits on an open terminal. The [non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode) and the [`codex exec` reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) own current CLI behavior. Check `codex exec --help` on the installed version before you pass extra flags after `--`; the [flag lookup](references/FLAGS.md) maps them.
 
 Run the launcher only in repositories you trust. For another repository, run `codex exec -s read-only -c 'approval_policy="never"'` yourself.
 

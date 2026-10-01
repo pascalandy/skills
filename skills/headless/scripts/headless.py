@@ -3,8 +3,9 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run Codex or Claude Code as a child agent in review or fix mode, then print
-the model that ran, its session, the files it changed, and its answer."""
+"""Run Codex or Claude Code as a child agent that reviews read-only or reviews
+and fixes, then print the model that ran, its session, the files it changed,
+and its answer. One command shape per run keeps headless use deterministic."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -229,32 +230,34 @@ CHECK_TIMEOUT = 60.0
 log = logging.getLogger("headless")
 
 RULES = {
-    "review": (
-        "Mode: review. Report your findings only. Leave every file in {cwd} "
+    "review-only": (
+        "Mode: review only. Report your findings only. Leave every file in {cwd} "
         "unchanged, and do not commit, push, merge, or post comments. Commands, "
         "tests, and checks may write caches and ignored build output."
     ),
-    "fix": (
-        "Mode: fix. You may edit files in {cwd}. Do not commit, push, merge, or "
-        "post comments; the caller reviews your diff."
+    "review-fix": (
+        "Mode: review and fix. You may edit files in {cwd} to fix what you find. "
+        "Do not commit, push, merge, or post comments; the caller reviews your diff."
     ),
 }
+
+CLAUDE_EDIT_TOOLS = "Edit,Write,NotebookEdit"
 
 EXIT_CODES = exit_codes(
     {
         1: "the child failed, gave no answer, was denied a tool, "
-        "or changed the checkout in review mode",
+        "or changed the checkout under --review-only",
         TEMPORARY: "a login check timed out; rerun",
     }
 )
 
 EXAMPLES = """\
 examples:
-  headless.py codex --mode review --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
-  headless.py claude --mode review --prompt-file prompt.md --json
-  headless.py codex --mode fix --prompt-file fix.md --model gpt-6-astra --effort high
-  headless.py claude --mode fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
-  headless.py codex --mode review --prompt-file prompt.md -- -c 'web_search="live"'
+  headless.py codex --review-only --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
+  headless.py claude --review-only --prompt-file prompt.md --json
+  headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
+  headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
+  headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
 Flags after -- go to the child CLI unchanged. On success, stdout holds the model,
 effort, session, changed, and run lines, a blank line, then the answer. The run
@@ -365,6 +368,11 @@ def claude_command(request: Request, run: Path) -> list[str]:
         "--settings",
         settings,
         "--dangerously-skip-permissions",
+        *(
+            ["--disallowedTools", CLAUDE_EDIT_TOOLS]
+            if request.mode == "review-only"
+            else []
+        ),
         "--output-format",
         "json",
         session,
@@ -620,8 +628,10 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         problems.insert(0, f"{args.target} exited {status}; read stderr.log in {run}")
     if not result.answer:
         problems.append(f"{args.target} gave no answer")
-    if args.mode == "review" and result.changed:
-        problems.append(f"the review changed the checkout: {', '.join(result.changed)}")
+    if args.mode == "review-only" and result.changed:
+        problems.append(
+            f"the review-only run changed the checkout: {', '.join(result.changed)}"
+        )
     if problems:
         raise ScriptError(*problems, detail=summary(result), report=asdict(result))
     return result
@@ -634,11 +644,21 @@ def build_parser() -> Parser:
         epilog=EXAMPLES,
     )
     parser.add_argument("target", choices=sorted(RUNNERS), help="child CLI to run")
-    parser.add_argument(
-        "--mode",
-        required=True,
-        choices=sorted(RULES),
-        help="review: report only, and fail if the checkout changed; fix: may edit files",
+    access = parser.add_mutually_exclusive_group(required=True)
+    access.add_argument(
+        "--review-only",
+        dest="mode",
+        action="store_const",
+        const="review-only",
+        help="report findings; the run fails if the checkout changed, "
+        "and Claude runs without its file-editing tools",
+    )
+    access.add_argument(
+        "--review-fix",
+        dest="mode",
+        action="store_const",
+        const="review-fix",
+        help="report findings and fix them in --cwd",
     )
     parser.add_argument(
         "--prompt-file",
@@ -660,7 +680,10 @@ def build_parser() -> Parser:
         + " by default",
     )
     parser.add_argument(
-        "--effort", default="xhigh", help="reasoning effort (default: xhigh)"
+        "--effort",
+        default="xhigh",
+        help="reasoning level, passed to codex as model_reasoning_effort "
+        "and to claude as --effort (default: xhigh)",
     )
     parser.add_argument(
         "--resume", metavar="SESSION", help="continue a session a previous run printed"
