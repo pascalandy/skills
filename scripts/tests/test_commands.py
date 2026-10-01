@@ -9,7 +9,7 @@ from pathlib import Path
 from test_skill_invocation import packages
 
 ROOT = Path(__file__).resolve().parents[2]
-COMMANDS = ROOT / "authoring" / "commands"
+COMMANDS = ROOT / "commands"
 
 # Pi and OpenCode read `$2` in `$2nd-pass` as the second argument, so the agent
 # receives `nd-pass`; Claude Code leaves it alone, which hides the break there

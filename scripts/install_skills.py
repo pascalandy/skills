@@ -5,9 +5,10 @@
 # ///
 """Install public skills, private skills, and shared commands into local agent directories.
 
-The installer owns every name this repository ever published under skills/ or
-authoring/commands/, as recorded in git history. It removes an owned name once
-no source provides it and never touches entries it did not publish.
+The installer owns every name this repository ever published under skills/,
+commands/, or the former authoring/commands/, as recorded in git history. It
+removes an owned name once no source provides it and never touches entries it
+did not publish.
 """
 
 from __future__ import annotations
@@ -286,8 +287,8 @@ def skill_sources(
 
 def command_sources() -> dict[str, Source]:
     sources: dict[str, Source] = {}
-    for relative in flatten_skills.git_files("authoring/commands"):
-        if len(relative.parts) != 3 or relative.suffix != ".md":
+    for relative in flatten_skills.git_files("commands"):
+        if len(relative.parts) != 2 or relative.suffix != ".md":
             continue
         path = ROOT / relative
         if not path.exists():
@@ -576,7 +577,7 @@ def install(args: argparse.Namespace) -> str:
             raise ScriptError(
                 *(
                     f"command {name!r} has the same name as a skill; rename "
-                    f"authoring/commands/{name}.md, then rerun: just install-skills"
+                    f"commands/{name}.md, then rerun: just install-skills"
                     for name in clashes
                 )
             )
@@ -589,7 +590,8 @@ def install(args: argparse.Namespace) -> str:
             owned_skills() | owned_private(args.private_root),
             {
                 path.name
-                for path in published("authoring/commands")
+                for directory in ("commands", "authoring/commands")
+                for path in published(directory)
                 if len(path.parts) == 1 and path.suffix == ".md"
             },
         )

@@ -12,7 +12,7 @@ Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow
 2. Run `just flatten-skills`, then `just remote-skills`; if flattening fails, rerun `just flatten-skills --debug`
 3. Review and commit the source and generated output together
 
-The flattening script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes `authoring/commands/` and ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
+The flattening script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
@@ -38,10 +38,10 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Install skills
 
-`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `authoring/commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
+`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 
 ## Read on demand
 
-- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md). `authoring/commands/cli-contract.md` carries the same contract to other projects
+- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md). `commands/cli-contract.md` carries the same contract to other projects
 - Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/references/checks.md)
 - To release, follow [release](docs/references/release.md). Never move or delete a pushed tag

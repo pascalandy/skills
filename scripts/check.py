@@ -158,6 +158,7 @@ CHECKS = [
         "scripts",
         "docs",
         "authoring",
+        "commands",
         "justfile",
         "README.md",
         "AGENTS.md",
@@ -166,7 +167,7 @@ CHECKS = [
         ".lefthook",
         ".github",
     ),
-    repo_test("commands", "authoring", cheap=True),
+    repo_test("commands", "commands", "authoring", cheap=True),
     repo_test("common"),
     repo_test(
         "discover_skills",
