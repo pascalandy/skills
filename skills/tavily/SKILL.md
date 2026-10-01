@@ -1,6 +1,6 @@
 ---
 name: "tavily"
-description: "Use when the user explicitly requests Tavily, or for basic or current external web search and URL discovery. Do not select automatically for advanced research, extraction, schema-constrained output, or cited synthesis."
+description: "Use when the user explicitly requests Tavily. Never run automatically."
 kind: "general"
 ---
 
