@@ -42,6 +42,6 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Read on demand
 
-- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md). `commands/cli-contract.md` carries the same contract to other projects
+- Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md)
 - Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/references/checks.md)
 - To release, follow [release](docs/references/release.md). Never move or delete a pushed tag
