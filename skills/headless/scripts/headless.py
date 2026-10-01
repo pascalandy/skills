@@ -218,6 +218,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -432,41 +433,71 @@ RUNNERS = {
 }
 
 
-def git(cwd: Path, *args: str) -> str | None:
+class GitFailure(Exception):
+    """A git command failed; the message is git's own diagnostic."""
+
+
+def git(cwd: Path, *args: str) -> str:
     try:
         done = subprocess.run(
-            ["git", *args],
+            ["git", "--no-optional-locks", *args],
             cwd=cwd,
             capture_output=True,
             text=True,
             timeout=CHECK_TIMEOUT,
             check=False,
+            env={**os.environ, "LC_ALL": "C"},
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return done.stdout if done.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise GitFailure(str(error)) from None
+    if done.returncode != 0:
+        raise GitFailure(
+            done.stderr.strip() or f"git {args[0]} exited {done.returncode}"
+        )
+    return done.stdout
 
 
-def snapshot(cwd: Path) -> dict[str, str] | None:
-    """The commit and every changed or untracked file with its content hash,
-    or None outside a Git checkout. Ignored files, such as caches, stay out."""
-    top = git(cwd, "rev-parse", "--show-toplevel")
-    if top is None:
-        return None
-    root = Path(top.strip())
-    state = {"HEAD": (git(root, "rev-parse", "--verify", "-q", "HEAD") or "").strip()}
-    entries = iter(
-        (
-            git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all") or ""
-        ).split("\0")
-    )
-    for entry in entries:
-        if not entry:
-            continue
-        code, path = entry[:2], entry[3:]
-        if code[0] in "RC":
-            next(entries, None)
-        state[path] = f"{code} {digest(root / path)}"
+def git_root(cwd: Path) -> Path | None:
+    """The top of the checkout holding `cwd`, or None when `cwd` is outside Git."""
+    try:
+        return Path(git(cwd, "rev-parse", "--show-toplevel").strip())
+    except GitFailure as error:
+        if "not a git repository" in str(error):
+            return None
+        raise ScriptError(f"cannot read the Git state of {cwd}: {error}") from None
+
+
+def snapshot(root: Path, cwd: Path, moment: str) -> dict[str, str]:
+    """The commit, then every changed or untracked path with its full status
+    record and content hash. A porcelain v2 record carries the HEAD, index, and
+    worktree modes and the HEAD and index blob IDs, so a change to staged content
+    shows even when the worktree bytes are restored. Ignored files stay out."""
+    try:
+        listing = git(
+            root, "status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"
+        )
+        state: dict[str, str] = {}
+        records = iter(listing.split("\0"))
+        for record in records:
+            if record.startswith("# branch.oid "):
+                state["HEAD"] = record.removeprefix("# branch.oid ")
+                continue
+            kind = record[:1]
+            if kind not in ("1", "2", "u", "?"):
+                continue
+            fields = {"1": 8, "2": 9, "u": 10, "?": 1}[kind]
+            path = record.split(" ", fields)[fields]
+            if kind == "2":
+                record += f" from {next(records, '')}"
+            state[path] = f"{record} {digest(root / path)}"
+    except (GitFailure, OSError) as error:
+        raise ScriptError(
+            f"cannot read the Git state of {cwd} {moment}: {error}"
+        ) from None
+    if "HEAD" not in state:
+        raise ScriptError(
+            f"cannot read the Git state of {cwd} {moment}: no branch header"
+        )
     return state
 
 
@@ -507,9 +538,9 @@ def preflight(target: str, runner: Runner) -> None:
 
 
 def run_child(command: list[str], *, cwd: Path, run: Path, timeout: float) -> int:
-    """Run the child with the prompt on stdin and its output in the run folder.
-    On a timeout or an interrupt, its process group gets SIGTERM, then SIGKILL
-    GRACE seconds later."""
+    """Run the child in its own process group, with the prompt on stdin and its
+    output in the run folder. A timeout or an interrupt stops the whole group,
+    and so does a child that exits while processes it started keep running."""
     with (
         open(run / "prompt.md", encoding="utf-8") as stdin,
         open(run / "stdout.log", "w", encoding="utf-8") as stdout,
@@ -519,23 +550,42 @@ def run_child(command: list[str], *, cwd: Path, run: Path, timeout: float) -> in
             command, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr, process_group=0
         )
         try:
-            return process.wait(timeout=timeout)
+            status = process.wait(timeout=timeout)
         except BaseException:
             stop(process)
             raise
+        if group_alive(process):
+            log.warning("warning: %s left processes running; stopping them", command[0])
+            stop(process)
+        return status
+
+
+def group_alive(process: subprocess.Popen[bytes]) -> bool:
+    """Whether any process in the child's group still runs, after reaping the child."""
+    process.poll()
+    try:
+        os.killpg(process.pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def stop(process: subprocess.Popen[bytes]) -> None:
+    """SIGTERM the child's process group, SIGKILL every member still alive GRACE
+    seconds later, then reap the child."""
     for number in (signal.SIGTERM, signal.SIGKILL):
         try:
             os.killpg(process.pid, number)
         except ProcessLookupError:
-            return
-        try:
-            process.wait(timeout=GRACE)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+            break
+        deadline = time.monotonic() + GRACE
+        while group_alive(process) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        if not group_alive(process):
+            break
+    process.wait()
 
 
 def read_prompt(name: str) -> str:
@@ -575,7 +625,8 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         raise UsageError("the prompt is empty")
     preflight(args.target, runner)
 
-    before = snapshot(cwd)
+    root = git_root(cwd)
+    before = snapshot(root, cwd, "before the run") if root else None
     if before is None:
         log.warning(
             "warning: %s is not a Git checkout, so file changes go unchecked", cwd
@@ -615,7 +666,7 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         model=reply.model,
         effort=args.effort,
         session=reply.session or request.session,
-        changed=changes(before, snapshot(cwd)),
+        changed=changes(before, snapshot(root, cwd, "after the run") if root else None),
         run_dir=str(run),
         answer=reply.answer.strip(),
     )

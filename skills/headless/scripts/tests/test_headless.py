@@ -1,7 +1,9 @@
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -9,7 +11,7 @@ import pytest
 SCRIPT = Path(__file__).resolve().parents[1] / "headless.py"
 
 STUB = """\
-import json, os, sys
+import json, os, subprocess, sys, time
 from pathlib import Path
 
 name, args = Path(sys.argv[0]).name, sys.argv[1:]
@@ -21,6 +23,21 @@ with open(os.environ["STUB_LOG"], "a") as log:
 if os.environ.get("STUB_TOUCH"):
     with open(os.environ["STUB_TOUCH"], "a") as edited:
         edited.write("changed by the child\\n")
+if os.environ.get("STUB_RESTAGE"):
+    target = Path(os.environ["STUB_RESTAGE"])
+    working = target.read_bytes()
+    target.write_text("restaged by the child\\n")
+    subprocess.run(["git", "add", target.name], cwd=target.parent, check=True)
+    target.write_bytes(working)
+if os.environ.get("STUB_CORRUPT_INDEX"):
+    Path(".git/index").write_bytes(b"not an index")
+if os.environ.get("STUB_LINGER"):
+    subprocess.Popen([sys.executable, "-c", (
+        "import os, signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(60)"
+    ), os.environ["STUB_LINGER"]])
+    if not os.environ.get("STUB_LINGER_EXIT"):
+        time.sleep(60)
 answer = os.environ.get("STUB_ANSWER", "No findings.")
 if name == "codex":
     model = args[args.index("-m") + 1]
@@ -71,6 +88,22 @@ def env(tmp_path: Path) -> dict[str, str]:
     }
 
 
+def command(cwd: Path, args: tuple[str, ...], prompt: str) -> list[str]:
+    prompt_file = cwd.parent / "prompt.md"
+    prompt_file.write_text(prompt)
+    split = args.index("--") if "--" in args else len(args)
+    return [
+        sys.executable,
+        str(SCRIPT),
+        *args[:split],
+        "--prompt-file",
+        str(prompt_file),
+        "--cwd",
+        str(cwd),
+        *args[split:],
+    ]
+
+
 def launch(
     env: dict[str, str],
     cwd: Path,
@@ -78,25 +111,41 @@ def launch(
     prompt: str = "Review README.md.",
     **stub: str,
 ):
-    prompt_file = cwd.parent / "prompt.md"
-    prompt_file.write_text(prompt)
-    split = args.index("--") if "--" in args else len(args)
     return subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            *args[:split],
-            "--prompt-file",
-            str(prompt_file),
-            "--cwd",
-            str(cwd),
-            *args[split:],
-        ],
+        command(cwd, args, prompt),
         env={**env, **stub},
         capture_output=True,
         text=True,
         check=False,
     )
+
+
+def start(env: dict[str, str], cwd: Path, *args: str, **stub: str):
+    return subprocess.Popen(
+        command(cwd, args, "Review README.md."),
+        env={**env, **stub},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def alive(pid: int) -> bool:
+    state = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return bool(state) and not state.startswith("Z")
+
+
+def wait_for(path: Path) -> int:
+    deadline = time.monotonic() + 15
+    while not (path.exists() and path.read_text()):
+        assert time.monotonic() < deadline, f"{path} never appeared"
+        time.sleep(0.05)
+    return int(path.read_text())
 
 
 def calls(env: dict[str, str]) -> list[dict]:
@@ -264,3 +313,74 @@ def test_exactly_one_access_flag_is_required(env, repo, access):
 
     assert done.returncode == 2
     assert calls(env) == []
+
+
+@pytest.mark.parametrize("when", ["before the run", "after the run"])
+def test_a_checkout_git_cannot_read_fails_the_run(env, repo, when):
+    stub = {"STUB_TOUCH": str(repo / "README.md")}
+    if when == "before the run":
+        (repo / ".git" / "index").write_bytes(b"not an index")
+    else:
+        stub["STUB_CORRUPT_INDEX"] = "1"
+    done = launch(env, repo, "codex", "--review-only", **stub)
+
+    assert done.returncode == 1
+    assert done.stdout == ""
+    assert f"cannot read the Git state of {repo.resolve()} {when}" in done.stderr
+    if when == "before the run":
+        assert calls(env) == []
+
+
+def test_review_only_fails_when_only_the_staged_content_changed(env, repo):
+    readme = repo / "README.md"
+    readme.write_text("staged\n")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    readme.write_text("working\n")
+    done = launch(env, repo, "codex", "--review-only", STUB_RESTAGE=str(readme))
+
+    assert readme.read_text() == "working\n"
+    assert done.returncode == 1
+    assert done.stdout == ""
+    assert "error: the review-only run changed the checkout: README.md" in done.stderr
+
+
+def test_a_timeout_kills_descendants_that_ignore_sigterm(env, repo, tmp_path):
+    pid_file = tmp_path / "linger.pid"
+    done = launch(
+        env, repo, "codex", "--review-fix", "--timeout", "1s", STUB_LINGER=str(pid_file)
+    )
+
+    assert done.returncode == 1
+    assert "codex ran past --timeout" in done.stderr
+    assert not alive(wait_for(pid_file))
+
+
+@pytest.mark.parametrize(
+    ("number", "code"), [(signal.SIGINT, 130), (signal.SIGTERM, 143)]
+)
+def test_an_interrupt_kills_descendants_that_ignore_sigterm(
+    env, repo, tmp_path, number, code
+):
+    pid_file = tmp_path / "linger.pid"
+    process = start(env, repo, "codex", "--review-fix", STUB_LINGER=str(pid_file))
+    descendant = wait_for(pid_file)
+    process.send_signal(number)
+    process.communicate(timeout=60)
+
+    assert process.returncode == code
+    assert not alive(descendant)
+
+
+def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path):
+    pid_file = tmp_path / "linger.pid"
+    done = launch(
+        env,
+        repo,
+        "codex",
+        "--review-only",
+        STUB_LINGER=str(pid_file),
+        STUB_LINGER_EXIT="1",
+    )
+
+    assert done.returncode == 0, done.stderr
+    assert not alive(wait_for(pid_file))
