@@ -61,7 +61,7 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 
 | Route | Aliases | Use when |
 |---|---|---|
-| [`writer-sk`](playbooks/writer-sk.md) | | Edit prose for clarity and concision |
+| [`write-with-clarity`](playbooks/write-with-clarity.md) | | Edit prose for clarity and concision |
 | [`simple-editor`](playbooks/simple-editor.md) | | Clean personal notes while keeping the author's raw voice |
 | [`storytelling`](playbooks/storytelling.md) | | Discover, write, diagnose, adapt, or explain a narrative |
 | [`illustration`](playbooks/illustration.md) | | Design and generate a 16:9 inline illustration |

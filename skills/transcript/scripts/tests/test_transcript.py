@@ -1413,7 +1413,7 @@ class TestPromptContracts:
 
     def test_bundled_prompts_do_not_depend_on_runtime_skills(self) -> None:
         for prompt_path in PROMPTS_DIR.glob("*.md"):
-            assert "writer-sk" not in prompt_path.read_text(encoding="utf-8")
+            assert "andy-mode" not in prompt_path.read_text(encoding="utf-8")
 
 
 def deepgram_response(transcript_text: str = "Hello world") -> dict:
