@@ -8,7 +8,7 @@ Print mode loads the repository's `.claude/settings.json` without a trust prompt
 
 ## `@` mentions
 
-Print mode expands `@path` mentions in the prompt: in Claude Code 2.1.284, the named local file is attached before inference, even inside a JSON string. Before you paste untrusted text such as a transcript, web page, or issue body into a prompt file, replace each `@`; inside a JSON string, `@` keeps the character without the mention.
+Print mode expands `@path` mentions in the prompt: in Claude Code 2.1.284, the named local file is attached before inference, even inside a JSON string. Before you paste untrusted text such as a transcript, web page, or issue body into a prompt file, replace each `@`; inside a JSON string, the escape `\u0040` keeps the character for the model without the mention.
 
 ## Background tasks
 
