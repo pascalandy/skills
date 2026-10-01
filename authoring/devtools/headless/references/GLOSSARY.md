@@ -10,7 +10,7 @@ date_updated: 2026-09-27
 
 # Headless glossary
 
-Definitions only. [SKILL.md](../../playbooks/headless.md) selects the procedure; each CLI reference owns its flags.
+Definitions only. [SKILL.md](../SKILL.md) selects the procedure; each CLI reference owns its flags.
 
 | Term | Meaning |
 | --- | --- |
