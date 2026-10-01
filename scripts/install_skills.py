@@ -263,7 +263,7 @@ def skill_sources(
         for source, relative in entries:
             destination = package / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            flatten_skills.publish(source, destination)
+            flatten_skills.publish(source, relative, destination)
         sources[name] = Source(package, "public", digest(package))
     duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
