@@ -1,14 +1,9 @@
 [
   {
-    "skills": [
-      "commit"
-    ],
+    "skills": ["commit"],
     "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/two-files/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
     "query": "Commit my changes.",
-    "files": [
-      "evals/fixtures/base/",
-      "evals/fixtures/two-files/"
-    ],
+    "files": ["evals/fixtures/base/", "evals/fixtures/two-files/"],
     "expected_behavior": [
       "Creates two commits: README.md alone, and app.py alone",
       "Uses 📚 docs for the README.md commit and ✨ feat for the app.py commit, each subject in the form <emoji> <type>: <scope>: <summary>",
@@ -17,15 +12,10 @@
     ]
   },
   {
-    "skills": [
-      "commit"
-    ],
+    "skills": ["commit"],
     "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/one-file/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
     "query": "Commit my changes.",
-    "files": [
-      "evals/fixtures/base/",
-      "evals/fixtures/one-file/"
-    ],
+    "files": ["evals/fixtures/base/", "evals/fixtures/one-file/"],
     "expected_behavior": [
       "Splits app.py into two commits: the empty-list guard in average() and the new maximum()",
       "Uses 🚑 fix for the guard and ✨ feat for maximum(), each subject in the form <emoji> <type>: <scope>: <summary>",
@@ -34,15 +24,10 @@
     ]
   },
   {
-    "skills": [
-      "commit"
-    ],
+    "skills": ["commit"],
     "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/skill-and-doc/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
     "query": "Commit my changes.",
-    "files": [
-      "evals/fixtures/base/",
-      "evals/fixtures/skill-and-doc/"
-    ],
+    "files": ["evals/fixtures/base/", "evals/fixtures/skill-and-doc/"],
     "expected_behavior": [
       "Creates two commits: authoring/demo/SKILL.md alone, and docs/guide.md alone",
       "Uses 🧰 skill for the SKILL.md commit and 📚 docs for the guide commit",
@@ -50,15 +35,10 @@
     ]
   },
   {
-    "skills": [
-      "commit"
-    ],
+    "skills": ["commit"],
     "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/two-files/ over it and stage both files with git add README.md app.py",
     "query": "Commit my changes.",
-    "files": [
-      "evals/fixtures/base/",
-      "evals/fixtures/two-files/"
-    ],
+    "files": ["evals/fixtures/base/", "evals/fixtures/two-files/"],
     "expected_behavior": [
       "Unstages one group before the first commit, so README.md and app.py land in separate commits",
       "Uses 📚 docs for the README.md commit and ✨ feat for the app.py commit",
