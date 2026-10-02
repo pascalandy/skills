@@ -100,9 +100,7 @@ recommendation changes, even if the labels stay the same. Leave it untouched whe
 both labels and reasoning remain current; recover missing comments after partial
 failures.
 
-End every comment you create or update with `Updated by [AGENT NAME]`, replacing
-the placeholder with your actual agent name. On edits, replace the existing agent
-signature with your own instead of accumulating signatures.
+End every comment you create or update with the signature from $oem.
 
 Format comments in this order, omitting sections with no applicable action:
 
