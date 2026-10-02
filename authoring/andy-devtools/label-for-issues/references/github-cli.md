@@ -10,10 +10,6 @@ reading timeline events.
 
 - `--parent` and `--add-sub-issue` silently replace an existing parent. Read
   `parent` first; moving an issue to another epic detaches it from the old one
-- `subIssues`, `blockedBy`, and `blocking` are objects: iterate `.nodes[]` and count
-  `.totalCount`. Nodes carry number, state, title, and URL, not labels. They stop at
-  100, 50, and 50 nodes; page the rest with `gh api --paginate` when `totalCount` is
-  higher
 - Search qualifiers need full references, as in `parent-issue:OWNER/REPO#N` and
   `blocked-by:OWNER/REPO#N`; a bare number matches nothing. `has:blocked-by` also
   matches issues whose blockers are closed. To drop issues with an open blocker, add

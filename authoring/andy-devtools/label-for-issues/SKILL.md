@@ -27,10 +27,14 @@ the repository, the issues, and whether writes are authorized are explicit.
 `gh label list --limit 200 --json name,color,description`, raising the limit if
 it returns 200 rows. Read each issue with
 `gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
-then relevant review records and linked issue and PR states. Follow evidence that
-could change the decision, and leave unrelated code and tickets alone. Prefer current
-object states over stale prose, but retain explicit human decisions unless new
-evidence warrants revisiting. Done when each requested issue and its links are read.
+then relevant review records and linked issue and PR states. `subIssues`,
+`blockedBy`, and `blocking` are objects: iterate `.nodes[]` and count `.totalCount`.
+Nodes carry number, state, title, and URL, not labels. They stop at 100, 50, and 50
+nodes; page the rest with `gh api --paginate` when `totalCount` is higher. Follow
+evidence that could change the decision, and leave unrelated code and tickets alone.
+Prefer current object states over stale prose, but retain explicit human decisions
+unless new evidence warrants revisiting. Done when each requested issue and its links
+are read, with every relationship counted against its `totalCount`.
 
 **Step 3: Assess.** Form one assessment per issue: desired labels, evidence,
 unresolved decision or input, recommendation, next actor, and start conditions.
