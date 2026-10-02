@@ -10,10 +10,15 @@ import pytest
 from conftest import commit, skill
 
 # The commit waiting on GitHub edits the skill alpha and swaps the private sync
-# for this stub, so a test sees whether the sync ran the code the pull brought
+# for this stub, so a test sees whether the sync ran the code the pull brought.
+# The installer imports PRIVATE from it, so only a run leaves the marker
 PULLED_PRIVATE_SYNC = """from pathlib import Path
 
-(Path(__file__).resolve().parent.parent / "pulled-private-sync-ran").touch()
+ROOT = Path(__file__).resolve().parent.parent
+PRIVATE = ROOT / "_skills_private"
+
+if __name__ == "__main__":
+    (ROOT / "pulled-private-sync-ran").touch()
 """
 
 
