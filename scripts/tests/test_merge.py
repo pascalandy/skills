@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -133,6 +135,28 @@ def test_a_rerun_after_the_merge_only_deploys_again(github: Sandbox) -> None:
     assert (result.returncode, result.stdout) == (0, "synced\tmbp\n")
     assert github.git("--git-dir", str(github.origin), "rev-parse", "main") == merged
     assert len(github.deploys()) == 2
+
+
+def test_deploys_from_the_scripts_main_checkout_whatever_the_cwd(
+    github: Sandbox, tmp_path: Path
+) -> None:
+    github.open_pr()
+    github.sign(github.git("rev-parse", "HEAD"))
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(github.work / "scripts/merge.py")],
+        cwd=unrelated,
+        env=github.env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert github.deploys() == [github.main.resolve()]
 
 
 def test_a_failed_deploy_warns_without_failing_the_merge(github: Sandbox) -> None:

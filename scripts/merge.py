@@ -23,11 +23,11 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
 from _common import main_checkout, run, run_git, run_script
 from signoff import (
+    ROOT,
     branch,
     check_and_sign,
     gh,
@@ -237,7 +237,7 @@ def deploy(sha: str, args: argparse.Namespace) -> str:
     try:
         if not main_holds_tested_tree(sha, args.timeout):
             return ""
-        checkout = main_checkout(Path.cwd())
+        checkout = main_checkout(ROOT)
         # The deploy runs this checkout's code, which must be code main has held
         held = run_git(
             "merge-base", "--is-ancestor", "HEAD", "origin/main", cwd=checkout
