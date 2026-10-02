@@ -83,7 +83,7 @@ The link check covers inline links with at most one level of parentheses, angle-
 
 ## Best practices checklist
 
-To create, edit, or improve a target skill, copy the IDs and titles into your reply and fill them in. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails. A review reports in its own format instead, and a target document uses "Any agent document" alone.
+To create, edit, or improve a target skill, copy the IDs and titles into your reply and fill them in: for an existing skill once before your changes (Step 1) and once at the end (Step 8), for a new skill at the end. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails. A review reports in its own format instead, and a target document uses "Any agent document" alone.
 
 IDs never change and are never reused. To change a practice, move its line under a `### Voided` heading at the end with `void <date>, replaced by BP_NN`, and give the new practice the next free ID.
 
