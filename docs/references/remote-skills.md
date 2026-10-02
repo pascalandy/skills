@@ -25,7 +25,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | oem | Load at the start of every session, before the first reply. Shared definitions and conventions for every task. |
 | plan | Use only when explicitly invoked as `plan`. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
-| tavily | Use when the user explicitly requests Tavily. Never run automatically. |
+| tavily | Use only when explicitly invoked as `tavily`. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
 | writing-for-agents | Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read. |
