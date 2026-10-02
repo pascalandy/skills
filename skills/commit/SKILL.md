@@ -17,12 +17,12 @@ Create atomic commits: one logical change per commit. If a commit cannot be desc
 
 ## Workflow
 
-1. Run `git status` and `git diff --stat`, then review every changed file, not only the files of the prior task. Done when each changed path is accounted for
+1. Run `git status`, then read `git diff` and `git diff --cached`. Review untracked files too. Done when every staged, unstaged, and untracked change is accounted for
 2. Group the changes by the rules in Split when. Done when each path, or each hunk of a file that mixes groups, belongs to one group
-3. Run the checks the repository provides for the current group, sized to the change. Run a full suite such as `just ci` only when the user requests it, repository policy requires it, or the change affects shared validation or broad behavior. Report unrelated pre-existing failures as findings, not as proof that the change failed
-4. Stage only the current group by path with `git add <paths>`, never `git add .` or `git add -A`. For a file that mixes groups, `git apply --cached` a patch holding only this group's hunks
+3. Run the checks the repository provides for the current group, sized to the change. Run a full suite such as `just ci` only when the user requests it, repository policy requires it, or the change affects shared validation or broad behavior. Done when applicable checks pass or only unrelated pre-existing failures remain; report those failures separately
+4. Stage only the current group by path with `git add <paths>`, never `git add .` or `git add -A`. If the index already holds changes outside this group, unstage them with `git restore --staged <paths>`, which keeps them in the working tree. For a file that mixes groups, `git apply --cached` a patch holding only this group's hunks
 5. Run `git diff --cached --check` and read `git diff --cached`. Done when the check passes and the staged diff holds only this group
-6. Commit in the format below and let the configured hooks run. Pass `--no-verify` only when the user explicitly authorizes it
+6. Commit in the format below and let the configured hooks run. Pass `--no-verify` only when the user explicitly authorizes it. If a hook fails, review its changes and return to step 3. Done when the commit succeeds and `git show HEAD` contains only the validated group
 7. Repeat steps 3 to 6 for each group, in order
 8. Run `git log -n <count> --oneline` and report each commit's hash and subject. Done when every group is committed
 
