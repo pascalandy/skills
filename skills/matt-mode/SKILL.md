@@ -26,7 +26,7 @@ Recognize spaced names such as "to spec", "to tickets", "grill with docs", and "
 | `to-spec` | Synthesize existing context into a spec, including design and testing decisions | [to-spec](playbooks/to-spec/to-spec.md) |
 | `to-tickets` | Break defined work into verifiable deliveries and blocking edges | [to-tickets](playbooks/to-tickets/to-tickets.md) |
 
-An architecture review of existing code, including a request for `improve-codebase-architecture`, belongs to `code-review-mode`.
+For an architecture review of existing code, including `improve-codebase-architecture`, direct the caller to `code-review-mode` instead of running a Matt-mode procedure.
 
 When upstream asks to call a Skill by one of these names, read that procedure here. A slash command is an instruction pointer, not a required executable or separate installed skill.
 
