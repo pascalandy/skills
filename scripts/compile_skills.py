@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Flatten authoring packages into the published skills directory."""
+"""Compile authoring packages into the published skills directory."""
 
 from __future__ import annotations
 
@@ -30,19 +30,19 @@ tab and skills/<name>. A dry run prints the same lines and changes nothing;
 a run with nothing to change prints nothing.
 
 examples:
-  just flatten-skills
-  just flatten-skills --dry-run
-  just flatten-skills --check
-  just flatten-skills --verbose"""
+  just compile-skills
+  just compile-skills --dry-run
+  just compile-skills --check
+  just compile-skills --verbose"""
 
 EXIT_CODES = exit_codes(
     {
         0: "skills/ matches authoring/, or now does",
-        1: "flatten failed, or --check found changes",
+        1: "compile failed, or --check found changes",
     }
 )
 
-log = logging.getLogger("flatten-skills")
+log = logging.getLogger("compile-skills")
 
 
 def git(*args: str) -> bytes:
@@ -71,7 +71,7 @@ def git_files(directory: str) -> list[Path]:
 
 
 def collect() -> dict[str, list[tuple[Path, Path]]]:
-    """Map each skill to the tracked source files that flattening would copy.
+    """Map each skill to the source files that compiling would copy.
 
     A package is a folder holding a SKILL.md, either directly under authoring/
     or inside a category folder there."""
@@ -212,20 +212,20 @@ def changes(expected: dict[Path, Path]) -> list[str]:
     ]
 
 
-def flatten(*, dry_run: bool = False) -> list[str]:
+def compile_tree(*, dry_run: bool = False) -> list[str]:
     """Rebuild skills/ from authoring/ when they differ; return one change line
     per skill, and change nothing on a dry run."""
     if OUTPUT.is_symlink() or (OUTPUT.exists() and not OUTPUT.is_dir()):
         raise ScriptError(
             "skills/ must be a directory, not a file or symlink; "
-            "move it aside, then rerun just flatten-skills"
+            "move it aside, then rerun just compile-skills"
         )
     expected = build_expected()
     lines = changes(expected)
     if dry_run or not lines:
         return lines
 
-    with tempfile.TemporaryDirectory(prefix=".skills-flatten-", dir=ROOT) as temporary:
+    with tempfile.TemporaryDirectory(prefix=".skills-compile-", dir=ROOT) as temporary:
         staging = Path(temporary) / "skills"
         staging.mkdir()
         for relative, source in expected.items():
@@ -237,10 +237,10 @@ def flatten(*, dry_run: bool = False) -> list[str]:
 
 
 def work(args: argparse.Namespace) -> str:
-    lines = flatten(dry_run=args.dry_run or args.check)
+    lines = compile_tree(dry_run=args.dry_run or args.check)
     if args.check and lines:
         raise ScriptError(
-            "skills/ differs from authoring/; run: just flatten-skills",
+            "skills/ differs from authoring/; run: just compile-skills",
             detail="\n".join(lines),
         )
     return "\n".join(lines)
@@ -248,9 +248,9 @@ def work(args: argparse.Namespace) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
-        prog="just flatten-skills",
+        prog="just compile-skills",
         description=(
-            "Flatten authoring/<skill>/ and authoring/<category>/<skill>/ "
+            "Compile authoring/<skill>/ and authoring/<category>/<skill>/ "
             "packages into skills/<skill>/"
         ),
         epilog=EPILOG,
@@ -268,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="dry run that exits 1 when skills/ differs, listing the changes on stderr",
     )
-    return run_script(parser, work, argv, debug="FLATTEN_SKILLS_DEBUG")
+    return run_script(parser, work, argv, debug="COMPILE_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

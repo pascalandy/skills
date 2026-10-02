@@ -81,7 +81,7 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     for name in (
         "_cli.py",
         "_common.py",
-        "flatten_skills.py",
+        "compile_skills.py",
         "install_skills.py",
         "sync_fleet.py",
         "sync_private.py",

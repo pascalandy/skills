@@ -26,7 +26,7 @@ ENTRIES = {
     "scripts/check_cli_block.py": "scripts/check_cli_block.py",
     "scripts/check_frontmatter.py": "just check-frontmatter",
     "scripts/discover_skills.py": "just skills-discover",
-    "scripts/flatten_skills.py": "just flatten-skills",
+    "scripts/compile_skills.py": "just compile-skills",
     "scripts/install_skills.py": "just install-skills",
     "scripts/merge.py": "just merge",
     "scripts/release_check.py": "just release-check",

@@ -34,4 +34,4 @@ build/
 # Local skill collections
 /_skills_private/
 /_skills_archived/
-/.skills-flatten-*/
+/.skills-compile-*/

@@ -29,7 +29,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
-import flatten_skills
+import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes
 from _common import (
     FRONTMATTER,
@@ -259,12 +259,12 @@ def skill_sources(
     """Stage public packages under `stage`, add every private package, and drop
     the profile's exclusions."""
     sources: dict[str, Source] = {}
-    for name, entries in flatten_skills.collect().items():
+    for name, entries in compile_skills.collect().items():
         package = stage / name
         for source, relative in entries:
             destination = package / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            flatten_skills.publish(source, relative, destination)
+            compile_skills.publish(source, relative, destination)
         sources[name] = Source(package, "public", digest(package))
     duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
@@ -277,7 +277,7 @@ def skill_sources(
     if duplicates:
         raise ScriptError(*duplicates)
     if not sources:
-        raise ScriptError("no public skills found; run just flatten-skills")
+        raise ScriptError("no public skills found; run just compile-skills")
     return {
         name: source
         for name, source in sources.items()
@@ -287,7 +287,7 @@ def skill_sources(
 
 def command_sources() -> dict[str, Source]:
     sources: dict[str, Source] = {}
-    for relative in flatten_skills.git_files("commands"):
+    for relative in compile_skills.git_files("commands"):
         if len(relative.parts) != 2 or relative.suffix != ".md":
             continue
         path = ROOT / relative
@@ -323,11 +323,11 @@ def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source
 
 def published(directory: str) -> list[Path]:
     """List every path git history ever added under `directory`, relative to it."""
-    if flatten_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
+    if compile_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
         raise ScriptError(
             "shallow clone hides retired skills; run git fetch --unshallow and rerun"
         )
-    listed = flatten_skills.git(
+    listed = compile_skills.git(
         "log",
         "--no-renames",
         "--diff-filter=A",
@@ -342,10 +342,10 @@ def published(directory: str) -> list[Path]:
 
 
 def owned_skills() -> set[str]:
-    """Names ever committed under skills/, plus uncommitted ones flattened there."""
+    """Names ever committed under skills/, plus uncommitted ones compiled there."""
     return {path.parts[0] for path in published("skills") if len(path.parts) > 1} | {
         path.parts[1]
-        for path in flatten_skills.git_files("skills")
+        for path in compile_skills.git_files("skills")
         if len(path.parts) > 2
     }
 
@@ -531,7 +531,7 @@ def summarize(actions: list[Action], expected: dict[str, int]) -> list[dict]:
 def install_lock() -> Path:
     """One lock per repository, shared by its worktrees and outside the home,
     so a run that fails validation still writes nothing there."""
-    common = os.fsdecode(flatten_skills.git("rev-parse", "--git-common-dir"))
+    common = os.fsdecode(compile_skills.git("rev-parse", "--git-common-dir"))
     return ROOT / common.strip() / "install-skills.lock"
 
 
@@ -632,7 +632,7 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
-        flatten_skills.flatten()
+        compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
         return output
 
