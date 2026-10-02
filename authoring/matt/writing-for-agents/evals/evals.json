@@ -42,5 +42,18 @@
       "Does not run the skill validator and adds no frontmatter",
       "Leaves the unrelated release rule unchanged"
     ]
+  },
+  {
+    "skills": ["writing-for-agents"],
+    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "query": "Improve the skill pdf-helper with writing-for-agents.",
+    "files": ["evals/fixtures/messy-skill.md"],
+    "expected_behavior": [
+      "Fills the BP checklist before editing, with at least five BPs open and their finding counts",
+      "Edits pdf-helper/SKILL.md to fix the validator errors and at least three judgment findings, such as BP_06, BP_14, BP_19",
+      "Runs the skill validator on pdf-helper and ends with it printing nothing, or names the reason for each warning left",
+      "Ends with the BP checklist filled again, every BP ticked, and a reason for each BP that does not apply",
+      "Leaves the name change to the user, or renames the folder and the name together"
+    ]
   }
 ]

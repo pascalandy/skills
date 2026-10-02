@@ -14,7 +14,9 @@ sys.path.insert(0, str(SCRIPTS))
 import validate_skill as validator
 
 THIS_SKILL = SCRIPTS.parent
-BP_LINE_RE = re.compile(r"^- \*\*(?P<id>BP_\d{2}) (?P<title>[^*]+)\*\*", re.MULTILINE)
+BP_LINE_RE = re.compile(
+    r"^- (?P<box>\[ \] )?\*\*(?P<id>BP_\d{2}) (?P<title>[^*]+)\*\*", re.MULTILINE
+)
 
 
 def skill(
@@ -230,7 +232,10 @@ def test_validator_ids_match_the_skill_list() -> None:
     active = {m["id"]: m["title"] for m in BP_LINE_RE.finditer(active_text)}
     voided = [m["id"] for m in BP_LINE_RE.finditer(voided_text)]
     all_ids = [m["id"] for m in BP_LINE_RE.finditer(text)]
-    assert len(all_ids) == len(set(all_ids)), "a BP ID is listed twice"
+    assert sorted(all_ids) == [f"BP_{n:02d}" for n in range(1, len(all_ids) + 1)]
+    assert all(m["box"] for m in BP_LINE_RE.finditer(active_text)), (
+        "an active BP is not a checkbox"
+    )
     assert not set(validator.BP_TITLES) & set(voided), "the validator cites a voided BP"
     assert {bp: active.get(bp) for bp in validator.BP_TITLES} == validator.BP_TITLES
 
