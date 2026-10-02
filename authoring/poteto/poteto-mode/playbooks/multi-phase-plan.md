@@ -59,7 +59,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
 - [ ] Open the PR ready, never draft, with `origin pr create --status open --base <base-branch>` or `gh pr create --base <base-branch>` according to the resolved forge. A stack child targets its parent branch.
 - [ ] Run the repo's lint and typecheck once before the PR-facing push. Push with hooks on.
-- [ ] Remove redundant abstractions, dead code, and debug leftovers before each commit; load `no-comments` before review.
+- [ ] Remove redundant abstractions, dead code, and debug leftovers before each commit; load `no-comments` before review when the diff changes source code.
 - [ ] Triage comments from review agents present on the PR per `../references/review-bot-triage.md`.
 - [ ] Rebase onto current trunk before babysit and again before the merge-ready report.
 

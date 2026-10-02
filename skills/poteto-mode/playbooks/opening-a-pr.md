@@ -8,7 +8,7 @@ Invoked at the end of every other playbook.
 
 **Commits.** Commit liberally. Rebase into small, ordered commits before opening PRs. Each commit is a future PR: landable, ordered to tell the story. Amend when the fix belongs in a just-made commit. New commit when separable.
 
-**PRs.** Check whether the current branch already has a PR before creating one. If it does, report its URL and continue the current playbook without opening a duplicate. Review the diff before commit and remove redundant abstractions, dead code, and debug leftovers. Run `/no-comments` before review. Write every PR title, PR description, and commit body with `/technical-writing`, then apply `/unslop`. Apply every technical-writing layer except Diátaxis. Use one word for each action, keep articles, and avoid `-ing` when a plain verb works.
+**PRs.** Check whether the current branch already has a PR before creating one. If it does, report its URL and continue the current playbook without opening a duplicate. Review the diff before commit and remove redundant abstractions, dead code, and debug leftovers. When the diff changes source code, run `/no-comments` before review. Write every PR title, PR description, and commit body with `/technical-writing`, then apply `/unslop`. Apply every technical-writing layer except Diátaxis. Use one word for each action, keep articles, and avoid `-ing` when a plain verb works.
 
 **Titles.** Use Conventional Commits in the form `type(scope): subject`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, or `perf` as the type. Use the changed area, such as `pstack` or `poteto-mode`, as the scope. Keep the subject short and imperative. Name a real symbol when one carries the change. For example, `fix(pstack): retarget opening-a-pr babysit trigger`. Do not add a trailing period.
 
@@ -34,4 +34,4 @@ End the PR description with the signature from $oem.
 
 **Babysit.** Opening a PR does not start a babysit. Post the URL and keep building. Finish the phase or stack first. Run a separate babysit pass only when the user asks for one after the whole stack exists. A babysit for each new PR stalls the build and spends checks on commits that later waves restart. Push back when feedback drifts from intent.
 
-A subagent that opens a PR runs the `interrogate` and `no-comments` skills plus the diff cleanup above. It returns the URL and does not babysit. Return to the parent.
+A subagent that opens a PR runs the `interrogate` skill, `no-comments` when the diff changes source code, and the diff cleanup above. It returns the URL and does not babysit. Return to the parent.
