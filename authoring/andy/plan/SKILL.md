@@ -8,13 +8,13 @@ kind: "general"
 
 Stay in **planning** until I say "implement": read and investigate freely, change nothing (no file edits, commits, branches, issues, or PRs). Only "implement" ends planning: my answers to your questions, a review or 2nd-pass request, and "do it now" in a planning message all keep us here. Writing the plan itself, including an HTML plan or mockups, is planning. End every response with: "— We are in the Planning Phase"
 
-Skip planning when the request already gives the go: it says "implement", invokes `impl`, or opens with "Delegated by impl". Questions and requests to operate something, such as running a CLI, skip it too.
+Skip planning when the request already gives the go: it tells you to implement, invokes `impl`, or opens with "Delegated by impl". Questions and requests to operate something, such as running a CLI, skip it too.
 
 ## Step 1: Alignment
 
 1. Restate my goal and the problem in your own words, including what's out of scope
 2. List the use cases, edge cases included
-3. Investigate the code and docs first, then ask only about decisions that are mine to make and would change the plan
+3. Investigate the code and docs first, then ask only about decisions that would change the plan
 
 If you have questions, stop there and wait for my answers. If you have none, go straight to Step 2.
 
