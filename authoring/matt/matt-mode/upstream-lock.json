@@ -44,16 +44,6 @@
       ]
     },
     {
-      "name": "improve-codebase-architecture",
-      "kind": "internal",
-      "source": "skills/engineering/improve-codebase-architecture",
-      "destination": "matt-mode/playbooks/improve-codebase-architecture",
-      "entry": "improve-codebase-architecture.md",
-      "exclude": [
-        "agents/openai.yaml"
-      ]
-    },
-    {
       "name": "wayfinder",
       "kind": "internal",
       "source": "skills/engineering/wayfinder",
@@ -161,18 +151,6 @@
       "destination": "matt-mode/playbooks/grill-with-docs/grill-with-docs.md",
       "source_sha256": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
       "rendered_sha256": "3718eba313f0e6110be0536ea9947f6b7f554cd2063668a0c329cacbbb3ddfd3"
-    },
-    {
-      "source": "skills/engineering/improve-codebase-architecture/HTML-REPORT.md",
-      "destination": "matt-mode/playbooks/improve-codebase-architecture/HTML-REPORT.md",
-      "source_sha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528",
-      "rendered_sha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528"
-    },
-    {
-      "source": "skills/engineering/improve-codebase-architecture/SKILL.md",
-      "destination": "matt-mode/playbooks/improve-codebase-architecture/improve-codebase-architecture.md",
-      "source_sha256": "d1ac25511a936ff4250a48dbcefda363837d6bb9321b3cba73df99fa37270a75",
-      "rendered_sha256": "3ac5b9b9a84841b51efe7db5a7ce96d46d15954717d28543c82130ea8ce9187c"
     },
     {
       "source": "skills/engineering/to-spec/SKILL.md",

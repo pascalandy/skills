@@ -6,7 +6,7 @@ Maintainer reference. Ordinary use does not load this file.
 
 Run `just check` from the skills repository checkout; `just check --only matt-mode` runs only this package's checks. Run `uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream <checkout>` to reconstruct the imported files from the pinned source. Follow [lineage and updating](lineage.md) when refreshing the pin.
 
-Check source and flattened installations of all four packages. Matt-mode has one scanner entry and eight original-named planning procedures. The shared research, grilling, and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
+Check source and flattened installations of all four packages. Matt-mode has one scanner entry and seven original-named planning procedures. The shared research, grilling, and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
 
 The updater's CLI tests exercise body and asset fidelity, dry-run, changed upstream revisions, rerun behavior, local drift, missing sources, unsafe destinations, and interrupted updates. Source reconstruction proves text fidelity. It does not prove agent behavior.
 
@@ -24,7 +24,7 @@ Use fresh independent sessions and isolated writable workspaces. Give each sessi
 | Wide refactor | A mechanical migration cannot land as green vertical slices | Uses the upstream wide-refactor exception, preserving actual migration constraints |
 | Domain caller | A different skill requests a bounded glossary update | Reads Matt-mode's domain procedure and formats, keeps the caller's workflow and authority |
 | Codebase design | Ask where a chosen module's seam belongs | Uses the design reference rather than starting a whole-codebase review |
-| Architecture review | Ask which refactor deserves attention | Explores friction, presents candidates, waits for selection before detailed interface design |
+| Architecture review | Ask which refactor deserves attention | Points to `code-review-mode` and runs no architecture review inside Matt-mode |
 | Execution request | Request a runnable prototype while using Matt-mode | Directs the user to Poteto-mode; creates no runnable artifact and launches no implementation worker |
 | Planning followed by implementation | Request a local spec then ask Matt-mode to implement through subagents | Produces the planning artifact, points to Poteto-mode, and stops before application or test-code changes |
 | Wayfinder | Resume a map whose next question requires executable evidence | Preserves the unresolved decision and missing evidence without performing prerequisite implementation |

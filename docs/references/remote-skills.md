@@ -38,7 +38,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | arena | Use when the user invokes `arena`, or when competing designs or implementations should be compared before choosing an approach for a non-trivial artifact. |
 | automate-me | Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow. |
 | blast-radius | Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust. |
-| code-review-mode | Use for a code review of a branch or code area, a test audit, or a thermonuclear review, and whenever writing or changing tests. |
+| code-review-mode | Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests. |
 | coding-eng-laws | Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned. |
 | coding-language | Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code. |
 | coding-standard | Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior. |

@@ -4,7 +4,7 @@ These are the explicit differences from the imported Matt procedures. Keep upstr
 
 ## Planning boundary
 
-Matt-mode prepares implementation. Permitted work includes reading the codebase, researching constraints, discussing interfaces and testing strategy, and writing authorized specs, plans, domain documentation, architecture reports, and GitHub tickets. Code excerpts inside planning documents express decisions; they are not application changes.
+Matt-mode prepares implementation. Permitted work includes reading the codebase, researching constraints, discussing interfaces and testing strategy, and writing authorized specs, plans, domain documentation, and GitHub tickets. Code excerpts inside planning documents express decisions; they are not application changes.
 
 Do not write or modify application code, runnable prototypes, implementation tests, or deployment configuration. Do not implement through subagents, merge, or deploy. Delegate only bounded research and inspection while retaining the same planning scope.
 
@@ -31,7 +31,3 @@ Use the complete upstream spec and ticket templates. Record agreed implementatio
 Resolve upstream named Skill calls through the Matt-mode route table or its shared skills. When another workflow needs just domain modeling or codebase design, it reads this contract and that procedure directly. It retains its original task and authority.
 
 Use the active harness's available research and delegation capabilities. Keep delegated work read-only except for the authorized findings document. Use actual context limits rather than upstream's fixed session-size estimates. If delegation is unavailable, investigate facts directly and report the limitation. Human decisions still require the human's answers.
-
-## Planning reports
-
-An architecture report presents proposals, not a working application. Follow the project's documentation and visual conventions for such reports. Preserve upstream's candidate analysis and comparisons without executing the proposed refactors.

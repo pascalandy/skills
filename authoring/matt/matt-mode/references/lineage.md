@@ -1,10 +1,10 @@
 # Lineage and updating
 
-Matt-mode packages Matt Pocock's complete procedures under their original names. The router, standalone entry wrappers, workspace adapter, and local execution rules belong to Pascal. This is not an upstream Matt Pocock or PStack release.
+Matt-mode imports selected Matt Pocock procedures in full under their original names. The router, standalone entry wrappers, workspace adapter, and local execution rules belong to Pascal. This is not an upstream Matt Pocock or PStack release.
 
 ## Canonical sources
 
-The [upstream lock](../upstream-lock.json) records the imported Matt revision, source paths, destination paths, and source and rendered SHA-256 hashes. The imported inventory covers all eight internal procedures and two shared skills: `research` and `grilling`. Each supporting instruction file has the same provenance as its procedure. `writing-for-agents` is locally authored and is not refreshed from Matt's upstream repository.
+The [upstream lock](../upstream-lock.json) records the imported Matt revision, source paths, destination paths, and source and rendered SHA-256 hashes. The imported inventory covers seven internal procedures and two shared skills: `research` and `grilling`. Matt's `improve-codebase-architecture` left this package for `code-review-mode`, which keeps its own copy outside this lock. Each supporting instruction file has the same provenance as its procedure. `writing-for-agents` is locally authored and is not refreshed from Matt's upstream repository.
 
 The initial pin is [Matt Pocock skills, 3cca18b](https://github.com/mattpocock/skills/tree/3cca18b368ae95cdbdebbff572ccafa662551015). Its source bodies were also compared with Pascal's supplied Mac checkout during planning. The lock, rather than this initial-history note, owns the current revision.
 
@@ -18,7 +18,7 @@ Upstream planning procedures can still mention executable work. The lock's `hand
 
 ## Fidelity contract
 
-There is one canonical runtime copy of each imported file. Internal procedures live under `playbooks/<upstream-name>/`. Imported shared skills keep their bodies under their own `references/upstream/` directories. Their root `SKILL.md` files preserve local discovery and point to those bodies. Matt-mode still routes to the locally authored `writing-for-agents` skill, which owns its own content.
+Each file tracked by this lock has one canonical runtime copy. Internal procedures live under `playbooks/<upstream-name>/`. Imported shared skills keep their bodies under their own `references/upstream/` directories. Their root `SKILL.md` files preserve local discovery and point to those bodies. Matt-mode still routes to the locally authored `writing-for-agents` skill, which owns its own content.
 
 The importer removes the opening skill frontmatter and rewrites file links affected by relocation. It preserves the remaining upstream instructions and supporting assets. Upstream agent registration metadata is excluded because the local entrypoints own invocation. There are no editorial patches, compressed replacement procedures, or duplicate local spec and ticket templates.
 
