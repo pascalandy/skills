@@ -25,7 +25,9 @@
       "Writes a description that says when to load the skill",
       "Ships a script that does the conversion and tells the agent to run it",
       "Names the tool the script needs, with its install command, before the first step that uses it",
+      "Checks that each required tool is available before using it",
       "Runs the skill validator on the new skill and ends with it printing nothing",
+      "Reruns the three scenarios with the completed skill in fresh agent sessions and records each result against its expected behavior and baseline",
       "Keeps SKILL.md under 500 lines"
     ]
   },

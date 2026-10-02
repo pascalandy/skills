@@ -17,8 +17,8 @@ Write documents an agent reads so that it takes the same _process_ every run: a 
 ## Pick the branch
 
 - **Create or edit a target skill**: follow [Create or edit a skill](#create-or-edit-a-skill)
-- **Review a target skill**: follow [Review](#review)
-- **Write, edit, or review a target document**: apply the "Any agent document" BPs; the skill validator does not apply
+- **Review a target skill or target document**: follow [Review](#review)
+- **Write or edit a target document**: apply the "Any agent document" BPs; the skill validator does not apply
 
 ## Create or edit a skill
 
@@ -68,13 +68,15 @@ A finding that fits two BPs goes under the more specific one.
 
 ## Skill validator
 
-Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)). Run it from any folder:
+Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)). Confirm it with `uv --version`, then run from any folder:
 
 ```bash
 uv run <this-skill-folder>/scripts/validate_skill.py <target-skill-folder>
 ```
 
-It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment. It resolves Markdown links only: for a path in inline code, such as `scripts/extract.py`, it checks the slashes, so confirm the file exists yourself.
+It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment.
+
+The link check covers inline links with at most one level of parentheses, angle-bracket destinations, and single-line reference definitions inside the target folder. Check other links and inline-code paths yourself. The validator checks inline-code paths for backslashes only.
 
 ## Best practices
 
