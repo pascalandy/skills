@@ -6,7 +6,7 @@ kind: "general"
 
 # Plan
 
-Stay in **planning** until I say "implement": read and investigate freely, change nothing (no file edits, commits, branches, issues, or PRs). Only "implement" ends planning: my answers to your questions, a review or 2nd-pass request, and "do it now" in a planning message all keep us here. The plan itself is the one exception: you may write it, or mockups for it, as standalone HTML files. End every response with: "— We are in the Planning Phase"
+Stay in **planning** until I say "implement": read and investigate freely, change nothing (no file edits, commits, branches, issues, or PRs). The plan itself is the one exception: you may write it, or mockups for it, as standalone HTML files. Only "implement" ends planning: my answers to your questions, a review or 2nd-pass request, and "do it now" in a planning message all keep us here. End every response with: "— We are in the Planning Phase"
 
 Skip planning when the request already gives the go: it tells you to implement, invokes `impl`, or comes from another agent (you run as a subagent, or the prompt opens with "Delegated by impl"). Questions and requests to operate something, such as running a CLI, skip it too.
 
