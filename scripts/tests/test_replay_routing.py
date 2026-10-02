@@ -26,8 +26,9 @@ request = sys.stdin.read()
 scratch = args[args.index("-C") + 1]
 status = subprocess.run(["git", "status", "--porcelain"], cwd=scratch,
                         capture_output=True, text=True).stdout
+skills = sorted(os.listdir(os.path.join(scratch, ".agents/skills")))
 with open(os.environ["STUB_LOG"], "a") as log:
-    log.write(json.dumps({"args": args, "request": request, "status": status,
+    log.write(json.dumps({"args": args, "request": request, "status": status, "skills": skills,
                           "pid": os.getpid()}) + "\\n")
 for event in json.load(open(os.environ["STUB_EVENTS"]))[request]:
     if "sleep" in event:
@@ -75,7 +76,12 @@ def repo(tmp_path: Path) -> Path:
     (skill / "references").mkdir()
     (skill / "SKILL.md").write_text(
         '---\nname: "demo"\ndescription: "Use for demos."\n---\n\n'
-        "Route to [cro](playbooks/cro.md) or [seo](playbooks/seo.md).\n"
+        "Route to [cro](playbooks/cro.md), [seo](playbooks/seo.md), "
+        "or [the other skill](../other/SKILL.md).\n"
+    )
+    (root / "skills/other").mkdir()
+    (root / "skills/other/SKILL.md").write_text(
+        '---\nname: "other"\ndescription: "Use for other demos."\n---\n\nOther.\n'
     )
     (skill / "playbooks/cro.md").write_text("CRO steps.\n")
     (skill / "playbooks/seo.md").write_text("SEO steps.\n")
@@ -137,6 +143,7 @@ SEO = "cat .agents/skills/demo/playbooks/seo.md"
         CRO,
         f"{SKILL_MD} && {CRO}",
         "/bin/bash -lc 'rtk proxy sed -n \"1,80p\" .agents/skills/demo/playbooks/cro.md'",
+        "/bin/bash -lc 'cd .agents/skills/demo && cat ./playbooks/cro.md'",
     ],
 )
 def test_each_row_passes_and_a_routed_run_stops_before_its_work(
@@ -175,6 +182,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
     assert time.monotonic() - started < 30
     first = calls(repo)[0]
     assert first["status"] == ""
+    assert first["skills"] == ["demo", "other"]
     assert (
         f'skills.config=[{{path="{repo.parent}/codex-home/skills/demo/SKILL.md",enabled=false}}]'
         in first["args"]
@@ -380,6 +388,26 @@ def test_a_project_in_a_linked_worktree_leaves_its_repository_alone(
             check=True,
         ).stdout
     )
+
+
+def test_a_project_holding_an_old_copy_of_the_skill_gets_the_compiled_one(
+    repo: Path, tmp_path: Path
+) -> None:
+    project = tmp_path / "project-with-copy"
+    (project / ".agents/skills/demo").mkdir(parents=True)
+    (project / ".agents/skills/demo/SKILL.md").write_text("old copy\n")
+
+    result = replay(
+        repo,
+        {"fix my build": [message("Done."), DONE]},
+        "--case",
+        "2",
+        "--project",
+        str(project),
+    )
+
+    assert (result.returncode, result.stderr) == (0, "")
+    assert calls(repo)[0]["skills"] == ["demo", "other"]
 
 
 def test_a_missing_codex_fails_before_any_row(repo: Path) -> None:

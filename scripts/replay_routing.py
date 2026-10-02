@@ -73,6 +73,8 @@ EXIT_CODES = exit_codes(
 HEADER = ("request", "reads", "opens with")
 CELL_RE = re.compile(r"`([^`]+)`")
 LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
+# A path ends at the end, a space, a quote, or shell punctuation
+END = r"(?=$|[\s'\";|&)<>])"
 
 log = logging.getLogger("replay-routing")
 
@@ -164,13 +166,18 @@ def parse_cases(path: Path, routes: set[str]) -> list[Case]:
 
 
 def opened_in(command: str, name: str, routes: set[str]) -> list[str]:
-    """Route files a shell command names, in the order it names them. A path
-    ends at a quote, a space, or shell punctuation, so `cro.md.bak` is not `cro.md`."""
+    """Route files a shell command names, in the order it names them, so
+    `cro.md.bak` is not `cro.md`. After a `cd` into the skill folder, a route's
+    own relative path counts too."""
+    folder = re.escape(f"skills/{name}")
+    inside = re.search(rf"\bcd\s+['\"]?[^\s;&|'\"]*{folder}/?['\"]?{END}", command)
     hits = []
     for route in routes:
-        needle = posixpath.normpath(f"skills/{name}/{route}")
-        if match := re.search(re.escape(needle) + r"(?=$|[\s'\";|&)<>])", command):
-            hits.append((match.start(), route))
+        patterns = [re.escape(posixpath.normpath(f"skills/{name}/{route}")) + END]
+        if inside and not route.startswith(".."):
+            patterns.append(r"(?<![\w./-])(?:\./)?" + re.escape(route) + END)
+        if starts := [m.start() for p in patterns if (m := re.search(p, command))]:
+            hits.append((min(starts), route))
     return [route for _, route in sorted(hits)]
 
 
@@ -214,8 +221,9 @@ def installed_copies(name: str) -> list[Path]:
     ]
 
 
-def prepare(work: Path, skill: Path, project: Path | None) -> Path:
-    """A scratch Git project with `project`'s files and an untracked copy of the skill."""
+def prepare(work: Path, skill: Path, routes: set[str], project: Path | None) -> Path:
+    """A scratch Git project with `project`'s files and untracked copies of the
+    skill and of every sibling skill a route leads to, such as `../2nd-pass/SKILL.md`."""
     scratch = work / "project"
     if project:
         # A linked worktree's .git file points at the source repository
@@ -232,10 +240,16 @@ def prepare(work: Path, skill: Path, project: Path | None) -> Path:
             raise ScriptError(
                 f"could not seed the scratch project: {done.stderr.strip()}"
             )
-    copy = scratch / ".agents/skills" / skill.name
-    shutil.copytree(skill, copy, ignore=shutil.ignore_patterns("__pycache__"))
-    # The tested agent then sees no uncommitted change from the copy
-    (copy / ".gitignore").write_text("*\n", encoding="utf-8")
+    siblings = {route.split("/")[1] for route in routes if route.startswith("../")}
+    for name in (skill.name, *sorted(siblings)):
+        copy = scratch / ".agents/skills" / name
+        # The project may already hold an older copy; the compiled one replaces it
+        shutil.rmtree(copy, ignore_errors=True)
+        shutil.copytree(
+            SKILLS / name, copy, ignore=shutil.ignore_patterns("__pycache__")
+        )
+        # The tested agent then sees no uncommitted change from the copy
+        (copy / ".gitignore").write_text("*\n", encoding="utf-8")
     return scratch
 
 
@@ -265,7 +279,7 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
         return f"skip\t{case.number}\t{case.request}\tmanual"
     work = Path(tempfile.mkdtemp(prefix=f"replay-{skill.name}-{case.number}-"))
     events = work / "events.jsonl"
-    scratch = prepare(work, skill, args.project)
+    scratch = prepare(work, skill, routes, args.project)
     run = Run()
     reason: str | None = None
     timed_out = threading.Event()
