@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -222,3 +223,59 @@ def test_validator_ids_match_the_skill_list() -> None:
     assert len(all_ids) == len(set(all_ids)), "a BP ID is listed twice"
     assert not set(validator.BP_TITLES) & set(voided), "the validator cites a voided BP"
     assert {bp: active.get(bp) for bp in validator.BP_TITLES} == validator.BP_TITLES
+
+
+def test_link_forms(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    body = (
+        "See [v2](references/guide(v2).md) and [spaced](<references/my guide.md>).\n"
+        "See [gone](<references/gone file.md>) and [the ref][ref].\n"
+        "\n"
+        "[ref]: references/missing.md\n"
+    )
+    root = skill(
+        tmp_path,
+        body,
+        files={
+            "references/guide(v2).md": "# V2\n",
+            "references/my guide.md": "# Mine\n",
+        },
+    )
+    s = f"{root}/SKILL.md"
+    assert run(capsys, root) == (
+        1,
+        [
+            f"{s}:7: error: BP_12 Links resolve: link to missing file 'references/gone file.md'",
+            f"{s}:9: error: BP_12 Links resolve: link to missing file 'references/missing.md'",
+        ],
+    )
+
+
+def test_yaml_comments_are_ignored(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "commented"
+    root.mkdir()
+    (root / "SKILL.md").write_text(
+        '---\n# owned by the docs team\nname: "commented" # stable name\n'
+        "description: Use when filling PDF forms # trigger\n---\n\nSteps.\n",
+        encoding="utf-8",
+    )
+    assert run(capsys, root) == (0, [])
+
+
+def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
+    root = skill(tmp_path, name="Bad_Name", folder="bad-name")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS / "validate_skill.py"), str(root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert (result.returncode, result.stderr, result.stdout.splitlines()) == (
+        1,
+        "",
+        [
+            f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' does not match the folder name 'bad-name'",
+            f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' may only use lowercase letters, digits, and hyphens",
+        ],
+    )

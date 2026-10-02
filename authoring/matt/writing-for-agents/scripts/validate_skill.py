@@ -52,11 +52,17 @@ CONTENTS_SEARCH_LINES = 25
 NAME_CHARS_RE = re.compile(r"[a-z0-9-]+")
 XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")
+BLOCK_INDICATORS = {">", "|", ">-", "|-", ">+", "|+"}
+QUOTED_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'")
+COMMENT_RE = re.compile(r"\s+#.*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
+# Inline links and reference definitions; a bare target may hold one level of parentheses
+DESTINATION = r"(?:<(?P<angle>[^<>\n]*)>|(?P<bare>(?:[^()\s]|\([^()\s]*\))+))"
 LINK_RE = re.compile(
-    r"!?\[[^\]]*\]\(\s*<?(?P<target>[^)\s>]+)>?(?:\s+[\"'][^)]*[\"'])?\s*\)"
+    rf"!?\[[^\]]*\]\(\s*{DESTINATION}(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\)))?\s*\)"
 )
+REFERENCE_DEF_RE = re.compile(rf"^ {{0,3}}\[[^\]]+\]:\s*{DESTINATION}")
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 WINDOWS_PATH_RE = re.compile(
     r"(?:[A-Za-z0-9_.-]+\\)+[A-Za-z0-9_.-]+\.(?:md|py|sh|js|ts|json|ya?ml|toml|txt)\b"
@@ -116,12 +122,17 @@ class Prose:
     headings: tuple[str, ...]
 
 
-def unquote_scalar(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
-    if len(value) >= 2 and value[0] == value[-1] == "'":
-        return value[1:-1].replace("''", "'")
-    return value
+def scalar(raw: str, block: bool) -> str:
+    """The string a YAML scalar holds: block text as written, quoted text unescaped,
+    plain text without its trailing comment."""
+    if block:
+        return raw
+    if quoted := QUOTED_RE.match(raw):
+        text = quoted.group(0)[1:-1]
+        if quoted.group(0)[0] == "'":
+            return text.replace("''", "'")
+        return text.replace('\\"', '"').replace("\\\\", "\\")
+    return COMMENT_RE.sub("", raw)
 
 
 def parse_frontmatter(lines: list[str]) -> tuple[dict[str, Field], int]:
@@ -131,26 +142,24 @@ def parse_frontmatter(lines: list[str]) -> tuple[dict[str, Field], int]:
     end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
     if end is None:
         return {}, 0
-    fields: dict[str, Field] = {}
+    raw: dict[str, tuple[str, int, bool]] = {}
     key: str | None = None
     for index in range(1, end):
         line = lines[index]
+        if line.startswith("#"):
+            continue
         match = KEY_RE.fullmatch(line) if not line[:1].isspace() else None
         if match:
             key = name = match.group("key")
             value = match.group("value").strip()
             # A block scalar's text starts on the next line
-            fields[name] = Field(
-                "" if value in {">", "|", ">-", "|-", ">+", "|+"} else value, index + 1
-            )
+            block = COMMENT_RE.sub("", value) in BLOCK_INDICATORS
+            raw[name] = ("" if block else value, index + 1, block)
         elif key and line.strip():
-            previous = fields[key]
-            fields[key] = Field(
-                f"{previous.value} {line.strip()}".strip(), previous.line
-            )
-    return {
-        k: Field(unquote_scalar(f.value), f.line) for k, f in fields.items()
-    }, end + 1
+            value, number, block = raw[key]
+            raw[key] = (f"{value} {line.strip()}".strip(), number, block)
+    fields = {k: Field(scalar(v, block), n) for k, (v, n, block) in raw.items()}
+    return fields, end + 1
 
 
 def prose_lines(lines: list[str], start: int) -> list[Prose]:
@@ -257,11 +266,15 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
 
 
 def link_targets(prose: list[Prose]) -> list[tuple[Prose, str]]:
-    return [
-        (line, match["target"])
-        for line in prose
-        for match in LINK_RE.finditer(line.masked)
-    ]
+    found: list[tuple[Prose, str]] = []
+    for line in prose:
+        matches = [*LINK_RE.finditer(line.masked)]
+        if definition := REFERENCE_DEF_RE.match(line.masked):
+            matches.append(definition)
+        found += [
+            (line, m["angle"] if m["angle"] is not None else m["bare"]) for m in matches
+        ]
+    return found
 
 
 def resolve_local(skill: Path, source: Path, target: str) -> Path | None:

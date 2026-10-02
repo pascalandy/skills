@@ -53,7 +53,7 @@ Skill progress:
 
 1. Run the skill validator on the target skill. For a target document, skip this step
 2. Check the target against every BP that applies: all of them for a target skill, "Any agent document" for a target document
-3. Report the findings grouped by BP, with a count per BP and a fix per finding. End with a `Pass:` line naming every BP without findings, so each BP appears once
+3. Report the findings grouped by BP, with a count per BP and a fix per finding. End with a `Pass:` line naming every applicable BP without findings, so each applicable BP appears once
 
 ```
 BP_06 Every line relevant: 2
