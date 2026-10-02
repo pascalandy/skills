@@ -79,7 +79,7 @@ For a follow-up round on the same thread, pass the printed session to `--resume`
 
 ## Wait for a run
 
-A run often takes 5 to 15 minutes, and the launcher blocks until the child exits. In Claude Code, start the command in the background and wait for the completion notification. In Codex, run it in the foreground: the shell tool keeps a long command alive and lets you poll it until it exits. Keep the launcher in the command you run, because a harness stops a process that `&` left behind when that command ends.
+A run often takes 5 to 15 minutes, and the launcher blocks until the child exits. In Claude Code, start the command with the Bash tool's `run_in_background` set to `true` and `timeout` set to its maximum, `7200000` milliseconds, then wait for the completion notification. Bash's 30-minute background default would otherwise stop a run before the launcher's 2-hour `--timeout`. In Codex, run it in the foreground: the shell tool keeps a long command alive and lets you poll it until it exits. Keep the launcher in the command you run, because a harness stops a process that `&` left behind when that command ends.
 
 ## Limits
 
