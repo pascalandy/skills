@@ -48,6 +48,25 @@ def test_this_skill_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(capsys, THIS_SKILL) == (0, [])
 
 
+def test_exclude_skips_findings_in_copied_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = skill(
+        tmp_path,
+        "See [ads](vendor/ads.md) and [mine](mine.md).\n",
+        files={"vendor/ads.md": "[gone](../gone.md)\n", "mine.md": "[gone](gone.md)\n"},
+    )
+
+    code, lines = run(capsys, root)
+    excluded = validator.main(["--exclude", str(root / "vendor"), str(root)])
+
+    assert (code, len(lines)) == (1, 2)
+    assert excluded == 1
+    assert capsys.readouterr().out.splitlines() == [
+        f"{root}/mine.md:1: error: BP_12 Links resolve: link to missing file 'gone.md'"
+    ]
+
+
 def test_clean_skill_prints_nothing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

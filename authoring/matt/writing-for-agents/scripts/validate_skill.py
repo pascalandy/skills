@@ -29,7 +29,8 @@ exit codes:
 
 examples:
   uv run path/to/writing-for-agents/scripts/validate_skill.py ../processing-pdfs
-  uv run path/to/writing-for-agents/scripts/validate_skill.py ~/.agents/skills/*"""
+  uv run path/to/writing-for-agents/scripts/validate_skill.py ~/.agents/skills/*
+  uv run path/to/writing-for-agents/scripts/validate_skill.py --exclude vendor/playbooks vendor"""
 
 # Titles match the BP lines in SKILL.md; a test keeps them in sync
 BP_TITLES = {
@@ -447,6 +448,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         metavar="SKILL_FOLDER",
         help="a folder holding SKILL.md",
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="skip findings in files under PATH, such as text copied from another repository; repeatable",
+    )
     return parser.parse_args(argv)
 
 
@@ -455,10 +464,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         findings = [finding for folder in args.folders for finding in validate(folder)]
     except UsageError as error:
-        print(f"usage: {PROG} SKILL_FOLDER [SKILL_FOLDER ...]", file=sys.stderr)
+        print(
+            f"usage: {PROG} [--exclude PATH] SKILL_FOLDER [SKILL_FOLDER ...]",
+            file=sys.stderr,
+        )
         print(f"{PROG}: error: {error}", file=sys.stderr)
         print(f"run '{PROG} --help'", file=sys.stderr)
         return 2
+    excluded = [path.resolve() for path in args.exclude]
+    findings = [
+        finding
+        for finding in findings
+        if not any(finding.path.resolve().is_relative_to(path) for path in excluded)
+    ]
     for finding in findings:
         print(finding)
     return 1 if any(finding.level == "error" for finding in findings) else 0
