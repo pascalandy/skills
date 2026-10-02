@@ -56,5 +56,17 @@
       "Ends with the BP checklist filled again, each BP ticked or open with a reason only the user can resolve, and a reason for each BP that does not apply",
       "Leaves the name change to the user, or renames the folder and the name together"
     ]
+  },
+  {
+    "skills": ["writing-for-agents"],
+    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "query": "Fix this line in the skill pdf-helper: \"Don't forget to check the element names.\" It should tell the agent to check the field names before it copies them.",
+    "files": ["evals/fixtures/messy-skill.md"],
+    "expected_behavior": [
+      "Replaces only the element-names line in pdf-helper/SKILL.md and leaves every other line unchanged",
+      "Writes the new line positively and calls them fields, such as 'Check the field names before you copy them.'",
+      "Runs the skill validator on pdf-helper and reports what it prints about other lines as findings, without fixing them",
+      "Writes no evaluation scenarios and shows no filled BP checklist"
+    ]
   }
 ]
