@@ -141,12 +141,30 @@ HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
 COREY_MODE = "authoring/corey-mode/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
+# Every compiled skill, so a new skill is validated without a new row
+SKILLS = tuple(
+    sorted(
+        path.parent.relative_to(ROOT).as_posix()
+        for path in ROOT.glob("skills/*/SKILL.md")
+    )
+)
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
     Check("compile", uv_run("scripts/compile_skills.py", "--check")),
     Check("remote-skills", uv_run("scripts/remote_skills.py", "--check")),
     Check("cli-block", uv_run("scripts/check_cli_block.py")),
+    # The compiled validator names no package, so this runs on every change.
+    # corey-mode's playbooks are Corey Haines' text, pinned by its upstream lock
+    Check(
+        "skills",
+        uv_run(
+            "skills/writing-for-agents/scripts/validate_skill.py",
+            "--exclude",
+            "skills/corey-mode/playbooks",
+            *SKILLS,
+        ),
+    ),
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
