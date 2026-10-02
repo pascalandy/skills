@@ -16,7 +16,8 @@ Write documents an agent reads so that it takes the same _process_ every run: a 
 
 ## Pick the branch
 
-- **Create, edit, or improve a target skill**: follow [Create, edit, or improve a skill](#create-edit-or-improve-a-skill)
+- **Make an edit the request spells out in a target skill**, such as a one-line fix from an issue: apply the BPs to the lines you write or change, and run the skill validator. Done when it reports nothing about your lines; report what it prints about other lines as findings
+- **Create or improve a target skill, or make an edit the request leaves open**: follow [Create, edit, or improve a skill](#create-edit-or-improve-a-skill)
 - **Review a target skill or target document**: follow [Review](#review)
 - **Write or edit a target document**: apply the "Any agent document" BPs to the lines you write or change, and report other lines that break one as findings; the skill validator does not apply
 
@@ -83,7 +84,7 @@ The link check covers inline links with at most one level of parentheses, angle-
 
 ## Best practices checklist
 
-To create, edit, or improve a target skill, copy the IDs and titles into your reply and fill them in: for an existing skill once before your changes (Step 1) and once at the end (Step 8), for a new skill at the end. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails. A review reports in its own format instead, and a target document uses "Any agent document" alone.
+On the [Create, edit, or improve a skill](#create-edit-or-improve-a-skill) branch, copy the IDs and titles into your reply and fill them in: for an existing skill once before your changes (Step 1) and once at the end (Step 8), for a new skill at the end. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails. A review reports in its own format instead, and a target document uses "Any agent document" alone.
 
 IDs never change and are never reused. To change a practice, move its line under a `### Voided` heading at the end with `void <date>, replaced by BP_NN`, and give the new practice the next free ID.
 
