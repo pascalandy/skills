@@ -26,5 +26,5 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | tavily | Use when the user explicitly requests Tavily. Never run automatically. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
 | unslop | Use when communicating directly with the user or writing and editing documents. |
-| writing-for-agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. |
+| writing-for-agents | Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read. |
 | writing-great-skills | Use when creating, modifying, evaluating a skill. |

@@ -1,0 +1,44 @@
+[
+  {
+    "skills": ["writing-for-agents"],
+    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "query": "Hey, I want you to review the skill pdf-helper. Please make sure we are using best practices and that the skill is optimized from the guidelines of writing-for-agents. Report the findings without editing files.",
+    "files": ["evals/fixtures/messy-skill.md"],
+    "expected_behavior": [
+      "Runs the skill validator from the writing-for-agents folder on pdf-helper, not on writing-for-agents",
+      "Groups the findings by BP ID with a count per BP, and ends with a Pass line so every BP appears once",
+      "Reports BP_13: the name PDF_Helper breaks the format and does not match the folder pdf-helper",
+      "Reports BP_14: the description says what the skill is, not when to load it",
+      "Reports BP_07 for the before/after August 2025 instructions and BP_12 for the backslash path and the missing advanced.md",
+      "Reports at least two findings the validator cannot catch: BP_19 for 'Claude should', BP_06 for 'Be thorough', BP_03 for field, box, and element, BP_05 for 'Don't forget', or BP_18 for the pdf library with no install step",
+      "Gives each finding a file:line and a concrete fix, and edits no file"
+    ]
+  },
+  {
+    "skills": ["writing-for-agents"],
+    "setup": "Start in an empty folder",
+    "query": "Create a skill that converts a CSV file into a Markdown table. Put it in a folder named after the skill.",
+    "files": [],
+    "expected_behavior": [
+      "Writes three evaluation scenarios before writing the instructions",
+      "Names the skill with lowercase letters, digits, and hyphens, matching its folder, such as converting-csv-to-markdown",
+      "Writes a description that says when to load the skill",
+      "Ships a script that does the conversion and tells the agent to run it",
+      "Names the tool the script needs, with its install command, before the first step that uses it",
+      "Runs the skill validator on the new skill and ends with it printing nothing",
+      "Keeps SKILL.md under 500 lines"
+    ]
+  },
+  {
+    "skills": ["writing-for-agents"],
+    "setup": "In an empty folder, copy evals/fixtures/agents-md.md to AGENTS.md and run the query from that folder",
+    "query": "Add a rule to AGENTS.md: never commit without running the checks first.",
+    "files": ["evals/fixtures/agents-md.md"],
+    "expected_behavior": [
+      "Merges the rule with the existing just check line instead of adding a second line about the same checks",
+      "Phrases the rule positively, such as 'Run just check before every commit and push'",
+      "Does not run the skill validator and adds no frontmatter",
+      "Leaves the unrelated release rule unchanged"
+    ]
+  }
+]

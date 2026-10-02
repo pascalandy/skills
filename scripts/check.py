@@ -140,6 +140,7 @@ IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
 HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
 COREY_MODE = "authoring/corey-mode/scripts"
+WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
@@ -255,6 +256,13 @@ CHECKS = [
         *ruff(HEADLESS),
         pyright(HEADLESS),
         pytest(f"{HEADLESS}/tests"),
+    ),
+    Check(
+        "writing-for-agents",
+        *ruff(f"{WRITING_FOR_AGENTS}/scripts"),
+        pyright(f"{WRITING_FOR_AGENTS}/scripts", python="3.10"),
+        pytest(f"{WRITING_FOR_AGENTS}/scripts/tests"),
+        uv_run(f"{WRITING_FOR_AGENTS}/scripts/validate_skill.py", WRITING_FOR_AGENTS),
     ),
     Check(
         "image-creator",
