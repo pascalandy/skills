@@ -40,7 +40,10 @@ optional impediments.
    comments before writing. For read-only requests, return the label diff, summaries,
    and any requested comment preview, then stop
 4. **Reconcile.** For setup-only requests, first read the repository label catalog.
-   For authorized writes, create missing labels from the JSON below.
+   For authorized writes, create missing labels from the JSON below before any
+   issue write names them. GitHub creates an unknown label on the fly, without
+   its color or description, so when no available tool can create a label, leave
+   it off and report it as missing.
    Update metadata only when existing meanings match. Report equivalent names,
    case variants, and semantic conflicts with proposed mappings and affected issues.
    Ask the user whether to migrate and agree on scope before changing legacy labels;
