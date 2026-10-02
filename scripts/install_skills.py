@@ -86,7 +86,8 @@ RUNTIME_NAMES = frozenset(
 RUNTIME_PREFIXES = (".coverage.", "._")
 RUNTIME_SUFFIXES = (".pyc", ".pyo", ".tsbuildinfo", ".swp", ".swo", "~")
 # What a tool or Finder regenerates. A move leaves these behind in the old
-# authoring/ folder, since git keeps a directory holding ignored files
+# folder, since git keeps a directory holding ignored files. Narrower than
+# RUNTIME_NAMES, whose build/ and dist/ may hold work
 DISPOSABLE = frozenset(
     {".DS_Store", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
 )
@@ -103,8 +104,8 @@ Each run prints one line per change: add, update, or remove, then a tab and
 the installed path. A dry run prints the same lines and writes nothing; a run
 with nothing to change prints nothing. A conflict, a symlink or wrong type at
 a target path, blocks the install and is reported on stderr. An apply also
-deletes each authoring/ folder a move left holding only caches, and warns
-about one holding other ignored files.
+deletes each authoring/ or skills/ folder a move left holding only caches,
+and warns about one holding other ignored files.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -566,12 +567,18 @@ def report(
 
 
 def prune_leftovers() -> None:
-    """Delete each authoring/ category or package folder that holds no file git
-    lists and only DISPOSABLE entries; warn about one holding anything else.
-    An empty folder may be a skill in the making, so it stays."""
+    """Delete each skills/ folder, and each authoring/ category or package
+    folder, that holds no file git lists and only DISPOSABLE entries; warn
+    about one holding anything else. An empty folder may be a skill in the
+    making, so it stays."""
+    compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
+    candidates = [
+        folder
+        for folder in sorted(compile_skills.OUTPUT.iterdir())
+        if folder.name not in compiled
+    ]
     listed = {path.parts[1:3] for path in compile_skills.git_files("authoring")}
     categories = {parts[0] for parts in listed}
-    candidates: list[Path] = []
     for folder in sorted(compile_skills.AUTHORING.iterdir()):
         if folder.name not in categories:
             candidates.append(folder)
@@ -674,8 +681,8 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
-        prune_leftovers()
         compile_skills.compile_tree()
+        prune_leftovers()
         execute(home, {**sources, **codex}, commands, actions)
         return output
 

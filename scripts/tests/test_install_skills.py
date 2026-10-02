@@ -285,10 +285,12 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
     with (repo / ".gitignore").open("a") as ignore:
         ignore.write(".DS_Store\n.env\nnode_modules/\n")
     skill(repo / "authoring", "solo")
+    skill(repo / "skills", "solo")
     commit(repo)
     for path in (
         "authoring/retired/beta/__pycache__/beta.pyc",
         "authoring/content/gone/.DS_Store",
+        "skills/retired/.DS_Store",
         "authoring/kept/.env",
         "authoring/solo/scripts/node_modules/dep.js",
     ):
@@ -311,6 +313,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         for folder in (
             "authoring/retired",
             "authoring/content/gone",
+            "skills/retired",
             "authoring/kept",
             "authoring/solo/scripts/node_modules",
             "authoring/content/empty",
@@ -318,6 +321,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
     } == {
         "authoring/retired": False,
         "authoring/content/gone": False,
+        "skills/retired": False,
         "authoring/kept": True,
         "authoring/solo/scripts/node_modules": True,
         "authoring/content/empty": True,

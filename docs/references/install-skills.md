@@ -19,7 +19,7 @@ date_updated: 2026-10-02
 - A name that is both public and private stops the run; delete the stale copy it names
 - A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
-- Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old `authoring/` folder behind. An apply deletes each such category or package folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply warns with the file's path
+- Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old folder in `authoring/` or `skills/` behind. An apply deletes each such category, package, or skill folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply warns with the file's path
 
 ## Commands
 
