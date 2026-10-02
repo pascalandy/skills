@@ -54,7 +54,7 @@ CONTENTS_SEARCH_LINES = 25
 NAME_CHARS_RE = re.compile(r"[a-z0-9-]+")
 XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 # A description that limits firing to an invocation must use the BP_21 form
-INVOKE_ONLY_RE = re.compile(r"use only when\b.*\binvok", re.IGNORECASE)
+INVOKE_ONLY_RE = re.compile(r"use only when\b.*\b(?:invok|mention)", re.IGNORECASE)
 INVOKE_FORM_RE = re.compile(r"Use only when explicitly invoked as `[^`]+`")
 ACTOR_RE = re.compile(r"\bthe user\b", re.IGNORECASE)
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")

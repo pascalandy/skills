@@ -315,20 +315,36 @@ def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         name="actor",
         description='"Use only when the user invokes `actor`."',
     )
+    mention = skill(
+        tmp_path,
+        folder="mention",
+        name="mention",
+        description='"Use only when the user mentions `mention`."',
+    )
+    by_user = skill(
+        tmp_path,
+        folder="by-user",
+        name="by-user",
+        description='"Use only when explicitly invoked as `by-user` by the user."',
+    )
     model = skill(
         tmp_path,
         folder="model",
         name="model",
         description='"Use when the user asks to fill a PDF form."',
     )
+    actor_message = "names an actor, 'the user'; a delegated prompt would be refused"
     form = (
         "start with 'Use only when explicitly invoked as `word`', the word in backticks"
     )
-    assert run(capsys, good, bare, actor, model) == (
+    assert run(capsys, good, bare, actor, mention, by_user, model) == (
         0,
         [
             f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
             f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: names an actor, 'the user'; a delegated prompt would be refused",
             f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
+            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{by_user}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
         ],
     )
