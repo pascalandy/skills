@@ -10,7 +10,7 @@ pre-commit:
       glob: "authoring/**/SKILL.md"
       run: just check-frontmatter
     compiled-skills:
-      glob: "{authoring,skills}/**/*"
+      glob: "{authoring/**/*,skills/**/*,docs/references/skill-count.md}"
       run: just compile-skills --check
     remote-skills:
       glob: "{skills/**/SKILL.md,docs/references/remote-skills*.md}"
