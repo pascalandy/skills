@@ -971,14 +971,30 @@ def _parse_json_document(content: str, stream: str) -> dict[str, object]:
     return payload
 
 
+def _reported_error(stderr: str) -> str:
+    """`: <code>: <message>` from transcript's JSON error on stderr, or nothing."""
+    try:
+        payload = json.loads(stderr)
+    except json.JSONDecodeError:
+        return ""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return ""
+    code, message = error.get("code"), error.get("message")
+    if not isinstance(code, str) or not isinstance(message, str):
+        return ""
+    return f": {code}: {message}"
+
+
 def parse_expected_output(
     process: CapturedProcess, expectation: OutputExpectation
 ) -> dict[str, object]:
     """Parse only the declared public stream and enforce its exit contract."""
-    _require(
-        process.exit_code in expectation.exit_codes,
-        f"transcript exited {process.exit_code}; expected {expectation.exit_codes}",
-    )
+    if process.exit_code not in expectation.exit_codes:
+        raise AssertionError(
+            f"transcript exited {process.exit_code}; expected {expectation.exit_codes}"
+            + _reported_error(process.stderr)
+        )
     kind = expectation.kind
     if kind == "json-by-exit":
         kind = "stdout-json" if process.exit_code == 0 else "stderr-json"

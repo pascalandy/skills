@@ -276,6 +276,31 @@ def test_response_contract_enforces_json_streams():
         )
 
 
+@pytest.mark.parametrize(
+    ("stderr", "verdict"),
+    [
+        (
+            '{"ok": false, "error": {"code": "transcription_failed", '
+            '"message": "yt-dlp failed: HTTP Error 403: Forbidden"}}\n',
+            "transcript exited 1; expected (0,): transcription_failed: "
+            "yt-dlp failed: HTTP Error 403: Forbidden",
+        ),
+        ("Traceback (most recent call last):\n", "transcript exited 1; expected (0,)"),
+        ("", "transcript exited 1; expected (0,)"),
+        ('{"ok": false, "error": {"code": 3}}\n', "transcript exited 1; expected (0,)"),
+    ],
+)
+def test_a_wrong_exit_code_names_the_error_transcript_reported(stderr, verdict):
+    failed = verify_transcript.CapturedProcess((), 1, "", stderr, 0.1, False)
+
+    with pytest.raises(AssertionError) as raised:
+        verify_transcript.parse_expected_output(
+            failed, verify_transcript.OutputExpectation("stdout-json", (0,))
+        )
+
+    assert str(raised.value) == verdict
+
+
 def test_a_doctor_report_is_read_from_the_stream_its_exit_code_names():
     by_exit = verify_transcript.OutputExpectation("json-by-exit", (0, 1))
     ready = verify_transcript.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
