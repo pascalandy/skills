@@ -1,8 +1,6 @@
 [
   {
-    "skills": [
-      "label-for-issues"
-    ],
+    "skills": ["label-for-issues"],
     "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
     "query": "Triage issue #225 in pascalandy/skills. Read-only: tell me which labels you would change, and change nothing.",
     "files": [],
@@ -14,9 +12,7 @@
     ]
   },
   {
-    "skills": [
-      "label-for-issues"
-    ],
+    "skills": ["label-for-issues"],
     "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
     "query": "Preview the decision comment you would post on issue #273 in pascalandy/skills. Do not post it.",
     "files": [],
@@ -28,9 +24,7 @@
     ]
   },
   {
-    "skills": [
-      "label-for-issues"
-    ],
+    "skills": ["label-for-issues"],
     "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
     "query": "I'm about to file an issue in pascalandy/skills titled 'replay-routing: a pipe inside a request cell splits the row'. Which labels should it get? Don't create it.",
     "files": [],
