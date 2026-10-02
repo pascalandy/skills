@@ -182,6 +182,28 @@ def test_every_private_package_installs_and_duplicates_are_all_named(
     assert "skill 'gamma' is public and private" in duplicate.stderr
 
 
+def test_a_worktree_installs_the_main_checkouts_private_skills(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    skill(repo / "_skills_private/content", "secret", "private")
+    worktree = repo.parent / "worktree"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(worktree)], cwd=repo, check=True
+    )
+
+    applied = run(worktree, home, "--json")
+
+    assert applied.returncode == 0, applied.stderr
+    assert {a["name"] for a in report(applied)} == {"alpha", "secret"}
+    assert all(
+        (home / target / "secret/SKILL.md").read_text(encoding="utf-8")
+        == "# secret\n\nprivate\n"
+        for target in MAC
+    )
+    assert not (worktree / "_skills_private").exists()
+
+
 def test_private_skill_promotes_to_public_without_flags(
     sandbox: tuple[Path, Path],
 ) -> None:
