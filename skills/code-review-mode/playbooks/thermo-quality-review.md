@@ -46,6 +46,7 @@ Apply the baseline prompt above, plus these explicit review rules:
    - Treat brittle, ad-hoc, or "magic" behavior as a code-quality problem.
    - Be skeptical of generic mechanisms that hide simple data-shape assumptions.
    - Flag thin abstractions, identity wrappers, or pass-through helpers that add indirection without buying clarity.
+   - Settle a doubtful abstraction with the deletion test: imagine deleting it. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.
 
 5. **Push hard on type and boundary cleanliness when they affect maintainability.**
    - Question unnecessary optionality, `unknown`, `any`, or cast-heavy code when a clearer type boundary could exist.
