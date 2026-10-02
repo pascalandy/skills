@@ -56,7 +56,7 @@ Order the plan's PRs as they must be implemented, each with its reason:
 2. `architecture-review` second: the chosen candidate reshapes the modules on that test net.
 3. `thermo-quality-review` last: polish spent on code the architecture PR removes is wasted.
 
-Include only PRs with work to do. Each lists its findings and the check that proves it. When `architecture-review` returns candidates, recommend one and ask which to build. Mark findings in code a candidate would remove as depending on that candidate. Before the quality PR, rerun `thermo-quality-review` on the code the architecture PR leaves. When the target has almost no tests, the first PR adds behavior tests at the outer boundary, under the authoring gate.
+Include only PRs with work to do. Each lists its findings and the check that proves it. When `architecture-review` returns candidates, recommend one and ask which to build. Mark findings in code a candidate would remove as depending on that candidate. In the architecture PR, delete an old test only after recording the candidate evidence that `test-audit` requires. Before the quality PR, rerun `thermo-quality-review` on the code the architecture PR leaves. When the target has almost no tests, the first PR adds behavior tests at the outer boundary, under the authoring gate.
 
 The plan is the deliverable. When the request asks for changes, build one PR at a time in the plan's order.
 
