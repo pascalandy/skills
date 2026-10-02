@@ -1,0 +1,8 @@
+---
+name: "demo"
+description: "Use when summing a price list."
+---
+
+# Demo
+
+Run `total()` on the list. Round the result to two decimals before you report it.
