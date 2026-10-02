@@ -32,6 +32,11 @@ git config rerere.enabled true         # remember conflict resolutions
 git config remote.pushDefault origin   # required if the repo has more than one remote
 ```
 
+If `gh auth status` fails, build the stack by hand: one branch per layer, each branched from the
+layer below, and each PR opened with the layer below as its base. Replace `gh stack rebase` with
+`git rebase --onto <layer below> <its old tip> <branch>`, which replays only the branch's own
+commits, and `gh stack push` with `git push --force-with-lease`.
+
 ## Non-interactive use
 
 `gh stack` branches on whether **stdout is a TTY**. Piped, most commands error cleanly or print
@@ -46,7 +51,7 @@ Agent harnesses differ, so always pass the flags below instead of relying on tha
 |---|---|---|
 | `gh stack view --json` | `gh stack view` | opens a TUI under a PTY |
 | `gh stack submit --auto` | `gh stack submit` | prompts for a title per new PR |
-| `gh stack merge <target> --yes` | `gh pr merge` | `gh pr merge` cannot merge a stack |
+| `gh stack merge <target> --yes` | `gh pr merge` | GitHub refuses it for any PR in a stack |
 | `gh stack init <branch>...` | `gh stack init` | prompts for branch names |
 | `gh stack add <branch>` | `gh stack add` | prompts for a name, and fails even when piped |
 | `gh stack checkout <target>` | `gh stack checkout` | opens a selection menu |
@@ -88,6 +93,11 @@ gh stack view --json            # confirm
 Add `--open` to `submit` to create PRs ready for review instead of drafts. Branch names are
 verbatim — `gh stack add refactor/foo` creates `refactor/foo`.
 
+`init` creates a missing first branch from the local trunk, which can lag `origin/<trunk>`, for
+example when another worktree has it checked out. To start from the remote trunk, run
+`git fetch origin` and `git switch -c <branch> origin/<trunk>` first; `init` adopts an existing
+branch.
+
 ## Staying in sync
 
 ```bash
@@ -101,7 +111,9 @@ diverged, `sync` prints both chains, makes no changes, and exits 0 with `Sync ab
 
 ## Merging
 
-Scope the merge with an argument:
+On a stack's own branch, `gh stack merge --yes` merges the whole stack; `gh stack view --json`
+prints no stack number to look up. Otherwise, scope the merge with an argument. A bare number is
+read as a stack number first, then as a PR number:
 
 ```bash
 gh stack merge 42 --yes          # PR #42 plus every unmerged PR below it
@@ -112,6 +124,9 @@ gh stack merge 42 --yes --squash # or --merge, --rebase, --merge-method <method>
 Pass a PR number to merge that PR and every unmerged PR below it, or a stack number to merge every
 unmerged PR in that stack. The operation is all-or-nothing: if any PR in that set cannot merge,
 none do.
+
+With GitHub's default squash setting, a PR with one commit lands under that commit's subject, not
+the PR title. Before `--squash`, make the two match: amend the commit or retitle the PR.
 
 Without a method flag the last-used method is reused. If the base branch uses a merge queue, the
 stack is queued instead and the queue picks the method, ignoring any flag you passed with a
@@ -125,11 +140,12 @@ them, branch on exit codes instead.
 ```
 trunk           string
 currentBranch   string
-branches[]      name, head, base, isCurrent, isMerged, isQueued, needsRebase
+branches[]      name, base, isCurrent, isMerged, isQueued, needsRebase
 branches[].pr   number, url, state ("OPEN" | "MERGED" | "QUEUED"); absent when no PR exists
 ```
 
-`base` is the saved SHA of the parent branch that this branch was last known to contain. It may be
+No field holds a branch's tip; read it with `git rev-parse <name>`. `base` is the saved SHA of the
+parent branch that this branch was last known to contain. It may be
 older than the parent's current tip. `needsRebase` is true when the current parent tip is no longer
 an ancestor of the branch.
 
@@ -139,7 +155,7 @@ an ancestor of the branch.
 |---|---|---|
 | 0 | Success | — |
 | 1 | Generic error | Read stderr |
-| 2 | Not in a stack | `gh stack init`, or `gh stack checkout <target>` |
+| 2 | Not in a stack | `gh stack init`, or `gh stack checkout <target>`; for open PRs never linked, `gh stack link <pr>...` bottom to top |
 | 3 | Rebase conflict | Follow the Exit 3 recovery below |
 | 4 | GitHub API failure | Check `gh auth status`, retry |
 | 5 | Invalid arguments | Fix the invocation; see `<command> --help` |

@@ -166,7 +166,7 @@ Removes the stack **grouping** only. It never deletes pull requests or branches.
   than merged; the queue chooses the method and any method flag you passed is ignored with a
   warning. Queued PRs are submitted together but land as the queue processes them, so they may merge
   in separate groups rather than all at once.
-- `gh pr merge` cannot merge a stack. Always use `gh stack merge`.
+- GitHub refuses `gh pr merge` for any PR in a stack, even the bottom one. Use `gh stack merge`.
 
 ## Navigation
 
