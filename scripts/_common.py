@@ -153,6 +153,8 @@ def run_git(
 def main_checkout(root: Path) -> Path:
     """The repository's first working tree, which its worktrees share; `root` when
     git cannot list the working trees."""
+    if shutil.which("git") is None:
+        return root
     listed = run_git("worktree", "list", "--porcelain", cwd=root)
     first = listed.stdout.partition("\n")[0]
     if listed.returncode or not first.startswith("worktree "):
