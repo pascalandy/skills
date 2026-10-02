@@ -40,7 +40,7 @@
       "Merges the rule with the existing just check line instead of adding a second line about the same checks",
       "Phrases the rule positively, such as 'Run just check before every commit and push'",
       "Does not run the skill validator and adds no frontmatter",
-      "Leaves the unrelated release rule unchanged"
+      "Leaves every line the request does not need unchanged, including 'Never skip the formatter' and the release rule, and may report the formatter line as a BP_05 finding"
     ]
   },
   {
