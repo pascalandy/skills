@@ -105,7 +105,7 @@ the installed path. A dry run prints the same lines and writes nothing; a run
 with nothing to change prints nothing. A conflict, a symlink or wrong type at
 a target path, blocks the install and is reported on stderr. An apply also
 deletes each authoring/ or skills/ folder a move left holding only caches,
-and warns about one holding other ignored files.
+and warns about one holding other ignored files or one it cannot delete.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -566,11 +566,43 @@ def report(
     }
 
 
+def prune(folder: Path) -> None:
+    """Delete a folder holding only DISPOSABLE entries, or warn about the first
+    other entry. It deletes those entries, then each folder deepest first, so a
+    file saved meanwhile survives and the rmdir of its folder fails."""
+    disposable: list[Path] = []
+    folders: list[Path] = []
+    for directory, names, files in os.walk(folder):
+        here = Path(directory)
+        folders.append(here)
+        disposable += [here / name for name in (*names, *files) if name in DISPOSABLE]
+        names[:] = [name for name in names if name not in DISPOSABLE]
+        # os.walk lists a directory symlink but never enters it
+        kept = [name for name in files if name not in DISPOSABLE]
+        kept += [name for name in names if (here / name).is_symlink()]
+        if kept:
+            log.warning(
+                "warning: %s holds only ignored files, such as %s; "
+                "delete it once nothing in it is needed",
+                folder.relative_to(ROOT),
+                (here / kept[0]).relative_to(ROOT),
+            )
+            return
+    for path in disposable:
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    for here in reversed(folders):
+        here.rmdir()
+    log.info("prune %s", folder.relative_to(ROOT))
+
+
 def prune_leftovers() -> None:
-    """Delete each skills/ folder, and each authoring/ category or package
-    folder, that holds no file git lists and only DISPOSABLE entries; warn
-    about one holding anything else. An empty folder may be a skill in the
-    making, so it stays."""
+    """Prune each skills/ folder, and each authoring/ category or package
+    folder, that holds no file git lists. An empty folder may be a skill in the
+    making, so it stays. A folder it cannot delete gets a warning, since the
+    install it follows already succeeded."""
     compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
     candidates = [
         folder
@@ -589,22 +621,17 @@ def prune_leftovers() -> None:
                 if (folder.name, package.name) not in listed
             ]
     for folder in candidates:
-        if folder.is_symlink() or not folder.is_dir() or not any(folder.iterdir()):
+        if folder.is_symlink() or not folder.is_dir():
             continue
-        for directory, folders, files in os.walk(folder):
-            folders[:] = [name for name in folders if name not in DISPOSABLE]
-            kept = [name for name in files if name not in DISPOSABLE]
-            if kept:
-                log.warning(
-                    "warning: %s holds only ignored files, such as %s; "
-                    "delete it once nothing in it is needed",
-                    folder.relative_to(ROOT),
-                    Path(directory, kept[0]).relative_to(ROOT),
-                )
-                break
-        else:
-            shutil.rmtree(folder)
-            log.info("prune %s", folder.relative_to(ROOT))
+        try:
+            if any(folder.iterdir()):
+                prune(folder)
+        except OSError as error:
+            log.warning(
+                "warning: could not delete %s: %s",
+                folder.relative_to(ROOT),
+                error.strerror or error,
+            )
 
 
 def install(args: argparse.Namespace) -> str:
@@ -682,8 +709,8 @@ def install(args: argparse.Namespace) -> str:
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
         compile_skills.compile_tree()
-        prune_leftovers()
         execute(home, {**sources, **codex}, commands, actions)
+        prune_leftovers()
         return output
 
 

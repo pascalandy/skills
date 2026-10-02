@@ -283,7 +283,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
 ) -> None:
     repo, home = sandbox
     with (repo / ".gitignore").open("a") as ignore:
-        ignore.write(".DS_Store\n.env\nnode_modules/\n")
+        ignore.write(".DS_Store\n.env\nnode_modules/\n.vscode/\n")
     skill(repo / "authoring", "solo")
     skill(repo / "skills", "solo")
     commit(repo)
@@ -297,6 +297,8 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         (repo / path).parent.mkdir(parents=True)
         (repo / path).write_text("ignored\n")
     (repo / "authoring/content/empty").mkdir()
+    (repo / "authoring/linked/.vscode").mkdir(parents=True)
+    (repo / "authoring/linked/.vscode/notes").symlink_to(home.parent)
 
     assert run(repo, home, "--dry-run").returncode == 0
     assert (repo / "authoring/retired").exists()
@@ -306,6 +308,8 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         (
             "warning: authoring/kept holds only ignored files, such as "
             "authoring/kept/.env; delete it once nothing in it is needed\n"
+            "warning: authoring/linked holds only ignored files, such as "
+            "authoring/linked/.vscode/notes; delete it once nothing in it is needed\n"
         ),
     )
     assert {
@@ -315,6 +319,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
             "authoring/content/gone",
             "skills/retired",
             "authoring/kept",
+            "authoring/linked",
             "authoring/solo/scripts/node_modules",
             "authoring/content/empty",
         )
@@ -323,9 +328,29 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         "authoring/content/gone": False,
         "skills/retired": False,
         "authoring/kept": True,
+        "authoring/linked": True,
         "authoring/solo/scripts/node_modules": True,
         "authoring/content/empty": True,
     }
+
+
+def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    cache = repo / "authoring/retired/__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "beta.pyc").write_text("ignored\n")
+    cache.chmod(0o500)
+    try:
+        applied = run(repo, home)
+    finally:
+        cache.chmod(0o700)
+    assert (applied.returncode, applied.stderr) == (
+        0,
+        "warning: could not delete authoring/retired: Permission denied\n",
+    )
+    assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
 
 def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
