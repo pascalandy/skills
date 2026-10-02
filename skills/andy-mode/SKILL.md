@@ -27,6 +27,7 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 | Route | Aliases | Use when |
 |---|---|---|
 | [`retro-skill`](playbooks/retro-skill.md) | `retro` | A skill loaded this session was wrong or confusing enough to cost a detour |
+| [`retro-global`](playbooks/retro-global.md) | | The agent's environment could serve the next run better: navigation, checks, steering files, or tools |
 
 ### Ideas and quality
 
