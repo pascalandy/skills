@@ -30,6 +30,8 @@ To compare a changed skill with its installed copy, copy the variant into `<cwd>
 
 Add one `{path=...,enabled=false}` entry per installed copy, such as `~/.agents/skills/<name>/SKILL.md` when that folder exists. On CLI 0.159.3, a low-effort run that reads the skill a request needs, then stops and names its path, shows which copy loads.
 
+Write a `.gitignore` holding `*` into the copied skill folder, so neither git nor the tested agent counts the copy as an uncommitted change.
+
 ## Models
 
 Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for model names and supported reasoning levels. An installed CLI's catalog can differ by sign-in and rollout; `codex debug models` shows it.

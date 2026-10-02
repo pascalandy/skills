@@ -14,4 +14,8 @@ Print mode expands `@path` mentions in the prompt: in Claude Code 2.1.284, the n
 
 `claude -p` stops background Bash tasks about five seconds after its final result. When the child delegates to another process, such as `codex exec`, the prompt must keep its turn open until that process exits.
 
+## Test a changed skill
+
+To compare a changed skill with its installed copy, copy the variant into `<cwd>/.claude/skills/<name>/` with a `.gitignore` holding `*`, and run `claude -p` yourself with `--setting-sources project`. Without that flag, the copy in `~/.claude/skills/` loads instead. A first prompt such as "Quote the description of the skill named <name>" shows which copy loaded. Skip the launcher here: its mode line tells the child that a caller reviews the result, so the child treats a typed request as delegated work.
+
 For maintenance, follow the [update checklist](../UPDATE.md).

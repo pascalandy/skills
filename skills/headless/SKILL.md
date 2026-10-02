@@ -10,7 +10,7 @@ Run Codex or Claude Code as a child agent with `scripts/headless.py`, so every h
 
 1. Pick the access the request asks for: `--review-only` or `--review-fix`
 2. Write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up
-3. Run the matching command below and wait for it to exit, as [Wait for a run](#wait-for-a-run) describes
+3. Run the matching command below and wait for it to exit, as [Wait for a run](#wait-for-a-run) describes. If the CLI it names is not installed, say so, show the command, give the same prompt file to the session's own subagent tool with the same access, and report that the requested model did not review
 4. Read the result before you report
 
 ## Review only
@@ -36,6 +36,13 @@ Keep the checkout and the reviewed artifact unchanged until the run exits. The l
 ## Review and fix
 
 The child gets the same access, with every tool, and may edit files in `--cwd` to fix what it finds. It leaves commits, pushes, and comments to you.
+
+The launcher never sandboxes Codex. When a request asks for a sandboxed fixer, such as `-s workspace-write` with `.git` read-only and no network, run `codex exec` yourself, then run the checks the child could not run offline and commit its changes:
+
+```bash
+codex exec -C /absolute/path/to/repo -s workspace-write -m gpt-6.1-sol \
+  -c model_reasoning_effort="xhigh" -o /tmp/fix.a1B2c3/answer.md - < /tmp/fix.a1B2c3/prompt.md
+```
 
 Ask Codex to review and fix:
 
