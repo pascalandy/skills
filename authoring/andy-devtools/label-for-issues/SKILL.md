@@ -14,17 +14,6 @@ optional impediments.
 
 ## Workflow
 
-Copy this checklist and track your progress:
-
-```
-Label progress:
-- [ ] Step 1: Scope
-- [ ] Step 2: Inspect
-- [ ] Step 3: Assess
-- [ ] Step 4: Reconcile
-- [ ] Step 5: Apply and verify
-```
-
 **Step 1: Scope.** Resolve the repository and the requested issues. Reviews stay
 read-only unless the user requested changes. Creating issues includes labeling them;
 creating a PR includes updating its explicitly linked issues, and a PR with no linked
