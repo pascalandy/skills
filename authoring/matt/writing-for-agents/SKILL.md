@@ -36,15 +36,15 @@ Skill progress:
 - [ ] Step 8: BP checklist complete
 ```
 
-**Step 1: BP checklist filled.** For an existing target skill, fill the [BP checklist](#best-practices-checklist) with Review steps 1 and 2, so the evaluations and fixes target what fails. Skip this step for a new skill.
+**Step 1: BP checklist filled.** For an existing target skill, fill the [BP checklist](#best-practices-checklist) with Review steps 1 and 2, so the evaluations and fixes target what fails. Done when each BP is ticked or open with its finding count. Skip this step for a new skill.
 
-**Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them without the target skill (BP_20). Skip steps 2 and 7 for a wording-only edit.
+**Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them without the target skill (BP_20). Done when each scenario has a recorded baseline. Skip steps 2 and 7 for a wording-only edit.
 
-**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21).
+**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21). Done when the description says when to load the skill and the validator reports nothing for BP_13, BP_14, or BP_21.
 
-**Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01).
+**Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01). Done when every branch has its steps and each linked file says when to read it.
 
-**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18).
+**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). Done when no step asks the agent to redo such work by hand.
 
 **Step 6: Skill validator silent.** Run the skill validator, fix each error, and rerun. Done when it prints nothing, or every warning left has a reason you tell the user.
 
