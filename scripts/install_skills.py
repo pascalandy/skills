@@ -567,19 +567,25 @@ def report(
 
 
 def prune(folder: Path) -> None:
-    """Delete a folder holding only DISPOSABLE entries, or warn about the first
-    other entry. Delete those entries, then each folder deepest first. A file
-    saved outside disposable entries survives and prevents its folder's rmdir."""
+    """Delete a folder holding only DISPOSABLE entries and empty folders, or
+    warn about the first other entry, symlinks included. A folder without a
+    DISPOSABLE entry stays, since its empty folders may be skills in the making.
+    Delete the entries, then each folder deepest first. A file saved outside
+    disposable entries survives and prevents its folder's rmdir."""
     disposable: list[Path] = []
     folders: list[Path] = []
     for directory, names, files in os.walk(folder):
         here = Path(directory)
         folders.append(here)
-        disposable += [here / name for name in (*names, *files) if name in DISPOSABLE]
-        names[:] = [name for name in names if name not in DISPOSABLE]
+        entries = (*names, *files)
+        disposable += [here / name for name in entries if name in DISPOSABLE]
         # os.walk lists a directory symlink but never enters it
-        kept = [name for name in files if name not in DISPOSABLE]
-        kept += [name for name in names if (here / name).is_symlink()]
+        kept = [
+            name
+            for name in entries
+            if (here / name).is_symlink() or (name in files and name not in DISPOSABLE)
+        ]
+        names[:] = [name for name in names if name not in DISPOSABLE]
         if kept:
             log.warning(
                 "warning: %s holds only ignored files, such as %s; "
@@ -588,8 +594,10 @@ def prune(folder: Path) -> None:
                 (here / kept[0]).relative_to(ROOT),
             )
             return
+    if not disposable:
+        return
     for path in disposable:
-        if path.is_dir() and not path.is_symlink():
+        if path.is_dir():
             shutil.rmtree(path)
         else:
             path.unlink()
@@ -600,9 +608,8 @@ def prune(folder: Path) -> None:
 
 def prune_leftovers() -> None:
     """Prune each skills/ folder, and each authoring/ category or package
-    folder, that holds no file git lists. An empty folder may be a skill in the
-    making, so it stays. A folder it cannot delete gets a warning, since the
-    install it follows already succeeded."""
+    folder, that holds no file git lists. A folder it cannot delete gets a
+    warning, since the install it follows already succeeded."""
     compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
     candidates = [
         folder
@@ -626,8 +633,7 @@ def prune_leftovers() -> None:
         if folder.is_symlink() or not folder.is_dir():
             continue
         try:
-            if any(folder.iterdir()):
-                prune(folder)
+            prune(folder)
         except OSError as error:
             log.warning(
                 "warning: could not delete %s: %s",

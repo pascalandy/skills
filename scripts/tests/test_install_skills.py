@@ -300,7 +300,8 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         (repo / path).write_text("ignored\n")
     (repo / "authoring/content/empty").mkdir()
     (repo / "authoring/linked/.vscode").mkdir(parents=True)
-    (repo / "authoring/linked/.vscode/notes").symlink_to(home.parent)
+    (repo / "authoring/linked/.vscode/node_modules").symlink_to(home.parent)
+    (repo / "authoring/fresh/draft").mkdir(parents=True)
 
     assert run(repo, home, "--dry-run").returncode == 0
     assert (repo / "authoring/retired").exists()
@@ -311,7 +312,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
             "warning: authoring/kept holds only ignored files, such as "
             "authoring/kept/.env; delete it once nothing in it is needed\n"
             "warning: authoring/linked holds only ignored files, such as "
-            "authoring/linked/.vscode/notes; delete it once nothing in it is needed\n"
+            "authoring/linked/.vscode/node_modules; delete it once nothing in it is needed\n"
         ),
     )
     assert {
@@ -324,6 +325,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
             "authoring/linked",
             "authoring/solo/scripts/node_modules",
             "authoring/content/empty",
+            "authoring/fresh/draft",
         )
     } == {
         "authoring/retired": False,
@@ -333,6 +335,7 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
         "authoring/linked": True,
         "authoring/solo/scripts/node_modules": True,
         "authoring/content/empty": True,
+        "authoring/fresh/draft": True,
     }
 
 
