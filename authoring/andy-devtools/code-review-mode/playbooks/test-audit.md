@@ -1,10 +1,3 @@
----
-name: "test-audit"
-description: "Invoke whenever writing, changing, reviewing, or sweeping tests. Authoring gate for new tests plus audit workflow for low-value, implementation-coupled, or duplicative tests and the test-only production seams they demand."
-kind: "dev"
-author: "Peter Steinberger"
----
-
 # Test Audit
 
 Three modes, one value bar. Authoring mode gates every new or changed test at
@@ -13,7 +6,7 @@ duplicate stronger proof, couple behavior to implementation, or keep test-only
 production seams alive. Continue broad audits as separate coherent follow-up
 PRs; optimize for confidence, not deletion count. Campaign mode prunes one
 whole subsystem's test surface (every test file a plugin or core area owns);
-before starting one, read [CAMPAIGN.md](CAMPAIGN.md).
+before starting one, read [CAMPAIGN.md](../references/test-audit/CAMPAIGN.md).
 
 ## Authoring gate
 
@@ -136,26 +129,24 @@ to increase deletion counts.
 
 ## Validation
 
-Never edit source or tests while Vitest is running in the checkout. Follow
-`$openclaw-testing`; route heavy proof through its `$crabbox` rules.
+Use the test runner, formatter, and changed-path gate that the repository's
+`AGENTS.md` or task runner names. Stop any test watcher in the checkout before
+editing source or tests.
 
-1. Run the smallest owner and sibling tests with
-   `node scripts/run-vitest.mjs <path-or-filter>`.
+1. Run the smallest owner and sibling tests, filtered to the changed paths.
 2. For removed source greps or plan assertions, run the executable script or
    dry-run that owns the real contract.
 3. Run targeted formatting, then `git diff --check`.
-4. Classify with
-   `node scripts/check-changed.mjs --dry-run -- <changed-paths>`, then run the
-   actual changed gate required by repository policy.
+4. Run the changed-path gate required by repository policy.
 5. Inspect `git diff --numstat`; report production/tooling separately from
    tests and test support.
 
 ## Landing and continuation
 
-Commit, push, open a PR, or land only when authorized. Use
-`$openclaw-pr-maintainer` and the repository `scripts/pr` flow. Land one
-coherent PR at a time; after landing, refresh from current `main` and rerun
-read-only discovery for the next high-confidence batch.
+Commit, push, open a PR, or land only when authorized, through the
+repository's own PR flow. Land one coherent PR at a time; after landing,
+refresh from current `main` and rerun read-only discovery for the next
+high-confidence batch.
 
 ## Handoff
 
