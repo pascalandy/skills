@@ -32,7 +32,7 @@ List proof of work from previous steps plus a completion audit.
 
 Include this section only if input is needed.
 
-If you need user input, use and reload `andy-mode ; sparring` for each unresolved decision or unapplied fix requiring user judgment.
+If you need user input, use and reload `andy-mode ; sparring` for each unresolved decision or unapplied fix requiring user judgment. When the user or the calling workflow sets a question format, such as the one in $oem, write the questions in it instead of the list below, and use sparring only to reason.
 
 For each unresolved decision, include:
 
