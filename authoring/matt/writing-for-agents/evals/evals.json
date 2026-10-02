@@ -5,7 +5,7 @@
     "query": "Hey, I want you to review the skill pdf-helper. Please make sure we are using best practices and that the skill is optimized from the guidelines of writing-for-agents. Report the findings without editing files.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
-      "Runs the skill validator from the writing-for-agents folder on pdf-helper, not on writing-for-agents",
+      "Runs the skill validator on pdf-helper, not on writing-for-agents",
       "Groups the findings by BP ID with a count per BP, and ends with a Pass line so every BP appears once",
       "Reports BP_13: the name PDF_Helper breaks the format and does not match the folder pdf-helper",
       "Reports BP_14: the description says what the skill is, not when to load it",

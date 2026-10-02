@@ -22,10 +22,10 @@ A good script:
 
 ## BP_18 Prerequisites named
 
-Name each tool a step needs, and how to install it, before the first step that uses it:
+Name each tool a step needs, how to install it, and how to confirm it is available, such as `uv --version`, before the first step that uses it:
 
 - Assumes the tool: "Use the pdf library to process the file."
-- Names it: "Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)). Run `uv run --with pypdf scripts/extract.py file.pdf`."
+- Names it: "Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)); `uv --version` confirms it. Run `uv run --with pypdf scripts/extract.py file.pdf`."
 
 A Python script with an inline dependency block (PEP 723) installs its own packages under `uv run`.
 

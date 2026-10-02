@@ -102,7 +102,7 @@ IDs never change and are never reused. To change a practice, move its line under
 - **BP_15 SKILL.md under 500 lines** _(validator)_
 - **BP_16 Contents list**: a reference file over 100 lines starts with a Contents list, added only after the user approves _(validator)_
 - **BP_17 Scripts for repeatable results**: work that must give the same result every run ships as a script the skill runs
-- **BP_18 Prerequisites named**: each tool a step needs, with its install command, before the first step that uses it
+- **BP_18 Prerequisites named**: each tool a step needs, with its install command and a check that it is available, before the first step that uses it
 - **BP_19 Works on any agent**: instructions any agent can follow; a step tied to one agent names it and gives the fallback
 - **BP_20 Evaluations first**: three scenarios and a baseline before the instructions
 
