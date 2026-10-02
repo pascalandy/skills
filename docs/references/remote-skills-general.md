@@ -21,6 +21,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | image-creator | Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter. |
 | mermaid | Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data. |
 | oem | Load at the start of every session, before the first reply. Shared definitions and conventions for every task. |
+| plan | Use on a session's first request to build or change something, and whenever planning comes up later. |
 | research | Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. |
 | tavily | Use when the user explicitly requests Tavily. Never run automatically. |
 | transcript | Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording. |
