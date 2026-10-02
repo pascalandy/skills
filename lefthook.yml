@@ -9,9 +9,9 @@ pre-commit:
     frontmatter:
       glob: "authoring/**/SKILL.md"
       run: just check-frontmatter
-    flattened-skills:
-      glob: "{authoring,skills}/**/*"
-      run: just flatten-skills --check
+    compiled-skills:
+      glob: "{authoring/**/*,skills/**/*,docs/references/skill-count.md}"
+      run: just compile-skills --check
     remote-skills:
       glob: "{skills/**/SKILL.md,docs/references/remote-skills*.md}"
       run: just remote-skills --check

@@ -39,10 +39,10 @@ merge *args:
 install-skills *args:
     @uv run --quiet scripts/install_skills.py "$@"
 
-# Flatten authoring/ packages into skills/
+# Compile authoring/ packages into skills/
 [group('commands')]
-flatten-skills *args:
-    @uv run --quiet scripts/flatten_skills.py "$@"
+compile-skills *args:
+    @uv run --quiet scripts/compile_skills.py "$@"
 
 # Rebuild the skill tables that agents without these skills read on GitHub
 [group('commands')]

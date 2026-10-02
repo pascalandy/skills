@@ -29,7 +29,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
-import flatten_skills
+import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes
 from _common import (
     FRONTMATTER,
@@ -85,6 +85,12 @@ RUNTIME_NAMES = frozenset(
 )
 RUNTIME_PREFIXES = (".coverage.", "._")
 RUNTIME_SUFFIXES = (".pyc", ".pyo", ".tsbuildinfo", ".swp", ".swo", "~")
+# What a tool or Finder regenerates. A move leaves these behind in the old
+# folder, since git keeps a directory holding ignored files. Narrower than
+# RUNTIME_NAMES, whose build/ and dist/ may hold work
+DISPOSABLE = frozenset(
+    {".DS_Store", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+)
 CHANGES = ("add", "update", "remove")
 EXIT_CODES = exit_codes(
     {
@@ -97,7 +103,9 @@ EPILOG = """\
 Each run prints one line per change: add, update, or remove, then a tab and
 the installed path. A dry run prints the same lines and writes nothing; a run
 with nothing to change prints nothing. A conflict, a symlink or wrong type at
-a target path, blocks the install and is reported on stderr.
+a target path, blocks the install and is reported on stderr. An apply also
+deletes each authoring/ or skills/ folder a move left holding only caches,
+and warns about one holding other ignored files or one it cannot delete.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -259,12 +267,12 @@ def skill_sources(
     """Stage public packages under `stage`, add every private package, and drop
     the profile's exclusions."""
     sources: dict[str, Source] = {}
-    for name, entries in flatten_skills.collect().items():
+    for name, entries in compile_skills.collect().items():
         package = stage / name
         for source, relative in entries:
             destination = package / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            flatten_skills.publish(source, relative, destination)
+            compile_skills.publish(source, relative, destination)
         sources[name] = Source(package, "public", digest(package))
     duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
@@ -277,7 +285,7 @@ def skill_sources(
     if duplicates:
         raise ScriptError(*duplicates)
     if not sources:
-        raise ScriptError("no public skills found; run just flatten-skills")
+        raise ScriptError("no public skills found; run just compile-skills")
     return {
         name: source
         for name, source in sources.items()
@@ -287,7 +295,7 @@ def skill_sources(
 
 def command_sources() -> dict[str, Source]:
     sources: dict[str, Source] = {}
-    for relative in flatten_skills.git_files("commands"):
+    for relative in compile_skills.git_files("commands"):
         if len(relative.parts) != 2 or relative.suffix != ".md":
             continue
         path = ROOT / relative
@@ -323,11 +331,11 @@ def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source
 
 def published(directory: str) -> list[Path]:
     """List every path git history ever added under `directory`, relative to it."""
-    if flatten_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
+    if compile_skills.git("rev-parse", "--is-shallow-repository").strip() == b"true":
         raise ScriptError(
             "shallow clone hides retired skills; run git fetch --unshallow and rerun"
         )
-    listed = flatten_skills.git(
+    listed = compile_skills.git(
         "log",
         "--no-renames",
         "--diff-filter=A",
@@ -342,10 +350,10 @@ def published(directory: str) -> list[Path]:
 
 
 def owned_skills() -> set[str]:
-    """Names ever committed under skills/, plus uncommitted ones flattened there."""
+    """Names ever committed under skills/, plus uncommitted ones compiled there."""
     return {path.parts[0] for path in published("skills") if len(path.parts) > 1} | {
         path.parts[1]
-        for path in flatten_skills.git_files("skills")
+        for path in compile_skills.git_files("skills")
         if len(path.parts) > 2
     }
 
@@ -531,7 +539,7 @@ def summarize(actions: list[Action], expected: dict[str, int]) -> list[dict]:
 def install_lock() -> Path:
     """One lock per repository, shared by its worktrees and outside the home,
     so a run that fails validation still writes nothing there."""
-    common = os.fsdecode(flatten_skills.git("rev-parse", "--git-common-dir"))
+    common = os.fsdecode(compile_skills.git("rev-parse", "--git-common-dir"))
     return ROOT / common.strip() / "install-skills.lock"
 
 
@@ -556,6 +564,87 @@ def report(
         "targets": summarize(actions, expected),
         "actions": [action.__dict__ for action in actions],
     }
+
+
+def prune(folder: Path) -> None:
+    """Delete a folder holding DISPOSABLE entries and nothing else but empty
+    folders, or warn about the first other entry, a symlink included. A folder
+    without a DISPOSABLE entry stays, since git deletes the folders a pull
+    empties and only one made since lacks a cache. Delete the entries without
+    following symlinks, then each folder deepest first. A file saved outside
+    them meanwhile survives and blocks its folder's rmdir. A folder it cannot
+    scan raises before anything is deleted."""
+    disposable: list[Path] = []
+    folders: list[Path] = []
+    errors: list[OSError] = []
+    for directory, names, files in os.walk(folder, onerror=errors.append):
+        here = Path(directory)
+        folders.append(here)
+        entries = (*names, *files)
+        disposable += [here / name for name in entries if name in DISPOSABLE]
+        # os.walk lists a directory symlink but never enters it
+        kept = [
+            name
+            for name in entries
+            if (here / name).is_symlink() or (name in files and name not in DISPOSABLE)
+        ]
+        names[:] = [name for name in names if name not in DISPOSABLE]
+        if kept:
+            log.warning(
+                "warning: %s holds only ignored files, such as %s; "
+                "delete it once nothing in it is needed",
+                folder.relative_to(ROOT),
+                (here / kept[0]).relative_to(ROOT),
+            )
+            return
+    if errors:
+        raise errors[0]
+    if not disposable:
+        return
+    for path in disposable:
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    for here in reversed(folders):
+        here.rmdir()
+    log.info("prune %s", folder.relative_to(ROOT))
+
+
+def prune_leftovers() -> None:
+    """Prune each skills/ folder, and each authoring/ category or package
+    folder, that holds no file git lists. A folder it cannot delete gets a
+    warning, since the install it follows already succeeded."""
+    compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
+    candidates = [
+        folder
+        for folder in sorted(compile_skills.OUTPUT.iterdir())
+        if folder.name not in compiled
+    ]
+    listed = {path.parts[1:3] for path in compile_skills.git_files("authoring")}
+    categories = {parts[0] for parts in listed}
+    for folder in sorted(compile_skills.AUTHORING.iterdir()):
+        if folder.is_symlink():
+            continue
+        if folder.name not in categories:
+            candidates.append(folder)
+        elif not (folder / "SKILL.md").is_file():
+            candidates += [
+                package
+                for package in sorted(folder.iterdir())
+                if (folder.name, package.name) not in listed
+            ]
+    for folder in candidates:
+        if folder.is_symlink() or not folder.is_dir():
+            continue
+        try:
+            prune(folder)
+        except OSError as error:
+            log.warning(
+                "warning: could not delete %s: %s",
+                folder.relative_to(ROOT),
+                error.strerror or error,
+            )
 
 
 def install(args: argparse.Namespace) -> str:
@@ -632,8 +721,12 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
-        flatten_skills.flatten()
+        compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
+        try:
+            prune_leftovers()
+        except (OSError, ScriptError) as error:
+            log.warning("warning: could not prune leftover skill folders: %s", error)
         return output
 
 

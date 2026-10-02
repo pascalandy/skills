@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Flatten authoring packages into the published skills directory."""
+"""Compile authoring packages into the published skills directory."""
 
 from __future__ import annotations
 
@@ -15,34 +15,48 @@ import shutil
 import stat
 import subprocess
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import FRONTMATTER, frontmatter_value, run, run_script, swap
+from _common import (
+    FRONTMATTER,
+    KINDS,
+    UNKNOWN,
+    frontmatter_value,
+    kind_of,
+    run,
+    run_script,
+    swap,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"
 OUTPUT = ROOT / "skills"
+COUNT = Path("docs/references/skill-count.md")
+TOP_LEVEL = "(top level)"
 
 EPILOG = """\
 Each run prints one line per skill it changes: add, update, or remove, then a
-tab and skills/<name>. A dry run prints the same lines and changes nothing;
-a run with nothing to change prints nothing.
+tab and skills/<name>. It also writes docs/references/skill-count.md, the
+skills per category and kind, and prints a line when that page changes. A dry
+run prints the same lines and changes nothing; a run with nothing to change
+prints nothing.
 
 examples:
-  just flatten-skills
-  just flatten-skills --dry-run
-  just flatten-skills --check
-  just flatten-skills --verbose"""
+  just compile-skills
+  just compile-skills --dry-run
+  just compile-skills --check
+  just compile-skills --verbose"""
 
 EXIT_CODES = exit_codes(
     {
         0: "skills/ matches authoring/, or now does",
-        1: "flatten failed, or --check found changes",
+        1: "compile failed, or --check found changes",
     }
 )
 
-log = logging.getLogger("flatten-skills")
+log = logging.getLogger("compile-skills")
 
 
 def git(*args: str) -> bytes:
@@ -71,7 +85,7 @@ def git_files(directory: str) -> list[Path]:
 
 
 def collect() -> dict[str, list[tuple[Path, Path]]]:
-    """Map each skill to the tracked source files that flattening would copy.
+    """Map each skill to the source files that compiling would copy.
 
     A package is a folder holding a SKILL.md, either directly under authoring/
     or inside a category folder there."""
@@ -150,7 +164,7 @@ def render(source: Path, inside: Path) -> bytes:
     if header is None or frontmatter_value(text, "kind") is not None:
         return data
     end = header.end(1)
-    return f'{text[:end]}\nkind: "unknown"{text[end:]}'.encode()
+    return f'{text[:end]}\nkind: "{UNKNOWN}"{text[end:]}'.encode()
 
 
 def publish(source: Path, inside: Path, destination: Path) -> None:
@@ -212,35 +226,84 @@ def changes(expected: dict[Path, Path]) -> list[str]:
     ]
 
 
-def flatten(*, dry_run: bool = False) -> list[str]:
-    """Rebuild skills/ from authoring/ when they differ; return one change line
-    per skill, and change nothing on a dry run."""
+def count_page(expected: dict[Path, Path], compiled: int) -> str:
+    """The skill-count page: skills per authoring/ category and kind, then the
+    authoring/ total beside the `compiled` count of skills/."""
+    columns = (*KINDS, UNKNOWN)
+    counts: dict[str, Counter[str]] = {}
+    for relative, source in expected.items():
+        if relative.parts[2:] != ("SKILL.md",):
+            continue
+        package = source.parent
+        category = TOP_LEVEL if package.parent == AUTHORING else package.parent.name
+        kind = kind_of(source.read_text(encoding="utf-8"))
+        counts.setdefault(category, Counter())[kind] += 1
+    total = sum(counts.values(), Counter())
+    order = sorted(counts, key=lambda category: (category == TOP_LEVEL, category))
+
+    def row(label: str, counter: Counter[str]) -> str:
+        cells = [counter[kind] for kind in columns]
+        return f"| {label} | {' | '.join(map(str, cells))} | {sum(cells)} |\n"
+
+    return (
+        "---\nname: skill-count\n"
+        "description: How many skills authoring/ holds, by category and kind\n---\n\n"
+        "<!-- Generated from authoring/ by `just compile-skills`; do not edit -->\n\n"
+        f"| Category | {' | '.join(kind.capitalize() for kind in columns)} | Total |\n"
+        f"|---|{'---|' * (len(columns) + 1)}\n"
+        + "".join(row(category, counts[category]) for category in order)
+        + row("**Total**", total)
+        + f"\nauthoring {total.total()} · skills {compiled}\n"
+    )
+
+
+def compile_tree(*, dry_run: bool = False) -> list[str]:
+    """Rebuild skills/ and the skill-count page from authoring/ when they
+    differ; return one change line per skill or page, and change nothing on a
+    dry run."""
     if OUTPUT.is_symlink() or (OUTPUT.exists() and not OUTPUT.is_dir()):
         raise ScriptError(
             "skills/ must be a directory, not a file or symlink; "
-            "move it aside, then rerun just flatten-skills"
+            "move it aside, then rerun just compile-skills"
         )
     expected = build_expected()
     lines = changes(expected)
-    if dry_run or not lines:
-        return lines
+    if lines and not dry_run:
+        with tempfile.TemporaryDirectory(
+            prefix=".skills-compile-", dir=ROOT
+        ) as temporary:
+            staging = Path(temporary) / "skills"
+            staging.mkdir()
+            for relative, source in expected.items():
+                destination = staging / relative.relative_to("skills")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                publish(source, Path(*relative.parts[2:]), destination)
+            swap(staging, OUTPUT, Path(temporary) / "previous")
 
-    with tempfile.TemporaryDirectory(prefix=".skills-flatten-", dir=ROOT) as temporary:
-        staging = Path(temporary) / "skills"
-        staging.mkdir()
-        for relative, source in expected.items():
-            destination = staging / relative.relative_to("skills")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            publish(source, Path(*relative.parts[2:]), destination)
-        swap(staging, OUTPUT, Path(temporary) / "previous")
+    # A run with changes swaps in exactly the expected skills; otherwise
+    # skills/ stays as it is, strays included, so a dry run counts the same
+    compiled = (
+        len({relative.parts[1] for relative in expected})
+        if lines
+        else len(list(OUTPUT.glob("*/SKILL.md")))
+    )
+    page = count_page(expected, compiled)
+    target = ROOT / COUNT
+    current = target.read_text(encoding="utf-8") if target.is_file() else None
+    if page != current:
+        lines.append(f"{'add' if current is None else 'update'}\t{COUNT.as_posix()}")
+        if not dry_run:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(page, encoding="utf-8")
     return lines
 
 
 def work(args: argparse.Namespace) -> str:
-    lines = flatten(dry_run=args.dry_run or args.check)
+    lines = compile_tree(dry_run=args.dry_run or args.check)
     if args.check and lines:
         raise ScriptError(
-            "skills/ differs from authoring/; run: just flatten-skills",
+            "skills/ or the skill count differs from authoring/; "
+            "run: just compile-skills",
             detail="\n".join(lines),
         )
     return "\n".join(lines)
@@ -248,9 +311,9 @@ def work(args: argparse.Namespace) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
-        prog="just flatten-skills",
+        prog="just compile-skills",
         description=(
-            "Flatten authoring/<skill>/ and authoring/<category>/<skill>/ "
+            "Compile authoring/<skill>/ and authoring/<category>/<skill>/ "
             "packages into skills/<skill>/"
         ),
         epilog=EPILOG,
@@ -266,9 +329,10 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="dry run that exits 1 when skills/ differs, listing the changes on stderr",
+        help="dry run that exits 1 when skills/ or the skill count differs, "
+        "listing the changes on stderr",
     )
-    return run_script(parser, work, argv, debug="FLATTEN_SKILLS_DEBUG")
+    return run_script(parser, work, argv, debug="COMPILE_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

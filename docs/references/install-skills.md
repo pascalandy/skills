@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-01
+date_updated: 2026-10-02
 ---
 
 `just install-skills` installs public skills, every package in the private tree, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -19,6 +19,7 @@ date_updated: 2026-10-01
 - A name that is both public and private stops the run; delete the stale copy it names
 - A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
+- Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old folder in `authoring/` or `skills/` behind. An apply deletes each such category, package, or skill folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply warns with the file's path. A file saved outside those caches during cleanup survives. If cleanup cannot scan or delete a leftover, it warns after the install completes
 
 ## Commands
 
@@ -73,7 +74,7 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 
 ## Ownership
 
-- The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
+- The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still compiled in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
 - It also owns every package name the private clone's history ever added, so deleting a private skill and letting `just sync` commit the deletion removes its installed copies on every machine the deletion reaches. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or the private clone

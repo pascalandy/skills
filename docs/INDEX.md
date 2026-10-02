@@ -1,19 +1,19 @@
 ---
 name: Docs
-description: Script conventions, checks, installs, releases, and the remote skill tables, read on demand from AGENTS.md
+description: Script conventions, checks, installs, releases, the remote skill tables, and the skill count, read on demand from AGENTS.md
 schema_version: 3
 tags:
   - area/ea
   - kind/wiki
   - status/open
 date_created: 2026-09-26
-date_updated: 2026-09-30
+date_updated: 2026-10-02
 ---
 
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 7 | **Last updated:** 2026-09-30
+> **Total pages:** 8 | **Last updated:** 2026-10-02
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need
 
@@ -30,3 +30,4 @@ date_updated: 2026-09-30
 | `references/remote-skills-general.md` | Generated table of the `general` skills only, for someone who never writes code |
 | `references/remote-skills.md` | Generated name and description of every skill in `skills/`, grouped by kind, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |
+| `references/skill-count.md` | Generated count of skills per `authoring/` category and kind, to spot skills that appeared or vanished |
