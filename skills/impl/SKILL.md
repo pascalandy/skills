@@ -6,7 +6,7 @@ kind: "dev"
 
 # Impl
 
-Time to implement this! Invoking impl is my instruction to merge when step 6 allows it.
+Time to implement this! My "implement" or my `impl` is my instruction to merge when step 6 allows it. When neither came from me, stop after step 5 and ask before merging.
 
 #### Agency
 
@@ -37,6 +37,7 @@ Run these steps in order. Finish each one before you start the next:
 **4. External review**
 - Start a 🧰 headless `--review-fix` run in the stack's checkout and ask it: "Delegated by impl. Use $poteto-mode to review the stack at 'URL'. The solution works. Make it great and pristine while keeping the solution simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
 	- the agent leaves commits and pushes to you. Review its diff, run the checks, commit each change to the layer it belongs to with $gh-stack, and push
+- If the stack changed documented behavior, run 🧰 andy-mode ; docs, then commit its edits to the layer they belong to and push
 
 **5. Report**
 - PR links, links to the issues you filed
@@ -52,7 +53,6 @@ Run these steps in order. Finish each one before you start the next:
 **7. Close**
 - Feedback on my skills: run 🧰 andy-mode ; retro-skill-usage. Publish its issues as needed (max: 3)
 - Environment feedback: run 🧰 andy-mode ; retro-global
-- If the final code changed documented behavior, run 🧰 andy-mode ; docs
 - Say goodbye
 
 #### Rules
