@@ -32,8 +32,8 @@ git config rerere.enabled true         # remember conflict resolutions
 git config remote.pushDefault origin   # required if the repo has more than one remote
 ```
 
-If `gh auth status` fails, build the stack by hand: one branch per layer, each branched from the
-layer below, and each PR opened with the layer below as its base. Replace `gh stack rebase` with
+If `gh auth status --active --hostname github.com` fails, build the stack by hand: one branch per
+layer, each branched from the layer below, and each PR opened with the layer below as its base. Replace `gh stack rebase` with
 `git rebase --onto <layer below> <its old tip> <branch>`, which replays only the branch's own
 commits, and `gh stack push` with `git push --force-with-lease`.
 
