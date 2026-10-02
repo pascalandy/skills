@@ -23,10 +23,10 @@ Remaining triggers:
 - Parallel fan-out → the **swarm** skill for coverage matrices, races, gauntlets, and exploration partitions. Use **arena** for design or code bakeoffs with base selection and grafting.
 - Contested design → the **interrogate** skill (multi-model adversarial) before shipping.
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
-- Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skill creation and modification route to **writing-great-skills** through the runtime reference. Other agent-facing documents use **writing-for-agents**.
+- Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skills and other agent-facing documents use **writing-for-agents**, resolved through the runtime reference.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
 - Before commit → the diff cleanup procedure in [agent runtime](references/agent-runtime.md#author-clean-up-and-verify).
-- Before review → the **no-comments** skill (`/no-comments`).
+- Before review of a diff that changes source code → the **no-comments** skill (`/no-comments`).
 - Shipping UI / IDE / CLI → the project verification skill and an available shell, PTY, browser, or native application driver, as described in the runtime reference. For bug fixes, reproduce first on the same surface yourself. Hand to the user only under the narrow Bug fix step 1 exception.
 - Any PR-status request → the **Babysit** playbook (`playbooks/babysit.md`). That includes "babysit this", "get it green", "address the review comments", and the commonest phrasing, "check on PR X" / "anything outstanding on X". Never triggered by merely opening a PR. Declare its mode before polling. The playbook's step 1 owns the request-to-mode mapping. Keep long-lived supervision in the coordinator so phase workers can return their results.
 - Multiple dependent PRs for one coherent effort → before implementation, load `gh-stack` unless the active playbook already owns stack topology or landing.
