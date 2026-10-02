@@ -32,6 +32,7 @@ ENTRIES = {
     "scripts/merge.py": "just merge",
     "scripts/release_check.py": "just release-check",
     "scripts/remote_skills.py": "just remote-skills",
+    "scripts/replay_routing.py": "just replay-routing",
     "scripts/signoff.py": "just signoff",
     "scripts/sync.py": "just sync",
     "scripts/sync_fleet.py": "just sync-fleet",
