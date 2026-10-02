@@ -301,7 +301,7 @@ def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         tmp_path,
         folder="good",
         name="good",
-        description='"Use only when explicitly invoked as `good`."',
+        description='"Use only when explicitly invoked as `good`. Help the user learn Python."',
     )
     bare = skill(
         tmp_path,
@@ -333,11 +333,17 @@ def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         name="model",
         description='"Use when the user asks to fill a PDF form."',
     )
+    restricted = skill(
+        tmp_path,
+        folder="restricted",
+        name="restricted",
+        description='"Use only when debugging tests. Help the user invoke a failing test."',
+    )
     actor_message = "names an actor, 'the user'; a delegated prompt would be refused"
     form = (
         "start with 'Use only when explicitly invoked as `word`', the word in backticks"
     )
-    assert run(capsys, good, bare, actor, mention, by_user, model) == (
+    assert run(capsys, good, bare, actor, mention, by_user, model, restricted) == (
         0,
         [
             f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",

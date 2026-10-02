@@ -267,8 +267,9 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
                 f"description contains the XML tag '{tag.group(0)}'",
             )
         )
-    if INVOKE_ONLY_RE.match(field.value):
-        if not INVOKE_FORM_RE.match(field.value):
+    invocation = field.value.partition(". ")[0]
+    if INVOKE_ONLY_RE.match(invocation):
+        if not INVOKE_FORM_RE.match(invocation):
             findings.append(
                 Finding(
                     skill_md,
@@ -278,7 +279,7 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
                     "start with 'Use only when explicitly invoked as `word`', the word in backticks",
                 )
             )
-        if ACTOR_RE.search(field.value):
+        if ACTOR_RE.search(invocation):
             findings.append(
                 Finding(
                     skill_md,
