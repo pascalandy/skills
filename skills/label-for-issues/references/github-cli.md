@@ -1,4 +1,4 @@
-## GitHub CLI
+# GitHub CLI
 
 `gh` 2.94 and later manages issue relationships. On an older version, report it
 and use `gh api` for relationships. Set them with `gh issue create --parent`,

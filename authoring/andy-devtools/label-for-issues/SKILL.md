@@ -7,66 +7,85 @@ kind: "dev"
 # Label for issues
 
 Help the user decide what happens next on each issue. Labels carry the assessment;
-a decision comment is opt-in, as Ticket comments defines.
+a decision comment is opt-in, as [Decision comments](#decision-comments) defines.
 Apply this vocabulary to issues, not PRs. Keep one state and one priority
 per open triaged issue, one type except for epic parents, at most one epic role, and
 optional impediments.
 
 ## Workflow
 
-1. **Scope.** Resolve the repository and requested issues. Reviews are read-only
-   unless changes were requested. Creating issues includes labeling them; creating
-   a PR includes updating its explicitly linked issues. No linked issues means no
-   label work unless setup was requested. Limit changes to those issues and directly
-   affected epics; include closed issues only on request. Leave issue and PR
-   authoring to the caller. Do not start implementation, rewrite
-   specifications, or modify other skills as a labeling side effect
-   For setup-only requests, go directly to Reconcile
-2. **Inspect.** Read the label catalog once per run with
-   `gh label list --limit 200 --json name,color,description`, raising the limit if
-   it returns 200 rows. Read each issue with
-   `gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
-   then relevant review records and linked issue and PR states. Follow evidence that
-   could change the decision; do not audit unrelated code or tickets. Prefer current
-   object states over stale prose, but retain explicit human decisions unless new
-   evidence warrants revisiting
-3. **Assess.** Form one assessment per issue: desired labels, evidence, unresolved
-   decision or input, recommendation, next actor, and start conditions. Derive label
-   edits, a one-line summary naming the next actor, recommendation, and any blocker,
-   and any requested comment from it. Separate facts from inference and name any
-   uncertainty that could change the recommendation. Stop investigating once the
-   next action is supported; if evidence is insufficient, identify the smallest
-   question or check that would resolve it. Prepare a requested comment using Ticket
-   comments before writing. For read-only requests, return the label diff, summaries,
-   and any requested comment preview, then stop
-4. **Reconcile.** For setup-only requests, first read the repository label catalog.
-   For authorized writes, create missing labels from the JSON below before any
-   issue write names them. GitHub creates an unknown label on the fly, without
-   its color or description, so when no available tool can create a label, leave
-   it off and report it as missing.
-   Update metadata only when existing meanings match. Report equivalent names,
-   case variants, and semantic conflicts with proposed mappings and affected issues.
-   Ask the user whether to migrate and agree on scope before changing legacy labels;
-   reuse approval within that scope. Do not silently rename, delete, or reinterpret
-   labels. Preserve custom labels; continue unambiguous changes. Missing canonical
-   labels alone need no migration approval. Read-only setup returns proposed metadata
-   without writes. Setup-only requests end after label metadata is verified and reported
-5. **Apply and verify.** Reread the issue, labels, comments, and relationships before
-   writing; revise the assessment if relevant evidence changed. Apply targeted
-   label and relationship changes with `gh issue edit`, following GitHub CLI.
-   Replace only canonical labels in the same family. Read back changed labels,
-   review records, and relationships; check family exclusivity and epic membership.
-   Publish a requested decision comment using verified results, then read it back.
-   Report each issue's label changes and summary, issue and comment links, conflicts,
-   and partial failures. Without a comment request, flag an existing managed comment
-   that the new labels contradict as stale and leave it unedited. If a write times
-   out or fails, reread before retrying and perform only missing operations. Continue
-   independent issues; report triage as complete only when all requested changes
-   are verified
+Copy this checklist and track your progress:
 
-## Ticket comments
+```
+Label progress:
+- [ ] Step 1: Scope
+- [ ] Step 2: Inspect
+- [ ] Step 3: Assess
+- [ ] Step 4: Reconcile
+- [ ] Step 5: Apply and verify
+```
 
-Read [references/ticket-comments.md](references/ticket-comments.md) before you prepare a requested comment.
+**Step 1: Scope.** Resolve the repository and the requested issues. Reviews stay
+read-only unless the user requested changes. Creating issues includes labeling them;
+creating a PR includes updating its explicitly linked issues, and a PR with no linked
+issue needs no label work unless setup was requested. Limit changes to those issues
+and directly affected epics; include closed issues only on request. Leave issue and
+PR authoring to the caller, and keep implementation, specification rewrites, and
+other skills out of a labeling run. For a setup-only request, go to Step 4. Done when
+the repository, the issues, and whether writes are authorized are explicit.
+
+**Step 2: Inspect.** Read the label catalog once per run with
+`gh label list --limit 200 --json name,color,description`, raising the limit if
+it returns 200 rows. Read each issue with
+`gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
+then relevant review records and linked issue and PR states. Follow evidence that
+could change the decision, and leave unrelated code and tickets alone. Prefer current
+object states over stale prose, but retain explicit human decisions unless new
+evidence warrants revisiting. Done when each requested issue and its links are read.
+
+**Step 3: Assess.** Form one assessment per issue: desired labels, evidence,
+unresolved decision or input, recommendation, next actor, and start conditions.
+Derive from it the label edits, a one-line summary naming the next actor,
+recommendation, and any blocker, and any requested decision comment. Separate
+facts from inference and name any uncertainty that could change the recommendation.
+Stop investigating once the next action is supported; if evidence is insufficient,
+identify the smallest question or check that would resolve it. For read-only
+requests, return the label diff, summaries, and any requested decision comment
+preview, then stop. Done when each issue has its label edits and summary.
+
+**Step 4: Reconcile.** Read the repository label catalog if Step 2 did not, and
+compare it with [Labels](#labels). For authorized writes, create missing labels
+from that JSON before any issue write names them. GitHub creates an unknown label
+on the fly, without its color or description, so when no available tool can create
+a label, leave it off and report it as missing. Update metadata only when existing
+meanings match. Report equivalent names, case variants, and semantic conflicts with
+proposed mappings and affected issues. Ask the user whether to migrate and agree
+on scope before changing legacy labels; reuse approval within that scope. Rename,
+delete, or reinterpret a label only with that approval. Preserve custom labels;
+continue unambiguous changes. Missing canonical labels alone need no migration
+approval. Read-only setup returns proposed metadata without writes. Done when each
+canonical label exists or is reported missing; a setup-only request ends here,
+after reporting the verified label metadata.
+
+**Step 5: Apply and verify.** Reread the issue, labels, comments, and relationships
+before writing; revise the assessment if relevant evidence changed. Apply targeted
+label and relationship changes with `gh issue edit`, following [GitHub CLI](#github-cli).
+Replace only canonical labels in the same family. Read back changed labels, review
+records, and relationships; check family exclusivity and epic membership. Publish a
+requested decision comment using verified results, then read it back. Without a
+comment request, flag an existing decision comment that the new labels contradict as
+stale and leave it unedited. If a write times out or fails, reread before retrying
+and perform only missing operations. Continue independent issues. Report each
+issue's label changes and summary, issue and comment links, conflicts, and partial
+failures. Done when each requested change is read back as applied or reported as
+failed; call triage complete only when all of them applied.
+
+## Decision comments
+
+Write or update an issue comment only when the user explicitly asks for one.
+Triage, issue creation, PR links, and label changes do not imply a comment. When the
+user asks for one, including a read-only preview, read
+[references/decision-comments.md](references/decision-comments.md) before you prepare it.
 
 ## Classification rules
 
@@ -132,4 +151,6 @@ This JSON owns exact names, colors, and descriptions.
 
 ## GitHub CLI
 
-Read [references/github-cli.md](references/github-cli.md) before you set a relationship, search by relationship, or filter an issue list.
+Before you set a relationship, search by relationship, or filter an issue list, read [references/github-cli.md](references/github-cli.md). It holds the `gh` relationship flags, their traps, and the issue-list filters.
+
+Use [routing cases](references/routing-cases.md) when changing which file a request reads.

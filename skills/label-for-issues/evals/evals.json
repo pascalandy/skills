@@ -1,0 +1,37 @@
+[
+  {
+    "skills": ["label-for-issues"],
+    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "query": "Triage issue #365 in pascalandy/skills. Read-only: tell me which labels you would change, and change nothing.",
+    "files": [],
+    "expected_behavior": [
+      "Reads the label catalog and issue #365 with gh, and runs no gh write",
+      "Proposes exactly one state label, keeps one priority, and keeps the custom label 2-type:postmortem",
+      "Gives a one-line summary naming the next actor and the recommendation",
+      "Does not read references/decision-comments.md and drafts no comment"
+    ]
+  },
+  {
+    "skills": ["label-for-issues"],
+    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "query": "Preview the decision comment you would post on issue #273 in pascalandy/skills. Do not post it.",
+    "files": [],
+    "expected_behavior": [
+      "Reads references/decision-comments.md and the sparring playbook of andy-mode, and runs no gh write",
+      "Shows a comment that starts with the marker <!-- label-for-issues:decision --> and one H2 in the form ## #273 · <next actor and action>",
+      "Names the missing information, why it matters, and who supplies it, since #273 is labeled 1-needs-info",
+      "Describes any label edit as proposed, not done, and ends the comment with a signature line"
+    ]
+  },
+  {
+    "skills": ["label-for-issues"],
+    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "query": "I'm about to file an issue in pascalandy/skills titled 'replay-routing: a pipe inside a request cell splits the row'. Which labels should it get? Don't create it.",
+    "files": [],
+    "expected_behavior": [
+      "Reads the label catalog with gh and runs no gh write",
+      "Proposes 2-type:bug, 3-pty:p2, and one state label such as 1-needs-triage",
+      "Does not read references/decision-comments.md and drafts no comment"
+    ]
+  }
+]
