@@ -10,7 +10,7 @@ Andy-mode carries the tools Pascal wrote, one route per tool. Poteto-mode runs e
 
 ## Pick the route
 
-A request names its route after the mode, as in `andy-mode ; qa`. Compare names with case, spaces, hyphens, and underscores ignored, so `RetroSkill`, `retro skill`, and `retro-skill` name one route. An alias counts as its route's name.
+A request names its route after the mode, as in `andy-mode ; qa`. Compare names with case, spaces, hyphens, and underscores ignored, so `RetroSkillUsage`, `retro skill usage`, and `retro-skill-usage` name one route. An alias counts as its route's name.
 
 - **A name matches.** Read that route's file and follow it to the route's own result.
 - **No name, one clear owner.** Run the route whose "Use when" owns the request, and say which route you chose.
@@ -26,7 +26,7 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 
 | Route | Aliases | Use when |
 |---|---|---|
-| [`retro-skill`](playbooks/retro-skill.md) | `retro` | A skill loaded this session was wrong or confusing enough to cost a detour |
+| [`retro-skill-usage`](playbooks/retro-skill-usage.md) | | A skill loaded this session was wrong or confusing enough to cost a detour |
 | [`retro-global`](playbooks/retro-global.md) | | The agent's environment could serve the next run better: navigation, checks, steering files, or tools |
 
 ### Ideas and quality
@@ -76,6 +76,6 @@ A path that starts with `playbooks/`, `scripts/`, or `references/<route>/` names
 
 ## Callers
 
-A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill.md`. It keeps its own task and loads another route only when that playbook calls for it.
+A skill or command outside this mode reaches one route by reading its playbook in the active `andy-mode` skill directory, such as `playbooks/retro-skill-usage.md`. It keeps its own task and loads another route only when that playbook calls for it.
 
 Use [routing cases](references/routing-cases.md) when changing a route name, an alias, or this file's routing rules.
