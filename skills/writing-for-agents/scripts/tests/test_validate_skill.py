@@ -110,12 +110,16 @@ def test_description_limits(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
         tmp_path, folder="tag", name="tag", description='"Use as `tag ; <route>`."'
     )
     missing = skill(tmp_path, folder="missing", name="missing", description='""')
-    assert run(capsys, long, tag, missing) == (
+    comment = skill(
+        tmp_path, folder="comment", name="comment", description="# Add a trigger"
+    )
+    assert run(capsys, long, tag, missing, comment) == (
         1,
         [
             f"{long}/SKILL.md:3: error: BP_14 Description is a trigger: description has 1025 characters; the limit is 1024",
             f"{tag}/SKILL.md:3: error: BP_14 Description is a trigger: description contains the XML tag '<route>'",
             f"{missing}/SKILL.md:3: error: BP_14 Description is a trigger: description is missing",
+            f"{comment}/SKILL.md:3: error: BP_14 Description is a trigger: description is missing",
         ],
     )
 
@@ -142,16 +146,22 @@ def test_missing_frontmatter(
     )
 
 
-def test_body_over_500_lines(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("lines", [500, 501])
+def test_skill_md_line_limit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], lines: int
 ) -> None:
-    root = skill(tmp_path, "line\n" * 500)
-    assert run(capsys, root) == (
-        1,
-        [
-            f"{root}/SKILL.md:505: error: BP_15 SKILL.md under 500 lines: body has 501 lines; the limit is 500",
-        ],
+    root = skill(tmp_path, "line\n" * (lines - 5))
+    expected = (
+        (0, [])
+        if lines == 500
+        else (
+            1,
+            [
+                f"{root}/SKILL.md:501: error: BP_15 SKILL.md under 500 lines: file has 501 lines; the limit is 500",
+            ],
+        )
     )
+    assert run(capsys, root) == expected
 
 
 def test_code_and_outside_links_are_skipped(

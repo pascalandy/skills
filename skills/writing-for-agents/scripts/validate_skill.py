@@ -19,7 +19,8 @@ PROG = "validate_skill.py"
 
 EPILOG = """\
 Checks the best practices marked (validator) in writing-for-agents/SKILL.md:
-SKILL.md and every Markdown file it links. A clean skill prints nothing.
+SKILL.md and the Markdown files it links directly inside the skill folder.
+A clean skill prints nothing.
 
 exit codes:
   0  no errors; warnings may print
@@ -44,7 +45,7 @@ BP_TITLES = {
 # Limits from the Agent Skills specification and the strictest agent platforms
 NAME_MAX = 64
 DESCRIPTION_MAX = 1024
-BODY_MAX = 500
+SKILL_MAX = 500
 RESERVED_WORDS = ("anthropic", "claude")
 CONTENTS_THRESHOLD = 100
 CONTENTS_SEARCH_LINES = 25
@@ -54,7 +55,7 @@ XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")
 BLOCK_INDICATORS = {">", "|", ">-", "|-", ">+", "|+"}
 QUOTED_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'")
-COMMENT_RE = re.compile(r"\s+#.*$")
+COMMENT_RE = re.compile(r"(?:^|\s+)#.*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
 # Inline links and reference definitions; a bare target may hold one level of parentheses
@@ -152,7 +153,6 @@ def parse_frontmatter(lines: list[str]) -> tuple[dict[str, Field], int]:
         if match:
             key = name = match.group("key")
             value = match.group("value").strip()
-            # A block scalar's text starts on the next line
             block = COMMENT_RE.sub("", value) in BLOCK_INDICATORS
             raw[name] = ("" if block else value, index + 1, block)
         elif key and line.strip():
@@ -372,14 +372,14 @@ def validate(skill: Path) -> list[Finding]:
     lines = skill_md.read_text(encoding="utf-8").splitlines()
     fields, body_start = parse_frontmatter(lines)
     findings = check_name(skill, skill_md, fields) + check_description(skill_md, fields)
-    if (body := len(lines) - body_start) > BODY_MAX:
+    if len(lines) > SKILL_MAX:
         findings.append(
             Finding(
                 skill_md,
-                body_start + BODY_MAX + 1,
+                SKILL_MAX + 1,
                 "error",
                 "BP_15",
-                f"body has {body} lines; the limit is {BODY_MAX}",
+                f"file has {len(lines)} lines; the limit is {SKILL_MAX}",
             )
         )
     prose = prose_lines(lines, body_start)
