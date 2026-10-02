@@ -246,7 +246,11 @@ CHECKS = [
         pytest(f"{COREY_MODE}/tests"),
         uv_run(f"{COREY_MODE}/update_corey_mode.py", "check"),
     ),
-    Check("distill", pytest(f"{ANDY_MODE}/scripts/distill/tests")),
+    Check(
+        "distill",
+        *ruff(f"{ANDY_MODE}/scripts/distill"),
+        pytest(f"{ANDY_MODE}/scripts/distill/tests"),
+    ),
     Check(
         "tavily",
         pytest("authoring/andy/tavily/scripts/tests", "httpx", "rich", "respx"),
