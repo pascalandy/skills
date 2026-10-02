@@ -7,3 +7,4 @@ Replay these cases with `just replay-routing unslop`, and run `just replay-routi
 | `Use $unslop to rewrite this sentence: This pivotal release serves as a testament to our team.` | `references/english.md` | |
 | `Utilise $unslop pour réécrire cette phrase : Cette version charnière témoigne de l'engagement de notre équipe.` | `references/french.md` | |
 | `Usa $unslop para reescribir esta frase: Esta versión es un testimonio del compromiso de nuestro equipo.` | `references/english.md` | |
+| `Use $unslop to clean up this French sentence and keep it in French: Cette version charnière témoigne de l'engagement de notre équipe.` | `references/french.md` | |
