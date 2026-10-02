@@ -4,57 +4,33 @@ description: "Use when creating atomic git commits, staging logical changes, spl
 kind: "dev"
 ---
 
-# Skill: Commit
+# Commit
 
-Create atomic commits: 1 logical change/commit
+Create atomic commits: one logical change per commit. If a commit cannot be described in one sentence without "and", split it.
 
-## Rule
+## Split when
 
-If commit cannot be described in 1 sentence without "and", split it
-
-## Req behavior
-
-- Review full working tree before commit
-- Never combine unrelated changes
-- Stage and commit each logical group separately
-- Use commit body for non-trivial commits
-- When splitting commits, never use `git add .` or `git add -A`
-- Never bypass configured hooks with `--no-verify` unless the user explicitly authorizes it
-
-## Validation
-
-- Match validation to the logical change
-- Run targeted checks when the repository provides them
-- Run a full-repository suite only when the user requests it, repository policy requires it, or the change affects shared validation or broad behavior
-- Do not run a full suite such as `just ci` by default for a routine commit
-- Treat unrelated pre-existing failures as findings, not proof that the requested change failed
-- After staging, run `git diff --cached --check` and inspect the staged diff before committing
+- Changes serve different purposes or features
+- Changes use different commit types
+- Changes would not revert together
+- Docs, config, or tooling changes are unrelated to the code change
 
 ## Workflow
 
-1. Run `git status` and `git diff --stat`
-2. Review all files, not only prior work target
-3. Group changes by logical purpose
-4. Split by purpose, feature, type, or rollback boundary
-5. Run validation proportional to the current group
-6. Stage only 1 group paths: `git add <paths>`; for a file that mixes groups, `git apply --cached` a patch holding only this group's hunks
-7. Verify the exact staged content with `git diff --cached --check` and `git diff --cached`
-8. Commit each group in order and let configured hooks run
-9. Verify the created commits with `git log -n <count> --oneline` and report their hashes and subjects
+1. Run `git status`, then read `git diff` and `git diff --cached`. Review untracked files too. Done when every staged, unstaged, and untracked change is accounted for
+2. Group the changes by the rules in Split when. Done when each path, or each hunk of a file that mixes groups, belongs to one group
+3. Run the checks the repository provides for the current group, sized to the change. Run a full suite such as `just ci` only when the user requests it, repository policy requires it, or the change affects shared validation or broad behavior. Done when applicable checks pass or only unrelated pre-existing failures remain; report those failures separately
+4. Stage only the current group by path with `git add <paths>`, never `git add .` or `git add -A`. If the index already holds changes outside this group, unstage them with `git restore --staged <paths>`, which keeps them in the working tree. For a file that mixes groups, `git apply --cached` a patch holding only this group's hunks
+5. Run `git diff --cached --check` and read `git diff --cached`. Done when the check passes and the staged diff holds only this group
+6. Commit in the format below and let the configured hooks run. Pass `--no-verify` only when the user explicitly authorizes it. If a hook fails, review its changes and return to step 3. Done when the commit succeeds and `git show HEAD` contains only the validated group
+7. Repeat steps 3 to 6 for each group, in order
+8. Run `git log -n <count> --oneline` and report each commit's hash and subject exactly as `git log` prints them. Done when every group is committed
 
 ## Push authorization
 
 A commit request authorizes local commits only. The workflow is complete after local verification and reporting.
 
 Run `git push` as a separate action only when the user requests it or an existing authorization in the conversation covers that push. Reuse applicable authorization without asking again. Without it, finish locally without prompting for a push.
-
-## Split when
-
-- Changes serve different purposes
-- Changes belong to different features
-- Changes use different commit types
-- Changes would not revert together
-- Docs/config/tooling changes unrelated to code change
 
 ## Commit types
 
@@ -71,23 +47,7 @@ Run `git push` as a separate action only when the user requests it or an existin
 - `🔒 security`
 - `🚧 wip`
 
-## Skills vs docs
-
-Skill updates get their own type.
-
-Prefer `🧰 skill` for changes to skill packages, such as `authoring/**` in `pascalandy/skills`, including:
-- `SKILL.md` behavior or instructions
-- skill references, examples, metadata, or helper scripts
-- creating, editing, normalizing, or maintaining skills
-
-Use `📚 docs` for general documentation, wiki pages, READMEs, or reference prose outside skill behavior.
-
-Use `♻️ refactor` when the skill change is mostly structural, such as moving or renaming skill bundles.
-
-Examples:
-- `🧰 skill: commit: classify skill edits explicitly`
-- `🧰 skill: tavily: use skill-relative paths`
-- `♻️ refactor: toolbox: move commit skill`
+Use `🧰 skill` for changes to skill packages, such as `authoring/**` in `pascalandy/skills`: instructions, references, examples, metadata, or helper scripts. Use `♻️ refactor` when a skill change is mostly structural, such as moving or renaming skill bundles, and `📚 docs` for documentation outside skill behavior, such as wiki pages and READMEs.
 
 ## Format
 
@@ -98,27 +58,16 @@ Examples:
 - Impact: <effect on users, system, or future work>
 ```
 
-Optional fields when useful:
-- `File(s) changed:` for multi-file or non-obvious commits
-- `Nature of changes:` when category needs clarification
+Examples:
+
+- `🧰 skill: commit: classify skill edits explicitly`
+- `♻️ refactor: toolbox: move commit skill`
+
+Write the body for non-trivial commits. Optional fields, when useful: `File(s) changed:` for multi-file or non-obvious commits, and `Nature of changes:` when the type needs clarification.
 
 ## Style
 
-- Imperative mood
-- Active voice
-- Specific and concrete
-- Cut filler
-- Avoid vague claims like `improve`, `enhance`, `streamline`, `optimize` unless concrete
-- Subject <72 chars
+- Subject in the imperative mood, under 72 characters, naming what changed
+- Body says why the change matters
+- Name the concrete change instead of `improve`, `enhance`, `streamline`, or `optimize`
 - No periods at body line ends
-
-## Final check
-
-Before commit, confirm:
-- 1 logical change
-- No unrelated files staged
-- Staged diff was reviewed and passes `git diff --cached --check`
-- Validation was proportional to the change
-- Subject says what changed
-- Body says why it matters
-- Skill changes use `🧰 skill` (or `♻️ refactor` if structural)
