@@ -35,7 +35,7 @@ Run these steps in order. Finish each one before you start the next:
 - Fix every high-severity finding from both premortems, then run 🧰 2nd-pass again
 
 **4. External review**
-- Start a 🧰 headless `--review-fix` run in the stack's checkout and ask it: "Delegated by impl. Use $poteto-mode to review the stack at 'URL'. The solution works. Make it great and pristine while keeping the solution simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
+- Start a 🧰 headless `--review-fix` run in the stack's checkout and ask it: "Delegated by impl. Use $poteto-mode to review the stack at 'stack PR URLs', including the checkout's uncommitted changes. The solution works. Make it great and pristine while keeping the solution simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
 	- the agent leaves commits and pushes to you. Review its diff, run the checks, commit each change to the layer it belongs to with $gh-stack, and push
 - If the stack changed documented behavior, run 🧰 andy-mode ; docs, then commit its edits to the layer they belong to and push
 
@@ -46,7 +46,7 @@ Run these steps in order. Finish each one before you start the next:
 - Confidence to merge: XX %
 
 **6. Merge gate**
-- If confidence is at least 90 %, checks are green on every PR (or the repo has no CI and you say so), and no high-severity finding is open, land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs.
+- If confidence is at least 90 %, checks are green on every PR (or the repo has no CI and you say so), and no high-severity finding is open, land the stack with poteto's Shipping playbook, following the repository's merge and deployment procedure.
 	- if applicable, explicitly share why we don't get a 100%
 - Otherwise, ask me how to unblock it (format below).
 
