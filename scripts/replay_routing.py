@@ -75,6 +75,9 @@ LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
 
 log = logging.getLogger("replay-routing")
 
+# Running Codex sessions, stopped on an interrupt so none keeps working unwatched
+LIVE: set[subprocess.Popen[str]] = set()
+
 Kind = Literal["route", "none", "no route", "manual"]
 KINDS: dict[str, Kind] = {"none": "none", "no route": "no route", "manual": "manual"}
 
@@ -166,7 +169,7 @@ def opened_in(command: str, name: str, routes: set[str]) -> list[str]:
 
 
 def verdict(case: Case, run: Run) -> str | None:
-    """ "" when the row passed, a reason when it failed, None while undecided."""
+    """An empty reason when the row passed, a reason when it failed, None while undecided."""
     routes = run.routes()
     if case.kind == "route":
         for expected, actual in zip(case.reads, routes, strict=False):
@@ -261,6 +264,7 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
             text=True,
             start_new_session=True,
         )
+        LIVE.add(process)
         assert process.stdin and process.stdout
         process.stdin.write(case.request)
         process.stdin.close()
@@ -283,6 +287,7 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
             if process.poll() is None:
                 stop(process, group=True)
             process.wait()
+            LIVE.discard(process)
     if reason is None and timed_out.is_set():
         reason = f"no verdict within {args.timeout:g}s"
     if reason is None:
@@ -344,7 +349,12 @@ def work(args: argparse.Namespace) -> str:
     if shutil.which("codex") is None:
         raise ScriptError("codex not found on PATH; install the Codex CLI, then rerun")
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        lines = list(pool.map(lambda case: replay(case, skill, routes, args), cases))
+        try:
+            lines = list(pool.map(lambda c: replay(c, skill, routes, args), cases))
+        except BaseException:
+            for process in list(LIVE):
+                send(process, signal.SIGTERM, group=True)
+            raise
     if failed := [line for line in lines if line.startswith("fail\t")]:
         rerun = ["just replay-routing", args.skill]
         rerun += [f"--cases {args.cases}"] if args.cases else []

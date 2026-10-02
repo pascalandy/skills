@@ -22,7 +22,13 @@ Replay them with `just replay-routing corey-mode --project authoring/corey-mode/
 | `$matt-mode grill me: should Acme Notes do its marketing through a podcast?` | manual |  |
 | `marketing: set up social listening for Acme Notes` | `playbooks/social/social.md` | `Route: social` |
 
-Judge three things by hand, from a full run: row 4 opens with a route line naming all three routes, row 6 fixes `build.sh` and opens with `Route: none` when the mode loads, and row 12 runs matt-mode's interview with no route line, reading at most `SKILL.md` and one playbook as a reference.
+A replay stops once the agent routes, so judge these by hand, from a full run:
+
+- Row 4 opens with a route line naming all three routes
+- Row 6 fixes `build.sh` and opens with `Route: none` when the mode loads
+- Row 7 adds `FAQPage` JSON-LD to `index.html`
+- Row 12 runs matt-mode's interview with no route line, reading at most `SKILL.md` and one playbook as a reference
+- Row 13 starts its source list from `playbooks/social/references/listening-sources-template.md`
 
 A playbook may load the routes it calls for after the expected ones, as `copywriting` loads `copy-editing` and `marketing-plan` loads `product-marketing`.
 

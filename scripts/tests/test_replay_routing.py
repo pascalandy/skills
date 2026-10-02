@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -25,7 +26,8 @@ scratch = args[args.index("-C") + 1]
 status = subprocess.run(["git", "status", "--porcelain"], cwd=scratch,
                         capture_output=True, text=True).stdout
 with open(os.environ["STUB_LOG"], "a") as log:
-    log.write(json.dumps({"args": args, "request": request, "status": status}) + "\\n")
+    log.write(json.dumps({"args": args, "request": request, "status": status,
+                          "pid": os.getpid()}) + "\\n")
 for event in json.load(open(os.environ["STUB_EVENTS"]))[request]:
     if "sleep" in event:
         time.sleep(event["sleep"])
@@ -217,6 +219,48 @@ def test_a_row_that_must_not_route_fails_on_the_first_playbook(repo: Path) -> No
         "error: fail\t2\tfix my build\tloaded the skill: opened SKILL.md; opened SKILL.md",
         "error: fail\t3\timprove it\topened playbooks/seo.md; opened SKILL.md, playbooks/seo.md",
     ]
+
+
+def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
+    scripted = repo.parent / "events.json"
+    scripted.write_text(
+        json.dumps({"make it convert": [command(SKILL_MD), {"sleep": 60}]})
+    )
+    env = {
+        **os.environ,
+        "PATH": f"{repo.parent / 'bin'}{os.pathsep}{os.environ['PATH']}",
+        "CODEX_HOME": str(repo.parent / "codex-home"),
+        "STUB_EVENTS": str(scripted),
+        "STUB_LOG": str(repo.parent / "codex.log"),
+        "TMPDIR": str(repo.parent),
+    }
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(repo / "scripts/replay_routing.py"),
+            "demo",
+            "--case",
+            "1",
+        ],
+        cwd=repo,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline = time.monotonic() + 30
+    while not calls(repo):
+        assert time.monotonic() < deadline, "codex never started"
+        time.sleep(0.1)
+
+    process.send_signal(signal.SIGINT)
+    process.communicate(timeout=30)
+
+    assert process.returncode == 130
+    stub = calls(repo)[0]["pid"]
+    deadline = time.monotonic() + 15
+    while Path(f"/proc/{stub}").exists():
+        assert time.monotonic() < deadline, "the codex session outlived the interrupt"
+        time.sleep(0.1)
 
 
 def test_a_missing_codex_fails_before_any_row(repo: Path) -> None:
