@@ -9,7 +9,6 @@ Run each request in a fresh session that has andy-mode installed. A case passes 
 | `andy-mode ; retro` | The route tables and a question, since `retro-skill-usage` and `retro-global` both fit |
 | `andy-mode ; retro-skill` | The route tables and a question. No route runs |
 | `andy-mode ; retro global` | `playbooks/retro-global.md` |
-| `andy-mode ; retro-general` | The route tables and a question. No route runs |
 | `andy-mode ; 2nd-pass` | `../2nd-pass/SKILL.md` |
 | `andy-mode ; 2nd pass` | `../2nd-pass/SKILL.md` |
 | `andy-mode ; pa-retro` | The route tables and a question. No route runs |
