@@ -19,7 +19,7 @@ Use these cases when evaluating changes to `think`. They test routing and bounda
 | "Decide where this module's seam belongs and how deep its interface should be" | Recommend `matt-mode ; codebase-design` | Route to execution architecture |
 | "Reproduce this bug, diagnose it, and repair it" | Recommend the `poteto-mode` Bug fix playbook | Stop after a hypothetical diagnosis |
 | "Give this completed report one final fresh-eyes review" | Recommend `2nd-pass` | Route to code review |
-| "Run a thermonuclear maintainability review on this code" | Recommend `interrogate` | Substitute ordinary code review |
+| "Run a thermonuclear maintainability review on this code" | Recommend `code-review-mode ; thermo-quality-review`, or `interrogate` when the request wants several reviewers | Substitute ordinary code review |
 | "Help me think better about this before I decide" | Infer the blocking uncertainty and choose one method | Ask the user to select from the method list |
 | "Compare build and buy; the vendor's reaction will change each option's cost" | Start with `dynamics`; use `compare` only after the response model is complete and still needed | Run both methods in parallel |
 | "Compare two data vendors, but one option may invalidate user consent" | Start with `ethics`; compare only the options that remain permissible | Average consent into a weighted score |

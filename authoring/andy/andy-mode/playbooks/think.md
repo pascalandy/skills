@@ -33,7 +33,7 @@ This step is complete when one uncertainty can be named whose reduction would ch
 | Design a module interface, seam, or abstraction depth | `matt-mode ; codebase-design` |
 | Reproduce, diagnose, or repair software behavior | the `poteto-mode` Bug fix playbook |
 | Review any completed deliverable with fresh eyes | `2nd-pass` |
-| Run an unusually harsh maintainability review | `interrogate` |
+| Run an unusually harsh maintainability review | `code-review-mode ; thermo-quality-review`, or `interrogate` for several reviewers |
 | Work with the opinionated Game Theory lecture corpus | `game-theory-corpus` |
 
 If the specialist is already active, follow it. Otherwise name the recommended invocation and explain the handoff in one sentence. Do not pretend to have run an explicit-only skill that was not invoked.

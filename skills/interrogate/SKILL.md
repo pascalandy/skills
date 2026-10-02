@@ -41,7 +41,7 @@ Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent
 2. The diff or file contents
 3. The review rubric from `references/rubric.md`
-4. The code-quality lens from `references/code-quality-review.md`
+4. The code-quality lens: the `thermo-quality-review` playbook of the **code-review-mode** skill, read from the active skill catalog. If the catalog lacks code-review-mode, say so and leave that lens out
 
 The same filled template goes to all reviewers, so every reviewer applies the code-quality lens.
 
