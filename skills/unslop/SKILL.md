@@ -14,6 +14,7 @@ Edit text to remove AI patterns and add human voice.
 2. Rewrite. Preserve meaning, match intended tone.
 3. Add soul (see next section).
 4. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
+5. Keep the typography a project or domain skill sets, such as curly apostrophes, « » quotes, or dialogue dashes, over rules 13 and 19.
 
 ## Adding soul
 
@@ -94,6 +95,7 @@ drag in connotations the writer did not choose and cannot control. The fix is to
 2. Réécrire. Conserve le sens et le ton voulu
 3. Donne-lui une voix (Regarde la prochaine section)
 4. Fais ton propre audit : "Qu'est-ce qui fait que ce texte a clairement été généré par l'AI?" Corrige toute trace.
+5. Garde la typographie qu'un projet ou un skill de domaine impose, comme l'apostrophe ’, les guillemets « » ou les tirets de réplique, plutôt que les règles 13 et 19.
 
 ## Garder une voix
 
