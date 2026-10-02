@@ -1,0 +1,38 @@
+[
+  {
+    "skills": ["unslop"],
+    "setup": "In an empty folder, copy evals/fixtures/draft.md to draft.md and run the query from that folder",
+    "query": "Clean up draft.md so it reads like a person wrote it. Keep every fact. Edit the file in place.",
+    "files": ["evals/fixtures/draft.md"],
+    "expected_behavior": [
+      "Reads references/english.md before editing",
+      "Leaves no em dash and no curly quote in draft.md",
+      "Removes pivotal, testament, delve, serves as, seamless, Additionally, landscape, Experts believe, and I hope this helps",
+      "Keeps Tidewater, version 2.4, the export command, and sync 40% faster"
+    ]
+  },
+  {
+    "skills": ["unslop"],
+    "setup": "In an empty folder, copy evals/fixtures/brouillon.md to brouillon.md and run the query from that folder",
+    "query": "Nettoie brouillon.md pour qu'il sonne écrit par une personne. Garde tous les faits. Modifie le fichier directement.",
+    "files": ["evals/fixtures/brouillon.md"],
+    "expected_behavior": [
+      "Reads references/french.md before editing",
+      "Writes the result in French with no em dash",
+      "Removes moment charnière, témoignage, Afin de, favoriser, fait office de, mettant en lumière, Il est important de noter, Selon des rapports du secteur, paysage, and J'espère que ça aide",
+      "Keeps Tidewater, version 2.4, the export command, and synchronisation 40 % plus rapide"
+    ]
+  },
+  {
+    "skills": ["unslop"],
+    "setup": "In an empty folder, copy evals/fixtures/agents-md.md to AGENTS.md and evals/fixtures/transcription.md to transcription.md, then run the query from that folder",
+    "query": "Nettoie transcription.md pour enlever les tics d'IA. Modifie le fichier directement.",
+    "files": ["evals/fixtures/agents-md.md", "evals/fixtures/transcription.md"],
+    "expected_behavior": [
+      "Reads references/french.md before editing",
+      "Keeps the project typography from AGENTS.md: every ’, the « » around Tidewater, and the dash that opens each line of dialogue",
+      "Removes témoigne de notre engagement profond, Il est important de noter, moment charnière, plonger dans, and afin de favoriser",
+      "Keeps four lines of dialogue in French"
+    ]
+  }
+]
