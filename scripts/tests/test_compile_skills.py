@@ -1,4 +1,4 @@
-"""Failure recovery checks for the skill flattener."""
+"""Failure recovery checks for the skill compiler."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import flatten_skills
+import compile_skills
 
 
-class FlattenSkillsTests(unittest.TestCase):
+class CompileSkillsTests(unittest.TestCase):
     @contextmanager
     def repository(self) -> Iterator[tuple[Path, Path, Path]]:
         with tempfile.TemporaryDirectory() as temporary:
@@ -42,9 +42,9 @@ class FlattenSkillsTests(unittest.TestCase):
                 timeout=10,
             )
             with (
-                patch.object(flatten_skills, "ROOT", root),
-                patch.object(flatten_skills, "AUTHORING", authoring),
-                patch.object(flatten_skills, "OUTPUT", output),
+                patch.object(compile_skills, "ROOT", root),
+                patch.object(compile_skills, "AUTHORING", authoring),
+                patch.object(compile_skills, "OUTPUT", output),
             ):
                 yield root, source, destination
 
@@ -52,7 +52,7 @@ class FlattenSkillsTests(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            result = flatten_skills.main(list(argv))
+            result = compile_skills.main(list(argv))
         return result, stdout.getvalue(), stderr.getvalue()
 
     def check(self, *, verbose: bool = False) -> tuple[int, str, str]:
@@ -124,7 +124,7 @@ class FlattenSkillsTests(unittest.TestCase):
                 self.assertEqual(result, 1)
                 self.assertEqual(stdout, "")
                 self.assertIn(reason, stderr)
-                self.assertIn("just flatten-skills", stderr)
+                self.assertIn("just compile-skills", stderr)
 
     def test_check_default_error_names_skill_and_fix_once(self) -> None:
         with self.repository() as (_, source, _):
@@ -135,7 +135,7 @@ class FlattenSkillsTests(unittest.TestCase):
         self.assertEqual(
             stderr,
             "update\tskills/example\n"
-            "error: skills/ differs from authoring/; run: just flatten-skills\n",
+            "error: skills/ differs from authoring/; run: just compile-skills\n",
         )
 
     def test_a_skill_without_a_kind_publishes_kind_unknown(self) -> None:
@@ -210,6 +210,25 @@ class FlattenSkillsTests(unittest.TestCase):
             ),
         )
 
+    def test_two_categories_with_the_same_skill_name_fail(self) -> None:
+        with self.repository() as (root, _, _):
+            twin = root / "authoring/content/example/SKILL.md"
+            twin.parent.mkdir(parents=True)
+            twin.write_text("# Example\n")
+            result = self.check()
+
+        self.assertEqual(
+            result,
+            (
+                1,
+                "",
+                (
+                    "error: duplicate skill name 'example': authoring/content/example "
+                    "and authoring/devtools/example; rename one package\n"
+                ),
+            ),
+        )
+
     def test_interrupt_after_moving_output_restores_previous_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -245,13 +264,13 @@ class FlattenSkillsTests(unittest.TestCase):
                 return moved
 
             with (
-                patch.object(flatten_skills, "ROOT", root),
-                patch.object(flatten_skills, "AUTHORING", authoring),
-                patch.object(flatten_skills, "OUTPUT", output),
+                patch.object(compile_skills, "ROOT", root),
+                patch.object(compile_skills, "AUTHORING", authoring),
+                patch.object(compile_skills, "OUTPUT", output),
                 patch.object(Path, "rename", interrupt_after_move),
                 self.assertRaises(KeyboardInterrupt),
             ):
-                flatten_skills.flatten(dry_run=False)
+                compile_skills.compile_tree(dry_run=False)
 
             self.assertEqual(
                 (output / "existing.txt").read_text(encoding="utf-8"), "keep me\n"

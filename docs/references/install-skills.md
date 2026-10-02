@@ -73,7 +73,7 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 
 ## Ownership
 
-- The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still flattened in `skills/`. A shallow clone is refused because its history is incomplete
+- The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still compiled in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
 - It also owns every package name the private clone's history ever added, so deleting a private skill and letting `just sync` commit the deletion removes its installed copies on every machine the deletion reaches. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or the private clone

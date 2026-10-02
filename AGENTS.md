@@ -9,18 +9,18 @@ Load `writing-great-skills` before creating, changing, or refactoring a skill. I
 Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow_implicit_invocation: false` in Codex metadata. Agents may invoke skills when relevant
 
 1. For skill content, edit only the skill's package in `authoring/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
-2. Run `just flatten-skills`, then `just remote-skills`; if flattening fails, rerun `just flatten-skills --debug`
+2. Run `just compile-skills`, then `just remote-skills`; if compiling fails, rerun `just compile-skills --debug`
 3. Review and commit the source and generated output together
 
-The flattening script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
+The compile script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
 
 `SKILL.md` frontmatter string values use double quotes; `just check-frontmatter` enforces it
 
-`SKILL.md` frontmatter sets `kind: "general"` when someone who never writes code would ask for the skill, and `kind: "dev"` otherwise. A `general` skill must not need a `dev` skill to run. When `kind` is missing, flattening publishes `kind: "unknown"` and no check fails; `docs/references/remote-skills.md` lists those skills under Unknown
+`SKILL.md` frontmatter sets `kind: "general"` when someone who never writes code would ask for the skill, and `kind: "dev"` otherwise. A `general` skill must not need a `dev` skill to run. When `kind` is missing, compiling publishes `kind: "unknown"` and no check fails; `docs/references/remote-skills.md` lists those skills under Unknown
 
 `scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 
-If generated output is wrong, fix `authoring/` or the flattening script, then rerun `just flatten-skills`
+If generated output is wrong, fix `authoring/` or the compile script, then rerun `just compile-skills`
 
 Repository-wide scripts live in `scripts/`; skill-specific scripts stay in the package's `scripts/` and travel with the skill. The `justfile` exposes routine operations
 
@@ -38,7 +38,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Install skills
 
-`just install-skills` flattens current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
+`just install-skills` compiles current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 
 ## Read on demand
 

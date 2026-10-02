@@ -138,7 +138,7 @@ def test_a_skill_without_a_one_line_description_fails_before_writing(
         "",
         (
             f"error: skills/bare/SKILL.md {problem}; "
-            "fix its source in authoring/, then run: just flatten-skills\n"
+            "fix its source in authoring/, then run: just compile-skills\n"
         ),
     )
     assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))

@@ -263,7 +263,7 @@ def test_uncommitted_public_skill_is_removed_after_its_source_goes(
     assert not any((home / target / "draft").exists() for target in MAC)
 
 
-def test_a_skill_without_a_kind_installs_the_flattened_kind_unknown(
+def test_a_skill_without_a_kind_installs_the_compiled_kind_unknown(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox

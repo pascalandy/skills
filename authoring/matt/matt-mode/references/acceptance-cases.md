@@ -6,7 +6,7 @@ Maintainer reference. Ordinary use does not load this file.
 
 Run `just check` from the skills repository checkout; `just check --only matt-mode` runs only this package's checks. Run `uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream <checkout>` to reconstruct the imported files from the pinned source. Follow [lineage and updating](lineage.md) when refreshing the pin.
 
-Check source and flattened installations of all four packages. Matt-mode has one scanner entry and seven original-named planning procedures. The shared research, grilling, and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
+Check source and compiled installations of all four packages. Matt-mode has one scanner entry and seven original-named planning procedures. The shared research, grilling, and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
 
 The updater's CLI tests exercise body and asset fidelity, dry-run, changed upstream revisions, rerun behavior, local drift, missing sources, unsafe destinations, and interrupted updates. Source reconstruction proves text fidelity. It does not prove agent behavior.
 

@@ -32,7 +32,7 @@ When upstream asks to call a Skill by one of these names, read that procedure he
 
 ## Shared skills
 
-Resolve `research`, `grilling`, and `writing-for-agents` from the active catalog or the sibling skill directories in a source or flattened installation. Read each skill's `SKILL.md` before using it. Their canonical upstream bodies live in those packages, not here.
+Resolve `research`, `grilling`, and `writing-for-agents` from the active catalog or the sibling skill directories in a source or compiled installation. Read each skill's `SKILL.md` before using it. Their canonical upstream bodies live in those packages, not here.
 
 - `research` gathers primary-source evidence, including when the user says `matt-mode ; research`
 - `grilling` supplies the interview used by `grill-me`, `grill-with-docs`, and Wayfinder

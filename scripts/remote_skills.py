@@ -28,7 +28,7 @@ UNKNOWN = "unknown"
 TABLE_HEAD = "| Skill | Description |\n|---|---|\n"
 
 EPILOG = """\
-The tables read skills/, so run just flatten-skills first. A run prints one
+The tables read skills/, so run just compile-skills first. A run prints one
 line per page it changes: add or update, then a tab and the page's path. A dry
 run prints the same lines and changes nothing; a run with nothing to change
 prints nothing.
@@ -72,7 +72,7 @@ def rows_by_kind() -> dict[str, list[str]]:
         if problem:
             errors.append(
                 f"{path.relative_to(ROOT)} {problem}; "
-                "fix its source in authoring/, then run: just flatten-skills"
+                "fix its source in authoring/, then run: just compile-skills"
             )
             continue
         kind = frontmatter_value(text, "kind")
@@ -84,7 +84,7 @@ def rows_by_kind() -> dict[str, list[str]]:
         raise ScriptError(*errors)
     if not any(rows.values()):
         raise ScriptError(
-            "no skills found at skills/<name>/SKILL.md; run: just flatten-skills"
+            "no skills found at skills/<name>/SKILL.md; run: just compile-skills"
         )
     return rows
 
