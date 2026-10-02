@@ -71,7 +71,7 @@ def git_files(directory: str) -> list[Path]:
 
 
 def collect() -> dict[str, list[tuple[Path, Path]]]:
-    """Map each skill to the tracked source files that compiling would copy.
+    """Map each skill to the source files that compiling would copy.
 
     A package is a folder holding a SKILL.md, either directly under authoring/
     or inside a category folder there."""
