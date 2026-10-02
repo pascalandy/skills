@@ -111,6 +111,10 @@ Pruning never happens without `--prune` when non-interactive. If the local and r
 diverged, `sync` prints both chains, makes no changes, and exits 0 with `Sync aborted` — see
 `references/troubleshooting.md`.
 
+When another worktree has the trunk checked out and the remote trunk has moved,
+`gh stack rebase` warns `Could not update local <trunk>`, rebases the stack onto
+`<remote>/<trunk>`, and leaves that worktree untouched. The warning needs no action.
+
 ## Merging
 
 On a branch of a stack tracked locally, so `gh stack view --json` succeeds, `gh stack merge --yes`
