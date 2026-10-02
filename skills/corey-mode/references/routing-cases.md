@@ -9,22 +9,22 @@ Replay them with `just replay-routing corey-mode --project authoring/corey-mode/
 | Request | Reads | Opens with |
 |---|---|---|
 | `marketing: my landing page in index.html isn't converting. What should I change?` | `playbooks/cro/cro.md` | `Route: cro` |
-| `My landing page in index.html isn't converting. What should I change?` | none |  |
-| `marketing ; copywriting for the hero section of index.html` | `playbooks/copywriting/copywriting.md` | `Route: copywriting` |
-| `marketing: we launch Acme Notes next month. Plan the launch, then write the welcome email sequence and the landing page copy.` | `playbooks/launch/launch.md`, `playbooks/emails/emails.md`, `playbooks/copywriting/copywriting.md` | `Route:` |
-| `marketing: improve my homepage` | no route |  |
-| `Our marketing site build fails when I run ./build.sh. Fix it.` | no route |  |
-| `marketing: add FAQ schema to index.html` | `playbooks/schema/schema.md` | `Route: schema` |
-| `marketing: write a marketing plan for my client, Acme Notes` | `playbooks/marketing-plan/marketing-plan.md` | `Route: marketing-plan` |
-| `Peux-tu m'aider avec le marketing de mon app ? Je manque d'idées pour la faire connaître.` | `playbooks/marketing-ideas/marketing-ideas.md` | `Route: marketing-ideas` |
-| `$corey-mode rewrite the hero section of index.html` | `playbooks/copywriting/copywriting.md` | `Route: copywriting` |
-| `marketing ; Copy Editing: tighten the FAQ answers in index.html` | `playbooks/copy-editing/copy-editing.md` | `Route: copy-editing` |
-| `$matt-mode grill me: should Acme Notes do its marketing through a podcast?` | manual |  |
-| `marketing: set up social listening for Acme Notes` | `playbooks/social/social.md` | `Route: social` |
+| `My landing page in index.html isn't converting. What should I change?` | none | |
+| `marketing ; copywriting for the hero section of index.html` | `playbooks/copywriting/copywriting.md` | |
+| `marketing: we launch Acme Notes next month. Plan the launch, then write the welcome email sequence and the landing page copy.` | `playbooks/launch/launch.md`, `playbooks/emails/emails.md`, `playbooks/copywriting/copywriting.md` | |
+| `marketing: improve my homepage` | no route | |
+| `Our marketing site build fails when I run ./build.sh. Fix it.` | no route | |
+| `marketing: add FAQ schema to index.html` | `playbooks/schema/schema.md` | |
+| `marketing: write a marketing plan for my client, Acme Notes` | `playbooks/marketing-plan/marketing-plan.md` | |
+| `Peux-tu m'aider avec le marketing de mon app ? Je manque d'idées pour la faire connaître.` | `playbooks/marketing-ideas/marketing-ideas.md` | |
+| `$corey-mode rewrite the hero section of index.html` | `playbooks/copywriting/copywriting.md` | |
+| `marketing ; Copy Editing: tighten the FAQ answers in index.html` | `playbooks/copy-editing/copy-editing.md` | |
+| `$matt-mode grill me: should Acme Notes do its marketing through a podcast?` | manual | |
+| `marketing: set up social listening for Acme Notes` | `playbooks/social/social.md` | |
 
 A replay stops once the agent routes, so judge these by hand, from a full run:
 
-- Row 4 opens with a route line naming all three routes
+- Each routed row's final answer opens with its route line, such as `Route: copywriting`; row 4 names all three routes. A replay checks this only on row 1, because a row with an opener runs to the end
 - Row 6 fixes `build.sh` and opens with `Route: none` when the mode loads
 - Row 7 adds `FAQPage` JSON-LD to `index.html`
 - Row 12 runs matt-mode's interview with no route line, reading at most `SKILL.md` and one playbook as a reference

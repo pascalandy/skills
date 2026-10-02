@@ -43,15 +43,16 @@ TABLE = """# Routing cases
 
 | Request | Reads | Opens with |
 |---|---|---|
-| `make it convert` | `playbooks/cro.md` | `Route: cro` |
+| `make it convert` | `playbooks/cro.md` | |
 | `fix my build` | none | |
 | `improve it` | no route | |
 | `ask the other mode` | manual | |
+| `convert and say so` | `playbooks/cro.md` | `Route: cro` |
 """
 
 
-def command(cmd: str, exit_code: int = 0) -> dict:
-    item = {"type": "command_execution", "command": cmd, "exit_code": exit_code}
+def command(cmd: str) -> dict:
+    item = {"type": "command_execution", "command": cmd, "exit_code": 0}
     return {"type": "item.completed", "item": item}
 
 
@@ -130,17 +131,34 @@ CRO = "cat .agents/skills/demo/playbooks/cro.md"
 SEO = "cat .agents/skills/demo/playbooks/seo.md"
 
 
-def test_each_row_passes_and_a_routed_run_stops_before_its_work(repo: Path) -> None:
+@pytest.mark.parametrize(
+    "read_command",
+    [
+        CRO,
+        f"{SKILL_MD} && {CRO}",
+        "/bin/bash -lc 'rtk proxy sed -n \"1,80p\" .agents/skills/demo/playbooks/cro.md'",
+    ],
+)
+def test_each_row_passes_and_a_routed_run_stops_before_its_work(
+    repo: Path, read_command: str
+) -> None:
     events = {
         "make it convert": [
             command(SKILL_MD),
             message("Route: cro\nReading the playbook."),
-            command(CRO),
+            command(read_command),
             {"sleep": 60},
             DONE,
         ],
         "fix my build": [message("Fixed build.sh."), DONE],
         "improve it": [command(SKILL_MD), message("cro or seo?"), DONE],
+        "convert and say so": [
+            command(SKILL_MD),
+            message("Reading the playbook."),
+            command(CRO),
+            message("Route: cro\nChange the headline."),
+            DONE,
+        ],
     }
 
     started = time.monotonic()
@@ -152,6 +170,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(repo: Path) -> N
         "pass\t2\tfix my build",
         "pass\t3\timprove it",
         "skip\t4\task the other mode\tmanual",
+        "pass\t5\tconvert and say so",
     ]
     assert time.monotonic() - started < 30
     first = calls(repo)[0]
@@ -162,6 +181,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(repo: Path) -> N
     )
     assert 'model_reasoning_effort="low"' in first["args"]
     assert sorted(call["request"] for call in calls(repo)) == [
+        "convert and say so",
         "fix my build",
         "improve it",
         "make it convert",
@@ -185,17 +205,19 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(repo: Path) -> N
             ),
         ),
         (
-            [command(SKILL_MD), command(CRO), message("Here is my advice."), DONE],
-            "first message opens with 'Here is my advice.'; opened SKILL.md, playbooks/cro.md",
-        ),
-        (
             [command(SKILL_MD), message("Route: cro"), DONE],
             "finished without opening playbooks/cro.md; opened SKILL.md",
         ),
-        (
-            [command(SKILL_MD), message("Route: cro"), command(CRO, exit_code=1), DONE],
-            "finished without opening playbooks/cro.md; opened SKILL.md",
-        ),
+        *[
+            (
+                [command(SKILL_MD), message("Route: cro"), command(nonread), DONE],
+                "finished without opening playbooks/cro.md; opened SKILL.md",
+            )
+            for nonread in (
+                "cat .agents/skills/demo/playbooks/cro.md.bak",
+                "cat .agents/skills/demo/playbooks/cro.mdx",
+            )
+        ],
     ],
 )
 def test_a_row_that_misroutes_fails_with_what_the_agent_opened(
@@ -209,6 +231,26 @@ def test_a_row_that_misroutes_fails_with_what_the_agent_opened(
     assert Path(line.rsplit("events ", 1)[1]).is_file()
     assert rerun.endswith(
         "1 of 1 rows failed; rerun them with: just replay-routing demo --case 1"
+    )
+
+
+def test_a_route_line_is_read_from_the_final_message(repo: Path) -> None:
+    events = {
+        "convert and say so": [
+            command(SKILL_MD),
+            message("Route: cro"),
+            command(CRO),
+            message("Here is my advice."),
+            DONE,
+        ]
+    }
+
+    result = replay(repo, events, "--case", "5")
+
+    assert result.returncode == 1
+    assert result.stderr.startswith(
+        "error: fail\t5\tconvert and say so\tfinal message opens with "
+        "'Here is my advice.'; opened SKILL.md, playbooks/cro.md; events "
     )
 
 
@@ -229,7 +271,7 @@ def test_a_row_that_must_not_route_fails_on_the_first_playbook(repo: Path) -> No
 
 def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
     scripted = repo.parent / "events.json"
-    waiting = [command(SKILL_MD), {"sleep": 60}]
+    waiting = [message("Waiting."), {"sleep": 60}]
     scripted.write_text(
         json.dumps(
             {"make it convert": waiting, "fix my build": waiting, "improve it": waiting}
@@ -249,7 +291,7 @@ def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
             str(repo / "scripts/replay_routing.py"),
             "demo",
             "--jobs",
-            "1",
+            "2",
         ],
         cwd=repo,
         env=env,
@@ -257,7 +299,7 @@ def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
         stderr=subprocess.PIPE,
     )
     deadline = time.monotonic() + 30
-    while not calls(repo):
+    while len(calls(repo)) < 2:
         assert time.monotonic() < deadline, "codex never started"
         time.sleep(0.1)
 
@@ -265,12 +307,10 @@ def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
     process.communicate(timeout=30)
 
     assert process.returncode == 130
-    assert len(calls(repo)) == 1
-    stub = calls(repo)[0]["pid"]
-    deadline = time.monotonic() + 15
-    while Path(f"/proc/{stub}").exists():
-        assert time.monotonic() < deadline, "the codex session outlived the interrupt"
-        time.sleep(0.1)
+    assert len(calls(repo)) == 2
+    for call in calls(repo):
+        with pytest.raises(ProcessLookupError):
+            os.kill(call["pid"], 0)
 
 
 def test_a_session_that_ignores_sigterm_still_ends_at_the_timeout(repo: Path) -> None:

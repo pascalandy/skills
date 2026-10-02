@@ -29,3 +29,8 @@ Replay these cases with `just replay-routing andy-mode`, and run `just replay-ro
 | `andy-mode ; storytelling ; style modeler` | `playbooks/storytelling.md` | |
 | `andy-mode ; meta skill creator` | `playbooks/meta-skill-creator.md` | |
 | `andy-mode ; meta-sc` | no route | |
+
+Judge these answer requirements by hand from a full run:
+
+- Rows 3, 4, 8, 12, 17, 18, and 25 show the route tables and ask a question, with no route run
+- Row 23 reads the storytelling playbook's style modeler reference after choosing that route

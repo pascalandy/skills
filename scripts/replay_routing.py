@@ -39,7 +39,8 @@ GIT_IDENTITY = {
 EPILOG = f"""\
 Each row runs in a fresh scratch Git project that holds a copy of the compiled
 skill in .agents/skills/<skill>/, with every installed copy disabled. The run
-stops as soon as the row passes or fails, so the agent never does the work.
+stops as soon as the row passes or fails. Rows expecting no reads must finish
+before they can pass, so those runs may carry out the request in the scratch project.
 
 The table, in <skill>/{CASES} unless --cases names another file, has three
 columns:
@@ -49,9 +50,9 @@ columns:
 Request is the prompt, in backticks. Reads lists, in order, the files that
 SKILL.md links to and the agent must open after it, as backticked paths from the
 skill folder, such as `playbooks/cro/cro.md`. A read counts once its command
-succeeds. `none` means the skill must not load, `no route` means it may read
+completes. `none` means the skill must not load, `no route` means it may read
 SKILL.md but no file it links to, and `manual` skips the row. Opens with, when
-set, is the start of the agent's first message.
+set, is the start of the agent's final message, so that row runs to the end.
 
 A run prints one line per row: pass or skip, the row number, and the request.
 When a row fails, stderr names each failed row, what the agent opened, and the
@@ -100,10 +101,10 @@ class Case:
 
 @dataclass
 class Run:
-    """What the agent did so far: route files opened, in order, and its first message."""
+    """What the agent did so far: route files opened, in order, and its latest message."""
 
     opened: list[str] = field(default_factory=list)
-    first_message: str | None = None
+    last_message: str = ""
     finished: bool = False
     error: str = ""
 
@@ -163,12 +164,13 @@ def parse_cases(path: Path, routes: set[str]) -> list[Case]:
 
 
 def opened_in(command: str, name: str, routes: set[str]) -> list[str]:
-    """Route files a shell command names, in the order it names them."""
+    """Route files a shell command names, in the order it names them. A path
+    ends at a quote, a space, or shell punctuation, so `cro.md.bak` is not `cro.md`."""
     hits = []
     for route in routes:
         needle = posixpath.normpath(f"skills/{name}/{route}")
-        if (index := command.find(needle)) >= 0:
-            hits.append((index, route))
+        if match := re.search(re.escape(needle) + r"(?=$|[\s'\";|&)<>])", command):
+            hits.append((match.start(), route))
     return [route for _, route in sorted(hits)]
 
 
@@ -180,11 +182,13 @@ def verdict(case: Case, run: Run) -> str | None:
             if actual != expected:
                 return f"opened {actual} where {expected} was expected"
         routed = len(routes) >= len(case.reads)
-        if routed and (not case.opens_with or run.first_message is not None):
-            return opener(case, run)
+        if routed and not case.opens_with:
+            return ""
         if run.finished:
-            missing = ", ".join(case.reads[len(routes) :]) or "its first message"
-            return run.error or f"finished without opening {missing}"
+            if not routed:
+                missing = ", ".join(case.reads[len(routes) :])
+                return run.error or f"finished without opening {missing}"
+            return run.error or opener(case, run)
         return None
     if case.kind == "none" and run.opened:
         return f"loaded the skill: opened {run.opened[0]}"
@@ -196,9 +200,9 @@ def verdict(case: Case, run: Run) -> str | None:
 
 
 def opener(case: Case, run: Run) -> str:
-    first = (run.first_message or "").strip().splitlines()[:1]
+    first = run.last_message.strip().splitlines()[:1]
     if case.opens_with and not (first and first[0].startswith(case.opens_with)):
-        return f"first message opens with {first[0] if first else 'nothing'!r}"
+        return f"final message opens with {first[0] if first else 'nothing'!r}"
     return ""
 
 
@@ -327,17 +331,17 @@ def read(line: str, name: str, routes: set[str], run: Run) -> None:
     except json.JSONDecodeError:
         return
     item = event.get("item") or {}
+    # A compound command's exit code is its last part's, so a read counts on
+    # completion; just check's link validation catches a route file that is missing
     if (
         event.get("type") == "item.completed"
         and item.get("type") == "command_execution"
-        and item.get("exit_code") == 0
     ):
         for route in opened_in(str(item.get("command", "")), name, routes):
             if route not in run.opened:
                 run.opened.append(route)
     elif event.get("type") == "item.completed" and item.get("type") == "agent_message":
-        if run.first_message is None:
-            run.first_message = str(item.get("text", ""))
+        run.last_message = str(item.get("text", ""))
     elif event.get("type") == "turn.completed":
         run.finished = True
     elif event.get("type") in ("turn.failed", "error"):
