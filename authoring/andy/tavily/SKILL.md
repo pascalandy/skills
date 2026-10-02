@@ -14,8 +14,8 @@ Tavily gives LLM-optimized search, content extraction, site mapping, and crawlin
 
 | Situation | Tool | Rule |
 |---|---|---|
-| Explicit user request for Tavily or Exa | Requested tool | Honor the request. |
-| Tavily fails to satisfy the request, or the user explicitly asks for corroboration | Exa after Tavily | Sequential escalation is allowed. |
+| A request that names Tavily or Exa | Requested tool | Honor the request. |
+| Tavily fails to satisfy the request, or the request asks for corroboration | Exa after Tavily | Sequential escalation is allowed. |
 | Local filesystem or repository work | Local tools | Use neither Tavily nor Exa. |
 
 Do not automatically use both tools.
@@ -30,16 +30,12 @@ Do not automatically use both tools.
 | Crawl site | `POST /crawl` | Map + extract in one call |
 | Deep research | `POST /research` | Multi-step analysis with citations |
 
-## When to Use
-
-- An explicit user request for Tavily
-
 ## When NOT to Use
 
 - Local filesystem or repository work; use local tools
-- An explicit user request for Exa
-- A search the user did not ask Tavily for
-- A request to use both tools at once; escalate to Exa only after Tavily fails or the user asks for corroboration
+- A request that names Exa
+- A search that no request named Tavily for
+- A request to use both tools at once; escalate to Exa only after Tavily fails or the request asks for corroboration
 - API key is missing from keyring (check first)
 
 ## Authentication
