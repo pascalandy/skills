@@ -39,9 +39,9 @@ from _common import (
     run_script,
     swap,
 )
+from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
-PRIVATE = ROOT / "_skills_private"
 PROFILES = {
     "mac": (
         ".pi/agent/skills",
@@ -746,7 +746,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--private-root",
         type=Path,
-        help="private package tree whose packages all install (default: _skills_private/ when present)",
+        help="private package tree whose packages all install (default: the main checkout's _skills_private/ when present)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
