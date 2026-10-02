@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Literal
 
 from _cli import Parser, ScriptError, UsageError, duration, exit_codes
-from _common import run_git, run_script, send, stop
+from _common import GRACE, run_git, run_script, send, stop
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -46,12 +46,12 @@ columns:
 
   | Request | Reads | Opens with |
 
-Request is the prompt, in backticks. Reads lists the route files the agent must
-open, in order, as backticked paths from the skill folder, such as
-`playbooks/cro/cro.md`; a route file is SKILL.md or a file SKILL.md links to.
-`none` means the skill must not load, `no route` means it may read SKILL.md but
-no other route file, and `manual` skips the row. Opens with, when set, is the
-start of the agent's first message.
+Request is the prompt, in backticks. Reads lists, in order, the files that
+SKILL.md links to and the agent must open after it, as backticked paths from the
+skill folder, such as `playbooks/cro/cro.md`. A read counts once its command
+succeeds. `none` means the skill must not load, `no route` means it may read
+SKILL.md but no file it links to, and `manual` skips the row. Opens with, when
+set, is the start of the agent's first message.
 
 A run prints one line per row: pass or skip, the row number, and the request.
 When a row fails, stderr names each failed row, what the agent opened, and the
@@ -75,8 +75,12 @@ LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
 
 log = logging.getLogger("replay-routing")
 
-# Running Codex sessions, stopped on an interrupt so none keeps working unwatched
+# Running Codex sessions, stopped on an interrupt so none keeps working unwatched.
+# Executor.map cancels rows not yet started; LOCK and CANCELLED stop a row that was
+# still preparing its project from launching after the interrupt
 LIVE: set[subprocess.Popen[str]] = set()
+LOCK = threading.Lock()
+CANCELLED = threading.Event()
 
 Kind = Literal["route", "none", "no route", "manual"]
 KINDS: dict[str, Kind] = {"none": "none", "no route": "no route", "manual": "manual"}
@@ -148,10 +152,10 @@ def parse_cases(path: Path, routes: set[str]) -> list[Case]:
                 f"{path}: row {number} needs one backticked request and backticked "
                 "route files, none, no route, or manual"
             )
-        if unknown := [p for p in reads if p not in routes]:
+        if unknown := [p for p in reads if p not in routes - {"SKILL.md"}]:
             raise UsageError(
-                f"{path}: row {number} expects {', '.join(unknown)}, which SKILL.md "
-                "does not link to"
+                f"{path}: row {number} expects {', '.join(unknown)}; list only files "
+                "SKILL.md links to, or write no route"
             )
         opens = CELL_RE.findall(row[2])
         cases.append(Case(number, request[0], kind, reads, opens[0] if opens else ""))
@@ -210,7 +214,8 @@ def prepare(work: Path, skill: Path, project: Path | None) -> Path:
     """A scratch Git project with `project`'s files and an untracked copy of the skill."""
     scratch = work / "project"
     if project:
-        shutil.copytree(project, scratch)
+        # A linked worktree's .git file points at the source repository
+        shutil.copytree(project, scratch, ignore=shutil.ignore_patterns(".git"))
     scratch.mkdir(exist_ok=True)
     env = {**os.environ, **GIT_IDENTITY}
     for args in (
@@ -241,6 +246,15 @@ def codex_command(scratch: Path, name: str, args: argparse.Namespace) -> list[st
     return [*command, "-"]
 
 
+def terminate(process: subprocess.Popen[str]) -> None:
+    """SIGTERM the session's group now and SIGKILL it GRACE seconds later, so a
+    read blocked on a session that ignores SIGTERM still ends."""
+    send(process, signal.SIGTERM, group=True)
+    killer = threading.Timer(GRACE, send, (process, signal.SIGKILL, True))
+    killer.daemon = True
+    killer.start()
+
+
 def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) -> str:
     """One line for the row: pass, or fail with the reason and the saved events."""
     if case.kind == "manual":
@@ -256,22 +270,26 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
         events.open("w", encoding="utf-8") as saved,
         (work / "stderr.txt").open("w", encoding="utf-8") as stderr,
     ):
-        process = subprocess.Popen(
-            codex_command(scratch, skill.name, args),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=stderr,
-            text=True,
-            start_new_session=True,
-        )
-        LIVE.add(process)
+        with LOCK:
+            if CANCELLED.is_set():
+                shutil.rmtree(work, ignore_errors=True)
+                return f"skip\t{case.number}\t{case.request}\tinterrupted"
+            process = subprocess.Popen(
+                codex_command(scratch, skill.name, args),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=stderr,
+                text=True,
+                start_new_session=True,
+            )
+            LIVE.add(process)
         assert process.stdin and process.stdout
         process.stdin.write(case.request)
         process.stdin.close()
 
         def expire() -> None:
             timed_out.set()
-            send(process, signal.SIGTERM, group=True)
+            terminate(process)
 
         timer = threading.Timer(args.timeout, expire)
         timer.start()
@@ -309,7 +327,11 @@ def read(line: str, name: str, routes: set[str], run: Run) -> None:
     except json.JSONDecodeError:
         return
     item = event.get("item") or {}
-    if item.get("type") == "command_execution":
+    if (
+        event.get("type") == "item.completed"
+        and item.get("type") == "command_execution"
+        and item.get("exit_code") == 0
+    ):
         for route in opened_in(str(item.get("command", "")), name, routes):
             if route not in run.opened:
                 run.opened.append(route)
@@ -352,8 +374,10 @@ def work(args: argparse.Namespace) -> str:
         try:
             lines = list(pool.map(lambda c: replay(c, skill, routes, args), cases))
         except BaseException:
-            for process in list(LIVE):
-                send(process, signal.SIGTERM, group=True)
+            with LOCK:
+                CANCELLED.set()
+                for process in list(LIVE):
+                    terminate(process)
             raise
     if failed := [line for line in lines if line.startswith("fail\t")]:
         rerun = ["just replay-routing", args.skill]

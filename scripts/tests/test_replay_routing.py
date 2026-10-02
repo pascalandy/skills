@@ -17,9 +17,10 @@ from conftest import SCRIPTS
 ROOT = SCRIPTS.parent
 
 # Prints the events scripted for the request on stdin, one JSON object per line.
-# {"sleep": N} pauses, so a test can see whether the replay stopped the run.
+# {"sleep": N} pauses, so a test can see whether the replay stopped the run;
+# {"ignore_term": true} makes the stub ignore SIGTERM from then on.
 STUB_CODEX = """#!/usr/bin/env python3
-import json, os, subprocess, sys, time
+import json, os, signal, subprocess, sys, time
 args = sys.argv[1:]
 request = sys.stdin.read()
 scratch = args[args.index("-C") + 1]
@@ -31,6 +32,9 @@ with open(os.environ["STUB_LOG"], "a") as log:
 for event in json.load(open(os.environ["STUB_EVENTS"]))[request]:
     if "sleep" in event:
         time.sleep(event["sleep"])
+        continue
+    if "ignore_term" in event:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         continue
     print(json.dumps(event), flush=True)
 """
@@ -46,11 +50,9 @@ TABLE = """# Routing cases
 """
 
 
-def command(cmd: str) -> dict:
-    return {
-        "type": "item.started",
-        "item": {"type": "command_execution", "command": cmd},
-    }
+def command(cmd: str, exit_code: int = 0) -> dict:
+    item = {"type": "command_execution", "command": cmd, "exit_code": exit_code}
+    return {"type": "item.completed", "item": item}
 
 
 def message(text: str) -> dict:
@@ -190,6 +192,10 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(repo: Path) -> N
             [command(SKILL_MD), message("Route: cro"), DONE],
             "finished without opening playbooks/cro.md; opened SKILL.md",
         ),
+        (
+            [command(SKILL_MD), message("Route: cro"), command(CRO, exit_code=1), DONE],
+            "finished without opening playbooks/cro.md; opened SKILL.md",
+        ),
     ],
 )
 def test_a_row_that_misroutes_fails_with_what_the_agent_opened(
@@ -223,8 +229,11 @@ def test_a_row_that_must_not_route_fails_on_the_first_playbook(repo: Path) -> No
 
 def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
     scripted = repo.parent / "events.json"
+    waiting = [command(SKILL_MD), {"sleep": 60}]
     scripted.write_text(
-        json.dumps({"make it convert": [command(SKILL_MD), {"sleep": 60}]})
+        json.dumps(
+            {"make it convert": waiting, "fix my build": waiting, "improve it": waiting}
+        )
     )
     env = {
         **os.environ,
@@ -239,7 +248,7 @@ def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
             sys.executable,
             str(repo / "scripts/replay_routing.py"),
             "demo",
-            "--case",
+            "--jobs",
             "1",
         ],
         cwd=repo,
@@ -256,11 +265,81 @@ def test_an_interrupt_stops_every_running_codex_session(repo: Path) -> None:
     process.communicate(timeout=30)
 
     assert process.returncode == 130
+    assert len(calls(repo)) == 1
     stub = calls(repo)[0]["pid"]
     deadline = time.monotonic() + 15
     while Path(f"/proc/{stub}").exists():
         assert time.monotonic() < deadline, "the codex session outlived the interrupt"
         time.sleep(0.1)
+
+
+def test_a_session_that_ignores_sigterm_still_ends_at_the_timeout(repo: Path) -> None:
+    events = {
+        "make it convert": [{"ignore_term": True}, command(SKILL_MD), {"sleep": 60}]
+    }
+
+    started = time.monotonic()
+    result = replay(repo, events, "--case", "1", "--timeout", "1")
+
+    assert result.returncode == 1
+    assert "no verdict within 1s" in result.stderr
+    assert time.monotonic() - started < 40
+
+
+def test_a_project_in_a_linked_worktree_leaves_its_repository_alone(
+    repo: Path, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    subprocess.run(["git", "init", "-q", str(source)], check=True)
+    (source / "README.md").write_text("seed\n")
+    subprocess.run(["git", "-C", str(source), "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source),
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "seed",
+        ],
+        check=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(source), "worktree", "add", "-q", str(linked)], check=True
+    )
+    (linked / "draft.txt").write_text("not committed\n")
+    before = subprocess.run(
+        ["git", "-C", str(linked), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    events = {"fix my build": [message("Done."), DONE]}
+
+    result = replay(repo, events, "--case", "2", "--project", str(linked))
+
+    assert (result.returncode, result.stderr) == (0, "")
+    after = subprocess.run(
+        ["git", "-C", str(linked), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert after == before
+    assert (
+        "?? draft.txt"
+        in subprocess.run(
+            ["git", "-C", str(linked), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
 
 
 def test_a_missing_codex_fails_before_any_row(repo: Path) -> None:
@@ -281,9 +360,21 @@ def test_a_row_naming_a_file_skill_md_does_not_link_is_a_usage_error(
 
     assert result.returncode == 2
     assert (
-        "row 1 expects playbooks/cr0.md, which SKILL.md does not link to"
+        "row 1 expects playbooks/cr0.md; list only files SKILL.md links to"
         in result.stderr
     )
+
+
+def test_a_row_expecting_skill_md_is_a_usage_error(repo: Path) -> None:
+    cases = repo / "skills/demo/references/routing-cases.md"
+    cases.write_text(
+        TABLE.replace("`playbooks/cro.md`", "`SKILL.md`, `playbooks/cro.md`")
+    )
+
+    result = replay(repo, {}, "--dry-run")
+
+    assert result.returncode == 2
+    assert "row 1 expects SKILL.md; list only files SKILL.md links to" in result.stderr
 
 
 @pytest.mark.parametrize(("skill", "rows"), [("corey-mode", 13), ("andy-mode", 25)])
