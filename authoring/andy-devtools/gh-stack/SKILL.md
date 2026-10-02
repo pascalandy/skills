@@ -36,7 +36,8 @@ If `gh auth status --active --hostname github.com` fails, build the stack by han
 layer, each branched from the layer below, and each PR opened with the layer below as its base.
 Replace `gh stack rebase` with `git rebase --onto <layer below> <its old tip> <branch>` for each
 layer above a change, which replays only that branch's own commits. Replace `gh stack push` with
-`git push --force-with-lease origin <branch>...`, naming every layer you rebased.
+`git push --force-with-lease origin <branch>...`, naming the layer you changed and every layer
+you rebased.
 
 ## Non-interactive use
 
