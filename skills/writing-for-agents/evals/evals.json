@@ -49,7 +49,8 @@
     "query": "Improve the skill pdf-helper with writing-for-agents.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
-      "Fills the BP checklist before editing, with at least five BPs open and their finding counts",
+      "Shows the filled BP checklist before editing, with at least five BPs open and their finding counts",
+      "Writes evaluation scenarios for pdf-helper and records a baseline for each before changing its behavior",
       "Edits pdf-helper/SKILL.md to fix the validator errors and at least three judgment findings, such as BP_06, BP_14, BP_19",
       "Runs the skill validator on pdf-helper and ends with it printing nothing, or names the reason for each warning left",
       "Ends with the BP checklist filled again, every BP ticked, and a reason for each BP that does not apply",

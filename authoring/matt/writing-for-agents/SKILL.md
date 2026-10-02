@@ -40,7 +40,7 @@ Skill progress:
 
 **Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them without the target skill (BP_20). Done when each scenario has a recorded baseline. Skip steps 2 and 7 for a wording-only edit.
 
-**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21). Done when the description says when to load the skill and the validator reports nothing for BP_13, BP_14, or BP_21.
+**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21). Done when the description says when to load the skill, the validator reports no BP_13 or BP_14 error, and any BP_21 warning has a reason.
 
 **Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01). Done when every branch has its steps and each linked file says when to read it.
 
@@ -50,12 +50,12 @@ Skill progress:
 
 **Step 7: Evaluations beat the baseline.** Rerun the scenarios. Done when the target skill passes every expected behavior; otherwise return to Step 4.
 
-**Step 8: BP checklist complete.** Fill the BP checklist again. Done when every BP is ticked.
+**Step 8: BP checklist complete.** Fill the BP checklist again. Done when every BP is ticked, or left open with a reason only the user can resolve, such as a rename.
 
 ## Review
 
 1. Run the skill validator on the target skill. For a target document, skip this step
-2. Fill the [BP checklist](#best-practices-checklist) against the target
+2. Check the target against each applicable BP in the [BP checklist](#best-practices-checklist)
 3. Report the findings grouped by BP, with a count per BP and a fix per finding. End with a `Pass:` line naming every applicable BP without findings, so each applicable BP appears once
 
 ```
@@ -83,7 +83,7 @@ The link check covers inline links with at most one level of parentheses, angle-
 
 ## Best practices checklist
 
-Copy the IDs and titles into your reply: every section for a target skill, "Any agent document" alone for a target document. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails.
+To create, edit, or improve a target skill, copy the IDs and titles into your reply and fill them in. Tick a BP when it passes, or when it does not apply and you give the reason. Leave it open with its finding count when it fails. A review reports in its own format instead, and a target document uses "Any agent document" alone.
 
 IDs never change and are never reused. To change a practice, move its line under a `### Voided` heading at the end with `void <date>, replaced by BP_NN`, and give the new practice the next free ID.
 
