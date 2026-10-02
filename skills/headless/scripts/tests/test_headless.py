@@ -36,6 +36,10 @@ if os.environ.get("STUB_LINGER"):
         "import os, signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
         "open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(60)"
     ), os.environ["STUB_LINGER"]])
+    # Exit only once the descendant runs, so the launcher has a process to stop
+    linger = Path(os.environ["STUB_LINGER"])
+    while not (linger.exists() and linger.read_text()):
+        time.sleep(0.01)
     if not os.environ.get("STUB_LINGER_EXIT"):
         time.sleep(60)
 answer = os.environ.get("STUB_ANSWER", "No findings.")
