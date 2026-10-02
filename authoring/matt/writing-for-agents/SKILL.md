@@ -50,7 +50,7 @@ Skill progress:
 
 **Step 7: Evaluations beat the baseline.** Rerun the scenarios. Done when the target skill passes every expected behavior; otherwise return to Step 4.
 
-**Step 8: BP checklist complete.** Fill the BP checklist again. Done when every BP is ticked, or left open with a reason only the user can resolve, such as a rename.
+**Step 8: BP checklist complete.** Fill the BP checklist again. Done when every BP is ticked, or left open with a reason only the user can resolve, such as a rename, and your reply shows this fill and, for an existing skill, the one from Step 1.
 
 ## Review
 
