@@ -1,11 +1,11 @@
-# Architecture review
+# Improve Codebase Architecture
 
 Surface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
 
-This playbook is _informed_ by the project's domain model and built on a shared design vocabulary:
+This command is _informed_ by the project's domain model and built on a shared design vocabulary:
 
 - Read [codebase-design.md](../references/architecture-review/codebase-design.md) for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
-- The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this playbook should not re-litigate.
+- The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
 
 ## Process
 
@@ -55,7 +55,7 @@ Do NOT propose interfaces yet. After the file is written, ask the user: "Which o
 
 ### 3. Grilling loop
 
-Once the user picks a candidate, load the `grilling` skill to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
+Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
 
 Side effects happen inline as decisions crystallize. Keep the domain model current as you go, in the formats of [CONTEXT-FORMAT.md](../references/architecture-review/CONTEXT-FORMAT.md) and [ADR-FORMAT.md](../references/architecture-review/ADR-FORMAT.md):
 
