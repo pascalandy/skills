@@ -55,7 +55,9 @@ EXIT_CODES = exit_codes(
         75: "GitHub did not make the PR mergeable in time, or the network failed; retry",
     }
 )
-FIELDS = "number,url,title,state,isDraft,baseRefName,headRefOid,mergeStateStatus"
+FIELDS = (
+    "number,url,title,state,isDraft,baseRefName,headRefOid,mergeStateStatus,mergeCommit"
+)
 # What each merge state other than CLEAN needs before GitHub merges without a
 # bypass
 BLOCKERS = {
@@ -82,6 +84,7 @@ class PullRequest:
     base: str
     head: str
     merge_state: str
+    merge_commit: str
 
     @classmethod
     def parse(cls, raw: dict) -> PullRequest:
@@ -94,6 +97,7 @@ class PullRequest:
             base=raw["baseRefName"],
             head=raw["headRefOid"],
             merge_state=raw["mergeStateStatus"],
+            merge_commit=(raw.get("mergeCommit") or {}).get("oid", ""),
         )
 
 
@@ -283,7 +287,12 @@ def merge(args: argparse.Namespace) -> str:
     name = branch()
     pr = branch_pr(name, args.timeout)
     if pr.state == "MERGED":
-        if pr.base != "main":
+        # A stack layer keeps its lower layer as base after gh stack merge lands
+        # it on main, so its merge commit decides (#266)
+        if pr.base != "main" and not (
+            pr.merge_commit
+            and is_ancestor(pr.merge_commit, remote_tip("main", args.timeout))
+        ):
             raise ScriptError(f"PR #{pr.number} was merged into {pr.base}, not main")
         head = git("rev-parse", "HEAD")
         if pr.head != head:
