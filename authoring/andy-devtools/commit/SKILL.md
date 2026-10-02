@@ -24,7 +24,7 @@ Create atomic commits: one logical change per commit. If a commit cannot be desc
 5. Run `git diff --cached --check` and read `git diff --cached`. Done when the check passes and the staged diff holds only this group
 6. Commit in the format below and let the configured hooks run. Pass `--no-verify` only when the user explicitly authorizes it. If a hook fails, review its changes and return to step 3. Done when the commit succeeds and `git show HEAD` contains only the validated group
 7. Repeat steps 3 to 6 for each group, in order
-8. Run `git log -n <count> --oneline` and report each commit's hash and subject. Done when every group is committed
+8. Run `git log -n <count> --oneline` and report each commit's hash and subject exactly as `git log` prints them. Done when every group is committed
 
 ## Push authorization
 
@@ -63,7 +63,7 @@ Examples:
 - `🧰 skill: commit: classify skill edits explicitly`
 - `♻️ refactor: toolbox: move commit skill`
 
-Write the body for non-trivial commits. Add `File(s) changed:` for multi-file or non-obvious commits, and `Nature of changes:` when the type needs clarification.
+Write the body for non-trivial commits. Optional fields, when useful: `File(s) changed:` for multi-file or non-obvious commits, and `Nature of changes:` when the type needs clarification.
 
 ## Style
 
