@@ -13,7 +13,8 @@ reading timeline events.
 - Search qualifiers need full references, as in `parent-issue:OWNER/REPO#N` and
   `blocked-by:OWNER/REPO#N`; a bare number matches nothing. `has:blocked-by` also
   matches issues whose blockers are closed. To drop issues with an open blocker, add
-  `--json number,title,blockedBy --jq '[.[] | select(all(.blockedBy.nodes[]; .state == "CLOSED"))]'`
+  `--json number,title,blockedBy --jq '[.[] | select(.blockedBy.totalCount == (.blockedBy.nodes | length)) | select(all(.blockedBy.nodes[]; .state == "CLOSED"))]'`
+  This excludes incomplete blocker lists; page those before assessing readiness
 - `gh issue list` and `gh label list` return 30 rows unless given `--limit`
 
 ## Issue-list filters
@@ -24,5 +25,5 @@ reading timeline events.
 - One epic's members: `is:issue parent-issue:OWNER/REPO#N`
 - Members missing a parent: `is:issue is:open label:4-epic:member -has:parent-issue`
 - Agent candidates: `is:issue is:open label:1-ready-for-agent -label:0-impediment`,
-  then drop open blockers as GitHub CLI shows and check prerequisites in issue content
+  then apply the blocker filter above and check prerequisites in issue content
 - Agent WIP: `is:issue is:open label:1-wip-by-agent`

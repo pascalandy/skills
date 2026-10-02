@@ -18,7 +18,7 @@
     "files": [],
     "expected_behavior": [
       "Reads references/decision-comments.md and the sparring playbook of andy-mode, and runs no gh write",
-      "Shows a comment that starts with the marker <!-- label-for-issues:decision --> and one H2 in the form ## #273 · <next actor and action>",
+      "Shows a comment that carries the marker <!-- label-for-issues:decision --> and one H2 in the form ## #273 · <next actor and action>",
       "Names the missing information, why it matters, and who supplies it, since #273 is labeled 1-needs-info",
       "Describes any label edit as proposed, not done, and ends the comment with a signature line"
     ]

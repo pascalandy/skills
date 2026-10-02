@@ -6,11 +6,13 @@ kind: "dev"
 
 # Label for issues
 
-Help the user decide what happens next on each issue. Labels carry the assessment;
-a decision comment is opt-in, as [Decision comments](#decision-comments) defines.
+Help the user decide what happens next on each issue. Labels carry the assessment.
 Apply this vocabulary to issues, not PRs. Keep one state and one priority
 per open triaged issue, one type except for epic parents, at most one epic role, and
 optional impediments.
+
+Requires `gh` ([install](https://cli.github.com/)); confirm with `gh --version`
+and `gh auth status`.
 
 ## Workflow
 
@@ -20,12 +22,14 @@ creating a PR includes updating its explicitly linked issues, and a PR with no l
 issue needs no label work unless setup was requested. Limit changes to those issues
 and directly affected epics; include closed issues only on request. Leave issue and
 PR authoring to the caller, and keep implementation, specification rewrites, and
-other skills out of a labeling run. For a setup-only request, go to Step 4. Done when
+other skills out of a labeling run. Pass `--repo OWNER/REPO` to repository-scoped
+`gh` commands. For a setup-only request, go to Step 4. Done when
 the repository, the issues, and whether writes are authorized are explicit.
 
 **Step 2: Inspect.** Read the label catalog once per run with
 `gh label list --limit 200 --json name,color,description`, raising the limit if
-it returns 200 rows. Read each issue with
+it returns 200 rows. For an unfiled issue, inspect the supplied draft instead of
+running `gh issue view`. Read each existing issue with
 `gh issue view <n> --json state,stateReason,body,comments,labels,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences`,
 then relevant review records and linked issue and PR states. `subIssues`,
 `blockedBy`, and `blocking` are objects: iterate `.nodes[]` and count `.totalCount`.
@@ -56,9 +60,10 @@ proposed mappings and affected issues. Ask the user whether to migrate and agree
 on scope before changing legacy labels; reuse approval within that scope. Rename,
 delete, or reinterpret a label only with that approval. Preserve custom labels;
 continue unambiguous changes. Missing canonical labels alone need no migration
-approval. Read-only setup returns proposed metadata without writes. Done when each
-canonical label exists or is reported missing; a setup-only request ends here,
-after reporting the verified label metadata.
+approval. After metadata writes, reread the catalog and compare with the requested
+changes. Done when each requested metadata change is verified, proposed for a
+read-only request, or reported as missing, conflicting, or failed. A setup-only
+request ends here after reporting those results.
 
 **Step 5: Apply and verify.** Reread the issue, labels, comments, and relationships
 before writing; revise the assessment if relevant evidence changed. Apply targeted
@@ -116,9 +121,6 @@ user asks for one, including a read-only preview, read
 
 ## Labels
 
-Use lowercase names. Prefixes sort impediment, state, type, priority, then epic role.
-Colors: gray for context, amber for attention, green for ready, blue for active work,
-orange for high priority, red for impediments or emergencies.
 This JSON owns exact names, colors, and descriptions.
 
 ```json
