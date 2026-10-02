@@ -202,6 +202,14 @@ CHECKS = [
     repo_test("merge", "scripts/merge.py", "scripts/signoff.py"),
     repo_test("release_check", "scripts/release_check.py"),
     repo_test("remote_skills", "scripts/remote_skills.py"),
+    repo_test(
+        "replay_routing",
+        "scripts/replay_routing.py",
+        "authoring/corey-mode/SKILL.md",
+        "authoring/corey-mode/references/routing-cases.md",
+        "authoring/andy/andy-mode/SKILL.md",
+        "authoring/andy/andy-mode/references/routing-cases.md",
+    ),
     repo_test("signoff", "scripts/signoff.py"),
     repo_test("skill_invocation", "authoring", cheap=True),
     repo_test(
