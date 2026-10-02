@@ -19,7 +19,7 @@ Write documents an agent reads so that it takes the same _process_ every run: a 
 - **Make an edit the request spells out in a target skill**, such as a one-line fix from an issue: apply the BPs to the lines you write or change, and run the skill validator. Done when it reports nothing about your lines; report what it prints about other lines as findings
 - **Create or improve a target skill, or make an edit the request leaves open**: follow [Create, edit, or improve a skill](#create-edit-or-improve-a-skill)
 - **Review a target skill or target document**: follow [Review](#review)
-- **Write or edit a target document**: apply the "Any agent document" BPs to the lines you write or change, and report other lines that break one as findings; the skill validator does not apply
+- **Write or edit a target document**: apply the "Any agent document" BPs to the lines you write or change, and report other lines that break one as findings; the skill validator does not apply. Done when each line you write or change passes those BPs, such as a new rule merged into the line that already covers its subject (BP_02) and stated as what to do (BP_05)
 
 ## Create, edit, or improve a skill
 
