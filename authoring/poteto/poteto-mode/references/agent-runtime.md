@@ -36,7 +36,7 @@ Discover MCP servers and connectors through the active tool catalog or supported
 
 ## Author, clean up, and verify
 
-For skill authoring, resolve `writing-great-skills` from the active catalog and read its `SKILL.md` plus the references needed for the current step. When it is absent from the catalog, locate its managed repository source through repository policy and read that source directly. If neither route resolves it, report the missing dependency and leave the authoring step unmet. Do not substitute another skill-authoring standard. Preserve each consumer workflow's domain inputs, output contract, and domain-specific verification.
+For skill authoring, resolve `writing-for-agents` from the active catalog and read its `SKILL.md` plus the references needed for the current step. When it is absent from the catalog, locate its managed repository source through repository policy and read that source directly. If neither route resolves it, report the missing dependency and leave the authoring step unmet. Do not substitute another skill-authoring standard. Preserve each consumer workflow's domain inputs, output contract, and domain-specific verification.
 
 Before commit, inspect the diff for redundant abstractions, duplicated checks, dead code, debug leftovers, and unrelated churn. Use project lint and formatting commands. Apply unslop to prose. This cleanup does not require a plugin.
 

@@ -23,7 +23,7 @@ Remaining triggers:
 - Parallel fan-out → the **swarm** skill for coverage matrices, races, gauntlets, and exploration partitions. Use **arena** for design or code bakeoffs with base selection and grafting.
 - Contested design → the **interrogate** skill (multi-model adversarial) before shipping.
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
-- Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skill creation and modification route to **writing-great-skills** through the runtime reference. Other agent-facing documents use **writing-for-agents**.
+- Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skills and other agent-facing documents use **writing-for-agents**, resolved through the runtime reference.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
 - Before commit → the diff cleanup procedure in [agent runtime](references/agent-runtime.md#author-clean-up-and-verify).
 - Before review → the **no-comments** skill (`/no-comments`).
