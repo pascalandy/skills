@@ -25,9 +25,9 @@
   },
   {
     "skills": ["unslop"],
-    "setup": "In an empty folder, copy evals/fixtures/AGENTS.md to AGENTS.md and evals/fixtures/transcription.md to transcription.md, then run the query from that folder",
+    "setup": "In an empty folder, copy evals/fixtures/agents-md.md to AGENTS.md and evals/fixtures/transcription.md to transcription.md, then run the query from that folder",
     "query": "Nettoie transcription.md pour enlever les tics d'IA. Modifie le fichier directement.",
-    "files": ["evals/fixtures/AGENTS.md", "evals/fixtures/transcription.md"],
+    "files": ["evals/fixtures/agents-md.md", "evals/fixtures/transcription.md"],
     "expected_behavior": [
       "Reads references/french.md before editing",
       "Keeps the project typography from AGENTS.md: every ’, the « » around Tidewater, and the dash that opens each line of dialogue",
