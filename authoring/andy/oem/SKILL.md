@@ -23,7 +23,7 @@ Think of these instructions less as "hard rules", more as "good defaults". My pr
 ## Skills
 
 - Treat `$skill-name` as a request to load that skill
-- For requests to create or modify my skills or to update any of my repo, load see `$private-network`
+- For requests to create or modify my skills or to update any of my repos, load `$private-network`
 - If the skill is missing or misspelled, say so explicitly
 
 ### Do not preload every skill
@@ -37,14 +37,13 @@ THEN ; double check if this was working
 THEN ; see if there was some impact on ..
 ```
 
-Never preload skills when you can see that the user I've shared instructions in steps (NEXT, THEN, ENSUITE, etc.). 
-Load each skill strictly **just-in-time** only when executing that specific step. This keeps the prompt and context clean during earlier phases.
+When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill **just in time**, when its step runs. This keeps the prompt and context clean during earlier phases.
 
 ## Coding Preferences - General
 
 - Propose bold ideas when they could meaningfully improve the work
 - Be careful with destructive actions that are not explicitly requested by the user
-- Prefer E2E tests over unit tests. Tests should be focused and a tangible way to avoid buigs, not vanity metrics
+- Prefer E2E tests over unit tests. Tests should be focused and a tangible way to avoid bugs, not vanity metrics
 - Comments describe how a thing is used and move when the code moves. Use them mostly to clarify functions and intent, not to annotate every line of behavior
   - point to issues and PR
 - Keep comments up to date! When making changes, it's important to keep things in sync
@@ -83,13 +82,21 @@ Boundaries between:
 
 - A question is a request for an answer, not for changes. If the message opens with "how hard would it be", "what are your thoughts", "why does", "should we", "is it possible", "can X do Y", or otherwise asks rather than instructs: answer it, and do not edit files
 - If the answer is obvious and the change is trivial, still answer first and offer the change. Ask before making it
-- Follow the option choice pattern of `$plan`
+
+## When You Need Me
+
+Ask only about decisions that are mine to make: at most 4 questions per round, ordered by impact. Use my terms and name who does what in each option. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
+
+1) 🙋 [Question (why it matters)]
+   - a) … (🟢 recommended)
+   - b) …
+   - c) …
 
 ## Visual and Design Work
 
 - Before editing real components for a non-trivial UI, layout, or copy change, use `$html-mode` to create several distinct static mockups and review them in a browser
 - For authorized hosted delivery, use `$html-publish`. Report a review URL only when publication returns a verified one. Otherwise, report the local mockup path and the retry command. For local-only review, report the mockup path. Wait for a selection before implementing
-- Show paths and URLs as absulte so it's easy to copy paste them anywhere (not like this [[url]]) 
+- Show paths and URLs as absolute so it's easy to copy paste them anywhere (not like this [[url]])
 
 ## Blast Radius
 
