@@ -4,7 +4,7 @@ Matt-mode packages Matt Pocock's complete procedures under their original names.
 
 ## Canonical sources
 
-The [upstream lock](../upstream-lock.json) records the imported Matt revision, source paths, destination paths, and source and rendered SHA-256 hashes. The imported inventory covers all eight internal procedures and two shared skills: `research` and `grilling`. Each supporting instruction file has the same provenance as its procedure. `writing-for-agents` is locally authored and is not refreshed from Matt's upstream repository.
+The [upstream lock](../upstream-lock.json) records the imported Matt revision, source paths, destination paths, and source and rendered SHA-256 hashes. The imported inventory covers seven internal procedures and two shared skills: `research` and `grilling`. Matt's `improve-codebase-architecture` left this package for `code-review-mode`, which keeps its own copy outside this lock. Each supporting instruction file has the same provenance as its procedure. `writing-for-agents` is locally authored and is not refreshed from Matt's upstream repository.
 
 The initial pin is [Matt Pocock skills, 3cca18b](https://github.com/mattpocock/skills/tree/3cca18b368ae95cdbdebbff572ccafa662551015). Its source bodies were also compared with Pascal's supplied Mac checkout during planning. The lock, rather than this initial-history note, owns the current revision.
 

@@ -12,6 +12,7 @@ Code-review-mode reviews code with one playbook per object under review. A reque
 |---|---|---|
 | [`test-audit`](playbooks/test-audit.md) | | Tests, and production code that exists only for tests |
 | [`thermo-quality-review`](playbooks/thermo-quality-review.md) | `thermonuclear` | Production code: structure, file size, branching, types, and layering |
+| [`architecture-review`](playbooks/architecture-review.md) | `improve-codebase-architecture` | Module shape across an area: depth, seams, and locality |
 
 ## Pick the route
 
