@@ -143,7 +143,7 @@ COREY_MODE = "authoring/corey-mode/scripts"
 
 CHECKS = [
     Check("frontmatter", uv_run("scripts/check_frontmatter.py")),
-    Check("flatten", uv_run("scripts/flatten_skills.py", "--check")),
+    Check("compile", uv_run("scripts/compile_skills.py", "--check")),
     Check("remote-skills", uv_run("scripts/remote_skills.py", "--check")),
     Check("cli-block", uv_run("scripts/check_cli_block.py")),
     Check("lint", *ruff("scripts")),
@@ -172,12 +172,12 @@ CHECKS = [
     repo_test(
         "discover_skills",
         "scripts/discover_skills.py",
-        "scripts/flatten_skills.py",
+        "scripts/compile_skills.py",
         "scripts/install_skills.py",
     ),
-    repo_test("flatten_skills", "scripts/flatten_skills.py"),
+    repo_test("compile_skills", "scripts/compile_skills.py"),
     repo_test(
-        "install_skills", "scripts/install_skills.py", "scripts/flatten_skills.py"
+        "install_skills", "scripts/install_skills.py", "scripts/compile_skills.py"
     ),
     repo_test("justfile", "justfile"),
     repo_test("merge", "scripts/merge.py", "scripts/signoff.py"),
@@ -188,7 +188,7 @@ CHECKS = [
     repo_test(
         "sync",
         "scripts/sync.py",
-        "scripts/flatten_skills.py",
+        "scripts/compile_skills.py",
         "scripts/install_skills.py",
         "scripts/sync_private.py",
     ),
@@ -196,7 +196,7 @@ CHECKS = [
         "sync_fleet",
         "scripts/sync_fleet.py",
         "scripts/sync_private.py",
-        "scripts/flatten_skills.py",
+        "scripts/compile_skills.py",
         "scripts/install_skills.py",
     ),
     repo_test("sync_private", "scripts/sync_private.py"),

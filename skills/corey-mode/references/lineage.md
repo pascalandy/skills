@@ -26,7 +26,7 @@ revision="$(jq -r '.repos["github.com/coreyhaines31/marketingskills"].commitSha'
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision"
 uv run authoring/corey-mode/scripts/update_corey_mode.py check --upstream "$upstream"
-just flatten-skills
+just compile-skills
 just remote-skills
 just check
 ```
