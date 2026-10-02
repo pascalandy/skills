@@ -116,7 +116,7 @@ Ask only about decisions that are mine to make: at most 4 questions per round, o
 - If nothing is new, stay quiet, do not post filler comments
 - Stop monitoring when review bots are green on the latest commit
 - Merge only when the request specifies that disposition; otherwise, report the result and ask
-- use `pascalandy@users.noreply.github.com` to push on github
+- Use `pascalandy@users.noreply.github.com` as the author and committer email so GitHub accepts the push
 
 ## Overall
 
