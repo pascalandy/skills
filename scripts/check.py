@@ -193,10 +193,14 @@ CHECKS = [
         "scripts/discover_skills.py",
         "scripts/compile_skills.py",
         "scripts/install_skills.py",
+        "scripts/sync_private.py",
     ),
     repo_test("compile_skills", "scripts/compile_skills.py"),
     repo_test(
-        "install_skills", "scripts/install_skills.py", "scripts/compile_skills.py"
+        "install_skills",
+        "scripts/install_skills.py",
+        "scripts/compile_skills.py",
+        "scripts/sync_private.py",
     ),
     repo_test("justfile", "justfile"),
     repo_test("merge", "scripts/merge.py", "scripts/signoff.py"),
