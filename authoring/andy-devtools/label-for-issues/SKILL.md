@@ -146,6 +146,6 @@ This JSON owns exact names, colors, and descriptions.
 
 ## GitHub CLI
 
-Before you set a relationship, search by relationship, or filter an issue list, read [references/github-cli.md](references/github-cli.md). It holds the `gh` relationship flags, their traps, and the issue-list filters.
+`gh issue list` and `gh label list` return 30 rows unless given `--limit`. Before you set a relationship or search issues by relationship, or to reuse a ready-made issue-list filter, read [references/github-cli.md](references/github-cli.md). It holds the `gh` relationship flags, their traps, and the filters.
 
 Use [routing cases](references/routing-cases.md) when changing which file a request reads.

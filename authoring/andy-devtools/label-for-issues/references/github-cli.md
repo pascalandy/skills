@@ -15,7 +15,6 @@ reading timeline events.
   matches issues whose blockers are closed. To drop issues with an open blocker, add
   `--json number,title,blockedBy --jq '[.[] | select(.blockedBy.totalCount == (.blockedBy.nodes | length)) | select(all(.blockedBy.nodes[]; .state == "CLOSED"))]'`
   This excludes incomplete blocker lists; page those before assessing readiness
-- `gh issue list` and `gh label list` return 30 rows unless given `--limit`
 
 ## Issue-list filters
 
