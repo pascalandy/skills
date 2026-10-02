@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
@@ -27,6 +27,18 @@ def no_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(transcript, "run_child", refuse)
     monkeypatch.setattr(youtube_smoke, "run_child", refuse)
     monkeypatch.setattr(transcript.httpx, "post", refuse)
+
+
+@pytest.fixture(autouse=True)
+def restore_transcript_logger() -> Iterator[None]:
+    """main() sets the shared transcript logger's level and handlers; restore them
+    so a --debug run cannot leak DEBUG records into a later test (#313)."""
+    import transcript
+
+    level, handlers = transcript.log.level, list(transcript.log.handlers)
+    yield
+    transcript.log.setLevel(level)
+    transcript.log.handlers[:] = handlers
 
 
 Test = TypeVar("Test", bound=Callable[..., Any])
