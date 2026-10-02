@@ -25,6 +25,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | grill-for-unknowns | Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria. |
 | headless | Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. `headless` may arrive as any voice-to-text spelling that sounds like it, such as `endless` or `adless`. |
 | how | Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation. |
+| impl | Use to implement a plan or an issue. |
 | interrogate | Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots. |
 | label-for-issues | Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue. |
 | maintain-verification-skill | Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill. |
