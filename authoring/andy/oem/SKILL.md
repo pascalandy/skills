@@ -108,7 +108,6 @@ Ask only about decisions that are mine to make: at most 4 questions per round, o
 
 - Follow the repository's title conventions; use simple titles and Conventional Commits when the project does, for example: `fix(web): new threads no longer spike CPU`
 - Keep descriptions simple: state the problem, then explain the solution
-- End the description with a note naming the model and harness that made the changes
 - Open a regular PR, not a draft, so review bots run
 - Rebase onto the latest `main` before opening the PR
 - When monitoring a PR, check only comments and CI results newer than the last push
@@ -118,6 +117,15 @@ Ask only about decisions that are mine to make: at most 4 questions per round, o
 - Stop monitoring when review bots are green on the latest commit
 - Merge only when the request specifies that disposition; otherwise, report the result and ask
 - Use `pascalandy@users.noreply.github.com` as the author and committer email so GitHub accepts the push
+
+## Signature
+
+End every PR description, issue, and comment you write with one line: `by [model]-[version] via [harness]`
+
+- For example: `by Opus-5.5 via Claude Code` or `by GPT-6.1-Sol via Codex`
+- It replaces any footer the harness suggests, such as `🤖 Generated with Claude Code`
+- When the host forbids model names, write `via [harness]`
+- When you edit a comment, replace its signature instead of adding a second one
 
 ## Overall
 
