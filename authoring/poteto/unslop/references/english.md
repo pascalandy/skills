@@ -2,13 +2,14 @@
 
 Edit text to remove AI patterns and add human voice.
 
+Keep typography required by the project or a domain skill, such as curly apostrophes, « » quotes, or dialogue dashes, over rules 13 and 19 throughout the process.
+
 ## Process
 
 1. Scan for the patterns below.
 2. Rewrite. Preserve meaning, match intended tone.
 3. Add soul (see next section).
 4. Self-audit: "What makes this obviously AI generated?" Fix each answer. Done when the question finds nothing.
-5. Keep the typography a project or domain skill sets, such as curly apostrophes, « » quotes, or dialogue dashes, over rules 13 and 19.
 
 ## Adding soul
 

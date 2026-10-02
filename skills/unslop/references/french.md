@@ -2,13 +2,14 @@
 
 Éditer le texte pour supprimer les patterns d'IA et ajouter une touche humaine.
 
+Garder la typographie qu'un projet ou un skill de domaine impose, comme l'apostrophe ’, les guillemets « » ou les tirets de réplique, plutôt que les règles 13 et 19 pendant toute la procédure.
+
 ## Procédure
 
 1. Repérer dans tout le texte les patterns décrits ci-dessous.
 2. Réécrire. Conserver le sens et le ton voulu.
 3. Donner une voix au texte (voir la section suivante).
 4. Faire son propre audit : "Qu'est-ce qui fait que ce texte a clairement été généré par l'IA ?" Corriger chaque réponse. Terminé quand la question ne trouve plus rien.
-5. Garder la typographie qu'un projet ou un skill de domaine impose, comme l'apostrophe ’, les guillemets « » ou les tirets de réplique, plutôt que les règles 13 et 19.
 
 ## Garder une voix
 
