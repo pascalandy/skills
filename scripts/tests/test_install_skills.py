@@ -369,15 +369,26 @@ def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
     cache = repo / "authoring/retired/__pycache__"
     cache.mkdir(parents=True)
     (cache / "beta.pyc").write_text("ignored\n")
+    locked = repo / "authoring/sealed/locked"
+    locked.mkdir(parents=True)
+    sealed_cache = locked.parent / "__pycache__/old.pyc"
+    sealed_cache.parent.mkdir()
+    sealed_cache.write_text("ignored\n")
     cache.chmod(0o500)
+    locked.chmod(0o000)
     try:
         applied = run(repo, home)
     finally:
         cache.chmod(0o700)
+        locked.chmod(0o700)
     assert (applied.returncode, applied.stderr) == (
         0,
-        "warning: could not delete authoring/retired: Permission denied\n",
+        (
+            "warning: could not delete authoring/retired: Permission denied\n"
+            "warning: could not delete authoring/sealed: Permission denied\n"
+        ),
     )
+    assert sealed_cache.is_file()
     assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
 

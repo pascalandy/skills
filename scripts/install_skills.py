@@ -567,14 +567,17 @@ def report(
 
 
 def prune(folder: Path) -> None:
-    """Delete a folder holding only DISPOSABLE entries and empty folders, or
-    warn about the first other entry, symlinks included. A folder without a
-    DISPOSABLE entry stays, since its empty folders may be skills in the making.
-    Delete the entries, then each folder deepest first. A file saved outside
-    disposable entries survives and prevents its folder's rmdir."""
+    """Delete a folder holding DISPOSABLE entries and nothing else but empty
+    folders, or warn about the first other entry, a symlink included. A folder
+    without a DISPOSABLE entry stays, since git deletes the folders a pull
+    empties and only one made since lacks a cache. Delete the entries without
+    following symlinks, then each folder deepest first. A file saved outside
+    them meanwhile survives and blocks its folder's rmdir. A folder it cannot
+    scan raises before anything is deleted."""
     disposable: list[Path] = []
     folders: list[Path] = []
-    for directory, names, files in os.walk(folder):
+    errors: list[OSError] = []
+    for directory, names, files in os.walk(folder, onerror=errors.append):
         here = Path(directory)
         folders.append(here)
         entries = (*names, *files)
@@ -594,6 +597,8 @@ def prune(folder: Path) -> None:
                 (here / kept[0]).relative_to(ROOT),
             )
             return
+    if errors:
+        raise errors[0]
     if not disposable:
         return
     for path in disposable:
