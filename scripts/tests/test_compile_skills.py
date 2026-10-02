@@ -211,6 +211,21 @@ class CompileSkillsTests(unittest.TestCase):
             self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
             self.assertEqual(count.read_text(), expected)
 
+    def test_check_and_a_run_agree_on_a_stray_skill_in_skills(self) -> None:
+        with self.repository() as (root, _, _):
+            stray = root / "skills/__pycache__/SKILL.md"
+            stray.parent.mkdir()
+            stray.write_text("# Stray\n", encoding="utf-8")
+
+            self.assertEqual(self.check()[:2], (1, ""))
+            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertTrue(
+                (root / "docs/references/skill-count.md")
+                .read_text()
+                .endswith("\nauthoring 1 · skills 2\n")
+            )
+            self.assertEqual(self.check(), (0, "", ""))
+
     def test_a_skill_without_a_kind_publishes_kind_unknown(self) -> None:
         untagged = '---\nname: "example"\ndescription: "Use for x."\n---\n# Example\n'
         with self.repository() as (root, source, _):

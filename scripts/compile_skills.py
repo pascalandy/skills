@@ -280,11 +280,11 @@ def compile_tree(*, dry_run: bool = False) -> list[str]:
                 publish(source, Path(*relative.parts[2:]), destination)
             swap(staging, OUTPUT, Path(temporary) / "previous")
 
-    # A real run leaves skills/ holding exactly the expected skills, so a dry
-    # run counts those to print the lines a real run prints
+    # A run with changes swaps in exactly the expected skills; otherwise
+    # skills/ stays as it is, strays included, so a dry run counts the same
     compiled = (
         len({relative.parts[1] for relative in expected})
-        if dry_run
+        if lines
         else len(list(OUTPUT.glob("*/SKILL.md")))
     )
     page = count_page(expected, compiled)
