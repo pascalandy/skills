@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPT_PATH = Path(__file__).parent.parent / "distill.py"
 PROMPTS_DIR = SCRIPT_PATH.parent.parent.parent / "references" / "distill-prompt"
 E2E_INPUT_DIR = Path.home() / "Documents" / "_my_docs" / "62_distill_exports"
@@ -235,7 +234,7 @@ class TestPromptDrivenCli:
         input_file = tmp_path / "article.md"
         input_file.write_text("hello world\n", encoding="utf-8")
 
-        stdout, stderr, code = run_script(
+        _stdout, stderr, code = run_script(
             "--prompt",
             "short_summary",
             str(input_file),
@@ -322,7 +321,7 @@ class TestEndToEndWithRealTranscript:
         env = os.environ.copy()
         env["PATH"] = f"{bin_dir}:{env['PATH']}"
 
-        stdout, stderr, code = run_script(
+        _stdout, stderr, code = run_script(
             "--prompt",
             "short_summary",
             str(E2E_INPUT_PATH),
@@ -362,7 +361,7 @@ class TestEndToEndWithRealTranscript:
         env = os.environ.copy()
         env["PATH"] = f"{bin_dir}:{env['PATH']}"
 
-        stdout, stderr, code = run_script(
+        _stdout, stderr, code = run_script(
             "--provider",
             "opencode",
             "--prompt",
