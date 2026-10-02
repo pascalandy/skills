@@ -167,14 +167,19 @@ def parse_cases(path: Path, routes: set[str]) -> list[Case]:
 
 def opened_in(command: str, name: str, routes: set[str]) -> list[str]:
     """Route files a shell command names, in the order it names them, so
-    `cro.md.bak` is not `cro.md`. After a `cd` into the skill folder, a route's
-    own relative path counts too."""
+    `cro.md.bak` is not `cro.md`. A sibling route counts spelled through the skill
+    folder, as in `andy-mode/../2nd-pass/SKILL.md`, and after a `cd` into the skill
+    folder a route's own relative path counts too."""
     folder = re.escape(f"skills/{name}")
     inside = re.search(rf"\bcd\s+['\"]?[^\s;&|'\"]*{folder}/?['\"]?{END}", command)
     hits = []
     for route in routes:
-        patterns = [re.escape(posixpath.normpath(f"skills/{name}/{route}")) + END]
-        if inside and not route.startswith(".."):
+        spelled = {
+            f"skills/{name}/{route}",
+            posixpath.normpath(f"skills/{name}/{route}"),
+        }
+        patterns = [re.escape(path) + END for path in spelled]
+        if inside:
             patterns.append(r"(?<![\w./-])(?:\./)?" + re.escape(route) + END)
         if starts := [m.start() for p in patterns if (m := re.search(p, command))]:
             hits.append((min(starts), route))
@@ -225,10 +230,15 @@ def prepare(work: Path, skill: Path, routes: set[str], project: Path | None) -> 
     """A scratch Git project with `project`'s files and untracked copies of the
     skill and of every sibling skill a route leads to, such as `../2nd-pass/SKILL.md`."""
     scratch = work / "project"
+    siblings = {route.split("/")[1] for route in routes if route.startswith("../")}
+    names = (skill.name, *sorted(siblings))
     if project:
         # A linked worktree's .git file points at the source repository
         shutil.copytree(project, scratch, ignore=shutil.ignore_patterns(".git"))
     scratch.mkdir(exist_ok=True)
+    # A copy the project already holds would be committed, then show as modified
+    for name in names:
+        shutil.rmtree(scratch / ".agents/skills" / name, ignore_errors=True)
     env = {**os.environ, **GIT_IDENTITY}
     for args in (
         ("init", "-q"),
@@ -240,11 +250,8 @@ def prepare(work: Path, skill: Path, routes: set[str], project: Path | None) -> 
             raise ScriptError(
                 f"could not seed the scratch project: {done.stderr.strip()}"
             )
-    siblings = {route.split("/")[1] for route in routes if route.startswith("../")}
-    for name in (skill.name, *sorted(siblings)):
+    for name in names:
         copy = scratch / ".agents/skills" / name
-        # The project may already hold an older copy; the compiled one replaces it
-        shutil.rmtree(copy, ignore_errors=True)
         shutil.copytree(
             SKILLS / name, copy, ignore=shutil.ignore_patterns("__pycache__")
         )

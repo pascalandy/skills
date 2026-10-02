@@ -49,6 +49,7 @@ TABLE = """# Routing cases
 | `improve it` | no route | |
 | `ask the other mode` | manual | |
 | `convert and say so` | `playbooks/cro.md` | `Route: cro` |
+| `use the other skill` | `../other/SKILL.md` | |
 """
 
 
@@ -166,6 +167,12 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
             message("Route: cro\nChange the headline."),
             DONE,
         ],
+        "use the other skill": [
+            command(SKILL_MD),
+            command("cat .agents/skills/other/SKILL.md"),
+            {"sleep": 60},
+            DONE,
+        ],
     }
 
     started = time.monotonic()
@@ -178,6 +185,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
         "pass\t3\timprove it",
         "skip\t4\task the other mode\tmanual",
         "pass\t5\tconvert and say so",
+        "pass\t6\tuse the other skill",
     ]
     assert time.monotonic() - started < 30
     first = calls(repo)[0]
@@ -193,6 +201,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
         "fix my build",
         "improve it",
         "make it convert",
+        "use the other skill",
     ]
 
 
@@ -240,6 +249,24 @@ def test_a_row_that_misroutes_fails_with_what_the_agent_opened(
     assert rerun.endswith(
         "1 of 1 rows failed; rerun them with: just replay-routing demo --case 1"
     )
+
+
+@pytest.mark.parametrize(
+    "read_command",
+    [
+        "cat .agents/skills/demo/../other/SKILL.md",
+        "/bin/bash -lc 'cd .agents/skills/demo && cat ../other/SKILL.md'",
+        "cat /home/someone/.codex/skills/other/SKILL.md",
+    ],
+)
+def test_a_sibling_route_counts_however_its_path_is_spelled(
+    repo: Path, read_command: str
+) -> None:
+    events = {"use the other skill": [command(SKILL_MD), command(read_command), DONE]}
+
+    result = replay(repo, events, "--case", "6")
+
+    assert (result.returncode, result.stdout) == (0, "pass\t6\tuse the other skill\n")
 
 
 def test_a_route_line_is_read_from_the_final_message(repo: Path) -> None:
@@ -408,6 +435,7 @@ def test_a_project_holding_an_old_copy_of_the_skill_gets_the_compiled_one(
 
     assert (result.returncode, result.stderr) == (0, "")
     assert calls(repo)[0]["skills"] == ["demo", "other"]
+    assert calls(repo)[0]["status"] == ""
 
 
 def test_a_missing_codex_fails_before_any_row(repo: Path) -> None:
