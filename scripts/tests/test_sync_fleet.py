@@ -384,6 +384,27 @@ def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
     assert not (hub.parent / "hub-home/.claude").exists()
 
 
+def test_a_worktree_syncs_with_the_main_checkouts_registry_and_skips_hooks(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down")
+    worktree = hub.parent / "worktree"
+    git(hub, "worktree", "add", "-q", str(worktree))
+    head = git(hub, "rev-parse", "HEAD")
+    fleet_log = hub.parent / "hub-home/.local/state/skills-sync/fleet.log"
+
+    result = run(worktree, homes, bin_dir, "--dry-run")
+    refs = f"refs/heads/main {head} refs/heads/main {'0' * 40}\n"
+    pushing = run(worktree, homes, bin_dir, "--hook", "pre-push", stdin=refs)
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert result.stderr.splitlines()[0] == f"offline\tdown\t{head[:7]}"
+    assert not (worktree / "_skills_private").exists()
+    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
+    assert not fleet_log.exists()
+
+
 def test_brings_the_machine_it_runs_on_to_github_main(
     fleet: tuple[Path, Path, Path],
 ) -> None:

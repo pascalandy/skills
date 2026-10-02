@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import run, run_git, run_script
+from _common import main_checkout, run, run_git, run_script
 from signoff import (
     branch,
     check_and_sign,
@@ -233,16 +233,11 @@ def main_holds_tested_tree(sha: str, timeout: float) -> bool:
 
 def deploy(sha: str, args: argparse.Namespace) -> str:
     """Run just deploy from the main checkout once main holds the tree the checks
-    ran on `sha`. A worktree lacks the private clone that holds the fleet
-    registry. The merge already landed, so expected failures only warn."""
+    ran on `sha`. The merge already landed, so expected failures only warn."""
     try:
         if not main_holds_tested_tree(sha, args.timeout):
             return ""
-        checkout = Path(
-            git("worktree", "list", "--porcelain")
-            .splitlines()[0]
-            .removeprefix("worktree ")
-        )
+        checkout = main_checkout(Path.cwd())
         # The deploy runs this checkout's code, which must be code main has held
         held = run_git(
             "merge-base", "--is-ancestor", "HEAD", "origin/main", cwd=checkout

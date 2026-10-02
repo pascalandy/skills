@@ -22,10 +22,11 @@ import subprocess
 from pathlib import Path
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import exclusive, is_network_failure, run_git, run_script
+from _common import exclusive, is_network_failure, main_checkout, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
-PRIVATE = ROOT / "_skills_private"
+# One clone per machine: a worktree uses the one in the main checkout
+PRIVATE = main_checkout(ROOT) / "_skills_private"
 LABEL = "_skills_private"
 TIMEOUT = 300.0
 EPILOG = """\
