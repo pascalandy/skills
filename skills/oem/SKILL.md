@@ -64,7 +64,8 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Default to `pnpm` for JavaScript/TypeScript; use alternatives (like `bun`) only when already present in the project; never use `npm` or `yarn`
 - On macOS, pnpm owns global JavaScript and TypeScript CLI applications. Use the skill's pnpm update command even when an embedded guide recommends npm, npx, yarn, Bun installation or a self-updater. Bun may run existing scripts, but must not install or update global applications
 - Prefer `gh` for GitHub, `trash` for safe deletion, `shellcheck` and `shfmt` for shell, `ruff`, `pyright`, and `bandit` for Python, and `biome` for JavaScript and TypeScript
-- Run CI through project commands such as `just`, `gh signoff`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
+- Run CI through project commands such as `just`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
+- Sign off through the project's recipe, such as `just signoff`, which runs the checks before it calls `gh signoff`. A bare `gh signoff` posts a green status without running anything
 - Find the latest screenshot by running: `ls -lt ~/Documents/screenshots | head -2` (on my fleet, see mbp)
 
 ## Definitions
