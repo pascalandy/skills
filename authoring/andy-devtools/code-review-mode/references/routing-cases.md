@@ -14,9 +14,13 @@ Run each request in a fresh session that has code-review-mode installed, from a 
 | "Audit the tests in `scripts/tests`" | Any | `test-audit` alone. It reports candidates and edits nothing |
 | "Run a thermonuclear review" | Branch changes production code | `thermo-quality-review` alone |
 | "Run a thermonuclear review of `scripts/`" | Branch changes files outside `scripts/` | `thermo-quality-review` alone on `scripts/`, not on the branch |
-| "Add a test for the new flag", during a feature | Any | The authoring gate in `test-audit`. No plan |
-| `code-review-mode ; thermonuclear` | Any | `thermo-quality-review` alone |
-| `code-review-mode ; thermo-nuclear-code-quality-review` | Any | `thermo-quality-review` alone |
-| `code-review-mode ; test audit` | Any | `test-audit` alone |
-| `code-review-mode ; architecture-review` | Any | `architecture-review` alone, with its HTML report and candidate question |
-| `code-review-mode ; improve-codebase-architecture` | Any | `architecture-review` alone |
+| "Add a test for the new flag", during a feature | Any | The authoring gate in `test-audit`, then continuation of the feature. No review plan |
+| "Change the existing test for the new flag", during a feature | Any | The same authoring gate and continuation |
+| `code-review-mode ; thermonuclear` | Branch changes production code | `thermo-quality-review` alone |
+| `code-review-mode ; thermo-nuclear-code-quality-review` | Branch changes production code | `thermo-quality-review` alone |
+| `code-review-mode ; test audit` | Branch changes tests | `test-audit` alone |
+| `code-review-mode ; architecture-review` | Branch changes production code | `architecture-review` alone on the touched modules, with its HTML report and candidate question |
+| `code-review-mode ; improve-codebase-architecture` | Branch changes production code | The same standalone architecture review |
+| `code-review-mode ; missing-playbook` | Any | Lists the valid choices and stops. No playbook is read |
+| "Run a thermonuclear review" | Default branch with no changes | Asks which area to review before loading a playbook |
+| "Review `scripts/`", followed by choosing a candidate | Area has architectural friction | Returns text candidates in the combined plan. Selection starts discussion; source and domain documentation stay read-only until changes are requested |
