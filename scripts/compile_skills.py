@@ -236,8 +236,8 @@ def count_page(expected: dict[Path, Path], compiled: int) -> str:
             continue
         package = source.parent
         category = TOP_LEVEL if package.parent == AUTHORING else package.parent.name
-        text = render(source, Path("SKILL.md")).decode("utf-8")
-        counts.setdefault(category, Counter())[kind_of(text)] += 1
+        kind = kind_of(source.read_text(encoding="utf-8"))
+        counts.setdefault(category, Counter())[kind] += 1
     total = sum(counts.values(), Counter())
     order = sorted(counts, key=lambda category: (category == TOP_LEVEL, category))
 
@@ -329,7 +329,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="dry run that exits 1 when skills/ differs, listing the changes on stderr",
+        help="dry run that exits 1 when skills/ or the skill count differs, "
+        "listing the changes on stderr",
     )
     return run_script(parser, work, argv, debug="COMPILE_SKILLS_DEBUG")
 
