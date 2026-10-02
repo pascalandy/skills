@@ -47,7 +47,7 @@ Run `git push` as a separate action only when the user requests it or an existin
 - `🔒 security`
 - `🚧 wip`
 
-Use `🧰 skill` for changes to skill packages, such as `authoring/**` in `pascalandy/skills`: instructions, references, examples, metadata, or helper scripts. Use `♻️ refactor` when a skill change mostly moves or renames skill bundles, and `📚 docs` for documentation outside skill behavior, such as wiki pages and READMEs.
+Use `🧰 skill` for changes to skill packages, such as `authoring/**` in `pascalandy/skills`: instructions, references, examples, metadata, or helper scripts. Use `♻️ refactor` when a skill change is mostly structural, such as moving or renaming skill bundles, and `📚 docs` for documentation outside skill behavior, such as wiki pages and READMEs.
 
 ## Format
 
