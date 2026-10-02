@@ -30,12 +30,12 @@ Run these steps in order. Finish each one before you start the next:
 - Run a $2nd-pass
 
 **3. Impacts**
-- Start a 🧰 headless `--review-only` run and ask it: "Delegated by impl. Use $poteto-mode and $blast-radius on 'stack PR URLs'. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?"
+- Start a 🧰 headless `--review-only` run and ask it: "Use $poteto-mode and $blast-radius on 'stack PR URLs'. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?"
 - While it runs, write your own premortem. What could go wrong? Are we adding debt or code smells?
 - Fix every high-severity finding from both premortems, then run 🧰 2nd-pass again
 
 **4. External review**
-- Start a 🧰 headless `--review-fix` run in the stack's checkout and ask it: "Delegated by impl. Use $poteto-mode to review the stack at 'stack PR URLs', including the checkout's uncommitted changes. The solution works. Make it great and pristine while keeping the solution simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
+- Start a 🧰 headless `--review-fix` run in the stack's checkout and ask it: "Use $poteto-mode to review the stack at 'stack PR URLs', including the checkout's uncommitted changes. The solution works. Make it great and pristine while keeping the solution simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
 	- the agent leaves commits and pushes to you. Review its diff, run the checks, commit each change to the layer it belongs to with $gh-stack, and push
 - If the stack changed documented behavior, run 🧰 andy-mode ; docs, then commit its edits to the layer they belong to and push
 
