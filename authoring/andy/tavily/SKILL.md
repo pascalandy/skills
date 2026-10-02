@@ -1,6 +1,6 @@
 ---
 name: "tavily"
-description: "Use when the user explicitly requests Tavily. Never run automatically."
+description: "Use only when explicitly invoked as `tavily`."
 kind: "general"
 ---
 
@@ -8,7 +8,7 @@ kind: "general"
 
 ## Overview
 
-Tavily gives LLM-optimized search, content extraction, site mapping, and crawling via REST. Use it only when the user asks for Tavily.
+Tavily gives LLM-optimized search, content extraction, site mapping, and crawling via REST.
 
 ## Routing Policy
 
