@@ -8,6 +8,7 @@ its help lists. The contract is in docs/references/script-conventions.md.
 from __future__ import annotations
 
 import importlib
+import os
 import re
 import subprocess
 import sys
@@ -127,10 +128,13 @@ def test_help_comes_from_the_shared_parser_and_docs_use_only_its_flags(
     shown = subprocess.run(
         [sys.executable, str(ROOT / path), "--help"],
         cwd=ROOT,
+        env={**os.environ, "PATH": ""},
         capture_output=True,
         text=True,
         check=False,
     )
+    assert (shown.returncode, shown.stderr) == (0, "")
+    assert shown.stdout.startswith(f"usage: {name} ")
     codes = [int(line.split()[0]) for line in section(shown.stdout, "exit codes")]
     allowed = set(FLAG.findall("\n".join(section(shown.stdout, "options"))))
     unknown = [
@@ -139,8 +143,6 @@ def test_help_comes_from_the_shared_parser_and_docs_use_only_its_flags(
         if not accepted(flag, allowed)
     ]
 
-    assert (shown.returncode, shown.stderr) == (0, "")
-    assert shown.stdout.startswith(f"usage: {name} ")
     assert section(shown.stdout, "examples")
     assert codes == list(importlib.import_module(Path(path).stem).EXIT_CODES)
     assert unknown == []

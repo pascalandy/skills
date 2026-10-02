@@ -58,6 +58,7 @@ from _common import (
     GRACE,
     exclusive,
     is_network_failure,
+    main_checkout,
     run,
     run_git,
     run_script,
@@ -678,7 +679,7 @@ def hook(event: list[str]) -> str:
     an event that would act warns and never blocks git.
     """
     name, *rest = event
-    if not sync_private.is_clone():
+    if ROOT != main_checkout(ROOT) or not sync_private.is_clone():
         return ""
     if name == "pre-push":
         if (sha := pushed_main(sys.stdin.read().splitlines())) and has_registry():

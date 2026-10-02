@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-09-30
+date_updated: 2026-10-02
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
@@ -42,7 +42,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
 4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
 5. It reads the PR back, then warns when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
-6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout, since a worktree lacks the private clone that holds the fleet registry. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync; the run warns and still exits 0, since the merge landed
+6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync; the run warns and still exits 0, since the merge landed
 
 `just merge --dry-run` runs step 1 and prints what a run would do, without deploying. A rerun on a merged PR runs only the deploy. It never deletes the branch
 
