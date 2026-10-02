@@ -1,10 +1,3 @@
----
-name: "test-audit"
-description: "Invoke whenever writing, changing, reviewing, or sweeping tests. Authoring gate for new tests plus audit workflow for low-value, implementation-coupled, or duplicative tests and the test-only production seams they demand."
-kind: "dev"
-author: "Peter Steinberger"
----
-
 # Test Audit
 
 Three modes, one value bar. Authoring mode gates every new or changed test at
@@ -13,7 +6,7 @@ duplicate stronger proof, couple behavior to implementation, or keep test-only
 production seams alive. Continue broad audits as separate coherent follow-up
 PRs; optimize for confidence, not deletion count. Campaign mode prunes one
 whole subsystem's test surface (every test file a plugin or core area owns);
-before starting one, read [CAMPAIGN.md](CAMPAIGN.md).
+before starting one, read [CAMPAIGN.md](../references/test-audit/CAMPAIGN.md).
 
 ## Authoring gate
 
