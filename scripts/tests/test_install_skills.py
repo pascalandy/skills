@@ -278,6 +278,52 @@ def test_a_skill_without_a_kind_installs_the_compiled_kind_unknown(
     )
 
 
+def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    with (repo / ".gitignore").open("a") as ignore:
+        ignore.write(".DS_Store\n.env\nnode_modules/\n")
+    skill(repo / "authoring", "solo")
+    commit(repo)
+    for path in (
+        "authoring/retired/beta/__pycache__/beta.pyc",
+        "authoring/content/gone/.DS_Store",
+        "authoring/kept/.env",
+        "authoring/solo/scripts/node_modules/dep.js",
+    ):
+        (repo / path).parent.mkdir(parents=True)
+        (repo / path).write_text("ignored\n")
+    (repo / "authoring/content/empty").mkdir()
+
+    assert run(repo, home, "--dry-run").returncode == 0
+    assert (repo / "authoring/retired").exists()
+    applied = run(repo, home)
+    assert (applied.returncode, applied.stderr) == (
+        0,
+        (
+            "warning: authoring/kept holds only ignored files, such as "
+            "authoring/kept/.env; delete it once nothing in it is needed\n"
+        ),
+    )
+    assert {
+        folder: (repo / folder).exists()
+        for folder in (
+            "authoring/retired",
+            "authoring/content/gone",
+            "authoring/kept",
+            "authoring/solo/scripts/node_modules",
+            "authoring/content/empty",
+        )
+    } == {
+        "authoring/retired": False,
+        "authoring/content/gone": False,
+        "authoring/kept": True,
+        "authoring/solo/scripts/node_modules": True,
+        "authoring/content/empty": True,
+    }
+
+
 def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     shallow = repo.parent / "shallow"

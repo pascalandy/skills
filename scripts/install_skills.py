@@ -85,6 +85,11 @@ RUNTIME_NAMES = frozenset(
 )
 RUNTIME_PREFIXES = (".coverage.", "._")
 RUNTIME_SUFFIXES = (".pyc", ".pyo", ".tsbuildinfo", ".swp", ".swo", "~")
+# What a tool or Finder regenerates. A move leaves these behind in the old
+# authoring/ folder, since git keeps a directory holding ignored files
+DISPOSABLE = frozenset(
+    {".DS_Store", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+)
 CHANGES = ("add", "update", "remove")
 EXIT_CODES = exit_codes(
     {
@@ -97,7 +102,9 @@ EPILOG = """\
 Each run prints one line per change: add, update, or remove, then a tab and
 the installed path. A dry run prints the same lines and writes nothing; a run
 with nothing to change prints nothing. A conflict, a symlink or wrong type at
-a target path, blocks the install and is reported on stderr.
+a target path, blocks the install and is reported on stderr. An apply also
+deletes each authoring/ folder a move left holding only caches, and warns
+about one holding other ignored files.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -558,6 +565,41 @@ def report(
     }
 
 
+def prune_leftovers() -> None:
+    """Delete each authoring/ category or package folder that holds no file git
+    lists and only DISPOSABLE entries; warn about one holding anything else.
+    An empty folder may be a skill in the making, so it stays."""
+    listed = {path.parts[1:3] for path in compile_skills.git_files("authoring")}
+    categories = {parts[0] for parts in listed}
+    candidates: list[Path] = []
+    for folder in sorted(compile_skills.AUTHORING.iterdir()):
+        if folder.name not in categories:
+            candidates.append(folder)
+        elif not (folder / "SKILL.md").is_file():
+            candidates += [
+                package
+                for package in sorted(folder.iterdir())
+                if (folder.name, package.name) not in listed
+            ]
+    for folder in candidates:
+        if folder.is_symlink() or not folder.is_dir() or not any(folder.iterdir()):
+            continue
+        for directory, folders, files in os.walk(folder):
+            folders[:] = [name for name in folders if name not in DISPOSABLE]
+            kept = [name for name in files if name not in DISPOSABLE]
+            if kept:
+                log.warning(
+                    "warning: %s holds only ignored files, such as %s; "
+                    "delete it once nothing in it is needed",
+                    folder.relative_to(ROOT),
+                    Path(directory, kept[0]).relative_to(ROOT),
+                )
+                break
+        else:
+            shutil.rmtree(folder)
+            log.info("prune %s", folder.relative_to(ROOT))
+
+
 def install(args: argparse.Namespace) -> str:
     home = Path.home()
     preview = args.dry_run or args.check
@@ -632,6 +674,7 @@ def install(args: argparse.Namespace) -> str:
             return output
         if conflicts:
             raise ScriptError(*conflicts, report=summary)
+        prune_leftovers()
         compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
         return output
