@@ -145,6 +145,8 @@ SEO = "cat .agents/skills/demo/playbooks/seo.md"
         f"{SKILL_MD} && {CRO}",
         "/bin/bash -lc 'rtk proxy sed -n \"1,80p\" .agents/skills/demo/playbooks/cro.md'",
         "/bin/bash -lc 'cd .agents/skills/demo && cat ./playbooks/cro.md'",
+        "/bin/bash -lc 'nl -ba .agents/skills/demo/playbooks/cro.md | sed -n \"1,40p\"'",
+        "/bin/bash -lc 'ls .agents/skills/demo; sed -n 1,80p .agents/skills/demo/playbooks/cro.md'",
     ],
 )
 def test_each_row_passes_and_a_routed_run_stops_before_its_work(
@@ -233,6 +235,9 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
             for nonread in (
                 "cat .agents/skills/demo/playbooks/cro.md.bak",
                 "cat .agents/skills/demo/playbooks/cro.mdx",
+                "ls .agents/skills/demo/playbooks/cro.md",
+                "/bin/bash -lc 'test -f .agents/skills/demo/playbooks/cro.md && echo ok'",
+                "cat .agents/skills/demo/SKILL.md; ls .agents/skills/demo/playbooks/cro.md",
             )
         ],
     ],

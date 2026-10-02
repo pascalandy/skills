@@ -75,6 +75,22 @@ CELL_RE = re.compile(r"`([^`]+)`")
 LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
 # A path ends at the end, a space, a quote, or shell punctuation
 END = r"(?=$|[\s'\";|&)<>])"
+# Commands that print a file's content; a listing such as `ls` or `test -f` is no read
+READERS = {
+    "cat",
+    "head",
+    "tail",
+    "sed",
+    "nl",
+    "less",
+    "more",
+    "bat",
+    "awk",
+    "rg",
+    "grep",
+}
+# Where one shell command ends and the next begins, including `bash -lc '`
+SEGMENT = re.compile(r"&&|\|\||[;|&\n]|-l?c\s+['\"]")
 
 log = logging.getLogger("replay-routing")
 
@@ -181,9 +197,23 @@ def opened_in(command: str, name: str, routes: set[str]) -> list[str]:
         patterns = [re.escape(path) + END for path in spelled]
         if inside:
             patterns.append(r"(?<![\w./-])(?:\./)?" + re.escape(route) + END)
-        if starts := [m.start() for p in patterns if (m := re.search(p, command))]:
+        starts = [
+            m.start()
+            for p in patterns
+            for m in re.finditer(p, command)
+            if read_by(command, m.start())
+        ]
+        if starts:
             hits.append((min(starts), route))
     return [route for _, route in sorted(hits)]
+
+
+def read_by(command: str, start: int) -> bool:
+    """Whether the shell command around position `start` runs a reader."""
+    words = [w.strip("'\"") for w in SEGMENT.split(command[:start])[-1].split()]
+    while words and words[0] in ("rtk", "proxy", "command"):
+        words = words[1:]
+    return bool(words) and Path(words[0]).name in READERS
 
 
 def verdict(case: Case, run: Run) -> str | None:
