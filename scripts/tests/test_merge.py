@@ -57,6 +57,14 @@ def test_signs_off_an_unsigned_head_once_then_merges(github: Sandbox) -> None:
             {"state": "MERGED", "baseRefName": "lower-layer"},
             "PR #7 was merged into lower-layer, not main",
         ),
+        (
+            {
+                "state": "MERGED",
+                "baseRefName": "lower-layer",
+                "mergeCommit": {"oid": "f" * 40},
+            },
+            "PR #7 was merged into lower-layer, not main",
+        ),
     ],
 )
 def test_refuses_a_pr_that_cannot_merge_as_is_before_the_checks(
@@ -157,6 +165,21 @@ def test_deploys_from_the_scripts_main_checkout_whatever_the_cwd(
 
     assert result.returncode == 0, result.stderr
     assert github.deploys() == [github.main.resolve()]
+
+
+def test_a_rerun_deploys_a_stack_layer_that_landed_on_main(github: Sandbox) -> None:
+    github.open_pr()
+    github.sign(github.git("rev-parse", "HEAD"))
+    assert github.run("merge.py").returncode == 0
+    # gh stack merge leaves the layer's base pointing at the layer below it
+    state = github.state()
+    state["prs"][0]["baseRefName"] = "lower-layer"
+    github.save(state)
+
+    result = github.run("merge.py")
+
+    assert (result.returncode, result.stdout) == (0, "synced\tmbp\n")
+    assert len(github.deploys()) == 2
 
 
 def test_a_failed_deploy_warns_without_failing_the_merge(github: Sandbox) -> None:

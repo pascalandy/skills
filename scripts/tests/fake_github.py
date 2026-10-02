@@ -253,6 +253,7 @@ def merge(state: dict, number: str, sha: str, subject: str) -> tuple[int, str]:
     )
     stored = next(pr for pr in state["prs"] if str(pr["number"]) == number)
     stored["state"] = "MERGED"
+    stored["mergeCommit"] = {"oid": commit.stdout.strip()}
     return 0, ""
 
 
