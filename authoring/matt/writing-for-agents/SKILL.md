@@ -40,7 +40,7 @@ Skill progress:
 
 **Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them without the target skill (BP_20). Skip steps 2 and 7 for a wording-only edit.
 
-**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14).
+**Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21).
 
 **Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01).
 
@@ -64,7 +64,7 @@ BP_06 Every line relevant: 2
 - references/api.md:12 restates the package.json scripts → point to package.json
 BP_14 Description is a trigger: 1
 - SKILL.md:3 says what the skill is, never when to load it → "Use when …"
-Pass: BP_01–BP_05, BP_07–BP_13, BP_15–BP_20
+Pass: BP_01–BP_05, BP_07–BP_13, BP_15–BP_21
 ```
 
 A finding that fits two BPs goes under the more specific one.
@@ -112,10 +112,11 @@ IDs never change and are never reused. To change a practice, move its line under
 - [ ] **BP_18 Prerequisites named**: each tool a step needs, with its install command and a check that it is available, before the first step that uses it
 - [ ] **BP_19 Works on any agent**: instructions any agent can follow; a step tied to one agent names it and gives the fallback
 - [ ] **BP_20 Evaluations first**: three scenarios and a baseline before the instructions
+- [ ] **BP_21 Invoke by a word**: a skill that must never fire on its own says ``Use only when explicitly invoked as `<word>`.``, with the word in backticks and no actor named _(validator: warning)_
 
 ## References
 
 - [writing-levers.md](references/writing-levers.md): BP_01 to BP_06, plus context pointers and the two loads. Read when writing or reviewing any document
 - [patterns.md](references/patterns.md): BP_07 to BP_11. Read when the document has steps, examples, templates, or a validation step
-- [skill-format.md](references/skill-format.md): BP_13 to BP_16 and BP_19, plus invocation and layout. Read when writing a skill's frontmatter or deciding its files
+- [skill-format.md](references/skill-format.md): BP_13 to BP_16, BP_19, and BP_21, plus invocation and layout. Read when writing a skill's frontmatter or deciding its files
 - [scripts-and-evals.md](references/scripts-and-evals.md): BP_17, BP_18, BP_20. Read when a skill runs code, or before writing a new skill

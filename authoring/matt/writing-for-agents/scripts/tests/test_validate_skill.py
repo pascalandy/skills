@@ -294,3 +294,41 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
             f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' may only use lowercase letters, digits, and hyphens",
         ],
     )
+
+
+def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    good = skill(
+        tmp_path,
+        folder="good",
+        name="good",
+        description='"Use only when explicitly invoked as `good`."',
+    )
+    bare = skill(
+        tmp_path,
+        folder="bare",
+        name="bare",
+        description='"Use only when explicitly invoked as bare."',
+    )
+    actor = skill(
+        tmp_path,
+        folder="actor",
+        name="actor",
+        description='"Use only when the user invokes `actor`."',
+    )
+    model = skill(
+        tmp_path,
+        folder="model",
+        name="model",
+        description='"Use when the user asks to fill a PDF form."',
+    )
+    form = (
+        "start with 'Use only when explicitly invoked as `word`', the word in backticks"
+    )
+    assert run(capsys, good, bare, actor, model) == (
+        0,
+        [
+            f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: names an actor, 'the user'; a delegated prompt would be refused",
+            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+        ],
+    )

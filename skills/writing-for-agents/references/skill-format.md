@@ -30,11 +30,23 @@ Agents list each installed skill's name and description, but a large catalog can
 ### Invocation
 
 - A **model-invoked** skill keeps a description the agent matches, so the agent and other skills can reach it, and the human can still type its name. The description is permanent context load paid for discovery. A model-invoked skill that is all reference is also a home for reference several skills share
-- A **user-invoked** skill is reached only when the human names it: no context load, but the human is the index that must remember it. Agents hide a skill from matching through their own settings, and the settings differ. The portable form keeps the skill model-invoked with a description such as ``Use only when explicitly invoked as `tdd`.`` plus an optional tail. Write _invoked_: a mere mention also fires on talk about the skill. Name no actor: "the user" makes the agent judge who is speaking, so a delegated prompt or another skill's call gets refused
+- A **user-invoked** skill is reached only when the human names it: no context load, but the human is the index that must remember it. Write it as BP_21 describes
 
 Make a skill model-invoked only when the agent or another skill must reach it unaided. Split off a new model-invoked skill only for a distinct trigger word you actually use, or for a skill another skill must reach: its description costs context load every turn.
 
 When hand-fired skills multiply past what you remember, a **router skill** names them and says when to reach for each, so you remember one skill instead of many.
+
+## BP_21 Invoke by a word
+
+A skill that fires only when called by a word still keeps a description: agents hide skills through settings that differ, and a host `AGENTS.md` may keep every skill model-invocable. Write ``Use only when explicitly invoked as `<word>`.`` plus an optional tail for what it does:
+
+- Write _invoked_: a mention also fires on talk about the skill, and a common word like `plan` fires on everyday prompts and on other skills' descriptions
+- Mark `<word>`, usually the skill name, with backticks. Quote anything else with backticks or single quotes: when the frontmatter wraps the description in double quotes, an inner `"` ends the value
+- Name no actor: _the user_ makes the agent judge who is speaking, so a delegated prompt or another skill's call gets refused
+
+```yaml
+description: "Use only when explicitly invoked as `tdd`."
+```
 
 ## BP_15 SKILL.md under 500 lines
 
