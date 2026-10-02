@@ -31,8 +31,8 @@ Think of these instructions less as "hard rules", more as "good defaults". My pr
 I share dense instructions meant to be executed sequentially using queued steps. For example:
 
 ```
-I want you to do this. 
-THEN ; I want you to do that. 
+I want you to do this.
+THEN ; I want you to do that.
 THEN ; double check if this was working
 THEN ; see if there was some impact on ..
 ```
@@ -100,7 +100,7 @@ Ask only about decisions that are mine to make: at most 4 questions per round, o
 
 ## Blast Radius
 
-- Never touch production, live databases, or daily-driver build/preview channels unless explicitly told to. 
+- Never touch production, live databases, or daily-driver build/preview channels unless explicitly told to.
 - When a task is adjacent to any of them, name what you are about to touch before touching it
 
 ## Pull requests
