@@ -30,7 +30,8 @@ Agents list each installed skill's name and description, but a large catalog can
 ### Invocation
 
 - A **model-invoked** skill keeps a description the agent matches, so the agent and other skills can reach it, and the human can still type its name. The description is permanent context load paid for discovery. A model-invoked skill that is all reference is also a home for reference several skills share
-- An **explicitly invoked** skill loads when a prompt or another skill calls it by its invocation word. Its description remains in the catalog, so it still costs context load. Write it as BP_21 describes
+- A **user-invoked** skill is hidden from matching by the agent's own setting: no context load, but the human is the index that must remember it. The setting differs per agent, and a host `AGENTS.md` may forbid it
+- An **explicitly invoked** skill is the portable middle ground: it keeps its description, so it costs context load, but loads only when a prompt or another skill calls it by its word. Write it as BP_21 describes
 
 Make a skill model-invoked only when the agent or another skill must reach it unaided. Split off a new model-invoked skill only for a distinct trigger word you actually use, or for a skill another skill must reach: its description costs context load every turn.
 
