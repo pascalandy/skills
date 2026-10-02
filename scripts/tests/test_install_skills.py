@@ -38,7 +38,9 @@ def command(repo: Path, name: str, body: str = "command") -> Path:
     return path
 
 
-def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(
+    repo: Path, home: Path, *args: str, script: str = "install_skills.py"
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["UV_CACHE_DIR"] = str(home.parent / "uv-cache")
@@ -47,7 +49,7 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         [
             "uv",
             "run",
-            str(repo / "scripts/install_skills.py"),
+            str(repo / "scripts" / script),
             "--profile",
             "mac",
             *args,
@@ -334,6 +336,29 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
     }
 
 
+def test_an_apply_keeps_external_files_behind_a_category_symlink(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    retired = skill(repo / "authoring/retired", "gone")
+    subprocess.run(["git", "add", "authoring"], cwd=repo, check=True)
+    shutil.rmtree(retired.parent)
+    with (repo / ".gitignore").open("a", encoding="utf-8") as ignore:
+        ignore.write("/authoring/retired\n")
+    cache = repo.parent / "external/personal/__pycache__/keep.pyc"
+    cache.parent.mkdir(parents=True)
+    cache.write_bytes(b"external cache")
+    link = repo / "authoring/retired"
+    link.symlink_to(cache.parents[2], target_is_directory=True)
+
+    applied = run(repo, home)
+
+    assert (applied.returncode, applied.stderr) == (0, "")
+    assert link.is_symlink()
+    assert cache.read_bytes() == b"external cache"
+    assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
+
+
 def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
     sandbox: tuple[Path, Path],
 ) -> None:
@@ -350,6 +375,47 @@ def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
         0,
         "warning: could not delete authoring/retired: Permission denied\n",
     )
+    assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
+
+
+def test_a_file_saved_after_the_prune_scan_survives(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    cache = repo / "authoring/retired/package/scripts/__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "old.pyc").write_bytes(b"cache")
+    saved = cache.parent / "new-work.txt"
+    driver = repo / "scripts/save_during_prune.py"
+    driver.write_text(
+        """\
+from pathlib import Path
+import install_skills
+
+rmtree = install_skills.shutil.rmtree
+retired = install_skills.compile_skills.AUTHORING / "retired"
+
+def save(path, *args, **kwargs):
+    if Path(path).is_relative_to(retired):
+        (retired / "package/scripts/new-work.txt").write_text(
+            "work saved during cleanup\\n", encoding="utf-8"
+        )
+    return rmtree(path, *args, **kwargs)
+
+install_skills.shutil.rmtree = save
+raise SystemExit(install_skills.main())
+""",
+        encoding="utf-8",
+    )
+
+    applied = run(repo, home, script=driver.name)
+
+    assert applied.returncode == 0, applied.stderr
+    assert saved.read_text(encoding="utf-8") == "work saved during cleanup\n"
+    assert applied.stderr == (
+        "warning: could not delete authoring/retired: Directory not empty\n"
+    )
+    assert not cache.exists()
     assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
 

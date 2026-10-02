@@ -568,8 +568,8 @@ def report(
 
 def prune(folder: Path) -> None:
     """Delete a folder holding only DISPOSABLE entries, or warn about the first
-    other entry. It deletes those entries, then each folder deepest first, so a
-    file saved meanwhile survives and the rmdir of its folder fails."""
+    other entry. Delete those entries, then each folder deepest first. A file
+    saved outside disposable entries survives and prevents its folder's rmdir."""
     disposable: list[Path] = []
     folders: list[Path] = []
     for directory, names, files in os.walk(folder):
@@ -612,6 +612,8 @@ def prune_leftovers() -> None:
     listed = {path.parts[1:3] for path in compile_skills.git_files("authoring")}
     categories = {parts[0] for parts in listed}
     for folder in sorted(compile_skills.AUTHORING.iterdir()):
+        if folder.is_symlink():
+            continue
         if folder.name not in categories:
             candidates.append(folder)
         elif not (folder / "SKILL.md").is_file():
@@ -710,7 +712,10 @@ def install(args: argparse.Namespace) -> str:
             raise ScriptError(*conflicts, report=summary)
         compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
-        prune_leftovers()
+        try:
+            prune_leftovers()
+        except (OSError, ScriptError) as error:
+            log.warning("warning: could not prune leftover skill folders: %s", error)
         return output
 
 
