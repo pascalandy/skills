@@ -85,6 +85,12 @@ RUNTIME_NAMES = frozenset(
 )
 RUNTIME_PREFIXES = (".coverage.", "._")
 RUNTIME_SUFFIXES = (".pyc", ".pyo", ".tsbuildinfo", ".swp", ".swo", "~")
+# What a tool or Finder regenerates. A move leaves these behind in the old
+# folder, since git keeps a directory holding ignored files. Narrower than
+# RUNTIME_NAMES, whose build/ and dist/ may hold work
+DISPOSABLE = frozenset(
+    {".DS_Store", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+)
 CHANGES = ("add", "update", "remove")
 EXIT_CODES = exit_codes(
     {
@@ -97,7 +103,9 @@ EPILOG = """\
 Each run prints one line per change: add, update, or remove, then a tab and
 the installed path. A dry run prints the same lines and writes nothing; a run
 with nothing to change prints nothing. A conflict, a symlink or wrong type at
-a target path, blocks the install and is reported on stderr.
+a target path, blocks the install and is reported on stderr. An apply also
+deletes each authoring/ or skills/ folder a move left holding only caches,
+and warns about one holding other ignored files or one it cannot delete.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -558,6 +566,87 @@ def report(
     }
 
 
+def prune(folder: Path) -> None:
+    """Delete a folder holding DISPOSABLE entries and nothing else but empty
+    folders, or warn about the first other entry, a symlink included. A folder
+    without a DISPOSABLE entry stays, since git deletes the folders a pull
+    empties and only one made since lacks a cache. Delete the entries without
+    following symlinks, then each folder deepest first. A file saved outside
+    them meanwhile survives and blocks its folder's rmdir. A folder it cannot
+    scan raises before anything is deleted."""
+    disposable: list[Path] = []
+    folders: list[Path] = []
+    errors: list[OSError] = []
+    for directory, names, files in os.walk(folder, onerror=errors.append):
+        here = Path(directory)
+        folders.append(here)
+        entries = (*names, *files)
+        disposable += [here / name for name in entries if name in DISPOSABLE]
+        # os.walk lists a directory symlink but never enters it
+        kept = [
+            name
+            for name in entries
+            if (here / name).is_symlink() or (name in files and name not in DISPOSABLE)
+        ]
+        names[:] = [name for name in names if name not in DISPOSABLE]
+        if kept:
+            log.warning(
+                "warning: %s holds only ignored files, such as %s; "
+                "delete it once nothing in it is needed",
+                folder.relative_to(ROOT),
+                (here / kept[0]).relative_to(ROOT),
+            )
+            return
+    if errors:
+        raise errors[0]
+    if not disposable:
+        return
+    for path in disposable:
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    for here in reversed(folders):
+        here.rmdir()
+    log.info("prune %s", folder.relative_to(ROOT))
+
+
+def prune_leftovers() -> None:
+    """Prune each skills/ folder, and each authoring/ category or package
+    folder, that holds no file git lists. A folder it cannot delete gets a
+    warning, since the install it follows already succeeded."""
+    compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
+    candidates = [
+        folder
+        for folder in sorted(compile_skills.OUTPUT.iterdir())
+        if folder.name not in compiled
+    ]
+    listed = {path.parts[1:3] for path in compile_skills.git_files("authoring")}
+    categories = {parts[0] for parts in listed}
+    for folder in sorted(compile_skills.AUTHORING.iterdir()):
+        if folder.is_symlink():
+            continue
+        if folder.name not in categories:
+            candidates.append(folder)
+        elif not (folder / "SKILL.md").is_file():
+            candidates += [
+                package
+                for package in sorted(folder.iterdir())
+                if (folder.name, package.name) not in listed
+            ]
+    for folder in candidates:
+        if folder.is_symlink() or not folder.is_dir():
+            continue
+        try:
+            prune(folder)
+        except OSError as error:
+            log.warning(
+                "warning: could not delete %s: %s",
+                folder.relative_to(ROOT),
+                error.strerror or error,
+            )
+
+
 def install(args: argparse.Namespace) -> str:
     home = Path.home()
     preview = args.dry_run or args.check
@@ -634,6 +723,10 @@ def install(args: argparse.Namespace) -> str:
             raise ScriptError(*conflicts, report=summary)
         compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
+        try:
+            prune_leftovers()
+        except (OSError, ScriptError) as error:
+            log.warning("warning: could not prune leftover skill folders: %s", error)
         return output
 
 
