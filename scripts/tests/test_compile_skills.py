@@ -13,6 +13,14 @@ from unittest.mock import patch
 
 import compile_skills
 
+COUNT_HEAD = (
+    "---\nname: skill-count\n"
+    "description: How many skills authoring/ holds, by category and kind\n---\n\n"
+    "<!-- Generated from authoring/ by `just compile-skills`; do not edit -->\n\n"
+    "| Category | General | Dev | Unknown | Total |\n|---|---|---|---|---|\n"
+)
+COUNT_CHANGED = "update\tdocs/references/skill-count.md\n"
+
 
 class CompileSkillsTests(unittest.TestCase):
     @contextmanager
@@ -28,6 +36,13 @@ class CompileSkillsTests(unittest.TestCase):
             destination.parent.mkdir(parents=True)
             destination.write_text("# Example\n", encoding="utf-8")
             (root / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+            count = root / "docs/references/skill-count.md"
+            count.parent.mkdir(parents=True)
+            count.write_text(
+                COUNT_HEAD + "| devtools | 0 | 0 | 1 | 1 |\n"
+                "| **Total** | 0 | 0 | 1 | 1 |\n\nauthoring 1 · skills 1\n",
+                encoding="utf-8",
+            )
             subprocess.run(
                 ["git", "init", "-q", str(root)],
                 check=True,
@@ -76,7 +91,7 @@ class CompileSkillsTests(unittest.TestCase):
             added.parent.mkdir()
             added.write_text("# Fresh\n", encoding="utf-8")
             subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
-            lines = "update\tskills/example\nadd\tskills/fresh\n"
+            lines = "update\tskills/example\nadd\tskills/fresh\n" + COUNT_CHANGED
 
             self.assertEqual(self.cli("-vn")[:2], (0, lines))
             self.assertEqual(
@@ -135,8 +150,81 @@ class CompileSkillsTests(unittest.TestCase):
         self.assertEqual(
             stderr,
             "update\tskills/example\n"
-            "error: skills/ differs from authoring/; run: just compile-skills\n",
+            "error: skills/ or the skill count differs from authoring/; "
+            "run: just compile-skills\n",
         )
+
+    def test_the_count_page_tallies_each_category_by_kind(self) -> None:
+        with self.repository() as (root, _, _):
+            for path, text in {
+                "devtools/tagged": 'kind: "dev"',
+                "content/writer": 'kind: "general"',
+                "content/typo": 'kind: "gneral"',
+                "solo": 'name: "solo"',
+            }.items():
+                source = root / "authoring" / path / "SKILL.md"
+                source.parent.mkdir(parents=True)
+                source.write_text(f"---\n{text}\n---\n", encoding="utf-8")
+            subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
+            self.cli()
+            page = (root / "docs/references/skill-count.md").read_text()
+
+        self.assertEqual(
+            page,
+            COUNT_HEAD + "| content | 1 | 0 | 1 | 2 |\n"
+            "| devtools | 0 | 1 | 1 | 2 |\n"
+            "| (top level) | 0 | 0 | 1 | 1 |\n"
+            "| **Total** | 1 | 1 | 3 | 5 |\n\nauthoring 5 · skills 5\n",
+        )
+
+    def test_a_category_move_changes_only_the_count_page(self) -> None:
+        with self.repository() as (root, source, _):
+            moved = root / "authoring/content/example"
+            moved.parent.mkdir()
+            source.parent.rename(moved)
+            subprocess.run(["git", "add", "-A", "authoring"], cwd=root, check=True)
+
+            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertEqual(
+                (root / "docs/references/skill-count.md").read_text(),
+                COUNT_HEAD + "| content | 0 | 0 | 1 | 1 |\n"
+                "| **Total** | 0 | 0 | 1 | 1 |\n\nauthoring 1 · skills 1\n",
+            )
+
+    def test_check_fails_on_a_hand_edited_count_page_and_a_run_repairs_it(
+        self,
+    ) -> None:
+        with self.repository() as (root, _, _):
+            count = root / "docs/references/skill-count.md"
+            expected = count.read_text()
+            count.write_text(expected.replace("| 1 |", "| 9 |"))
+
+            self.assertEqual(
+                self.check(),
+                (
+                    1,
+                    "",
+                    COUNT_CHANGED + "error: skills/ or the skill count differs "
+                    "from authoring/; run: just compile-skills\n",
+                ),
+            )
+            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertEqual(count.read_text(), expected)
+
+    def test_check_and_a_run_agree_on_a_stray_skill_in_skills(self) -> None:
+        with self.repository() as (root, _, _):
+            stray = root / "skills/__pycache__/SKILL.md"
+            stray.parent.mkdir()
+            stray.write_text("# Stray\n", encoding="utf-8")
+
+            self.assertEqual(self.check()[:2], (1, ""))
+            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertTrue(
+                (root / "docs/references/skill-count.md")
+                .read_text()
+                .endswith("\nauthoring 1 · skills 2\n")
+            )
+            self.assertEqual(self.check(), (0, "", ""))
 
     def test_a_skill_without_a_kind_publishes_kind_unknown(self) -> None:
         untagged = '---\nname: "example"\ndescription: "Use for x."\n---\n# Example\n'
@@ -164,7 +252,7 @@ class CompileSkillsTests(unittest.TestCase):
                     0,
                     (
                         "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/solo\n"
-                        "add\tskills/tagged\n"
+                        "add\tskills/tagged\n" + COUNT_CHANGED
                     ),
                     "",
                 ),

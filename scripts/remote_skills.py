@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
-from _common import frontmatter_description, frontmatter_value, run_script
+from _common import KINDS, UNKNOWN, frontmatter_description, kind_of, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -21,10 +21,6 @@ DOCS = ROOT / "docs" / "references"
 URL = (
     "https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md"
 )
-# Each kind gets a section of remote-skills.md and a page of its own. A skill
-# with any other kind, or none, is listed under Unknown on remote-skills.md only
-KINDS = ("general", "dev")
-UNKNOWN = "unknown"
 TABLE_HEAD = "| Skill | Description |\n|---|---|\n"
 
 EPILOG = """\
@@ -75,11 +71,8 @@ def rows_by_kind() -> dict[str, list[str]]:
                 "fix its source in authoring/, then run: just compile-skills"
             )
             continue
-        kind = frontmatter_value(text, "kind")
         cell = description.replace("|", "\\|")
-        rows[kind if kind in KINDS else UNKNOWN].append(
-            f"| {path.parent.name} | {cell} |\n"
-        )
+        rows[kind_of(text)].append(f"| {path.parent.name} | {cell} |\n")
     if errors:
         raise ScriptError(*errors)
     if not any(rows.values()):
@@ -98,7 +91,8 @@ def page(name: str, description: str, body: str) -> str:
 
 
 def render() -> dict[Path, str]:
-    """Each page's path and text."""
+    """Each page's path and text. Each kind gets a section of remote-skills.md
+    and a page of its own; Unknown gets only a section, and only when it has rows."""
     rows = rows_by_kind()
     sections = [
         f"## {kind.capitalize()}\n\n{TABLE_HEAD}{''.join(kind_rows)}"

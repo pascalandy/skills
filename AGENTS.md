@@ -10,7 +10,7 @@ Never set `disable-model-invocation: true` in skill frontmatter or `policy.allow
 
 1. For skill content, edit only the skill's package in `authoring/`, including supporting files. Even when working from `skills/<skill-name>/`, never edit generated files directly
 2. Run `just compile-skills`, then `just remote-skills`; if compiling fails, rerun `just compile-skills --debug`
-3. Review and commit the source and generated output together
+3. Review and commit the source and generated output together. The output includes `docs/references/skill-count.md`, the skills per category and kind; confirm each count change matches the skills you added, removed, or moved
 
 The compile script maps each package, a folder with a root `SKILL.md` at `authoring/<category>/<skill-name>/` or `authoring/<skill-name>/`, to `skills/<skill-name>/`. It includes supporting files, excludes ignored local artifacts, and fails on duplicate skill names, a package inside another package, or files outside a package
 
