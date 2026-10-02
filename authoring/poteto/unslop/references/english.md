@@ -30,7 +30,7 @@ Removing patterns is half the job. Sterile, voiceless writing is just as obvious
 2. **Name-dropping.** Listing media outlets without context. Pick one, say what was said.
 3. **Superficial -ing phrases.** "highlighting...", "ensuring...", "reflecting...", "showcasing...", "fostering...". Delete or expand with real sources.
 4. **Promotional language.** "nestled", "vibrant", "breathtaking", "groundbreaking", "renowned", "stunning", "must-visit". Use neutral descriptions.
-5. **Vague attributions.** "Experts believe", "Industry reports suggest", "Some critics argue". Name the source or delete.
+5. **Vague attributions.** "Experts believe", "Industry reports suggest", "Some critics argue". Name the source or delete the claim. An unsourced claim is not a fact to keep.
 6. **Formulaic challenges.** "Despite challenges... continues to thrive." Replace with specific facts.
 
 ### Language

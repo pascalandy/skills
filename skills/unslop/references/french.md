@@ -30,7 +30,7 @@ Supprimer les patterns n'est que la moitié du travail. Une écriture stérile e
 2. **Listage de noms (Name-dropping)** Énumérer des médias sans contexte. En choisir un, dire ce qui a été dit.
 3. **Tournures en "-ant" superficielles (Superficial -ing phrases)** "mettant en lumière...", "assurant...", "reflétant...", "illustrant...", "favorisant...". Supprimer ou développer avec de vraies sources.
 4. **Langage promotionnel** "niché", "vibrant", "à couper le souffle", "révolutionnaire", "réputé", "spectaculaire", "incontournable". Utiliser des descriptions neutres.
-5. **Attributions vagues** "Les experts estiment", "Selon des rapports du secteur", "Certains critiques soutiennent". Nommer la source ou supprimer.
+5. **Attributions vagues** "Les experts estiment", "Selon des rapports du secteur", "Certains critiques soutiennent". Nommer la source ou supprimer l'affirmation. Une affirmation sans source n'est pas un fait à garder.
 6. **Formules convenues sur les difficultés** "Malgré les défis... continue de prospérer." Remplacer par des faits précis.
 
 ### Langue
