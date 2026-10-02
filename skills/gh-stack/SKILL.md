@@ -112,9 +112,11 @@ diverged, `sync` prints both chains, makes no changes, and exits 0 with `Sync ab
 
 ## Merging
 
-On a stack's own branch, `gh stack merge --yes` merges the whole stack; `gh stack view --json`
-prints no stack number to look up. Otherwise, scope the merge with an argument. A bare number is
-read as a stack number first, then as a PR number:
+On a branch of a stack tracked locally, so `gh stack view --json` succeeds, `gh stack merge --yes`
+merges the whole stack, and no stack number needs looking up; `view` prints none. After
+`gh stack link`, which tracks nothing locally, pass the top PR's number, or run
+`gh stack checkout <pr>` first. Otherwise, scope the merge with an argument. A bare number is read
+as a stack number first, then as a PR number:
 
 ```bash
 gh stack merge 42 --yes          # PR #42 plus every unmerged PR below it
