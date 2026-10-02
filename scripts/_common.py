@@ -88,6 +88,16 @@ def frontmatter_description(text: str) -> str:
     return frontmatter_value(text, "description") or ""
 
 
+KINDS = ("general", "dev")
+UNKNOWN = "unknown"
+
+
+def kind_of(text: str) -> str:
+    """A SKILL.md's kind; a missing or unrecognized kind reads as UNKNOWN."""
+    kind = frontmatter_value(text, "kind")
+    return kind if kind in KINDS else UNKNOWN
+
+
 # How long a child may clean up after SIGTERM before SIGKILL
 GRACE = 10.0
 
