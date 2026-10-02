@@ -14,7 +14,9 @@ sys.path.insert(0, str(SCRIPTS))
 import validate_skill as validator
 
 THIS_SKILL = SCRIPTS.parent
-BP_LINE_RE = re.compile(r"^- \*\*(?P<id>BP_\d{2}) (?P<title>[^*]+)\*\*", re.MULTILINE)
+BP_LINE_RE = re.compile(
+    r"^- (?P<box>\[ \] )?\*\*(?P<id>BP_\d{2}) (?P<title>[^*]+)\*\*", re.MULTILINE
+)
 
 
 def skill(
@@ -230,7 +232,10 @@ def test_validator_ids_match_the_skill_list() -> None:
     active = {m["id"]: m["title"] for m in BP_LINE_RE.finditer(active_text)}
     voided = [m["id"] for m in BP_LINE_RE.finditer(voided_text)]
     all_ids = [m["id"] for m in BP_LINE_RE.finditer(text)]
-    assert len(all_ids) == len(set(all_ids)), "a BP ID is listed twice"
+    assert sorted(all_ids) == [f"BP_{n:02d}" for n in range(1, len(all_ids) + 1)]
+    assert all(m["box"] for m in BP_LINE_RE.finditer(active_text)), (
+        "an active BP is not a checkbox"
+    )
     assert not set(validator.BP_TITLES) & set(voided), "the validator cites a voided BP"
     assert {bp: active.get(bp) for bp in validator.BP_TITLES} == validator.BP_TITLES
 
@@ -287,5 +292,65 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
         [
             f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' does not match the folder name 'bad-name'",
             f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' may only use lowercase letters, digits, and hyphens",
+        ],
+    )
+
+
+def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    good = skill(
+        tmp_path,
+        folder="good",
+        name="good",
+        description='"Use only when explicitly invoked as `good`. Help the user learn Python."',
+    )
+    bare = skill(
+        tmp_path,
+        folder="bare",
+        name="bare",
+        description='"Use only when explicitly invoked as bare."',
+    )
+    actor = skill(
+        tmp_path,
+        folder="actor",
+        name="actor",
+        description='"Use only when the user invokes `actor`."',
+    )
+    mention = skill(
+        tmp_path,
+        folder="mention",
+        name="mention",
+        description='"Use only when the user mentions `mention`."',
+    )
+    by_user = skill(
+        tmp_path,
+        folder="by-user",
+        name="by-user",
+        description='"Use only when explicitly invoked as `by-user` by the user."',
+    )
+    model = skill(
+        tmp_path,
+        folder="model",
+        name="model",
+        description='"Use when the user asks to fill a PDF form."',
+    )
+    restricted = skill(
+        tmp_path,
+        folder="restricted",
+        name="restricted",
+        description='"Use only when debugging tests. Help the user invoke a failing test."',
+    )
+    actor_message = "names an actor, 'the user'; a delegated prompt would be refused"
+    form = (
+        "start with 'Use only when explicitly invoked as `word`', the word in backticks"
+    )
+    assert run(capsys, good, bare, actor, mention, by_user, model, restricted) == (
+        0,
+        [
+            f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: names an actor, 'the user'; a delegated prompt would be refused",
+            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
+            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
+            f"{by_user}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
         ],
     )

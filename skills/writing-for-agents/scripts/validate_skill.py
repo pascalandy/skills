@@ -40,6 +40,7 @@ BP_TITLES = {
     "BP_14": "Description is a trigger",
     "BP_15": "SKILL.md under 500 lines",
     "BP_16": "Contents list",
+    "BP_21": "Invoke by a word",
 }
 
 # Limits from the Agent Skills specification and the strictest agent platforms
@@ -52,6 +53,10 @@ CONTENTS_SEARCH_LINES = 25
 
 NAME_CHARS_RE = re.compile(r"[a-z0-9-]+")
 XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
+# A description that limits firing to an invocation must use the BP_21 form
+INVOKE_ONLY_RE = re.compile(r"use only when\b.*\b(?:invok|mention)", re.IGNORECASE)
+INVOKE_FORM_RE = re.compile(r"Use only when explicitly invoked as `[^`]+`")
+ACTOR_RE = re.compile(r"\bthe user\b", re.IGNORECASE)
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")
 BLOCK_INDICATORS = {">", "|", ">-", "|-", ">+", "|+"}
 QUOTED_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'")
@@ -262,6 +267,28 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
                 f"description contains the XML tag '{tag.group(0)}'",
             )
         )
+    invocation = field.value.partition(". ")[0]
+    if INVOKE_ONLY_RE.match(invocation):
+        if not INVOKE_FORM_RE.match(invocation):
+            findings.append(
+                Finding(
+                    skill_md,
+                    field.line,
+                    "warning",
+                    "BP_21",
+                    "start with 'Use only when explicitly invoked as `word`', the word in backticks",
+                )
+            )
+        if ACTOR_RE.search(invocation):
+            findings.append(
+                Finding(
+                    skill_md,
+                    field.line,
+                    "warning",
+                    "BP_21",
+                    "names an actor, 'the user'; a delegated prompt would be refused",
+                )
+            )
     return findings
 
 
