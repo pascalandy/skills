@@ -27,8 +27,8 @@ exit codes:
   2  usage error: a folder is missing or has no SKILL.md
 
 examples:
-  uv run scripts/validate_skill.py ../processing-pdfs
-  uv run scripts/validate_skill.py ~/.agents/skills/*"""
+  uv run path/to/writing-for-agents/scripts/validate_skill.py ../processing-pdfs
+  uv run path/to/writing-for-agents/scripts/validate_skill.py ~/.agents/skills/*"""
 
 # Titles match the BP lines in SKILL.md; a test keeps them in sync
 BP_TITLES = {

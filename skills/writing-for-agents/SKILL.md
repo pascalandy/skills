@@ -68,13 +68,13 @@ A finding that fits two BPs goes under the more specific one.
 
 ## Skill validator
 
-Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)). From this skill's folder:
+Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)). Run it from any folder:
 
 ```bash
-uv run scripts/validate_skill.py <target-skill-folder>
+uv run <this-skill-folder>/scripts/validate_skill.py <target-skill-folder>
 ```
 
-It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment.
+It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment. It resolves Markdown links only: for a path in inline code, such as `scripts/extract.py`, it checks the slashes, so confirm the file exists yourself.
 
 ## Best practices
 
