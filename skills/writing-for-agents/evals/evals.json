@@ -1,7 +1,7 @@
 [
   {
     "skills": ["writing-for-agents"],
-    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "setup": ["mkdir pdf-helper", "cp \"$EVALS/fixtures/messy-skill.md\" pdf-helper/SKILL.md"],
     "query": "Hey, I want you to review the skill pdf-helper. Please make sure we are using best practices and that the skill is optimized from the guidelines of writing-for-agents. Report the findings without editing files.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
@@ -16,7 +16,7 @@
   },
   {
     "skills": ["writing-for-agents", "coding-language"],
-    "setup": "Start in an empty folder",
+    "setup": [],
     "query": "Create a skill that converts a CSV file into a Markdown table. Put it in a folder named after the skill.",
     "files": [],
     "expected_behavior": [
@@ -34,7 +34,7 @@
   },
   {
     "skills": ["writing-for-agents"],
-    "setup": "In an empty folder, copy evals/fixtures/agents-md.md to AGENTS.md and run the query from that folder",
+    "setup": ["cp \"$EVALS/fixtures/agents-md.md\" AGENTS.md"],
     "query": "Add a rule to AGENTS.md: never commit without running the checks first.",
     "files": ["evals/fixtures/agents-md.md"],
     "expected_behavior": [
@@ -46,7 +46,7 @@
   },
   {
     "skills": ["writing-for-agents"],
-    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "setup": ["mkdir pdf-helper", "cp \"$EVALS/fixtures/messy-skill.md\" pdf-helper/SKILL.md"],
     "query": "Improve the skill pdf-helper with writing-for-agents.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
@@ -60,7 +60,7 @@
   },
   {
     "skills": ["writing-for-agents"],
-    "setup": "In an empty folder, copy evals/fixtures/messy-skill.md to pdf-helper/SKILL.md and run the query from that folder",
+    "setup": ["mkdir pdf-helper", "cp \"$EVALS/fixtures/messy-skill.md\" pdf-helper/SKILL.md"],
     "query": "Fix this line in the skill pdf-helper: \"Don't forget to check the element names.\" It should tell the agent to check the field names before it copies them.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
