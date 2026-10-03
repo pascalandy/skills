@@ -84,8 +84,9 @@ Create the stack before writing any file, so each concern lands in its own layer
 3. Open the PRs with `gh stack submit --auto --open`: it pushes every layer and opens one PR per
    layer, ready for review. Open a lower layer's PR early, for CI, the same way: `gh stack merge`
    lands only PRs in a stack on GitHub, which `submit` creates, and refuses drafts. `--auto` writes the
-   titles and bodies; set them with `gh pr edit <number>`. Done when `gh stack view --json` shows a
-   `pr` on every layer
+   titles and bodies; set them with `gh pr edit <number>`. `submit` can exit 0 when GitHub refused
+   the stack, so done when `gh stack view --short` starts with `Stack #<number>`, which appears only
+   once the stack exists on GitHub, and `gh stack view --json` shows a `pr` on every layer
 
 ```bash
 git fetch origin && git switch -c auth origin/main && gh stack init auth
@@ -130,7 +131,7 @@ gh stack top                    # return to where you were
 `gh stack sync > /dev/null` fetches, rebases the stack onto the remote trunk, pushes, and
 refreshes PR state; add `--prune` to also delete local branches of merged PRs. `sync` can exit 0
 even when a push failed or it aborted, so check the result yourself. Done when stderr has no
-`Sync aborted`, and, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
+`Sync aborted`, `gh stack view --short` starts with `Stack #<number>`, and, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
 <bottom>` succeeds and `git rev-parse <layer> <remote>/<layer>` prints the same commit twice for
 every layer.
 
@@ -196,7 +197,7 @@ branches[]      name, base, isCurrent, isMerged, isQueued, needsRebase
 branches[].pr   number, url, state ("OPEN" | "MERGED" | "QUEUED"); absent when no PR exists
 ```
 
-No field holds a branch's tip; read it with `git rev-parse <name>`. `base` is the saved SHA of the
+Read a branch's tip with `git rev-parse <name>`. A stack on GitHub also prints `branches[].head`. `base` is the saved SHA of the
 parent branch that this branch was last known to contain. It may be older than the parent's
 current tip. `needsRebase` is true when the current parent tip is no longer an ancestor of the
 branch.
