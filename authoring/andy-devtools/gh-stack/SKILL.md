@@ -24,14 +24,15 @@ Left is the **bottom**, right is the **top**. `auth` is based on `main` and merg
 
 ## Prerequisites
 
-Run each check before the first `gh stack` command. Done when every check passes, or you took the
-path its failure names.
+Run each check before the first `gh stack` command. The local commands `init`, `add`, `view`, `up`,
+`down`, `top`, and `bottom` need only the extension; the other checks gate commands that reach
+GitHub or the remote. Done when every check passes, or you took the path its failure names.
 
 | Check | When it fails |
 |---|---|
-| `gh auth status --active --hostname github.com` | [Without gh stack](#without-gh-stack) |
 | `gh stack --version` | `gh extension install github/gh-stack`, then check again |
-| `git remote` prints a remote | [Without a remote](#without-a-remote) |
+| `gh auth status --active --hostname github.com` | Local commands still work; for `submit`, `sync`, `link`, and `merge`, follow [Without gh stack](#without-gh-stack) |
+| `git remote` prints a remote | Local commands still work; to restack, follow [Without a remote](#without-a-remote) |
 | `git remote` prints one remote, or `git config remote.pushDefault` is set | `git config remote.pushDefault <name>`, or pass `--remote <name>` to `push`, `submit`, `sync`, `rebase`, and `link` |
 
 Use that selected remote for every fetch, branch base, and push below. `<remote>` names it;
@@ -86,13 +87,15 @@ Create the stack before writing any file, so each concern lands in its own layer
 1. Branch the bottom layer from the remote trunk. The local trunk can lag it, for example when
    another worktree has it checked out. Run `git fetch <remote>`, `git switch -c <bottom>
    <remote>/<trunk>`, then `gh stack init --base <trunk> <bottom>`, which adopts the branch.
-   Done when `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds and
-   `gh stack view --json` prints `<trunk>` as its `trunk`
+   Without a remote, branch from `<trunk>` instead.
+   Done when `git merge-base --is-ancestor <remote>/<trunk> <bottom>`, or `<trunk>` without a
+   remote, succeeds and `gh stack view --json` prints `<trunk>` as its `trunk`
 2. Commit the bottom layer's concern. For each next layer, run `gh stack add <branch>`, which
    branches from the current layer, and commit its concern there. Done when each layer holds one
    concern and `gh stack view --json` lists them bottom to top
-3. Open the PRs with `gh stack submit --auto --open`: it pushes every layer and opens one PR per
-   layer, ready for review. Open a lower layer's PR early, for CI, the same way, and add later
+3. Stop after step 2 when the request asks for local layers only. Otherwise open the PRs with
+   `gh stack submit --auto --open`: it pushes every layer and opens one PR per layer, ready for
+   review. Open a lower layer's PR early, for CI, the same way, and add later
    layers as [Force pushes](#force-pushes) says: `gh stack merge` lands only PRs in a stack on
    GitHub, and refuses drafts. `--auto` writes the titles and bodies; set them with
    `gh pr edit <number>`. `submit` can exit 0 when GitHub refused part of the stack, so check
