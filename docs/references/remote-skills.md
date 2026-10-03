@@ -67,6 +67,7 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | teach | Use when the user asks to be taught, requests a guided technical explanation, or wants one account combining how something works with why it was designed that way. |
 | technical-writing | Use for /technical-writing or when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages. |
 | typescript-best-practices | Use when TypeScript work centers on type safety, domain modeling, narrowing, casts, or runtime boundaries. Use `coding-language` for general TypeScript implementation and tooling. |
+| verify-skills | Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill. |
 | verify-transcript | Use when validating transcript CLI behavior or locating its verification features. Use for paid YouTube end-to-end checks only when explicitly authorized. |
 | verify-video-archive | Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery. |
 | why | Use for questions about design rationale, the history of regressions or incidents, or the evidence behind thresholds and tradeoffs. Use `how` for runtime behavior. Do not use for plain commit or date lookups. |
