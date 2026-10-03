@@ -256,8 +256,10 @@ shell commands run in the fresh repo, with $EVALS naming the evals folder.
 Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled. Claude runs with --setting-sources project, so it sees only
-the copies this run installs. A gh wrapper logs every call to gh-calls.log and
-lets only reads and help through. A run that ends or times out has its whole
+the copies this run installs. A gh wrapper, in place from setup on, logs every
+call to gh-calls.log and lets only reads and help through, plus gh stack push
+when every remote is local. It guards gh, not git push: give each scenario a
+local bare remote. A run that ends or times out has its whole
 process group stopped. stdout prints one line per run: name, status, folder."""
 
 GH_WRAPPER = """\
@@ -281,8 +283,13 @@ done
 case "${{words[0]:-}} ${{words[1]:-}}" in
   "issue view"|"issue list"|"issue status"|"pr view"|"pr list"|"pr status"|"pr diff"|"pr checks"|\\
   "repo view"|"label list"|"run view"|"run list"|"release view"|"release list"|"search "*|\\
-  "auth status"|"extension list"|"stack view"|"stack init"|"stack add"|"stack rebase"|"stack push"|\\
+  "auth status"|"extension list"|"stack view"|"stack init"|"stack add"|"stack rebase"|\\
   "stack up"|"stack down"|"stack top"|"stack bottom"|"stack checkout"|"stack trunk") exec {gh} "$@" ;;
+  "stack push")
+    for r in $(git remote); do
+      case "$(git remote get-url --push "$r")" in *://*|*@*:*) refuse "$@" ;; esac
+    done
+    exec {gh} "$@" ;;
   "api "*) ;;
   *) refuse "$@" ;;
 esac
@@ -645,6 +652,18 @@ def execute(
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
     env = {**os.environ, "EVALS": str(plan.evals)}
+    real_gh = shutil.which("gh")
+    if real_gh:
+        wrapper = folder / "bin" / "gh"
+        wrapper.parent.mkdir()
+        wrapper.write_text(
+            GH_WRAPPER.format(
+                log=shlex.quote(str(folder / "gh-calls.log")), gh=shlex.quote(real_gh)
+            ),
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+        env["PATH"] = f"{wrapper.parent}{os.pathsep}{env.get('PATH', '')}"
     with (folder / "setup.log").open("wb") as setup_log:
         for command in scenario.setup:
             status = children.run(
@@ -664,18 +683,6 @@ def execute(
     skills_dir = work / (".claude" if run.agent == "claude" else ".agents") / "skills"
     lines = install(plan, wanted(plan, scenario), skills_dir, present)
     (folder / "skills.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    real_gh = shutil.which("gh")
-    if real_gh:
-        wrapper = folder / "bin" / "gh"
-        wrapper.parent.mkdir()
-        wrapper.write_text(
-            GH_WRAPPER.format(
-                log=shlex.quote(str(folder / "gh-calls.log")), gh=shlex.quote(real_gh)
-            ),
-            encoding="utf-8",
-        )
-        wrapper.chmod(0o755)
-        env["PATH"] = f"{wrapper.parent}{os.pathsep}{env.get('PATH', '')}"
     hide = hidden_paths(set(wanted(plan, scenario)) | deleted)
     command, stdin = agent_command(run, work, hide)
     (folder / "command.txt").write_text(shlex.join(command) + "\n", encoding="utf-8")

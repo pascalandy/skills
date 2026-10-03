@@ -205,7 +205,8 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         FAKE_ACTION="gh issue view 1; gh pr create --help; gh pr create --title x; "
         "gh api -X post repos/a/b/labels; gh api repos/a/b; gh -R a/b pr merge 1; "
         "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; "
-        "gh pr create --title --help --body x; gh stack --version; true",
+        "gh pr create --title --help --body x; gh stack --version; gh stack push; "
+        "git remote add up https://github.com/a/b.git; gh stack push; true",
     )
 
     assert result.returncode == 0, result.stderr
@@ -228,6 +229,9 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "pr create --title --help --body x",
         "REFUSED pr create --title --help --body x",
         "stack --version",
+        "stack push",
+        "stack push",
+        "REFUSED stack push",
     ]
     real = lab.reports / "real-gh.log"
     assert real.read_text().splitlines() == [
@@ -236,6 +240,7 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "api repos/a/b",
         "-R a/b pr view 1",
         "stack --version",
+        "stack push",
     ]
 
 
@@ -400,3 +405,18 @@ def test_a_timeout_stops_the_whole_process_group(lab: Lab):
     assert result.returncode == 1
     assert "s2-codex\ttimeout" in result.stderr
     assert not late.exists()
+
+
+def test_setup_runs_behind_the_gh_wrapper(lab: Lab):
+    evals = lab.skill / "evals" / "evals.json"
+    evals.write_text(
+        json.dumps([{"query": "Go.", "setup": ["gh pr create --title x || true"]}])
+    )
+    result = run(
+        lab, "--ref", lab.ref, "--output-dir", str(lab.out), "--agent", "codex"
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = (lab.out / "s1-codex" / "gh-calls.log").read_text().splitlines()
+    assert calls == ["pr create --title x", "REFUSED pr create --title x"]
+    assert not (lab.reports / "real-gh.log").exists()
