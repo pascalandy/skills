@@ -234,6 +234,10 @@ GRACE = 10.0
 CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
 INSTALLED = (CODEX_HOME / "skills", Path.home() / ".agents" / "skills")
 
+# A runner started by an agent under test stays in that agent's process group,
+# so the outer run's timeout or interrupt stops the nested agents too
+NESTED = env_flag("RUN_EVALS_PARENT")
+
 log = logging.getLogger("run_evals")
 
 EXIT_CODES = exit_codes(
@@ -277,7 +281,7 @@ for a in "$@"; do
   esac
   if [ "$skip" = 1 ]; then skip=0; continue; fi
   case "$a" in
-    -R|--repo|--hostname) skip=1 ;;
+    -R|--repo|--hostname|-X|--method|-H|--header|-f|-F|--field|--raw-field|-t|--template|-q|--jq|--cache|-p|--preview|--input) skip=1 ;;
     -*) ;;
     *) words+=("$a") ;;
   esac
@@ -376,7 +380,7 @@ class Children:
                 stdin=subprocess.PIPE,
                 stdout=stdout,
                 stderr=stderr,
-                start_new_session=True,
+                start_new_session=not NESTED,
             )
             self.live.add(process)
         try:
@@ -399,19 +403,26 @@ class Children:
 
 def stop(process: subprocess.Popen[bytes]) -> None:
     """SIGTERM the child's process group, then SIGKILL what is left of it after
-    GRACE seconds, even when the leader already exited."""
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
+    GRACE seconds, even when the leader already exited. A nested runner signals
+    only its child, since the group belongs to the outer run."""
+
+    def send(number: int) -> bool:
+        try:
+            if NESTED:
+                process.send_signal(number)
+            else:
+                os.killpg(process.pid, number)
+        except ProcessLookupError:
+            return False
+        return True
+
+    if not send(signal.SIGTERM):
         return
     try:
         process.wait(timeout=GRACE)
     except subprocess.TimeoutExpired:
         pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    send(signal.SIGKILL)
     process.wait()
 
 
@@ -505,7 +516,10 @@ def skill_names(paths: str) -> dict[str, list[str]]:
 
 
 def skills_at(plan: Plan) -> dict[str, list[str]]:
-    return skill_names(git(plan.repo, "ls-tree", "-r", "--name-only", plan.sha))
+    folders = skill_names(git(plan.repo, "ls-tree", "-r", "--name-only", plan.sha))
+    if folders.pop("", None) and plan.skill == plan.repo:
+        folders.setdefault(plan.skill.name, []).append(".")
+    return folders
 
 
 def deleted_by(plan: Plan, present: Mapping[str, list[str]]) -> set[str]:
@@ -520,7 +534,7 @@ def deleted_by(plan: Plan, present: Mapping[str, list[str]]) -> set[str]:
         "--",
         "*SKILL.md",
     )
-    return set(skill_names(added)) - set(present)
+    return set(skill_names(added)) - set(present) - {""}
 
 
 def source_of(plan: Plan, name: str, present: Mapping[str, list[str]]) -> str | None:
@@ -566,7 +580,7 @@ def install(
             subprocess.run(
                 ["tar", "-x", "-C", scratch], input=archive.stdout, check=True
             )
-            shutil.move(str(Path(scratch) / source), str(target / name))
+            shutil.copytree(Path(scratch) / source, target / name, symlinks=True)
         lines.append(f"installed\t{name}")
     return lines
 
@@ -648,7 +662,7 @@ def execute(
     git(work, "init", "-q")
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
-    env = {**os.environ, "EVALS": str(plan.evals)}
+    env = {**os.environ, "EVALS": str(plan.evals), "RUN_EVALS_PARENT": "1"}
     real_gh = shutil.which("gh")
     if real_gh:
         wrapper = folder / "bin" / "gh"

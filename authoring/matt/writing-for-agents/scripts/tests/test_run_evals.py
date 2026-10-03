@@ -132,6 +132,7 @@ def lab(tmp_path: Path) -> Lab:
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "FAKE_REPORTS": str(reports),
     }
+    env.pop("RUN_EVALS_PARENT", None)
     return Lab(
         skills / "demo", ref, before, home, reports, env, tmp_path / "out", tmp_path
     )
@@ -206,7 +207,8 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "gh api -X post repos/a/b/labels; gh api repos/a/b; gh -R a/b pr merge 1; "
         "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; "
         "gh pr create --title --help --body x; gh stack --version; gh stack push; "
-        "git remote add up https://github.com/a/b.git; gh stack push; true",
+        "git remote add up https://github.com/a/b.git; gh stack push; "
+        "gh api --template graphql repos/a/b/labels -X POST -f name=x; true",
     )
 
     assert result.returncode == 0, result.stderr
@@ -233,6 +235,8 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "REFUSED stack push",
         "stack push",
         "REFUSED stack push",
+        "api --template graphql repos/a/b/labels -X POST -f name=x",
+        "REFUSED api --template graphql repos/a/b/labels -X POST -f name=x",
     ]
     real = lab.reports / "real-gh.log"
     assert real.read_text().splitlines() == [
@@ -442,3 +446,60 @@ def test_codex_hides_copies_under_codex_home(lab: Lab):
     argv = report(lab, "s2-codex", "argv").splitlines()
     hidden = next(arg for arg in argv if arg.startswith("skills.config="))
     assert str(home / "skills" / "demo" / "SKILL.md") in hidden
+
+
+@pytest.mark.parametrize(("parent", "same_group"), [("", False), ("1", True)])
+def test_a_nested_runner_keeps_agents_in_the_callers_group(
+    lab: Lab, parent: str, same_group: bool
+):
+    groups = lab.reports / "groups"
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        RUN_EVALS_PARENT=parent,
+        FAKE_ACTION=f'echo "$(ps -o pgid= -p $$) $(ps -o pgid= -p $PPID) '
+        f'$RUN_EVALS_PARENT" > {groups}',
+    )
+
+    assert result.returncode == 0, result.stderr
+    agent, runner, marker = groups.read_text().split()
+    assert (agent == runner) is same_group
+    assert marker == "1"
+
+
+def test_a_skill_at_the_repository_root_installs(tmp_path: Path, lab: Lab):
+    repo = tmp_path / "solo-skill"
+    write(repo / "SKILL.md", "solo\n")
+    write(repo / "evals" / "evals.json", json.dumps([{"query": "Go."}]))
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    ref = commit(repo, "solo skill")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(RUNNER),
+            str(repo),
+            "--ref",
+            ref,
+            "--agent",
+            "codex",
+            "--output-dir",
+            str(lab.out),
+        ],
+        capture_output=True,
+        text=True,
+        env=lab.env,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        lab.out / "s1-codex" / "skills.txt"
+    ).read_text() == "installed\tsolo-skill\n"
+    assert report(lab, "s1-codex", "demo") == "absent\n"
