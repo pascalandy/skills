@@ -56,7 +56,8 @@ layer with `--force-with-lease`, which can replace a commit someone else pushed,
 `gh stack rebase` rewrites the layers it replays. When a rule says to ask before any force push,
 run them only while no layer is on the remote. After that, push with plain `git push`, carry
 changes up as in [Change a layer](#change-a-layer), step 3, and open a later layer's PR with
-`gh stack link <stack-number> <branch>`, which pushes without force and appends it to the stack.
+`gh stack link --open <stack-number> <branch>`, which pushes without force and appends a PR
+ready for review; without `--open` the PR is a draft, which `gh stack merge` refuses.
 `gh stack view --short` prints the stack number.
 
 ## Non-interactive use
@@ -100,8 +101,8 @@ Create the stack before writing any file, so each concern lands in its own layer
    GitHub, and refuses drafts. `--auto` writes the titles and bodies; set them with
    `gh pr edit <number>`. `submit` can exit 0 when GitHub refused part of the stack, so check
    GitHub itself. Done when `gh stack view --json` shows a `pr` on every layer, and
-   `gh pr view <number> --json baseRefName` names the layer below for each PR, or `<trunk>` for the
-   bottom one
+   `gh pr view <number> --json baseRefName,isDraft` shows each PR is not a draft and names the
+   layer below as its base, or `<trunk>` for the bottom one
 
 ```bash
 git fetch origin && git switch -c auth origin/main && gh stack init auth
