@@ -3,10 +3,10 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run Codex or Claude Code as a child agent that reviews read-only, reviews and
-fixes, or runs the CLI's own code review, then print the model that ran, its
-session, the files it changed, and its answer. One command shape per run keeps
-headless use deterministic."""
+"""Run Codex, Claude Code, or Grok Build as a child agent that reviews
+read-only, reviews and fixes, or runs the CLI's own code review, then print the
+model that ran, its session, the files it changed, and its answer. One command
+shape per run keeps headless use deterministic."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -222,7 +222,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -232,8 +232,8 @@ DEBUG_ENV = "HEADLESS_DEBUG"
 GRACE = 10.0
 CHECK_TIMEOUT = 60.0
 CONFIG = Path(__file__).resolve().parents[1] / "config.toml"
-HARNESSES = ("codex", "claude", "pi", "opencode")
-# One model reaches Pi and OpenCode through several providers; Codex and Claude pick their own
+HARNESSES = ("codex", "claude", "grok", "pi", "opencode")
+# One model reaches Pi and OpenCode through several providers; Codex, Claude, and Grok pick their own
 PROVIDER_HARNESSES = ("pi", "opencode")
 TABLE_KEYS = ("provider", "model", "reasoning-level")
 READ_ONLY = ("review-only", "code-review")
@@ -253,6 +253,9 @@ RULES = {
 }
 
 CLAUDE_EDIT_TOOLS = "Edit,Write,NotebookEdit"
+# Grok's default profile edits with search_replace and write; the rest belong to
+# other agent profiles a config can select, and Grok ignores names it lacks
+GROK_EDIT_TOOLS = "search_replace,write,edit,hashline_edit,apply_patch"
 
 EXIT_CODES = exit_codes(
     {
@@ -268,6 +271,7 @@ examples:
   headless.py claude --code-review --commit HEAD --cwd ~/projects/app
   headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
   headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
+  headless.py grok --code-review --uncommitted --cwd ~/projects/app
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
 Without a CLI name, the launcher runs the config's harness, and --code-review
@@ -343,6 +347,12 @@ class Runner:
     review: Callable[[argparse.Namespace, Path], tuple[str, ...]]
     command: Callable[[Request, Path], list[str]]
     reply: Callable[[Path], Reply]
+    # The launcher names each new session, so a failed run still prints it
+    names_session: bool = False
+    # What the auth command prints signed out, when it exits 0 either way
+    signed_out: str | None = None
+    # Variables the child gets on top of the caller's environment
+    env: Mapping[str, str] = field(default_factory=dict)
 
 
 def read_text(path: Path) -> str:
@@ -537,6 +547,131 @@ def claude_reply(run: Path) -> Reply:
     )
 
 
+def grok_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
+    if args.prompt_file is not None:
+        raise UsageError(
+            "grok --code-review takes no --prompt-file; to apply your own "
+            "criteria, use --review-only"
+        )
+    if args.title is not None:
+        raise UsageError("--title works only with codex --code-review")
+    if args.commit:
+        raise UsageError(
+            "grok --code-review has no commit target; run codex or claude "
+            "--code-review --commit"
+        )
+    if args.uncommitted:
+        return ("--local",)
+    # /review --main compares with origin/main, or origin/master without it
+    default = "origin/main" if resolves(root, "origin/main") else "origin/master"
+    if args.base != default:
+        raise UsageError(
+            f"grok --code-review --base compares with {default} only, as Grok's "
+            f"/review --main does; pass --base {default}, or run codex "
+            f"--code-review --base {args.base}"
+        )
+    try:
+        status = git(root, "status", "--porcelain", "-z", "--no-renames")
+    except GitFailure as error:
+        raise ScriptError(f"cannot read the Git state of {root}: {error}") from None
+    dirty = [entry[3:] for entry in status.split("\0") if entry]
+    if dirty:
+        raise UsageError(
+            "grok --code-review --base needs a clean checkout, as Grok's /review "
+            f"--main does, and these files have changes: {', '.join(dirty)}; "
+            "commit them, or pass --uncommitted"
+        )
+    return ("--main",)
+
+
+def grok_command(request: Request, run: Path) -> list[str]:
+    # Grok reads no prompt from stdin. Its /review keeps the write tool for the
+    # scratch files it writes outside the checkout, and its report keeps only the
+    # top issues unless the rule asks for the whole review
+    prompt = (
+        [
+            "-p",
+            f"/review {' '.join(request.review)}",
+            "--rules",
+            (
+                f"{RULES['review-only'].format(cwd=request.cwd)} End your final "
+                "report with the full text of the review file."
+            ),
+        ]
+        if request.mode == "code-review"
+        else ["--prompt-file", str(run / "prompt.md")]
+    )
+    return [
+        "grok",
+        "--cwd",
+        str(request.cwd),
+        *prompt,
+        "-m",
+        request.model,
+        "--reasoning-effort",
+        request.effort,
+        "--always-approve",
+        "--no-leader",
+        "--no-auto-update",
+        *(
+            ["--disallowed-tools", GROK_EDIT_TOOLS]
+            if request.mode == "review-only"
+            else []
+        ),
+        "--output-format",
+        "streaming-messages-json",
+        "--resume" if request.resume else "--session-id",
+        str(request.session),
+        *request.extra,
+    ]
+
+
+def grok_reply(run: Path) -> Reply:
+    events: list[dict[str, Any]] = []
+    for line in read_text(run / "stdout.log").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+    result = next(
+        (event for event in reversed(events) if event.get("type") == "result"), None
+    )
+    if result is None:
+        return Reply("", None, None, ("Grok printed no result",))
+    problems = []
+    stop = result.get("stop_reason")
+    if result.get("is_error"):
+        errors = "; ".join(str(each) for each in result.get("errors") or [])
+        problems.append(
+            f"Grok ended with an error: {result.get('subtype', 'unknown')}"
+            + (f": {errors}" if errors else "")
+        )
+    elif stop not in (None, "end_turn"):
+        problems.append(f"Grok stopped with {stop}")
+    # Assistant frames name the model that answered, main conversation first;
+    # the init line only repeats the requested one
+    frames = [
+        event
+        for event in events
+        if event.get("type") == "assistant" and isinstance(event.get("message"), dict)
+    ]
+    frames.sort(key=lambda frame: frame.get("parent_tool_use_id") is not None)
+    models = dict.fromkeys(
+        str(frame["message"]["model"])
+        for frame in frames
+        if frame["message"].get("model") not in (None, "unknown")
+    )
+    answer = result.get("result")
+    return Reply(
+        answer if isinstance(answer, str) else "",
+        ", ".join(models) or None,
+        result.get("session_id"),
+        tuple(problems),
+    )
+
+
 RUNNERS = {
     "codex": Runner(
         efforts=("low", "medium", "high", "xhigh", "max", "ultra"),
@@ -553,6 +688,22 @@ RUNNERS = {
         review=claude_review,
         command=claude_command,
         reply=claude_reply,
+        names_session=True,
+    ),
+    # Grok checks each model's own levels and exits 1 naming the ones it accepts
+    "grok": Runner(
+        efforts=("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+        auth=("grok", "models"),
+        login="grok login",
+        review=grok_review,
+        command=grok_command,
+        reply=grok_reply,
+        names_session=True,
+        signed_out="You are not authenticated",
+        # Grok loads a repository's AGENTS.md, skills, and hooks only in a folder
+        # it trusts. The launcher runs in trusted repositories, so the gate opens
+        # for this run without recording a grant in ~/.grok
+        env={"GROK_FOLDER_TRUST": "0"},
     ),
 }
 
@@ -632,7 +783,7 @@ def resolve_target(named: str | None, mode: str, config: Config) -> str:
     if target not in RUNNERS:
         raise UsageError(
             f'{config.path} sets harness = "{target}", which the launcher does not run '
-            f"yet (#281); pass codex or claude, or follow references/{target}/MetaSkill.md"
+            f"yet (#281); pass codex, claude, or grok, or follow references/{target}/MetaSkill.md"
         )
     return target
 
@@ -776,13 +927,15 @@ def preflight(target: str, runner: Runner) -> None:
         )
     except subprocess.TimeoutExpired:
         raise TemporaryError(f"'{shlex.join(runner.auth)}' timed out") from None
-    if done.returncode != 0:
+    if done.returncode != 0 or (runner.signed_out and runner.signed_out in done.stdout):
         raise ScriptError(
             f"{target} is not logged in; run '{runner.login}', then rerun"
         )
 
 
-def run_child(command: list[str], *, cwd: Path, run: Path, timeout: float) -> int:
+def run_child(
+    command: list[str], *, cwd: Path, run: Path, timeout: float, env: Mapping[str, str]
+) -> int:
     """Run the child in its own process group, with the prompt on stdin and its
     output in the run folder. A timeout or an interrupt stops the whole group,
     and so does a child that exits while processes it started keep running."""
@@ -792,7 +945,13 @@ def run_child(command: list[str], *, cwd: Path, run: Path, timeout: float) -> in
         open(run / "stderr.log", "w", encoding="utf-8") as stderr,
     ):
         process = subprocess.Popen(
-            command, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr, process_group=0
+            command,
+            cwd=cwd,
+            env={**os.environ, **env},
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            process_group=0,
         )
         try:
             status = process.wait(timeout=timeout)
@@ -899,7 +1058,7 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         log.warning(
             "warning: %s is not a Git checkout, so file changes go unchecked", cwd
         )
-    fresh_session = str(uuid.uuid4()) if target == "claude" else None
+    fresh_session = str(uuid.uuid4()) if runner.names_session else None
     request = Request(
         target=target,
         mode=args.mode,
@@ -919,9 +1078,16 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
     )
     command = runner.command(request, run)
     log.info("run folder: %s", run)
-    log.info("command: %s", shlex.join(command))
+    log.info(
+        "command: %s",
+        shlex.join(
+            [*(f"{key}={value}" for key, value in runner.env.items()), *command]
+        ),
+    )
     try:
-        status = run_child(command, cwd=cwd, run=run, timeout=args.timeout)
+        status = run_child(
+            command, cwd=cwd, run=run, timeout=args.timeout, env=runner.env
+        )
     except subprocess.TimeoutExpired:
         raise ScriptError(
             f"{target} ran past --timeout; its partial output is in {run}"
@@ -977,7 +1143,7 @@ def build_parser() -> Parser:
         action="store_const",
         const="review-only",
         help="report findings; the run fails if the checkout changed, "
-        "and Claude runs without its file-editing tools",
+        "and Claude and Grok run without their file-editing tools",
     )
     access.add_argument(
         "--review-fix",
@@ -991,8 +1157,8 @@ def build_parser() -> Parser:
         dest="mode",
         action="store_const",
         const="code-review",
-        help="run the CLI's own reviewer read-only, codex exec review or Claude "
-        "Code's /review; the run fails if the checkout changed",
+        help="run the CLI's own reviewer read-only: codex exec review, or the "
+        "/review of Claude Code or Grok; the run fails if the checkout changed",
     )
     parser.add_argument(
         "--prompt-file",
@@ -1005,17 +1171,20 @@ def build_parser() -> Parser:
     diff.add_argument(
         "--base",
         metavar="BRANCH",
-        help="with --code-review: review the changes against BRANCH",
+        help="with --code-review: review the changes against BRANCH; grok "
+        "takes only origin/main, or origin/master without it",
     )
     diff.add_argument(
         "--uncommitted",
         action="store_true",
-        help="with codex --code-review: review staged, unstaged, and untracked changes",
+        help="with codex or grok --code-review: review staged, unstaged, and "
+        "untracked changes",
     )
     diff.add_argument(
         "--commit",
         metavar="SHA",
-        help="with --code-review: review the changes a commit introduced",
+        help="with codex or claude --code-review: review the changes a commit "
+        "introduced",
     )
     parser.add_argument(
         "--title", help="with codex --code-review: the title the review summary shows"
@@ -1040,8 +1209,9 @@ def build_parser() -> Parser:
     )
     parser.add_argument(
         "--effort",
-        help="reasoning level, passed to codex as model_reasoning_effort "
-        "and to claude as --effort (default: reasoning-level in the config)",
+        help="reasoning level, passed to codex as model_reasoning_effort, "
+        "to claude as --effort, and to grok as --reasoning-effort "
+        "(default: reasoning-level in the config)",
     )
     parser.add_argument(
         "--resume", metavar="SESSION", help="continue a session a previous run printed"

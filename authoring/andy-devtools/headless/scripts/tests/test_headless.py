@@ -24,6 +24,10 @@ reasoning-level = "xhigh"
 model = "claude-opus-5-5"
 reasoning-level = "xhigh"
 
+[grok]
+model = "grok-4.7"
+reasoning-level = "xhigh"
+
 [pi]
 provider = "openai-codex"
 model = "gpt-6.1-sol"
@@ -37,9 +41,17 @@ from pathlib import Path
 name, args = Path(sys.argv[0]).name, sys.argv[1:]
 if args[:2] in (["login", "status"], ["auth", "status"]):
     sys.exit(1 if os.environ.get("STUB_AUTH_FAIL") else 0)
+if args == ["models"]:
+    signed_out = os.environ.get("STUB_AUTH_FAIL")
+    print("You are not authenticated." if signed_out else "You are logged in.")
+    sys.exit(0)
+# Grok reads its prompt from --prompt-file and ignores stdin
 prompt = sys.stdin.read()
+if "--prompt-file" in args:
+    prompt = Path(args[args.index("--prompt-file") + 1]).read_text()
 with open(os.environ["STUB_LOG"], "a") as log:
-    log.write(json.dumps({"argv": args, "stdin": prompt}) + "\\n")
+    trust = os.environ.get("GROK_FOLDER_TRUST")
+    log.write(json.dumps({"argv": args, "stdin": prompt, "trust": trust}) + "\\n")
 if os.environ.get("STUB_TOUCH"):
     with open(os.environ["STUB_TOUCH"], "a") as edited:
         edited.write("changed by the child\\n")
@@ -67,6 +79,20 @@ if name == "codex":
     model = args[args.index("-m") + 1]
     print(f"model: {model}\\nsession id: stub-codex-session", file=sys.stderr)
     Path(args[args.index("-o") + 1]).write_text(answer)
+elif name == "grok":
+    session = args[args.index("--resume" if "--resume" in args else "--session-id") + 1]
+    model = args[args.index("-m") + 1]
+    served = os.environ.get("STUB_SERVED", model)
+    error = os.environ.get("STUB_ERROR")
+    for event in (
+        {"type": "system", "subtype": "init", "session_id": session, "model": model},
+        {"type": "assistant", "message": {"model": served, "content": []},
+         "parent_tool_use_id": None, "session_id": session},
+        {"type": "result", "subtype": error or "success", "is_error": bool(error),
+         "result": answer, "stop_reason": os.environ.get("STUB_STOP", "end_turn"),
+         "errors": [f"{error} details"] if error else None, "session_id": session},
+    ):
+        print(json.dumps(event))
 else:
     session = args[args.index("--resume" if "--resume" in args else "--session-id") + 1]
     denied = [{"tool_name": "Edit"}] if os.environ.get("STUB_DENY") else []
@@ -100,7 +126,7 @@ def repo(tmp_path: Path) -> Path:
 def env(tmp_path: Path) -> dict[str, str]:
     stubs = tmp_path / "bin"
     stubs.mkdir()
-    for name in ("codex", "claude"):
+    for name in ("codex", "claude", "grok"):
         stub = stubs / name
         stub.write_text(f"#!{sys.executable}\n{STUB}")
         stub.chmod(0o755)
@@ -226,6 +252,40 @@ def test_claude_fix_may_edit_and_lists_the_changed_file(env, repo):
     assert call["stdin"].startswith("Mode: review and fix. You may edit files in")
 
 
+def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
+    review = launch(env, repo, "grok", "--review-only")
+    fix = launch(env, repo, "grok", "--review-fix")
+
+    assert review.returncode == 0, review.stderr
+    assert fix.returncode == 0, fix.stderr
+    lines = review.stdout.splitlines()
+    assert lines[:2] == ["model: grok-4.7", "effort: xhigh"]
+    assert lines[3] == "changed: nothing"
+    assert review.stdout.endswith("\n\nNo findings.\n")
+    review_call, fix_call = calls(env)
+    argv = review_call["argv"]
+    assert argv[:2] == ["--cwd", str(repo)]
+    assert Path(argv[argv.index("--prompt-file") + 1]).name == "prompt.md"
+    assert review_call["stdin"].startswith("Mode: review only.")
+    assert argv[argv.index("--reasoning-effort") + 1] == "xhigh"
+    assert {"--always-approve", "--no-leader", "--no-auto-update"} <= set(argv)
+    assert argv[argv.index("--output-format") + 1] == "streaming-messages-json"
+    session = argv[argv.index("--session-id") + 1]
+    assert f"session: {session}" in lines
+    tools = argv[argv.index("--disallowed-tools") + 1].split(",")
+    assert {"search_replace", "write"} <= set(tools)
+    assert "--disallowed-tools" not in fix_call["argv"]
+    assert fix_call["stdin"].startswith("Mode: review and fix.")
+    assert review_call["trust"] == fix_call["trust"] == "0"
+
+
+def test_grok_prints_the_model_that_answered_not_the_one_requested(env, repo):
+    done = launch(env, repo, "grok", "--review-only", STUB_SERVED="grok-4.7-build-fast")
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[0] == "model: grok-4.7-build-fast"
+
+
 def test_a_review_that_edits_the_checkout_fails(env, repo):
     done = launch(
         env, repo, "codex", "--review-only", STUB_TOUCH=str(repo / "README.md")
@@ -247,6 +307,16 @@ def test_a_review_that_edits_the_checkout_fails(env, repo):
         ),
         ("claude", {"STUB_DENY": "1"}, "error: Claude was denied Edit"),
         ("claude", {"STUB_EXIT": "1"}, "error: claude exited 1"),
+        ("grok", {"STUB_ANSWER": ""}, "error: grok gave no answer"),
+        (
+            "grok",
+            {"STUB_ERROR": "error_during_execution", "STUB_EXIT": "1"},
+            (
+                "Grok ended with an error: error_during_execution: "
+                "error_during_execution details"
+            ),
+        ),
+        ("grok", {"STUB_STOP": "refusal"}, "error: Grok stopped with refusal"),
     ],
 )
 def test_an_unusable_answer_fails(env, repo, target, stub, message):
@@ -269,11 +339,14 @@ def test_an_unknown_effort_is_refused_before_launch(env, repo):
     assert calls(env) == []
 
 
-def test_a_missing_login_names_the_command_that_fixes_it(env, repo):
-    done = launch(env, repo, "codex", "--review-only", STUB_AUTH_FAIL="1")
+@pytest.mark.parametrize(
+    ("target", "login"), [("codex", "codex login"), ("grok", "grok login")]
+)
+def test_a_missing_login_names_the_command_that_fixes_it(env, repo, target, login):
+    done = launch(env, repo, target, "--review-only", STUB_AUTH_FAIL="1")
 
     assert done.returncode == 1
-    assert "error: codex is not logged in; run 'codex login', then rerun" in done.stderr
+    assert f"error: {target} is not logged in; run '{login}', then rerun" in done.stderr
     assert calls(env) == []
 
 
@@ -288,12 +361,15 @@ def test_flags_after_double_dash_reach_the_child(env, repo):
 def test_resume_continues_the_named_session(env, repo):
     codex = launch(env, repo, "codex", "--review-fix", "--resume", "abc")
     claude = launch(env, repo, "claude", "--review-fix", "--resume", "def")
+    grok = launch(env, repo, "grok", "--review-fix", "--resume", "ghi")
 
-    assert codex.returncode == 0 and claude.returncode == 0
-    codex_call, claude_call = calls(env)
+    assert codex.returncode == 0 and claude.returncode == 0 and grok.returncode == 0
+    codex_call, *others = calls(env)
     assert codex_call["argv"][:3] == ["exec", "resume", "abc"]
-    assert claude_call["argv"][claude_call["argv"].index("--resume") + 1] == "def"
-    assert "--session-id" not in claude_call["argv"]
+    for call, session in zip(others, ("def", "ghi")):
+        assert call["argv"][call["argv"].index("--resume") + 1] == session
+        assert "--session-id" not in call["argv"]
+    assert "session: ghi" in grok.stdout.splitlines()
 
 
 def test_json_prints_the_run_as_one_object(env, repo):
@@ -409,7 +485,7 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
     assert not alive(wait_for(pid_file))
 
 
-@pytest.mark.parametrize("name", [None, "codex", "claude"])
+@pytest.mark.parametrize("name", [None, "codex", "claude", "grok"])
 def test_the_shipped_config_reaches_each_cli(env, repo, name):
     shipped = tomllib.loads(SHIPPED.read_text())
     table = shipped[name or shipped["harness"]]
@@ -425,10 +501,9 @@ def test_the_shipped_config_reaches_each_cli(env, repo, name):
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
     assert table["model"] in call["argv"]
-    if (name or shipped["harness"]) == "claude":
-        assert (
-            call["argv"][call["argv"].index("--effort") + 1] == table["reasoning-level"]
-        )
+    if (name or shipped["harness"]) in ("claude", "grok"):
+        flag = "--effort" if name == "claude" else "--reasoning-effort"
+        assert call["argv"][call["argv"].index(flag) + 1] == table["reasoning-level"]
     else:
         assert f'model_reasoning_effort="{table["reasoning-level"]}"' in call["argv"]
     assert f"effort: {table['reasoning-level']}" in done.stdout.splitlines()
@@ -746,6 +821,28 @@ def test_claude_code_review_of_a_base_ignores_untracked_files(env, repo):
     assert done.stdout.splitlines()[3] == "changed: nothing"
 
 
+def test_grok_code_review_types_review_with_the_local_or_main_target(env, repo):
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=repo, check=True
+    )
+    main = launch(
+        env, repo, "grok", "--code-review", "--base", "origin/main", prompt=None
+    )
+    (repo / "draft.md").write_text("draft\n")
+    local = launch(env, repo, "grok", "--code-review", "--uncommitted", prompt=None)
+
+    assert main.returncode == 0, main.stderr
+    assert local.returncode == 0, local.stderr
+    main_call, local_call = calls(env)
+    assert main_call["argv"][2:4] == ["-p", "/review --main"]
+    assert local_call["argv"][2:4] == ["-p", "/review --local"]
+    argv = local_call["argv"]
+    rule = argv[argv.index("--rules") + 1]
+    assert "do not commit, push, merge, or post comments" in rule
+    assert "full text of the review file" in rule
+    assert "--prompt-file" not in argv and "--disallowed-tools" not in argv
+
+
 def test_a_code_review_that_edits_the_checkout_fails(env, repo):
     done = launch(
         env,
@@ -792,6 +889,14 @@ def test_a_code_review_that_edits_the_checkout_fails(env, repo):
             "--title works only with codex --code-review",
         ),
         (("claude", "--code-review", "--commit", "HEAD"), None, "has no parent"),
+        (("grok", "--code-review", "--commit", "HEAD"), None, "has no commit target"),
+        (
+            ("grok", "--code-review", "--base", "HEAD"),
+            None,
+            "compares with origin/master only",
+        ),
+        (("grok", "--code-review"), "x", "use --review-only"),
+        (("grok", "--review-only", "--effort", "ultra"), "x", "for grok"),
         (
             ("codex", "--review-only", "--base", "main"),
             "x",
@@ -810,6 +915,23 @@ def test_code_review_usage_errors_stop_before_launch(env, repo, args, prompt, me
 
     assert done.returncode == 2
     assert message in done.stderr
+    assert calls(env) == []
+
+
+def test_grok_code_review_of_main_needs_a_clean_checkout(env, repo):
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=repo, check=True
+    )
+    named = launch(env, repo, "grok", "--code-review", "--base", "HEAD", prompt=None)
+    (repo / "draft.md").write_text("draft\n")
+    dirty = launch(
+        env, repo, "grok", "--code-review", "--base", "origin/main", prompt=None
+    )
+
+    assert named.returncode == 2 and dirty.returncode == 2
+    assert "compares with origin/main only" in named.stderr
+    assert "needs a clean checkout" in dirty.stderr
+    assert "these files have changes: draft.md" in dirty.stderr
     assert calls(env) == []
 
 
