@@ -409,11 +409,13 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
     assert not alive(wait_for(pid_file))
 
 
-def test_the_shipped_config_sets_the_harness_model_and_reasoning_level(env, repo):
+@pytest.mark.parametrize("name", [None, "codex", "claude"])
+def test_the_shipped_config_reaches_each_cli(env, repo, name):
     shipped = tomllib.loads(SHIPPED.read_text())
-    harness = shipped["harness"]
+    table = shipped[name or shipped["harness"]]
+    args = ("--review-only",) if name is None else (name, "--review-only")
     done = subprocess.run(
-        command(repo, ("--review-only",), "Review README.md.", shipped=True),
+        command(repo, args, "Review README.md.", shipped=True),
         env=env,
         capture_output=True,
         text=True,
@@ -422,10 +424,14 @@ def test_the_shipped_config_sets_the_harness_model_and_reasoning_level(env, repo
 
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
-    argv = " ".join(call["argv"])
-    assert shipped[harness]["model"] in argv
-    assert shipped[harness]["reasoning-level"] in argv
-    assert f"effort: {shipped[harness]['reasoning-level']}" in done.stdout.splitlines()
+    assert table["model"] in call["argv"]
+    if (name or shipped["harness"]) == "claude":
+        assert (
+            call["argv"][call["argv"].index("--effort") + 1] == table["reasoning-level"]
+        )
+    else:
+        assert f'model_reasoning_effort="{table["reasoning-level"]}"' in call["argv"]
+    assert f"effort: {table['reasoning-level']}" in done.stdout.splitlines()
 
 
 def test_without_a_cli_name_the_config_harness_runs(env, repo, tmp_path):
