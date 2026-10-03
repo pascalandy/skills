@@ -214,6 +214,7 @@ def duration(text: str) -> float:
 # <<< cli-block
 
 import logging
+import posixpath
 import shlex
 import shutil
 import subprocess
@@ -222,6 +223,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import BinaryIO
 
 DEBUG_ENV = "RUN_EVALS_DEBUG"
 AGENTS = ("claude", "codex")
@@ -245,49 +247,57 @@ examples:
 
 The scenarios come from <skill>/evals/evals.json in the working tree, so new
 scenarios run against an older ref. The skill and each other skill a scenario
-lists come from <ref>, read as siblings of <skill>; a skill absent at <ref> is
-left out, which gives a no-skill baseline. Each scenario's setup is a list of
+lists come from <ref>; a listed name resolves to the folder that shares the
+longest path with <skill>. A skill absent at <ref> is left out, which gives a
+no-skill baseline. Each scenario's setup is a list of
 shell commands run in the fresh repo, with $EVALS naming the evals folder.
 
 Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled. Claude runs with --setting-sources project, so it sees only
 the copies this run installs. A gh wrapper logs every call to gh-calls.log and
-refuses GitHub writes other than help. stdout prints one line per run: name,
-status, folder."""
+lets only reads and help through. A run that ends or times out has its whole
+process group stopped. stdout prints one line per run: name, status, folder."""
 
 GH_WRAPPER = """\
 #!/usr/bin/env bash
 log={log}
 printf '%s\\n' "$*" >> "$log"
-for a in "$@"; do case "$a" in -h|--help) exec {gh} "$@" ;; esac; done
-refuse() {{ printf 'REFUSED %s\\n' "$*" >> "$log"; echo "gh: this run refuses GitHub writes: $*" >&2; exit 1; }}
-case "$1 ${{2:-}}" in
-  "issue create"|"issue edit"|"issue comment"|"issue close"|"issue reopen"|"issue delete"|\\
-  "issue transfer"|"issue lock"|"issue unlock"|"issue pin"|"issue unpin"|"issue develop"|\\
-  "pr create"|"pr edit"|"pr merge"|"pr comment"|"pr close"|"pr review"|"pr ready"|\\
-  "label create"|"label edit"|"label delete"|"label clone"|"repo create"|"repo edit"|\\
-  "repo delete"|"release create"|"release delete"|"sub-issue add"|"sub-issue remove"|\\
-  "stack submit"|"stack merge"|"stack link") refuse "$@" ;;
+refuse() {{ printf 'REFUSED %s\\n' "$*" >> "$log"; echo "gh: this run allows only reads; refused: $*" >&2; exit 1; }}
+words=() skip=0
+for a in "$@"; do
+  case "$a" in -h|--help|--version) exec {gh} "$@" ;; esac
+  if [ "$skip" = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -R|--repo|--hostname) skip=1 ;;
+    -*) ;;
+    *) words+=("$a") ;;
+  esac
+done
+case "${{words[0]:-}} ${{words[1]:-}}" in
+  "issue view"|"issue list"|"issue status"|"pr view"|"pr list"|"pr status"|"pr diff"|"pr checks"|\\
+  "repo view"|"label list"|"run view"|"run list"|"release view"|"release list"|"search "*|\\
+  "auth status"|"extension list"|"stack view"|"stack init"|"stack add"|"stack rebase"|"stack push"|\\
+  "stack up"|"stack down"|"stack top"|"stack bottom"|"stack checkout"|"stack trunk") exec {gh} "$@" ;;
+  "api "*) ;;
+  *) refuse "$@" ;;
 esac
-if [ "$1" = api ]; then
-  method="" body=0 prev=""
-  for a in "$@"; do
-    case "$prev" in -X|--method) method=$a ;; esac
-    case "$a" in
-      -X?*) method=${{a#-X}} ;;
-      --method=*) method=${{a#--method=}} ;;
-      -f|-F|--field|--raw-field|--input|-f?*|-F?*|--field=*|--raw-field=*|--input=*) body=1 ;;
-    esac
-    case "$a" in *mutation*) refuse "$@" ;; esac
-    prev=$a
-  done
-  method=$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')
-  if [ "${{2:-}}" != graphql ]; then
-    [ -n "$method" ] && [ "$method" != GET ] && refuse "$@"
-    [ -z "$method" ] && [ "$body" = 1 ] && refuse "$@"
-  fi
-fi
+method="" body=0 prev=""
+for a in "$@"; do
+  case "$prev" in -X|--method) method=$a ;; esac
+  case "$a" in
+    -X?*) method=${{a#-X}} ;;
+    --method=*) method=${{a#--method=}} ;;
+    --input|--input=*) refuse "$@" ;;
+    -f|-F|--field|--raw-field|-f?*|-F?*|--field=*|--raw-field=*) body=1 ;;
+  esac
+  case "$a" in *mutation*|*=@*) refuse "$@" ;; esac
+  prev=$a
+done
+[ "${{words[1]:-}}" = graphql ] && exec {gh} "$@"
+method=$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')
+[ -n "$method" ] && [ "$method" != GET ] && refuse "$@"
+[ -z "$method" ] && [ "$body" = 1 ] && refuse "$@"
 exec {gh} "$@"
 """
 
@@ -327,15 +337,36 @@ class Run:
 
 
 class Children:
-    """Agent processes still running, so an interrupt can stop them."""
+    """Agent processes still running. Once cancelled, no new one starts, so an
+    interrupt during a run's setup cannot launch a paid agent afterward."""
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.live: set[subprocess.Popen[bytes]] = set()
+        self.cancelled = False
 
-    def add(self, process: subprocess.Popen[bytes]) -> None:
+    def start(
+        self,
+        command: list[str],
+        cwd: Path,
+        env: Mapping[str, str],
+        stdout: BinaryIO,
+        stderr: BinaryIO,
+    ) -> subprocess.Popen[bytes] | None:
         with self.lock:
+            if self.cancelled:
+                return None
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=stdout,
+                stderr=stderr,
+                start_new_session=True,
+            )
             self.live.add(process)
+            return process
 
     def remove(self, process: subprocess.Popen[bytes]) -> None:
         with self.lock:
@@ -343,23 +374,28 @@ class Children:
 
     def stop_all(self) -> None:
         with self.lock:
+            self.cancelled = True
             live = list(self.live)
         for process in live:
             stop(process)
 
 
 def stop(process: subprocess.Popen[bytes]) -> None:
-    """SIGTERM the child's process group, then SIGKILL it after GRACE seconds."""
-    for number, wait in ((signal.SIGTERM, GRACE), (signal.SIGKILL, None)):
-        try:
-            os.killpg(process.pid, number)
-        except ProcessLookupError:
-            return
-        try:
-            process.wait(timeout=wait)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+    """SIGTERM the child's process group, then SIGKILL what is left of it after
+    GRACE seconds, even when the leader already exited."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=GRACE)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -434,17 +470,23 @@ def make_plan(skill: Path, ref: str, output: Path | None) -> Plan:
     return Plan(skill, repo, sha, skill / "evals", output)
 
 
-def names_at(plan: Plan) -> set[str]:
-    """Skill folders beside the target at the ref."""
-    parent = plan.skill.parent.relative_to(plan.repo).as_posix()
-    listed = git(plan.repo, "ls-tree", "--name-only", f"{plan.sha}:{parent}")
-    return set(listed.split())
+def skill_names(paths: str) -> dict[str, list[str]]:
+    """Folders holding a SKILL.md, by skill name, from git's path listing."""
+    folders: dict[str, list[str]] = {}
+    for path in paths.splitlines():
+        if path == "SKILL.md" or path.endswith("/SKILL.md"):
+            folder = posixpath.dirname(path)
+            folders.setdefault(posixpath.basename(folder), []).append(folder)
+    return folders
 
 
-def deleted_by(plan: Plan) -> set[str]:
-    """Skill folders the ref's history added beside the target, minus those left."""
-    parent = plan.skill.parent.relative_to(plan.repo).as_posix()
-    listed = git(
+def skills_at(plan: Plan) -> dict[str, list[str]]:
+    return skill_names(git(plan.repo, "ls-tree", "-r", "--name-only", plan.sha))
+
+
+def deleted_by(plan: Plan, present: Mapping[str, list[str]]) -> set[str]:
+    """Skills the ref's history added anywhere in the repository, minus those left."""
+    added = git(
         plan.repo,
         "log",
         "--format=",
@@ -452,28 +494,45 @@ def deleted_by(plan: Plan) -> set[str]:
         "--diff-filter=A",
         plan.sha,
         "--",
-        f"{parent}/",
+        "*SKILL.md",
     )
-    prefix = f"{parent}/" if parent != "." else ""
-    added = {
-        line[len(prefix) :].split("/")[0]
-        for line in listed.splitlines()
-        if line.startswith(prefix) and "/" in line[len(prefix) :]
-    }
-    return added - names_at(plan)
+    return set(skill_names(added)) - set(present)
 
 
-def install(plan: Plan, names: Sequence[str], target: Path) -> list[str]:
+def source_of(plan: Plan, name: str, present: Mapping[str, list[str]]) -> str | None:
+    """The folder of `name` that shares the longest path with the target, so
+    authoring/<category>/ and a compiled skills/ tree each resolve to their own."""
+    target = plan.skill.relative_to(plan.repo).as_posix()
+
+    def shared(folder: str) -> int:
+        common = posixpath.commonpath([target, folder])
+        return len(common.split("/")) if common else 0
+
+    candidates = sorted(present.get(name, []), key=shared, reverse=True)
+    if len(candidates) > 1 and shared(candidates[0]) == shared(candidates[1]):
+        raise UsageError(
+            f"skill {name} has several folders at the ref: {', '.join(candidates)}"
+        )
+    return candidates[0] if candidates else None
+
+
+def wanted(plan: Plan, scenario: Scenario) -> list[str]:
+    """The target, then each other skill the scenario lists."""
+    return list(dict.fromkeys([plan.skill.name, *scenario.skills]))
+
+
+def install(
+    plan: Plan, names: Sequence[str], target: Path, present: Mapping[str, list[str]]
+) -> list[str]:
     """Copy each named skill as it stood at the ref; return one line per name."""
     target.mkdir(parents=True)
     (target.parent / ".gitignore").write_text("*\n", encoding="utf-8")
-    present = names_at(plan)
     lines = []
     for name in names:
-        if name not in present:
+        source = source_of(plan, name, present)
+        if source is None:
             lines.append(f"absent\t{name}")
             continue
-        source = (plan.skill.parent / name).relative_to(plan.repo).as_posix()
         archive = subprocess.run(
             ["git", "-C", str(plan.repo), "archive", plan.sha, source],
             capture_output=True,
@@ -545,9 +604,18 @@ def claude_answer(events: Path) -> str:
     return answer
 
 
-def execute(run: Run, plan: Plan, timeout: float, children: Children) -> str:
+def execute(
+    run: Run,
+    plan: Plan,
+    timeout: float,
+    children: Children,
+    present: Mapping[str, list[str]],
+    deleted: set[str],
+) -> str:
     """Build the run's repo, run the agent in it, and record what it left."""
     folder, scenario = run.folder, run.scenario
+    if children.cancelled:
+        return "cancelled"
     work = folder / "work"
     work.mkdir(parents=True)
     (folder / "query.txt").write_text(scenario.query + "\n", encoding="utf-8")
@@ -571,7 +639,7 @@ def execute(run: Run, plan: Plan, timeout: float, children: Children) -> str:
             )
             return f"setup failed: {command}"
     skills_dir = work / (".claude" if run.agent == "claude" else ".agents") / "skills"
-    lines = install(plan, scenario.skills, skills_dir)
+    lines = install(plan, wanted(plan, scenario), skills_dir, present)
     (folder / "skills.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     real_gh = shutil.which("gh")
     if real_gh:
@@ -585,7 +653,7 @@ def execute(run: Run, plan: Plan, timeout: float, children: Children) -> str:
         )
         wrapper.chmod(0o755)
         env["PATH"] = f"{wrapper.parent}{os.pathsep}{env.get('PATH', '')}"
-    hide = hidden_paths(set(scenario.skills) | deleted_by(plan))
+    hide = hidden_paths(set(wanted(plan, scenario)) | deleted)
     command, stdin = agent_command(run, work, hide)
     (folder / "command.txt").write_text(shlex.join(command) + "\n", encoding="utf-8")
     log.info("%s started", run.name)
@@ -593,23 +661,16 @@ def execute(run: Run, plan: Plan, timeout: float, children: Children) -> str:
         (folder / "events.jsonl").open("wb") as events,
         (folder / "stderr.log").open("wb") as errors,
     ):
-        process = subprocess.Popen(
-            command,
-            cwd=work,
-            env=env,
-            stdin=subprocess.PIPE,
-            stdout=events,
-            stderr=errors,
-            start_new_session=True,
-        )
-        children.add(process)
+        process = children.start(command, work, env, events, errors)
+        if process is None:
+            return "cancelled"
         try:
             process.communicate(stdin, timeout=timeout)
             status = "done" if process.returncode == 0 else f"exit {process.returncode}"
         except subprocess.TimeoutExpired:
-            stop(process)
             status = "timeout"
         finally:
+            stop(process)
             children.remove(process)
     if run.agent == "claude":
         (folder / "answer.md").write_text(
@@ -643,6 +704,11 @@ def launch(args: argparse.Namespace) -> str:
                 for cli in missing
             )
         )
+    present = skills_at(plan)
+    for scenario in scenarios:
+        for name in wanted(plan, scenario):
+            source_of(plan, name, present)
+    deleted = deleted_by(plan, present)
     runs = [
         Run(scenario, agent, plan.output / f"s{scenario.number}-{agent}")
         for scenario in scenarios
@@ -655,7 +721,12 @@ def launch(args: argparse.Namespace) -> str:
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     try:
         statuses = list(
-            pool.map(lambda run: execute(run, plan, args.timeout, children), runs)
+            pool.map(
+                lambda run: execute(
+                    run, plan, args.timeout, children, present, deleted
+                ),
+                runs,
+            )
         )
     finally:
         children.stop_all()

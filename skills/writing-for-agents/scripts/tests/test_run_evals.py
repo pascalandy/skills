@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -89,7 +91,7 @@ def lab(tmp_path: Path) -> Lab:
     holding installed copies."""
     repo = tmp_path / "repo"
     skills = repo / "skills"
-    write(skills / "helper" / "SKILL.md", "helper\n")
+    write(repo / "extras" / "helper" / "SKILL.md", "helper\n")
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     before = commit(repo, "helper only")
     write(skills / "demo" / "SKILL.md", "demo v1\n")
@@ -111,7 +113,7 @@ def lab(tmp_path: Path) -> Lab:
             ],
             "query": "Tidy the notes.",
         },
-        {"skills": ["demo"], "query": "Second request."},
+        {"query": "Second request."},
     ]
     write(evals / "evals.json", json.dumps(scenarios))
 
@@ -163,6 +165,7 @@ def test_each_scenario_runs_in_each_agent_with_the_skill_from_the_ref(lab: Lab):
     assert report(lab, "s1-claude", "demo") == "demo v2\n"
     assert report(lab, "s1-codex", "demo") == "demo v2\n"
     assert report(lab, "s1-claude", "skills").split() == ["demo", "helper"]
+    assert report(lab, "s2-claude", "demo") == "demo v2\n"
     assert "Tidy the notes." in report(lab, "s1-claude", "argv").splitlines()
     assert report(lab, "s1-codex", "stdin") == "Tidy the notes."
     first = out / "s1-claude"
@@ -199,7 +202,8 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "--scenario",
         "2",
         FAKE_ACTION="gh issue view 1; gh pr create --help; gh pr create --title x; "
-        "gh api -X post repos/a/b/labels; gh api repos/a/b; true",
+        "gh api -X post repos/a/b/labels; gh api repos/a/b; gh -R a/b pr merge 1; "
+        "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; true",
     )
 
     assert result.returncode == 0, result.stderr
@@ -212,9 +216,21 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "api -X post repos/a/b/labels",
         "REFUSED api -X post repos/a/b/labels",
         "api repos/a/b",
+        "-R a/b pr merge 1",
+        "REFUSED -R a/b pr merge 1",
+        "stack unstack",
+        "REFUSED stack unstack",
+        "api graphql --input q.json",
+        "REFUSED api graphql --input q.json",
+        "-R a/b pr view 1",
     ]
     real = lab.reports / "real-gh.log"
-    assert real.read_text() == "issue view 1\npr create --help\napi repos/a/b\n"
+    assert real.read_text().splitlines() == [
+        "issue view 1",
+        "pr create --help",
+        "api repos/a/b",
+        "-R a/b pr view 1",
+    ]
 
 
 def test_a_ref_without_the_skill_gives_a_no_skill_baseline(lab: Lab):
@@ -284,3 +300,56 @@ def test_bad_input_is_a_usage_error(lab: Lab, scenarios, args, message):
     assert result.returncode == 2
     assert message in result.stderr
     assert result.stdout == ""
+
+
+def test_an_interrupt_during_setup_launches_no_agent(lab: Lab):
+    evals = lab.skill / "evals" / "evals.json"
+    evals.write_text(json.dumps([{"query": "Go.", "setup": ["sleep 3"]}]))
+    runner = subprocess.Popen(
+        [
+            sys.executable,
+            str(RUNNER),
+            str(lab.skill),
+            "--ref",
+            lab.ref,
+            "--output-dir",
+            str(lab.out),
+            "--agent",
+            "codex",
+        ],
+        env=lab.env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline = time.monotonic() + 10
+    while not (lab.out / "s1-codex" / "query.txt").exists():
+        assert time.monotonic() < deadline, "setup never started"
+        time.sleep(0.05)
+    runner.send_signal(signal.SIGINT)
+    runner.wait(timeout=30)
+
+    assert runner.returncode == 130
+    assert not any(lab.reports.iterdir())
+
+
+def test_a_timeout_stops_the_whole_process_group(lab: Lab):
+    late = lab.reports / "late"
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        "--timeout",
+        "1s",
+        FAKE_ACTION=f"(trap '' TERM; sleep 2; echo late > {late}) & sleep 30",
+    )
+    time.sleep(3)
+
+    assert result.returncode == 1
+    assert "s2-codex\ttimeout" in result.stderr
+    assert not late.exists()
