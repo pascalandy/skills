@@ -425,7 +425,12 @@ def test_the_shipped_config_reaches_each_cli(env, repo, name):
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
     assert table["model"] in call["argv"]
-    assert table["reasoning-level"] in " ".join(call["argv"])
+    if (name or shipped["harness"]) == "claude":
+        assert (
+            call["argv"][call["argv"].index("--effort") + 1] == table["reasoning-level"]
+        )
+    else:
+        assert f'model_reasoning_effort="{table["reasoning-level"]}"' in call["argv"]
     assert f"effort: {table['reasoning-level']}" in done.stdout.splitlines()
 
 
