@@ -1,3 +1,7 @@
+---
+description: "Sketch low-fidelity HTML wireframes that test content, navigation, and layout before visual design."
+---
+
 # Wireframe
 
 1. Identify the user, task, bounded screen or flow, required information and actions, and structural questions. Use real labels and representative content. Finish when the reviewer can tell which product decision the wireframe tests.

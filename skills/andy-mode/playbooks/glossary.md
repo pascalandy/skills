@@ -1,3 +1,7 @@
+---
+description: "Create or revise a canonical glossary of a project's or domain's vocabulary."
+---
+
 # Glossary Builder
 
 ## Purpose

@@ -1,3 +1,7 @@
+---
+description: "Open a pull request at the end of any other playbook."
+---
+
 ### Opening a PR
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

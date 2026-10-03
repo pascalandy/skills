@@ -1,3 +1,7 @@
+---
+description: "Restructure code without changing its behavior, such as a rename, extraction, or move."
+---
+
 ### Refactoring
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

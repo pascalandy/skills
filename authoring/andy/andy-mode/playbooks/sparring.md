@@ -1,3 +1,7 @@
+---
+description: "Challenge an opinion or argument as a blunt sparring partner who tests assumptions instead of agreeing."
+---
+
 # Sparring Partner
 
 ## Purpose

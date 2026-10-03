@@ -1,3 +1,7 @@
+---
+description: "Run a queue of independent PRs to merged with full autonomy, one owner per PR and each merge verified first."
+---
+
 ### Autopilot-full
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

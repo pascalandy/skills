@@ -1,3 +1,7 @@
+---
+description: "Build a standalone HTML report, explainer, landing page, tool, or data story that no narrower playbook owns."
+---
+
 # Artifact
 
 An HTML presentation has a narrower owner. Switch to the [slides playbook](slides.md) instead of adapting this generic playbook.

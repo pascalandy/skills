@@ -1,3 +1,7 @@
+---
+description: "Drive one long task to completion without stopping, until a stated exit condition holds."
+---
+
 ### Autonomous run
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

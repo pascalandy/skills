@@ -1,3 +1,7 @@
+---
+description: "Diagnose a runtime symptom such as a leak, idle CPU spin, or glitch from live instrumentation."
+---
+
 ### Runtime forensics
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

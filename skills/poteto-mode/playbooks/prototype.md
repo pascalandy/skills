@@ -1,3 +1,7 @@
+---
+description: "Build a throwaway sketch to settle a design or behavior question by observing it."
+---
+
 ### Prototype
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

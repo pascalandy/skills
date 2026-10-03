@@ -1,3 +1,7 @@
+---
+description: "Design and generate a 16:9 hand-drawn illustration that turns one key idea of a text into a scene."
+---
+
 # Illustration
 
 ## Purpose

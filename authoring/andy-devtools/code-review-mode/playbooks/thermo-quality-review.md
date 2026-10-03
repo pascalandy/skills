@@ -1,3 +1,7 @@
+---
+description: "Run an unusually strict review of production code for structure, file size, branching, types, and layering."
+---
+
 # Thermo-Nuclear Code Quality Review
 
 Use this skill for an unusually strict review focused on implementation quality, maintainability, abstraction quality, and codebase health.

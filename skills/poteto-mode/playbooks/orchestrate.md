@@ -1,3 +1,7 @@
+---
+description: "Coordinate a multi-day project of many stacked PRs and subagents from one standing coordinator."
+---
+
 ### Orchestrate
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

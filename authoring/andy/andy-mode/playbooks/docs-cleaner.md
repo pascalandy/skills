@@ -1,3 +1,7 @@
+---
+description: "Clean up existing documentation by fixing drift, duplicates, frontmatter, and structure."
+---
+
 # Doc Cleaner
 
 Explicit entry point: `andy-mode ; docs-cleaner`.

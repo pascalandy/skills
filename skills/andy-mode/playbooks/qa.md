@@ -1,3 +1,7 @@
+---
+description: "Validate a finished change against its accepted behavior, or turn a reported problem into durable QA findings."
+---
+
 # QA Session
 
 Run post-implementation QA after the selected implementation workflow or before closing a change. Validate accepted user-facing behavior when no problem is reported. When the user reports problems conversationally, clarify lightly, inspect enough context, and produce durable QA findings or follow-ups in project domain language.

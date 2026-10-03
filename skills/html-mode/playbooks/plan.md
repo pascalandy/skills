@@ -1,3 +1,7 @@
+---
+description: "Turn a work plan into an HTML document that shows its commitments, order, owners, dependencies, and risks."
+---
+
 # Plan
 
 1. Read the source plan and [document guidance](../references/documents-and-presentations.md). Identify actual commitments, ordering, owners, dependencies, risks, acceptance checks, and open questions. Finish when each source commitment has an intended place in the artifact.

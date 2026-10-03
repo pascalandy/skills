@@ -1,3 +1,7 @@
+---
+description: "Write the plan for work that spans several phases or stacked PRs, as a checklist an owner runs box by box."
+---
+
 ### Multi-phase or multi-PR plan
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

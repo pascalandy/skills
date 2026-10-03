@@ -1,3 +1,7 @@
+---
+description: "Manage Trello boards, lists, and cards through the Trello REST API."
+---
+
 # Trello Skill
 
 Manage Trello boards, lists, and cards.

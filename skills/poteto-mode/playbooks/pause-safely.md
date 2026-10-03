@@ -1,3 +1,7 @@
+---
+description: "Suspend in-flight work at a safe boundary, with a checkpoint another session can resume from."
+---
+
 ### Pause safely
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

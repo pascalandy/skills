@@ -1,3 +1,7 @@
+---
+description: "Build and verify a queue of changes autonomously, then hand over one reviewed stack for the operator to land."
+---
+
 ### Autopilot-stack
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

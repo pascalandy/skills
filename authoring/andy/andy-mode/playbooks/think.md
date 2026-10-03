@@ -1,3 +1,7 @@
+---
+description: "Pick the smallest reasoning method that resolves the uncertainty blocking a judgment, decision, or action."
+---
+
 # Think
 
 Use the smallest reasoning method that can reduce the uncertainty blocking the user. Depth comes from following the decisive uncertainty, not from applying many lenses.

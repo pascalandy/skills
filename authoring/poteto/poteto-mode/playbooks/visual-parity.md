@@ -1,3 +1,7 @@
+---
+description: "Make two UI implementations match pixel for pixel, or migrate a styling system without visual change."
+---
+
 ### Visual parity
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

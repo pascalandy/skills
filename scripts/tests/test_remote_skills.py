@@ -28,17 +28,20 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def skill(root: Path, name: str, text: str, *playbooks: str) -> None:
-    """A compiled skill; each playbook ending in / is a folder, else a file."""
+    """A compiled skill; each playbook ending in / is a folder, else a file. Each
+    route's entry file describes it as "Run <route>."."""
     path = root / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     for playbook in playbooks:
+        route = playbook.removesuffix("/").removesuffix(".md")
         entry = path.parent / "playbooks" / playbook
         if playbook.endswith("/"):
-            entry.mkdir(parents=True)
-        else:
-            entry.parent.mkdir(parents=True, exist_ok=True)
-            entry.write_text("# Route\n", encoding="utf-8")
+            entry /= f"{route}.md"
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_text(
+            f'---\ndescription: "Run {route}."\n---\n\n# Route\n', encoding="utf-8"
+        )
 
 
 def tagged(name: str, description: str, kind: str, role: str | None = None) -> str:
@@ -115,25 +118,66 @@ def test_each_kind_lists_modes_with_their_routes_then_skills_then_helpers(
     skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), "ink.md")
 
     assert run()[0] == 0
+    routes = "  - `ask`: Run ask.\n  - `cro`: Run cro.\n  - `plan`: Run plan.\n"
     assert listing(root, MAIN) == (
         f"{URL}## General\n\n### Modes\n\n"
         "- `draw-mode`: Use to draw.\n"
-        "  - ink\n"
+        "  - `ink`: Run ink.\n"
         "\n## Dev\n\n### Modes\n\n"
-        "- `zeta-mode`: Use for z.\n"
-        "  - ask\n"
-        "  - cro\n"
-        "  - plan\n"
+        f"- `zeta-mode`: Use for z.\n{routes}"
         "\n### Skills\n\n"
         "- `beta`: Use for b.\n"
         "\n### Helpers\n\n"
         "- `alpha`: Use for a.\n"
     )
     assert listing(root, DEV) == (
-        f"{URL}## Modes\n\n- `zeta-mode`: Use for z.\n  - ask\n  - cro\n  - plan\n"
+        f"{URL}## Modes\n\n- `zeta-mode`: Use for z.\n{routes}"
         "\n## Skills\n\n- `beta`: Use for b.\n"
         "\n## Helpers\n\n- `alpha`: Use for a.\n"
     )
+
+
+def test_a_route_lists_the_first_sentence_of_its_description(root: Path) -> None:
+    skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), "ink.md")
+    (root / "skills/draw-mode/playbooks/ink.md").write_text(
+        "---\nname: ink\n"
+        'description: "Ink logos, e.g. Marks vs. Icons. Also use when inking."\n'
+        "---\n",
+        encoding="utf-8",
+    )
+
+    assert run()[0] == 0
+    assert listing(root, GENERAL) == (
+        f"{URL}## Modes\n\n- `draw-mode`: Use to draw.\n"
+        "  - `ink`: Ink logos, e.g. Marks vs. Icons.\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("playbook", "entry", "content", "problem"),
+    [
+        ("ink.md", "ink.md", "# Ink\n", "has no description"),
+        ("ink/", "ink/ink.md", None, "is missing"),
+    ],
+)
+def test_a_route_without_a_description_fails_before_writing(
+    root: Path, playbook: str, entry: str, content: str | None, problem: str
+) -> None:
+    skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), playbook)
+    path = root / "skills/draw-mode/playbooks" / entry
+    path.unlink()
+    if content is not None:
+        path.write_text(content, encoding="utf-8")
+
+    assert run() == (
+        1,
+        "",
+        (
+            f"error: skills/draw-mode/playbooks/{entry} {problem}; "
+            "fix its source in authoring/, then run: just compile-skills\n"
+        ),
+    )
+    assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))
 
 
 def test_classifying_the_last_unknown_skill_drops_the_unknown_section(

@@ -1,3 +1,7 @@
+---
+description: "Find where a skill loaded in a session was wrong or confusing enough to cost a detour, and propose one-line fixes."
+---
+
 # Retro skill usage
 
 Post-mortem on the skills the agent loaded in this conversation.

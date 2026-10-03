@@ -1,3 +1,7 @@
+---
+description: "List, choose, or add a reusable prompt for distilling long-form text, ready for the `distill` route."
+---
+
 # distill-prompt
 
 > A library of reusable prompts for distilling long-form text. Each sub-skill is a single named prompt style, ready to be passed to the `distill` tool.

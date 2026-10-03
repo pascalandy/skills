@@ -1,3 +1,7 @@
+---
+description: "Resume or take over another agent's in-flight work from a transcript, a cloud-agent URL, or a pushed branch."
+---
+
 ### Session pickup
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

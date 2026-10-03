@@ -1,3 +1,7 @@
+---
+description: "Build or maintain a Markdown knowledge base with provenance, indexes, and cross-references."
+---
+
 # Wiki Map
 
 Build and maintain a persistent Markdown knowledge base with explicit provenance, navigable indexes, cross-references, and controlled structural migrations

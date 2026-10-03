@@ -1,3 +1,7 @@
+---
+description: "Edit prose for clarity and concision, following Strunk's rules and removing AI writing patterns."
+---
+
 # Writing Clearly and Concisely
 
 ## Overview

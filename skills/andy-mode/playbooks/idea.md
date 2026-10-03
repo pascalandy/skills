@@ -1,3 +1,7 @@
+---
+description: "Write down a rough idea in its author's voice and export it."
+---
+
 # Write Down Idea
 
 ## Export

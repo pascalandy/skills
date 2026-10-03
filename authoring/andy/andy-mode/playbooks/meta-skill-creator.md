@@ -1,3 +1,7 @@
+---
+description: "Create or refactor a skill that routes one entry point to several internal branches."
+---
+
 # Meta-skill creator
 
 Create one user-facing skill that selects the smallest relevant internal branch without making the user learn its taxonomy.

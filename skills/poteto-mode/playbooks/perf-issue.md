@@ -1,3 +1,7 @@
+---
+description: "Trace a measured slowness and improve it against a baseline."
+---
+
 ### Perf issue
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

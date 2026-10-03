@@ -1,3 +1,7 @@
+---
+description: "Build a polished HTML mockup or a working prototype of a bounded product flow."
+---
+
 # Prototype
 
 1. Choose fidelity. A **mockup** is polished and mostly static, for visual hierarchy and product fit. A **prototype** implements a bounded flow, for navigation, input, state changes, feedback, or recovery. Record the user, critical job, scenario, design source, and where the real product would take over. Finish when the mode and modeled boundary are explicit.
