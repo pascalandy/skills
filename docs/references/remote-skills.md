@@ -13,7 +13,6 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 |---|---|
 | 2nd-pass | Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts. |
 | andy-mode | Use only when explicitly invoked as `andy-mode`, followed by `;` and a route name, where `andy` may be any voice-to-text spelling that sounds like it, such as `ND` or `indie`. |
-| bro | Use only when explicitly invoked as `bro`. |
 | concise | Use when the user requests to be more concise. |
 | corey-mode | Use only when a request contains the word marketing, or invokes corey-mode, to run Corey Haines' marketing playbooks. |
 | grilling | Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`. |
