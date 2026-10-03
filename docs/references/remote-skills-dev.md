@@ -19,13 +19,13 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | coding-standard | Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior. |
 | commit | Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages. |
 | create-verification-skill | Use only when explicitly invoked as `create-verification-skill`. |
+| execute | Use only when explicitly invoked as `execute` or `implement`, or by a clear go-ahead to implement an agreed plan. |
 | figure-it-out | Use when the user invokes `figure-it-out`, for a large migration or cross-cutting effort, for work a human will review after stepping away, or when no narrower playbook fits. |
 | gh-stack | Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out. |
 | git-local | Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries. |
 | grill-for-unknowns | Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria. |
 | headless | Use when running `codex exec`, `codex exec review`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. `headless` may arrive as any voice-to-text spelling that sounds like it, such as `endless` or `adless`. |
 | how | Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation. |
-| impl | Use to implement a plan or an issue. |
 | interrogate | Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots. |
 | label-for-issues | Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue. |
 | maintain-verification-skill | Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill. |
