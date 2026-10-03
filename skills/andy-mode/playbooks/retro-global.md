@@ -21,7 +21,7 @@ Review the coding agent's **environment** so future runs go better. This is not 
 
 ## Publishing findings
 
-If the user wants issues, draft one per finding in the repository that owns the change: the project for its `AGENTS.md`, `justfile`, or hooks, `pascalandy/skills` for a skill, and `pascalandy/dotfiles` for global config it tracks. A finding with no owning repository stays in the report. Write in the language of the conversation. Compress with the `concise` skill.
+Draft one issue per finding in the repository that owns the change: the project for its `AGENTS.md`, `justfile`, or hooks, `pascalandy/skills` for a skill, and `pascalandy/dotfiles` for global config it tracks. A finding with no owning repository, or whose repository sits outside `pascalandy`, stays in the report. Write in the language of the conversation. Compress with the `concise` skill.
 
 **Titles.** Use Conventional Commits in the form `type(scope): subject`, where the scope names the area to change, for example `feat(lefthook): run just check before push`. Use `fix` when an instruction or check is wrong, `docs` when an instruction is only unclear or a pointer is missing, and `feat` when a check, step, or tool is missing. Keep the subject short and imperative, naming the change. Name a real symbol when one carries the change, such as a recipe, file, or flag. Do not add a trailing period.
 
@@ -39,4 +39,4 @@ Before publishing:
 2. If the repository is public, remove session IDs, absolute local paths, hostnames, private repo or project names, and any conversation content that isn't about the finding.
 3. Run the `2nd-pass` skill on the drafts.
 
-Then, once the user authorizes it, publish with labels `1-needs-triage` and `2-type:postmortem` (or `2-type:task` where the repository lacks it), link the session's PR when one exists, read each issue back, and return the links.
+Then publish with labels `1-needs-triage` and `2-type:postmortem` (or `2-type:task` where the repository lacks it), link the session's PR when one exists, read each issue back, and return the links.
