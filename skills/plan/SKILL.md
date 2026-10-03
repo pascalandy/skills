@@ -16,7 +16,7 @@ Tell me:
 2. List the use cases, edge cases included
 3. What's out of scope
 
-If you have questions, stop ASAP and wait for my answers. If you have none, go straight to suggest solution(s).
+If you have questions, stop ASAP and wait for my answers. If you have none, go straight to "Suggest Solutions".
 
 **STEP B | Suggest Solutions**
 
@@ -42,19 +42,10 @@ Imagine the execution failed, either mid-build or in the first weeks of use. Lis
 
 **Questions**
 
-When you need me, ask at most 4 questions per round, ordered by impact. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
-
-1) 🙋 [Question (why it matters)]
-   - a) … (🟢 recommended)
-   - b) …
-   - c) …
+Ask question(s) in the format of 🧰 oem's "When You Need Me".
+- After my answers, apply them, rethink the whole solution and go back to Step A
 
 If nothing is left to decide, say:
+- 👍 Zero questions left. Say "execute" or "go" 🚀
 
-👍 Zero questions left. Say "execute" or "go" 🚀
-
-After my answers, apply them, rethink the whole solution and go back to Step A
-
-**End every response with**
-
-"Planning Phase 📐"
+**End every response with**: "Planning Phase 📐"
