@@ -91,7 +91,7 @@ IDs never change and are never reused. To change a practice, move its line under
 ### Any agent document
 
 - [ ] **BP_01 Progressive disclosure**: the top holds the steps and what every branch needs; the rest sits one link away, each pointer saying when to read it _(validator: links between reference files)_
-- [ ] **BP_02 One place per meaning**: no meaning stated twice; each concept under one heading; nothing a file or command already shows
+- [ ] **BP_02 One place per meaning**: no meaning stated twice (DRY); each concept under one heading; nothing a file or command already shows
 - [ ] **BP_03 One term per concept**: one word per concept, everywhere
 - [ ] **BP_04 Leading words**: a word the model already knows replaces a spelled-out description
 - [ ] **BP_05 Positive phrasing**: state what to do; a ban only as a hard guardrail, paired with what to do
