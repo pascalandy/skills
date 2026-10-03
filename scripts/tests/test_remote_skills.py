@@ -158,9 +158,15 @@ def test_a_route_lists_the_first_sentence_of_its_description(root: Path) -> None
     [
         ("ink.md", "ink.md", "# Ink\n", "has no description"),
         ("ink/", "ink/ink.md", None, "is missing"),
+        (
+            "ink.md",
+            "ink.md",
+            '---\ndescription: "Ink logos. Also use\\nfor maps."\n---\n',
+            "has a line break in its description",
+        ),
     ],
 )
-def test_a_route_without_a_description_fails_before_writing(
+def test_a_route_that_breaks_a_listing_rule_fails_before_writing(
     root: Path, playbook: str, entry: str, content: str | None, problem: str
 ) -> None:
     skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), playbook)

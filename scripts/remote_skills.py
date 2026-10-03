@@ -116,12 +116,11 @@ def route_bullets(playbooks: Path, errors: list[str]) -> str:
         if not source.is_file():
             errors.append(failure(source, "is missing"))
             continue
-        description = SENTENCE_END.split(
-            frontmatter_description(source.read_text(encoding="utf-8")), maxsplit=1
-        )[0]
+        description = frontmatter_description(source.read_text(encoding="utf-8"))
         if found := description_problems(description):
             errors.extend(failure(source, problem) for problem in found)
             continue
+        description = SENTENCE_END.split(description, maxsplit=1)[0]
         bullets.append(f"  - `{route}`: {description}\n")
     return "".join(bullets)
 
