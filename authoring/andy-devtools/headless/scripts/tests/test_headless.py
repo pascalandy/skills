@@ -772,7 +772,17 @@ def test_a_code_review_that_edits_the_checkout_fails(env, repo):
         ),
         (("claude", "--code-review"), "x", "use --review-only"),
         (
+            ("claude", "--code-review", "--prompt-file", "."),
+            None,
+            "use --review-only",
+        ),
+        (
             ("claude", "--code-review", "--commit", "HEAD", "--title", "t"),
+            None,
+            "--title works only with codex --code-review",
+        ),
+        (
+            ("claude", "--code-review", "--commit", "HEAD", "--title", ""),
             None,
             "--title works only with codex --code-review",
         ),

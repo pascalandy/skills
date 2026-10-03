@@ -12,11 +12,13 @@ Each mode passes `--model` and `--effort` from the `[claude]` table of [config.t
 | `--review-fix` | The same command; the rule allows edits in `--cwd` | Nothing; read `git diff` yourself |
 | `--code-review` | `claude -p "/review <effort> <range>"` with empty stdin; the review-only rule arrives through `--append-system-prompt`, so `/review` starts the prompt | The same tool removal and change check as `--review-only` |
 
-`--base BRANCH` becomes the range `BRANCH...HEAD` and `--commit SHA` becomes `SHA^..SHA`, the ref ranges the [code review documentation](https://code.claude.com/docs/en/code-review#review-a-diff-locally) accepts. `--base` refuses a branch that shares no history with `HEAD`, and `--commit` refuses a commit without a parent, such as a root commit or the oldest commit of a shallow clone. Claude Code documents no target for uncommitted changes alone, so `--uncommitted` stays with Codex.
+`--base BRANCH` becomes `BRANCH...HEAD`. It requires shared history with `HEAD` and no staged or unstaged tracked changes. `--commit SHA` becomes `SHA^..SHA` and requires a parent, which a root commit or shallow boundary may lack. These ranges follow the [code review documentation](https://code.claude.com/docs/en/code-review#review-a-diff-locally). Claude Code documents no target for uncommitted changes alone, so `--uncommitted` stays with Codex.
 
-The launcher types the effort level, because `/review` without one reuses the level last typed in any session. It types `/review` rather than `/code-review`, because a custom skill named `code-review` replaces `/code-review` but never its `/review` alias. The alias needs Claude Code 2.1.223 or later; an older `/review` reviews a GitHub pull request instead. The `disableBundledSkills` setting turns the bundled review off; when an answer holds no findings, check it and any `skillOverrides` entry for `code-review`. To ask about a finding, pass the printed session to `claude --review-only --resume SESSION --prompt-file FILE`.
+The launcher types the effort because `/review` otherwise reuses the last level typed in any session. Custom skills can replace `/code-review` but leave `/review` intact. The alias needs Claude Code 2.1.223 or later. Older versions use `/review` for GitHub pull requests.
 
-A local review counts toward a subscription's usage and bills tokens with an API key. `/code-review ultra` starts a cloud review billed as usage credits, and `--comment` posts the findings to the pull request. The launcher writes the `/review` line itself, so neither reaches a run.
+The `disableBundledSkills` setting turns off the bundled review. If the answer contains no findings, check that setting and any `skillOverrides` entry for `code-review`. To ask about a finding, run the launcher with `claude --review-only --resume SESSION --prompt-file FILE`, using the printed session.
+
+A local review counts toward subscription usage or bills tokens with an API key. `/code-review ultra` starts a cloud review billed as usage credits. `--comment` posts findings to the pull request. The launcher generates only the local `/review <effort> <range>` form.
 
 ## Models
 

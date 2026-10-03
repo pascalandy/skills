@@ -62,7 +62,7 @@ Read `git diff` and run the relevant checks yourself before you report the fix. 
 
 ## Code review
 
-`--code-review` runs the CLI's built-in reviewer with its own criteria on one diff, and the run fails when the checkout changed. Without a CLI name, it runs Codex. Fetch first: a worktree's local `main` often lags `origin/main`, and a ref Git cannot find stops the run before it starts.
+`--code-review` runs the CLI's built-in reviewer on one diff. The run fails if the checkout changes. Without a CLI name, it runs Codex. Fetch first, since a worktree's local `main` often lags `origin/main`. The launcher rejects missing refs before starting the child.
 
 - **Codex** runs `codex exec review` in a read-only sandbox, and the launcher rejects sandbox-bypass flags before the child starts. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Custom review instructions from `--prompt-file` replace the diff, because Codex refuses both together
 - **Claude** runs Claude Code's `/review` without its file-editing tools. Give it `--base BRANCH` or `--commit SHA`. It reviews commits only, so `--base` refuses a checkout whose tracked files have uncommitted changes
@@ -75,7 +75,7 @@ uv run <skill-dir>/scripts/headless.py claude --code-review --base origin/main \
   --cwd /absolute/path/to/repo
 ```
 
-To apply your own criteria to a diff, use `--review-only`. Before you pick `--code-review` to save usage, read the CLI's reference, [Codex](references/codex/MetaSkill.md#modes) or [Claude Code](references/claude/MetaSkill.md#modes): each covers the commands its modes run and how its reviews are billed.
+To apply your own criteria, use `--review-only`. For mode commands and billing, read [Codex](references/codex/MetaSkill.md#modes) or [Claude Code](references/claude/MetaSkill.md#modes).
 
 ## Defaults
 

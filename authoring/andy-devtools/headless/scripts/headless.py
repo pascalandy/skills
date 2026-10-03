@@ -419,7 +419,6 @@ def codex_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
 
 
 def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
-    """The ref range `/review` reads; a range holds commits only."""
     if args.uncommitted:
         raise UsageError(
             "claude --code-review reviews commits only; commit the changes, "
@@ -430,7 +429,7 @@ def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
             "claude --code-review takes no --prompt-file; to apply your own "
             "criteria, use --review-only"
         )
-    if args.title:
+    if args.title is not None:
         raise UsageError("--title works only with codex --code-review")
     if args.commit:
         if not resolves(root, f"{args.commit}^"):
@@ -447,7 +446,7 @@ def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
             "unrelated branch or a shallow clone; name another base, or run "
             "'git fetch --unshallow'"
         ) from None
-    # Staged and unstaged changes apart, so a staged edit undone in the worktree still counts
+    # A staged edit undone in the worktree still counts as uncommitted
     try:
         tracked = sorted(
             {
@@ -471,9 +470,9 @@ def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
 def claude_command(request: Request, run: Path) -> list[str]:
     session = "--resume" if request.resume else "--session-id"
     settings = json.dumps({"env": {"CLAUDE_CODE_EFFORT_LEVEL": request.effort}})
-    # /review, unlike /code-review, cannot be replaced by a custom skill. Without
-    # a level, it reuses the level last typed in any session. The mode rule moves
-    # to the system prompt, since a command only expands at the prompt's start
+    # Custom skills can replace /code-review but leave /review intact. Without a
+    # level, /review reuses the last one typed in any session. The rule goes in
+    # the system prompt so the slash command stays at the start, where it expands
     review = (
         [
             f"/review {request.effort} {' '.join(request.review)}",
@@ -625,8 +624,6 @@ def load_config(path: Path) -> Config:
 
 
 def resolve_target(named: str | None, mode: str, config: Config) -> str:
-    """The CLI to run: a named CLI wins, else --code-review runs Codex and the
-    other modes run the config's harness."""
     if named:
         return named
     if mode == "code-review":
@@ -880,9 +877,6 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
     cwd = Path(args.cwd).expanduser().resolve()
     if not cwd.is_dir():
         raise UsageError(f"--cwd {args.cwd} is not a directory")
-    prompt = "" if args.prompt_file is None else read_prompt(args.prompt_file)
-    if args.prompt_file is not None and not prompt.strip():
-        raise UsageError("the prompt is empty")
     root = git_root(cwd)
     if root is None and args.mode == "code-review":
         raise UsageError(
@@ -895,6 +889,9 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
                 f"{flag} {ref} names no commit in {cwd}; run 'git fetch' or name one that exists"
             )
     review = runner.review(args, root) if args.mode == "code-review" and root else ()
+    prompt = "" if args.prompt_file is None else read_prompt(args.prompt_file)
+    if args.prompt_file is not None and not prompt.strip():
+        raise UsageError("the prompt is empty")
     preflight(target, runner)
 
     before = snapshot(root, cwd, "before the run") if root else None
