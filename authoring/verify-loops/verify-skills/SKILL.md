@@ -26,6 +26,7 @@ export MISE_CONFIG_DIR='${XDG_CONFIG_HOME:-$HOME/.config}/mise' MISE_DATA_DIR='$
 export MISE_STATE_DIR='${XDG_STATE_HOME:-$HOME/.local/state}/mise' MISE_CACHE_DIR='${XDG_CACHE_HOME:-$HOME/.cache}/mise'
 export HOME='$RUN/home' TMPDIR='$RUN/tmp' XDG_CONFIG_HOME='$RUN/home/.config' XDG_DATA_HOME='$RUN/home/.local/share'
 export XDG_STATE_HOME='$RUN/home/.local/state' XDG_CACHE_HOME='$RUN/home/.cache'
+unset CODEX_HOME PI_CODING_AGENT_DIR OPENCODE_CONFIG_DIR
 EOF
 cat >>"$RUN/env" <<'EOF' &&
 record() {
@@ -44,7 +45,7 @@ git -C "$CHECKOUT" status --short >"$EVIDENCE/status.txt" &&
 echo "RUN=$RUN"
 ```
 
-`env` keeps uv's cache and Python, and mise's folders, on their real paths. Without them, uv downloads again into the test home and mise's shims refuse to run. `record NAME COMMAND...` saves a command with its stdout, stderr, and exit code in the evidence folder.
+`env` keeps uv's cache and Python, and mise's folders, on their real paths. Without them, uv downloads again into the test home and mise's shims refuse to run. It unsets the folder overrides of Codex, Pi, and OpenCode, so each one reads the test home. `record NAME COMMAND...` saves a command with its stdout, stderr, and exit code in the evidence folder.
 
 ## Doctor
 
@@ -77,7 +78,7 @@ The evidence folder holds:
 Run this after a pass, a failure, or an interruption:
 
 ```bash
-case "${RUN:?}" in /var/tmp/verify-skills.*) rm -rf "$RUN" ;; *) echo "refusing to delete $RUN" >&2 ;; esac
+if [ "${RUN:?}" != "${RUN#/var/tmp/verify-skills.}" ]; then rm -rf "$RUN"; else echo "refusing to delete $RUN" >&2; fi
 ```
 
 It deletes the run folder and nothing else. The evidence folder sits outside it and stays. The recipes start no process that outlives its command, so there is nothing to stop.
