@@ -265,25 +265,30 @@ def skill_sources(
     stage: Path, private_root: Path | None, profile: str
 ) -> dict[str, Source]:
     """Stage public packages under `stage`, add every private package, and drop
-    the profile's exclusions."""
+    the profile's exclusions. A private package replaces a public one of the
+    same name, so a skill moving between the repositories never stops an install."""
     sources: dict[str, Source] = {}
+    public: dict[str, Path] = {}
     for name, entries in compile_skills.collect().items():
         package = stage / name
         for source, relative in entries:
             destination = package / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             compile_skills.publish(source, relative, destination)
+            public[name] = Path(
+                *source.parts[: len(source.parts) - len(relative.parts)]
+            )
         sources[name] = Source(package, "public", digest(package))
-    duplicates: list[str] = []
     for name, package in private_packages(private_root).items():
         if name in sources:
-            duplicates.append(
-                f"skill {name!r} is public and private; delete the stale copy at {package}"
+            log.warning(
+                "warning: skill %r is public and private; installing the private copy "
+                "%s. Remove %s to keep it private, or delete the private copy to publish it",
+                name,
+                package,
+                public[name].relative_to(ROOT),
             )
-            continue
         sources[name] = Source(package, "private", digest(package))
-    if duplicates:
-        raise ScriptError(*duplicates)
     if not sources:
         raise ScriptError("no public skills found; run just compile-skills")
     return {
