@@ -1,20 +1,10 @@
 # Skills repository verification map
 
-This map pairs each recipe a skills change goes through with the exact commands and the proof they must produce.
-
-## Baseline preconditions
-
-- Launch and Doctor in [SKILL.md](../SKILL.md) passed, and `RUN` holds the printed run folder
-
 ## Proof and skip reporting
 
 - A feature passes when every `.exit` and `.out` file it names matches its page
-- Report a failure with its command and its `.err` file, then stop: fixing belongs to the change, not to its verification
-- Report a feature you did not run as not run, never as covered by another feature
-
-## Feature entry contract
-
-Each feature page has exactly four H2 sections in this order: `Sub-features`, `How to get to it (user POV)`, `Driving it with just`, and `Gotchas`.
+- Report a failure with its command and its `.err` file, then stop
+- Report each feature as passed, failed, or not run, with the evidence folder
 
 ## Features
 

@@ -1,16 +1,16 @@
 ---
 name: "verify-skills"
-description: "Use when proving that `just compile-skills`, `just install-skills`, or `just skills-discover` in the skills repository works on this machine, such as after changing their scripts or adding, renaming, or moving a skill, without writing to the live agent folders."
+description: "Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill."
 kind: "dev"
 ---
 
 # Verify skills
 
-Drive the skills repository's real `just` recipes against a checkout, with the installer pointed at a test home instead of the real one. A run lives in its own folder under `/var/tmp`, keeps its evidence under `~/.local/state/verify-skills/runs/`, and ends by deleting the run folder. The live agent folders, such as `~/.claude/skills`, stay untouched.
+Drive the skills repository's real `just` recipes with a test home. The live agent folders stay untouched.
 
 ## Launch
 
-Run from inside the checkout under test. The block writes `$RUN/env` and prints the run folder. Each later block loads that file in a subshell, so the test home never leaks into another command. When your shell does not keep variables between commands, start each block by setting `RUN` to the printed path.
+Run from inside the checkout under test. The block creates a run folder under `/var/tmp`, writes `$RUN/env`, and prints `RUN`. Later blocks load that file in a subshell. If your shell does not keep variables between commands, set `RUN` to the printed path before each block.
 
 ```bash
 CHECKOUT=$(git rev-parse --show-toplevel) &&
@@ -45,7 +45,7 @@ git -C "$CHECKOUT" status --short >"$EVIDENCE/status.txt" &&
 echo "RUN=$RUN"
 ```
 
-`env` keeps uv's cache and Python, and mise's folders, on their real paths. Without them, uv downloads again into the test home and mise's shims refuse to run. It unsets the folder overrides of Codex, Pi, and OpenCode, so each one reads the test home. `record NAME COMMAND...` saves a command with its stdout, stderr, and exit code in the evidence folder.
+`env` keeps uv's cache and Python installation, and mise's folders, on their real paths. This avoids fresh uv downloads and broken mise shims. It unsets the folder overrides of Codex, Pi, and OpenCode, so each reads the test home.
 
 ## Doctor
 
@@ -58,20 +58,18 @@ Run it after Launch, and whenever a result looks wrong. It reads only.
   uv --version )
 ```
 
-The run is worth driving when `home` is `$RUN/home`, no `missing:` line appears, and `uv --version` prints a version. Discovery needs `codex`, `pi`, and `opencode`; without one, its agent reports `unverified`.
+Proceed when `home` is `$RUN/home`, no `missing:` line appears, and `uv --version` prints a version.
 
 ## Drive
 
-Read [features/README.md](features/README.md), then run its features in order: [compile](features/compile.md), [install](features/install.md), and [discovery](features/discovery.md). Each assumes the previous one passed in the same run. A run that checks only discovery still installs first, because discovery reads the test home that the install fills.
+Read [features/README.md](features/README.md), then run [compile](features/compile.md), [install](features/install.md), and [discovery](features/discovery.md) in order. Each requires the previous feature to pass in the same run.
 
 ## Evidence
 
-The evidence folder holds:
+`record NAME COMMAND...` saves its command, stdout, stderr, and exit code in `$EVIDENCE`. That folder holds:
 
 - `head.txt` and `status.txt`: the commit and the uncommitted changes the run tested
 - `NAME.cmd`, `NAME.out`, `NAME.err`, and `NAME.exit` for each recorded command
-
-[features/README.md](features/README.md) says when a feature passes and how to report one that fails.
 
 ## Cleanup
 

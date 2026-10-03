@@ -15,10 +15,6 @@
 
 ## Driving it with just
 
-Preconditions:
-
-- Launch and Doctor passed
-
 - **Check both.** Run the block. It prints `compile-check: exit 0` and `remote-check: exit 0`, and both `.out` files are empty.
 
 ```bash
@@ -27,7 +23,7 @@ Preconditions:
   record remote-check just remote-skills --check )
 ```
 
-- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated tables there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` holds one `add` line per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` line per table.
+- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated tables there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` holds one `add` line per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` line per table. `compile-after.out` is empty.
 
 ```bash
 ( . "${RUN:?}/env" &&
