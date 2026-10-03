@@ -70,7 +70,7 @@ uv run <skill-dir>/scripts/headless.py --code-review --base origin/main \
   --cwd /absolute/path/to/repo
 ```
 
-A `--prompt-file` of custom review instructions replaces the diff; Codex refuses both together, so a review with the caller's own criteria belongs in `--review-only`. Run locally, a code review counts toward general Codex usage like the other modes. The [Codex reference](references/codex/MetaSkill.md#modes) covers the commands each mode runs and the separate Code Review allowance.
+Custom review instructions from `--prompt-file` replace the diff, because Codex refuses both together. To apply your own criteria to a diff, use `--review-only`. Before you pick `--code-review` to save usage, read the [Codex reference](references/codex/MetaSkill.md#modes): it covers the commands each mode runs and which reviews draw on the separate Code Review allowance.
 
 ## Defaults
 

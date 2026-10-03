@@ -494,11 +494,14 @@ def load_config(path: Path) -> Config:
     for name, value in data.items():
         if name == "harness":
             continue
-        if name not in HARNESSES or not isinstance(value, dict):
+        if name not in HARNESSES:
             problems.append(
                 f"unknown key '{name}'; keep harness and the "
                 f"[{'], ['.join(HARNESSES)}] tables"
             )
+            continue
+        if not isinstance(value, dict):
+            problems.append(f"{name} must be a [{name}] table")
             continue
         table = cast(dict[str, object], value)
         problems += [

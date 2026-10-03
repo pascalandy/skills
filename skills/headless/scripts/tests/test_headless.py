@@ -490,6 +490,10 @@ def test_a_harness_the_launcher_cannot_run_points_to_its_reference(env, repo, tm
             "unknown key 'thinking'",
         ),
         (("[codex]", "codex = ["), "is not valid TOML"),
+        (
+            ('harness = "codex"', 'harness = "codex"\nopencode = "x"'),
+            "opencode must be a [opencode] table",
+        ),
     ],
 )
 def test_an_invalid_config_names_the_file_and_the_key(
