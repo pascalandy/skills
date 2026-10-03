@@ -35,7 +35,7 @@ Keep disclosure one level deep: the top file links each reference file directly.
 
 ## BP_02 One place per meaning
 
-- **Single source of truth**: each meaning lives in one place, so changing a behavior is a one-place edit. Duplication costs tokens and maintenance, and inflates a meaning's rank past its real weight
+- **Single source of truth (DRY)**: each meaning lives in one place, so changing a behavior is a one-place edit. Duplication costs tokens and maintenance, and inflates a meaning's rank past its real weight
 - **Co-location**: a concept's definition, rules, and caveats sit under one heading, so reading one part brings its neighbors. Scattering fragments one meaning across many places
 - **The environment is a source too**: `package.json` scripts, config files, the directory layout, and `--help` output. A document that restates them is a **cache** that goes stale. Cache only what looking cannot find: the unwritten convention, the reason behind a choice, the gotcha no config confesses
 

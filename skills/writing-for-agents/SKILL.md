@@ -45,7 +45,7 @@ Skill progress:
 
 **Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01). Done when every branch has its steps and each linked file says when to read it.
 
-**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). Done when no step asks the agent to redo such work by hand.
+**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). When the `coding-language` skill is installed, load it before writing a script, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand.
 
 **Step 6: Skill validator silent.** Run the skill validator, fix each error, and rerun. Done when it prints nothing, or every warning left has a reason you tell the user.
 
@@ -91,7 +91,7 @@ IDs never change and are never reused. To change a practice, move its line under
 ### Any agent document
 
 - [ ] **BP_01 Progressive disclosure**: the top holds the steps and what every branch needs; the rest sits one link away, each pointer saying when to read it _(validator: links between reference files)_
-- [ ] **BP_02 One place per meaning**: no meaning stated twice; each concept under one heading; nothing a file or command already shows
+- [ ] **BP_02 One place per meaning**: no meaning stated twice (DRY); each concept under one heading; nothing a file or command already shows
 - [ ] **BP_03 One term per concept**: one word per concept, everywhere
 - [ ] **BP_04 Leading words**: a word the model already knows replaces a spelled-out description
 - [ ] **BP_05 Positive phrasing**: state what to do; a ban only as a hard guardrail, paired with what to do
