@@ -8,8 +8,8 @@ kind: "dev"
 
 Run Codex or Claude Code as a child agent with `scripts/headless.py`, so every headless run is deterministic: one command shape, a required mode flag, defaults from one file, and fixed exit codes. The launcher waits for the child, checks the result, and prints the answer. `<skill-dir>` below is the directory that holds this file. The launcher does not run OpenCode or Pi yet (#281); read [OpenCode](references/opencode/MetaSkill.md) or [Pi](references/pi/MetaSkill.md) for those.
 
-1. Pick the mode the request asks for: `--review-only`, `--review-fix`, or `--code-review`, Codex's own reviewer
-2. For `--review-only` and `--review-fix`, write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up. For `--code-review`, pick the diff it reviews, as [Codex code review](#codex-code-review) describes
+1. Pick the mode the request asks for: `--review-only`, `--review-fix`, or `--code-review`, the CLI's own reviewer
+2. For `--review-only` and `--review-fix`, write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up. For `--code-review`, pick the diff it reviews, as [Code review](#code-review) describes
 3. Run the matching command below and wait for it to exit, as [Wait for a run](#wait-for-a-run) describes. If the CLI it names is not installed, say so, show the command, give the same prompt file to the session's own subagent tool with the same access, and report that the requested model did not review
 4. Read the result before you report
 
@@ -60,17 +60,22 @@ uv run <skill-dir>/scripts/headless.py claude --review-fix \
 
 Read `git diff` and run the relevant checks yourself before you report the fix. To keep working while a fixer runs, point `--cwd` at a separate worktree.
 
-## Codex code review
+## Code review
 
-`--code-review` runs `codex exec review`, Codex's built-in reviewer with its own criteria, in a read-only sandbox, and the run still fails when the checkout changed. The launcher rejects sandbox-bypass flags before the child starts. It always runs Codex. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Fetch first: a worktree's local `main` often lags `origin/main`, and a ref Git cannot find stops the run before it starts.
+`--code-review` runs the CLI's built-in reviewer on one diff. The run fails if the checkout changes. Without a CLI name, it runs Codex. Fetch first, since a worktree's local `main` often lags `origin/main`. The launcher rejects missing refs before starting the child.
+
+- **Codex** runs `codex exec review` in a read-only sandbox, and the launcher rejects sandbox-bypass flags before the child starts. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Custom review instructions from `--prompt-file` replace the diff, because Codex refuses both together
+- **Claude** runs Claude Code's `/review` without its file-editing tools. Give it `--base BRANCH` or `--commit SHA`. It reviews commits only, so `--base` refuses a checkout whose tracked files have uncommitted changes
 
 ```bash
 git -C /absolute/path/to/repo fetch origin
 uv run <skill-dir>/scripts/headless.py --code-review --base origin/main \
   --cwd /absolute/path/to/repo
+uv run <skill-dir>/scripts/headless.py claude --code-review --base origin/main \
+  --cwd /absolute/path/to/repo
 ```
 
-Custom review instructions from `--prompt-file` replace the diff, because Codex refuses both together. To apply your own criteria to a diff, use `--review-only`. Before you pick `--code-review` to save usage, read the [Codex reference](references/codex/MetaSkill.md#modes): it covers the commands each mode runs and which reviews draw on the separate Code Review allowance.
+To apply your own criteria, use `--review-only`. For mode commands and billing, read [Codex](references/codex/MetaSkill.md#modes) or [Claude Code](references/claude/MetaSkill.md#modes).
 
 ## Defaults
 

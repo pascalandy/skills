@@ -409,11 +409,13 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
     assert not alive(wait_for(pid_file))
 
 
-def test_the_shipped_config_sets_the_harness_model_and_reasoning_level(env, repo):
+@pytest.mark.parametrize("name", [None, "codex", "claude"])
+def test_the_shipped_config_reaches_each_cli(env, repo, name):
     shipped = tomllib.loads(SHIPPED.read_text())
-    harness = shipped["harness"]
+    table = shipped[name or shipped["harness"]]
+    args = ("--review-only",) if name is None else (name, "--review-only")
     done = subprocess.run(
-        command(repo, ("--review-only",), "Review README.md.", shipped=True),
+        command(repo, args, "Review README.md.", shipped=True),
         env=env,
         capture_output=True,
         text=True,
@@ -422,10 +424,14 @@ def test_the_shipped_config_sets_the_harness_model_and_reasoning_level(env, repo
 
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
-    argv = " ".join(call["argv"])
-    assert shipped[harness]["model"] in argv
-    assert shipped[harness]["reasoning-level"] in argv
-    assert f"effort: {shipped[harness]['reasoning-level']}" in done.stdout.splitlines()
+    assert table["model"] in call["argv"]
+    if (name or shipped["harness"]) == "claude":
+        assert (
+            call["argv"][call["argv"].index("--effort") + 1] == table["reasoning-level"]
+        )
+    else:
+        assert f'model_reasoning_effort="{table["reasoning-level"]}"' in call["argv"]
+    assert f"effort: {table['reasoning-level']}" in done.stdout.splitlines()
 
 
 def test_without_a_cli_name_the_config_harness_runs(env, repo, tmp_path):
@@ -645,6 +651,101 @@ def test_code_review_runs_codex_even_when_the_config_harness_is_claude(
     assert call["argv"][:2] == ["exec", "review"]
 
 
+def test_claude_code_review_types_review_with_the_effort_and_a_range(env, repo):
+    subprocess.run(["git", "branch", "main"], cwd=repo, check=False)
+    done = launch(env, repo, "claude", "--code-review", "--base", "main", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == ["model: claude-opus-5-5", "effort: xhigh"]
+    [call] = calls(env)
+    argv = call["argv"]
+    assert argv[:2] == ["-p", "/review xhigh main...HEAD"]
+    assert call["stdin"] == ""
+    assert argv[argv.index("--disallowedTools") + 1] == "Edit,Write,NotebookEdit"
+    rule = argv[argv.index("--append-system-prompt") + 1]
+    assert "do not commit, push, merge, or post comments" in rule
+
+
+def test_claude_code_review_compares_a_commit_with_its_parent(env, repo):
+    (repo / "NOTES.md").write_text("notes\n")
+    for command in (
+        ["git", "add", "NOTES.md"],
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "notes"],
+    ):
+        subprocess.run(command, cwd=repo, check=True)
+    done = launch(
+        env,
+        repo,
+        "claude",
+        "--code-review",
+        "--commit",
+        "HEAD",
+        "--effort",
+        "low",
+        prompt=None,
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][1] == "/review low HEAD^..HEAD"
+
+
+@pytest.mark.parametrize("state", ["unstaged", "staged", "staged, then undone"])
+def test_claude_code_review_of_a_base_refuses_uncommitted_tracked_changes(
+    env, repo, state
+):
+    (repo / "README.md").write_text("edited\n")
+    if state != "unstaged":
+        subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    if state == "staged, then undone":
+        (repo / "README.md").write_text("demo\n")
+    done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
+
+    assert done.returncode == 2
+    assert "tracked files have uncommitted changes: README.md" in done.stderr
+    assert calls(env) == []
+
+
+def test_claude_code_review_of_a_base_needs_shared_history(env, repo):
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    for command in (
+        ["git", "switch", "-q", "--orphan", "other"],
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "other",
+        ],
+        ["git", "switch", "-q", branch],
+    ):
+        subprocess.run(command, cwd=repo, check=True)
+    done = launch(env, repo, "claude", "--code-review", "--base", "other", prompt=None)
+
+    assert done.returncode == 2
+    assert "--base other shares no history with HEAD" in done.stderr
+    assert calls(env) == []
+
+
+def test_claude_code_review_of_a_base_ignores_untracked_files(env, repo):
+    (repo / "draft.md").write_text("draft\n")
+    done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[3] == "changed: nothing"
+
+
 def test_a_code_review_that_edits_the_checkout_fails(env, repo):
     done = launch(
         env,
@@ -669,7 +770,28 @@ def test_a_code_review_that_edits_the_checkout_fails(env, repo):
         ),
         (("--code-review", "--base", "main"), "x", "needs exactly one of"),
         (("--code-review", "--uncommitted", "--resume", "abc"), None, "cannot resume"),
-        (("claude", "--code-review", "--uncommitted"), None, "runs Codex only"),
+        (
+            ("claude", "--code-review", "--uncommitted"),
+            None,
+            "run codex --code-review --uncommitted",
+        ),
+        (("claude", "--code-review"), "x", "use --review-only"),
+        (
+            ("claude", "--code-review", "--prompt-file", "."),
+            None,
+            "use --review-only",
+        ),
+        (
+            ("claude", "--code-review", "--commit", "HEAD", "--title", "t"),
+            None,
+            "--title works only with codex --code-review",
+        ),
+        (
+            ("claude", "--code-review", "--commit", "HEAD", "--title", ""),
+            None,
+            "--title works only with codex --code-review",
+        ),
+        (("claude", "--code-review", "--commit", "HEAD"), None, "has no parent"),
         (
             ("codex", "--review-only", "--base", "main"),
             "x",
