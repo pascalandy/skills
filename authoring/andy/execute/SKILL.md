@@ -12,7 +12,8 @@ Help me understand what is happening. All these steps, review delays, and glitch
 
 #### Step by step
 
-Run these steps in order. Finish each one before you start the next:
+- Run these steps in order, and finish each one before you start the next
+- When the agreed work opens or updates no PR, such as issue edits only, skip the Independent review, Codex on each PR, and Merge gate steps, and say so in the report
 
 **1. Execute**
 - Use 🧰 poteto-mode to implement everything we agreed on, and open the PRs
