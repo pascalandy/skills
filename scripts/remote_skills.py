@@ -100,8 +100,13 @@ def bullets_by_kind() -> dict[str, dict[str, list[str]]]:
                 for problem in found
             )
             continue
+        # Hidden entries, such as the .DS_Store Finder drops, are not routes
         routes = (
-            sorted(entry.name.removesuffix(".md") for entry in playbooks.iterdir())
+            sorted(
+                entry.name.removesuffix(".md")
+                for entry in playbooks.iterdir()
+                if not entry.name.startswith(".")
+            )
             if playbooks.is_dir()
             else []
         )

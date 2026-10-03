@@ -110,6 +110,7 @@ def test_each_kind_lists_modes_with_their_routes_then_skills_then_helpers(
         "plan.md",
         "cro/",
         "ask.md",
+        ".DS_Store",
     )
     skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), "ink.md")
 
