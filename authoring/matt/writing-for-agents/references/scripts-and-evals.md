@@ -55,6 +55,6 @@ Keep the scenarios in the skill's `evals/evals.json`, one object per scenario:
 }
 ```
 
-`setup` lists the shell commands that build the scenario's folder; `$EVALS` names the `evals` folder. Give a scenario that needs a remote a local bare repository: the runner guards `gh`, not `git push`. Name a fixture so no agent or script mistakes it for a live file, such as `agents-md.md` for an `AGENTS.md` or `SKILL.md.txt` for a `SKILL.md`, and let `setup` copy it to the real name.
+`setup` lists the shell commands that build the scenario's folder; `$EVALS` names the `evals` folder. Give a scenario that needs a remote a local bare repository: runs carry no GitHub or git credentials. Name a fixture so no agent or script mistakes it for a live file, such as `agents-md.md` for an `AGENTS.md` or `SKILL.md.txt` for a `SKILL.md`, and let `setup` copy it to the real name.
 
 Run the scenarios with the eval runner in `SKILL.md`. It gives each scenario a fresh session on every agent it targets, with the skill copied from a git ref and the installed copies hidden, so a run never tests the wrong version.

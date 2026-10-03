@@ -91,7 +91,7 @@ Requires `uv`, `git`, and the CLI of each agent it runs: `claude --version` and 
 uv run <this-skill-folder>/scripts/run_evals.py <target-skill-folder> --ref <git-ref>
 ```
 
-It runs each scenario in `evals/evals.json` in a fresh repo per agent, with the skill copied from `<git-ref>` and the installed copies hidden, so a run never tests the wrong version. It prints one line per run with its folder. Grade each folder's `answer.md`, `events.jsonl`, and `git-log.txt` against the scenario's expected behavior. `--help` lists the options.
+It runs each scenario in `evals/evals.json` in a fresh repo per agent, with the skill copied from `<git-ref>` and the installed copies hidden, so a run never tests the wrong version. Runs carry no GitHub or git credentials, so GitHub refuses their writes; a scenario that reads GitHub needs a read-only token, passed as `--help` describes. It prints one line per run with its folder. Grade each folder's `answer.md`, `events.jsonl`, and `git-log.txt` against the scenario's expected behavior. `--help` lists the options.
 
 ## Best practices checklist
 

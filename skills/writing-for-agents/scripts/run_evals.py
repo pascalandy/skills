@@ -234,9 +234,15 @@ GRACE = 10.0
 CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
 INSTALLED = (CODEX_HOME / "skills", Path.home() / ".agents" / "skills")
 
-# A runner started by an agent under test stays in that agent's process group,
-# so the outer run's timeout or interrupt stops the nested agents too
-NESTED = env_flag("RUN_EVALS_PARENT")
+# Set for every setup command and agent; a runner that sees it refuses to start
+PARENT_ENV = "RUN_EVALS_PARENT"
+# Removed from each run, so neither setup nor the agent can authenticate to GitHub
+CREDENTIALS = (
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
+)
 
 log = logging.getLogger("run_evals")
 
@@ -262,54 +268,18 @@ Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
 ~/.agents/skills. Claude runs with --setting-sources project, so it sees only
-the copies this run installs. A gh wrapper, in place from setup on, logs every
-call to gh-calls.log and lets only reads and help through. It guards gh, not
-git push: give each scenario a local bare remote. A run that ends or times out
-has its whole process group stopped. stdout prints one line per run: name,
+the copies this run installs. Setup and agent run without GitHub or git
+credentials: no gh login, no token, no credential helper, no SSH. GitHub
+refuses their writes, so a scenario that needs a remote uses a local bare
+repository. --github-token-file gives gh a token for scenarios that read
+GitHub; give it a read-only one. A gh shim logs every call to gh-calls.log. A
+runner started inside a run refuses to start. A run that ends or times out has
+its whole process group stopped. stdout prints one line per run: name,
 status, folder."""
 
-GH_WRAPPER = """\
+GH_SHIM = """\
 #!/usr/bin/env bash
-log={log}
-printf '%s\\n' "$*" >> "$log"
-refuse() {{ printf 'REFUSED %s\\n' "$*" >> "$log"; echo "gh: this run allows only reads; refused: $*" >&2; exit 1; }}
-words=() skip=0
-for a in "$@"; do
-  case "$a" in -h|--help|--version)
-    [[ "$*" =~ ^([a-z][a-z0-9-]*[[:space:]]){{0,2}}(-h|--help|--version)$ ]] && exec {gh} "$@"
-    refuse "$@" ;;
-  esac
-  if [ "$skip" = 1 ]; then skip=0; continue; fi
-  case "$a" in
-    -R|--repo|--hostname|-X|--method|-H|--header|-f|-F|--field|--raw-field|-t|--template|-q|--jq|--cache|-p|--preview|--input) skip=1 ;;
-    -*) ;;
-    *) words+=("$a") ;;
-  esac
-done
-case "${{words[0]:-}} ${{words[1]:-}}" in
-  "issue view"|"issue list"|"issue status"|"pr view"|"pr list"|"pr status"|"pr diff"|"pr checks"|\\
-  "repo view"|"label list"|"run view"|"run list"|"release view"|"release list"|"search "*|\\
-  "auth status"|"extension list"|"stack view"|"stack init"|"stack add"|"stack rebase"|\\
-  "stack up"|"stack down"|"stack top"|"stack bottom"|"stack checkout"|"stack trunk") exec {gh} "$@" ;;
-  "api "*) ;;
-  *) refuse "$@" ;;
-esac
-method="" body=0 prev=""
-for a in "$@"; do
-  case "$prev" in -X|--method) method=$a ;; esac
-  case "$a" in
-    -X?*) method=${{a#-X}} ;;
-    --method=*) method=${{a#--method=}} ;;
-    --input|--input=*) refuse "$@" ;;
-    -f|-F|--field|--raw-field|-f?*|-F?*|--field=*|--raw-field=*) body=1 ;;
-  esac
-  case "$a" in *mutation*|*=@*) refuse "$@" ;; esac
-  prev=$a
-done
-[ "${{words[1]:-}}" = graphql ] && exec {gh} "$@"
-method=$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')
-[ -n "$method" ] && [ "$method" != GET ] && refuse "$@"
-[ -z "$method" ] && [ "$body" = 1 ] && refuse "$@"
+printf '%s\\n' "$*" >> {log}
 exec {gh} "$@"
 """
 
@@ -333,6 +303,7 @@ class Plan:
     sha: str
     evals: Path
     output: Path
+    token: str | None
 
 
 @dataclass(frozen=True)
@@ -380,7 +351,7 @@ class Children:
                 stdin=subprocess.PIPE,
                 stdout=stdout,
                 stderr=stderr,
-                start_new_session=not NESTED,
+                start_new_session=True,
             )
             self.live.add(process)
         try:
@@ -403,15 +374,11 @@ class Children:
 
 def stop(process: subprocess.Popen[bytes]) -> None:
     """SIGTERM the child's process group, then SIGKILL what is left of it after
-    GRACE seconds, even when the leader already exited. A nested runner signals
-    only its child, since the group belongs to the outer run."""
+    GRACE seconds, even when the leader already exited."""
 
     def send(number: int) -> bool:
         try:
-            if NESTED:
-                process.send_signal(number)
-            else:
-                os.killpg(process.pid, number)
+            os.killpg(process.pid, number)
         except ProcessLookupError:
             return False
         return True
@@ -473,7 +440,9 @@ def load_scenarios(evals: Path, wanted: Sequence[int]) -> list[Scenario]:
     return [s for s in scenarios if not wanted or s.number in wanted]
 
 
-def make_plan(skill: Path, ref: str, output: Path | None) -> Plan:
+def make_plan(
+    skill: Path, ref: str, output: Path | None, token: str | None = None
+) -> Plan:
     skill = skill.expanduser().resolve()
     if not skill.is_dir():
         raise UsageError(f"{skill} is not a folder")
@@ -502,7 +471,7 @@ def make_plan(skill: Path, ref: str, output: Path | None) -> Plan:
     output = output.expanduser().resolve()
     if output.exists() and any(output.iterdir()):
         raise UsageError(f"{output} is not empty; pass another --output-dir")
-    return Plan(skill, repo, sha, skill / "evals", output)
+    return Plan(skill, repo, sha, skill / "evals", output, token)
 
 
 def skill_names(paths: str) -> dict[str, list[str]]:
@@ -662,19 +631,7 @@ def execute(
     git(work, "init", "-q")
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
-    env = {**os.environ, "EVALS": str(plan.evals), "RUN_EVALS_PARENT": "1"}
-    real_gh = shutil.which("gh")
-    if real_gh:
-        wrapper = folder / "bin" / "gh"
-        wrapper.parent.mkdir()
-        wrapper.write_text(
-            GH_WRAPPER.format(
-                log=shlex.quote(str(folder / "gh-calls.log")), gh=shlex.quote(real_gh)
-            ),
-            encoding="utf-8",
-        )
-        wrapper.chmod(0o755)
-        env["PATH"] = f"{wrapper.parent}{os.pathsep}{env.get('PATH', '')}"
+    env = run_env(plan, folder)
     with (folder / "setup.log").open("wb") as setup_log:
         for command in scenario.setup:
             status = children.run(
@@ -721,8 +678,64 @@ def execute(
     return status
 
 
+def run_env(plan: Plan, folder: Path) -> dict[str, str]:
+    """The environment of a run's setup and agent: no GitHub or git credentials,
+    so GitHub refuses any write, and a gh shim that logs each call."""
+    gh_config = folder / "gh-config"
+    gh_config.mkdir()
+    env = {key: value for key, value in os.environ.items() if key not in CREDENTIALS}
+    env.update(
+        {
+            "EVALS": str(plan.evals),
+            PARENT_ENV: "1",
+            "GH_CONFIG_DIR": str(gh_config),
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_SSH_COMMAND": "false",
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "credential.helper",
+            "GIT_CONFIG_VALUE_0": "",
+        }
+    )
+    if plan.token:
+        env["GH_TOKEN"] = plan.token
+    real_gh = shutil.which("gh")
+    if real_gh:
+        shim = folder / "bin" / "gh"
+        shim.parent.mkdir()
+        shim.write_text(
+            GH_SHIM.format(
+                log=shlex.quote(str(folder / "gh-calls.log")), gh=shlex.quote(real_gh)
+            ),
+            encoding="utf-8",
+        )
+        shim.chmod(0o755)
+        env["PATH"] = f"{shim.parent}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def read_token(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        token = path.expanduser().read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise UsageError(
+            f"cannot read --github-token-file {path}: {error.strerror}"
+        ) from None
+    if not token:
+        raise UsageError(f"--github-token-file {path} is empty")
+    return token
+
+
 def launch(args: argparse.Namespace) -> str:
-    plan = make_plan(Path(args.skill), args.ref, args.output_dir)
+    if env_flag(PARENT_ENV):
+        raise ScriptError(
+            "run_evals.py is running inside an eval run, which cannot start another; "
+            "record this scenario's baseline from a normal session"
+        )
+    plan = make_plan(
+        Path(args.skill), args.ref, args.output_dir, read_token(args.github_token_file)
+    )
     scenarios = load_scenarios(plan.evals, args.scenario or [])
     agents = tuple(dict.fromkeys(args.agent or AGENTS))
     missing = [
@@ -830,6 +843,13 @@ def build_parser() -> Parser:
         metavar="DIR",
         help="folder for the run folders (default: "
         "~/.cache/run-evals/<skill>-<sha>-<UTC time>)",
+    )
+    parser.add_argument(
+        "--github-token-file",
+        type=Path,
+        metavar="FILE",
+        help="give gh in each run the token in FILE; use a read-only token "
+        "(default: runs have no GitHub credentials)",
     )
     parser.add_argument(
         "-n",

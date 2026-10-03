@@ -131,6 +131,8 @@ def lab(tmp_path: Path) -> Lab:
         "HOME": str(home),
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "FAKE_REPORTS": str(reports),
+        "GH_TOKEN": "user-token",
+        "GITHUB_TOKEN": "user-token",
     }
     env.pop("RUN_EVALS_PARENT", None)
     return Lab(
@@ -189,63 +191,6 @@ def test_codex_hides_installed_copies_of_listed_and_deleted_skills(lab: Lab):
     assert str(installed / "demo" / "SKILL.md") in hidden
     assert str(installed / "gone" / "SKILL.md") in hidden
     assert "private" not in hidden
-
-
-def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
-    out = lab.out
-    result = run(
-        lab,
-        "--ref",
-        str(lab.ref),
-        "--output-dir",
-        str(out),
-        "--agent",
-        "claude",
-        "--scenario",
-        "2",
-        FAKE_ACTION="gh issue view 1; gh pr create --help; gh pr create --title x; "
-        "gh api -X post repos/a/b/labels; gh api repos/a/b; gh -R a/b pr merge 1; "
-        "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; "
-        "gh pr create --title --help --body x; gh stack --version; gh stack push; "
-        "git remote add up https://github.com/a/b.git; gh stack push; "
-        "gh api --template graphql repos/a/b/labels -X POST -f name=x; true",
-    )
-
-    assert result.returncode == 0, result.stderr
-    calls = (out / "s2-claude" / "gh-calls.log").read_text().splitlines()
-    assert calls == [
-        "issue view 1",
-        "pr create --help",
-        "pr create --title x",
-        "REFUSED pr create --title x",
-        "api -X post repos/a/b/labels",
-        "REFUSED api -X post repos/a/b/labels",
-        "api repos/a/b",
-        "-R a/b pr merge 1",
-        "REFUSED -R a/b pr merge 1",
-        "stack unstack",
-        "REFUSED stack unstack",
-        "api graphql --input q.json",
-        "REFUSED api graphql --input q.json",
-        "-R a/b pr view 1",
-        "pr create --title --help --body x",
-        "REFUSED pr create --title --help --body x",
-        "stack --version",
-        "stack push",
-        "REFUSED stack push",
-        "stack push",
-        "REFUSED stack push",
-        "api --template graphql repos/a/b/labels -X POST -f name=x",
-        "REFUSED api --template graphql repos/a/b/labels -X POST -f name=x",
-    ]
-    real = lab.reports / "real-gh.log"
-    assert real.read_text().splitlines() == [
-        "issue view 1",
-        "pr create --help",
-        "api repos/a/b",
-        "-R a/b pr view 1",
-        "stack --version",
-    ]
 
 
 def test_a_ref_without_the_skill_gives_a_no_skill_baseline(lab: Lab):
@@ -411,21 +356,6 @@ def test_a_timeout_stops_the_whole_process_group(lab: Lab):
     assert not late.exists()
 
 
-def test_setup_runs_behind_the_gh_wrapper(lab: Lab):
-    evals = lab.skill / "evals" / "evals.json"
-    evals.write_text(
-        json.dumps([{"query": "Go.", "setup": ["gh pr create --title x || true"]}])
-    )
-    result = run(
-        lab, "--ref", lab.ref, "--output-dir", str(lab.out), "--agent", "codex"
-    )
-
-    assert result.returncode == 0, result.stderr
-    calls = (lab.out / "s1-codex" / "gh-calls.log").read_text().splitlines()
-    assert calls == ["pr create --title x", "REFUSED pr create --title x"]
-    assert not (lab.reports / "real-gh.log").exists()
-
-
 def test_codex_hides_copies_under_codex_home(lab: Lab):
     home = lab.tmp / "codex-home"
     write(home / "skills" / "demo" / "SKILL.md", "installed demo\n")
@@ -446,32 +376,6 @@ def test_codex_hides_copies_under_codex_home(lab: Lab):
     argv = report(lab, "s2-codex", "argv").splitlines()
     hidden = next(arg for arg in argv if arg.startswith("skills.config="))
     assert str(home / "skills" / "demo" / "SKILL.md") in hidden
-
-
-@pytest.mark.parametrize(("parent", "same_group"), [("", False), ("1", True)])
-def test_a_nested_runner_keeps_agents_in_the_callers_group(
-    lab: Lab, parent: str, same_group: bool
-):
-    groups = lab.reports / "groups"
-    result = run(
-        lab,
-        "--ref",
-        lab.ref,
-        "--output-dir",
-        str(lab.out),
-        "--agent",
-        "codex",
-        "--scenario",
-        "2",
-        RUN_EVALS_PARENT=parent,
-        FAKE_ACTION=f'echo "$(ps -o pgid= -p $$) $(ps -o pgid= -p $PPID) '
-        f'$RUN_EVALS_PARENT" > {groups}',
-    )
-
-    assert result.returncode == 0, result.stderr
-    agent, runner, marker = groups.read_text().split()
-    assert (agent == runner) is same_group
-    assert marker == "1"
 
 
 def test_a_skill_at_the_repository_root_installs(tmp_path: Path, lab: Lab):
@@ -503,3 +407,83 @@ def test_a_skill_at_the_repository_root_installs(tmp_path: Path, lab: Lab):
         lab.out / "s1-codex" / "skills.txt"
     ).read_text() == "installed\tsolo-skill\n"
     assert report(lab, "s1-codex", "demo") == "absent\n"
+
+
+CREDENTIAL_PROBE = (
+    'printf "%s|%s|%s|%s|%s|%s\\n" "${GH_TOKEN:-none}" "${GITHUB_TOKEN:-none}" '
+    '"$GH_CONFIG_DIR" "$GIT_SSH_COMMAND" "$(git config --get-all credential.helper)" '
+    '"$RUN_EVALS_PARENT" > '
+)
+
+
+def probe(lab: Lab, name: str) -> list[str]:
+    return (lab.reports / name).read_text().strip().split("|")
+
+
+def test_setup_and_agent_run_without_github_credentials(lab: Lab):
+    evals = lab.skill / "evals" / "evals.json"
+    setup_probe = CREDENTIAL_PROBE + str(lab.reports / "setup")
+    evals.write_text(
+        json.dumps([{"query": "Go.", "setup": [setup_probe, "gh issue list"]}])
+    )
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        FAKE_ACTION=CREDENTIAL_PROBE + str(lab.reports / "agent") + "; gh pr list",
+    )
+
+    assert result.returncode == 0, result.stderr
+    folder = lab.out / "s1-codex"
+    for name in ("setup", "agent"):
+        token, github_token, config, ssh, helper, parent = probe(lab, name)
+        assert (token, github_token, ssh, helper, parent) == (
+            "none",
+            "none",
+            "false",
+            "",
+            "1",
+        )
+        assert config == str(folder / "gh-config")
+    assert not any((folder / "gh-config").iterdir())
+    assert (folder / "gh-calls.log").read_text().splitlines() == [
+        "issue list",
+        "pr list",
+    ]
+
+
+def test_a_token_file_gives_gh_only_that_token(lab: Lab):
+    token = lab.tmp / "read-only-token"
+    token.write_text("read-only\n")
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        "--github-token-file",
+        str(token),
+        FAKE_ACTION=CREDENTIAL_PROBE + str(lab.reports / "agent"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert probe(lab, "agent")[:2] == ["read-only", "none"]
+
+
+def test_a_runner_inside_an_eval_run_refuses_to_start(lab: Lab):
+    result = run(
+        lab, "--ref", lab.ref, "--output-dir", str(lab.out), RUN_EVALS_PARENT="1"
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "running inside an eval run" in result.stderr
+    assert not lab.out.exists()
