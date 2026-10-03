@@ -1,11 +1,10 @@
 # Skills repository verification map
 
-This map pairs each recipe a skills change goes through with the exact commands and the proof they must produce. Run the features in the order listed; each one assumes the previous one passed in the same run.
+This map pairs each recipe a skills change goes through with the exact commands and the proof they must produce.
 
 ## Baseline preconditions
 
 - Launch and Doctor in [SKILL.md](../SKILL.md) passed, and `RUN` holds the printed run folder
-- Every block runs in a subshell that loads `$RUN/env` first
 
 ## Proof and skip reporting
 
