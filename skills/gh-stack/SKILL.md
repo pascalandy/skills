@@ -10,8 +10,8 @@ metadata:
 # gh-stack
 
 `gh stack` is a [GitHub CLI](https://cli.github.com/) extension for stacked branches and pull
-requests. A stack is an ordered chain of branches rooted on a trunk, where each branch has one PR
-based on the branch below it, so a reviewer sees only that layer's diff.
+requests. A stack is an ordered chain of branches rooted on a trunk, where each branch, a layer,
+has one PR based on the layer below it, so a reviewer sees only that layer's diff.
 
 `gh stack` prints a stack trunk-first, left to right:
 
@@ -21,33 +21,35 @@ based on the branch below it, so a reviewer sees only that layer's diff.
 
 Left is the **bottom**, right is the **top**. `auth` is based on `main` and merges first;
 `frontend` merges last. `up` moves toward the top, away from trunk; `down` moves toward it.
-Foundational work belongs at the bottom, code that depends on it above. For how to choose the
-layers, read `references/stack-design.md`.
 
-## Setup
+## Prerequisites
 
-```bash
-gh extension install github/gh-stack
-git config rerere.enabled true         # remember conflict resolutions
-git config remote.pushDefault origin   # required if the repo has more than one remote
-```
+Run each check before the first `gh stack` command. Done when every check passes, or you took the
+path its failure names.
 
-If `gh auth status --active --hostname github.com` fails, build the stack by hand: one branch per
-layer, each branched from the layer below, and each PR opened with the layer below as its base.
-Replace `gh stack rebase` with `git rebase --onto <layer below> <its old tip> <branch>` for each
-layer above a change, which replays only that branch's own commits. Replace `gh stack push` with
-`git push --force-with-lease origin <branch>...`, naming the layer you changed and every layer
-you rebased.
+| Check | When it fails |
+|---|---|
+| `gh auth status --active --hostname github.com` | [Without gh stack](#without-gh-stack) |
+| `gh stack --version` | `gh extension install github/gh-stack`, then check again |
+| `git remote` prints a remote | [Without a remote](#without-a-remote) |
+| `git remote` prints one remote, or `git config remote.pushDefault` is set | `git config remote.pushDefault origin`, or pass `--remote <name>` to `push`, `submit`, `sync`, `rebase`, and `link` |
+
+Once per clone, `git config rerere.enabled true` makes a rebase reuse conflict resolutions.
+
+## Pick the path
+
+- **The layers would touch the same lines, or the change cannot land in parts:** open one PR, no
+  stack
+- **Multi-part work with no stack yet:** [Start a stack](#start-a-stack)
+- **A change belongs to a layer of an existing stack:** [Change a layer](#change-a-layer)
+- **The trunk moved:** [Sync](#sync)
+- **The stack is approved:** [Land](#land)
 
 ## Non-interactive use
 
 `gh stack` branches on whether **stdout is a TTY**. Piped, most commands error cleanly or print
 static text; under a PTY the same commands open a prompt or a full-screen TUI and block forever.
 Agent harnesses differ, so always pass the flags below instead of relying on that detection.
-
-**Multiple remotes:** never run `push`, `submit`, `sync`, `rebase`, or `link` without
-`--remote <name>` unless `remote.pushDefault` is configured. `checkout` and `trunk` have no
-`--remote` flag and require the config.
 
 | Always run | Never run bare | Why |
 |---|---|---|
@@ -60,90 +62,120 @@ Agent harnesses differ, so always pass the flags below instead of relying on tha
 | `gh stack up` / `down` / `top` / `bottom` | `gh stack switch` | `switch` is menu-only |
 | — | `gh stack modify` | TUI-only, no non-interactive path |
 
-- `view --short` is safe in both modes, but it is formatted for humans. Use `--json` to parse.
-- **`checkout <pr>` when a different local stack already covers those branches** cannot be forced.
-  Run `gh stack unstack --local` first (this keeps the stack on GitHub), then retry.
+`view --short` is safe in both modes, but it is formatted for humans. Use `--json` to parse.
 
-## Branch placement
+## Start a stack
 
-- **Starting multi-part work:** create the stack before writing files. Do not implement every
-  concern on trunk and split it later. Put one dependent concern in each layer, bottom to top.
-- **Editing an existing stack:** check out the layer that owns the change before editing. Never
-  commit a lower layer's concern on the current top branch. Run `gh stack view --json`; if
-  ownership is unclear, inspect `git log --all -- <path>`. Then check out the owner, edit, commit,
-  rebase upstack, and return to top.
+Create the stack before writing any file, so each concern lands in its own layer. Read
+`references/stack-design.md` to choose the layers.
+
+1. Branch the bottom layer from the remote trunk. The local trunk can lag it, for example when
+   another worktree has it checked out. Run `git fetch origin`, `git switch -c <bottom>
+   origin/<trunk>`, then `gh stack init <bottom>`, which adopts the branch. Done when
+   `git merge-base --is-ancestor origin/<trunk> <bottom>` succeeds
+2. Commit the bottom layer's concern. For each next layer, run `gh stack add <branch>`, which
+   branches from the current layer, and commit its concern there. Done when each layer holds one
+   concern and `gh stack view --json` lists them bottom to top
+3. Open the PRs with `gh stack submit --auto --open`: it pushes every layer and opens one PR per
+   layer, ready for review. Open a lower layer's PR early, for CI, the same way: `gh stack merge`
+   lands only PRs in a stack on GitHub, which `submit` creates, and refuses drafts. `--auto` writes the
+   titles and bodies; set them with `gh pr edit <number>`. Done when `gh stack view --json` shows a
+   `pr` on every layer
+
+```bash
+git fetch origin && git switch -c auth origin/main && gh stack init auth
+git add ... && git commit -m "Add auth middleware"
+gh stack add api
+git add ... && git commit -m "Add API routes"
+gh stack submit --auto --open
+gh stack view --json
+```
+
+## Change a layer
+
+1. Check out the layer that owns the change: run `gh stack view --json`, and
+   `git log --all -- <path>` when ownership is unclear. Done when you are on the owning layer,
+   which is often not the top
+2. Commit the change there
+3. Bring the change into every layer above. Choose by whether those layers are on the remote:
+   - **Not pushed yet, or the session allows force pushes:** run `gh stack rebase --upstack`, then
+     `gh stack push`, which rewrites the layers above and force-pushes them with
+     `--force-with-lease`. A rebase restamps each commit's committer from git config, so check
+     `git log --format='%h %ce'` before pushing when the repository requires an email
+   - **Pushed, and a rule says to ask before any force push:** run `git push origin <layer>`. Then,
+     for each layer above, bottom to top, run `git switch <upper>`,
+     `git merge --no-ff <layer below>`, and `git push origin <upper>`. Every push is a fast-forward
+
+   Done when `git merge-base --is-ancestor <changed layer> <top>` succeeds and the remote holds
+   every layer you changed
 
 ```bash
 gh stack down                   # or: gh stack checkout api
 git add ... && git commit -m "Add get-user endpoint"
-gh stack rebase --upstack       # replay every branch above onto the change
-gh stack top                    # return to where you were
+gh stack rebase --upstack       # replay every layer above onto the change
 gh stack push
+gh stack top                    # return to where you were
 ```
 
-## Core loop
+## Sync
+
+`gh stack sync` fetches, rebases the stack onto the remote trunk, pushes, and refreshes PR state.
+`gh stack sync --prune` also deletes local branches of merged PRs; pruning never happens without
+`--prune` when non-interactive. Done when `gh stack view --json` shows no layer with
+`needsRebase`.
+
+- **Local and remote stacks diverged:** `sync` prints both chains, makes no changes, and exits 0
+  with `Sync aborted`. Read `references/troubleshooting.md`
+- **Another worktree holds the trunk:** `gh stack rebase` warns `Could not update local <trunk>`,
+  rebases the stack onto `<remote>/<trunk>`, and leaves that worktree untouched. The warning needs
+  no action
+- **A rule says to ask before any force push:** `sync` rewrites pushed layers. Merge
+  `origin/<trunk>` into the bottom layer instead, then carry it up as in
+  [Change a layer](#change-a-layer), step 3
+
+## Land
+
+On a layer of a stack tracked locally, so `gh stack view --json` succeeds, `gh stack merge --yes`
+merges the whole stack without a number. After `gh stack link`, which tracks nothing locally, pass
+the top PR's number. A bare number is read as a stack number first, then as a PR number: a PR
+number merges that PR and every unmerged PR below it.
 
 ```bash
-gh stack init auth              # create the stack and check out its branch
-git add ... && git commit -m "Add auth middleware"
-gh stack add api                # next layer, branched from the current one
-git add ... && git commit -m "Add API routes"
-gh stack submit --auto          # push every branch and open draft PRs
-gh stack view --json            # confirm
+gh stack merge --yes --squash    # the current stack; or --merge, --rebase, --merge-method
+gh stack merge 42 --yes          # PR #42 and every unmerged PR below it
 ```
 
-Add `--open` to `submit` to create PRs ready for review instead of drafts. Branch names are
-verbatim — `gh stack add refactor/foo` creates `refactor/foo`.
+- **All-or-nothing:** if any PR in the set cannot merge, none do
+- **Squash:** with GitHub's default squash setting, a PR with one commit lands under that commit's
+  subject, not the PR title. Before `--squash`, amend the commit or retitle the PR so they match
+- **Method:** without a method flag, the last-used method is reused. A merge queue on the base
+  branch queues the stack instead, picks the method, and ignores any method flag with a warning;
+  queued PRs may land in separate groups
 
-`init` creates a missing first branch from the local trunk, which can lag `origin/<trunk>`, for
-example when another worktree has it checked out. To start from the remote trunk, run
-`git fetch origin` and `git switch -c <branch> origin/<trunk>` first; `init` adopts an existing
-branch.
+Done when `gh pr view <number> --json state` prints `MERGED` for every PR in the stack.
 
-## Staying in sync
+## Without gh stack
 
-```bash
-gh stack sync                   # fetch, reconcile with GitHub, rebase, push, refresh PR state
-gh stack sync --prune           # also delete local branches for merged PRs
-```
+When `gh` is missing or not signed in, build the stack by hand: one branch per layer, each
+branched from the layer below, and each PR opened with the layer below as its base, through
+whatever forge tool the session has. Replace `gh stack rebase` with
+`git rebase --onto <layer below> <its old tip> <branch>` for each layer above a change, which
+replays only that branch's own commits. Replace `gh stack push` with
+`git push --force-with-lease origin <branch>...`, naming the layer you changed and every layer you
+rebased; when a rule says to ask before any force push, merge upward as in
+[Change a layer](#change-a-layer), step 3. Done when each layer's PR targets the layer below.
 
-Pruning never happens without `--prune` when non-interactive. If the local and remote stacks have
-diverged, `sync` prints both chains, makes no changes, and exits 0 with `Sync aborted` — see
-`references/troubleshooting.md`.
+## Without a remote
 
-When another worktree has the trunk checked out and the remote trunk has moved,
-`gh stack rebase` warns `Could not update local <trunk>`, rebases the stack onto
-`<remote>/<trunk>`, and leaves that worktree untouched. The warning needs no action.
-
-## Merging
-
-On a branch of a stack tracked locally, so `gh stack view --json` succeeds, `gh stack merge --yes`
-merges the whole stack, and no stack number needs looking up; `view` prints none. After
-`gh stack link`, which tracks nothing locally, pass the top PR's number, or run
-`gh stack checkout <pr>` first. Otherwise, scope the merge with an argument. A bare number is read
-as a stack number first, then as a PR number:
-
-```bash
-gh stack merge 42 --yes          # PR #42 plus every unmerged PR below it
-gh stack merge 7 --yes           # every unmerged PR in stack #7
-gh stack merge 42 --yes --squash # or --merge, --rebase, --merge-method <method>
-```
-
-Pass a PR number to merge that PR and every unmerged PR below it, or a stack number to merge every
-unmerged PR in that stack. The operation is all-or-nothing: if any PR in that set cannot merge,
-none do.
-
-With GitHub's default squash setting, a PR with one commit lands under that commit's subject, not
-the PR title. Before `--squash`, make the two match: amend the commit or retitle the PR.
-
-Without a method flag the last-used method is reused. If the base branch uses a merge queue, the
-stack is queued instead and the queue picks the method, ignoring any flag you passed with a
-warning; queued PRs may land in separate groups.
+`gh stack rebase` needs a remote: without one, it prints `no remotes configured` and still exits
+0. Restack with `git rebase --update-refs <changed layer> <top>`, which replays the layers above
+and moves each of their branches. Done when `git merge-base --is-ancestor <changed layer> <top>`
+succeeds.
 
 ## Reading state
 
-`gh stack view --json` writes JSON to **stdout**. Status messages go to **stderr** — do not parse
-them, branch on exit codes instead.
+`gh stack view --json` writes JSON to **stdout**. Status messages go to **stderr**; branch on exit
+codes instead of parsing them.
 
 ```
 trunk           string
@@ -153,9 +185,9 @@ branches[].pr   number, url, state ("OPEN" | "MERGED" | "QUEUED"); absent when n
 ```
 
 No field holds a branch's tip; read it with `git rev-parse <name>`. `base` is the saved SHA of the
-parent branch that this branch was last known to contain. It may be
-older than the parent's current tip. `needsRebase` is true when the current parent tip is no longer
-an ancestor of the branch.
+parent branch that this branch was last known to contain. It may be older than the parent's
+current tip. `needsRebase` is true when the current parent tip is no longer an ancestor of the
+branch.
 
 ## Exit codes
 
@@ -165,7 +197,7 @@ an ancestor of the branch.
 | 1 | Generic error | Read stderr |
 | 2 | Not in a stack | `gh stack init`, or `gh stack checkout <target>`; for open PRs never linked, `gh stack link <pr>...` bottom to top |
 | 3 | Rebase conflict | Follow the Exit 3 recovery below |
-| 4 | GitHub API failure | Check `gh auth status`, retry |
+| 4 | GitHub API failure | Run `gh auth status`: signed in, retry; signed out, follow [Without gh stack](#without-gh-stack) |
 | 5 | Invalid arguments | Fix the invocation; see `<command> --help` |
 | 6 | Disambiguation required | Branch is in several stacks; check out a non-shared branch |
 | 7 | Rebase already in progress | `gh stack rebase --continue` or `--abort` |
@@ -184,19 +216,20 @@ an ancestor of the branch.
 
 - Stacks are strictly linear: one parent, at most one child. Use separate stacks for parallel work.
 - There is no non-interactive reorder or removal. Errors may suggest `gh stack modify`, but it is
-  TUI-only — restructure with `unstack` then `init` instead.
-- PR titles and bodies are auto-generated. Use `gh pr edit` afterwards to change them.
+  TUI-only; restructure with `unstack`, then `init`, instead.
+- `checkout <pr>` cannot be forced when a different local stack already covers those branches. Run
+  `gh stack unstack --local` first, which keeps the stack on GitHub, then retry.
 
 ## More detail
 
-`gh stack <command> --help` is authoritative for flags and arguments. Note that
-`gh stack help <command>` does **not** work — it prints the top-level help.
+`gh stack <command> --help` is authoritative for flags and arguments. `gh stack help <command>`
+prints the top-level help instead.
 
 Open the reference whose trigger matches the task; no need to preload all three.
 
-- `references/stack-design.md` — read before creating a stack, when deciding how many layers to
+- `references/stack-design.md`: read before creating a stack, when deciding how many layers to
   use, what belongs in each one, or whether work belongs in a new stack.
-- `references/commands.md` — read when a command fails unexpectedly or you need its preconditions,
+- `references/commands.md`: read when a command fails unexpectedly or you need its preconditions,
   side effects, atomicity, or ordering guarantees.
-- `references/troubleshooting.md` — read on a rebase conflict, after a squash-merge, on local and
+- `references/troubleshooting.md`: read on a rebase conflict, after a squash-merge, on local and
   remote divergence, when restructuring a stack, or when driving stacks from another tool.
