@@ -76,7 +76,7 @@ Read [features/README.md](features/README.md), then run [compile](features/compi
 Run this after a pass, a failure, or an interruption:
 
 ```bash
-if [ "${RUN:?}" != "${RUN#/var/tmp/verify-skills.}" ]; then rm -rf "$RUN"; else echo "refusing to delete $RUN" >&2; fi
+if [ "${RUN:?}" != "${RUN#/var/tmp/verify-skills.}" ]; then rm -r "$RUN"; else echo "refusing to delete $RUN" >&2; fi
 ```
 
 It deletes the run folder and nothing else. The evidence folder sits outside it and stays. The recipes start no process that outlives its command, so there is nothing to stop.
