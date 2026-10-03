@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-02
+date_updated: 2026-10-03
 ---
 
 `just install-skills` installs public skills, every package in the private tree, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -16,7 +16,7 @@ date_updated: 2026-10-02
 
 - The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
 - Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
-- A name that is both public and private stops the run; delete the stale copy it names
+- A name that is both public and private installs the private copy and warns with both paths, so a skill moving between the repositories never stops an install
 - A run prints one line per change, such as `add\t~/.claude/skills/concise`, and nothing when every target is current. `--dry-run` prints the same lines without writing; `--check` exits 1 and lists them on stderr when a selected target needs work. `--json` prints the per-target report instead
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
 - Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old folder in `authoring/` or `skills/` behind. An apply deletes each such category, package, or skill folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply warns with the file's path. A file saved outside those caches during cleanup survives. If cleanup cannot scan or delete a leftover, it warns after the install completes
@@ -78,7 +78,8 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
 - It also owns every package name the private clone's history ever added, so deleting a private skill and letting `just sync` commit the deletion removes its installed copies on every machine the deletion reaches. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or the private clone
-- To promote a private skill, move it into `authoring/`, delete the private copy, and rerun
+- To make a public skill private, copy its package into the private clone; the next install uses it. Then remove it from `authoring/` in a PR, which ends the warning
+- To promote a private skill, add it to `authoring/` in a PR, then delete the private copy; until then, the private copy stays installed and the warning says so
 
 ## Cutover
 

@@ -12,6 +12,7 @@ Write documents an agent reads so that it takes the same _process_ every run: a 
 - **Target skill**: the skill being created, edited, improved, or reviewed
 - **Target document**: any other document an agent reads, such as `AGENTS.md`
 - **Skill validator**: `scripts/validate_skill.py` in this skill's folder. It checks the target skill you point it at
+- **Eval runner**: `scripts/run_evals.py` in this skill's folder. It runs the target skill's evaluation scenarios in fresh agent sessions
 - **BP**: a best practice from the checklist below, cited by its fixed ID, such as `BP_06`
 
 ## Pick the branch
@@ -39,7 +40,7 @@ Skill progress:
 
 **Step 1: BP checklist filled.** For an existing target skill, fill the [BP checklist](#best-practices-checklist) with Review steps 1 and 2, so the evaluations and fixes target what fails. Done when each BP is ticked or open with its finding count. Skip this step for a new skill.
 
-**Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them without the target skill (BP_20). Done when each scenario has a recorded baseline. Skip steps 2 and 7 for a wording-only edit.
+**Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them with the [eval runner](#eval-runner) on the target skill's current version, or on a ref without it for a new skill (BP_20). Done when each scenario has a recorded baseline. Skip steps 2 and 7 for a wording-only edit.
 
 **Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21). Done when the description says when to load the skill, the validator reports no BP_13 or BP_14 error, and any BP_21 warning has a reason.
 
@@ -49,7 +50,7 @@ Skill progress:
 
 **Step 6: Skill validator silent.** Run the skill validator, fix each error, and rerun. Done when it prints nothing, or every warning left has a reason you tell the user.
 
-**Step 7: Evaluations beat the baseline.** Rerun the scenarios. Done when the target skill passes every expected behavior; otherwise return to Step 4.
+**Step 7: Evaluations beat the baseline.** Rerun the scenarios with the eval runner on the commit you will merge. Done when the target skill passes every expected behavior; otherwise return to Step 4.
 
 **Step 8: BP checklist complete.** Fill the BP checklist again. Done when every BP is ticked, or left open with a reason only the user can resolve, such as a rename, and your reply shows this fill and, for an existing skill, the one from Step 1.
 
@@ -81,6 +82,16 @@ uv run <this-skill-folder>/scripts/validate_skill.py <target-skill-folder>
 It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment.
 
 The link check covers inline links with at most one level of parentheses, angle-bracket destinations, and single-line reference definitions inside the target folder. Check other links and inline-code paths yourself. The validator checks inline-code paths for backslashes only.
+
+## Eval runner
+
+Requires `uv`, `git`, and the CLI of each agent it runs: `claude --version` and `codex --version` confirm them. From the repository that holds the target skill, run:
+
+```bash
+uv run <this-skill-folder>/scripts/run_evals.py <target-skill-folder> --ref <git-ref>
+```
+
+It runs each scenario in `evals/evals.json` in a fresh repo per agent, with the skill copied from `<git-ref>` and the installed copies hidden, so a run never tests the wrong version. Runs carry no GitHub or git credentials, so GitHub refuses their writes; a scenario that reads GitHub needs a read-only token, passed as `--help` describes. It prints one line per run with its folder. Grade each folder's `answer.md`, `events.jsonl`, and `git-log.txt` against the scenario's expected behavior. `--help` lists the options.
 
 ## Best practices checklist
 

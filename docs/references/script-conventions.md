@@ -98,9 +98,11 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `just install-skills`: accepts a hidden `-q/--quiet` and ignores it, because a `just sync` or `just sync-fleet` started before this contract passes it; remove it once every machine has synced
 - `just release-check`: `--notes FILE` names what `-o` would write; `--notes -` writes to stdout
 - `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
+- `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
+- `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
 - `transcript`: no `--plain`; `list` already prints one item per line, tab-separated and colorless
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
 - `transcript`: a JSON error keeps `{"ok": false, "error": {"code", "message", "hint"}}`, which its agents and `verify-transcript` read, instead of the shared `errors` list; `hint` is the command that fixes it

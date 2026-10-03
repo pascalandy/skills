@@ -1,0 +1,37 @@
+[
+  {
+    "skills": ["gh-stack", "oem"],
+    "setup": ["bash \"$EVALS/fixtures/pushed-stack.sh\""],
+    "query": "The parser layer of my stack has a typo in its docstring: \"fiel\" should be \"file\". Both layers are pushed and under review. Fix it in the layer that owns it and update the remote.",
+    "files": ["evals/fixtures/pushed-stack.sh", "evals/fixtures/agents-md.md"],
+    "expected_behavior": [
+      "Commits the fix on the parser branch, not on cli",
+      "Brings the fix into cli, such as by merging parser into cli",
+      "Pushes both branches without a force push, so each old tip on the remote stays an ancestor of the new one",
+      "Leaves a clean working tree"
+    ]
+  },
+  {
+    "skills": ["gh-stack", "oem"],
+    "setup": ["bash \"$EVALS/fixtures/stale-trunk.sh\""],
+    "query": "Start a stack for this work: a bottom layer named config that adds config.py with a load() function returning {}, and a top layer named cli that adds cli.py printing load(). Commit each layer; don't push or open PRs.",
+    "files": ["evals/fixtures/stale-trunk.sh"],
+    "expected_behavior": [
+      "Bases config on origin/main, so it contains the Add LICENSE commit the local main lacks",
+      "Commits config.py on config and cli.py on cli, with cli based on config",
+      "gh stack view --json lists main as the trunk, then config, then cli",
+      "Leaves the trunk worktree on its old commit and pushes nothing"
+    ]
+  },
+  {
+    "skills": ["gh-stack", "oem"],
+    "setup": ["bash \"$EVALS/fixtures/first-layer.sh\""],
+    "query": "Open a PR for the config layer now so CI starts on it. I'll stack more layers on top later.",
+    "files": ["evals/fixtures/first-layer.sh"],
+    "expected_behavior": [
+      "Checks whether gh is signed in before using gh stack, finds it is not, and takes the path for working without gh stack",
+      "Pushes config to the remote with plain git, and opens no PR through gh pr create or gh stack submit",
+      "Reports that opening the PR needs a signed-in gh or another forge tool, instead of claiming a PR exists"
+    ]
+  }
+]

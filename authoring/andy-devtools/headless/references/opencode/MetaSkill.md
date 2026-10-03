@@ -27,12 +27,12 @@ V1 reads the same path but uses `mode: primary` and a `permission` map with `edi
 
 ## Complete review run
 
-Prepare an absolute prompt-file path with scope, criteria, and expected findings. Select a model from `opencode models` and configure provider authentication beforehand; in CI, provide the API key through the runner's secret mechanism. The `#high` suffix selects a v2 model variant, such as a reasoning level; variants are provider-specific.
+Prepare an absolute prompt-file path with scope, criteria, and expected findings. Take `provider`, `model`, and `reasoning-level` from the `[opencode]` table of [config.toml](../../config.toml), unless the request names others. Several providers serve one model, so the provider picks the account that pays. Confirm the pair with `opencode models` and configure provider authentication beforehand; in CI, provide the API key through the runner's secret mechanism. The `#<reasoning-level>` suffix selects a v2 model variant; variants are provider-specific.
 
 ```bash
 repo="/absolute/path/to/repository"
 prompt_file="/absolute/path/to/reviewer-prompt.md"
-model="anthropic/claude-sonnet-4-5#high"
+model="<provider>/<model>#<reasoning-level>"   # from [opencode] in config.toml
 review_dir="$(mktemp -d /tmp/opencode-review.XXXXXX)" || exit 1
 
 review_status=0
@@ -57,7 +57,7 @@ printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-Keep the message before `--file`: v1 reads every argument after `--file` as another file. `--standalone` starts a private server that receives the invocation's environment and exits with the run. On v1, drop `--standalone` and pass the variant as `--variant high` instead of the `#high` suffix.
+Keep the message before `--file`: v1 reads every argument after `--file` as another file. `--standalone` starts a private server that receives the invocation's environment and exits with the run. On v1, drop `--standalone` and pass the variant as `--variant <reasoning-level>` instead of the suffix.
 
 `result.md` preserves command stdout, including the reply; do not assume it is a final-message-only protocol. OpenCode exits 0 when the reply is empty, so the recipe checks for one. Besides the pinned model, OpenCode sends the prompt and attached files to a small model from the same provider to title the session, so both models see the review material.
 
