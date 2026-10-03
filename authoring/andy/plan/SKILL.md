@@ -4,46 +4,53 @@ description: "Use only when explicitly invoked as `plan`."
 kind: "general"
 ---
 
-# Plan
+Stay in **planning** until I say "execute": read and investigate freely, change nothing. End every response with: "— We are in the Planning Phase"
 
-Stay in **planning** until I say "implement": read and investigate freely, change nothing (no file edits, commits, branches, issues, or PRs). The plan itself is the one exception: you may write it, or mockups for it, as standalone HTML files. Only "implement" ends planning: my answers to your questions, a review or 2nd-pass request, and "do it now" in a planning message all keep us here. End every response with:
+**Step 1: Alignment**
 
-"— We are in the Planning Phase"
+Investigate the code and docs first, then ask only about decisions that are mine to make and would change the plan
 
-## Step 1: Alignment
+Tell me:
 
-1. Restate my goal and the problem in your own words, including what's out of scope
+1. Restate my goal and the problem in your own words
 2. List the use cases, edge cases included
-3. Investigate the code and docs first, then ask only about decisions that would change the plan
+3. What's out of scope
 
-If you have questions, stop there and wait for my answers. If you have none, go straight to Step 2.
+If you have questions, stop ASAP and wait for my answers. If you have none, go straight to suggest solution(s).
 
-## Step 2: Suggest solutions
+**Step 2: Suggest Solutions**
 
 If several approaches fit, compare them in a few lines and recommend one. Write the following for the recommended approach only and stay $concise:
 
-  ````md
-  ## CMO (current mode of operation)
+````md
+## CMO (current Mode of operation)
 
-  How it works today and the problems it causes.
+How it works today and the problems it causes.
 
-  ## FMO (future mode of operation)
+## FMO (future Mode of operation)
 
-  The happy path and how it handles each edge case.
+The happy path, how it handles each edge case, and how we'll verify it works.
 
-  ### How we'll know it works
+### How we'll know it works
 
-  The checks we'll run and what each must show.
+..
 
-  ## Premortem
+## Premortem
 
-  Imagine the implementation failed, either mid-build or in the first weeks of use. List the most likely reasons, ranked. For each: the cause, the early warning sign, and the change you made to the FMO to prevent it.
-  ````
+Imagine the execution failed, either mid-build or in the first weeks of use. List the most likely reasons, ranked. For each: the cause, the early warning sign, and the change you made to the FMO to prevent it.
+````
 
-## Questions
+**Questions**
 
-Ask in the question format from $oem. If nothing is left to decide, write:
+When you need me, ask at most 4 questions per round, ordered by impact. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
 
-0) No questions. Say "implement" 🚀
+1) 🙋 [Question (why it matters)]
+   - a) … (🟢 recommended)
+   - b) …
+   - c) …
 
-After my answers, apply them, rethink the whole solution and go back to Step 1.
+If nothing is left to decide, say:
+
+0) No questions. Say "execute" 🚀
+
+After my answers, apply them, rethink the whole solution and go back to Step 1
