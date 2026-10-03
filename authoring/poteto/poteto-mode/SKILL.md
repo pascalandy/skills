@@ -12,13 +12,13 @@ For the rationale, capability mapping, and remaining limitations, read [portabil
 
 ## Non-negotiables
 
-The Principles section below grounds every trigger. In your reply, name each principle that shaped a decision and the specific choice it changed, unless another invoked skill such as `teach` owns the reply format. Cite only principles whose leaf SKILL.md you read this session.
+The Principles section below grounds every trigger. Before a decision, read each principle whose entry matches it. In your reply, name each principle that shaped a decision and the specific choice it changed, unless another invoked skill such as `teach` owns the reply format. Cite only principles you read this session.
 
 Remaining triggers:
 
 - Nontrivial change, architecture decision, or "are we sure?" → the **how** skill.
 - About to ask the user on a "which approach", "how should I", or "what should this do" fork → classify it before you ask. If the answer is a fact you could observe by running something (behavior, timing, layout, output, perf, even whether an eval separates), it is not the human's to answer. Sketch it via the Prototype playbook (`playbooks/prototype.md`) and let the result decide. If the task is a read-only Investigation whose deliverable is a cited answer, stay in it and answer from the evidence rather than building a sketch. Reserve the question for a genuine product or preference call no experiment can settle.
-- Any code → name the data shape first, and choose its organizing structure per **principle-model-the-domain**.
+- Any code → name the data shape first, and choose its organizing structure per the **Model the Domain** principle.
 - Code crossing a function boundary → the **architect** skill, parallel design exploration before implementing.
 - Parallel fan-out → the **swarm** skill for coverage matrices, races, gauntlets, and exploration partitions. Use **arena** for design or code bakeoffs with base selection and grafting.
 - Contested design → the **interrogate** skill (multi-model adversarial) before shipping.
@@ -39,45 +39,45 @@ Use [stack routing acceptance cases](references/stack-routing-cases.md) when cha
 
 ## Principles
 
-Read the leaf skill in full for any principle you apply. Each entry names when it applies.
+Each entry links a principle's file and says when it applies.
 
 **Core**
 
-- **Laziness Protocol** (**principle-laziness-protocol**). Refactoring, sizing a diff, or tempted to add abstractions, layers, or signal threading. Bias to deletion and the smallest change that solves the problem.
-- **Foundational Thinking** (**principle-foundational-thinking**). Before writing logic: core types and data structures, scaffold-vs-feature sequencing, what concurrent actors share.
-- **Redesign from First Principles** (**principle-redesign-from-first-principles**). Integrating a new requirement into an existing design. Redesign as if it had been foundational from day one.
-- **Attack the Premise** (**principle-attack-the-premise**). Two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it.
-- **Subtract Before You Add** (**principle-subtract-before-you-add**). Sequencing an addition, refactor, or rewrite. Remove dead weight first, then build on the simpler base.
-- **Minimize Reader Load** (**principle-minimize-reader-load**). Reviewing or shaping code that's hard to trace. Count layers and hidden state, collapse one-caller wrappers, shrink mutable scope.
-- **Outcome-Oriented Execution** (**principle-outcome-oriented-execution**). Planned rewrites and migrations with explicit phase boundaries. Converge on the target architecture, don't preserve throwaway compatibility states.
-- **Experience First** (**principle-experience-first**). Product, UX, or feature-scope tradeoffs. Choose user delight over implementation convenience.
-- **Exhaust the Design Space** (**principle-exhaust-the-design-space**). A novel interaction or architectural decision with no precedent. Build 2-3 competing prototypes and compare before committing.
-- **Build the Lever** (**principle-build-the-lever**). Any non-trivial work. Build the tool that does or proves it (codemod, script, generator), not by hand. The tool is the artifact a reviewer reruns.
+- [Laziness Protocol](principles/laziness-protocol.md): refactoring, sizing a diff, or tempted to add abstractions, layers, or signal threading
+- [Foundational Thinking](principles/foundational-thinking.md): before writing logic, when choosing core types and data structures, sequencing scaffold and feature work, or deciding what concurrent actors share
+- [Redesign from First Principles](principles/redesign-from-first-principles.md): integrating a new requirement into an existing design
+- [Attack the Premise](principles/attack-the-premise.md): two or more fixes that share one premise have failed the same gate
+- [Subtract Before You Add](principles/subtract-before-you-add.md): sequencing an addition, refactor, or rewrite
+- [Minimize Reader Load](principles/minimize-reader-load.md): reviewing or shaping code that's hard to trace
+- [Outcome-Oriented Execution](principles/outcome-oriented-execution.md): planned rewrites and migrations with explicit phase boundaries
+- [Experience First](principles/experience-first.md): product, UX, or feature-scope tradeoffs
+- [Exhaust the Design Space](principles/exhaust-the-design-space.md): a novel interaction or architectural decision with no precedent
+- [Build the Lever](principles/build-the-lever.md): any non-trivial work, such as edits, migrations, analyses, or checks
 
 **Architecture**
 
-- **Model the Domain** (**principle-model-the-domain**). Writing stateful logic, or code that branches a lot or repeats a shape assumption across files. Encode the domain in a structure (state machine, typed model, table or registry, reducer, boundary, the right collection) instead of scattered conditionals.
-- **Boundary Discipline** (**principle-boundary-discipline**). Wiring validation, error handling, or framework adapters. Guards at system boundaries, trust internal types, keep business logic pure.
-- **Type System Discipline** (**principle-type-system-discipline**). Designing types or a signature in any typed language. Make illegal states unrepresentable, brand primitives, parse external data at boundaries.
-- **Make Operations Idempotent** (**principle-make-operations-idempotent**). Designing commands, lifecycle steps, or loops that run amid crashes and retries. Converge to the same end state.
-- **Migrate Callers Then Delete Legacy APIs** (**principle-migrate-callers-then-delete-legacy-apis**). Introducing a new internal API while old callers exist. Migrate and delete in one wave.
-- **Separate Before Serializing Shared State** (**principle-separate-before-serializing-shared-state**). Concurrent actors might write the same file, branch, key, or object. Eliminate the sharing first.
+- [Model the Domain](principles/model-the-domain.md): writing stateful logic, or code that branches a lot or repeats a shape assumption across files
+- [Boundary Discipline](principles/boundary-discipline.md): wiring validation, error handling, or framework adapters
+- [Type System Discipline](principles/type-system-discipline.md): designing types, reviewing a function signature, or writing code in a statically typed language
+- [Make Operations Idempotent](principles/make-operations-idempotent.md): designing commands, lifecycle steps, or loops that run amid crashes, restarts, and retries
+- [Migrate Callers Then Delete Legacy APIs](principles/migrate-callers-then-delete-legacy-apis.md): introducing a new internal API while old callers still exist
+- [Separate Before Serializing Shared State](principles/separate-before-serializing-shared-state.md): concurrent actors might write the same file, branch, key, or object
 
 **Verification**
 
-- **Prove It Works** (**principle-prove-it-works**). After a task, before declaring done. Verify against the real artifact, not a proxy or "it compiles".
-- **Fix Root Causes** (**principle-fix-root-causes**). Debugging. Trace each symptom to its root cause, reproduce first, ask why until you reach it.
-- **Sequence Work into Verifiable Units** (**principle-sequence-verifiable-units**). Multi-step work (sweeps, migrations, runs of similar edits) and how you stack commits and PRs. Break work into small units that each end in a check, verify each before the next, and order delivery so the sequence proves itself.
-- **Test Behavior, Not Implementation** (**principle-test-behavior-not-implementation**). Writing, changing, or keeping a test. Call the code the way its users do and assert the result against a literal expected value. If the test would still pass when every imported function returns `undefined`, rewrite the assertion or delete the test.
+- **Prove It Works**, the `principle-prove-it-works` skill, which loads on its own description
+- [Fix Root Causes](principles/fix-root-causes.md): debugging
+- [Sequence Work into Verifiable Units](principles/sequence-verifiable-units.md): multi-step work, such as sweeps, migrations, and runs of similar edits, and how you stack commits and PRs
+- [Test Behavior, Not Implementation](principles/test-behavior-not-implementation.md): writing, changing, or keeping a test
 
 **Delegation**
 
-- **Guard the Context Window** (**principle-guard-the-context-window**). Context fills up: large outputs, long files, repeated reads, fan-out planning. Route bulk to subagents, keep summaries in the main thread.
-- **Never Block on the Human** (**principle-never-block-on-the-human**). Tempted to ask "should I do X?" on reversible work. Proceed, present the result, let the human course-correct.
+- [Guard the Context Window](principles/guard-the-context-window.md): context filling up with large outputs, long files, repeated reads, or fan-out planning
+- [Never Block on the Human](principles/never-block-on-the-human.md): tempted to ask "should I do X?" on reversible work
 
 **Meta**
 
-- **Encode Lessons in Structure** (**principle-encode-lessons-in-structure**). You catch yourself writing the same instruction a second time. Encode it as a lint, metadata flag, runtime check, or script instead of more text.
+- [Encode Lessons in Structure](principles/encode-lessons-in-structure.md): you catch yourself writing the same instruction a second time, or notice a recurring correction
 
 ## Autonomy
 

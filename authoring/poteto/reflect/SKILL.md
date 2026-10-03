@@ -38,7 +38,7 @@ Launch a read-only synthesizer using the `Reviewer` role. Use `references/synthe
 
 ### 4. Structural enforcement check
 
-Sanity-check the synthesizer's Accepted list. For any item that would be enforced more reliably by a lint rule, script, metadata flag, or runtime check, move it from Accepted to Backlog. See the **encode-lessons-in-structure** principle skill.
+Sanity-check the synthesizer's Accepted list. For any item that would be enforced more reliably by a lint rule, script, metadata flag, or runtime check, move it from Accepted to Backlog. See poteto-mode's **Encode Lessons in Structure** principle.
 
 ### 5. Apply
 
