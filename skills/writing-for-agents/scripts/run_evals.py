@@ -219,6 +219,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -266,7 +267,10 @@ printf '%s\\n' "$*" >> "$log"
 refuse() {{ printf 'REFUSED %s\\n' "$*" >> "$log"; echo "gh: this run allows only reads; refused: $*" >&2; exit 1; }}
 words=() skip=0
 for a in "$@"; do
-  case "$a" in -h|--help|--version) exec {gh} "$@" ;; esac
+  case "$a" in -h|--help|--version)
+    [[ "$*" =~ ^([a-z][a-z0-9-]*[[:space:]]){{0,2}}(-h|--help|--version)$ ]] && exec {gh} "$@"
+    refuse "$@" ;;
+  esac
   if [ "$skip" = 1 ]; then skip=0; continue; fi
   case "$a" in
     -R|--repo|--hostname) skip=1 ;;
@@ -337,7 +341,7 @@ class Run:
 
 
 class Children:
-    """Agent processes still running. Once cancelled, no new one starts, so an
+    """Setup and agent processes still running. Once cancelled, no new one starts, so an
     interrupt during a run's setup cannot launch a paid agent afterward."""
 
     def __init__(self) -> None:
@@ -345,17 +349,22 @@ class Children:
         self.live: set[subprocess.Popen[bytes]] = set()
         self.cancelled = False
 
-    def start(
+    def run(
         self,
         command: list[str],
         cwd: Path,
         env: Mapping[str, str],
         stdout: BinaryIO,
         stderr: BinaryIO,
-    ) -> subprocess.Popen[bytes] | None:
+        deadline: float,
+        stdin: bytes = b"",
+    ) -> str:
         with self.lock:
             if self.cancelled:
-                return None
+                return "cancelled"
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return "timeout"
             process = subprocess.Popen(
                 command,
                 cwd=cwd,
@@ -366,11 +375,15 @@ class Children:
                 start_new_session=True,
             )
             self.live.add(process)
-            return process
-
-    def remove(self, process: subprocess.Popen[bytes]) -> None:
-        with self.lock:
-            self.live.discard(process)
+        try:
+            process.communicate(stdin, timeout=remaining)
+            return "done" if process.returncode == 0 else f"exit {process.returncode}"
+        except subprocess.TimeoutExpired:
+            return "timeout"
+        finally:
+            stop(process)
+            with self.lock:
+                self.live.discard(process)
 
     def stop_all(self) -> None:
         with self.lock:
@@ -419,6 +432,8 @@ def load_scenarios(evals: Path, wanted: Sequence[int]) -> list[Scenario]:
         raise UsageError(f"{path} must hold a list of scenarios")
     scenarios = []
     for number, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            raise UsageError(f"scenario {number} must be an object in {path}")
         setup = entry.get("setup", [])
         if not isinstance(setup, list) or not all(isinstance(c, str) for c in setup):
             raise UsageError(
@@ -427,9 +442,14 @@ def load_scenarios(evals: Path, wanted: Sequence[int]) -> list[Scenario]:
         query = entry.get("query")
         if not isinstance(query, str) or not query.strip():
             raise UsageError(f"scenario {number} in {path} has no query")
-        scenarios.append(
-            Scenario(number, query, tuple(setup), tuple(entry.get("skills", [])))
-        )
+        skills = entry.get("skills", [])
+        if not isinstance(skills, list) or not all(
+            isinstance(name, str) and name.strip() for name in skills
+        ):
+            raise UsageError(
+                f"scenario {number} in {path}: skills must be a list of nonempty names"
+            )
+        scenarios.append(Scenario(number, query, tuple(setup), tuple(skills)))
     for number in wanted:
         if not 1 <= number <= len(scenarios):
             raise UsageError(
@@ -616,6 +636,7 @@ def execute(
     folder, scenario = run.folder, run.scenario
     if children.cancelled:
         return "cancelled"
+    deadline = time.monotonic() + timeout
     work = folder / "work"
     work.mkdir(parents=True)
     (folder / "query.txt").write_text(scenario.query + "\n", encoding="utf-8")
@@ -624,20 +645,22 @@ def execute(
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
     env = {**os.environ, "EVALS": str(plan.evals)}
-    for command in scenario.setup:
-        done = subprocess.run(
-            ["bash", "-euo", "pipefail", "-c", command],
-            cwd=work,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if done.returncode:
-            (folder / "setup.log").write_text(
-                done.stdout + done.stderr, encoding="utf-8"
+    with (folder / "setup.log").open("wb") as setup_log:
+        for command in scenario.setup:
+            status = children.run(
+                ["bash", "-euo", "pipefail", "-c", command],
+                work,
+                env,
+                setup_log,
+                setup_log,
+                deadline,
             )
-            return f"setup failed: {command}"
+            if status != "done":
+                return (
+                    status
+                    if status in ("timeout", "cancelled")
+                    else f"setup failed: {command}"
+                )
     skills_dir = work / (".claude" if run.agent == "claude" else ".agents") / "skills"
     lines = install(plan, wanted(plan, scenario), skills_dir, present)
     (folder / "skills.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -661,17 +684,7 @@ def execute(
         (folder / "events.jsonl").open("wb") as events,
         (folder / "stderr.log").open("wb") as errors,
     ):
-        process = children.start(command, work, env, events, errors)
-        if process is None:
-            return "cancelled"
-        try:
-            process.communicate(stdin, timeout=timeout)
-            status = "done" if process.returncode == 0 else f"exit {process.returncode}"
-        except subprocess.TimeoutExpired:
-            status = "timeout"
-        finally:
-            stop(process)
-            children.remove(process)
+        status = children.run(command, work, env, events, errors, deadline, stdin)
     if run.agent == "claude":
         (folder / "answer.md").write_text(
             claude_answer(folder / "events.jsonl"), encoding="utf-8"
@@ -791,7 +804,7 @@ def build_parser() -> Parser:
         "--timeout",
         type=duration,
         default=duration("30m"),
-        help="stop a run after this long (default: 30m)",
+        help="stop a run after this long, including setup (default: 30m)",
     )
     parser.add_argument(
         "--output-dir",

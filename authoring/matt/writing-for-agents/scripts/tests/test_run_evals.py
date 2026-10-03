@@ -144,6 +144,7 @@ def run(lab: Lab, *args: str, **env: str) -> subprocess.CompletedProcess[str]:
         text=True,
         env={**lab.env, **env},
         check=False,
+        timeout=30,
     )
 
 
@@ -203,7 +204,8 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "2",
         FAKE_ACTION="gh issue view 1; gh pr create --help; gh pr create --title x; "
         "gh api -X post repos/a/b/labels; gh api repos/a/b; gh -R a/b pr merge 1; "
-        "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; true",
+        "gh stack unstack; gh api graphql --input q.json; gh -R a/b pr view 1; "
+        "gh pr create --title --help --body x; gh stack --version; true",
     )
 
     assert result.returncode == 0, result.stderr
@@ -223,6 +225,9 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "api graphql --input q.json",
         "REFUSED api graphql --input q.json",
         "-R a/b pr view 1",
+        "pr create --title --help --body x",
+        "REFUSED pr create --title --help --body x",
+        "stack --version",
     ]
     real = lab.reports / "real-gh.log"
     assert real.read_text().splitlines() == [
@@ -230,6 +235,7 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "pr create --help",
         "api repos/a/b",
         "-R a/b pr view 1",
+        "stack --version",
     ]
 
 
@@ -287,6 +293,10 @@ def test_dry_run_prints_the_plan_and_writes_nothing(lab: Lab):
     ("scenarios", "args", "message"),
     [
         ([{"query": "Go.", "setup": "In an empty folder"}], [], "setup must be a list"),
+        ([None], [], "scenario 1 must be an object"),
+        ([{"query": "Go.", "skills": "helper"}], [], "skills must be a list"),
+        ([{"query": "Go.", "skills": [None]}], [], "skills must be a list"),
+        ([{"query": "Go.", "skills": [" "]}], [], "skills must be a list"),
         ([{"query": "Go."}], ["--scenario", "3"], "--scenario 3 is out of range"),
         ([{"query": "Go."}], ["--ref", "no-such-ref"], "names no commit"),
     ],
@@ -302,9 +312,12 @@ def test_bad_input_is_a_usage_error(lab: Lab, scenarios, args, message):
     assert result.stdout == ""
 
 
-def test_an_interrupt_during_setup_launches_no_agent(lab: Lab):
+@pytest.mark.parametrize("number", [signal.SIGINT, signal.SIGTERM])
+def test_an_interrupt_during_setup_launches_no_agent(lab: Lab, number):
     evals = lab.skill / "evals" / "evals.json"
-    evals.write_text(json.dumps([{"query": "Go.", "setup": ["sleep 3"]}]))
+    evals.write_text(
+        json.dumps([{"query": "Go.", "setup": ["echo ready > ready; exec sleep 30"]}])
+    )
     runner = subprocess.Popen(
         [
             sys.executable,
@@ -320,15 +333,49 @@ def test_an_interrupt_during_setup_launches_no_agent(lab: Lab):
         env=lab.env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
-    deadline = time.monotonic() + 10
-    while not (lab.out / "s1-codex" / "query.txt").exists():
-        assert time.monotonic() < deadline, "setup never started"
-        time.sleep(0.05)
-    runner.send_signal(signal.SIGINT)
-    runner.wait(timeout=30)
+    try:
+        deadline = time.monotonic() + 10
+        while not (lab.out / "s1-codex" / "work" / "ready").exists():
+            assert time.monotonic() < deadline, "setup never started"
+            time.sleep(0.05)
+        runner.send_signal(number)
+        stdout, stderr = runner.communicate(timeout=3)
+    finally:
+        try:
+            os.killpg(runner.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        runner.communicate()
 
-    assert runner.returncode == 130
+    assert runner.returncode == 128 + number
+    assert stdout == b""
+    assert stderr == (b"interrupted\n" if number == signal.SIGINT else b"terminated\n")
+    assert not any(lab.reports.iterdir())
+
+
+def test_a_setup_timeout_stops_before_launching_an_agent(lab: Lab):
+    evals = lab.skill / "evals" / "evals.json"
+    evals.write_text(
+        json.dumps([{"query": "Go.", "setup": ["echo preparing; sleep 2"]}])
+    )
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--timeout",
+        "0.1s",
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "s1-codex\ttimeout" in result.stderr
+    assert (lab.out / "s1-codex" / "setup.log").read_text() == "preparing\n"
     assert not any(lab.reports.iterdir())
 
 
