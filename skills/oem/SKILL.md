@@ -86,7 +86,7 @@ Boundaries between:
 
 ## When You Need Me
 
-Ask only about decisions that are mine to make: at most 4 questions per round, ordered by impact. Use my terms and name who does what in each option. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
+When you need me, ask at most 4 questions per round, ordered by impact. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
 
 1) 🙋 [Question (why it matters)]
    - a) … (🟢 recommended)
