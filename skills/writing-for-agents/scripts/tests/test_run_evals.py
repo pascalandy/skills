@@ -487,3 +487,59 @@ def test_a_runner_inside_an_eval_run_refuses_to_start(lab: Lab):
     assert result.stdout == ""
     assert "running inside an eval run" in result.stderr
     assert not lab.out.exists()
+
+
+def test_git_sees_no_inherited_askpass_or_auth_header(lab: Lab):
+    write(
+        lab.home / ".gitconfig",
+        "[core]\n\taskPass = /bin/echo\n[http]\n\textraHeader = Authorization: x\n",
+    )
+    found = lab.reports / "git"
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        GIT_ASKPASS="/bin/echo",
+        SSH_ASKPASS="/bin/echo",
+        FAKE_ACTION=(
+            'printf "%s|%s|%s|%s\\n" "${GIT_ASKPASS:-none}" "${SSH_ASKPASS:-none}" '
+            '"$(git config --get core.askPass || echo none)" '
+            f'"$(git config --get-regexp "http.*extraheader" || echo none)" > {found}'
+        ),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert found.read_text().strip() == "none|none|none|none"
+
+
+def test_a_timeout_stops_a_child_in_its_own_session(lab: Lab):
+    late = lab.reports / "late"
+    escape = (
+        f"{sys.executable} -c 'import os, sys, time; os.setsid(); time.sleep(2); "
+        f'open(sys.argv[1], "w").write("late")\' {late} & sleep 30'
+    )
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        "--timeout",
+        "1s",
+        FAKE_ACTION=escape,
+    )
+    time.sleep(3)
+
+    assert result.returncode == 1
+    assert "s2-codex\ttimeout" in result.stderr
+    assert not late.exists()

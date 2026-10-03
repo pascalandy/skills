@@ -242,6 +242,8 @@ CREDENTIALS = (
     "GITHUB_TOKEN",
     "GH_ENTERPRISE_TOKEN",
     "GITHUB_ENTERPRISE_TOKEN",
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
 )
 
 log = logging.getLogger("run_evals")
@@ -269,12 +271,13 @@ at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
 ~/.agents/skills. Claude runs with --setting-sources project, so it sees only
 the copies this run installs. Setup and agent run without GitHub or git
-credentials: no gh login, no token, no credential helper, no SSH. GitHub
+credentials: no gh login, no token, no global or system git config, no
+credential helper or askpass, no SSH. GitHub
 refuses their writes, so a scenario that needs a remote uses a local bare
 repository. --github-token-file gives gh a token for scenarios that read
 GitHub; give it a read-only one. A gh shim logs every call to gh-calls.log. A
 runner started inside a run refuses to start. A run that ends or times out has
-its whole process group stopped. stdout prints one line per run: name,
+its process group and every descendant stopped. stdout prints one line per run: name,
 status, folder."""
 
 GH_SHIM = """\
@@ -372,19 +375,44 @@ class Children:
             stop(process)
 
 
+def descendants(pid: int) -> set[int]:
+    """Every process below `pid` in one `ps` snapshot, including any that left the
+    process group, such as an agent another launcher started in its own session."""
+    listed = subprocess.run(
+        ["ps", "-A", "-o", "pid=", "-o", "ppid="],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout
+    children: dict[int, list[int]] = {}
+    for line in listed.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and all(field.isdigit() for field in fields):
+            children.setdefault(int(fields[1]), []).append(int(fields[0]))
+    found: set[int] = set()
+    queue = [pid]
+    while queue:
+        for child in children.get(queue.pop(), []):
+            if child not in found:
+                found.add(child)
+                queue.append(child)
+    return found
+
+
 def stop(process: subprocess.Popen[bytes]) -> None:
-    """SIGTERM the child's process group, then SIGKILL what is left of it after
-    GRACE seconds, even when the leader already exited."""
+    """SIGTERM the child's process group and every descendant, then SIGKILL what
+    is left after GRACE seconds, even when the leader already exited."""
+    tree = descendants(process.pid)
 
-    def send(number: int) -> bool:
-        try:
-            os.killpg(process.pid, number)
-        except ProcessLookupError:
-            return False
-        return True
+    def send(number: int) -> None:
+        targets = [(os.killpg, process.pid), *((os.kill, pid) for pid in tree)]
+        for kill, target in targets:
+            try:
+                kill(target, number)
+            except (ProcessLookupError, PermissionError):
+                pass
 
-    if not send(signal.SIGTERM):
-        return
+    send(signal.SIGTERM)
     try:
         process.wait(timeout=GRACE)
     except subprocess.TimeoutExpired:
@@ -691,6 +719,8 @@ def run_env(plan: Plan, folder: Path) -> dict[str, str]:
             "GH_CONFIG_DIR": str(gh_config),
             "GIT_TERMINAL_PROMPT": "0",
             "GIT_SSH_COMMAND": "false",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_COUNT": "1",
             "GIT_CONFIG_KEY_0": "credential.helper",
             "GIT_CONFIG_VALUE_0": "",
