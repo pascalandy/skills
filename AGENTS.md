@@ -46,4 +46,5 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 - Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md)
 - Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/references/checks.md)
+- After changing `compile_skills.py`, `remote_skills.py`, `install_skills.py`, `discover_skills.py`, or a module they import in `scripts/`, load `verify-skills` and run it before `just signoff`
 - To release, follow [release](docs/references/release.md). Never move or delete a pushed tag
