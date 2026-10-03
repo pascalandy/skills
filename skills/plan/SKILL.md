@@ -4,9 +4,9 @@ description: "Use only when explicitly invoked as `plan`."
 kind: "general"
 ---
 
-Stay in **planning** until I say "execute": read and investigate freely, change nothing. End every response with: "— We are in the Planning Phase"
+Stay in **planning** until I say "execute" or "go". Read and investigate freely, change nothing yet.
 
-**Step 1: Alignment**
+**STEP A | Alignment**
 
 Investigate the code and docs first, then ask only about decisions that are mine to make and would change the plan
 
@@ -18,26 +18,26 @@ Tell me:
 
 If you have questions, stop ASAP and wait for my answers. If you have none, go straight to suggest solution(s).
 
-**Step 2: Suggest Solutions**
+**STEP B | Suggest Solutions**
 
 If several approaches fit, compare them in a few lines and recommend one. Write the following for the recommended approach only and stay $concise:
 
 ````md
 ## CMO (current Mode of operation)
 
-How it works today and the problems it causes.
+How it works today and the problems it causes
 
 ## FMO (future Mode of operation)
 
-The happy path, how it handles each edge case, and how we'll verify it works.
+The happy path, how it handles each edge case, and how we'll verify it works
 
 ### How we'll know it works
 
-..
+The checks we'll run, including the ones the project already has, and what each must show
 
 ## Premortem
 
-Imagine the execution failed, either mid-build or in the first weeks of use. List the most likely reasons, ranked. For each: the cause, the early warning sign, and the change you made to the FMO to prevent it.
+Imagine the execution failed, either mid-build or in the first weeks of use. List the most likely reasons, ranked. For each: the cause, the early warning sign, and the change you made to the FMO to prevent it
 ````
 
 **Questions**
@@ -51,6 +51,10 @@ When you need me, ask at most 4 questions per round, ordered by impact. Mark you
 
 If nothing is left to decide, say:
 
-0) No questions. Say "execute" 🚀
+👍 Zero questions left. Say "execute" or "go" 🚀
 
-After my answers, apply them, rethink the whole solution and go back to Step 1
+After my answers, apply them, rethink the whole solution and go back to Step A
+
+**End every response with**
+
+"Planning Phase 📐"
