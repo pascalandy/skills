@@ -1,6 +1,19 @@
 # Run Claude Code headlessly
 
-`scripts/headless.py claude` runs `claude -p`; read it for the exact flags. It passes `--dangerously-skip-permissions`, so the child keeps your settings, hooks, skills, and MCP servers, and it names the session so `--resume` can continue it. Under `--review-only` it also passes `--disallowedTools Edit,Write,NotebookEdit`, so the child cannot edit through its file tools. It pins the effort through `--settings`, because `CLAUDE_CODE_EFFORT_LEVEL` from the shell or any settings file overrides `--effort`. It refuses an effort Claude Code does not accept; `claude -p` alone would print a warning and run at the default. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior and the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Check `claude --help` before you pass extra flags after `--`.
+`scripts/headless.py claude` runs `claude -p`; read it for the exact flags. It passes `--dangerously-skip-permissions`, so the child keeps your settings, hooks, skills, and MCP servers, and it names the session so `--resume` can continue it. It pins the effort through `--settings`, because `CLAUDE_CODE_EFFORT_LEVEL` from the shell or any settings file overrides `--effort`. It refuses an effort Claude Code does not accept; `claude -p` alone would print a warning and run at the default. The official [headless guide](https://code.claude.com/docs/en/headless) owns non-interactive behavior and the [CLI reference](https://code.claude.com/docs/en/cli-reference) owns startup options. Check `claude --help` before you pass extra flags after `--`.
+
+## Modes
+
+Each mode passes `--model` and `--effort` from the `[claude]` table of [config.toml](../../config.toml) unless the launcher's `--model` or `--effort` overrides them. `-v` prints the exact command a run used.
+
+| Mode | Claude command | What keeps the checkout unchanged |
+| --- | --- | --- |
+| `--review-only` | `claude -p` with the prompt on stdin; the prompt starts with a review-only rule | `--disallowedTools Edit,Write,NotebookEdit` removes the file-editing tools, then the change check after the run catches an edit made through Bash |
+| `--review-fix` | The same command; the rule allows edits in `--cwd` | Nothing; read `git diff` yourself |
+
+## Models
+
+Check [model configuration](https://code.claude.com/docs/en/model-config) for model names, aliases, and effort levels before you change the `[claude]` table. `claude --help` lists the effort levels the installed CLI accepts.
 
 ## Untrusted repositories
 
