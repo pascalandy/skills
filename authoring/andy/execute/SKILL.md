@@ -34,10 +34,10 @@ Run these steps in order. Finish each one before you start the next:
 
 **4. Codex on each PR**
 - On each PR, leave the comment "@codex review"
-- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, Codex did not run: skip the rest of this step, and report the review as unavailable with any error Codex posted
+- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, report that PR's review as unavailable with any error Codex posted, and continue with the other PRs
 - Babysit: poll that comment until no row says `Running` (often 5–12 min), then read the reviews, inline comments, and reactions newer than your request. A 👍 with no review means the PR is clean
 - Fix each valid finding and dismiss the rest with a written reason. After you push a fix, comment "@codex review" again on that PR, once. Report fixes pushed after that second review as unreviewed
-- Done when Codex has reviewed each PR's latest head, or reviewed it twice, or you skipped this step
+- Done when each PR has a Codex review of its latest head, has had two Codex reviews, or has its Codex review reported as unavailable
 
 **5. Report**
 - PR links and links to the issues you filed
@@ -45,6 +45,7 @@ Run these steps in order. Finish each one before you start the next:
 - The gaps outside the scope you did not file
 - What you couldn't confirm, and where you looked
 - Confidence to merge: XX%, and why it is below 100% when it is
+- Done when the report includes every item above
 
 **6. Merge gate**
 - Land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs, when all of these hold:
@@ -57,7 +58,7 @@ Run these steps in order. Finish each one before you start the next:
 
 **7. Close**
 - Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. From each, file at most 2 issues: the fixes with the most bang for the buck
-- Say goodbye
+- Done when both retros are complete, the selected issues are filed, and you've said goodbye
 
 #### Rules
 
