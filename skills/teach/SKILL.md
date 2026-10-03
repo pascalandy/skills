@@ -2,6 +2,7 @@
 name: "teach"
 description: "Use when the user asks to be taught, requests a guided technical explanation, or wants one account combining how something works with why it was designed that way."
 kind: "dev"
+role: "helper"
 ---
 
 # Teach

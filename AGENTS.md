@@ -18,6 +18,8 @@ The compile script maps each package, a folder with a root `SKILL.md` at `author
 
 `SKILL.md` frontmatter sets `kind: "general"` when someone who never writes code would ask for the skill, and `kind: "dev"` otherwise. A `general` skill must not need a `dev` skill to run. When `kind` is missing, compiling publishes `kind: "unknown"` and no check fails; `docs/references/remote-skills.md` lists those skills under Unknown
 
+A mode is a skill named `*-mode` with a `playbooks/` folder of routes; `just remote-skills --help` gives the rules it enforces. Set `role: "helper"` on a skill that other skills call more often than Pascal does, so the remote lists show it last
+
 `scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 
 If generated output is wrong, fix `authoring/` or the compile script, then rerun `just compile-skills`

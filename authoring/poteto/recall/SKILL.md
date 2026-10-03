@@ -2,6 +2,7 @@
 name: "recall"
 description: "Use only when explicitly invoked as `recall`."
 kind: "dev"
+role: "helper"
 ---
 
 # Recall

@@ -2,6 +2,7 @@
 name: "typescript-best-practices"
 description: "Use when TypeScript work centers on type safety, domain modeling, narrowing, casts, or runtime boundaries. Use `coding-language` for general TypeScript implementation and tooling."
 kind: "dev"
+role: "helper"
 ---
 
 # TypeScript best practices
