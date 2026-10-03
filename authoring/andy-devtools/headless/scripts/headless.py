@@ -4,7 +4,7 @@
 # dependencies = []
 # ///
 """Run Codex or Claude Code as a child agent that reviews read-only, reviews and
-fixes, or runs Codex's own code review, then print the model that ran, its
+fixes, or runs the CLI's own code review, then print the model that ran, its
 session, the files it changed, and its answer. One command shape per run keeps
 headless use deterministic."""
 
@@ -266,11 +266,12 @@ EXAMPLES = """\
 examples:
   headless.py --review-only --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
   headless.py codex --code-review --base main --cwd ~/projects/app
+  headless.py claude --code-review --commit HEAD --cwd ~/projects/app
   headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
   headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
-Without a CLI name, the launcher runs the config's harness; --code-review always
+Without a CLI name, the launcher runs the config's harness, and --code-review
 runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
 flags under --code-review. On success, stdout holds the model, effort, session,
 changed, and run lines, a blank line, then the answer. The run folder keeps the
@@ -340,6 +341,7 @@ class Runner:
     efforts: tuple[str, ...]
     auth: tuple[str, ...]
     login: str
+    review: Callable[[argparse.Namespace, Path], tuple[str, ...]]
     command: Callable[[Request, Path], list[str]]
     reply: Callable[[Path], Reply]
 
@@ -406,12 +408,74 @@ def codex_reply(run: Path) -> Reply:
     return Reply(answer, header.get("model"), header.get("session id"), tuple(problems))
 
 
+def codex_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
+    title = ("--title", args.title) if args.title else ()
+    if args.base:
+        return ("--base", args.base, *title)
+    if args.uncommitted:
+        return ("--uncommitted", *title)
+    if args.commit:
+        return ("--commit", args.commit, *title)
+    return (*title, "-")
+
+
+def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
+    """The ref range `/review` reads; a range holds commits only."""
+    if args.uncommitted:
+        raise UsageError(
+            "claude --code-review reviews commits only; commit the changes, "
+            "or run codex --code-review --uncommitted"
+        )
+    if args.prompt_file is not None:
+        raise UsageError(
+            "claude --code-review takes no --prompt-file; to apply your own "
+            "criteria, use --review-only"
+        )
+    if args.title:
+        raise UsageError("--title works only with codex --code-review")
+    if args.commit:
+        if not resolves(root, f"{args.commit}^"):
+            raise UsageError(
+                f"--commit {args.commit} has no parent in {root}, as in a root commit "
+                "or a shallow clone; claude --code-review compares a commit with its parent"
+            )
+        return (f"{args.commit}^..{args.commit}",)
+    try:
+        tracked = [
+            name
+            for name in git(root, "diff", "--name-only", "-z", "HEAD").split("\0")
+            if name
+        ]
+    except GitFailure as error:
+        raise ScriptError(f"cannot read the Git state of {root}: {error}") from None
+    if tracked:
+        raise UsageError(
+            "claude --code-review --base reviews commits only, and these tracked "
+            f"files have uncommitted changes: {', '.join(tracked)}; commit them, "
+            "or run codex --code-review --base"
+        )
+    return (f"{args.base}...HEAD",)
+
+
 def claude_command(request: Request, run: Path) -> list[str]:
     session = "--resume" if request.resume else "--session-id"
     settings = json.dumps({"env": {"CLAUDE_CODE_EFFORT_LEVEL": request.effort}})
+    # /review, unlike /code-review, cannot be replaced by a custom skill. Without
+    # a level, it reuses the level last typed in any session. The mode rule moves
+    # to the system prompt, since a command only expands at the prompt's start
+    review = (
+        [
+            f"/review {request.effort} {' '.join(request.review)}",
+            "--append-system-prompt",
+            RULES["review-only"].format(cwd=request.cwd),
+        ]
+        if request.mode == "code-review"
+        else []
+    )
     return [
         "claude",
         "-p",
+        *review,
         "--model",
         request.model,
         "--effort",
@@ -421,7 +485,7 @@ def claude_command(request: Request, run: Path) -> list[str]:
         "--dangerously-skip-permissions",
         *(
             ["--disallowedTools", CLAUDE_EDIT_TOOLS]
-            if request.mode == "review-only"
+            if request.mode in READ_ONLY
             else []
         ),
         "--output-format",
@@ -468,6 +532,7 @@ RUNNERS = {
         efforts=("low", "medium", "high", "xhigh", "max", "ultra"),
         auth=("codex", "login", "status"),
         login="codex login",
+        review=codex_review,
         command=codex_command,
         reply=codex_reply,
     ),
@@ -475,6 +540,7 @@ RUNNERS = {
         efforts=("low", "medium", "high", "xhigh", "max"),
         auth=("claude", "auth", "status", "--text"),
         login="claude auth login",
+        review=claude_review,
         command=claude_command,
         reply=claude_reply,
     ),
@@ -548,14 +614,13 @@ def load_config(path: Path) -> Config:
 
 
 def resolve_target(named: str | None, mode: str, config: Config) -> str:
-    """The CLI to run: --code-review needs Codex, a named CLI wins, else the config's harness."""
+    """The CLI to run: a named CLI wins, else --code-review runs Codex and the
+    other modes run the config's harness."""
+    if named:
+        return named
     if mode == "code-review":
-        if named not in (None, "codex"):
-            raise UsageError(
-                f"--code-review runs Codex only; drop {named} or pass codex"
-            )
         return "codex"
-    target = named or config.harness
+    target = config.harness
     if target not in RUNNERS:
         raise UsageError(
             f'{config.path} sets harness = "{target}", which the launcher does not run '
@@ -564,8 +629,8 @@ def resolve_target(named: str | None, mode: str, config: Config) -> str:
     return target
 
 
-def review_target(args: argparse.Namespace) -> tuple[str, ...]:
-    """What `codex exec review` reviews, as its flags; empty for the other modes."""
+def check_mode_flags(args: argparse.Namespace) -> None:
+    """Reject flags the mode cannot use; each CLI's review function checks the rest."""
     diff = [
         flag
         for flag, value in (
@@ -581,7 +646,7 @@ def review_target(args: argparse.Namespace) -> tuple[str, ...]:
             raise UsageError(f"{', '.join(diff)} works only with --code-review")
         if args.prompt_file is None:
             raise UsageError(f"--{args.mode} needs --prompt-file")
-        return ()
+        return
     if args.resume:
         raise UsageError(
             "--code-review cannot resume; ask follow-up questions with "
@@ -595,14 +660,6 @@ def review_target(args: argparse.Namespace) -> tuple[str, ...]:
             "--code-review needs exactly one of --base, --uncommitted, --commit, "
             "or --prompt-file"
         )
-    title = ("--title", args.title) if args.title else ()
-    if args.base:
-        return ("--base", args.base, *title)
-    if args.uncommitted:
-        return ("--uncommitted", *title)
-    if args.commit:
-        return ("--commit", args.commit, *title)
-    return (*title, "-")
 
 
 class GitFailure(Exception):
@@ -801,7 +858,7 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         raise UsageError(
             f"--effort {effort} is not one of {', '.join(runner.efforts)} for {target}"
         )
-    review = review_target(args)
+    check_mode_flags(args)
     if args.mode == "code-review":
         for flag in ("--dangerously-bypass-approvals-and-sandbox", "--yolo"):
             if flag in extra:
@@ -820,12 +877,13 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         raise UsageError(
             f"--code-review reviews a Git diff; {cwd} is not a Git checkout"
         )
-    # Codex only meets a missing ref mid-review, after the paid run has started
+    # The child only meets a missing ref mid-review, after the paid run has started
     for flag, ref in (("--base", args.base), ("--commit", args.commit)):
         if ref and root and not resolves(root, ref):
             raise UsageError(
                 f"{flag} {ref} names no commit in {cwd}; run 'git fetch' or name one that exists"
             )
+    review = runner.review(args, root) if args.mode == "code-review" and root else ()
     preflight(target, runner)
 
     before = snapshot(root, cwd, "before the run") if root else None
@@ -902,7 +960,7 @@ def build_parser() -> Parser:
         "target",
         nargs="?",
         choices=sorted(RUNNERS),
-        help="child CLI to run (default: harness in the config)",
+        help="child CLI to run (default: harness in the config; codex for --code-review)",
     )
     access = parser.add_mutually_exclusive_group(required=True)
     access.add_argument(
@@ -925,14 +983,14 @@ def build_parser() -> Parser:
         dest="mode",
         action="store_const",
         const="code-review",
-        help="run Codex's own review, codex exec review, read-only; the run fails "
-        "if the checkout changed",
+        help="run the CLI's own reviewer read-only, codex exec review or Claude "
+        "Code's /review; the run fails if the checkout changed",
     )
     parser.add_argument(
         "--prompt-file",
         metavar="FILE",
         help="the task for the child; - reads stdin. Required by --review-only and "
-        "--review-fix; with --code-review, custom review instructions in place "
+        "--review-fix; with codex --code-review, custom review instructions in place "
         "of a diff to review",
     )
     diff = parser.add_mutually_exclusive_group()
@@ -944,7 +1002,7 @@ def build_parser() -> Parser:
     diff.add_argument(
         "--uncommitted",
         action="store_true",
-        help="with --code-review: review staged, unstaged, and untracked changes",
+        help="with codex --code-review: review staged, unstaged, and untracked changes",
     )
     diff.add_argument(
         "--commit",
@@ -952,7 +1010,7 @@ def build_parser() -> Parser:
         help="with --code-review: review the changes a commit introduced",
     )
     parser.add_argument(
-        "--title", help="with --code-review: the title the review summary shows"
+        "--title", help="with codex --code-review: the title the review summary shows"
     )
     parser.add_argument(
         "--cwd",
@@ -969,7 +1027,7 @@ def build_parser() -> Parser:
     )
     parser.add_argument(
         "--model",
-        help="model for the child; --code-review passes it as review_model too "
+        help="model for the child; codex --code-review passes it as review_model too "
         "(default: model in the config)",
     )
     parser.add_argument(

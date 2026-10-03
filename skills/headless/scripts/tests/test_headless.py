@@ -646,6 +646,67 @@ def test_code_review_runs_codex_even_when_the_config_harness_is_claude(
     assert call["argv"][:2] == ["exec", "review"]
 
 
+def test_claude_code_review_types_review_with_the_effort_and_a_range(env, repo):
+    subprocess.run(["git", "branch", "main"], cwd=repo, check=False)
+    done = launch(env, repo, "claude", "--code-review", "--base", "main", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == ["model: claude-opus-5-5", "effort: xhigh"]
+    [call] = calls(env)
+    argv = call["argv"]
+    assert argv[:2] == ["-p", "/review xhigh main...HEAD"]
+    assert call["stdin"] == ""
+    assert argv[argv.index("--disallowedTools") + 1] == "Edit,Write,NotebookEdit"
+    rule = argv[argv.index("--append-system-prompt") + 1]
+    assert "do not commit, push, merge, or post comments" in rule
+
+
+def test_claude_code_review_compares_a_commit_with_its_parent(env, repo):
+    (repo / "NOTES.md").write_text("notes\n")
+    for command in (
+        ["git", "add", "NOTES.md"],
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "notes"],
+    ):
+        subprocess.run(command, cwd=repo, check=True)
+    done = launch(
+        env,
+        repo,
+        "claude",
+        "--code-review",
+        "--commit",
+        "HEAD",
+        "--effort",
+        "low",
+        prompt=None,
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][1] == "/review low HEAD^..HEAD"
+
+
+@pytest.mark.parametrize("staged", [False, True])
+def test_claude_code_review_of_a_base_refuses_uncommitted_tracked_changes(
+    env, repo, staged
+):
+    (repo / "README.md").write_text("edited\n")
+    if staged:
+        subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
+
+    assert done.returncode == 2
+    assert "tracked files have uncommitted changes: README.md" in done.stderr
+    assert calls(env) == []
+
+
+def test_claude_code_review_of_a_base_ignores_untracked_files(env, repo):
+    (repo / "draft.md").write_text("draft\n")
+    done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[3] == "changed: nothing"
+
+
 def test_a_code_review_that_edits_the_checkout_fails(env, repo):
     done = launch(
         env,
@@ -670,7 +731,18 @@ def test_a_code_review_that_edits_the_checkout_fails(env, repo):
         ),
         (("--code-review", "--base", "main"), "x", "needs exactly one of"),
         (("--code-review", "--uncommitted", "--resume", "abc"), None, "cannot resume"),
-        (("claude", "--code-review", "--uncommitted"), None, "runs Codex only"),
+        (
+            ("claude", "--code-review", "--uncommitted"),
+            None,
+            "run codex --code-review --uncommitted",
+        ),
+        (("claude", "--code-review"), "x", "use --review-only"),
+        (
+            ("claude", "--code-review", "--commit", "HEAD", "--title", "t"),
+            None,
+            "--title works only with codex --code-review",
+        ),
+        (("claude", "--code-review", "--commit", "HEAD"), None, "has no parent"),
         (
             ("codex", "--review-only", "--base", "main"),
             "x",
