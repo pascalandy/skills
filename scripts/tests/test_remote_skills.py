@@ -29,7 +29,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def skill(root: Path, name: str, text: str, *playbooks: str) -> None:
     """A compiled skill; each playbook ending in / is a folder, else a file. Each
-    route's entry file describes it as "Run <route>."."""
+    route's entry file describes it as: Run <route>."""
     path = root / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
