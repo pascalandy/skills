@@ -141,7 +141,7 @@ def test_a_route_lists_the_first_sentence_of_its_description(root: Path) -> None
     skill(root, "draw-mode", tagged("draw-mode", "Use to draw.", "general"), "ink.md")
     (root / "skills/draw-mode/playbooks/ink.md").write_text(
         "---\nname: ink\n"
-        'description: "Ink logos, e.g. Marks vs. Icons for U.S. Clients. Also use when inking."\n'
+        'description: "Ink logos, e.g. Marks vs. Icons for U.S. Clients in v2.0. Also use when inking."\n'
         "---\n",
         encoding="utf-8",
     )
@@ -149,7 +149,7 @@ def test_a_route_lists_the_first_sentence_of_its_description(root: Path) -> None
     assert run()[0] == 0
     assert listing(root, GENERAL) == (
         f"{URL}## Modes\n\n- `draw-mode`: Use to draw.\n"
-        "  - `ink`: Ink logos, e.g. Marks vs. Icons for U.S. Clients.\n"
+        "  - `ink`: Ink logos, e.g. Marks vs. Icons for U.S. Clients in v2.0.\n"
     )
 
 

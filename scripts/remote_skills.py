@@ -33,7 +33,7 @@ ROUTES = "A mode's routes run through that mode's SKILL.md."
 TIERS = ("modes", "skills", "helpers")
 # A route lists only its first sentence, since upstream descriptions run long;
 # "vs." and initialisms such as "e.g." or "U.S." do not end one
-SENTENCE_END = re.compile(r"(?<=[.!?])(?<!\.\w\.)(?<!\bvs\.) +(?=[A-Z])")
+SENTENCE_END = re.compile(r"(?<=[.!?])(?<!\.[A-Za-z]\.)(?<!\bvs\.) +(?=[A-Z])")
 
 EPILOG = """\
 The lists read skills/, so run just compile-skills first. Each kind lists its
