@@ -1,3 +1,7 @@
+---
+description: "Generate a fixed five-file ontology of concepts, systems, questions, and connections from a folder of text."
+---
+
 # Ontology Map
 
 > Corpus-agnostic ontology generator. Given a directory, produces a fixed 5-file ontology: `INDEX.md`, `concepts.md`, `systems.md`, `questions.md`, `connections.md`. Works on wikis, docs trees, lecture notes, book chapters, or any folder of text. The skill owns output end-to-end; users do not hand-edit these files.

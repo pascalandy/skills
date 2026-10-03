@@ -1,3 +1,7 @@
+---
+description: "Search, retrieve from, or maintain collections in QMD, a local search engine for Markdown files."
+---
+
 # QMD
 
 This skill is a local policy layer over the version-matched skill bundled with

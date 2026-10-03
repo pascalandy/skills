@@ -1,3 +1,7 @@
+---
+description: "Document a change, decision, or artifact that already exists, as one bounded documentation job."
+---
+
 # Doc Update Session
 
 Explicit entry point: `andy-mode ; docs`.

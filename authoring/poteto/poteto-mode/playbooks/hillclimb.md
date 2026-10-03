@@ -1,3 +1,7 @@
+---
+description: "Improve one metric toward a target through measured hypotheses, a decision log, and one commit per accepted win."
+---
+
 ### Hillclimb
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

@@ -1,3 +1,7 @@
+---
+description: "Apply a named distill prompt to a local text file and save the result in a timestamped folder beside it."
+---
+
 # distill
 
 > Apply named distill prompt to local text file. Output lands in timestamped folder beside input

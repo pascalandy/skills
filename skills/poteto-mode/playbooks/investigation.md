@@ -1,3 +1,7 @@
+---
+description: "Answer a read-only question about how code works, why it was built that way, or which option to pick, with cited evidence."
+---
+
 ### Investigation
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

@@ -1,3 +1,7 @@
+---
+description: "Test how a skill, structure, or prompt change affects agent behavior before promoting it."
+---
+
 ### Eval
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

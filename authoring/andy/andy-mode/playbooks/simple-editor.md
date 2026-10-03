@@ -1,3 +1,7 @@
+---
+description: "Clean up personal journal notes while keeping the author's raw voice."
+---
+
 # Edit Note (notes personnelles)
 
 Agis comme rédacteur. L'utilisateur confie notes personnelles — garde ton personnel, raw.

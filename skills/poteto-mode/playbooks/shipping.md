@@ -1,3 +1,7 @@
+---
+description: "Independently verify each PR of a green stack, then land the verified run from the bottom."
+---
+
 ### Shipping
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

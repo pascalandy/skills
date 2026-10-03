@@ -12,41 +12,41 @@ A mode's routes run through that mode's SKILL.md.
 ## Modes
 
 - `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests.
-  - architecture-review
-  - test-audit
-  - thermo-quality-review
+  - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
+  - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
+  - `thermo-quality-review`: Run an unusually strict review of production code for structure, file size, branching, types, and layering.
 - `matt-mode`: Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets.
-  - codebase-design
-  - domain-modeling
-  - grill-me
-  - grill-with-docs
-  - to-spec
-  - to-tickets
-  - wayfinder
+  - `codebase-design`: Shared vocabulary for designing deep modules.
+  - `domain-modeling`: Build and sharpen a project's domain model.
+  - `grill-me`: A relentless interview to sharpen a plan or design.
+  - `grill-with-docs`: A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.
+  - `to-spec`: Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed.
+  - `to-tickets`: Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker (edges as text in one file per ticket locally, or native blocking links on a real tracker).
+  - `wayfinder`: Plan a huge chunk of work (more than one agent session can hold) as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear.
 - `poteto-mode`: Use only when explicitly invoked as `poteto` or `poteto-mode`.
-  - authoring-a-skill
-  - autonomous-run
-  - autopilot-full
-  - autopilot-stack
-  - babysit
-  - bug-fix
-  - eval
-  - feature
-  - hillclimb
-  - investigation
-  - multi-phase-plan
-  - opening-a-pr
-  - orchestrate
-  - pause-safely
-  - perf-issue
-  - prototype
-  - refactoring
-  - runtime-forensics
-  - session-pickup
-  - shipping
-  - trace-forensics
-  - visual-parity
-  - worktree-cleanup
+  - `authoring-a-skill`: Write or edit a skill's SKILL.md and supporting files.
+  - `autonomous-run`: Drive one long task to completion without stopping, until a stated exit condition holds.
+  - `autopilot-full`: Run a queue of independent PRs to merged with full autonomy, one owner per PR and each merge verified first.
+  - `autopilot-stack`: Build and verify a queue of changes autonomously, then hand over one reviewed stack for the operator to land.
+  - `babysit`: Drive a PR or a stack to merge-ready by resolving conflicts, review threads, and CI.
+  - `bug-fix`: Reproduce, root-cause, and fix a reported defect with runtime evidence.
+  - `eval`: Test how a skill, structure, or prompt change affects agent behavior before promoting it.
+  - `feature`: Build new or changed behavior, starting from a named data shape.
+  - `hillclimb`: Improve one metric toward a target through measured hypotheses, a decision log, and one commit per accepted win.
+  - `investigation`: Answer a read-only question about how code works, why it was built that way, or which option to pick, with cited evidence.
+  - `multi-phase-plan`: Write the plan for work that spans several phases or stacked PRs, as a checklist an owner runs box by box.
+  - `opening-a-pr`: Open a pull request at the end of any other playbook.
+  - `orchestrate`: Coordinate a multi-day project of many stacked PRs and subagents from one standing coordinator.
+  - `pause-safely`: Suspend in-flight work at a safe boundary, with a checkpoint another session can resume from.
+  - `perf-issue`: Trace a measured slowness and improve it against a baseline.
+  - `prototype`: Build a throwaway sketch to settle a design or behavior question by observing it.
+  - `refactoring`: Restructure code without changing its behavior, such as a rename, extraction, or move.
+  - `runtime-forensics`: Diagnose a runtime symptom such as a leak, idle CPU spin, or glitch from live instrumentation.
+  - `session-pickup`: Resume or take over another agent's in-flight work from a transcript, a cloud-agent URL, or a pushed branch.
+  - `shipping`: Independently verify each PR of a green stack, then land the verified run from the bottom.
+  - `trace-forensics`: Diagnose a captured profiling artifact such as a CPU profile, trace, or heap snapshot.
+  - `visual-parity`: Make two UI implementations match pixel for pixel, or migrate a styling system without visual change.
+  - `worktree-cleanup`: Reclaim disk space by pruning merged or abandoned git worktrees and stale iOS simulators.
 
 ## Skills
 

@@ -1,3 +1,7 @@
+---
+description: "Drive a PR or a stack to merge-ready by resolving conflicts, review threads, and CI."
+---
+
 ### Babysit
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

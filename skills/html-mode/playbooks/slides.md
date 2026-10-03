@@ -1,3 +1,7 @@
+---
+description: "Build an HTML slide deck with reveal.js that tells one story a screen at a time."
+---
+
 # Slides
 
 Use this playbook only for presentations delivered as HTML. PowerPoint, Google Slides, and other presentation formats keep their own workflows.

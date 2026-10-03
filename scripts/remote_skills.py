@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 from pathlib import Path
 
 from _cli import Parser, ScriptError, exit_codes
@@ -30,12 +31,17 @@ URL = (
 )
 ROUTES = "A mode's routes run through that mode's SKILL.md."
 TIERS = ("modes", "skills", "helpers")
+# A route lists only its first sentence, since upstream descriptions run long;
+# "vs." and initialisms such as "e.g." or "U.S." do not end one
+SENTENCE_END = re.compile(r"(?<=[.!?])(?<!\.[A-Za-z]\.)(?<!\bvs\.) +(?=[A-Z])")
 
 EPILOG = """\
 The lists read skills/, so run just compile-skills first. Each kind lists its
 modes, each with its routes, then its skills, then its helpers. A mode is a
 skill named *-mode with a playbooks/ folder; a skill with only one of the two
-fails the run. Each non-hidden file or folder in playbooks/ is a route.
+fails the run. Each non-hidden file or folder in playbooks/ is a route. A
+route's entry file, the file itself or <route>/<route>.md in the folder, needs
+a description in its frontmatter; the list keeps its first sentence.
 A skill whose frontmatter sets role: "helper" lists under helpers. Modes
 cannot set a role.
 
@@ -63,16 +69,20 @@ EXIT_CODES = exit_codes(
 log = logging.getLogger("remote-skills")
 
 
+def description_problems(description: str) -> list[str]:
+    if not description:
+        return ["has no description"]
+    # A quoted "\n" decodes to a real line break, which would split the bullet
+    if "\n" in description or "\r" in description:
+        return ["has a line break in its description"]
+    return []
+
+
 def problems(
     name: str, description: str, role: str | None, has_playbooks: bool
 ) -> list[str]:
     """What keeps a skill off the lists, each phrased to follow its SKILL.md path."""
-    found: list[str] = []
-    if not description:
-        found.append("has no description")
-    # A quoted "\n" decodes to a real line break, which would split the bullet
-    elif "\n" in description or "\r" in description:
-        found.append("has a line break in its description")
+    found = description_problems(description)
     if name.endswith("-mode") and not has_playbooks:
         found.append("is named like a mode but has no playbooks/ folder beside it")
     if has_playbooks and not name.endswith("-mode"):
@@ -82,6 +92,37 @@ def problems(
     if role is not None and has_playbooks:
         found.append("is a mode, which always lists first, but sets a role")
     return found
+
+
+def failure(path: Path, problem: str) -> str:
+    return (
+        f"{path.relative_to(ROOT)} {problem}; "
+        "fix its source in authoring/, then run: just compile-skills"
+    )
+
+
+def route_bullets(playbooks: Path, errors: list[str]) -> str:
+    """One nested bullet per route, in name order, each with the first sentence
+    of its entry file's description; what keeps a route off goes to errors."""
+    bullets: list[str] = []
+    entries = sorted(
+        (entry.name.removesuffix(".md"), entry)
+        for entry in playbooks.iterdir()
+        # Hidden entries, such as the .DS_Store Finder drops, are not routes
+        if not entry.name.startswith(".")
+    )
+    for route, entry in entries:
+        source = entry / f"{route}.md" if entry.is_dir() else entry
+        if not source.is_file():
+            errors.append(failure(source, "is missing"))
+            continue
+        description = frontmatter_description(source.read_text(encoding="utf-8"))
+        if found := description_problems(description):
+            errors.extend(failure(source, problem) for problem in found)
+            continue
+        description = SENTENCE_END.split(description, maxsplit=1)[0]
+        bullets.append(f"  - `{route}`: {description}\n")
+    return "".join(bullets)
 
 
 def bullets_by_kind() -> dict[str, dict[str, list[str]]]:
@@ -98,27 +139,11 @@ def bullets_by_kind() -> dict[str, dict[str, list[str]]]:
         playbooks = path.parent / "playbooks"
         has_playbooks = playbooks.is_dir()
         if found := problems(name, description, role, has_playbooks):
-            errors.extend(
-                f"{path.relative_to(ROOT)} {problem}; "
-                "fix its source in authoring/, then run: just compile-skills"
-                for problem in found
-            )
+            errors.extend(failure(path, problem) for problem in found)
             continue
-        # Hidden entries, such as the .DS_Store Finder drops, are not routes
-        routes = (
-            sorted(
-                entry.name.removesuffix(".md")
-                for entry in playbooks.iterdir()
-                if not entry.name.startswith(".")
-            )
-            if has_playbooks
-            else []
-        )
+        routes = route_bullets(playbooks, errors) if has_playbooks else ""
         tier = "modes" if has_playbooks else "helpers" if role else "skills"
-        bullets[kind_of(text)][tier].append(
-            f"- `{name}`: {description}\n"
-            + "".join(f"  - {route}\n" for route in routes)
-        )
+        bullets[kind_of(text)][tier].append(f"- `{name}`: {description}\n{routes}")
     if errors:
         raise ScriptError(*errors)
     if not any(any(tiers.values()) for tiers in bullets.values()):

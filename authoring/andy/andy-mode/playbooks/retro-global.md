@@ -1,3 +1,7 @@
+---
+description: "Review a coding session for changes to the agent's environment, such as checks, steering files, or tools, that would help the next run."
+---
+
 # Retro global
 
 Review the coding agent's **environment** so future runs go better. This is not an incident postmortem or a review limited to the skills loaded in the session.

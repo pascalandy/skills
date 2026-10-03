@@ -1,3 +1,7 @@
+---
+description: "Audit tests, and production code that exists only for tests, keeping only tests that add real confidence."
+---
+
 # Test Audit
 
 Three modes, one value bar. Authoring mode gates every new or changed test at

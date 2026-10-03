@@ -1,3 +1,7 @@
+---
+description: "Diagnose a captured profiling artifact such as a CPU profile, trace, or heap snapshot."
+---
+
 ### Trace forensics
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.

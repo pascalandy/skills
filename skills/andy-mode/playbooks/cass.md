@@ -1,3 +1,7 @@
+---
+description: "Search past coding-agent sessions with CASS, a CLI that indexes local agent transcripts."
+---
+
 # CASS
 
 CASS indexes coding-agent sessions and exposes them through a CLI and TUI

@@ -1,3 +1,7 @@
+---
+description: "Draw an HTML diagram that shows how components, events, states, or concepts relate."
+---
+
 # Diagram
 
 1. Name the question the diagram answers. Read [diagram techniques](../references/diagram-techniques.md) to choose notation and rendering method. Decide what must remain visible together and what can appear on demand. Finish when one visual grammar explains the primary relationship.

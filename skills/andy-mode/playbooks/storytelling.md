@@ -1,3 +1,7 @@
+---
+description: "Discover, write, diagnose, adapt, or explain a narrative so it moves its audience."
+---
+
 # Storytelling
 
 Make narrative **movement** actionable as deliberate audience change without taking

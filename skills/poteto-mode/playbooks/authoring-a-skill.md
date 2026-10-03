@@ -1,3 +1,7 @@
+---
+description: "Write or edit a skill's SKILL.md and supporting files."
+---
+
 ### Authoring or modifying a skill
 
 Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
