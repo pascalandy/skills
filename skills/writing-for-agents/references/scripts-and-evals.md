@@ -35,7 +35,7 @@ Build evaluations before writing extensive instructions, so the skill solves obs
 
 1. **Find the gaps**: run an agent on representative tasks without the skill, and note each failure or missing piece of context
 2. **Write three scenarios** that test those gaps
-3. **Record a baseline**: how the agent does without the skill
+3. **Record a baseline**: how the agent does without the skill, or with its current version when you improve one
 4. **Write the minimum**: just enough instruction to close the gaps and pass the scenarios
 5. **Iterate**: rerun the scenarios, compare with the baseline, and refine
 
@@ -44,6 +44,7 @@ Keep the scenarios in the skill's `evals/evals.json`, one object per scenario:
 ```json
 {
   "skills": ["pdf-processing"],
+  "setup": ["mkdir test-files", "cp \"$EVALS/fixtures/document.pdf\" test-files/"],
   "query": "Extract all text from this PDF file and save it to output.txt",
   "files": ["test-files/document.pdf"],
   "expected_behavior": [
@@ -54,4 +55,6 @@ Keep the scenarios in the skill's `evals/evals.json`, one object per scenario:
 }
 ```
 
-Run each scenario in a fresh agent session, on every agent the skill targets.
+`setup` lists the shell commands that build the scenario's folder; `$EVALS` names the `evals` folder. Name a fixture so no agent or script mistakes it for a live file, such as `agents-md.md` for an `AGENTS.md` or `SKILL.md.txt` for a `SKILL.md`, and let `setup` copy it to the real name.
+
+Run the scenarios with the eval runner in `SKILL.md`. It gives each scenario a fresh session on every agent it targets, with the skill copied from a git ref and the installed copies hidden, so a run never tests the wrong version.
