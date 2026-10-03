@@ -33,6 +33,7 @@ def test_a_route_keeps_only_its_description_and_a_shared_skill_keeps_none() -> N
         b"description:\n",
         b"description: >\n  Turn talk into a spec.\n",
         b"description: Turn talk\n  into a spec.\n",
+        b"description: Turn talk\n\n  into a spec.\n",
     ],
 )
 def test_a_route_without_a_one_line_description_fails(frontmatter: bytes) -> None:

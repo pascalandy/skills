@@ -271,7 +271,7 @@ def strip_frontmatter(
         if not line.startswith(b"description:"):
             continue
         value = line.removeprefix(b"description:").strip()
-        following = lines[index + 1] if index + 1 < len(lines) else b""
+        following = next((later for later in lines[index + 1 :] if later.strip()), b"")
         # A folded, literal, or wrapped value would need a YAML parser to keep
         if (
             value
