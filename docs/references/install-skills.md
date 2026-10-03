@@ -50,7 +50,7 @@ GitHub's `main` is the source. Every machine in the fleet runs the same commands
 - `just merge` runs `just deploy` from this machine's main checkout after it merges a PR, when `main` holds the tree its checks ran on, so the fleet gets the new `main` without a pull
 - `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference on stderr. It compares names and contents, so skills other tools installed do not count
 - Editing a private skill fires no hook, so run `just sync` or `just sync-fleet` afterwards; each sync also saves the private edits of the machines it reaches
-- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `private-network` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
+- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `fleet` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
 
 ```toml
 [machines.om1]
