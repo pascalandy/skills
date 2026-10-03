@@ -253,13 +253,34 @@ def sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def strip_frontmatter(content: bytes, source: PurePosixPath) -> bytes:
+def strip_frontmatter(
+    content: bytes, source: PurePosixPath, *, keep_description: bool
+) -> bytes:
+    """The entry's body. A route keeps only its upstream description, which
+    `just remote-skills` lists under matt-mode."""
     if not content.startswith(b"---\n"):
         fail(f"source entry has no opening frontmatter: {source}")
     end = content.find(b"\n---\n", 4)
     if end < 0:
         fail(f"source entry has unterminated frontmatter: {source}")
-    return content[end + len(b"\n---\n") :]
+    body = content[end + len(b"\n---\n") :]
+    if not keep_description:
+        return body
+    lines = content[4:end].split(b"\n")
+    for index, line in enumerate(lines):
+        if not line.startswith(b"description:"):
+            continue
+        value = line.removeprefix(b"description:").strip()
+        following = next((later for later in lines[index + 1 :] if later.strip()), b"")
+        # A folded, literal, or wrapped value would need a YAML parser to keep
+        if (
+            value
+            and value[:1] not in (b">", b"|")
+            and following[:1] not in (b" ", b"\t")
+        ):
+            return b"---\n" + line + b"\n---\n" + body
+        break
+    fail(f"source entry needs a one-line description: {source}")
 
 
 def render_markdown(
@@ -395,7 +416,9 @@ def build_plan(
             if relative.parts == ("SKILL.md",):
                 destination = mapping.destination / mapping.entry
                 rendered = render_markdown(
-                    strip_frontmatter(raw, source),
+                    strip_frontmatter(
+                        raw, source, keep_description=mapping.kind == "internal"
+                    ),
                     source,
                     destination,
                     entry_destinations,

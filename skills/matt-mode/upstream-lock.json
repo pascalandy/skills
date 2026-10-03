@@ -120,7 +120,7 @@
       "source": "skills/engineering/codebase-design/SKILL.md",
       "destination": "matt-mode/playbooks/codebase-design/codebase-design.md",
       "source_sha256": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2",
-      "rendered_sha256": "bf218e7ecc69d33a682cf2ffe7c3a7bc45de3c5bc1410fb6cb9beb0081d73a03"
+      "rendered_sha256": "5c4d1e9c99f8351f5f85d4a0ca1255c78b42f5a83c71a1cd7c1c28f4968cae79"
     },
     {
       "source": "skills/engineering/domain-modeling/ADR-FORMAT.md",
@@ -138,37 +138,37 @@
       "source": "skills/engineering/domain-modeling/SKILL.md",
       "destination": "matt-mode/playbooks/domain-modeling/domain-modeling.md",
       "source_sha256": "327a2b50620e2fd70abc6893cd6965e76b20f8d0adb0dc2c8d5eb3845efb643e",
-      "rendered_sha256": "70a61a670fcdba4d91c277379e6e866d42e244e786c6f6ff68951d840b3b484e"
+      "rendered_sha256": "f71ea240c2dcb6a00e6233d11bf7df330b41875b2d2fc7c2475846f873f621be"
     },
     {
       "source": "skills/productivity/grill-me/SKILL.md",
       "destination": "matt-mode/playbooks/grill-me/grill-me.md",
       "source_sha256": "caaf8b8de1684f96e26b28f3c29189db5c89cce4b73e1c93d86164f66ef88637",
-      "rendered_sha256": "dba3de439b31e958dfe3e7ac400899749e3f371bd5abf1e22f2cbd70e5d0d916"
+      "rendered_sha256": "79e66aba96fa863f389a09aae46b961b9b602069f2d039887c7df5d65639f9a2"
     },
     {
       "source": "skills/engineering/grill-with-docs/SKILL.md",
       "destination": "matt-mode/playbooks/grill-with-docs/grill-with-docs.md",
       "source_sha256": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
-      "rendered_sha256": "3718eba313f0e6110be0536ea9947f6b7f554cd2063668a0c329cacbbb3ddfd3"
+      "rendered_sha256": "89e8bbf78f346265d7f58d9a29761b9a577cfa828e47a6dfa96287b0d4ab85d9"
     },
     {
       "source": "skills/engineering/to-spec/SKILL.md",
       "destination": "matt-mode/playbooks/to-spec/to-spec.md",
       "source_sha256": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088",
-      "rendered_sha256": "9bc986bf599128bea79697a60115308c8433715674952c1832408aac7e823044"
+      "rendered_sha256": "d6176d79525a4337b42886791c414936c6bfba5a7b8387c38ce575a13aa4c841"
     },
     {
       "source": "skills/engineering/to-tickets/SKILL.md",
       "destination": "matt-mode/playbooks/to-tickets/to-tickets.md",
       "source_sha256": "5c9fba69845c2519b9b35b9af42ae5142c21f8ca15ac2123dc2722002c8058ae",
-      "rendered_sha256": "46f69979505d9b76f4bab2c8b2a55cedd422ae08719ba9c5a00801e08280c29b"
+      "rendered_sha256": "24d266b311d592037f4d85e835af4e4fd548971b840e57e81103d71d45aed5e0"
     },
     {
       "source": "skills/engineering/wayfinder/SKILL.md",
       "destination": "matt-mode/playbooks/wayfinder/wayfinder.md",
       "source_sha256": "fee6e1d0c50f0e736b4ef8a599060c959afae904c9a97d82c97f049fcc3aa0f1",
-      "rendered_sha256": "dd4a5254d80a47420ff91af70e5310c6d9ad40dcad26bba90426173874970b1b"
+      "rendered_sha256": "296a7d21387ebc157f58286a7f064e6563a06eedb9bfca2987a7619608cbadae"
     },
     {
       "source": "LICENSE",
