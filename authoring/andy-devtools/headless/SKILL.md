@@ -6,7 +6,7 @@ kind: "dev"
 
 # Headless CLI agents
 
-Run Codex or Claude Code as a child agent with `scripts/headless.py`, so every headless run is deterministic: one command shape, a required mode flag, defaults from one file, and fixed exit codes. The launcher gives the child the access of an interactive session, waits for it, checks the result, and prints the answer. `<skill-dir>` below is the directory that holds this file. The launcher does not run OpenCode or Pi yet (#281); read [OpenCode](references/opencode/MetaSkill.md) or [Pi](references/pi/MetaSkill.md) for those.
+Run Codex or Claude Code as a child agent with `scripts/headless.py`, so every headless run is deterministic: one command shape, a required mode flag, defaults from one file, and fixed exit codes. The launcher waits for the child, checks the result, and prints the answer. `<skill-dir>` below is the directory that holds this file. The launcher does not run OpenCode or Pi yet (#281); read [OpenCode](references/opencode/MetaSkill.md) or [Pi](references/pi/MetaSkill.md) for those.
 
 1. Pick the mode the request asks for: `--review-only`, `--review-fix`, or `--code-review`, Codex's own reviewer
 2. For `--review-only` and `--review-fix`, write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up. For `--code-review`, pick the diff it reviews, as [Codex code review](#codex-code-review) describes
@@ -37,7 +37,7 @@ Without `codex` or `claude`, the launcher runs the config's `harness`, as [Defau
 
 The child gets the same access, with every tool, and may edit files in `--cwd` to fix what it finds. It leaves commits, pushes, and comments to you.
 
-The launcher never sandboxes `codex exec`. When a request asks for a sandboxed fixer, such as `-s workspace-write` with `.git` read-only and no network, run `codex exec` yourself with the `model` and `reasoning-level` of the config's `[codex]` table, then run the checks the child could not run offline and commit its changes:
+For `--review-only` and `--review-fix`, the launcher runs `codex exec` without a sandbox. When a request asks for a sandboxed fixer, such as `-s workspace-write` with `.git` read-only and no network, run `codex exec` yourself with the `model` and `reasoning-level` of the config's `[codex]` table, then run the checks the child could not run offline and commit its changes:
 
 ```bash
 codex exec -C /absolute/path/to/repo -s workspace-write -m <model> \
@@ -62,7 +62,7 @@ Read `git diff` and run the relevant checks yourself before you report the fix. 
 
 ## Codex code review
 
-`--code-review` runs `codex exec review`, Codex's built-in reviewer with its own criteria, in a read-only sandbox, and the run still fails when the checkout changed. It always runs Codex. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Fetch first: a worktree's local `main` often lags `origin/main`, and a ref Git cannot find stops the run before it starts.
+`--code-review` runs `codex exec review`, Codex's built-in reviewer with its own criteria, in a read-only sandbox, and the run still fails when the checkout changed. The launcher rejects sandbox-bypass flags before the child starts. It always runs Codex. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Fetch first: a worktree's local `main` often lags `origin/main`, and a ref Git cannot find stops the run before it starts.
 
 ```bash
 git -C /absolute/path/to/repo fetch origin

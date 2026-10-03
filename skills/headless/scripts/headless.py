@@ -271,9 +271,10 @@ examples:
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
 Without a CLI name, the launcher runs the config's harness; --code-review always
-runs Codex. Flags after -- go to the child CLI unchanged. On success, stdout holds
-the model, effort, session, changed, and run lines, a blank line, then the answer.
-The run folder keeps the prompt, the answer, and the child's logs."""
+runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
+flags under --code-review. On success, stdout holds the model, effort, session,
+changed, and run lines, a blank line, then the answer. The run folder keeps the
+prompt, the answer, and the child's logs."""
 
 
 @dataclass(frozen=True)
@@ -349,9 +350,8 @@ def read_text(path: Path) -> str:
 
 def codex_command(request: Request, run: Path) -> list[str]:
     if request.mode == "code-review":
-        # Codex applies the last -c, so flags after -- come first and cannot lift the
-        # sandbox or swap the reviewer. The review reads review_model; -m only feeds
-        # the model line Codex prints
+        # Codex applies the last -c, so caller config overrides come first.
+        # The review reads review_model; -m only feeds the model line Codex prints
         return [
             "codex",
             "exec",
@@ -802,6 +802,13 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
             f"--effort {effort} is not one of {', '.join(runner.efforts)} for {target}"
         )
     review = review_target(args)
+    if args.mode == "code-review":
+        for flag in ("--dangerously-bypass-approvals-and-sandbox", "--yolo"):
+            if flag in extra:
+                raise UsageError(
+                    f"{flag} defeats the read-only sandbox required by --code-review; "
+                    "remove it from the flags after --"
+                )
     cwd = Path(args.cwd).expanduser().resolve()
     if not cwd.is_dir():
         raise UsageError(f"--cwd {args.cwd} is not a directory")

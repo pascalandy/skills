@@ -571,6 +571,20 @@ def test_flags_after_double_dash_cannot_lift_the_code_review_sandbox(env, repo):
     assert theirs < argv.index('review_model="gpt-6.1-sol"')
 
 
+@pytest.mark.parametrize(
+    "flag", ["--dangerously-bypass-approvals-and-sandbox", "--yolo"]
+)
+def test_code_review_rejects_sandbox_bypass_before_launch(env, repo, flag):
+    done = launch(env, repo, "--code-review", "--uncommitted", "--", flag, prompt=None)
+
+    assert done.returncode == 2
+    assert done.stdout == ""
+    assert (
+        f"{flag} defeats the read-only sandbox required by --code-review" in done.stderr
+    )
+    assert calls(env) == []
+
+
 def test_a_codex_flag_before_double_dash_is_a_usage_error(env, repo):
     done = launch(env, repo, "codex", "--review-only", "-c", 'web_search="live"')
 
