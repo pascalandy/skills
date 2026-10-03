@@ -67,6 +67,7 @@ Run these steps in order. Finish each one before you start the next:
 	- a contradiction or an unavailable live step blocks you (report it)
 	- you need a decision from me
 	- the next action deletes data, changes anything outside this repository and its PRs and issues (step 6's merge and the deploy it runs, and step 7's retro issues, are allowed), or force-pushes a branch you didn't create
+		- Deleting a branch whose tip is still the head commit its PR merged, by squash or by merge commit, is not deleting data
 
 #### When You Need Me
 
