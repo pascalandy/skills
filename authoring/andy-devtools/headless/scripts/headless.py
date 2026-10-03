@@ -264,8 +264,7 @@ EXIT_CODES = exit_codes(
 
 EXAMPLES = """\
 examples:
-  headless.py --review-only --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
-  headless.py codex --code-review --base main --cwd ~/projects/app
+  headless.py --code-review --base main --cwd ~/projects/app
   headless.py claude --code-review --commit HEAD --cwd ~/projects/app
   headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
   headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
