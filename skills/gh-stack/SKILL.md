@@ -106,8 +106,8 @@ gh stack view --json
      for each layer above, bottom to top, run `git switch <upper>`,
      `git merge --no-ff <layer below>`, and `git push origin <upper>`. Every push is a fast-forward
 
-   Done when `git merge-base --is-ancestor <changed layer> <top>` succeeds and the remote holds
-   every layer you changed
+   Done when `git merge-base --is-ancestor <lower> <upper>` succeeds for each pair of adjacent
+   layers from the changed one up, and the remote holds every layer you changed
 
 ```bash
 gh stack down                   # or: gh stack checkout api
@@ -129,9 +129,9 @@ gh stack top                    # return to where you were
 - **Another worktree holds the trunk:** `gh stack rebase` warns `Could not update local <trunk>`,
   rebases the stack onto `<remote>/<trunk>`, and leaves that worktree untouched. The warning needs
   no action
-- **A rule says to ask before any force push:** `sync` rewrites pushed layers. Merge
-  `origin/<trunk>` into the bottom layer instead, then carry it up as in
-  [Change a layer](#change-a-layer), step 3
+- **A rule says to ask before any force push:** `sync` rewrites pushed layers. Run
+  `git fetch origin`, merge `origin/<trunk>` into the bottom layer instead, then carry it up as
+  in [Change a layer](#change-a-layer), step 3
 
 ## Land
 
@@ -168,9 +168,11 @@ rebased; when a rule says to ask before any force push, merge upward as in
 ## Without a remote
 
 `gh stack rebase` needs a remote: without one, it fails with `no remotes configured` and leaves
-the layers above unchanged. Restack with `git rebase --update-refs <changed layer> <top>`, which replays the layers above
-and moves each of their branches. Done when `git merge-base --is-ancestor <changed layer> <top>`
-succeeds.
+the layers above unchanged. Restack with `git rebase --update-refs <changed layer> <top>`, which
+replays the layers above and moves each of their branches. It skips a layer checked out in another
+worktree: check that layer out here first, or restack from its worktree. Done when
+`git merge-base --is-ancestor <lower> <upper>` succeeds for each pair of adjacent layers from the
+changed one up.
 
 ## Reading state
 
