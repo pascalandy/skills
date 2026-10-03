@@ -23,7 +23,7 @@ Think of these instructions less as "hard rules", more as "good defaults". My pr
 ## Skills
 
 - Treat `$skill-name` as a request to load that skill
-- For requests to create or modify my skills or to update any of my repos, load `$private-network`
+- For requests to create or modify my skills or to update any of my repos, load `$fleet`
 - If the skill is missing or misspelled, say so explicitly
 
 ### Do not preload every skill

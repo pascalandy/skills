@@ -17,9 +17,9 @@ import sync_fleet
 from _cli import TemporaryError
 from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
-# Where the private-network skill ships the registry; the seed's .gitignore keeps
+# Where the fleet skill ships the registry; the seed's .gitignore keeps
 # it untracked, so it never reaches another machine's clone.
-REGISTRY = "_skills_private/integrations/private-network/references/fleet.toml"
+REGISTRY = "_skills_private/integrations/fleet/references/fleet.toml"
 
 # Drops the options, runs the remote command in the host's home, and refuses
 # the host named down the way ssh reports an unreachable machine. git uses it

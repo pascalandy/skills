@@ -15,9 +15,9 @@ is left untouched. A machine that is offline or fails waits for the next sync,
 which catches it up.
 
 The registry is the one fleet.toml in the private repository, so every machine
-has it and hosts stay out of this public one; the private-network skill ships
-it in references/. Each path is relative to that machine's home, and other keys
-are notes for agents:
+has it and hosts stay out of this public one; the fleet skill ships it in
+references/. Each path is relative to that machine's home, and other keys are
+notes for agents:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
@@ -270,7 +270,7 @@ def registry() -> Path:
         )
     if not found:
         raise ScriptError(
-            f"no fleet.toml in {PRIVATE}; the private-network skill keeps it in references/"
+            f"no fleet.toml in {PRIVATE}; the fleet skill keeps it in references/"
         )
     return found[0]
 
