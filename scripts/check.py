@@ -240,6 +240,7 @@ CHECKS = [
     Check(
         "matt-mode",
         uv_run("authoring/matt/matt-mode/scripts/check_matt_mode.py"),
+        pytest("authoring/matt/matt-mode/scripts/tests"),
         uv_run("authoring/matt/matt-mode/scripts/update_matt_mode.py", "check"),
         # It validates the upstream imports of every package in the bucket
         reads=("authoring/matt",),

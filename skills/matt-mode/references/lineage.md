@@ -20,7 +20,7 @@ Upstream planning procedures can still mention executable work. The lock's `hand
 
 Each file tracked by this lock has one canonical runtime copy. Internal procedures live under `playbooks/<upstream-name>/`. Imported shared skills keep their bodies under their own `references/upstream/` directories. Their root `SKILL.md` files preserve local discovery and point to those bodies. Matt-mode still routes to the locally authored `writing-for-agents` skill, which owns its own content.
 
-The importer removes the opening skill frontmatter and rewrites file links affected by relocation. It preserves the remaining upstream instructions and supporting assets. Upstream agent registration metadata is excluded because the local entrypoints own invocation. There are no editorial patches, compressed replacement procedures, or duplicate local spec and ticket templates.
+The importer removes the opening skill frontmatter, except a procedure's one-line `description`, which the remote skill lists show, and rewrites file links affected by relocation. It preserves the remaining upstream instructions and supporting assets. Upstream agent registration metadata is excluded because the local entrypoints own invocation. There are no editorial patches, compressed replacement procedures, or duplicate local spec and ticket templates.
 
 Read [local adaptations](local-adaptations.md) for differences in authorization, tracker configuration, planning scope and research capabilities. Standalone wrappers document their own integration differences. These files are handwritten and remain outside the importer. Fidelity of the text does not mean that every upstream environment assumption applies unchanged.
 
