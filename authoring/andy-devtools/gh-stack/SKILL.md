@@ -100,14 +100,16 @@ gh stack view --json
    `git log --all -- <path>` when ownership is unclear. Done when you are on the owning layer,
    which is often not the top
 2. Commit the change there
-3. Bring the change into every layer above. Choose by whether those layers are on the remote:
-   - **Not pushed yet, or the session allows force pushes:** run `gh stack rebase --upstack`, then
-     `gh stack push`, which rewrites the layers above and force-pushes them with
-     `--force-with-lease`. A rebase restamps each commit's committer from git config, so check
-     `git log --format='%h %ce'` before pushing when the repository requires an email
-   - **Pushed, and a rule says to ask before any force push:** run `git push <remote> <layer>`. Then,
-     for each layer above, bottom to top, run `git switch <upper>`,
-     `git merge --no-ff <layer below>`, and `git push <remote> <upper>`. Every push is a fast-forward
+3. Bring the change into every layer above. `gh stack rebase --upstack` can rewrite the changed
+   layer itself as well as those above, so choose by whether any of them is on the remote:
+   - **None is on the remote, or the session allows force pushes:** run
+     `gh stack rebase --upstack`, then `gh stack push`, which force-pushes the rewritten layers
+     with `--force-with-lease`. A rebase restamps each commit's committer from git config, so
+     check `git log --format='%h %ce'` before pushing when the repository requires an email
+   - **One is on the remote, and a rule says to ask before any force push:** run
+     `git push <remote> <layer>`. Then, for each layer above, bottom to top, run
+     `git switch <upper>`, `git merge --no-ff --no-edit <layer below>`, and
+     `git push <remote> <upper>`. Every push is a fast-forward
 
    Done when `git merge-base --is-ancestor <lower> <upper>` succeeds for each pair of adjacent
    layers from the changed one up, and the remote holds every layer you changed
@@ -124,8 +126,10 @@ gh stack top                    # return to where you were
 
 `gh stack sync` fetches, rebases the stack onto the remote trunk, pushes, and refreshes PR state.
 `gh stack sync --prune` also deletes local branches of merged PRs; pruning never happens without
-`--prune` when non-interactive. Done when `gh stack view --json` shows no layer with
-`needsRebase`.
+`--prune` when non-interactive. `sync` can exit 0 even when a push failed, so check the result
+yourself. Done when, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
+<bottom>` succeeds and `git rev-parse <layer> <remote>/<layer>` prints the same commit twice for
+every layer.
 
 - **Local and remote stacks diverged:** `sync` prints both chains, makes no changes, and exits 0
   with `Sync aborted`. Read `references/troubleshooting.md`
@@ -133,8 +137,8 @@ gh stack top                    # return to where you were
   rebases the stack onto `<remote>/<trunk>`, and leaves that worktree untouched. The warning needs
   no action
 - **A rule says to ask before any force push:** `sync` rewrites pushed layers. Run
-  `git fetch <remote>`, merge `<remote>/<trunk>` into the bottom layer instead, then carry it up as
-  in [Change a layer](#change-a-layer), step 3
+  `git fetch <remote>` and `git merge --no-edit <remote>/<trunk>` on the bottom layer instead, then
+  carry it up as in [Change a layer](#change-a-layer), step 3
 
 ## Land
 
