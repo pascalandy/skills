@@ -34,9 +34,10 @@ TIERS = ("modes", "skills", "helpers")
 EPILOG = """\
 The lists read skills/, so run just compile-skills first. Each kind lists its
 modes, each with its routes, then its skills, then its helpers. A mode is a
-skill named *-mode with a playbooks/ folder, and each file or folder in
-playbooks/ is a route; a skill with only one of the two fails the run. A skill
-whose frontmatter sets role: "helper" lists under helpers.
+skill named *-mode with a playbooks/ folder; a skill with only one of the two
+fails the run. Each non-hidden file or folder in playbooks/ is a route.
+A skill whose frontmatter sets role: "helper" lists under helpers. Modes
+cannot set a role.
 
 A run prints one line per page it changes: add or update, then a tab and the
 page's path. A dry run prints the same lines and changes nothing; a run with
@@ -62,7 +63,9 @@ EXIT_CODES = exit_codes(
 log = logging.getLogger("remote-skills")
 
 
-def problems(name: str, description: str, role: str | None, is_mode: bool) -> list[str]:
+def problems(
+    name: str, description: str, role: str | None, has_playbooks: bool
+) -> list[str]:
     """What keeps a skill off the lists, each phrased to follow its SKILL.md path."""
     found: list[str] = []
     if not description:
@@ -70,13 +73,13 @@ def problems(name: str, description: str, role: str | None, is_mode: bool) -> li
     # A quoted "\n" decodes to a real line break, which would split the bullet
     elif "\n" in description or "\r" in description:
         found.append("has a line break in its description")
-    if name.endswith("-mode") and not is_mode:
+    if name.endswith("-mode") and not has_playbooks:
         found.append("is named like a mode but has no playbooks/ folder beside it")
-    if is_mode and not name.endswith("-mode"):
+    if has_playbooks and not name.endswith("-mode"):
         found.append("has a playbooks/ folder beside it but no -mode name")
     if role is not None and role != "helper":
         found.append(f'has role "{role}", but the only role is "helper"')
-    if role is not None and is_mode:
+    if role is not None and has_playbooks:
         found.append("is a mode, which always lists first, but sets a role")
     return found
 
@@ -93,7 +96,8 @@ def bullets_by_kind() -> dict[str, dict[str, list[str]]]:
         description = frontmatter_description(text)
         role = frontmatter_value(text, "role")
         playbooks = path.parent / "playbooks"
-        if found := problems(name, description, role, playbooks.is_dir()):
+        has_playbooks = playbooks.is_dir()
+        if found := problems(name, description, role, has_playbooks):
             errors.extend(
                 f"{path.relative_to(ROOT)} {problem}; "
                 "fix its source in authoring/, then run: just compile-skills"
@@ -107,10 +111,10 @@ def bullets_by_kind() -> dict[str, dict[str, list[str]]]:
                 for entry in playbooks.iterdir()
                 if not entry.name.startswith(".")
             )
-            if playbooks.is_dir()
+            if has_playbooks
             else []
         )
-        tier = "modes" if playbooks.is_dir() else "helpers" if role else "skills"
+        tier = "modes" if has_playbooks else "helpers" if role else "skills"
         bullets[kind_of(text)][tier].append(
             f"- `{name}`: {description}\n"
             + "".join(f"  - {route}\n" for route in routes)
@@ -136,7 +140,8 @@ def tiers_body(tiers: dict[str, list[str]], heading: str) -> str:
 def page(name: str, description: str, body: str) -> str:
     return (
         f"---\nname: {name}\ndescription: {description}\n---\n\n"
-        "<!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->\n\n"
+        "<!-- Generated from skills/*/SKILL.md and skills/*/playbooks/* "
+        "by `just remote-skills`; do not edit -->\n\n"
         f"URL: {URL}\n\n{ROUTES}\n\n{body}"
     )
 

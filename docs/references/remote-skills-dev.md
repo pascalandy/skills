@@ -3,7 +3,7 @@ name: remote-skills-dev
 description: Use andy's dev skills remotely
 ---
 
-<!-- Generated from skills/*/SKILL.md by `just remote-skills`; do not edit -->
+<!-- Generated from skills/*/SKILL.md and skills/*/playbooks/* by `just remote-skills`; do not edit -->
 
 URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SKILL.md
 
