@@ -13,7 +13,7 @@ Help me understand what is happening. All these steps, review delays, and glitch
 #### Step by step
 
 - Run these steps in order, and finish each one before you start the next
-- When the agreed work opens or updates no PR, such as issue edits only, skip the Independent review, Codex on each PR, and Merge gate steps, and say so in the report
+- When the agreed work involves no PR, such as issue edits only, skip the Independent review, Codex on each PR, and Merge gate steps, and say so in the report
 
 **1. Execute**
 - Use 🧰 poteto-mode to implement everything we agreed on, and open the PRs
@@ -64,7 +64,7 @@ Help me understand what is happening. All these steps, review delays, and glitch
 #### Rules
 
 - One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to pascalandy
-- Run 🧰 headless with Codex, and show the command in a code block before you run it
+- Use Codex for 🧰 headless runs, and show the command in a code block before you run it
 	- Where Codex is missing, as in a cloud environment, skip those runs and say so in the report
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 - Whenever a change alters documented behavior, run 🧰 andy-mode ; docs and commit its edits to the layer they belong to
