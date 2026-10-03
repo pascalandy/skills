@@ -441,11 +441,23 @@ def claude_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
             )
         return (f"{args.commit}^..{args.commit}",)
     try:
-        tracked = [
-            name
-            for name in git(root, "diff", "--name-only", "-z", "HEAD").split("\0")
-            if name
-        ]
+        git(root, "merge-base", args.base, "HEAD")
+    except GitFailure:
+        raise UsageError(
+            f"--base {args.base} shares no history with HEAD in {root}, as in an "
+            "unrelated branch or a shallow clone; name another base, or run "
+            "'git fetch --unshallow'"
+        ) from None
+    # Staged and unstaged changes apart, so a staged edit undone in the worktree still counts
+    try:
+        tracked = sorted(
+            {
+                name
+                for staged in (("--cached",), ())
+                for name in git(root, "diff", "--name-only", "-z", *staged).split("\0")
+                if name
+            }
+        )
     except GitFailure as error:
         raise ScriptError(f"cannot read the Git state of {root}: {error}") from None
     if tracked:

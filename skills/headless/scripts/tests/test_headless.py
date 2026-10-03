@@ -685,17 +685,51 @@ def test_claude_code_review_compares_a_commit_with_its_parent(env, repo):
     assert call["argv"][1] == "/review low HEAD^..HEAD"
 
 
-@pytest.mark.parametrize("staged", [False, True])
+@pytest.mark.parametrize("state", ["unstaged", "staged", "staged, then undone"])
 def test_claude_code_review_of_a_base_refuses_uncommitted_tracked_changes(
-    env, repo, staged
+    env, repo, state
 ):
     (repo / "README.md").write_text("edited\n")
-    if staged:
+    if state != "unstaged":
         subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    if state == "staged, then undone":
+        (repo / "README.md").write_text("demo\n")
     done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
 
     assert done.returncode == 2
     assert "tracked files have uncommitted changes: README.md" in done.stderr
+    assert calls(env) == []
+
+
+def test_claude_code_review_of_a_base_needs_shared_history(env, repo):
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    for command in (
+        ["git", "switch", "-q", "--orphan", "other"],
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "other",
+        ],
+        ["git", "switch", "-q", branch],
+    ):
+        subprocess.run(command, cwd=repo, check=True)
+    done = launch(env, repo, "claude", "--code-review", "--base", "other", prompt=None)
+
+    assert done.returncode == 2
+    assert "--base other shares no history with HEAD" in done.stderr
     assert calls(env) == []
 
 
