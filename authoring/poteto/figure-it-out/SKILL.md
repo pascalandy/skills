@@ -2,6 +2,7 @@
 name: "figure-it-out"
 description: "Use when the user invokes `figure-it-out`, for a large migration or cross-cutting effort, for work a human will review after stepping away, or when no narrower playbook fits."
 kind: "dev"
+role: "helper"
 ---
 
 # Figure it out

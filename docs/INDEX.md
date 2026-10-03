@@ -1,6 +1,6 @@
 ---
 name: Docs
-description: Script conventions, checks, installs, releases, the remote skill tables, and the skill count, read on demand from AGENTS.md
+description: Script conventions, checks, installs, releases, the remote skill lists, and the skill count, read on demand from AGENTS.md
 schema_version: 3
 tags:
   - area/ea
@@ -26,8 +26,8 @@ date_updated: 2026-10-02
 | `references/checks.md` | How `just check`, signoff, merge, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
 | `references/release.md` | Steps to publish a tagged release |
-| `references/remote-skills-dev.md` | Generated table of the `dev` skills only |
-| `references/remote-skills-general.md` | Generated table of the `general` skills only, for someone who never writes code |
-| `references/remote-skills.md` | Generated name and description of every skill in `skills/`, grouped by kind, for agents that cannot load these skills |
+| `references/remote-skills-dev.md` | Generated list of the `dev` skills only |
+| `references/remote-skills-general.md` | Generated list of the `general` skills only, for someone who never writes code |
+| `references/remote-skills.md` | Generated name and description of every skill in `skills/`, grouped by kind with modes and their routes first, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |
 | `references/skill-count.md` | Generated count of skills per `authoring/` category and kind, to spot skills that appeared or vanished |

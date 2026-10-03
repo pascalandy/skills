@@ -2,6 +2,7 @@
 name: "tdd"
 description: "Use only when explicitly invoked as `tdd`."
 kind: "dev"
+role: "helper"
 ---
 
 # TDD Bug Fix

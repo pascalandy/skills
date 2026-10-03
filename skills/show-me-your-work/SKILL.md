@@ -2,6 +2,7 @@
 name: "show-me-your-work"
 description: "Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away."
 kind: "dev"
+role: "helper"
 ---
 
 # Show me your work

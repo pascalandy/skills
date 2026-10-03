@@ -1,11 +1,11 @@
 # Compile
 
-`just compile-skills` turns each package in `authoring/` into `skills/<name>/` and rewrites `docs/references/skill-count.md`. `just remote-skills` rewrites the skill tables in `docs/references/`. A checkout is compiled when both report no difference.
+`just compile-skills` turns each package in `authoring/` into `skills/<name>/` and rewrites `docs/references/skill-count.md`. `just remote-skills` rewrites the skill lists in `docs/references/`. A checkout is compiled when both report no difference.
 
 ## Sub-features
 
 - `compile-check`: `skills/` and the skill count match `authoring/`
-- `remote-check`: the generated skill tables match `skills/`
+- `remote-check`: the generated skill lists match `skills/`
 - `compile-write`: both recipes rebuild deleted output, and the rebuilt output passes both checks
 
 ## How to get to it (user POV)
@@ -23,7 +23,7 @@
   record remote-check just remote-skills --check )
 ```
 
-- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated tables there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` holds one `add` line per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` line per table. `compile-after.out` is empty.
+- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated lists there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` holds one `add` line per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` line per list page. `compile-after.out` is empty.
 
 ```bash
 ( . "${RUN:?}/env" &&
@@ -37,6 +37,6 @@
 
 ## Gotchas
 
-- A failure in the first block lists each differing skill or table in its `.err` file. The change was not compiled, or the compiler broke; report which and stop
+- A failure in the first block lists each differing skill or list page in its `.err` file. The change was not compiled, or the compiler broke; report which and stop
 - The copy keeps uncommitted changes and gets a fresh `git init`, because the compiler lists files through git. The rebuild leaves the checkout under test unchanged
 - An install recompiles the checkout's `skills/`. On a compiled checkout that changes nothing, which is why this feature runs first
