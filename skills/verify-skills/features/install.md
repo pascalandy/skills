@@ -39,6 +39,6 @@ Preconditions:
 
 - Without the run env, `just install-skills` writes into the live agent folders. Every block loads it first
 - The empty `$RUN/private` keeps the private clone out of the run. Without `--private-root`, a worktree also installs the main checkout's `_skills_private/`
-- An install also recompiles the checkout's `skills/` and deletes cache-only leftover folders in `authoring/` and `skills/`. Those are its only writes outside the run folder
+- An install also recompiles the checkout's `skills/`, deletes cache-only leftover folders in `authoring/` and `skills/`, and creates the empty lock file `install-skills.lock` in the repository's git folder. Those are its only writes outside the run folder
 - Installs from one repository, worktrees included, take turns through a lock in its git folder. An install waits for a concurrent one and exits 75 after `--timeout`; rerun it
-- On om1, the profile skips `apple-mail`. A public `apple-mail` would show in `install-diff.out` as an expected difference
+- On om1, the profile skips `apple-mail`, which is private today. If it becomes public, `install-diff.out` lists `Only in skills: apple-mail` on om1, and that line alone is not a failure
