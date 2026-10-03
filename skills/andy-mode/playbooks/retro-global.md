@@ -39,4 +39,4 @@ Before publishing:
 2. If the repository is public, remove session IDs, absolute local paths, hostnames, private repo or project names, and any conversation content that isn't about the finding.
 3. Run the `2nd-pass` skill on the drafts.
 
-Then publish with labels `1-needs-triage` and `2-type:postmortem` (or `2-type:task` where the repository lacks it), link the session's PR when one exists, read each issue back, and return the links.
+Then publish with labels `1-needs-triage` and `2-type:postmortem` (or `2-type:task` where the repository lacks it), read each issue back, and return the links. Each issue links the session's PR when one exists, except when a public issue would link a private repository.
