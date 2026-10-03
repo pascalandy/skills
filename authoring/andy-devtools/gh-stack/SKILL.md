@@ -48,6 +48,16 @@ Once per clone, `git config rerere.enabled true` makes a rebase reuse conflict r
 - **The trunk moved:** [Sync](#sync)
 - **The stack is approved:** [Land](#land)
 
+## Force pushes
+
+Once any layer is on the remote, `gh stack submit`, `gh stack sync`, and `gh stack push` push every
+layer with `--force-with-lease`, which can replace a commit someone else pushed, and
+`gh stack rebase` rewrites the layers it replays. When a rule says to ask before any force push,
+run them only while no layer is on the remote. After that, push with plain `git push`, carry
+changes up as in [Change a layer](#change-a-layer), step 3, and open a later layer's PR with
+`gh stack link <stack-number> <branch>`, which pushes without force and appends it to the stack.
+`gh stack view --short` prints the stack number.
+
 ## Non-interactive use
 
 `gh stack` branches on whether **stdout is a TTY**. Piped, most commands error cleanly or print
@@ -82,11 +92,13 @@ Create the stack before writing any file, so each concern lands in its own layer
    branches from the current layer, and commit its concern there. Done when each layer holds one
    concern and `gh stack view --json` lists them bottom to top
 3. Open the PRs with `gh stack submit --auto --open`: it pushes every layer and opens one PR per
-   layer, ready for review. Open a lower layer's PR early, for CI, the same way: `gh stack merge`
-   lands only PRs in a stack on GitHub, which `submit` creates, and refuses drafts. `--auto` writes the
-   titles and bodies; set them with `gh pr edit <number>`. `submit` can exit 0 when GitHub refused
-   the stack, so done when `gh stack view --short` starts with `Stack #<number>`, which appears only
-   once the stack exists on GitHub, and `gh stack view --json` shows a `pr` on every layer
+   layer, ready for review. Open a lower layer's PR early, for CI, the same way, and add later
+   layers as [Force pushes](#force-pushes) says: `gh stack merge` lands only PRs in a stack on
+   GitHub, and refuses drafts. `--auto` writes the titles and bodies; set them with
+   `gh pr edit <number>`. `submit` can exit 0 when GitHub refused part of the stack, so check
+   GitHub itself. Done when `gh stack view --json` shows a `pr` on every layer, and
+   `gh pr view <number> --json baseRefName` names the layer below for each PR, or `<trunk>` for the
+   bottom one
 
 ```bash
 git fetch origin && git switch -c auth origin/main && gh stack init auth
@@ -131,18 +143,18 @@ gh stack top                    # return to where you were
 `gh stack sync > /dev/null` fetches, rebases the stack onto the remote trunk, pushes, and
 refreshes PR state; add `--prune` to also delete local branches of merged PRs. `sync` can exit 0
 even when a push failed or it aborted, so check the result yourself. Done when stderr has no
-`Sync aborted`, `gh stack view --short` starts with `Stack #<number>`, and, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
-<bottom>` succeeds and `git rev-parse <layer> <remote>/<layer>` prints the same commit twice for
-every layer.
+`Sync aborted`, each PR's base passes the check in [Start a stack](#start-a-stack), step 3, and,
+after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds and
+`git rev-parse <layer> <remote>/<layer>` prints the same commit twice for every layer.
 
 - **Local and remote stacks diverged:** `sync` prints both chains, makes no changes, and exits 0
   with `Sync aborted`. Read `references/troubleshooting.md`
 - **Another worktree holds the trunk:** `gh stack rebase` warns `Could not update local <trunk>`,
   rebases the stack onto `<remote>/<trunk>`, and leaves that worktree untouched. The warning needs
   no action
-- **A rule says to ask before any force push:** `sync` rewrites pushed layers. Run
-  `git fetch <remote>` and `git merge --no-edit <remote>/<trunk>` on the bottom layer instead, then
-  carry it up as in [Change a layer](#change-a-layer), step 3
+- **A rule says to ask before any force push:** see [Force pushes](#force-pushes). Run
+  `git fetch <remote>` and `git merge --no-edit <remote>/<trunk>` on the bottom layer instead of
+  `sync`, then carry it up as in [Change a layer](#change-a-layer), step 3
 
 ## Land
 

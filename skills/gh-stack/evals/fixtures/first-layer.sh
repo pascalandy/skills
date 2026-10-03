@@ -1,4 +1,4 @@
-# A one-layer stack on a GitHub repository, before any PR exists; pushes go to a local copy
+# A one-layer stack on a GitHub repository, before any PR exists, in a run where gh is not signed in; pushes go to a local copy
 set -euo pipefail
 run=$(cd .. && pwd)
 git init -q --bare -b main "$run/origin.git"

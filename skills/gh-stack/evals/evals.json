@@ -29,8 +29,9 @@
     "query": "Open a PR for the config layer now so CI starts on it. I'll stack more layers on top later.",
     "files": ["evals/fixtures/first-layer.sh"],
     "expected_behavior": [
-      "Opens the PR with gh stack submit, never gh pr create, so gh stack merge can land the stack later",
-      "Reports that this run refused the GitHub write, instead of claiming a PR exists"
+      "Checks whether gh is signed in before using gh stack, finds it is not, and takes the path for working without gh stack",
+      "Pushes config to the remote with plain git, and opens no PR through gh pr create or gh stack submit",
+      "Reports that opening the PR needs a signed-in gh or another forge tool, instead of claiming a PR exists"
     ]
   }
 ]
