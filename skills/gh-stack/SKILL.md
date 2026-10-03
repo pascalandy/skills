@@ -167,8 +167,8 @@ rebased; when a rule says to ask before any force push, merge upward as in
 
 ## Without a remote
 
-`gh stack rebase` needs a remote: without one, it prints `no remotes configured` and still exits
-0. Restack with `git rebase --update-refs <changed layer> <top>`, which replays the layers above
+`gh stack rebase` needs a remote: without one, it fails with `no remotes configured` and leaves
+the layers above unchanged. Restack with `git rebase --update-refs <changed layer> <top>`, which replays the layers above
 and moves each of their branches. Done when `git merge-base --is-ancestor <changed layer> <top>`
 succeeds.
 
