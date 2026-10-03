@@ -34,13 +34,14 @@ Run these steps in order. Finish each one before you start the next:
 
 **4. Codex on each PR**
 - On each PR, leave the comment "@codex review"
-- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, the repo lacks the Codex GitHub app: skip the rest of this step and say so in the report
-- Babysit: poll that comment until no row says `Running` (about 4–8 min), then read the reviews, inline comments, and reactions newer than your request. A 👍 with no review means the PR is clean
-- Fix each valid finding and dismiss the rest with a written reason. After you push a fix, comment "@codex review" again on that PR
-- Done when Codex has reviewed each PR's latest head, or you skipped this step. Stop after 2 rounds on a PR and report its open findings
+- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, Codex did not run: skip the rest of this step, and report the review as unavailable with any error Codex posted
+- Babysit: poll that comment until no row says `Running` (often 5–12 min), then read the reviews, inline comments, and reactions newer than your request. A 👍 with no review means the PR is clean
+- Fix each valid finding and dismiss the rest with a written reason. After you push a fix, comment "@codex review" again on that PR, once. Report fixes pushed after that second review as unreviewed
+- Done when Codex has reviewed each PR's latest head, or reviewed it twice, or you skipped this step
 
 **5. Report**
 - PR links and links to the issues you filed
+- Every change you made outside what we agreed, and why
 - The gaps outside the scope you did not file
 - What you couldn't confirm, and where you looked
 - Confidence to merge: XX%, and why it is below 100% when it is
