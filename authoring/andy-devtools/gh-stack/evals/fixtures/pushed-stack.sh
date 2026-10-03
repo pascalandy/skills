@@ -6,6 +6,7 @@ git -C "$run/origin.git" config receive.denyNonFastForwards true
 git remote add origin "$run/origin.git"
 cp "$EVALS/fixtures/agents-md.md" AGENTS.md
 printf '# widgets\n' > README.md
+printf '__pycache__/\n' > .gitignore
 git add -A && git commit -qm "Add README" && git branch -M main && git push -q origin main
 git switch -q -c parser
 printf 'def parse(line):\n    """Parse one line of the config fiel."""\n    return line.split("=", 1)\n' > parser.py
