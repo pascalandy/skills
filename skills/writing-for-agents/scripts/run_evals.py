@@ -273,15 +273,16 @@ esac
 if [ "$1" = api ]; then
   method="" body=0 prev=""
   for a in "$@"; do
-    case "$prev" in -X|--method) method=${{a^^}} ;; esac
+    case "$prev" in -X|--method) method=$a ;; esac
     case "$a" in
-      -X?*) method=${{a#-X}}; method=${{method^^}} ;;
-      --method=*) method=${{a#--method=}}; method=${{method^^}} ;;
+      -X?*) method=${{a#-X}} ;;
+      --method=*) method=${{a#--method=}} ;;
       -f|-F|--field|--raw-field|--input|-f?*|-F?*|--field=*|--raw-field=*|--input=*) body=1 ;;
     esac
     case "$a" in *mutation*) refuse "$@" ;; esac
     prev=$a
   done
+  method=$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')
   if [ "${{2:-}}" != graphql ]; then
     [ -n "$method" ] && [ "$method" != GET ] && refuse "$@"
     [ -z "$method" ] && [ "$body" = 1 ] && refuse "$@"
