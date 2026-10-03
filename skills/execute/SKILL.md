@@ -33,11 +33,9 @@ Run these steps in order. Finish each one before you start the next:
 - Done when every medium- or high-severity finding from the review and both premortems is fixed or dismissed with a written reason, and each fix is committed to the layer it belongs to with 🧰 gh-stack and pushed
 
 **4. Codex on each PR**
-- On each PR, leave the comment "@codex review"
-- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, report that PR's review as unavailable with any error Codex posted, and continue with the other PRs
-- Babysit: poll that comment until no row says `Running` (often 5–12 min), then read the reviews, inline comments, and reactions newer than your request. A 👍 with no review means the PR is clean
-- Fix each valid finding and dismiss the rest with a written reason. After you push a fix, comment "@codex review" again on that PR, once. Report fixes pushed after that second review as unreviewed
-- Done when each PR has a Codex review of its latest head, has had two Codex reviews, or has its Codex review reported as unavailable
+- On each PR, comment "@codex review" and wait for its review
+- Fix or dismiss each finding. After you push a fix, comment "@codex review" once more on that PR
+- Done when each PR has a Codex review of its latest head or has had two, or Codex is unavailable and you say so in the report
 
 **5. Report**
 - PR links and links to the issues you filed
