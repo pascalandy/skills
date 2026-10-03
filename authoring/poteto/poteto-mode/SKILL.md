@@ -91,7 +91,7 @@ Each entry links a principle's file and says when it applies.
 
 ## Subagents
 
-When delegation helps, load `profile-routing-matrix` from the active skill catalog once for the current orchestration. It owns role selection, models, reasoning levels, and agent briefs. Apply it to every delegation in this task.
+When delegation helps, brief each worker as the [agent runtime](references/agent-runtime.md#delegate-by-capability) describes, and pick its role, model, and reasoning level from what the session's delegation tool supports.
 
 Prefer asynchronous workers for independent tasks when the runtime supports them. Give reviewers the tools needed to inspect evidence and constrain them to read operations. Supply accessible file pointers or self-contained excerpts. Follow the runtime reference for supervision, nesting limits, shared checkouts, and remote execution.
 

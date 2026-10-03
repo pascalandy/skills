@@ -19,32 +19,28 @@ URL: https://raw.githubusercontent.com/pascalandy/skills/main/skills/[$skill]/SK
 | coding-standard | Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior. |
 | commit | Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages. |
 | create-verification-skill | Use only when explicitly invoked as `create-verification-skill`. |
+| execute | Use only when explicitly invoked as `execute` or `implement`, or by a clear go-ahead to implement an agreed plan. |
 | figure-it-out | Use when the user invokes `figure-it-out`, for a large migration or cross-cutting effort, for work a human will review after stepping away, or when no narrower playbook fits. |
 | gh-stack | Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out. |
 | git-local | Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries. |
 | grill-for-unknowns | Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria. |
-| headless | Use when running `codex exec`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. `headless` may arrive as any voice-to-text spelling that sounds like it, such as `endless` or `adless`. |
+| headless | Use when running `codex exec`, `codex exec review`, Claude Code, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. `headless` may arrive as any voice-to-text spelling that sounds like it, such as `endless` or `adless`. |
 | how | Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation. |
-| impl | Use to implement a plan or an issue. |
 | interrogate | Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots. |
 | label-for-issues | Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue. |
 | maintain-verification-skill | Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill. |
 | make-bot-ui | Use when building a custom UI that starts agent tasks through a webhook or local runner. |
 | matt-mode | Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets. |
 | no-comments | Use only when explicitly invoked as `no-comments`, including `No comments` as an instruction. |
-| pi-workflow | Use when the user mentions `turk` or requests subagent execution workflows in Pi. |
 | poteto-mode | Use only when explicitly invoked as `poteto` or `poteto-mode`. |
 | principle-prove-it-works | Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.' |
-| profile-routing-matrix | Use when the user invokes profile-routing-matrix or asks to delegate work, including 'delegate' or 'délègue'. Routes subagents by role, model, and reasoning level. |
 | recall | Use only when explicitly invoked as `recall`. |
 | reflect | Use only when explicitly invoked as `reflect`. |
-| setup-pstack | Use for /setup-pstack, configure pstack models, or changing pstack's model choices. |
 | show-me-your-work | Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away. |
 | swarm | Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration. |
 | tdd | Use only when explicitly invoked as `tdd`. |
 | teach | Use when the user asks to be taught, requests a guided technical explanation, or wants one account combining how something works with why it was designed that way. |
 | technical-writing | Use for /technical-writing or when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages. |
-| typesafe-ai | Build AI-powered software with TypeSafe: small units of AI intelligence you can use like programming primitives. Its System One models, including Jev, turn natural language and application state into typed judgments and probabilities that code can combine. Use when a feature needs programmable common sense, when brainstorming what AI could make possible in an app, or when an LLM prompt-and-parse step could become a structured decision. Applications include routing, ranking, extraction, verification, and interactive experiences; these are starting points, not the limits. Read live docs and cookbooks to find useful patterns and discover new combinations. |
 | typescript-best-practices | Use when TypeScript work centers on type safety, domain modeling, narrowing, casts, or runtime boundaries. Use `coding-language` for general TypeScript implementation and tooling. |
 | verify-transcript | Use when validating transcript CLI behavior or locating its verification features. Use for paid YouTube end-to-end checks only when explicitly authorized. |
 | verify-video-archive | Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery. |

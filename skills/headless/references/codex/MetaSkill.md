@@ -4,6 +4,22 @@
 
 Run the launcher only in repositories you trust. For another repository, run `codex exec -s read-only -c 'approval_policy="never"'` yourself.
 
+## Modes
+
+Each mode takes `-m` and `model_reasoning_effort` from the `[codex]` table of [config.toml](../../config.toml) unless `--model` or `--effort` overrides them. `-v` prints the exact command a run used.
+
+| Mode | Codex command | What keeps the checkout unchanged |
+| --- | --- | --- |
+| `--review-only` | `codex exec` without sandbox; the prompt starts with a review-only rule | The change check after the run. Codex has no switch that removes its editing tools |
+| `--review-fix` | The same command; the rule allows edits in `--cwd` | Nothing; read `git diff` yourself |
+| `--code-review` | `codex exec review` with `sandbox_mode="read-only"`, `approval_policy="never"`, and the diff flag | The read-only sandbox, then the change check |
+
+The first two modes use `exec` because `codex exec review` refuses custom instructions together with a diff flag: `--base`, `--uncommitted`, and `--commit` each conflict with its prompt argument. A run that carries the caller's criteria, such as a premortem, needs `exec`.
+
+`codex exec review` reads its model from `review_model`, not `-m`. `-m` only sets the `model:` line Codex prints, so the launcher passes the same model to both and the line stays true. When the review fails, Codex can still exit 0 and write `Review was interrupted. Please re-run /review…` as its answer; the launcher counts that as a failure. To ask about a finding, pass the review's printed session to `--review-only --resume`; `--code-review` itself takes no `--resume`. These behaviors were verified on Codex CLI 0.159.3.
+
+The separate Code Review allowance on a ChatGPT plan applies only when Codex reviews through GitHub, such as `@codex review` on a pull request or automatic reviews on a repository. A local `--code-review` counts toward general usage like the other modes; see [Codex pricing](https://learn.chatgpt.com/docs/pricing).
+
 ## Run from inside a Codex session
 
 A Codex parent runs shell commands inside its own sandbox, and the child inherits it. When that sandbox blocks the network or writes outside the checkout, run the launcher outside it through the parent's escalation control.
@@ -34,6 +50,6 @@ Write a `.gitignore` holding `*` into the copied skill folder, so neither git no
 
 ## Models
 
-Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for model names and supported reasoning levels. An installed CLI's catalog can differ by sign-in and rollout; `codex debug models` shows it.
+Check the [current Codex model list](https://learn.chatgpt.com/docs/models) for model names and supported reasoning levels before you change the `[codex]` table. An installed CLI's catalog can differ by sign-in and rollout; `codex debug models` shows it.
 
 For maintenance, follow the [update checklist](../UPDATE.md).

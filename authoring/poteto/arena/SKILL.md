@@ -27,7 +27,7 @@ The N candidates will receive the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. The rubric is the picker's tool in Phase D. Candidates only see the task.
-3. Pick four runners from the Profile Routing matrix. Use `Planner` for design candidates and `Builder` for implementation candidates. Spawn more only when the arena covers more than one distinct design direction.
+3. Spawn four runners. Use the `Planner` role for design candidates and the `Builder` role for implementation candidates. Spawn more only when the arena covers more than one distinct design direction.
 4. Assign output paths. Each candidate writes to its own location (a git worktree when repository policy permits, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per poteto-mode's **Separate Before Serializing Shared State** principle.
 
 ## Phase B: Fan out
