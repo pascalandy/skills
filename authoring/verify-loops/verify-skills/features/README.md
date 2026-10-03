@@ -18,7 +18,7 @@ Each feature page has exactly four H2 sections in this order: `Sub-features`, `H
 
 ## Features
 
-- `compile.md` covers `skills/`, the skill count, and the generated skill tables matching `authoring/`
+- `compile.md` covers `skills/`, the skill count, and the generated skill tables: whether they match `authoring/`, and whether the recipes rebuild them
 - `install.md` covers skills and commands landing in every agent folder of the profile
 - `discovery.md` covers Codex, Pi, and OpenCode loading what the install wrote
 

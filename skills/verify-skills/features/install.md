@@ -20,14 +20,19 @@ Preconditions:
 - Compile passed in this run
 
 - **Install and check.** Run the block. It prints `install: exit 0` and `install-check: exit 0`. `install.out` holds one `add` line per entry, and `install-check.out` is empty.
-- **Compare with the checkout.** The same block prints `install-diff: exit 0`, and `install-diff.out` is empty: the installed Claude Code skills and commands match `skills/` and `commands/` file for file.
+- **Compare with the checkout.** The same block prints `install-diff: exit 0`, and `install-diff.out` is empty. The installed Claude Code skills match `skills/` file for file, each command folder matches `commands/`, and Codex has one skill per command.
 
 ```bash
 ( . "${RUN:?}/env" && cd "$CHECKOUT" &&
   record install just install-skills --private-root "$RUN/private" &&
   record install-check just install-skills --check --private-root "$RUN/private" &&
-  record install-diff sh -c 'diff -r -x __pycache__ -x ".*_cache" -x node_modules -x .DS_Store skills "$HOME/.claude/skills" &&
-    diff -r commands "$HOME/.claude/commands"' )
+  record install-diff sh -c '
+    diff -r -x __pycache__ -x ".*_cache" -x node_modules -x .DS_Store skills "$HOME/.claude/skills" || exit 1
+    for dir in .claude/commands .pi/agent/prompts .config/opencode/commands; do diff -r commands "$HOME/$dir" || exit 1; done
+    for file in commands/*.md; do
+      name=$(basename "$file" .md)
+      test -f "$HOME/.codex/skills/$name/SKILL.md" || { echo "no Codex skill for $file"; exit 1; }
+    done' )
 ```
 
 ## Gotchas

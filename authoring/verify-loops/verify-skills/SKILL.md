@@ -54,7 +54,7 @@ Run it after Launch, and whenever a result looks wrong. It reads only.
 ```bash
 ( . "${RUN:?}/env" && cd "$CHECKOUT" &&
   printf 'checkout %s\nhome     %s\nevidence %s\n' "$CHECKOUT" "$HOME" "$EVIDENCE" &&
-  for tool in git just uv codex pi opencode; do command -v "$tool" >/dev/null || echo "missing: $tool"; done &&
+  for tool in git just uv rsync codex pi opencode; do command -v "$tool" >/dev/null || echo "missing: $tool"; done &&
   uv --version )
 ```
 
