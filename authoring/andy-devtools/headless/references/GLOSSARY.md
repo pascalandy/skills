@@ -10,11 +10,14 @@ date_updated: 2026-09-27
 
 # Headless glossary
 
-Definitions only. [SKILL.md](../SKILL.md) selects the procedure; `scripts/headless.py` owns the Codex and Claude flags, and each CLI reference owns the rest.
+Definitions only. [SKILL.md](../SKILL.md) selects the procedure; `scripts/headless.py` owns the Codex and Claude flags, `config.toml` owns the defaults, and each CLI reference owns the rest.
 
 | Term | Meaning |
 | --- | --- |
 | Headless | Non-interactive CLI execution |
+| Harness | The CLI that runs the child agent: Codex, Claude Code, Pi, or OpenCode |
+| Provider | The service that serves a model to Pi or OpenCode; several providers can serve one model |
+| Code review | Codex's built-in reviewer, `codex exec review`: its own criteria applied to one diff, or custom instructions in place of the diff |
 | PTY | A pseudo-terminal; distinct from ordinary stdin/stdout pipes |
 | Permission mode | A CLI's policy for allowing, denying, or requesting approval for tool calls |
 | Sandbox | Execution restrictions enforced separately from the task prompt |

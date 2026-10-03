@@ -3,9 +3,10 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run Codex or Claude Code as a child agent that reviews read-only or reviews
-and fixes, then print the model that ran, its session, the files it changed,
-and its answer. One command shape per run keeps headless use deterministic."""
+"""Run Codex or Claude Code as a child agent that reviews read-only, reviews and
+fixes, or runs Codex's own code review, then print the model that ran, its
+session, the files it changed, and its answer. One command shape per run keeps
+headless use deterministic."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -223,10 +224,19 @@ import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
+
+import tomllib
 
 DEBUG_ENV = "HEADLESS_DEBUG"
 GRACE = 10.0
 CHECK_TIMEOUT = 60.0
+CONFIG = Path(__file__).resolve().parents[1] / "config.toml"
+HARNESSES = ("codex", "claude", "pi", "opencode")
+# One model reaches Pi and OpenCode through several providers; Codex and Claude pick their own
+PROVIDER_HARNESSES = ("pi", "opencode")
+TABLE_KEYS = ("provider", "model", "reasoning-level")
+READ_ONLY = ("review-only", "code-review")
 
 log = logging.getLogger("headless")
 
@@ -246,23 +256,25 @@ CLAUDE_EDIT_TOOLS = "Edit,Write,NotebookEdit"
 
 EXIT_CODES = exit_codes(
     {
-        1: "the child failed, gave no answer, was denied a tool, "
-        "or changed the checkout under --review-only",
+        1: "the child failed, gave no answer, was denied a tool, or changed the "
+        "checkout under --review-only or --code-review; or the config is invalid",
         TEMPORARY: "a login check timed out; rerun",
     }
 )
 
 EXAMPLES = """\
 examples:
-  headless.py codex --review-only --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
-  headless.py claude --review-only --prompt-file prompt.md --json
+  headless.py --review-only --prompt-file /tmp/review/prompt.md --cwd ~/projects/app
+  headless.py codex --code-review --base main --cwd ~/projects/app
   headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
   headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
-Flags after -- go to the child CLI unchanged. On success, stdout holds the model,
-effort, session, changed, and run lines, a blank line, then the answer. The run
-folder keeps the prompt, the answer, and the child's logs."""
+Without a CLI name, the launcher runs the config's harness; --code-review always
+runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
+flags under --code-review. On success, stdout holds the model, effort, session,
+changed, and run lines, a blank line, then the answer. The run folder keeps the
+prompt, the answer, and the child's logs."""
 
 
 @dataclass(frozen=True)
@@ -277,6 +289,7 @@ class Request:
     session: str | None
     resume: bool
     git: bool
+    review: tuple[str, ...]
     extra: tuple[str, ...]
 
 
@@ -305,10 +318,25 @@ class Result:
 
 
 @dataclass(frozen=True)
+class Defaults:
+    """One harness's table in the config."""
+
+    model: str
+    effort: str
+    provider: str | None
+
+
+@dataclass(frozen=True)
+class Config:
+    path: Path
+    harness: str
+    tables: dict[str, Defaults]
+
+
+@dataclass(frozen=True)
 class Runner:
     """How to launch, check, and read one child CLI."""
 
-    default_model: str
     efforts: tuple[str, ...]
     auth: tuple[str, ...]
     login: str
@@ -321,6 +349,28 @@ def read_text(path: Path) -> str:
 
 
 def codex_command(request: Request, run: Path) -> list[str]:
+    if request.mode == "code-review":
+        # Codex applies the last -c, so caller config overrides come first.
+        # The review reads review_model; -m only feeds the model line Codex prints
+        return [
+            "codex",
+            "exec",
+            "review",
+            *request.extra,
+            "-c",
+            'sandbox_mode="read-only"',
+            "-c",
+            'approval_policy="never"',
+            "-m",
+            request.model,
+            "-c",
+            f'review_model="{request.model}"',
+            "-c",
+            f'model_reasoning_effort="{request.effort}"',
+            "-o",
+            str(run / "answer.md"),
+            *request.review,
+        ]
     command = ["codex", "exec"]
     if request.resume and request.session:
         command += ["resume", request.session]
@@ -415,7 +465,6 @@ def claude_reply(run: Path) -> Reply:
 
 RUNNERS = {
     "codex": Runner(
-        default_model="gpt-6.1-sol",
         efforts=("low", "medium", "high", "xhigh", "max", "ultra"),
         auth=("codex", "login", "status"),
         login="codex login",
@@ -423,7 +472,6 @@ RUNNERS = {
         reply=codex_reply,
     ),
     "claude": Runner(
-        default_model="claude-opus-5-5",
         efforts=("low", "medium", "high", "xhigh", "max"),
         auth=("claude", "auth", "status", "--text"),
         login="claude auth login",
@@ -431,6 +479,130 @@ RUNNERS = {
         reply=claude_reply,
     ),
 }
+
+
+def load_config(path: Path) -> Config:
+    """Read and check the whole config, so a typo in any table fails every run."""
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ScriptError(
+            f"cannot read the config {path}: {error.strerror}; pass --config FILE"
+        ) from None
+    except tomllib.TOMLDecodeError as error:
+        raise ScriptError(f"{path} is not valid TOML: {error}") from None
+    problems: list[str] = []
+    tables: dict[str, Defaults] = {}
+    for name, value in data.items():
+        if name == "harness":
+            continue
+        if name not in HARNESSES:
+            problems.append(
+                f"unknown key '{name}'; keep harness and the "
+                f"[{'], ['.join(HARNESSES)}] tables"
+            )
+            continue
+        if not isinstance(value, dict):
+            problems.append(f"{name} must be a [{name}] table")
+            continue
+        table = cast(dict[str, object], value)
+        problems += [
+            f"[{name}] has an unknown key '{key}'"
+            for key in table
+            if key not in TABLE_KEYS
+        ]
+        model, effort = table.get("model"), table.get("reasoning-level")
+        provider = table.get("provider")
+        for key, text in (("model", model), ("reasoning-level", effort)):
+            if not isinstance(text, str) or not text:
+                problems.append(f"[{name}] needs {key} as a non-empty string")
+        if name in PROVIDER_HARNESSES and (
+            not isinstance(provider, str) or not provider
+        ):
+            problems.append(
+                f"[{name}] needs provider, since several providers serve one model"
+            )
+        if name not in PROVIDER_HARNESSES and provider is not None:
+            problems.append(f"[{name}] takes no provider; {name} picks its own")
+        efforts = RUNNERS[name].efforts if name in RUNNERS else None
+        if efforts and isinstance(effort, str) and effort and effort not in efforts:
+            problems.append(
+                f"[{name}] reasoning-level '{effort}' is not one of {', '.join(efforts)}"
+            )
+        if isinstance(model, str) and isinstance(effort, str):
+            tables[name] = Defaults(
+                model, effort, provider if isinstance(provider, str) else None
+            )
+    harness = data.get("harness")
+    if not isinstance(harness, str) or harness not in HARNESSES:
+        problems.append(f"harness must be one of {', '.join(HARNESSES)}")
+    needed = dict.fromkeys([*RUNNERS, harness if isinstance(harness, str) else ""])
+    problems += [
+        f"the [{name}] table is missing"
+        for name in needed
+        if name in HARNESSES and name not in data
+    ]
+    if problems:
+        raise ScriptError(*(f"{path}: {problem}" for problem in problems))
+    return Config(path, cast(str, harness), tables)
+
+
+def resolve_target(named: str | None, mode: str, config: Config) -> str:
+    """The CLI to run: --code-review needs Codex, a named CLI wins, else the config's harness."""
+    if mode == "code-review":
+        if named not in (None, "codex"):
+            raise UsageError(
+                f"--code-review runs Codex only; drop {named} or pass codex"
+            )
+        return "codex"
+    target = named or config.harness
+    if target not in RUNNERS:
+        raise UsageError(
+            f'{config.path} sets harness = "{target}", which the launcher does not run '
+            f"yet (#281); pass codex or claude, or follow references/{target}/MetaSkill.md"
+        )
+    return target
+
+
+def review_target(args: argparse.Namespace) -> tuple[str, ...]:
+    """What `codex exec review` reviews, as its flags; empty for the other modes."""
+    diff = [
+        flag
+        for flag, value in (
+            ("--base", args.base),
+            ("--uncommitted", args.uncommitted),
+            ("--commit", args.commit),
+            ("--title", args.title),
+        )
+        if value
+    ]
+    if args.mode != "code-review":
+        if diff:
+            raise UsageError(f"{', '.join(diff)} works only with --code-review")
+        if args.prompt_file is None:
+            raise UsageError(f"--{args.mode} needs --prompt-file")
+        return ()
+    if args.resume:
+        raise UsageError(
+            "--code-review cannot resume; ask follow-up questions with "
+            "--review-only --resume SESSION"
+        )
+    chosen = [flag for flag in diff if flag != "--title"]
+    if args.prompt_file is not None:
+        chosen.append("--prompt-file")
+    if len(chosen) != 1:
+        raise UsageError(
+            "--code-review needs exactly one of --base, --uncommitted, --commit, "
+            "or --prompt-file"
+        )
+    title = ("--title", args.title) if args.title else ()
+    if args.base:
+        return ("--base", args.base, *title)
+    if args.uncommitted:
+        return ("--uncommitted", *title)
+    if args.commit:
+        return ("--commit", args.commit, *title)
+    return (*title, "-")
 
 
 class GitFailure(Exception):
@@ -465,6 +637,14 @@ def git_root(cwd: Path) -> Path | None:
         if "not a git repository" in str(error):
             return None
         raise ScriptError(f"cannot read the Git state of {cwd}: {error}") from None
+
+
+def resolves(root: Path, ref: str) -> bool:
+    try:
+        git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+    except GitFailure:
+        return False
+    return True
 
 
 def snapshot(root: Path, cwd: Path, moment: str) -> dict[str, str]:
@@ -612,40 +792,64 @@ def summary(result: Result) -> str:
 
 
 def launch(args: argparse.Namespace, extra: list[str]) -> Result:
-    runner = RUNNERS[args.target]
-    if args.effort not in runner.efforts:
+    config = load_config(Path(args.config).expanduser())
+    target = resolve_target(args.target, args.mode, config)
+    runner = RUNNERS[target]
+    defaults = config.tables[target]
+    effort = args.effort or defaults.effort
+    if effort not in runner.efforts:
         raise UsageError(
-            f"--effort {args.effort} is not one of {', '.join(runner.efforts)} for {args.target}"
+            f"--effort {effort} is not one of {', '.join(runner.efforts)} for {target}"
         )
+    review = review_target(args)
+    if args.mode == "code-review":
+        for flag in ("--dangerously-bypass-approvals-and-sandbox", "--yolo"):
+            if flag in extra:
+                raise UsageError(
+                    f"{flag} defeats the read-only sandbox required by --code-review; "
+                    "remove it from the flags after --"
+                )
     cwd = Path(args.cwd).expanduser().resolve()
     if not cwd.is_dir():
         raise UsageError(f"--cwd {args.cwd} is not a directory")
-    prompt = read_prompt(args.prompt_file)
-    if not prompt.strip():
+    prompt = "" if args.prompt_file is None else read_prompt(args.prompt_file)
+    if args.prompt_file is not None and not prompt.strip():
         raise UsageError("the prompt is empty")
-    preflight(args.target, runner)
-
     root = git_root(cwd)
+    if root is None and args.mode == "code-review":
+        raise UsageError(
+            f"--code-review reviews a Git diff; {cwd} is not a Git checkout"
+        )
+    # Codex only meets a missing ref mid-review, after the paid run has started
+    for flag, ref in (("--base", args.base), ("--commit", args.commit)):
+        if ref and root and not resolves(root, ref):
+            raise UsageError(
+                f"{flag} {ref} names no commit in {cwd}; run 'git fetch' or name one that exists"
+            )
+    preflight(target, runner)
+
     before = snapshot(root, cwd, "before the run") if root else None
     if before is None:
         log.warning(
             "warning: %s is not a Git checkout, so file changes go unchecked", cwd
         )
-    fresh_session = str(uuid.uuid4()) if args.target == "claude" else None
+    fresh_session = str(uuid.uuid4()) if target == "claude" else None
     request = Request(
-        target=args.target,
+        target=target,
         mode=args.mode,
         cwd=cwd,
-        model=args.model or runner.default_model,
-        effort=args.effort,
+        model=args.model or defaults.model,
+        effort=effort,
         session=args.resume or fresh_session,
         resume=args.resume is not None,
         git=before is not None,
+        review=review,
         extra=tuple(extra),
     )
-    run = Path(tempfile.mkdtemp(prefix=f"headless-{args.target}-{args.mode}."))
+    run = Path(tempfile.mkdtemp(prefix=f"headless-{target}-{args.mode}."))
+    rule = RULES.get(args.mode)
     (run / "prompt.md").write_text(
-        f"{RULES[args.mode].format(cwd=cwd)}\n\n{prompt}", encoding="utf-8"
+        f"{rule.format(cwd=cwd)}\n\n{prompt}" if rule else prompt, encoding="utf-8"
     )
     command = runner.command(request, run)
     log.info("run folder: %s", run)
@@ -654,17 +858,17 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         status = run_child(command, cwd=cwd, run=run, timeout=args.timeout)
     except subprocess.TimeoutExpired:
         raise ScriptError(
-            f"{args.target} ran past --timeout; its partial output is in {run}"
+            f"{target} ran past --timeout; its partial output is in {run}"
         ) from None
 
     reply = runner.reply(run)
     if not (run / "answer.md").exists():
         (run / "answer.md").write_text(reply.answer, encoding="utf-8")
     result = Result(
-        target=args.target,
+        target=target,
         mode=args.mode,
         model=reply.model,
-        effort=args.effort,
+        effort=effort,
         session=reply.session or request.session,
         changed=changes(before, snapshot(root, cwd, "after the run") if root else None),
         run_dir=str(run),
@@ -676,12 +880,12 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
 
     problems = list(reply.problems)
     if status != 0:
-        problems.insert(0, f"{args.target} exited {status}; read stderr.log in {run}")
+        problems.insert(0, f"{target} exited {status}; read stderr.log in {run}")
     if not result.answer:
-        problems.append(f"{args.target} gave no answer")
-    if args.mode == "review-only" and result.changed:
+        problems.append(f"{target} gave no answer")
+    if args.mode in READ_ONLY and result.changed:
         problems.append(
-            f"the review-only run changed the checkout: {', '.join(result.changed)}"
+            f"the {args.mode} run changed the checkout: {', '.join(result.changed)}"
         )
     if problems:
         raise ScriptError(*problems, detail=summary(result), report=asdict(result))
@@ -694,7 +898,12 @@ def build_parser() -> Parser:
         exit_codes=EXIT_CODES,
         epilog=EXAMPLES,
     )
-    parser.add_argument("target", choices=sorted(RUNNERS), help="child CLI to run")
+    parser.add_argument(
+        "target",
+        nargs="?",
+        choices=sorted(RUNNERS),
+        help="child CLI to run (default: harness in the config)",
+    )
     access = parser.add_mutually_exclusive_group(required=True)
     access.add_argument(
         "--review-only",
@@ -711,11 +920,39 @@ def build_parser() -> Parser:
         const="review-fix",
         help="report findings and fix them in --cwd",
     )
+    access.add_argument(
+        "--code-review",
+        dest="mode",
+        action="store_const",
+        const="code-review",
+        help="run Codex's own review, codex exec review, read-only; the run fails "
+        "if the checkout changed",
+    )
     parser.add_argument(
         "--prompt-file",
-        required=True,
         metavar="FILE",
-        help="the task for the child; - reads stdin",
+        help="the task for the child; - reads stdin. Required by --review-only and "
+        "--review-fix; with --code-review, custom review instructions in place "
+        "of a diff to review",
+    )
+    diff = parser.add_mutually_exclusive_group()
+    diff.add_argument(
+        "--base",
+        metavar="BRANCH",
+        help="with --code-review: review the changes against BRANCH",
+    )
+    diff.add_argument(
+        "--uncommitted",
+        action="store_true",
+        help="with --code-review: review staged, unstaged, and untracked changes",
+    )
+    diff.add_argument(
+        "--commit",
+        metavar="SHA",
+        help="with --code-review: review the changes a commit introduced",
+    )
+    parser.add_argument(
+        "--title", help="with --code-review: the title the review summary shows"
     )
     parser.add_argument(
         "--cwd",
@@ -724,17 +961,21 @@ def build_parser() -> Parser:
         help="checkout the child works in (default: .)",
     )
     parser.add_argument(
+        "--config",
+        default=str(CONFIG),
+        metavar="FILE",
+        help="defaults for the harness, model, and reasoning level "
+        f"(default: {CONFIG})",
+    )
+    parser.add_argument(
         "--model",
-        help=", ".join(
-            f"{name}: {runner.default_model}" for name, runner in RUNNERS.items()
-        )
-        + " by default",
+        help="model for the child; --code-review passes it as review_model too "
+        "(default: model in the config)",
     )
     parser.add_argument(
         "--effort",
-        default="xhigh",
         help="reasoning level, passed to codex as model_reasoning_effort "
-        "and to claude as --effort (default: xhigh)",
+        "and to claude as --effort (default: reasoning-level in the config)",
     )
     parser.add_argument(
         "--resume", metavar="SESSION", help="continue a session a previous run printed"

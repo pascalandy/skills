@@ -7,8 +7,28 @@ import time
 from pathlib import Path
 
 import pytest
+import tomllib
 
 SCRIPT = Path(__file__).resolve().parents[1] / "headless.py"
+PACKAGE = SCRIPT.parents[1]
+SHIPPED = PACKAGE / "config.toml"
+
+CONFIG = """\
+harness = "codex"
+
+[codex]
+model = "gpt-6.1-sol"
+reasoning-level = "xhigh"
+
+[claude]
+model = "claude-opus-5-5"
+reasoning-level = "xhigh"
+
+[pi]
+provider = "openai-codex"
+model = "gpt-6.1-sol"
+reasoning-level = "high"
+"""
 
 STUB = """\
 import json, os, subprocess, sys, time
@@ -84,6 +104,7 @@ def env(tmp_path: Path) -> dict[str, str]:
         stub = stubs / name
         stub.write_text(f"#!{sys.executable}\n{STUB}")
         stub.chmod(0o755)
+    (tmp_path / "config.toml").write_text(CONFIG)
     return {
         **os.environ,
         "PATH": f"{stubs}{os.pathsep}{os.environ['PATH']}",
@@ -92,27 +113,25 @@ def env(tmp_path: Path) -> dict[str, str]:
     }
 
 
-def command(cwd: Path, args: tuple[str, ...], prompt: str) -> list[str]:
-    prompt_file = cwd.parent / "prompt.md"
-    prompt_file.write_text(prompt)
+def command(
+    cwd: Path, args: tuple[str, ...], prompt: str | None, shipped: bool = False
+) -> list[str]:
+    own: list[str] = ["--cwd", str(cwd)]
+    if prompt is not None:
+        prompt_file = cwd.parent / "prompt.md"
+        prompt_file.write_text(prompt)
+        own += ["--prompt-file", str(prompt_file)]
+    if not shipped:
+        own += ["--config", str(cwd.parent / "config.toml")]
     split = args.index("--") if "--" in args else len(args)
-    return [
-        sys.executable,
-        str(SCRIPT),
-        *args[:split],
-        "--prompt-file",
-        str(prompt_file),
-        "--cwd",
-        str(cwd),
-        *args[split:],
-    ]
+    return [sys.executable, str(SCRIPT), *args[:split], *own, *args[split:]]
 
 
 def launch(
     env: dict[str, str],
     cwd: Path,
     *args: str,
-    prompt: str = "Review README.md.",
+    prompt: str | None = "Review README.md.",
     **stub: str,
 ):
     return subprocess.run(
@@ -388,3 +407,295 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
 
     assert done.returncode == 0, done.stderr
     assert not alive(wait_for(pid_file))
+
+
+def test_the_shipped_config_sets_the_harness_model_and_reasoning_level(env, repo):
+    shipped = tomllib.loads(SHIPPED.read_text())
+    harness = shipped["harness"]
+    done = subprocess.run(
+        command(repo, ("--review-only",), "Review README.md.", shipped=True),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    argv = " ".join(call["argv"])
+    assert shipped[harness]["model"] in argv
+    assert shipped[harness]["reasoning-level"] in argv
+    assert f"effort: {shipped[harness]['reasoning-level']}" in done.stdout.splitlines()
+
+
+def test_without_a_cli_name_the_config_harness_runs(env, repo, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text(
+        config.read_text().replace('harness = "codex"', 'harness = "claude"')
+    )
+    done = launch(env, repo, "--review-only")
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][:3] == ["-p", "--model", "claude-opus-5-5"]
+
+
+def test_model_and_effort_flags_win_over_the_config(env, repo):
+    done = launch(
+        env, repo, "codex", "--review-only", "--model", "gpt-6-astra", "--effort", "low"
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][4:8] == [
+        "-m",
+        "gpt-6-astra",
+        "-c",
+        'model_reasoning_effort="low"',
+    ]
+
+
+def test_a_harness_the_launcher_cannot_run_points_to_its_reference(env, repo, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text(config.read_text().replace('harness = "codex"', 'harness = "pi"'))
+    done = launch(env, repo, "--review-only")
+
+    assert done.returncode == 2
+    assert (
+        'sets harness = "pi", which the launcher does not run yet (#281)' in done.stderr
+    )
+    assert "references/pi/MetaSkill.md" in done.stderr
+    assert calls(env) == []
+
+
+@pytest.mark.parametrize(
+    ("edit", "message"),
+    [
+        (
+            ('reasoning-level = "xhigh"', 'reasoning-level = "hihg"'),
+            "[codex] reasoning-level 'hihg' is not one of low, medium, high, xhigh, max, ultra",
+        ),
+        (
+            ("[codex]\n", '[codex]\nprovider = "openai"\n'),
+            "[codex] takes no provider; codex picks its own",
+        ),
+        (
+            ('provider = "openai-codex"\n', ""),
+            "[pi] needs provider, since several providers serve one model",
+        ),
+        (('harness = "codex"', 'harness = "gemini"'), "harness must be one of codex"),
+        (("[claude]", "[gemini]"), "unknown key 'gemini'"),
+        (
+            ('model = "gpt-6.1-sol"\n', 'model = "gpt-6.1-sol"\nthinking = "x"\n'),
+            "unknown key 'thinking'",
+        ),
+        (("[codex]", "codex = ["), "is not valid TOML"),
+        (
+            ('harness = "codex"', 'harness = "codex"\nopencode = "x"'),
+            "opencode must be a [opencode] table",
+        ),
+    ],
+)
+def test_an_invalid_config_names_the_file_and_the_key(
+    env, repo, tmp_path, edit, message
+):
+    config = tmp_path / "config.toml"
+    config.write_text(config.read_text().replace(*edit, 1))
+    done = launch(env, repo, "codex", "--review-only")
+
+    assert done.returncode == 1
+    assert done.stdout == ""
+    assert f"error: {config}" in done.stderr
+    assert message in done.stderr
+    assert calls(env) == []
+
+
+def test_a_missing_config_says_how_to_point_at_another(env, repo, tmp_path):
+    (tmp_path / "config.toml").unlink()
+    done = launch(env, repo, "codex", "--review-only")
+
+    assert done.returncode == 1
+    assert "cannot read the config" in done.stderr
+    assert "pass --config FILE" in done.stderr
+
+
+def test_the_docs_repeat_no_model_from_the_config():
+    shipped = tomllib.loads(SHIPPED.read_text())
+    models = {table["model"] for table in shipped.values() if isinstance(table, dict)}
+    repeats = [
+        f"{doc.relative_to(PACKAGE)} names {model}"
+        for doc in PACKAGE.rglob("*.md")
+        for model in models
+        if model in doc.read_text()
+    ]
+
+    assert repeats == []
+
+
+def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
+    subprocess.run(["git", "branch", "main"], cwd=repo, check=False)
+    done = launch(env, repo, "--code-review", "--base", "main", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == ["model: gpt-6.1-sol", "effort: xhigh"]
+    [call] = calls(env)
+    assert call["argv"][:2] == ["exec", "review"]
+    assert call["argv"][2:6] == [
+        "-c",
+        'sandbox_mode="read-only"',
+        "-c",
+        'approval_policy="never"',
+    ]
+    assert 'review_model="gpt-6.1-sol"' in call["argv"]
+    assert "--dangerously-bypass-approvals-and-sandbox" not in call["argv"]
+    assert call["argv"][-2:] == ["--base", "main"]
+
+
+def test_flags_after_double_dash_cannot_lift_the_code_review_sandbox(env, repo):
+    done = launch(
+        env,
+        repo,
+        "--code-review",
+        "--uncommitted",
+        "--",
+        "-c",
+        'sandbox_mode="danger-full-access"',
+        prompt=None,
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    argv = call["argv"]
+    theirs = argv.index('sandbox_mode="danger-full-access"')
+    assert theirs < argv.index('sandbox_mode="read-only"')
+    assert theirs < argv.index('review_model="gpt-6.1-sol"')
+
+
+@pytest.mark.parametrize(
+    "flag", ["--dangerously-bypass-approvals-and-sandbox", "--yolo"]
+)
+def test_code_review_rejects_sandbox_bypass_before_launch(env, repo, flag):
+    done = launch(env, repo, "--code-review", "--uncommitted", "--", flag, prompt=None)
+
+    assert done.returncode == 2
+    assert done.stdout == ""
+    assert (
+        f"{flag} defeats the read-only sandbox required by --code-review" in done.stderr
+    )
+    assert calls(env) == []
+
+
+def test_a_codex_flag_before_double_dash_is_a_usage_error(env, repo):
+    done = launch(env, repo, "codex", "--review-only", "-c", 'web_search="live"')
+
+    assert done.returncode == 2
+    assert "unrecognized arguments: -c" in done.stderr
+    assert calls(env) == []
+
+
+def test_code_review_passes_its_diff_target(env, repo):
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    uncommitted = launch(env, repo, "--code-review", "--uncommitted", prompt=None)
+    commit = launch(
+        env, repo, "--code-review", "--commit", sha, "--title", "Fix it", prompt=None
+    )
+
+    assert uncommitted.returncode == 0 and commit.returncode == 0, commit.stderr
+    uncommitted_call, commit_call = calls(env)
+    assert uncommitted_call["argv"][-1:] == ["--uncommitted"]
+    assert commit_call["argv"][-4:] == ["--commit", sha, "--title", "Fix it"]
+
+
+@pytest.mark.parametrize("flag", ["--base", "--commit"])
+def test_a_diff_target_git_cannot_find_stops_before_launch(env, repo, flag):
+    done = launch(env, repo, "--code-review", flag, "origin/gone", prompt=None)
+
+    assert done.returncode == 2
+    assert f"{flag} origin/gone names no commit" in done.stderr
+    assert "run 'git fetch'" in done.stderr
+    assert calls(env) == []
+
+
+def test_code_review_with_a_prompt_file_sends_custom_instructions(env, repo):
+    done = launch(env, repo, "--code-review", prompt="Focus on error handling.")
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][-1] == "-"
+    assert call["stdin"] == "Focus on error handling."
+
+
+def test_code_review_runs_codex_even_when_the_config_harness_is_claude(
+    env, repo, tmp_path
+):
+    config = tmp_path / "config.toml"
+    config.write_text(
+        config.read_text().replace('harness = "codex"', 'harness = "claude"')
+    )
+    done = launch(env, repo, "--code-review", "--uncommitted", prompt=None)
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][:2] == ["exec", "review"]
+
+
+def test_a_code_review_that_edits_the_checkout_fails(env, repo):
+    done = launch(
+        env,
+        repo,
+        "--code-review",
+        "--uncommitted",
+        prompt=None,
+        STUB_TOUCH=str(repo / "README.md"),
+    )
+
+    assert done.returncode == 1
+    assert "error: the code-review run changed the checkout: README.md" in done.stderr
+
+
+@pytest.mark.parametrize(
+    ("args", "prompt", "message"),
+    [
+        (
+            ("--code-review",),
+            None,
+            "needs exactly one of --base, --uncommitted, --commit",
+        ),
+        (("--code-review", "--base", "main"), "x", "needs exactly one of"),
+        (("--code-review", "--uncommitted", "--resume", "abc"), None, "cannot resume"),
+        (("claude", "--code-review", "--uncommitted"), None, "runs Codex only"),
+        (
+            ("codex", "--review-only", "--base", "main"),
+            "x",
+            "--base works only with --code-review",
+        ),
+        (
+            ("codex", "--review-only", "--title", "t"),
+            "x",
+            "--title works only with --code-review",
+        ),
+        (("codex", "--review-fix"), None, "--review-fix needs --prompt-file"),
+    ],
+)
+def test_code_review_usage_errors_stop_before_launch(env, repo, args, prompt, message):
+    done = launch(env, repo, *args, prompt=prompt)
+
+    assert done.returncode == 2
+    assert message in done.stderr
+    assert calls(env) == []
+
+
+def test_code_review_outside_git_is_a_usage_error(env, tmp_path):
+    folder = tmp_path / "notes"
+    folder.mkdir()
+    done = launch(env, folder, "--code-review", "--uncommitted", prompt=None)
+
+    assert done.returncode == 2
+    assert "is not a Git checkout" in done.stderr
+    assert calls(env) == []
