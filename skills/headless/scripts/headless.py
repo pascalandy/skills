@@ -585,9 +585,8 @@ def grok_review(args: argparse.Namespace, root: Path) -> tuple[str, ...]:
 
 
 def grok_command(request: Request, run: Path) -> list[str]:
-    # Grok reads no prompt from stdin. Its /review keeps the write tool for the
-    # scratch files it writes outside the checkout, and its report keeps only the
-    # top issues unless the rule asks for the whole review
+    # Grok reads no prompt from stdin, and the report of its /review keeps only
+    # the top issues unless the rule asks for the whole review
     prompt = (
         [
             "-p",
@@ -618,6 +617,9 @@ def grok_command(request: Request, run: Path) -> list[str]:
             if request.mode == "review-only"
             else []
         ),
+        # /review keeps its write tool for the review files it saves in the temp
+        # directory, which the read-only sandbox leaves writable
+        *(["--sandbox", "read-only"] if request.mode == "code-review" else []),
         "--output-format",
         "streaming-messages-json",
         "--resume" if request.resume else "--session-id",

@@ -275,6 +275,7 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
     tools = argv[argv.index("--disallowed-tools") + 1].split(",")
     assert {"search_replace", "write"} <= set(tools)
     assert "--disallowed-tools" not in fix_call["argv"]
+    assert "--sandbox" not in argv and "--sandbox" not in fix_call["argv"]
     assert fix_call["stdin"].startswith("Mode: review and fix.")
     assert review_call["trust"] == fix_call["trust"] == "0"
 
@@ -841,6 +842,7 @@ def test_grok_code_review_types_review_with_the_local_or_main_target(env, repo):
     assert "do not commit, push, merge, or post comments" in rule
     assert "full text of the review file" in rule
     assert "--prompt-file" not in argv and "--disallowed-tools" not in argv
+    assert argv[argv.index("--sandbox") + 1] == "read-only"
 
 
 def test_a_code_review_that_edits_the_checkout_fails(env, repo):

@@ -36,7 +36,7 @@ This table reflects `grok --help` in installed Grok Build 1.0.46. Run the instal
 
 Help omits these flags, and the parser accepts them: `--no-leader` starts a new agent even when the config enables the shared leader, `--no-auto-update` skips the update check, and `--trust` records a folder trust grant in `~/.grok/trusted_folders.toml`.
 
-For `--review-only` and `--review-fix`, `scripts/headless.py` already passes `--cwd`, `--prompt-file`, `-m`, `--reasoning-effort`, `--always-approve`, `--no-leader`, `--no-auto-update`, `--output-format streaming-messages-json`, and `--session-id` or `--resume`, plus `--disallowed-tools` under `--review-only`. For `--code-review`, it passes `-p "/review …"` and `--rules` in place of the prompt file. Pass any other flag after `--`.
+For `--review-only` and `--review-fix`, `scripts/headless.py` already passes `--cwd`, `--prompt-file`, `-m`, `--reasoning-effort`, `--always-approve`, `--no-leader`, `--no-auto-update`, `--output-format streaming-messages-json`, and `--session-id` or `--resume`, plus `--disallowed-tools` under `--review-only`. For `--code-review`, it passes `-p "/review …"` and `--rules` in place of the prompt file, plus `--sandbox read-only`. Pass any other flag after `--`.
 
 ## Help and model discovery
 

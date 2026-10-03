@@ -80,7 +80,7 @@ Read `git diff` and run the relevant checks yourself before you report the fix. 
 
 - **Codex** runs `codex exec review` in a read-only sandbox, and the launcher rejects sandbox-bypass flags before the child starts. Give it exactly one diff: `--base BRANCH`, `--uncommitted`, or `--commit SHA`. Custom review instructions from `--prompt-file` replace the diff, because Codex refuses both together
 - **Claude** runs Claude Code's `/review` without its file-editing tools. Give it `--base BRANCH` or `--commit SHA`. It reviews commits only, so `--base` refuses a checkout whose tracked files have uncommitted changes
-- **Grok** runs its bundled `/review`. Give it `--uncommitted`, or `--base origin/main` on a checkout with no changes, untracked files included. It has no other base and no commit target
+- **Grok** runs its bundled `/review` in its read-only sandbox. Give it `--uncommitted`, or `--base origin/main` on a checkout with no changes, untracked files included. It has no other base and no commit target
 
 ```bash
 git -C /absolute/path/to/repo fetch origin
