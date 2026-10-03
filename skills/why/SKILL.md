@@ -2,6 +2,7 @@
 name: "why"
 description: "Use for questions about design rationale, the history of regressions or incidents, or the evidence behind thresholds and tradeoffs. Use `how` for runtime behavior. Do not use for plain commit or date lookups."
 kind: "dev"
+role: "helper"
 ---
 
 # Why

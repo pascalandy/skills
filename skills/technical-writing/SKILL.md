@@ -2,6 +2,7 @@
 name: "technical-writing"
 description: "Use for /technical-writing or when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages."
 kind: "dev"
+role: "helper"
 ---
 
 # Technical writing
