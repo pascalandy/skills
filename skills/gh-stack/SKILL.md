@@ -32,7 +32,10 @@ path its failure names.
 | `gh auth status --active --hostname github.com` | [Without gh stack](#without-gh-stack) |
 | `gh stack --version` | `gh extension install github/gh-stack`, then check again |
 | `git remote` prints a remote | [Without a remote](#without-a-remote) |
-| `git remote` prints one remote, or `git config remote.pushDefault` is set | `git config remote.pushDefault origin`, or pass `--remote <name>` to `push`, `submit`, `sync`, `rebase`, and `link` |
+| `git remote` prints one remote, or `git config remote.pushDefault` is set | `git config remote.pushDefault <name>`, or pass `--remote <name>` to `push`, `submit`, `sync`, `rebase`, and `link` |
+
+Use that selected remote for every fetch, branch base, and push below. `<remote>` names it;
+the examples use `origin`.
 
 Once per clone, `git config rerere.enabled true` makes a rebase reuse conflict resolutions.
 
@@ -70,9 +73,9 @@ Create the stack before writing any file, so each concern lands in its own layer
 `references/stack-design.md` to choose the layers.
 
 1. Branch the bottom layer from the remote trunk. The local trunk can lag it, for example when
-   another worktree has it checked out. Run `git fetch origin`, `git switch -c <bottom>
-   origin/<trunk>`, then `gh stack init <bottom>`, which adopts the branch. Done when
-   `git merge-base --is-ancestor origin/<trunk> <bottom>` succeeds
+   another worktree has it checked out. Run `git fetch <remote>`, `git switch -c <bottom>
+   <remote>/<trunk>`, then `gh stack init <bottom>`, which adopts the branch. Done when
+   `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds
 2. Commit the bottom layer's concern. For each next layer, run `gh stack add <branch>`, which
    branches from the current layer, and commit its concern there. Done when each layer holds one
    concern and `gh stack view --json` lists them bottom to top
@@ -102,9 +105,9 @@ gh stack view --json
      `gh stack push`, which rewrites the layers above and force-pushes them with
      `--force-with-lease`. A rebase restamps each commit's committer from git config, so check
      `git log --format='%h %ce'` before pushing when the repository requires an email
-   - **Pushed, and a rule says to ask before any force push:** run `git push origin <layer>`. Then,
+   - **Pushed, and a rule says to ask before any force push:** run `git push <remote> <layer>`. Then,
      for each layer above, bottom to top, run `git switch <upper>`,
-     `git merge --no-ff <layer below>`, and `git push origin <upper>`. Every push is a fast-forward
+     `git merge --no-ff <layer below>`, and `git push <remote> <upper>`. Every push is a fast-forward
 
    Done when `git merge-base --is-ancestor <lower> <upper>` succeeds for each pair of adjacent
    layers from the changed one up, and the remote holds every layer you changed
@@ -130,7 +133,7 @@ gh stack top                    # return to where you were
   rebases the stack onto `<remote>/<trunk>`, and leaves that worktree untouched. The warning needs
   no action
 - **A rule says to ask before any force push:** `sync` rewrites pushed layers. Run
-  `git fetch origin`, merge `origin/<trunk>` into the bottom layer instead, then carry it up as
+  `git fetch <remote>`, merge `<remote>/<trunk>` into the bottom layer instead, then carry it up as
   in [Change a layer](#change-a-layer), step 3
 
 ## Land
@@ -161,7 +164,7 @@ branched from the layer below, and each PR opened with the layer below as its ba
 whatever forge tool the session has. Replace `gh stack rebase` with
 `git rebase --onto <layer below> <its old tip> <branch>` for each layer above a change, which
 replays only that branch's own commits. Replace `gh stack push` with
-`git push --force-with-lease origin <branch>...`, naming the layer you changed and every layer you
+`git push --force-with-lease <remote> <branch>...`, naming the layer you changed and every layer you
 rebased; when a rule says to ask before any force push, merge upward as in
 [Change a layer](#change-a-layer), step 3. Done when each layer's PR targets the layer below.
 
