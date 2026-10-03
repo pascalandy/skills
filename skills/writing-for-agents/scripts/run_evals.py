@@ -253,12 +253,14 @@ Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled. Claude runs with --setting-sources project, so it sees only
 the copies this run installs. A gh wrapper logs every call to gh-calls.log and
-refuses GitHub writes. stdout prints one line per run: name, status, folder."""
+refuses GitHub writes other than help. stdout prints one line per run: name,
+status, folder."""
 
 GH_WRAPPER = """\
 #!/usr/bin/env bash
 log={log}
 printf '%s\\n' "$*" >> "$log"
+for a in "$@"; do case "$a" in -h|--help) exec {gh} "$@" ;; esac; done
 refuse() {{ printf 'REFUSED %s\\n' "$*" >> "$log"; echo "gh: this run refuses GitHub writes: $*" >&2; exit 1; }}
 case "$1 ${{2:-}}" in
   "issue create"|"issue edit"|"issue comment"|"issue close"|"issue reopen"|"issue delete"|\\

@@ -198,18 +198,19 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "claude",
         "--scenario",
         "2",
-        FAKE_ACTION="gh issue view 1; gh pr create --title x || true",
+        FAKE_ACTION="gh issue view 1; gh pr create --help; gh pr create --title x || true",
     )
 
     assert result.returncode == 0, result.stderr
     calls = (out / "s2-claude" / "gh-calls.log").read_text().splitlines()
     assert calls == [
         "issue view 1",
+        "pr create --help",
         "pr create --title x",
         "REFUSED pr create --title x",
     ]
     real = lab.reports / "real-gh.log"
-    assert real.read_text() == "issue view 1\n"
+    assert real.read_text() == "issue view 1\npr create --help\n"
 
 
 def test_a_ref_without_the_skill_gives_a_no_skill_baseline(lab: Lab):
