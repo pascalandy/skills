@@ -74,7 +74,7 @@ Custom review instructions from `--prompt-file` replace the diff, because Codex 
 
 ## Defaults
 
-[config.toml](config.toml) holds the defaults, and each run prints the model and reasoning level that ran. Change a default there, never in a skill's prose. `harness` names the CLI the launcher runs when the command names none. The `[codex]` and `[claude]` tables set each CLI's `model` and `reasoning-level`. The `[pi]` and `[opencode]` tables add a `provider`, since several providers serve one model, and their references build the command from them. `--config FILE` reads another file.
+[config.toml](config.toml) holds the defaults, and each run prints the model and reasoning level that ran. Change a default in the skill's source copy of that file, never in a skill's prose; the next install overwrites an installed copy. For one run, pass `--model`, `--effort`, or `--config FILE` instead. `harness` names the CLI the launcher runs when the command names none. The `[codex]` and `[claude]` tables set each CLI's `model` and `reasoning-level`. The `[pi]` and `[opencode]` tables add a `provider`, since several providers serve one model, and their references build the command from them.
 
 A model or reasoning level named in the request overrides the file through `--model` and `--effort`. Harnesses name the reasoning level differently: `--effort` reaches Codex as `model_reasoning_effort` and Claude as `--effort`, and a request may say reasoning, effort, or thinking for the same setting. Flags after `--` reach the child CLI unchanged, such as `-- -c 'web_search="live"'` for Codex. `uv run <skill-dir>/scripts/headless.py --help` lists every option.
 

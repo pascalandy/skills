@@ -551,6 +551,34 @@ def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
     assert call["argv"][-2:] == ["--base", "main"]
 
 
+def test_flags_after_double_dash_cannot_lift_the_code_review_sandbox(env, repo):
+    done = launch(
+        env,
+        repo,
+        "--code-review",
+        "--uncommitted",
+        "--",
+        "-c",
+        'sandbox_mode="danger-full-access"',
+        prompt=None,
+    )
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    argv = call["argv"]
+    theirs = argv.index('sandbox_mode="danger-full-access"')
+    assert theirs < argv.index('sandbox_mode="read-only"')
+    assert theirs < argv.index('review_model="gpt-6.1-sol"')
+
+
+def test_a_codex_flag_before_double_dash_is_a_usage_error(env, repo):
+    done = launch(env, repo, "codex", "--review-only", "-c", 'web_search="live"')
+
+    assert done.returncode == 2
+    assert "unrecognized arguments: -c" in done.stderr
+    assert calls(env) == []
+
+
 def test_code_review_passes_its_diff_target(env, repo):
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"],

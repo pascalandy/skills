@@ -349,11 +349,14 @@ def read_text(path: Path) -> str:
 
 def codex_command(request: Request, run: Path) -> list[str]:
     if request.mode == "code-review":
-        # The review reads review_model, not -m; -m only feeds the model line Codex prints
+        # Codex applies the last -c, so flags after -- come first and cannot lift the
+        # sandbox or swap the reviewer. The review reads review_model; -m only feeds
+        # the model line Codex prints
         return [
             "codex",
             "exec",
             "review",
+            *request.extra,
             "-c",
             'sandbox_mode="read-only"',
             "-c",
@@ -364,7 +367,6 @@ def codex_command(request: Request, run: Path) -> list[str]:
             f'review_model="{request.model}"',
             "-c",
             f'model_reasoning_effort="{request.effort}"',
-            *request.extra,
             "-o",
             str(run / "answer.md"),
             *request.review,
@@ -952,7 +954,6 @@ def build_parser() -> Parser:
         help="checkout the child works in (default: .)",
     )
     parser.add_argument(
-        "-c",
         "--config",
         default=str(CONFIG),
         metavar="FILE",
