@@ -1,0 +1,141 @@
+[
+  {
+    "skills": [
+      "poteto-mode",
+      "oem",
+      "how",
+      "unslop",
+      "no-comments",
+      "technical-writing",
+      "architect",
+      "principle-attack-the-premise",
+      "principle-boundary-discipline",
+      "principle-build-the-lever",
+      "principle-encode-lessons-in-structure",
+      "principle-exhaust-the-design-space",
+      "principle-experience-first",
+      "principle-fix-root-causes",
+      "principle-foundational-thinking",
+      "principle-guard-the-context-window",
+      "principle-laziness-protocol",
+      "principle-make-operations-idempotent",
+      "principle-migrate-callers-then-delete-legacy-apis",
+      "principle-minimize-reader-load",
+      "principle-model-the-domain",
+      "principle-never-block-on-the-human",
+      "principle-outcome-oriented-execution",
+      "principle-prove-it-works",
+      "principle-redesign-from-first-principles",
+      "principle-separate-before-serializing-shared-state",
+      "principle-sequence-verifiable-units",
+      "principle-subtract-before-you-add",
+      "principle-test-behavior-not-implementation",
+      "principle-type-system-discipline"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/duplicated-prices.sh\""
+    ],
+    "query": "poteto: refactor shop.py so the price formatting lives in one place. Keep the output the same.",
+    "files": [
+      "evals/fixtures/duplicated-prices.sh"
+    ],
+    "expected_behavior": [
+      "Reads at least one principle before changing code, such as Laziness Protocol or Subtract Before You Add, from its file in poteto-mode or its skill",
+      "Moves the shared formatting into one helper that both functions call, and python test_shop.py still prints ok",
+      "Names in the reply each principle that shaped a decision and the choice it changed",
+      "Writes the reply without a long dash"
+    ]
+  },
+  {
+    "skills": [
+      "poteto-mode",
+      "oem",
+      "how",
+      "unslop",
+      "no-comments",
+      "technical-writing",
+      "architect",
+      "principle-attack-the-premise",
+      "principle-boundary-discipline",
+      "principle-build-the-lever",
+      "principle-encode-lessons-in-structure",
+      "principle-exhaust-the-design-space",
+      "principle-experience-first",
+      "principle-fix-root-causes",
+      "principle-foundational-thinking",
+      "principle-guard-the-context-window",
+      "principle-laziness-protocol",
+      "principle-make-operations-idempotent",
+      "principle-migrate-callers-then-delete-legacy-apis",
+      "principle-minimize-reader-load",
+      "principle-model-the-domain",
+      "principle-never-block-on-the-human",
+      "principle-outcome-oriented-execution",
+      "principle-prove-it-works",
+      "principle-redesign-from-first-principles",
+      "principle-separate-before-serializing-shared-state",
+      "principle-sequence-verifiable-units",
+      "principle-subtract-before-you-add",
+      "principle-test-behavior-not-implementation",
+      "principle-type-system-discipline",
+      "label-for-issues"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/titled-repo.sh\""
+    ],
+    "query": "poteto: open a PR for this branch.",
+    "files": [
+      "evals/fixtures/titled-repo.sh",
+      "evals/fixtures/agents-md.md"
+    ],
+    "expected_behavior": [
+      "Titles the PR in the repository's form, such as [docs] Fix the install typo in README, not type(scope): subject",
+      "Reports that this run refused the GitHub write, or that the repository is unreachable, instead of claiming a PR exists"
+    ]
+  },
+  {
+    "skills": [
+      "poteto-mode",
+      "oem",
+      "how",
+      "unslop",
+      "no-comments",
+      "technical-writing",
+      "architect",
+      "principle-attack-the-premise",
+      "principle-boundary-discipline",
+      "principle-build-the-lever",
+      "principle-encode-lessons-in-structure",
+      "principle-exhaust-the-design-space",
+      "principle-experience-first",
+      "principle-fix-root-causes",
+      "principle-foundational-thinking",
+      "principle-guard-the-context-window",
+      "principle-laziness-protocol",
+      "principle-make-operations-idempotent",
+      "principle-migrate-callers-then-delete-legacy-apis",
+      "principle-minimize-reader-load",
+      "principle-model-the-domain",
+      "principle-never-block-on-the-human",
+      "principle-outcome-oriented-execution",
+      "principle-prove-it-works",
+      "principle-redesign-from-first-principles",
+      "principle-separate-before-serializing-shared-state",
+      "principle-sequence-verifiable-units",
+      "principle-subtract-before-you-add",
+      "principle-test-behavior-not-implementation",
+      "principle-type-system-discipline"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/prose-branch.sh\""
+    ],
+    "query": "poteto: review the diff on this branch against main before I open a PR.",
+    "files": [
+      "evals/fixtures/prose-branch.sh"
+    ],
+    "expected_behavior": [
+      "Reviews the README change and leaves no-comments unloaded, since the diff changes no source code",
+      "Writes the reply without a long dash"
+    ]
+  }
+]
