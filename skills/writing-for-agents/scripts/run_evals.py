@@ -231,7 +231,8 @@ AGENTS = ("claude", "codex")
 CODEX_MODEL = "gpt-6.1-sol"
 CODEX_EFFORT = "high"
 GRACE = 10.0
-INSTALLED = (Path.home() / ".codex" / "skills", Path.home() / ".agents" / "skills")
+CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+INSTALLED = (CODEX_HOME / "skills", Path.home() / ".agents" / "skills")
 
 log = logging.getLogger("run_evals")
 
@@ -255,12 +256,13 @@ shell commands run in the fresh repo, with $EVALS naming the evals folder.
 
 Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
-deleted, disabled. Claude runs with --setting-sources project, so it sees only
+deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
+~/.agents/skills. Claude runs with --setting-sources project, so it sees only
 the copies this run installs. A gh wrapper, in place from setup on, logs every
-call to gh-calls.log and lets only reads and help through, plus gh stack push
-when every remote is local. It guards gh, not git push: give each scenario a
-local bare remote. A run that ends or times out has its whole
-process group stopped. stdout prints one line per run: name, status, folder."""
+call to gh-calls.log and lets only reads and help through. It guards gh, not
+git push: give each scenario a local bare remote. A run that ends or times out
+has its whole process group stopped. stdout prints one line per run: name,
+status, folder."""
 
 GH_WRAPPER = """\
 #!/usr/bin/env bash
@@ -285,11 +287,6 @@ case "${{words[0]:-}} ${{words[1]:-}}" in
   "repo view"|"label list"|"run view"|"run list"|"release view"|"release list"|"search "*|\\
   "auth status"|"extension list"|"stack view"|"stack init"|"stack add"|"stack rebase"|\\
   "stack up"|"stack down"|"stack top"|"stack bottom"|"stack checkout"|"stack trunk") exec {gh} "$@" ;;
-  "stack push")
-    for r in $(git remote); do
-      case "$(git remote get-url --push "$r")" in *://*|*@*:*) refuse "$@" ;; esac
-    done
-    exec {gh} "$@" ;;
   "api "*) ;;
   *) refuse "$@" ;;
 esac

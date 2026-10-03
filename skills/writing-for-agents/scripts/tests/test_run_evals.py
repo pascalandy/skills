@@ -230,6 +230,7 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "REFUSED pr create --title --help --body x",
         "stack --version",
         "stack push",
+        "REFUSED stack push",
         "stack push",
         "REFUSED stack push",
     ]
@@ -240,7 +241,6 @@ def test_gh_wrapper_logs_every_call_and_refuses_writes(lab: Lab):
         "api repos/a/b",
         "-R a/b pr view 1",
         "stack --version",
-        "stack push",
     ]
 
 
@@ -420,3 +420,25 @@ def test_setup_runs_behind_the_gh_wrapper(lab: Lab):
     calls = (lab.out / "s1-codex" / "gh-calls.log").read_text().splitlines()
     assert calls == ["pr create --title x", "REFUSED pr create --title x"]
     assert not (lab.reports / "real-gh.log").exists()
+
+
+def test_codex_hides_copies_under_codex_home(lab: Lab):
+    home = lab.tmp / "codex-home"
+    write(home / "skills" / "demo" / "SKILL.md", "installed demo\n")
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        CODEX_HOME=str(home),
+    )
+
+    assert result.returncode == 0, result.stderr
+    argv = report(lab, "s2-codex", "argv").splitlines()
+    hidden = next(arg for arg in argv if arg.startswith("skills.config="))
+    assert str(home / "skills" / "demo" / "SKILL.md") in hidden
