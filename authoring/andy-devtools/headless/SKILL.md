@@ -62,7 +62,7 @@ Read `git diff` and run the relevant checks yourself before you report the fix. 
 
 ## Models and options
 
-Codex runs GPT-6.1 Sol and Claude runs Opus 5.5, both at `xhigh`. These defaults hold even when `profile-routing-matrix` suggests another model. A model or reasoning level named in the request overrides them through `--model` and `--effort`. Harnesses name the reasoning level differently: `--effort` reaches Codex as `model_reasoning_effort` and Claude as `--effort`, and a request may say reasoning, effort, or thinking for the same setting. Flags after `--` reach the child CLI unchanged, such as `-- -c 'web_search="live"'` for Codex. `uv run <skill-dir>/scripts/headless.py --help` lists every option.
+Codex runs GPT-6.1 Sol and Claude runs Opus 5.5, both at `xhigh`. A model or reasoning level named in the request overrides them through `--model` and `--effort`. Harnesses name the reasoning level differently: `--effort` reaches Codex as `model_reasoning_effort` and Claude as `--effort`, and a request may say reasoning, effort, or thinking for the same setting. Flags after `--` reach the child CLI unchanged, such as `-- -c 'web_search="live"'` for Codex. `uv run <skill-dir>/scripts/headless.py --help` lists every option.
 
 ## Read the result
 
