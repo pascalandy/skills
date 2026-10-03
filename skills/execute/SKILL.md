@@ -4,17 +4,21 @@ description: "Use only when explicitly invoked as `execute` or `implement`, or b
 kind: "dev"
 ---
 
+Execute all of this!
+
 #### Agency
 
-Show real agency: use your expert judgment on every decision, follow your gut on what most improves the project, and work through every agreed task relentlessly.
+Show real agency: use your expert judgment on every decision and follow your gut on what most improves the project
 
-Help me understand what is happening. All these steps, review delays, and glitch fixes can be confusing. Share a status update regularly, like: "📍 [concise status about what is going on] / Step N/7"
+Post a status update at each step: "📍 [what is going on] / [step name]"
 
 #### Step by step
 
-Run these steps in order. Finish each one before you start the next:
+- Run these steps in order, and finish each one before you start the next
+- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, Codex on each PR, Code review, and Merge gate steps, and say so in the report
 
-**1. Execute**
+**STEP: Execute**
+
 - Use 🧰 poteto-mode to implement everything we agreed on, and open the PRs
 - Order the work by bang for the buck. Wiring in finished code that isn't connected yet is the typical quick win
 - Note each gap you find outside the scope for the report. File one as an issue with 🧰 label-for-issues only when it deserves its own fix and no existing issue covers it
@@ -22,24 +26,28 @@ Run these steps in order. Finish each one before you start the next:
 	- every item is implemented and checks are green
 	- or each remaining item is reported as blocked, with the reason
 
-**2. Self-check**
-- Run 🧰 2nd-pass
+**STEP: Self-check**
+- Run a $2nd-pass
 - Done when each 2nd-pass finding is fixed or reported
 
-**3. Independent review**
+**STEP: Blast-radius**
 - Run 🧰 headless `--review-only` and ask it:
 	- "Use $poteto-mode and $blast-radius on 'stack PR URLs'. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?"
 - While it runs, write your own premortem. What could go wrong? Are we adding debt or code smells?
-- Done when every medium- or high-severity finding from the review and both premortems is fixed or dismissed with a written reason, and each fix is committed to the layer it belongs to with 🧰 gh-stack and pushed
+- Done when each medium or high finding from the review and both premortems is fixed and pushed to its layer, or dismissed with a written reason
 
-**4. Codex on each PR**
-- On each PR, leave the comment "@codex review"
-- Within 2 min, Codex posts a summary comment whose table says `Running`. When none appears, report that PR's review as unavailable with any error Codex posted, and continue with the other PRs
-- Babysit: poll that comment until no row says `Running` (often 5–12 min), then read the reviews, inline comments, and reactions newer than your request. A 👍 with no review means the PR is clean
-- Fix each valid finding and dismiss the rest with a written reason. After you push a fix, comment "@codex review" again on that PR, once. Report fixes pushed after that second review as unreviewed
-- Done when each PR has a Codex review of its latest head, has had two Codex reviews, or has its Codex review reported as unavailable
+**STEP: Codex on each PR**
+- On each PR, comment "@codex review" and babysit, wait for its review
+- Fix or dismiss each finding. After you push a fix, comment "@codex review" once more on that PR
+- Done when each PR has a Codex review of its latest head or has had two, or Codex is unavailable and you say so in the report
 
-**5. Report**
+**STEP: Code review | across the whole stack**
+- Run 🧰 headless `--review-fix` in a sandbox (`.git` read-only, no network) within the stack's checkout, and ask it:
+	- "Use $poteto-mode to review this stack: every change from 'base branch' to HEAD. The solution works; now make it great and pristine while keeping it simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
+- Review its diff, then commit each change to its layer with $gh-stack and push
+- Done when each change is committed and pushed, or dropped with a reason
+
+**STEP: Report**
 - PR links and links to the issues you filed
 - Every change you made outside what we agreed, and why
 - The gaps outside the scope you did not file
@@ -47,23 +55,23 @@ Run these steps in order. Finish each one before you start the next:
 - Confidence to merge: XX%, and why it is below 100% when it is
 - Done when the report includes every item above
 
-**6. Merge gate**
+**STEP: Merge gate**
 - Land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs, when all of these hold:
 	- confidence to merge is at least 94%
 	- every agreed item is implemented, none blocked
 	- checks are green on every PR's final commit (or the repo has no CI and you say so)
-	- no medium- or high-severity finding is open
+	- no medium or high finding is open
 - Otherwise, ask me about the next steps (see below)
 - Done when each PR is merged and its deploy succeeded. The merge command can exit 0 after a failed deploy, so read its output and report a failed deploy
 
-**7. Close**
+**STEP: Close**
 - Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. From each, file at most 2 issues: the fixes with the most bang for the buck
 - Done when both retros are complete, the selected issues are filed, and you've said goodbye
 
 #### Rules
 
 - One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to pascalandy
-- Run 🧰 headless with Codex, and show the command in a code block before you run it
+- Use Codex for 🧰 headless runs, and show the command in a code block before you run it
 	- Where Codex is missing, as in a cloud environment, skip those runs and say so in the report
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 - Whenever a change alters documented behavior, run 🧰 andy-mode ; docs and commit its edits to the layer they belong to
@@ -75,10 +83,10 @@ Run these steps in order. Finish each one before you start the next:
 	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The merge gate's merge and the deploy it runs are allowed, and so are the Close step's retro issues in any of my repositories
 		- After a squash merge or merge commit, deleting a branch whose tip still matches the PR's head commit at merge time is not deleting data
 
-#### When You Need Me
+#### Questions
 
-Ask in the format of 🧰 oem's "When You Need Me". If nothing is left to decide, say:
+Ask question(s) in the format of 🧰 oem's "When You Need Me".
+- After my answers, apply them and resume at the earliest step they change
 
-0) ⛳ Implemented. [high-level summary of what landed]
-
-After my answers, apply them and resume at the earliest step they change
+If nothing is left to decide, say:
+- ⛳ Implemented. [high-level summary of what landed]
