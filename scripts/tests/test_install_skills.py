@@ -158,7 +158,7 @@ def test_overlapping_applies_leave_the_newest_tree_installed(
     } == {"# alpha\n\nnew\n"}
 
 
-def test_every_private_package_installs_and_duplicates_are_all_named(
+def test_every_private_package_installs_and_replaces_a_public_namesake(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
@@ -176,10 +176,26 @@ def test_every_private_package_installs_and_duplicates_are_all_named(
     skill(repo / "authoring/content", "gamma")
     skill(root / "content", "alpha", "private")
     skill(root / "content", "gamma", "private")
-    duplicate = run(repo, home, "--dry-run")
-    assert duplicate.returncode == 1
-    assert "skill 'alpha' is public and private" in duplicate.stderr
-    assert "skill 'gamma' is public and private" in duplicate.stderr
+    shadowed = run(repo, home)
+    assert shadowed.returncode == 0, shadowed.stderr
+    for name in ("alpha", "gamma"):
+        assert (
+            f"warning: skill '{name}' is public and private; installing the private copy "
+            f"{root / 'content' / name}. Remove authoring/content/{name} to keep it "
+            "private, or delete the private copy to publish it"
+        ) in shadowed.stderr
+    assert {
+        (home / target / name / "SKILL.md").read_text(encoding="utf-8")
+        for target in MAC
+        for name in ("alpha", "gamma")
+    } == {"# alpha\n\nprivate\n", "# gamma\n\nprivate\n"}
+    shutil.rmtree(root / "content" / "alpha")
+    published = run(repo, home)
+    assert published.returncode == 0, published.stderr
+    assert "skill 'alpha'" not in published.stderr
+    assert {
+        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8") for target in MAC
+    } == {"# alpha\n\nold\n"}
 
 
 def test_a_worktree_installs_the_main_checkouts_private_skills(
