@@ -57,6 +57,7 @@ Agent harnesses differ, so always pass the flags below instead of relying on tha
 | Always run | Never run bare | Why |
 |---|---|---|
 | `gh stack view --json` | `gh stack view` | opens a TUI under a PTY |
+| `gh stack sync > /dev/null` | `gh stack sync` | prompts on a stack divergence under a PTY; status still prints on stderr |
 | `gh stack submit --auto` | `gh stack submit` | prompts for a title per new PR |
 | `gh stack merge <target> --yes` | `gh pr merge` | GitHub refuses it for any PR in a stack |
 | `gh stack init <branch>...` | `gh stack init` | prompts for branch names |
@@ -74,8 +75,9 @@ Create the stack before writing any file, so each concern lands in its own layer
 
 1. Branch the bottom layer from the remote trunk. The local trunk can lag it, for example when
    another worktree has it checked out. Run `git fetch <remote>`, `git switch -c <bottom>
-   <remote>/<trunk>`, then `gh stack init <bottom>`, which adopts the branch. Done when
-   `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds
+   <remote>/<trunk>`, then `gh stack init --base <trunk> <bottom>`, which adopts the branch.
+   Done when `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds and
+   `gh stack view --json` prints `<trunk>` as its `trunk`
 2. Commit the bottom layer's concern. For each next layer, run `gh stack add <branch>`, which
    branches from the current layer, and commit its concern there. Done when each layer holds one
    concern and `gh stack view --json` lists them bottom to top
@@ -101,12 +103,13 @@ gh stack view --json
    which is often not the top
 2. Commit the change there
 3. Bring the change into every layer above. `gh stack rebase --upstack` can rewrite the changed
-   layer itself as well as those above, so choose by whether any of them is on the remote:
-   - **None is on the remote, or the session allows force pushes:** run
+   layer as well as those above, and `gh stack push` pushes every layer, so choose by whether any
+   layer of the stack is on the remote:
+   - **No layer is on the remote, or the session allows force pushes:** run
      `gh stack rebase --upstack`, then `gh stack push`, which force-pushes the rewritten layers
      with `--force-with-lease`. A rebase restamps each commit's committer from git config, so
      check `git log --format='%h %ce'` before pushing when the repository requires an email
-   - **One is on the remote, and a rule says to ask before any force push:** run
+   - **A layer is on the remote, and a rule says to ask before any force push:** run
      `git push <remote> <layer>`. Then, for each layer above, bottom to top, run
      `git switch <upper>`, `git merge --no-ff --no-edit <layer below>`, and
      `git push <remote> <upper>`. Every push is a fast-forward
@@ -124,10 +127,10 @@ gh stack top                    # return to where you were
 
 ## Sync
 
-`gh stack sync` fetches, rebases the stack onto the remote trunk, pushes, and refreshes PR state.
-`gh stack sync --prune` also deletes local branches of merged PRs; pruning never happens without
-`--prune` when non-interactive. `sync` can exit 0 even when a push failed, so check the result
-yourself. Done when, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
+`gh stack sync > /dev/null` fetches, rebases the stack onto the remote trunk, pushes, and
+refreshes PR state; add `--prune` to also delete local branches of merged PRs. `sync` can exit 0
+even when a push failed or it aborted, so check the result yourself. Done when stderr has no
+`Sync aborted`, and, after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk>
 <bottom>` succeeds and `git rev-parse <layer> <remote>/<layer>` prints the same commit twice for
 every layer.
 
