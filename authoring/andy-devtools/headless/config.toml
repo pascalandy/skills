@@ -1,0 +1,22 @@
+# Defaults for scripts/headless.py. A --model or --effort flag wins over this file.
+# harness: the CLI the launcher runs when the command names none
+# provider: Pi and OpenCode only; Codex and Claude Code pick their own
+harness = "codex"
+
+[codex]
+model = "gpt-6.1-sol"
+reasoning-level = "high"
+
+[claude]
+model = "claude-opus-5-5"
+reasoning-level = "xhigh"
+
+[pi]
+provider = "openai-codex"
+model = "gpt-6.1-sol"
+reasoning-level = "high"
+
+[opencode]
+provider = "openai"
+model = "gpt-6-astra"
+reasoning-level = "high"

@@ -14,19 +14,21 @@ With terminal stdin and stdout, plain `pi` opens the TUI. Redirecting either str
 
 ## Review or execute
 
-For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. This example selects GLM 5.3 Flash through OpenCode Go and requests `max` reasoning. Before running, confirm the model with `pi --list-models glm-5.3-flash` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking max` requests that level but does not prove the provider uses effective `max`.
+For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. Take `provider`, `model`, and `reasoning-level` from the `[pi]` table of [config.toml](../../config.toml), unless the request names others, and pass them as `--model <provider>/<model>` and `--thinking <reasoning-level>`. Several providers serve one model, so the provider picks the account that pays. Before running, confirm the pair with `pi --list-models <model>` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking` requests a level but does not prove the provider uses it.
 
 ```bash
 repo="/absolute/path/to/repository"
 prompt_file="/absolute/path/to/reviewer-prompt.md"
+model="<provider>/<model>"       # from [pi] in config.toml
+thinking="<reasoning-level>"
 review_dir="$(mktemp -d /tmp/pi-review.XXXXXX)" || exit 1
 
 review_status=0
 (
   cd "$repo" || exit 1
   pi --print \
-    --model opencode-go/glm-5.3-flash \
-    --thinking max \
+    --model "$model" \
+    --thinking "$thinking" \
     --no-session --no-extensions --no-approve \
     --tools read,grep,find,ls \
     < "$prompt_file" \
@@ -47,7 +49,7 @@ printf 'Exit status: %s\nReview files: %s\n' \
 For an event stream, select `--mode json`:
 
 ```bash
-pi --mode json --model opencode-go/glm-5.3-flash --thinking max \
+pi --mode json --model "$model" --thinking "$thinking" \
   --no-session --no-extensions --no-approve --tools read,grep,find,ls \
   "Review this diff and inspect related files" \
   < diff.patch > events.jsonl 2> review.stderr.log
