@@ -42,5 +42,5 @@ Preconditions:
 ## Gotchas
 
 - A failure in the first block lists each differing skill or table in its `.err` file. The change was not compiled, or the compiler broke; report which and stop
-- The copy keeps uncommitted changes and gets a fresh `git init`, because the compiler lists files through git. The checkout under test is never rewritten
+- The copy keeps uncommitted changes and gets a fresh `git init`, because the compiler lists files through git. The rebuild leaves the checkout under test unchanged
 - An install recompiles the checkout's `skills/`. On a compiled checkout that changes nothing, which is why this feature runs first
