@@ -10,7 +10,7 @@ Build a page whose buttons submit bounded jobs to a server. The server authentic
 
 ## Select the runner
 
-Discover the installed agent's supported automation interface. Inspect its CLI help or server API before writing the adapter. A chat interface alone is not a webhook receiver.
+Discover the installed agent's supported automation interface. Inspect its CLI help or server API before writing the adapter. A chat interface alone is not a webhook receiver. Load `$headless` for each CLI's non-interactive flags. Its `headless.py` launcher runs blocking reviews and streams no job events.
 
 | Agent | Available integration to check |
 | --- | --- |
