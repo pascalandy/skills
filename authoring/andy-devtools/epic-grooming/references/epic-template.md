@@ -24,7 +24,7 @@ Example:
 
 Title: `Epic <N> · <the outcome, in plain words>`
 
-Number the steps in work order, one issue entry per step. When a step groups several issues, give it a short `###` heading and list its entries under it. Out of this Epic names neighboring work and the Epic or issue that owns it; add below it what the next planner needs, such as a fix that quotes text that has since changed. Drop the "Before this batch" line when no Epic was kept.
+Number the steps in work order. Use an issue entry for a step with one issue. When a step groups several issues, use `### <step number>. <step name>` and list its issue entries under it. Below Out of this Epic, add what the next planner needs, such as a fix that quotes text that has since changed. Drop the "Before this batch" line when no kept Epic remains open.
 
 ````md
 <epic-grooming>
