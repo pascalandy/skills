@@ -364,12 +364,12 @@ class Failure(ScriptError):
 
 class QueueInterrupted(Interrupted):
     """A signal stopped a queue: `results` holds the URLs it finished, and
-    `remaining` the arguments that rerun only the URLs it did not."""
+    `rerun` the hint that reruns only the URLs it did not."""
 
-    def __init__(self, code: int, results: list[dict], remaining: list[str]) -> None:
+    def __init__(self, code: int, results: list[dict], rerun: str) -> None:
         super().__init__(code)
         self.results = results
-        self.remaining = remaining
+        self.rerun = rerun
 
 
 class TranscriptParser(Parser):
@@ -3314,18 +3314,23 @@ def _run_queue(
                     if "output_dir" in error.report:
                         print(error.report["output_dir"], flush=True)
                     report_failure(error, as_json=False, warnings=warnings)
-                continue
+            else:
+                results.append({"url": url, **run.payload})
+                if not args.json:
+                    print(run.final_dir, flush=True)
+                if args.open:
+                    open_folder(run.final_dir, run.budget)
             finally:
                 QUEUE_POSITION.reset(position)
-            results.append({"url": url, **run.payload})
-            if not args.json:
-                print(run.final_dir, flush=True)
-            if args.open:
-                open_folder(run.final_dir, run.budget)
     except KeyboardInterrupt as stop:
-        remaining = _rewrite(argv, drop={"--url"}, add=("--url", *urls[len(results) :]))
+        pending = urls[len(results) :]
+        rerun = (
+            _rerun(argv, drop={"--url"}, add=("--url", *pending))
+            if pending
+            else "nothing to rerun: every URL has a result"
+        )
         code = getattr(stop, "code", INTERRUPTED)
-        raise QueueInterrupted(code, results, remaining) from stop
+        raise QueueInterrupted(code, results, rerun) from stop
 
     report = {"command": "run", "source": "youtube", "results": results}
     if not failed:
@@ -3407,17 +3412,12 @@ def run_guarded(
                 print(word, file=sys.stderr)
                 return code
             rerun, result = (
-                (stop.remaining, {"results": stop.results})
+                (stop.rerun, {"results": stop.results})
                 if isinstance(stop, QueueInterrupted)
-                else (argv, None)
+                else (_rerun(argv, prog=prog), None)
             )
             stopped = Failure(
-                word,
-                word,
-                _rerun(rerun, prog=prog),
-                code=code,
-                label="rerun",
-                result=result,
+                word, word, rerun, code=code, label="rerun", result=result
             )
             return report_failure(stopped, as_json=True, warnings=warnings)
         except Failure as error:

@@ -1064,6 +1064,76 @@ def test_an_interrupted_queue_reports_what_it_published_and_what_remains(
     )
 
 
+def test_an_interrupt_after_the_last_url_has_nothing_to_rerun(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+    opened: list[str] = []
+
+    def interrupt_while_opening_the_last(path, _budget):
+        opened.append(path.name.rsplit("_", 1)[1])
+        if len(opened) == 2:
+            raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "open_folder", interrupt_while_opening_the_last)
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        *QUEUE[:2],
+        "--no-summary",
+        "--open",
+        "--output-dir",
+        str(tmp_path),
+        "--json",
+    )
+
+    report = json.loads(err)
+    assert (code, out, opened) == (130, "", ["aaa", "bbb"])
+    assert [r["url"] for r in report["results"]] == QUEUE[:2]
+    assert report["error"]["hint"] == "nothing to rerun: every URL has a result"
+
+
+def test_an_expired_budget_when_opening_a_folder_lets_the_queue_move_on(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+    now = [0.0]
+
+    def slow_transcription(audio_path, *_args):
+        if audio_path.stem == "aaa":
+            now[0] += 10_000.0
+        return deepgram_response(f"Words of {audio_path.stem}")
+
+    monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(transcript, "transcribe_audio", slow_transcription)
+    monkeypatch.setattr(transcript.platform, "system", lambda: "Darwin")
+    opened: list[str] = []
+
+    def finder(command, **_kwargs):
+        opened.append(Path(command[1]).name.rsplit("_", 1)[1])
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(transcript, "run_child", finder)
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        *QUEUE[:2],
+        "--no-summary",
+        "--open",
+        "--output-dir",
+        str(tmp_path),
+    )
+
+    assert (code, video_ids(out), opened) == (0, ["aaa", "bbb"], ["bbb"])
+    assert "[1/2] warning: Could not open the output folder in Finder" in err
+
+
 def test_each_verbose_queue_line_names_its_url(tmp_path, monkeypatch, capsys) -> None:
     fake_queue(monkeypatch)
 
