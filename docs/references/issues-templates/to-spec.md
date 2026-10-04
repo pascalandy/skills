@@ -3,9 +3,9 @@
 ````md
 <spec-template>
 
-## Problem Statement
+## Problem Statement (CMO)
 
-The problem that the user is facing, from the user's perspective.
+The problem that the user is facing, from the user's perspective. Restate my goal and the problem in your own words
 
 ## Solution
 
@@ -21,6 +21,8 @@ A detailed, numbered list (ID start at: US_101) of user stories. Each user story
 - US_101: As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
 </user-story-example>
 
+List the use cases, edge cases included
+
 ## Implementation Decisions
 
 A list of implementation decisions that were made. This can include:
@@ -35,15 +37,23 @@ A list of implementation decisions that were made. This can include:
 
 ## Testing Decisions
 
+<details>
+<summary>🧪 Tests</summary>
+
 A list of testing decisions that were made. Include:
 
 - A description of what makes a good test (only test external behavior, not implementation details)
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)
 
-## Out of Scope
+## How we'll know it works
 
-A description of the things that are out of scope for this spec.
+1. **Before the change:** <rerun the failing scenario with the current skill, in three fresh sessions when the result depends on the agent's choices>. If <it never fails>, the problem doesn't repeat
+2. **After the change:** <the same scenario and the result that proves the fix>
+3. **Nothing else changes:** <a nearby case that must keep its current result>
+4. `just check` passes
+
+</details>
 
 ## 👨🏻‍🍳 For the agent
 
