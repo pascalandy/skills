@@ -220,6 +220,11 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
             "the following arguments are required: --url",
         ),
         (
+            ["run", "youtube", "--url", "--url", "-n"],
+            "transcript run youtube",
+            "argument --url: give at least one YouTube URL",
+        ),
+        (
             ["list", "prompts", "--bogus-flag"],
             "transcript list prompts",
             "unrecognized arguments: --bogus-flag",
@@ -269,6 +274,7 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
     ids=[
         "no-command",
         "missing-url",
+        "empty-url",
         "unknown-flag",
         "abbreviated-flag",
         "unknown-command",
@@ -810,8 +816,13 @@ def video_ids(out: str) -> list[str]:
 @exits("transcript", 0)
 @pytest.mark.parametrize(
     "urls",
-    [["--url", *QUEUE[:2]], ["--url", QUEUE[0], "--url", QUEUE[1]]],
-    ids=["one-flag", "repeated-flag"],
+    [
+        ["--url", *QUEUE[:2]],
+        ["--url", QUEUE[0], "--url", QUEUE[1]],
+        # `just ttr --url A --url B`: the recipe adds its own --url first
+        ["--url", "--url", QUEUE[0], "--url", QUEUE[1]],
+    ],
+    ids=["one-flag", "repeated-flag", "empty-flag"],
 )
 def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
     urls: list[str], tmp_path, monkeypatch, capsys
@@ -831,13 +842,22 @@ def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
 
 
 @exits("transcript", 1)
+@pytest.mark.parametrize(
+    "flags_first", [False, True], ids=["urls-first", "flags-first"]
+)
 def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
-    tmp_path, monkeypatch, capsys
+    flags_first: bool, tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch, failing={"bbb": deepgram_status(500)})
     options = ["--no-summary", "--output-dir", str(tmp_path)]
+    # `just ttr --no-summary ... --url A B C`: the recipe adds its own --url first
+    argv = (
+        ["--url", *options, "--url", *QUEUE]
+        if flags_first
+        else ["--url", *QUEUE, *options]
+    )
 
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
+    code, out, err = cli(capsys, "run", "youtube", *argv)
 
     lines = err.splitlines()
     assert code == 1
