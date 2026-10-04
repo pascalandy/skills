@@ -989,23 +989,84 @@ def test_an_invalid_url_stops_the_queue_before_any_work(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_a_repeated_url_runs_once_with_a_warning(tmp_path, monkeypatch, capsys) -> None:
+def test_one_video_under_two_url_forms_runs_once_as_a_queue(
+    tmp_path, monkeypatch, capsys
+) -> None:
     fake_queue(monkeypatch)
+    forms = ["https://youtu.be/aaa", "https://www.youtube.com/watch?v=aaa"]
+    options = ["--no-summary", "--output-dir", str(tmp_path)]
 
-    code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        QUEUE[0],
-        QUEUE[0],
-        "--no-summary",
-        "--output-dir",
-        str(tmp_path),
-    )
+    code, out, err = cli(capsys, "run", "youtube", "--url", *forms, *options)
 
     assert (code, err) == (0, "warning: Skipped 1 repeated URL(s)\n")
     assert video_ids(out) == ["aaa"]
+
+    code, out, err = cli(capsys, "run", "youtube", "--url", *forms, *options, "--json")
+
+    report = json.loads(out)
+    assert (code, err) == (0, "")
+    assert [result["url"] for result in report["results"]] == forms[:1]
+    assert report["warnings"] == ["Skipped 1 repeated URL(s)"]
+
+
+@exits("transcript", 1)
+def test_a_failed_publication_stops_the_queue_before_more_paid_work(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+    uploads: list[str] = []
+    monkeypatch.setattr(
+        transcript,
+        "transcribe_audio",
+        lambda audio_path, *_args: (
+            uploads.append(audio_path.stem) or deepgram_response()
+        ),
+    )
+    monkeypatch.setattr(
+        transcript,
+        "_write_metadata",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    options = ["--no-summary", "--output-dir", str(tmp_path)]
+
+    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
+
+    fix = ["--no-summary", "--output-dir", "WRITABLE_DIR", "--url", *QUEUE]
+    assert (code, out, uploads) == (1, "", ["aaa"])
+    assert err.splitlines()[-2:] == [
+        "error: 1 of 3 URLs failed; 0 published a result folder. The queue "
+        "stopped before the last 2, which would fail to publish the same way",
+        "rerun: " + shlex.join(["transcript", "run", "youtube", *fix]),
+    ]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_an_interrupt_while_opening_a_failed_summary_keeps_its_result(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+    monkeypatch.setattr(
+        transcript,
+        "run_summary_prompt",
+        lambda *_args: (_ for _ in ()).throw(transcript.SummaryCLIError("quota")),
+    )
+
+    def interrupt(*_args):
+        raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "open_folder", interrupt)
+    options = ["--output-dir", str(tmp_path), "--open", "--json"]
+
+    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+
+    report = json.loads(err)
+    assert (code, out) == (130, "")
+    assert [(r["url"], r["error"]["code"]) for r in report["results"]] == [
+        (QUEUE[0], "summary_failed")
+    ]
+    assert report["error"]["hint"] == shlex.join(
+        ["transcript", "run", "youtube", *options, "--url", QUEUE[1]]
+    )
 
 
 def test_a_preflight_failure_stops_the_queue_before_any_url(

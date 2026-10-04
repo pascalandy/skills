@@ -1395,14 +1395,24 @@ def validate_env(budget: RunBudget) -> str:
 YOUTUBE_URL_PLACEHOLDER = "https://www.youtube.com/watch?v=VIDEO_ID"
 
 
+YOUTUBE_URL_PATTERNS = (
+    r"^https?://(www\.)?youtube\.com/watch\?v=(?P<id>[\w-]+)",
+    r"^https?://youtu\.be/(?P<id>[\w-]+)",
+    r"^https?://(www\.)?youtube\.com/shorts/(?P<id>[\w-]+)",
+)
+
+
+def youtube_video_id(url: str) -> str | None:
+    """The video ID a YouTube URL names, or None for any other URL."""
+    for pattern in YOUTUBE_URL_PATTERNS:
+        if match := re.match(pattern, url):
+            return match["id"]
+    return None
+
+
 def validate_youtube_url(url: str) -> bool:
     """Validate YouTube URL format."""
-    patterns = [
-        r"^https?://(www\.)?youtube\.com/watch\?v=[\w-]+",
-        r"^https?://youtu\.be/[\w-]+",
-        r"^https?://(www\.)?youtube\.com/shorts/[\w-]+",
-    ]
-    return any(re.match(pattern, url) for pattern in patterns)
+    return youtube_video_id(url) is not None
 
 
 def find_zoom_audio(meeting_dir: Path) -> Path:
@@ -1973,8 +1983,8 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help_text="Transcribe one or more YouTube videos",
         description=(
             "Download and transcribe each YouTube video's audio, one URL at a "
-            "time. A failed URL does not stop the others, and each result "
-            "folder prints as soon as it is published."
+            "time. Each result folder prints as soon as it is published, and a "
+            "failed URL lets the others run unless its publication failed."
         ),
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
@@ -2165,11 +2175,17 @@ def parse_args(
         args.output_dir = None
     else:
         args.zoom_export_path = None
-        urls = list(dict.fromkeys(args.urls))
-        args.repeated_urls = len(args.urls) - len(urls)
-        args.urls = urls
+        # One video under two URL forms, such as youtu.be/ID and watch?v=ID&t=30,
+        # would bill Deepgram twice for the same audio
+        unique: dict[str, str] = {}
+        for url in args.urls:
+            unique.setdefault(youtube_video_id(url) or url, url)
+        args.repeated_urls = len(args.urls) - len(unique)
+        # Several URLs make a queue and its output, even when they name one video
+        args.queued = len(args.urls) > 1
+        args.urls = list(unique.values())
         # A queue sets each URL's own `url` as it runs it
-        args.url = urls[0] if len(urls) == 1 else None
+        args.url = None if args.queued else args.urls[0]
 
     summary_options = {
         "--profile": args.profile,
@@ -2209,7 +2225,7 @@ def parse_args(
         source_parser.error(
             "--preview cannot be combined with --json because both use stdout"
         )
-    if args.preview and len(getattr(args, "urls", ())) > 1:
+    if args.preview and getattr(args, "queued", False):
         source_parser.error(
             "--preview takes one URL, because each summary would print "
             "between the result paths"
@@ -2402,9 +2418,9 @@ def _dry_run_payload(
     """Describe a run without reading secrets, calling APIs, or writing files."""
     if plan.source_kind == "youtube":
         source = (
-            {"kind": "youtube", "url": args.urls[0]}
-            if len(args.urls) == 1
-            else {"kind": "youtube", "urls": args.urls}
+            {"kind": "youtube", "urls": args.urls}
+            if args.queued
+            else {"kind": "youtube", "url": args.url}
         )
         output_dir = (args.output_dir or OUTPUT_DIR).expanduser()
     else:
@@ -3150,8 +3166,6 @@ def _transcribe_and_publish(
         metadata_path=final_dir / metadata_name,
     )
     if outcome.status == "failed":
-        if args.open:
-            open_folder(final_dir, budget)
         reporter.skip("Summary preview", "summary generation failed")
         raise Failure(
             "summary_failed",
@@ -3202,9 +3216,15 @@ def _run(
     reporter = ExecutionReporter(_live_console(args))
     reporter.run_configuration(plan, selected_prompt)
     api_key = _run_preflight(plan, args, argv, budget, reporter)
-    run = _transcribe_and_publish(
-        plan, selected_prompt, args, argv, api_key, budget, reporter
-    )
+    try:
+        run = _transcribe_and_publish(
+            plan, selected_prompt, args, argv, api_key, budget, reporter
+        )
+    except Failure as error:
+        # A failed summary still published the transcript folder
+        if args.open and "output_dir" in error.report:
+            open_folder(Path(error.report["output_dir"]), budget)
+        raise
 
     preview_follows = plan.preview and run.summary.path is not None
     if args.json:
@@ -3240,14 +3260,15 @@ def _run(
     return 0
 
 
-def _queue_fix(argv: Sequence[str], failed: Sequence[tuple[str, Failure]]) -> str:
-    """The command that reruns only the failed URLs. When every URL's own fix
+def _queue_fix(
+    argv: Sequence[str], failures: Sequence[Failure], urls: Sequence[str]
+) -> str:
+    """The command that reruns only `urls`. When every failure's own fix
     repairs the command the same way, such as a longer --timeout, it keeps
     that repair."""
-    urls = [url for url, _ in failed]
     repairs = {
         tuple(_rewrite(shlex.split(error.fix)[1:], drop={"--url"}))
-        for _, error in failed
+        for error in failures
     }
     if len(repairs) == 1:
         (repair,) = repairs
@@ -3296,6 +3317,7 @@ def _run_queue(
     try:
         for number, url in enumerate(urls, start=1):
             position = QUEUE_POSITION.set(f"[{number}/{len(urls)}] ")
+            budget = RunBudget.start(args.timeout)
             try:
                 run = _transcribe_and_publish(
                     plan,
@@ -3303,17 +3325,23 @@ def _run_queue(
                     argparse.Namespace(**{**vars(args), "url": url}),
                     _rewrite(argv, drop={"--url"}, add=("--url", url)),
                     api_key,
-                    RunBudget.start(args.timeout),
+                    budget,
                     reporter,
                 )
             except Failure as error:
                 results.append({"url": url, **_failure_object(error)})
                 failed.append((url, error))
+                # A failed summary still published the transcript folder
+                published = error.report.get("output_dir")
+                if published and not args.json:
+                    print(published, flush=True)
                 if not args.json:
-                    # A failed summary still published the transcript folder
-                    if "output_dir" in error.report:
-                        print(error.report["output_dir"], flush=True)
                     report_failure(error, as_json=False, warnings=warnings)
+                if published and args.open:
+                    open_folder(Path(published), budget)
+                if error.kind == "publication_failed":
+                    # Every later URL would bill Deepgram, then fail the same way
+                    break
             else:
                 results.append({"url": url, **run.payload})
                 if not args.json:
@@ -3338,12 +3366,25 @@ def _run_queue(
             _print_json({"ok": True, **report}, warnings)
         return 0
     published = sum("output_dir" in result for result in results)
+    pending = urls[len(results) :]
     temporary = all(error.code == TEMPORARY for _, error in failed)
+    message = (
+        f"{len(failed)} of {len(urls)} URLs failed; "
+        f"{published} published a result folder"
+    )
+    if pending:
+        message += (
+            f". The queue stopped before the last {len(pending)}, which would "
+            "fail to publish the same way"
+        )
     raise Failure(
         "queue_failed",
-        f"{len(failed)} of {len(urls)} URLs failed; "
-        f"{published} published a result folder",
-        _queue_fix(argv, failed),
+        message,
+        _queue_fix(
+            argv,
+            [error for _, error in failed],
+            [*(url for url, _ in failed), *pending],
+        ),
         # 75 promises that rerunning the same command bills nothing again
         code=TEMPORARY if temporary and not published else 1,
         label="retry" if temporary else "rerun",
@@ -3368,9 +3409,8 @@ def _dispatch(
         return _run_doctor(args)
     source_parser = _subcommands(_subcommands(parser)["run"])[args.source]
     if args.source == "youtube" and args.repeated_urls:
-        # A repeated URL would bill Deepgram twice for the same audio
         log.warning(f"Skipped {args.repeated_urls} repeated URL(s)")
-    if args.source == "youtube" and len(args.urls) > 1:
+    if args.source == "youtube" and args.queued:
         return _run_queue(args, argv, prompts, warnings, source_parser)
     return _run(args, argv, prompts, warnings, source_parser)
 
