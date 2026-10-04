@@ -1019,8 +1019,10 @@ def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
         # argparse reads both as values, not as options
         (["-1", QUEUE[0]], "-1"),
         (["-bad value", QUEUE[0]], "-bad value"),
+        # --path belongs to run zoom, so run youtube reads this as a value too
+        (["--path=bad value", QUEUE[0]], "--path=bad value"),
     ],
-    ids=["not-youtube", "negative-number", "dash-and-space"],
+    ids=["not-youtube", "negative-number", "dash-and-space", "zoom-option"],
 )
 def test_an_invalid_url_stops_the_queue_before_any_work(
     urls: list[str], invalid: str, tmp_path, monkeypatch, capsys
