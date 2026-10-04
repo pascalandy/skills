@@ -20,7 +20,7 @@
     "query": "Create a skill that converts a CSV file into a Markdown table. Put it in a folder named after the skill.",
     "files": [],
     "expected_behavior": [
-      "Writes three evaluation scenarios and records a baseline for each before writing the instructions",
+      "Writes no evaluation scenarios, since the request does not ask for them",
       "Names the skill with lowercase letters, digits, and hyphens, matching its folder, such as converting-csv-to-markdown",
       "Writes a description that says when to load the skill",
       "Loads coding-language before writing the script",
@@ -28,7 +28,7 @@
       "Names the tool the script needs, with its install command, before the first step that uses it",
       "Checks that each required tool is available before using it",
       "Runs the skill validator on the new skill and ends with it printing nothing",
-      "Reruns the three scenarios with the completed skill in fresh agent sessions and records each result against its expected behavior and baseline",
+      "Writes tests for the script and runs them until they pass",
       "Keeps SKILL.md under 500 lines"
     ]
   },
@@ -47,7 +47,7 @@
   {
     "skills": ["writing-for-agents"],
     "setup": ["mkdir pdf-helper", "cp \"$EVALS/fixtures/messy-skill.md\" pdf-helper/SKILL.md"],
-    "query": "Improve the skill pdf-helper with writing-for-agents.",
+    "query": "Improve the skill pdf-helper with writing-for-agents, and measure it with evaluations.",
     "files": ["evals/fixtures/messy-skill.md"],
     "expected_behavior": [
       "Shows the filled BP checklist before editing, with at least five BPs open and their finding counts",
