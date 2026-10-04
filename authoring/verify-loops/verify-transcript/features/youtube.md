@@ -22,7 +22,7 @@ Preconditions:
 
 - `verify-transcript doctor --json` locates `transcript` and `uv`
 - A real run has a valid Deepgram credential, pinned yt-dlp, `ffmpeg`, `ffprobe`, and a signed-in `claude` for the default summary profile
-- The user explicitly authorized the paid real flow
+- A local session on a Mac whose Arc is signed in to YouTube, as the transcript README's `Test videos` rule requires
 
 - **Free plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require exit `0`, `side_effects: []`, the canonical URL, the configured summary plan, and a planned output path that remains absent
 - **Transcript-only plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require the canonical URL, disabled summary fields, a timeout override, and no output creation

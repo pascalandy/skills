@@ -24,6 +24,8 @@ from typing import Literal
 
 __version__ = "2.0.0"
 CANONICAL_YOUTUBE_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
+# The transcript README's Test videos rule: every paid test run summarizes with it
+TEST_PROFILE = "sonnet"
 EVIDENCE_NAMESPACE = "eval-transcript"
 RUN_MARKER = ".verify-transcript-run"
 FEATURE_AREAS = (
@@ -317,7 +319,7 @@ PUBLIC_SURFACES = (
         "option.profile",
         "option",
         "--profile",
-        ("youtube.dry-run-summary", "zoom.dry-run"),
+        ("youtube.dry-run-summary", "zoom.dry-run", "youtube.real-summary"),
     ),
     PublicSurface(
         "option.provider",
@@ -825,6 +827,8 @@ def build_commands(
                     "youtube",
                     "--url",
                     context.youtube_url,
+                    "--profile",
+                    TEST_PROFILE,
                     "--prompt",
                     "short_summary",
                     "--output-dir",
@@ -1196,6 +1200,10 @@ def _validate_e2e(
     artifacts = payload.get("artifacts")
     _require(isinstance(summary, dict), "real run summary state is missing")
     _require(summary.get("status") == "succeeded", "real summary did not succeed")
+    _require(
+        summary.get("profile") == TEST_PROFILE,
+        f"real summary did not use the {TEST_PROFILE} test profile",
+    )
     _require(isinstance(artifacts, dict), "real run artifacts are missing")
     required = {"transcript", "sentences", "json", "metadata", "summary"}
     _require(required <= artifacts.keys(), "real run artifact set is incomplete")
@@ -1479,6 +1487,7 @@ def validate_feature(
             ("astra", "codex", "gpt-6-astra", "low"),
             ("sol", "codex", "gpt-5.6-sol", "medium"),
             ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
+            (TEST_PROFILE, "claude", "claude-sonnet-5-5", "medium"),
         ]
         actual = [
             (

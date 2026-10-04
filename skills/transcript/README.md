@@ -211,6 +211,12 @@ uvx yt-dlp@2026.7.4 --skip-download --print duration "<youtube-url>"
 
 The length prints in seconds.
 
+Every real test run also passes `--profile sonnet`, Claude Sonnet 5.5 at `medium` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
+
+Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. Any other paid run, such as a long video or another profile, still needs his go-ahead.
+
+Run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`. Linux has no Arc profile. In both cases yt-dlp falls back to anonymous access, YouTube refuses it, and the run fails before any paid request. From such a machine, hand the closeout commands to a local Mac session.
+
 ## Validation model
 
 Use these evidence names consistently:
@@ -266,6 +272,7 @@ Run the canonical YouTube Agent QA path:
 ```bash
 uv run <skill_dir>/scripts/transcript.py run youtube \
   --url "https://www.youtube.com/watch?v=EIEc43CxIvY" \
+  --profile sonnet \
   --prompt short_summary \
   --output-dir <temporary-dir> \
   --json
@@ -276,6 +283,7 @@ When a change touches the queue, also run both [test videos](#test-videos) as on
 ```bash
 uv run <skill_dir>/scripts/transcript.py run youtube \
   --url "https://www.youtube.com/watch?v=EIEc43CxIvY" "https://www.youtube.com/watch?v=QwpTAk_IiyU" \
+  --profile sonnet \
   --prompt short_summary \
   --output-dir <temporary-dir>
 ```
@@ -283,9 +291,10 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
 A real Zoom run is not part of the closeout for now, even when a change affects Zoom: Pascal does not use Zoom. Zoom mode stays supported, and its coverage is the automated tests plus the free `zoom.dry-run` and `diagnostics.zoom` features of `verify-transcript`. Report Zoom E2E as `NOT RUN`. To exercise Zoom anyway, run:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
+uv run <skill_dir>/scripts/transcript.py run zoom --latest --profile sonnet --json
 uv run <skill_dir>/scripts/transcript.py run zoom \
   --path "2026-05-03 14.46.55 Réunion Zoom de Camille Exemple" \
+  --profile sonnet \
   --json
 ```
 

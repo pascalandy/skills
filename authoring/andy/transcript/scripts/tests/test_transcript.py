@@ -87,7 +87,7 @@ class TestListModels:
     def test_default_provider_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models")
         assert code == 0
-        assert stdout.strip().splitlines() == ["claude-opus-5-5"]
+        assert stdout.strip().splitlines() == ["claude-opus-5-5", "claude-sonnet-5-5"]
 
     def test_openrouter_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "openrouter")
@@ -139,6 +139,12 @@ class TestProfiles:
                     "model": "z-ai/glm-5.3-flash",
                     "effort": "medium",
                 },
+                {
+                    "name": "sonnet",
+                    "provider": "claude",
+                    "model": "claude-sonnet-5-5",
+                    "effort": "medium",
+                },
             ],
         }
 
@@ -147,6 +153,7 @@ class TestProfiles:
         [
             ("sol", ("codex", "gpt-5.6-sol", "medium")),
             ("glm", ("openrouter", "z-ai/glm-5.3-flash", "medium")),
+            ("sonnet", ("claude", "claude-sonnet-5-5", "medium")),
         ],
     )
     def test_named_profile_resolves_the_complete_target(
