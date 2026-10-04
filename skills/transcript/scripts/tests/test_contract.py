@@ -727,6 +727,33 @@ def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     assert "retry: transcript run youtube" in err
 
 
+@exits("transcript", 75)
+def test_a_retry_hint_drops_the_empty_url_that_just_ttr_adds(
+    monkeypatch, capsys
+) -> None:
+    responses = [
+        subprocess.CompletedProcess([], 1, "", "ERROR: Sign in failed"),
+        subprocess.CompletedProcess(
+            [], 1, "", "ERROR: HTTP Error 429: Too Many Requests"
+        ),
+    ]
+    monkeypatch.setattr(
+        transcript, "run_child", lambda *_args, **_kwargs: responses.pop(0)
+    )
+    monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
+
+    # `just ttr --no-summary --url URL`
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", "--no-summary", "--url", URL
+    )
+
+    assert (code, out) == (75, "")
+    assert (
+        err.splitlines()[-1]
+        == f"retry: transcript run youtube --no-summary --url {URL}"
+    )
+
+
 @exits("youtube_smoke", 0, 1, 75)
 def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> None:
     def downloaded(_url, output_dir, *_args, **_kwargs):
