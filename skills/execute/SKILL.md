@@ -15,10 +15,9 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 #### Step by step
 
 - Run these steps in order, and finish each one before you start the next
-- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, Codex on each PR, Code review, Docs, Checks, and Merge gate steps, and say so in the report
+- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, assistant on each PR, Code review, Docs, Checks, and Merge gate steps, and say so in the report
 
 **STEP: Execute**
-
 - Use 🧰 poteto-mode to implement everything we agreed on, and open the PRs
 - Order the work by bang for the buck. Wiring in finished code that isn't connected yet is the typical quick win
 - Note each gap you find outside the scope for the report. File one as an issue with 🧰 label-for-issues only when it deserves its own fix and no existing issue covers it
@@ -30,22 +29,25 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Run a $2nd-pass
 - Done when each 2nd-pass finding is fixed or reported
 
+**STEP: Codex on each PR**
+- On each PR, post a new comment : 
+	- "Paula Review PR. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md Then use $poteto-mode to do an adversarial code review. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values.
+- then babysit, wait for Paula
+- Fix or explicitly dismiss each finding. Push changes and request a max of 4 reviews when needed.
+- Done when each PR has a review of its latest head or has had two, or Bot is unavailable and you say so in the report
+
 **STEP: Blast-radius**
-- Run 🧰 headless `--review-only` and ask it:
-	- "Use $poteto-mode and $blast-radius on 'stack PR URLs'. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?"
+- On the top PR, post a new comment : 
+	- "Paula Review PR but now focus on impacts. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md . Then use $poteto-mode and $blast-radius on 'stack PR URLs'. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?" followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values.
 - While it runs, write your own premortem. What could go wrong? Are we adding debt or code smells?
 - Done when each medium or high finding from the review and both premortems is fixed and pushed to its layer, or dismissed with a written reason
 
-**STEP: Codex on each PR**
-- On each PR, comment "@codex review" and babysit, wait for its review
-- Fix or dismiss each finding. After you push a fix, comment "@codex review" once more on that PR
-- Done when each PR has a Codex review of its latest head or has had two, or Codex is unavailable and you say so in the report
-
 **STEP: Code review | across the whole stack**
-- Run 🧰 headless `--review-fix` in a sandbox (`.git` read-only, no network) within the stack's checkout, and ask it:
-	- "Use $poteto-mode to review this stack: every change from 'base branch' to HEAD. The solution works; now make it great and pristine while keeping it simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
-- Review its diff, then commit each change to its layer with $gh-stack and push
-- Done when each change is committed and pushed, or dropped with a reason
+- On the top PR, post a new comment : 
+	- "Paula Review Stack. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md . Then use $poteto-mode to review this stack: every change from 'base branch' to HEAD. The solution works; now make it great and pristine while keeping it simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values.
+- then babysit, wait for Paula
+- Fix or explicitly dismiss each finding. Push changes and request a max of 4 reviews when needed.
+- Done when the latest stack is reviewed and findings are resolved or accepted. Report any blocker; merge only with the user's approval.
 
 **STEP: Docs**
 - Run 🧰 andy-mode ; docs on the stack's final diff, and commit its edits to the layer they belong to
@@ -53,7 +55,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when each doc that describes a behavior the stack changes matches the new behavior, and its edits are pushed
 
 **STEP: Checks**
-- On each PR's final commit, run the project's local checks and wait for its GitHub checks. Fix each failure in the PR that owns the code, push, and repeat
+- On each PR's final commit, run the project's checks (local ci) and wait for its GitHub checks. Fix each failure in the PR that owns the code, push, and repeat
 - If the repo has no CI, say so in the report
 - Done when local checks and any GitHub checks are green on every PR's final commit, or each failing check is reported as blocked, with the reason
 
@@ -79,8 +81,6 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 #### Rules
 
 - One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to pascalandy
-- Use Codex for 🧰 headless runs, and show the command in a code block before you run it
-	- Where Codex is missing, as in a cloud environment, skip those runs and say so in the report
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 - As you see fit, leave comments on the PRs to help me understand what happened
 - Keep going without me. You may push your own stack branches (`--force-with-lease` is fine), and open and update PRs and issues
