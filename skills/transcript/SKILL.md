@@ -9,7 +9,7 @@ configuration-is-needed: true
 
 Transcribe YouTube or Zoom audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
 
-Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Give a real run a 600-second process timeout for each URL it transcribes. The CLI enforces its own 570-second workflow deadline per URL by default.
+Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
 
 ## Choose the command
 
@@ -17,8 +17,8 @@ Resolve `scripts/transcript.py` relative to this skill directory and run that ab
 # YouTube
 uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --json
 
-# Several YouTube videos, one after another, in one run
-uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" "<youtube-url>" --json
+# YouTube queue
+uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url-a>" "<youtube-url-b>" --json
 
 # Latest Zoom meeting
 uv run <skill_dir>/scripts/transcript.py run zoom --latest --json

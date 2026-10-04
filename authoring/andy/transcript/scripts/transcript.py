@@ -607,7 +607,7 @@ class RunBudget:
 
     @classmethod
     def start(cls, timeout: float = WORKFLOW_TOTAL_TIMEOUT) -> "RunBudget":
-        """Start the workflow budget before any execution preflight."""
+        """Start a deadline from the current monotonic time."""
         return cls(time.monotonic() + timeout)
 
     def remaining(self, operation: str, maximum: float | None = None) -> float:
@@ -644,13 +644,11 @@ class StagedPublication:
 
 @dataclass(frozen=True)
 class PublishedRun:
-    """A published result folder, its JSON payload, and the run's remaining
-    budget for opening or previewing it."""
+    """A published result folder, its JSON payload, and summary outcome."""
 
     final_dir: Path
     payload: dict
     summary: SummaryOutcome
-    budget: RunBudget
 
 
 @dataclass
@@ -2986,7 +2984,7 @@ def _resolve_run(
     prompts: list[PromptSpec],
     source_parser: argparse.ArgumentParser,
 ) -> tuple[RunPlan, PromptSpec | None]:
-    """Resolve the summary plan and its prompt, or fail as a usage error."""
+    """Resolve the run plan and its summary prompt."""
     try:
         plan = resolve_run_plan(args)
         return plan, _resolve_prompt_for_run(plan, args, prompts)
@@ -3041,8 +3039,8 @@ def _transcribe_and_publish(
     budget: RunBudget,
     reporter: ExecutionReporter,
 ) -> PublishedRun:
-    """Transcribe one source and publish its result folder, or raise the Failure
-    whose hint reruns `argv`."""
+    """Transcribe one source and publish its result folder. Each Failure's hint
+    reruns `argv`, so a queue passes the arguments of one URL."""
     doctor = f"{PROG} doctor --source {plan.source_kind}"
     try:
         asset, artifacts = _acquire_and_transcribe(
@@ -3174,7 +3172,7 @@ def _transcribe_and_publish(
             _other_profile(argv, plan),
             result=payload,
         )
-    return PublishedRun(final_dir, payload, outcome, budget)
+    return PublishedRun(final_dir, payload, outcome)
 
 
 def _run(
@@ -3232,7 +3230,7 @@ def _run(
     else:
         print_result_path(run.final_dir, preview_follows=preview_follows)
     if args.open:
-        open_folder(run.final_dir, run.budget)
+        open_folder(run.final_dir, budget)
     if run.summary.path and plan.preview:
         final_summary_path = run.final_dir / run.summary.path.name
         if final_summary_path.exists():
@@ -3240,7 +3238,7 @@ def _run(
                 try:
                     render_markdown_with_glow(
                         final_summary_path,
-                        run.budget,
+                        budget,
                         color=color_enabled(sys.stdout, args.no_color),
                     )
                 except (
@@ -3284,9 +3282,8 @@ def _run_queue(
     warnings: list[str],
     source_parser: argparse.ArgumentParser,
 ) -> int:
-    """Transcribe each YouTube URL in turn and print each result folder once it
-    is published. A failed URL reports its own error and fix, then the queue
-    moves on; the exit code and final error count every failure."""
+    """Transcribe each URL in order. A failed URL reports its own fix and the
+    queue moves on, unless its result could not be published."""
     plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
     urls: list[str] = args.urls
     invalid = [url for url in urls if not validate_youtube_url(url)]
@@ -3347,7 +3344,7 @@ def _run_queue(
                 if not args.json:
                     print(run.final_dir, flush=True)
                 if args.open:
-                    open_folder(run.final_dir, run.budget)
+                    open_folder(run.final_dir, budget)
             finally:
                 QUEUE_POSITION.reset(position)
     except KeyboardInterrupt as stop:

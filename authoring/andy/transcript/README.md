@@ -60,28 +60,24 @@ Finder and preview are opt-in. A normal run has no GUI side effect and does not 
 
 ## Queue several videos
 
-`--url` takes several YouTube URLs, and it can repeat. `just ttr` passes every URL it receives:
+`--url` takes several YouTube URLs, so one terminal shows every video's status. `just ttr` passes every URL it receives:
 
 ```bash
 just ttr "https://www.youtube.com/watch?v=VIDEO_A" "https://www.youtube.com/watch?v=VIDEO_B"
 ```
 
-A queue runs one URL at a time, so uploads never share bandwidth.
+The queue runs one URL at a time, so uploads never share bandwidth.
 
-- Before any work, the queue checks every URL. One invalid URL exits `2`, and nothing runs
-- It checks the summary CLI and reads the Deepgram key once, then gives each URL its own `--timeout` budget and its own result folder
-- A repeated video runs once, with a warning, so Deepgram never bills the same audio twice. The queue compares video IDs, so `youtu.be/ID` and `watch?v=ID&t=30` count as one video
-- On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`. Lines from `-v` and `--debug` carry the same prefix
-- Each result folder prints on `stdout` as soon as it is published, even when a later URL fails. A URL whose summary failed still prints its transcript folder, so paid results are never hidden
-- A failed URL prints `[2/4] error:` and its own fix on `stderr`, and the queue moves on. After the last URL, `error: 1 of 4 URLs failed; 3 published a result folder` ends `stderr`, followed by a command that reruns only the failed URLs. That command keeps a repair they share, such as a longer `--timeout`
-- A failed publication, such as a full disk or an unwritable `--output-dir`, stops the queue. Every later URL would bill Deepgram, then fail the same way
-- The run exits `75` only when every URL failed before any paid request, so rerunning the same command is safe. Any other failure exits `1`
-- An interrupt stops the queue once the current URL is cleaned up. Under `--json`, its error object lists the finished URLs, and its hint reruns the URLs that did not finish
-- `--preview` takes one URL, because each summary would print between the result paths
+- Before any work, it checks every URL, and one invalid URL exits `2` with nothing run. It checks the summary CLI and reads the Deepgram key once, and each URL gets its own `--timeout` budget and result folder
+- A repeated video runs once, with a warning. The queue compares video IDs, so `youtu.be/ID` and `watch?v=ID&t=30` never bill the same audio twice
+- On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`, and so do the `-v` and `--debug` lines
+- Each published folder prints on `stdout` at once, even when a later URL fails. A URL whose summary failed still prints its transcript folder
+- A failed URL prints `[2/4] error:` and its own fix, and the queue moves on. A failed publication, such as a full disk, stops the queue instead, because every later URL would bill Deepgram and fail the same way
+- After the last URL, `error: 1 of 4 URLs failed; 3 published a result folder` and a command that reruns only the failed or unrun URLs end `stderr`. That command keeps a repair they share, such as a longer `--timeout`
+- The run exits `75` only when nothing was published and every failure came before any paid request, so rerunning the same command is safe. Any other failure exits `1`
+- An interrupt stops the queue once the current URL is cleaned up. Under `--json`, its error object lists the finished URLs, and its hint reruns the rest
 
-Several URLs always give the queue output, even when they name one video. With `--json`, the queue prints one object after the last URL: `ok`, `command`, `source`, and `results`. Each entry of `results` is the single-run payload from [Output and JSON](#output-and-json), or its failure object, plus the entry's `url`.
-
-When a URL fails, the object goes to `stderr` with `ok: false` and the error code `queue_failed`. A dry run lists the queue as `source.urls`.
+Several URLs always give the queue output, even when they name one video. With `--json`, `results` contains each single-run payload or failure object, plus its `url`. See [Output and JSON](#output-and-json). A failed queue sends this object to `stderr` with `ok: false` and `queue_failed`. A dry run lists the queue as `source.urls`.
 
 ## Discovery and diagnostics
 
@@ -149,7 +145,7 @@ For a slow connection or a long recording, allow more than the default workflow 
 just ttr "https://www.youtube.com/watch?v=VIDEO_ID" --timeout 20m
 ```
 
-Concurrent runs share the available bandwidth. Queue the URLs in one run instead, as in [Queue several videos](#queue-several-videos), which uploads one at a time.
+For several videos, use [Queue several videos](#queue-several-videos).
 
 A successful repeated command creates a new result folder. This preserves prior artifacts but means a full run is intentionally not idempotent. Use `--dry-run` for plan verification and do not replay a timed-out run until its output location has been checked.
 

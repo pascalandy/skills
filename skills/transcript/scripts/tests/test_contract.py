@@ -852,7 +852,7 @@ def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
 
 
 @exits("transcript", 75, 1)
-def test_a_queue_exits_75_only_when_it_billed_nothing(
+def test_a_queue_exits_75_only_when_nothing_was_published(
     tmp_path, monkeypatch, capsys
 ) -> None:
     options = ["--no-summary", "--output-dir", str(tmp_path)]
@@ -1034,8 +1034,10 @@ def test_a_failed_publication_stops_the_queue_before_more_paid_work(
     fix = ["--no-summary", "--output-dir", "WRITABLE_DIR", "--url", *QUEUE]
     assert (code, out, uploads) == (1, "", ["aaa"])
     assert err.splitlines()[-2:] == [
-        "error: 1 of 3 URLs failed; 0 published a result folder. The queue "
-        "stopped before the last 2, which would fail to publish the same way",
+        (
+            "error: 1 of 3 URLs failed; 0 published a result folder. The queue "
+            "stopped before the last 2, which would fail to publish the same way"
+        ),
         "rerun: " + shlex.join(["transcript", "run", "youtube", *fix]),
     ]
     assert list(tmp_path.iterdir()) == []
@@ -1195,7 +1197,9 @@ def test_an_expired_budget_when_opening_a_folder_lets_the_queue_move_on(
     assert "[1/2] warning: Could not open the output folder in Finder" in err
 
 
-def test_each_verbose_queue_line_names_its_url(tmp_path, monkeypatch, capsys) -> None:
+def test_verbose_queue_publications_include_their_position(
+    tmp_path, monkeypatch, capsys
+) -> None:
     fake_queue(monkeypatch)
 
     code, out, err = cli(
