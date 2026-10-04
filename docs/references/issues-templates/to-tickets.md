@@ -16,6 +16,13 @@ Verbatim copy of the two ticket templates in `authoring/matt/matt-mode/playbooks
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2
 
+<details>
+<summary>👨🏻‍🍳 Details for the agent</summary>
+
+<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.>
+
+</details>
+
 </local-ticket-template>
 ````
 
@@ -38,6 +45,13 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 ## Blocked by
 
 - A reference to each blocking ticket, or "None (can start immediately)".
+
+<details>
+<summary>👨🏻‍🍳 Details for the agent</summary>
+
+<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.>
+
+</details>
 
 </issue-template>
 ````

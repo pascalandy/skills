@@ -57,5 +57,12 @@ A description of the things that are out of scope for this spec.
 
 Any further notes about the feature.
 
+<details>
+<summary>👨🏻‍🍳 Details for the agent</summary>
+
+<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.>
+
+</details>
+
 </spec-template>
 ````

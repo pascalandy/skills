@@ -11,3 +11,4 @@ Verbatim copy of the title and body rules in `authoring/andy/andy-mode/playbooks
 - `## Tradeoffs`. Name only alternative fixes a reviewer would otherwise ask about.
 - `## Blast Radius`. In one to three sentences, name which agents, repos, or workflows the change reaches, why it is safe or risky, and the continuing cost if nothing changes.
 - `## Verification`. Name the scenario that failed and the outcome that proves the fix, so whoever fixes it can rerun it.
+- `<details>` with `<summary>👨🏻‍🍳 Details for the agent</summary>`. Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.

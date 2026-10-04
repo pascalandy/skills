@@ -56,7 +56,9 @@ That's the whole fix: one line.
 Test 1 settles it: <which result means ignore>.
 
 <details>
-<summary>Details for the agent</summary>
+<summary>👨🏻‍🍳 Details for the agent</summary>
+
+<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs. The subsections below are suggestions: keep, rename, or drop them.>
 
 ### <The evidence, such as the conflicting rules>
 
