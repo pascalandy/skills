@@ -33,6 +33,7 @@ Draft one issue per finding in the repository that owns the change: the project 
 
 ````md
 <retro-global>
+
 ## The problem (CMO)
 
 **Area:** <Navigation, Automated checks, Steering files, Tool economy, No-ops, or Information access>
