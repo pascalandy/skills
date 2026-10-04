@@ -1016,10 +1016,11 @@ def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
     ("urls", "invalid"),
     [
         ([QUEUE[0], "https://example.com/x"], "https://example.com/x"),
-        # argparse reads -1 as a value, not as an option
+        # argparse reads both as values, not as options
         (["-1", QUEUE[0]], "-1"),
+        (["-bad value", QUEUE[0]], "-bad value"),
     ],
-    ids=["not-youtube", "negative-number"],
+    ids=["not-youtube", "negative-number", "dash-and-space"],
 )
 def test_an_invalid_url_stops_the_queue_before_any_work(
     urls: list[str], invalid: str, tmp_path, monkeypatch, capsys
