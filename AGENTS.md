@@ -20,7 +20,7 @@ The compile script maps each package, a folder with a root `SKILL.md` at `author
 
 A mode is a skill named `*-mode` with a `playbooks/` folder of routes; `just remote-skills --help` gives the rules it enforces. Set `role: "helper"` on a skill that other skills call more often than Pascal does, so the remote lists show it last
 
-Set `configuration-is-needed: true` in a skill's frontmatter, or in a route's playbook when only that route needs it, when a public user must set something up before it works, such as a key read from Pascal's keyring, a private service, or a folder on his machine. A public tool whose install the skill documents does not count. Omit the key otherwise. No script reads it; `rg -l 'configuration-is-needed' authoring` lists the flagged skills
+Set `configuration-is-needed: true` in a skill's frontmatter when a public user must set something up before it works, such as a key read from Pascal's keyring, a private service, or a folder on his machine; put it in a route's playbook instead when only that route needs it. A public tool whose install the skill documents does not count. Omit the key otherwise. No script reads it; `rg -l 'configuration-is-needed' authoring` lists the flagged files
 
 `scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 
