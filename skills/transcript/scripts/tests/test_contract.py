@@ -220,6 +220,11 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
             "the following arguments are required: --url",
         ),
         (
+            ["run", "youtube", "--url", "--url", "-n"],
+            "transcript run youtube",
+            "argument --url: give at least one YouTube URL",
+        ),
+        (
             ["list", "prompts", "--bogus-flag"],
             "transcript list prompts",
             "unrecognized arguments: --bogus-flag",
@@ -269,6 +274,7 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
     ids=[
         "no-command",
         "missing-url",
+        "empty-url",
         "unknown-flag",
         "abbreviated-flag",
         "unknown-command",
@@ -721,6 +727,33 @@ def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     assert "retry: transcript run youtube" in err
 
 
+@exits("transcript", 75)
+def test_a_retry_hint_drops_the_empty_url_that_just_ttr_adds(
+    monkeypatch, capsys
+) -> None:
+    responses = [
+        subprocess.CompletedProcess([], 1, "", "ERROR: Sign in failed"),
+        subprocess.CompletedProcess(
+            [], 1, "", "ERROR: HTTP Error 429: Too Many Requests"
+        ),
+    ]
+    monkeypatch.setattr(
+        transcript, "run_child", lambda *_args, **_kwargs: responses.pop(0)
+    )
+    monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
+
+    # `just ttr --no-summary --url URL`
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", "--no-summary", "--url", URL
+    )
+
+    assert (code, out) == (75, "")
+    assert (
+        err.splitlines()[-1]
+        == f"retry: transcript run youtube --no-summary --url {URL}"
+    )
+
+
 @exits("youtube_smoke", 0, 1, 75)
 def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> None:
     def downloaded(_url, output_dir, *_args, **_kwargs):
@@ -810,8 +843,13 @@ def video_ids(out: str) -> list[str]:
 @exits("transcript", 0)
 @pytest.mark.parametrize(
     "urls",
-    [["--url", *QUEUE[:2]], ["--url", QUEUE[0], "--url", QUEUE[1]]],
-    ids=["one-flag", "repeated-flag"],
+    [
+        ["--url", *QUEUE[:2]],
+        ["--url", QUEUE[0], "--url", QUEUE[1]],
+        # `just ttr --url A --url B`: the recipe adds its own --url first
+        ["--url", "--url", QUEUE[0], "--url", QUEUE[1]],
+    ],
+    ids=["one-flag", "repeated-flag", "empty-flag"],
 )
 def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
     urls: list[str], tmp_path, monkeypatch, capsys
@@ -831,13 +869,22 @@ def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
 
 
 @exits("transcript", 1)
+@pytest.mark.parametrize(
+    "flags_first", [False, True], ids=["urls-first", "flags-first"]
+)
 def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
-    tmp_path, monkeypatch, capsys
+    flags_first: bool, tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch, failing={"bbb": deepgram_status(500)})
     options = ["--no-summary", "--output-dir", str(tmp_path)]
+    # `just ttr --no-summary ... --url A B C`: the recipe adds its own --url first
+    argv = (
+        ["--url", *options, "--url", *QUEUE]
+        if flags_first
+        else ["--url", *QUEUE, *options]
+    )
 
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
+    code, out, err = cli(capsys, "run", "youtube", *argv)
 
     lines = err.splitlines()
     assert code == 1
@@ -965,24 +1012,29 @@ def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
 
 
 @exits("transcript", 2)
+@pytest.mark.parametrize(
+    ("urls", "invalid"),
+    [
+        ([QUEUE[0], "https://example.com/x"], "https://example.com/x"),
+        # argparse reads both as values, not as options
+        (["-1", QUEUE[0]], "-1"),
+        (["-bad value", QUEUE[0]], "-bad value"),
+        # --path belongs to run zoom, so run youtube reads this as a value too
+        (["--path=bad value", QUEUE[0]], "--path=bad value"),
+    ],
+    ids=["not-youtube", "negative-number", "dash-and-space", "zoom-option"],
+)
 def test_an_invalid_url_stops_the_queue_before_any_work(
-    tmp_path, monkeypatch, capsys
+    urls: list[str], invalid: str, tmp_path, monkeypatch, capsys
 ) -> None:
     reads = fake_queue(monkeypatch)
 
     code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        QUEUE[0],
-        "https://example.com/x",
-        "--output-dir",
-        str(tmp_path),
+        capsys, "run", "youtube", "--url", *urls, "--output-dir", str(tmp_path)
     )
 
     assert (code, out, reads) == (2, "", [])
-    assert "error: Invalid YouTube URL: https://example.com/x" in err
+    assert f"error: Invalid YouTube URL: {invalid}" in err
     assert (
         f"fix: transcript run youtube --output-dir {tmp_path} --url {QUEUE[0]}" in err
     )

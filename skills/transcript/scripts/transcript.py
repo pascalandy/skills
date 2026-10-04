@@ -1998,10 +1998,12 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         "--url",
         dest="urls",
         required=True,
-        nargs="+",
+        # `just ttr` puts its own --url first, so `just ttr --url A` sends an empty one;
+        # parse_args() requires at least one URL across every --url
+        nargs="*",
         action="extend",
         metavar="URL",
-        help="YouTube URL; give several, or repeat --url, to queue them",
+        help="YouTube URL, at least one; give several, or repeat --url, to queue them",
     )
     youtube.set_defaults(zoom=False, zoom_custom_path=None)
     _add_run_options(youtube, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT)
@@ -2176,6 +2178,8 @@ def parse_args(
         args.output_dir = None
     else:
         args.zoom_export_path = None
+        if not args.urls:
+            source_parser.error("argument --url: give at least one YouTube URL")
         # One video under two URL forms, such as youtu.be/ID and watch?v=ID&t=30,
         # would bill Deepgram twice for the same audio
         unique: dict[str, str] = {}
@@ -2855,6 +2859,18 @@ def _value_options() -> dict[str, bool]:
     }
 
 
+@functools.cache
+def _multi_value_parsers() -> dict[str, argparse.ArgumentParser]:
+    """Each option that takes several values, such as `--url`, with the parser
+    that reads them."""
+    return {
+        option: parser
+        for parser in _all_parsers(build_parser())
+        for option, action in parser._option_string_actions.items()
+        if action.nargs in ("+", "*")
+    }
+
+
 def _rewrite(
     argv: Sequence[str], drop: Iterable[str] = (), add: Sequence[str] = ()
 ) -> list[str]:
@@ -2872,12 +2888,17 @@ def _rewrite(
     kept: list[str] = []
     skip_value = False
     skip_values = False
-    for token in options:
+    for token, following in zip(options, [*options[1:], None]):
         if skip_value or (skip_values and not token.startswith("-")):
             skip_value = False
             continue
         skip_values = False
         name = token.split("=", 1)[0]
+        # A multi-value option has no value when its parser reads the next token
+        # as an option, as with the --url `just ttr` puts first
+        owner = None if "=" in token else _multi_value_parsers().get(name)
+        if owner and (following is None or owner._parse_optional(following)):
+            continue
         if name in dropped:
             if "=" not in token and name in values:
                 skip_value = True
