@@ -24,7 +24,7 @@ Summary mode discovers profiles and prompts, resolves one explicit summary plan,
 Preconditions:
 
 - Free discovery and dry-run checks need no paid authorization
-- The real summary check needs a signed-in `claude`. The transcript README's `Test videos` rule pre-authorizes its paid calls
+- The real summary check needs a signed-in `claude`. Follow the transcript README's `Test videos` rule for paid calls
 
 - **Discovery.** Run the default `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --json`. Require all three providers and all bundled prompts
 - **Plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require the `glm` profile, OpenRouter, `z-ai/glm-5.3-flash`, `medium`, and `summary_with_quotes`

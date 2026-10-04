@@ -99,4 +99,4 @@ Arc's `Default` profile must have a valid YouTube session. If it expires, sign i
 
 Read `README.md` in this skill directory before changing code, tests, prompts, or documentation. It owns the CLI contract, runtime requirements, output formats, and validation procedure.
 
-Always finish every `transcript` change with the README's E2E closeout, without asking first. Every real test run follows the README's `Test videos` rule: a short video from its table and `--profile sonnet`. Keep Checks, Automated tests, CI, Agent QA, and E2E separate. E2E is the last gate and passes only when the relevant coded validation and Agent QA pass.
+Always finish every `transcript` change with the README's E2E closeout. Its `Test videos` rule pre-authorizes the paid runs with `--profile sonnet`, so run the closeout without asking. Keep Checks, Automated tests, CI, Agent QA, and E2E separate. E2E is the last gate and passes only when the relevant coded validation and Agent QA pass.

@@ -24,7 +24,7 @@ from typing import Literal
 
 __version__ = "2.0.0"
 CANONICAL_YOUTUBE_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
-# The transcript README's Test videos rule: every paid test run summarizes with it
+# Selected by the transcript README's Test videos rule
 TEST_PROFILE = "sonnet"
 EVIDENCE_NAMESPACE = "eval-transcript"
 RUN_MARKER = ".verify-transcript-run"
@@ -630,7 +630,7 @@ def select_features(
         raise VerificationError(
             "paid_intent_required",
             "Paid feature selection requires --allow-paid: " + ", ".join(paid),
-            "Confirm paid API use, then repeat the exact selection with --allow-paid.",
+            "Follow the transcript README's Test videos rule, then repeat with --allow-paid.",
             exit_code=2,
         )
     return selected
@@ -909,7 +909,7 @@ def assert_safe_command(
         raise VerificationError(
             "paid_intent_required",
             f"{feature.id} reached the paid boundary without --allow-paid.",
-            "Stop and obtain explicit authorization for the selected paid feature.",
+            "Follow the transcript README's Test videos rule, then repeat with --allow-paid.",
             exit_code=2,
         )
 
@@ -1481,26 +1481,21 @@ def validate_feature(
         _require(process.exit_code == 0, "profile discovery failed")
         _require(payload.get("default") == "opus", "default profile is invalid")
         profiles = payload.get("profiles")
-        _require(isinstance(profiles, list), "profile list is missing")
-        expected = [
-            ("opus", "claude", "claude-opus-5-5", "high"),
-            ("astra", "codex", "gpt-6-astra", "low"),
-            ("sol", "codex", "gpt-5.6-sol", "medium"),
-            ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
-            (TEST_PROFILE, "claude", "claude-sonnet-5-5", "medium"),
-        ]
-        actual = [
-            (
-                profile.get("name"),
-                profile.get("provider"),
-                profile.get("model"),
-                profile.get("effort"),
+        _require(isinstance(profiles, list) and bool(profiles), "profile list is empty")
+        for profile in profiles:
+            _require(
+                isinstance(profile, dict)
+                and all(
+                    isinstance(profile.get(key), str) and bool(profile[key].strip())
+                    for key in ("name", "provider", "model", "effort")
+                ),
+                f"profile has missing or empty fields: {profile!r}",
             )
-            for profile in profiles
-            if isinstance(profile, dict)
-        ]
-        _require(actual == expected, "profile registry is invalid")
-        return {"default": "opus", "profiles": [item[0] for item in expected]}
+        names = [profile["name"] for profile in profiles]
+        _require(len(set(names)) == len(names), f"duplicate profile names: {names!r}")
+        _require(payload["default"] in names, "default profile is not listed")
+        _require(TEST_PROFILE in names, f"test profile is not listed: {TEST_PROFILE}")
+        return {"default": payload["default"], "profiles": names}
     if feature.probe in {"doctor-youtube", "doctor-zoom"}:
         return _validate_doctor(feature, *captures[0])
     if feature.probe in {"youtube-dry-run-summary", "zoom-dry-run"}:

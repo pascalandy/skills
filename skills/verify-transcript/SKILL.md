@@ -48,7 +48,7 @@ uv run "$VERIFY_DIR/scripts/verify_transcript.py" features --json
 
 Read [features/README.md](features/README.md) for the index. Each feature page names its public command, expected state, and proof.
 
-The paid end-to-end check runs the canonical test video with the `sonnet` profile. The transcript README's `Test videos` rule pre-authorizes it and says where it can run, so run it without asking. A `--youtube-url` override outside that table is not pre-authorized: ask Pascal first.
+The paid end-to-end check runs the canonical test video with the `sonnet` profile. The transcript README's `Test videos` rule pre-authorizes it, sets its limits, and says where it runs.
 
 ```bash
 uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify \
@@ -87,7 +87,7 @@ After changing Deepgram uploads, run this bounded verification loop:
 1. Run the verifier doctor above and set `TRANSCRIPT_DIR` to the skill directory reported by its `transcript_skill` check, whether source or applied
 2. Run the upload contract tests below, then the verifier helper tests
 3. Run the default free verification and inspect its verdict and evidence
-4. Run the pre-authorized `youtube.real-summary` feature above and require its `audio_upload` evidence
+4. Run the `youtube.real-summary` feature above and require its `audio_upload` evidence
 
 ```bash
 uv run --with pytest --with httpx --with rich pytest \

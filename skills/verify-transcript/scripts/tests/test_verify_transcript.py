@@ -375,6 +375,35 @@ def test_process_helper_captures_streams_and_exit(tmp_path: Path):
     assert captured.timed_out is False
 
 
+def test_profile_discovery_accepts_new_profiles_but_rejects_duplicate_names(tmp_path):
+    context = make_context(tmp_path)
+    feature = next(
+        feature
+        for feature in verify_transcript.FEATURES
+        if feature.id == "configuration.profiles"
+    )
+    payload = {
+        "default": "opus",
+        "profiles": [
+            {"name": name, "provider": "claude", "model": "a-model", "effort": "medium"}
+            for name in ("opus", "sonnet", "new-profile")
+        ],
+    }
+    process = verify_transcript.CapturedProcess((), 0, "", "", 0.1, False)
+    try:
+        assert verify_transcript.validate_feature(
+            feature, (), ((process, payload),), context
+        ) == {"default": "opus", "profiles": ["opus", "sonnet", "new-profile"]}
+
+        payload["profiles"].append(payload["profiles"][-1])
+        with pytest.raises(AssertionError, match="duplicate profile names"):
+            verify_transcript.validate_feature(
+                feature, (), ((process, payload),), context
+            )
+    finally:
+        verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
+
+
 def test_doctor_validator_rejects_crossed_source():
     feature = next(
         feature
@@ -494,8 +523,8 @@ def test_the_paid_run_summarizes_with_the_sonnet_profile(tmp_path: Path):
     }
     process = verify_transcript.CapturedProcess((), 0, "", "", 1.0, False)
 
-    assert plan.args[plan.args.index("--profile") + 1] == "sonnet"
     try:
+        assert plan.args[plan.args.index("--profile") + 1] == "sonnet"
         with pytest.raises(AssertionError, match="sonnet test profile"):
             verify_transcript._validate_e2e(feature, plan, process, payload, context)
     finally:

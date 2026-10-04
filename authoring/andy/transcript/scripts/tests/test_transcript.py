@@ -84,10 +84,23 @@ class TestListPrompts:
 class TestListModels:
     """list models should print model names."""
 
-    def test_default_provider_models(self) -> None:
-        stdout, _stderr, code = run_script("list", "models")
-        assert code == 0
-        assert stdout.strip().splitlines() == ["claude-opus-5-5", "claude-sonnet-5-5"]
+    def test_default_provider_models(self, monkeypatch, capsys) -> None:
+        import transcript
+
+        monkeypatch.setattr(
+            transcript,
+            "INFERENCE_PROFILES",
+            {
+                "first": transcript.InferenceProfile("claude", "z-model", "high"),
+                "other": transcript.InferenceProfile("codex", "other-model", "low"),
+                "last": transcript.InferenceProfile("claude", "a-model", "medium"),
+            },
+        )
+
+        assert transcript.main(["list", "models"]) == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out.splitlines() == ["z-model", "a-model"]
 
     def test_openrouter_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "openrouter")
@@ -104,45 +117,39 @@ class TestListModels:
 
 
 class TestProfiles:
-    def test_profile_discovery_lists_the_ordered_inference_choices(self) -> None:
-        stdout, stderr, code = run_script("list", "profiles", "--json")
+    def test_profile_discovery_lists_the_ordered_inference_choices(
+        self, monkeypatch, capsys
+    ) -> None:
+        import transcript
 
-        assert code == 0
-        assert stderr == ""
-        payload = json.loads(stdout)
-        assert payload == {
+        monkeypatch.setattr(
+            transcript,
+            "INFERENCE_PROFILES",
+            {
+                "z-first": transcript.InferenceProfile("claude", "first-model", "high"),
+                "a-last": transcript.InferenceProfile("codex", "last-model", "medium"),
+            },
+        )
+        monkeypatch.setattr(transcript, "DEFAULT_PROFILE", "a-last")
+
+        assert transcript.main(["list", "profiles", "--json"]) == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert json.loads(captured.out) == {
             "ok": True,
             "command": "list profiles",
-            "default": "opus",
+            "default": "a-last",
             "profiles": [
                 {
-                    "name": "opus",
+                    "name": "z-first",
                     "provider": "claude",
-                    "model": "claude-opus-5-5",
+                    "model": "first-model",
                     "effort": "high",
                 },
                 {
-                    "name": "astra",
+                    "name": "a-last",
                     "provider": "codex",
-                    "model": "gpt-6-astra",
-                    "effort": "low",
-                },
-                {
-                    "name": "sol",
-                    "provider": "codex",
-                    "model": "gpt-5.6-sol",
-                    "effort": "medium",
-                },
-                {
-                    "name": "glm",
-                    "provider": "openrouter",
-                    "model": "z-ai/glm-5.3-flash",
-                    "effort": "medium",
-                },
-                {
-                    "name": "sonnet",
-                    "provider": "claude",
-                    "model": "claude-sonnet-5-5",
+                    "model": "last-model",
                     "effort": "medium",
                 },
             ],
