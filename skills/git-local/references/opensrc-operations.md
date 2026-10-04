@@ -2,7 +2,7 @@
 
 Use this reference when `opensrc` fails, the local cache looks inconsistent, or the task needs listing/removal/cleanup behavior.
 
-Before running these commands in any shell, initialize and validate `OPENSRC_HOME` and `OPENSRC_ROOT` using [Cache Location](../SKILL.md#cache-location). That section owns the fixed destination; do not inherit a different cache or rely on the current directory.
+Before running these commands in any shell, initialize and validate `OPENSRC_HOME` and `OPENSRC_ROOT` using [Cache Location](../SKILL.md#cache-location). That section owns the destination; do not pick another cache or rely on the current directory.
 
 ## Help Surface
 
