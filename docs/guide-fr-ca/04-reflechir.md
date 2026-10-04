@@ -1,16 +1,6 @@
-# Réfléchir avant que l'agent agisse
+# Réfléchir avant de décider
 
-Une demande floue donne une réponse floue, et une décision précipitée coûte plus cher que les minutes gagnées. Dans cette page, tu utilises trois skills et deux routes d'`andy-mode`. Ils font comprendre le but à l'agent avant qu'il agisse, ou aiguisent ta propre réflexion avant que tu décides.
-
-## Planifie avant d'agir avec `plan`
-
-```text
-plan Je veux faire passer le rapport hebdomadaire de mon équipe du courriel à un tableau de bord partagé
-```
-
-L'agent reformule ton but dans ses mots, liste les cas à couvrir et dit ce qui est hors périmètre. S'il a besoin d'une décision de ta part, il s'arrête et te pose la question. Il décrit ensuite comment les choses fonctionnent aujourd'hui, comment elles fonctionneront après le changement, comment tu sauras que ça marche et ce qui pourrait mal tourner.
-
-Il ne fait rien avant que tu dises `go`. Lis le plan, réponds aux questions et dis `go` seulement quand le plan est bon.
+Une demande floue donne une réponse floue, et une décision précipitée coûte plus cher que les minutes gagnées. `plan` aligne l'agent sur une tâche à exécuter, comme le montre la [page 2](./02-planifier-puis-go.md). Dans cette page, tu utilises deux skills et deux routes d'`andy-mode` qui aiguisent ta propre réflexion avant que tu décides.
 
 ## Mets un plan à l'épreuve avec `grilling`
 
@@ -46,6 +36,6 @@ research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux
 
 L'agent remonte chaque affirmation jusqu'à sa source d'origine, comme le site d'un commerce ou une page officielle, et la cite. Ouvre au moins une source pour vérifier la réponse au lieu de lui faire confiance.
 
-**Piège :** n'écris pas "planifie et fais-le" dans la même demande. `plan` s'arrête exprès avant d'agir, pour que tu attrapes une mauvaise idée pendant qu'elle coûte encore peu. Dis `go` quand le plan est bon.
+**Piège :** ne confonds pas `plan` et `grilling`. Utilise `plan` quand tu veux que l'agent exécute une tâche après votre alignement. Utilise `grilling` quand tu veux éprouver une idée ou une décision, sans rien exécuter.
 
-Suite : [Écrire et réviser avec l'agent](./04-write.md).
+Suite : [Écrire et réviser avec l'agent](./05-ecrire.md).

@@ -50,4 +50,4 @@ L'agent compare le texte à ce que tu as demandé. Il liste les erreurs concrèt
 
 **Piège :** "améliore-le" ne donne aucune cible à l'agent. Dis qui lit le texte et ce que cette personne doit faire après l'avoir lu : "Ma directrice le lit en deux minutes et approuve le budget."
 
-Suite : [Faire du marketing avec `corey-mode`](./05-marketing.md).
+Suite : [Faire du marketing avec `corey-mode`](./06-marketing.md).

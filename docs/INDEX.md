@@ -13,7 +13,7 @@ date_updated: 2026-10-04
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 24 | **Last updated:** 2026-10-04
+> **Total pages:** 25 | **Last updated:** 2026-10-04
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -24,7 +24,7 @@ date_updated: 2026-10-04
 | File | Description |
 |------|-------------|
 | `guide/README.md` | Public tutorial in seven pages for readers who use a chat app such as ChatGPT or Claude: paste one sentence, then use the modes and skills |
-| `guide-fr-ca/README.md` | The same tutorial in Canadian French, page for page under the same file names |
+| `guide-fr-ca/README.md` | The tutorial in Canadian French, in eight pages. It leads: new guide content lands here first, as `AGENTS.md` in this folder says |
 
 ### kind/doc
 

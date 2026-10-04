@@ -78,10 +78,10 @@ Pour un sujet vraiment nouveau, une nouvelle conversation marche mieux que "nouv
 - **Un but flou.** "Améliore-le" ne donne aucune cible à l'agent. Dis qui lit le résultat et ce que cette personne doit faire ensuite.
 - **Traduire les noms.** `corey-mode ; rédaction` ne trouve aucune route. Garde les noms anglais de la liste et écris le reste en français.
 - **Les skills qui demandent un ordinateur.** Certains skills travaillent sur des fichiers d'un ordinateur ou appellent des services externes : `image-creator`, `transcript`, `html-publish`, `tavily` et les routes `cass`, `qmd` et `trello` d'`andy-mode`, entre autres. Dans ton application, ils échouent ou l'agent improvise. Tous les skills nommés dans ce guide fonctionnent dans une application comme ChatGPT ou Claude.
-- **Un agent qui a sauté le skill.** Si la réponse ne nomme aucun skill et ne pose jamais les questions du playbook, l'agent a peut-être deviné. Demande quel skill il a ouvert. S'il ne peut pas répondre, colle de nouveau la phrase de la [page 1](./01-get-started.md).
+- **Un agent qui a sauté le skill.** Si la réponse ne nomme aucun skill et ne pose jamais les questions du playbook, l'agent a peut-être deviné. Demande quel skill il a ouvert. S'il ne peut pas répondre, colle de nouveau la phrase de la [page 1](./01-demarrer.md).
 - **Dire `go` trop tôt.** `plan` attend `go` pour que tu attrapes une mauvaise idée pendant qu'elle coûte peu. Lis le plan d'abord.
 - **Croire un chiffre sans source.** Demande les sources et ouvre-en au moins une.
 
-C'est tout pour le guide. Si tu as sauté des pages, retourne à la [page 1](./01-get-started.md) et lance une vraie tâche. Le réflexe vient en pratiquant, pas en lisant.
+C'est tout pour le guide. Si tu as sauté des pages, retourne à la [page 1](./01-demarrer.md) et lance une vraie tâche. Le réflexe vient en pratiquant, pas en lisant.
 
 Retour au [sommaire du guide](./README.md).

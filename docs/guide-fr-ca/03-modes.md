@@ -72,8 +72,8 @@ Certains skills fonctionnent seuls : `plan`, `grilling`, `research`, `unslop`, `
 grilling. Mets à l'épreuve mon plan d'ouvrir une deuxième succursale au printemps.
 ```
 
-Les pages 3 et 4 montrent les autres.
+Les pages 4 et 5 montrent les autres.
 
 **Piège :** n'énumère pas plusieurs skills dans une demande, comme "utilise sparring, puis storytelling, puis copywriting". Donne le but et laisse le mode choisir. Nomme une route seulement quand tu en veux une précise, et lance l'étape suivante après avoir lu le premier résultat.
 
-Suite : [Réfléchir avant que l'agent agisse](./03-think-first.md).
+Suite : [Réfléchir avant de décider](./04-reflechir.md).

@@ -59,4 +59,4 @@ Quelques routes se branchent sur des outils externes, comme les plateformes publ
 
 **Piège :** le mot "marketing" démarre `corey-mode`, même dans une phrase qui parle d'autre chose. Pour garder un autre skill aux commandes, nomme-le : `andy-mode ; storytelling. Raconte mon parcours en marketing.` Quand une demande nomme un autre mode, ce mode garde la tâche. À l'inverse, "mise en marché" ne démarre pas `corey-mode`. Écris "marketing" ou `corey-mode`.
 
-Suite : [Transformer ton travail en document à montrer](./06-show.md).
+Suite : [Transformer ton travail en document à montrer](./07-montrer.md).

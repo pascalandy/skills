@@ -44,4 +44,4 @@ Deux autres routes esquissent les écrans d'une application ou d'un site web : `
 
 **Piège :** demande une seule page à la fois. Un résumé, une présentation et un schéma dans la même demande donnent trois résultats bâclés. Demande le résumé, relis-le, puis demande la présentation.
 
-Suite : [Recettes et pièges](./07-recipes-and-pitfalls.md).
+Suite : [Recettes et pièges](./08-recettes-et-pieges.md).
