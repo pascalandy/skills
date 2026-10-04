@@ -48,7 +48,7 @@ uv run "$VERIFY_DIR/scripts/verify_transcript.py" features --json
 
 Read [features/README.md](features/README.md) for the index. Each feature page names its public command, expected state, and proof.
 
-The paid end-to-end check runs the canonical test video with the `sonnet` profile. It is pre-authorized under the transcript README's `Test videos` rule, so run it without asking, from a local session on a Mac whose Arc is signed in to YouTube.
+The paid end-to-end check runs the canonical test video with the `sonnet` profile. The transcript README's `Test videos` rule pre-authorizes it and says where it can run, so run it without asking.
 
 ```bash
 uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify \
