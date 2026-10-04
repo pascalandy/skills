@@ -1998,10 +1998,12 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         "--url",
         dest="urls",
         required=True,
-        nargs="+",
+        # `just ttr` adds its own --url, so `just ttr --url A` sends an empty one;
+        # parse_args() still requires one URL in all
+        nargs="*",
         action="extend",
         metavar="URL",
-        help="YouTube URL; give several, or repeat --url, to queue them",
+        help="YouTube URL, at least one; give several, or repeat --url, to queue them",
     )
     youtube.set_defaults(zoom=False, zoom_custom_path=None)
     _add_run_options(youtube, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT)
@@ -2176,6 +2178,8 @@ def parse_args(
         args.output_dir = None
     else:
         args.zoom_export_path = None
+        if not args.urls:
+            source_parser.error("argument --url: give at least one YouTube URL")
         # One video under two URL forms, such as youtu.be/ID and watch?v=ID&t=30,
         # would bill Deepgram twice for the same audio
         unique: dict[str, str] = {}
@@ -2880,8 +2884,9 @@ def _rewrite(
         name = token.split("=", 1)[0]
         if name in dropped:
             if "=" not in token and name in values:
-                skip_value = True
+                # A multi-value option may have no value, as in `--url --url A`
                 skip_values = values[name]
+                skip_value = not skip_values
             continue
         kept.append(token)
     return [*kept, *add, *rest]
