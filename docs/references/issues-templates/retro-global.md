@@ -2,7 +2,7 @@
 
 ````md
 <retro-global>
-## CMO: The problem
+## The problem (CMO)
 
 **Area:** <Navigation, Automated checks, Steering files, Tool economy, No-ops, or Information access>
 
