@@ -60,7 +60,7 @@ Add a row's flags only when the script has the matching behavior.
 | is installed as a command or has a release version | `--version`: one line on stdout, `<name> <version>` |
 | has steps worth reporting | `-v`, `--verbose`: progress and step details on stderr |
 | has failures worth diagnosing: network, locks, or subprocesses | `--debug`, also `<NAME>_DEBUG=1`: internals, timings, and stack traces on stderr |
-| has output read by programs or agents | `--json`: stdout is one JSON object and nothing else |
+| has output read by programs or agents, and does not answer in JSON yet | `--json`: stdout is one JSON object and nothing else |
 | emits color | `--no-color` |
 | changes state | `-n`, `--dry-run`: preview in the same format as a real run |
 | asks for confirmation | `-y`, `--yes`; `--no-input`: never prompt, and a missing value exits 2 naming the flag |
@@ -80,7 +80,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state prints one change line per change, `<action>\t<object>`, with an optional third tab-separated detail. A real run and its dry run print the same lines; a no-op prints nothing. `--check` is a dry run that exits 1 when a change is pending, with the change lines on stderr. Hooks stay silent
+A script that answers in JSON lists its changes under `changes`, as [[script-output]] shows. An older command that changes state prints one change line per change, `<action>\t<object>`, with an optional third tab-separated detail. A real run and its dry run print the same lines; a no-op prints nothing. `--check` is a dry run that exits 1 when a change is pending, with the change lines on stderr. Hooks stay silent
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 
