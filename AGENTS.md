@@ -42,6 +42,10 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 `just install-skills` compiles current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first and saves and pulls `_skills_private/`, a clone of the private repository `pascalandy/skills-private` that `.gitignore` keeps out of this one. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine saves and pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`, which runs from the main checkout, so keep each machine's main checkout on `main` and do branch work in a worktree. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 
+## Public guides
+
+`docs/guide/` and its Canadian French version `docs/guide-fr-ca/` hold the same pages under the same file names; change both in the same PR
+
 ## Read on demand
 
 - Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md)

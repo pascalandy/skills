@@ -22,7 +22,7 @@ In the same chat, type a real request. Swap in your own business:
 marketing ; write a headline for my bakery in Montreal
 ```
 
-Watch what happens. The word "marketing" opens `corey-mode`, my marketing mode. The word after the semicolon, `copywriting`, picks one of its playbooks. The agent opens that playbook and follows it. Some agents start the reply with a line such as `Route: copywriting`, which names the playbook they followed.
+Watch what happens. The word "marketing" opens `corey-mode`, my marketing mode. The mode reads the rest of your request and picks the playbook that fits, here `copywriting`. The agent opens that playbook and follows it. Some agents start the reply with a line such as `Route: copywriting`, which names the playbook they followed.
 
 You get headline options, the reason behind each one, and questions such as "What's your signature item?" Answer them. The next round fits your bakery instead of any bakery.
 

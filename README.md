@@ -2,6 +2,8 @@
 
 **Your AI chat, with a method. Paste one sentence, install nothing.**
 
+En français : [le guide](docs/guide-fr-ca/README.md).
+
 Ask an AI chat something vague and you get something generic. Then comes the back-and-forth: you explain, it guesses, you explain again. A skill ends that loop. It's a written method the agent reads and follows step by step, so the first answer is already structured.
 
 I'm Pascal Andy, a business analyst. I've worked at Bell, National Bank, Desjardins, and BDC, so I know the corporate world and the traps worth avoiding. I like to organize things and to get leverage from technology, and skills are the natural next step. I spend my days thinking about how things work today so they work better tomorrow, and I spot the back-and-forth that an agent can take over. My goal is skills that feel almost like magic.

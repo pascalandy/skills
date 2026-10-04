@@ -16,6 +16,8 @@ Here's what you'll do:
 
 Read the pages in order the first time. After that, each page stands alone.
 
+En français : [le guide](../guide-fr-ca/README.md).
+
 ## If you only remember one thing
 
 Name the job, then say what you want in your own words:
@@ -24,6 +26,6 @@ Name the job, then say what you want in your own words:
 marketing ; write a headline for my bakery in Montreal
 ```
 
-You don't need to know the playbook's steps. The word "marketing" opens `corey-mode`, the word after the semicolon picks its `copywriting` playbook, and the agent follows that playbook: it writes options, explains each one, and asks what would make them sharper.
+You don't need to know the playbook's steps. The word "marketing" opens `corey-mode`, which picks its `copywriting` playbook because your request asks for a headline. The agent follows that playbook. It writes options, explains each one, and asks what would make them sharper.
 
 Next: [Paste one sentence and run your first skill](./01-get-started.md).

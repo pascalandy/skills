@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v1
+**Document version:** v2
 **Last updated:** 2026-10-04
 
 ## Product Overview
@@ -11,7 +11,7 @@
 **Business model:** Free. No account, no install, no tracking
 
 ## Target Audience
-**Target readers:** Professionals who use an AI chat every day and never open a terminal: business analysts, consultants, marketers, managers, solo founders, freelancers
+**Target readers:** Professionals who use an AI chat every day and never open a terminal: business analysts, consultants, marketers, managers, solo founders, freelancers. They read English or Canadian French; the guide exists in both
 **Primary use case:** Get consistent, high-quality results from an AI chat without writing a long prompt each time
 **Jobs to be done:**
 - Turn a vague request into a structured result: a plan, a marketing page, a cleaner text
@@ -109,4 +109,5 @@ In Pascal's first person, as the README opens:
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v2 (2026-10-04) — Target audience: added Canadian French readers, served by docs/guide-fr-ca/.
 - v1 (2026-10-04) — Initial context, drafted from the repository and Pascal's brief for the public guide.
