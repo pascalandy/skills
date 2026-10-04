@@ -88,13 +88,7 @@ Report the result folder and summary status. After a summary failure, the transc
 
 ## YouTube transport check
 
-The canonical transport fixture is:
-
-```text
-https://www.youtube.com/watch?v=EIEc43CxIvY
-```
-
-Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check. The transport check requires Arc and pinned `yt-dlp` `2026.7.4`; it skips anonymous access, validates temporary audio with `ffprobe`, and never calls Deepgram or a summary model.
+Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on the canonical video, `https://www.youtube.com/watch?v=EIEc43CxIvY`, from the README's `Test videos` table. The transport check requires Arc and pinned `yt-dlp` `2026.7.4`; it skips anonymous access, validates temporary audio with `ffprobe`, and never calls Deepgram or a summary model.
 
 Arc's `Default` profile must have a valid YouTube session. If it expires, sign in again. Arc can remain open. YouTube Premium does not replace browser authentication. The normal run tries Arc, or Chrome when Arc is absent. If browser authentication fails, it retries anonymously.
 
@@ -102,4 +96,4 @@ Arc's `Default` profile must have a valid YouTube session. If it expires, sign i
 
 Read `README.md` in this skill directory before changing code, tests, prompts, or documentation. It owns the CLI contract, runtime requirements, output formats, and validation procedure.
 
-Always finish every `transcript` change with the README's E2E closeout. Keep Checks, Automated tests, CI, Agent QA, and E2E separate. E2E is the last gate and passes only when the relevant coded validation and Agent QA pass.
+Always finish every `transcript` change with the README's E2E closeout. Every real run in a test uses a short video from the README's `Test videos` table, never a long one. Keep Checks, Automated tests, CI, Agent QA, and E2E separate. E2E is the last gate and passes only when the relevant coded validation and Agent QA pass.
