@@ -16,7 +16,14 @@ from typing import Any
 
 import _common
 import pytest
-from _cli import INTERRUPTED, Interrupted, Parser, TemporaryError, exit_codes
+from _cli import (
+    INTERRUPTED,
+    Interrupted,
+    Parser,
+    ScriptError,
+    TemporaryError,
+    exit_codes,
+)
 from _common import run_script, stop
 
 
@@ -120,6 +127,26 @@ def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
         '{"ok":false,"errors":["RuntimeError: boom"],"rerun":"just tool --debug"}\n',
     )
     assert answered(interrupted) == (130, "", '{"ok":false,"errors":["interrupted"]}\n')
+
+
+def lying(_: argparse.Namespace) -> str:
+    raise ScriptError("the deploy missed mbp", report={"ok": True})
+
+
+def test_ok_follows_the_exit_code_whatever_work_returns() -> None:
+    assert answered(lying) == (
+        1,
+        "",
+        '{"ok":false,"errors":["the deploy missed mbp"]}\n',
+    )
+    assert answered(lambda _: "") == (
+        1,
+        "",
+        (
+            '{"ok":false,"errors":["TypeError: work must return a mapping under json_answer"],'
+            '"rerun":"just tool --debug"}\n'
+        ),
+    )
 
 
 def test_a_json_answer_covers_usage_errors_and_ends_stderr_after_a_traceback() -> None:

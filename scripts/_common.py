@@ -226,11 +226,13 @@ Form = Literal["line", "json", "text"]
 def answer(code: int, fields: Mapping[str, Any]) -> int:
     """Print the one JSON line a script answers with, and return `code`.
 
-    `ok` comes first and is true exactly when `code` is 0. Success goes to
-    stdout; a failure goes to stderr, after its diagnostics, and leaves stdout
-    empty.
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty.
     """
-    line = json.dumps(dict(ok=code == 0, **fields), separators=(",", ":"))
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    line = json.dumps(body, separators=(",", ":"))
     print(line, file=sys.stderr if code else sys.stdout)
     return code
 
@@ -308,7 +310,9 @@ def run_script(
                 force=True,
             )
             output = work(args)
-            if isinstance(output, Mapping):
+            if form == "line":
+                if not isinstance(output, Mapping):
+                    raise TypeError("work must return a mapping under json_answer")
                 return answer(0, output)
             if output:
                 print(output)
