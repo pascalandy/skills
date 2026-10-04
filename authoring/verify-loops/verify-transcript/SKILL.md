@@ -48,7 +48,7 @@ uv run "$VERIFY_DIR/scripts/verify_transcript.py" features --json
 
 Read [features/README.md](features/README.md) for the index. Each feature page names its public command, expected state, and proof.
 
-The paid end-to-end check runs the canonical test video with the `sonnet` profile. The transcript README's `Test videos` rule pre-authorizes it and says where it can run, so run it without asking.
+The paid end-to-end check runs the canonical test video with the `sonnet` profile. The transcript README's `Test videos` rule pre-authorizes it and says where it can run, so run it without asking. A `--youtube-url` override outside that table is not pre-authorized: ask Pascal first.
 
 ```bash
 uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify \
