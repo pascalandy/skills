@@ -41,6 +41,7 @@ Flag a closed issue that the set refers to and that was closed as completed with
 - Order the new batch: an Epic that another needs goes first, then order by return, using the Rank tiers. Give each place a one-sentence reason
 - Account for each candidate issue once in the proposal, under an Epic, the cleanup list, or the left-out list with its reason
 - Write each issue as an issue entry from the template, so the user decides without opening the issue
+- Show the comment each closure or reopening will carry, so the approval covers it
 - An Epic holds no open decision. Settle a decision that belongs to the user here, or leave its issues out
 - Ask only about decisions that belong to the user, in the question format the user sets
 
