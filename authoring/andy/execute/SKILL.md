@@ -53,7 +53,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when each doc that describes a behavior the stack changes matches the new behavior, and its edits are pushed
 
 **STEP: Checks**
-- Run poteto's Babysit playbook in `drive` mode on each PR, from the bottom of the stack up
+- On each PR's final commit, run the project's local checks and wait for its GitHub checks. Fix each failure in the PR that owns the code, push, and repeat
 - Done when checks are green on every PR's final commit (or the repo has no CI and you say so), or each failing check is reported as blocked, with the reason
 
 **STEP: Report**
