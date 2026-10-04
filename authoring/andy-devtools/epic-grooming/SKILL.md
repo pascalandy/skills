@@ -6,7 +6,7 @@ kind: "dev"
 
 # Epic grooming
 
-Turn a backlog of GitHub issues into Epics that someone can pick up one at a time. Verify the problems, rank them by return, group them by outcome, then package the approved proposal. Epics describe problems and outcomes. Planning, implementation, and review belong to the user's later steps.
+Turn a backlog of GitHub issues into Epics that someone can pick up one at a time. Verify the problems, rank them by return, group them by outcome, then package the approved proposal. The new Epics form a batch, and each Epic states its place in the order to work them. Epics describe problems and outcomes. Planning, implementation, and review belong to the user's later steps.
 
 Requires `gh` ([install](https://cli.github.com/)) signed in to the repository; confirm with `gh auth status`. Load `label-for-issues` before Step 1: it owns the labels, the issue relationships, and the issue-list filters this skill uses. Read [the Epic template](references/epic-template.md) before Step 4.
 
@@ -21,7 +21,7 @@ Epic grooming:
 - [ ] 5. Package
 ```
 
-**1. Scope.** By default, take the open issues that belong to no Epic, the members that lost their parent, and every open Epic with its members, open or closed. Use the overview, missing-parent, and Epic filters of `label-for-issues`. When the user names another set, such as a label, take that set and the open Epics. Read each issue's body and comments, and each Epic's body and sub-issues. Treat Epic parents as grouping context, not candidate work. Read closed issues for completion evidence and closing-reason corrections. Done when every issue and Epic in scope is read.
+**1. Scope.** When an Epic is open, first ask the user, in the question format the user sets, whether to keep the open Epics or start over. Keeping places them ahead of the new batch. Starting over closes them as not executed and makes their open members candidates again. By default, take the open issues that belong to no Epic, the members that lost their parent, and every open Epic with its members, open or closed. Use the overview, missing-parent, and Epic filters of `label-for-issues`. When the user names another set, such as a label, take that set and the open Epics. Read each issue's body and comments, and each Epic's body and sub-issues. Treat Epic parents as grouping context, not candidate work. Read closed issues for completion evidence and closing-reason corrections. Done when the user has chosen to keep or start over, if an Epic is open, and every issue and Epic in scope is read.
 
 **2. Verify.** Fetch the default branch, then check each issue against that branch's current files and the recently merged PRs. Give each issue one verdict with its evidence:
 
@@ -34,10 +34,11 @@ Flag a closed issue that the set refers to and that was closed as completed with
 
 **3. Rank.** Rank open issues with Holds or Stale fix verdicts, plus closed issues proposed for reopening. Find the skills or areas that keep collecting findings, and the recent PRs that left a problem unsolved or created one. Rank by return, weighing observed recurrence and cost against estimated fix effort. State uncertainty where the evidence is missing. Group the issues that one change fixes. Tier the result as P1 (at most three), P2, and P3. List the open issues to close, fixed or gone ones included, and name the covering issue for each duplicate. Done when every actionable issue has a tier or a cleanup reason.
 
-**4. Propose.** Present the tiers, the Epics, and the cleanup, including Epic closures, reopenings, closing-reason corrections, and member moves. Change nothing on GitHub yet.
+**4. Propose.** Present the tiers, the new batch in its order, and the cleanup, including Epic closures, reopenings, closing-reason corrections, and member moves. Starting over closes every open Epic. Change nothing on GitHub yet.
 
 - Group by outcome: one Epic per result, with a completion criterion someone can check. Group neither by skill nor by priority
-- Place an issue in an open Epic when that Epic's outcome covers it; open a new Epic otherwise. Inside an Epic, group the issues by pipeline step or subsystem
+- When keeping the open Epics, place an issue in one whose outcome covers it; open a new Epic otherwise. Inside an Epic, group the issues by pipeline step or subsystem
+- Order the new batch: an Epic that another needs goes first, then order by return, using the Rank tiers. Give each place a one-sentence reason
 - Account for each candidate issue once in the proposal, under an Epic, the cleanup list, or the left-out list with its reason
 - Write each issue as an issue entry from the template, so the user decides without opening the issue
 - An Epic holds no open decision. Settle a decision that belongs to the user here, or leave its issues out
@@ -49,12 +50,13 @@ Done when the user approves the proposal.
 
 1. Reread the affected issues and Epics before writing, as `label-for-issues` requires. Leave out an approved action whose scope, evidence, or membership changed, with its reason. Rerun the Step 1 query and verify new issues as in Step 2. Add a new issue only when an approved Epic's outcome covers it and it needs no decision from the user. Report it as added after approval, or leave it out with its reason
 2. Apply the approved corrections to issues closed as completed without a landed fix. Reopen those whose problem still holds and use their proposed placement. For those whose problem is gone, reopen and close as not planned with the evidence
-3. Number each new Epic after the highest `Epic N` title among all Epic issues, closed ones included
-4. Create each new Epic from the template and apply its parent labels through `label-for-issues`
+3. Number each new Epic after the highest `Epic N` title among all Epic issues, closed ones included, in the batch's order
+4. Create each new Epic from the template and apply its parent labels through `label-for-issues`. Once every Epic of the batch has its number, fill in each Order section
 5. Attach each member as a sub-issue and label it as `label-for-issues` describes. A `2-type:postmortem` issue takes the work type its title names: `fix` gives bug, `feat` gives feature, and any other prefix gives task
-6. Close each issue on the approved cleanup list, label it as `label-for-issues` describes, and comment the reason and evidence. Close as completed only when the fix landed, as duplicate with the covering issue identified, and as not planned otherwise. Apply only approved membership changes through `label-for-issues`. Close an Epic only after checking its completion criterion and every member's disposition
-7. Update each Epic body that no longer describes exactly its members, after gains, losses, or earlier drift
-8. Read back with the `label-for-issues` filters. Each Epic body matches its actual members, including closed ones. Every applied placement matches the proposal or a reported late addition. Every issue in the set is in an Epic, closed, or on the left-out list. Correct discrepancies and read back again
-9. Report a table of each Epic with its member count and URL, then the cleanup and the left-out issues
+6. Close each issue on the approved cleanup list, label it as `label-for-issues` describes, and comment the reason and evidence. Close as completed only when the fix landed, as duplicate with the covering issue identified, and as not planned otherwise. Apply only approved membership changes through `label-for-issues`. Close an Epic as completed only after checking its completion criterion and every member's disposition
+7. When starting over, close each open Epic that item 6 did not close as completed. First detach its open members as `label-for-issues` describes, then close it as not planned, with a comment that it was not executed and its open members were regroomed
+8. Update each Epic body that no longer describes exactly its members, after gains, losses, or earlier drift
+9. Read back with the `label-for-issues` filters. Each Epic body matches its actual members, including closed ones. Every new Epic's Order section names the same batch and order. An Epic closed by starting over holds only closed members. Every applied placement matches the proposal or a reported late addition. Every issue in the set is in an Epic, closed, or on the left-out list. Correct discrepancies and read back again
+10. Report a table of the kept Epics, then of the new batch in its order, each with its member count and URL, then the cleanup and the left-out issues
 
 Done when every write is read back as applied.
