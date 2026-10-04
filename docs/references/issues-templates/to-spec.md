@@ -1,5 +1,8 @@
 # Issue template: to-spec
 
+Feel free to add more section(s) as needed or to say N/A if not applicable
+
+
 ````md
 <spec-template>
 
