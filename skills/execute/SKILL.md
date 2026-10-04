@@ -30,7 +30,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Run a $2nd-pass
 - Done when each 2nd-pass finding is fixed or reported
 
-**STEP: Codex on each PR**
+**STEP: Code review on each PR**
 - On each PR, post a new comment:
 	- "Paula Review PR. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md Then use $poteto-mode to do an adversarial code review of the full diff from Base-SHA to Head-SHA, including deleted lines and the surrounding code, not only added lines. Do not edit files. List each finding with its location and reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values
 - Then babysit, wait for Paula
