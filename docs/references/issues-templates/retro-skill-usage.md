@@ -55,10 +55,10 @@ That's the whole fix: one line.
 <details>
 <summary>👨🏻‍🍳 Details</summary>
 
-Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc.
+<!-- Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc. -->
 
 
-The subsections below are suggestions: keep, rename, or drop them
+<!-- The subsections below are suggestions: keep, rename, or drop them -->
 
 ### <The evidence, such as the conflicting rules>
 
