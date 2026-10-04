@@ -1,34 +1,26 @@
 # Issue template: to-tickets
 
-````md
-<local-ticket-template>
-
-# <NN>: <Ticket title>
-
-**What to build:** the end-to-end behaviour this ticket makes work, from the user's perspective, not a layer-by-layer implementation list.
-
-**Blocked by:** the numbers/titles of the tickets that gate this one, or "None (can start immediately)".
-
-**Status:** ready-for-agent
-
-- [ ] Acceptance criterion 1
-- [ ] Acceptance criterion 2
-
-## 👨🏻‍🍳 For the agent
-
-See [👨🏻‍🍳 For the agent](for-the-agent.md)
-
-</local-ticket-template>
-````
+Feel free to add more section(s) as needed or to say N/A if not applicable
 
 ````md
 <issue-template>
 
-## Parent
+## The problem (CMO)
 
-A reference to the parent issue on the tracker (if the source was an existing issue, otherwise omit this section).
+**Area:** <Navigation, Automated checks, Steering files, Tool economy, No-ops, or Information access>
 
-## What to build
+**Problem Statement:** As an agent working in `<repo>`, I want <…>, so that <…>
+
+REF: #<PR or issue>
+
+### Analogy
+
+An everyday analogy in one or two sentences.
+
+- **What should happen:** <in the analogy's terms>
+- **What happened in #<PR>:** <what the agent did, in the analogy's terms>
+
+## FMO
 
 The end-to-end behaviour this ticket makes work, from the user's perspective, not layer-by-layer implementation.
 
@@ -37,9 +29,9 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 - [ ] Criterion 1
 - [ ] Criterion 2
 
-## Blocked by
+REF: #<PR or issue>
 
-- A reference to each blocking ticket, or "None (can start immediately)".
+## Blocked by
 
 ## 👨🏻‍🍳 For the agent
 
