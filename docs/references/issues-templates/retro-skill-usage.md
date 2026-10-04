@@ -41,7 +41,7 @@ That's the whole fix: one line.
 
 ## How we'll know it works
 
-1. **Before the change:** <rerun the failing scenario with the current skill, in three fresh sessions when the result depends on the agent's choices>. If <it never fails>, the problem doesn't repeat
+1. **Before the change:** <the recorded evidence from the session, or a rerun of the scenario when it is cheap>
 2. **After the change:** <the same scenario and the result that proves the fix>
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
