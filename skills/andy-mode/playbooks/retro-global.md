@@ -36,7 +36,7 @@ Draft one issue per finding in the repository that owns the change: the project 
 
 ## The problem (CMO)
 
-**Area:** <Navigation, Automated checks, Steering files, Tool economy, No-ops, or Information access>
+**Area:** <Navigation, Automated checks, Coding standards, Steering files, Tool economy, No-ops, or Information access>
 
 **Problem Statement:** As an agent working in `<repo>`, I want <…>, so that <…>
 
