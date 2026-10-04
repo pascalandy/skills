@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-03
+date_updated: 2026-10-04
 ---
 
 Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
@@ -16,9 +16,9 @@ Every CLI in `scripts/` follows this contract. A skill-local script may follow i
 
 ## Baseline
 
-Every script meets all of these. No exception waives an exit code, the Rule of Silence, or help behavior.
+Every script meets all of these. No exception waives an exit code, the output rule, or help behavior.
 
-Output follows the Rule of Silence: when nothing needs saying, print nothing
+Output follows [[script-output]]: one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`. A new script answers that way from the start. An older script its State section does not mark "now" still follows the Rule of Silence: when nothing needs saying, print nothing
 
 - stdout holds the primary result only: data, IDs, paths, or change lines. No banners or status lines
 - A failure leaves stdout empty. Under `--json`, the error is one JSON object on stderr
@@ -111,7 +111,7 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 
 `scripts/_cli.py` holds the contract pieces: the parser, the help pre-scan, signal handling, `<NAME>_DEBUG`, color detection, the duration parser, the exit-code table, and `ScriptError` (1), `UsageError` (2), and `TemporaryError` (75). Everything below its `cli-block` marker is the block a skill script pastes whole; `just check --only cli-block` fails when a copy differs, and `uv run scripts/check_cli_block.py --fix` rewrites the copies. Keep the block on the standard library and Python 3.10
 
-`scripts/_common.py` builds the `scripts/` entry point on it. Build a `Parser` with the script's `exit_codes(...)` table, then return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. `work` returns what stdout holds, or "" to stay silent, and raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, prints output only on success, and turns each outcome into its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
+`scripts/_common.py` builds the `scripts/` entry point on it. Build a `Parser` with the script's `exit_codes(...)` table, then return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. With `json_answer=True`, `work` returns the data beside `ok`, usually `{}`, and `run_script` answers in one JSON line; an older script's `work` returns what stdout holds, or "" to stay silent. `work` raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, prints output only on success, and turns each outcome into its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
 
 Use only the standard library unless a dependency earns its place. Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool through `uv run --quiet`; branching and chaining belong in the script. Bare `just` lists recipes in file order: the `commands` group, most-run first, then the `checks` group; hook-only recipes are `[private]`. `scripts/tests/test_justfile.py` enforces it
 
@@ -123,5 +123,6 @@ Repository test modules live in `scripts/tests/` as `test_<stem>.py`. Each modul
 
 ## Related
 
+- [[script-output]]
 - [[checks]]
 - [[release]]
