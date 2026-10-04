@@ -2,6 +2,7 @@
 name: "transcript"
 description: "Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording."
 kind: "general"
+configuration-is-needed: true
 ---
 
 # Transcript
