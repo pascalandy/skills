@@ -1012,24 +1012,26 @@ def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
 
 
 @exits("transcript", 2)
+@pytest.mark.parametrize(
+    ("urls", "invalid"),
+    [
+        ([QUEUE[0], "https://example.com/x"], "https://example.com/x"),
+        # argparse reads -1 as a value, not as an option
+        (["-1", QUEUE[0]], "-1"),
+    ],
+    ids=["not-youtube", "negative-number"],
+)
 def test_an_invalid_url_stops_the_queue_before_any_work(
-    tmp_path, monkeypatch, capsys
+    urls: list[str], invalid: str, tmp_path, monkeypatch, capsys
 ) -> None:
     reads = fake_queue(monkeypatch)
 
     code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        QUEUE[0],
-        "https://example.com/x",
-        "--output-dir",
-        str(tmp_path),
+        capsys, "run", "youtube", "--url", *urls, "--output-dir", str(tmp_path)
     )
 
     assert (code, out, reads) == (2, "", [])
-    assert "error: Invalid YouTube URL: https://example.com/x" in err
+    assert f"error: Invalid YouTube URL: {invalid}" in err
     assert (
         f"fix: transcript run youtube --output-dir {tmp_path} --url {QUEUE[0]}" in err
     )
