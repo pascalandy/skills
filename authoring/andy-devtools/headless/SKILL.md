@@ -115,7 +115,7 @@ answer: /tmp/headless-codex-review-only.8gcz_axu/answer.md
 
 `model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed. The run folder also keeps `prompt.md` and the child's logs.
 
-After `--review-only` or `--code-review`, stdout stops there: read the `answer` file with your file-reading tool, since an output filter such as RTK cuts long stdout. After `--review-fix`, the answer follows the six lines, and the file keeps it whole.
+After `--review-only` or `--code-review`, stdout stops there. Read the `answer` file with your file-reading tool, since an output filter such as RTK cuts long stdout. After `--review-fix`, the answer follows the six lines, and the file keeps it whole.
 
 Read the whole answer before deciding the run succeeded. A one-line "no findings" without criteria is weak evidence: add the criteria and check results, then rerun.
 
