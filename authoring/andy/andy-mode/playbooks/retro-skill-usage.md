@@ -33,14 +33,14 @@ List the **use cases**, edge cases included
 
 What's out of scope
 
-REF: #<PR or issue>
+REF: <#N in the issue's repository, owner/repo#N in another>
 
 ### Analogy
 
 An everyday analogy in one or two sentences, explain like I'm 12, so the end user can tell the analysis from what is actionable.
 
 - **What should happen:** <in the analogy's terms>
-- **What happened in #<PR>:** <what the agent did, in the analogy's terms>
+- **What happened in <PR>:** <what the agent did, in the analogy's terms>
 
 Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.
 
