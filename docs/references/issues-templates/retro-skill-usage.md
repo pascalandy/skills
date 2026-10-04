@@ -42,7 +42,9 @@ That's the whole fix: one line.
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
 
+## 👨🏻‍🍳 For the agent
+
+See [👨🏻‍🍳 For the agent](for-the-agent.md)
+
 </retro-skill-usage>
 ````
-
-Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section
