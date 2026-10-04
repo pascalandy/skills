@@ -48,12 +48,13 @@ Done when the user approves the proposal.
 **5. Package.** After the approval, write to GitHub:
 
 1. Rerun the Step 1 query, and verify each issue that entered the set since the proposal as in Step 2. Place it only when an Epic's outcome covers it and it needs no decision from the user, and flag it in the report as added after the approval; otherwise add it to the left-out list with the reason
-2. Number each new Epic after the highest `Epic N` title among all Epic issues, closed ones included
-3. Create each new Epic from the template, labeled `4-epic:parent`
-4. Attach each member as a sub-issue and label it as `label-for-issues` describes. A `2-type:postmortem` issue takes the work type its title names: `fix` gives bug, `feat` gives feature, and any other prefix gives task
-5. Whenever an existing Epic gains or loses a member, update its body so it still describes every member
-6. Close each issue on the cleanup list, label it as `label-for-issues` describes, and comment the reason and the evidence. Detach a member from its Epic before closing it; item 5 covers that Epic's body. Close as completed only when the fix landed, as duplicate when another issue covers it, and as not planned otherwise
-7. Read back with the `label-for-issues` filters: each Epic lists exactly its planned members, no member lacks a parent, and every issue in the set is in an Epic, closed, or on the left-out list
-8. Report a table of each Epic with its member count and URL, then the cleanup and the left-out issues
+2. Reopen each issue flagged in Step 2 as completed without its fix when the problem still holds, and place it like any other issue; change the closing reason of the others to not planned
+3. Number each new Epic after the highest `Epic N` title among all Epic issues, closed ones included
+4. Create each new Epic from the template, labeled `4-epic:parent`
+5. Attach each member as a sub-issue and label it as `label-for-issues` describes. A `2-type:postmortem` issue takes the work type its title names: `fix` gives bug, `feat` gives feature, and any other prefix gives task
+6. Close each issue on the cleanup list, label it as `label-for-issues` describes, and comment the reason and the evidence. Detach a member from its Epic before closing it; item 7 covers that Epic's body. Close as completed only when the fix landed, as duplicate when another issue covers it, and as not planned otherwise
+7. Update each Epic body that no longer describes exactly its members, after gains, losses, or earlier drift
+8. Read back with the `label-for-issues` filters: each Epic lists exactly its planned members, no member lacks a parent, and every issue in the set is in an Epic, closed, or on the left-out list
+9. Report a table of each Epic with its member count and URL, then the cleanup and the left-out issues
 
 Done when every write is read back as applied.
