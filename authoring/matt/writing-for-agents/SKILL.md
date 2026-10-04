@@ -40,13 +40,13 @@ Skill progress:
 
 **Step 1: BP checklist filled.** For an existing target skill, fill the [BP checklist](#best-practices-checklist) with Review steps 1 and 2, so the evaluations and fixes target what fails. Done when each BP is ticked or open with its finding count. Skip this step for a new skill.
 
-**Step 2: Evaluations and baseline.** Write three scenarios from real failures and run them with the [eval runner](#eval-runner) on the target skill's current version, or on a ref without it for a new skill (BP_20). Done when each scenario has a recorded baseline. Skip steps 2 and 7 for a wording-only edit.
+**Step 2: Evaluations and baseline.** Run steps 2 and 7 only when the user asks for evaluations; otherwise tick BP_20 with the reason "no evaluations asked" and go to Step 3. Write three scenarios from real failures and run them with the [eval runner](#eval-runner) on the target skill's current version, or on a ref without it for a new skill (BP_20). Done when each scenario has a recorded baseline.
 
 **Step 3: Frontmatter.** Write the name and the trigger (BP_13, BP_14, BP_21). Done when the description says when to load the skill, the validator reports no BP_13 or BP_14 error, and any BP_21 warning has a reason.
 
 **Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01). Done when every branch has its steps and each linked file says when to read it.
 
-**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). When the `coding-language` skill is installed, load it before writing a script, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand.
+**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). When the `coding-language` skill is installed, load it before writing a script, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand and each script has tests that pass.
 
 **Step 6: Skill validator silent.** Run the skill validator, fix each error, and rerun. Done when it prints nothing, or every warning left has a reason you tell the user.
 
@@ -131,4 +131,4 @@ IDs never change and are never reused. To change a practice, move its line under
 - [writing-levers.md](references/writing-levers.md): BP_01 to BP_06, plus context pointers and the two loads. Read when writing or reviewing any document
 - [patterns.md](references/patterns.md): BP_07 to BP_11. Read when the document has steps, examples, templates, or a validation step
 - [skill-format.md](references/skill-format.md): BP_13 to BP_16, BP_19, and BP_21, plus invocation and layout. Read when writing a skill's frontmatter or deciding its files
-- [scripts-and-evals.md](references/scripts-and-evals.md): BP_17, BP_18, BP_20. Read when a skill runs code, or before writing a new skill
+- [scripts-and-evals.md](references/scripts-and-evals.md): BP_17, BP_18, BP_20. Read when a skill runs code, or when the user asks for evaluations
