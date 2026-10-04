@@ -12,7 +12,7 @@ REF: #<PR or issue>
 
 ### Analogy
 
-An everyday analogy in one or two sentences.
+An everyday analogy in one or two sentences, explain like I'm 12, so the end user can tell the analysis from what is actionable.
 
 - **What should happen:** <in the analogy's terms>
 - **What happened in #<PR>:** <what the agent did, in the analogy's terms>
