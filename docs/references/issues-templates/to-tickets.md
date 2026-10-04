@@ -24,7 +24,12 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 
 ## 👨🏻‍🍳 For the agent
 
-See [👨🏻‍🍳 For the agent](for-the-agent.md)
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
 
 </issue-template>
 ````

@@ -41,7 +41,12 @@ The check, file, or tool already in place, and why it did not help: missing, unw
 
 ## 👨🏻‍🍳 For the agent
 
-See [👨🏻‍🍳 For the agent](for-the-agent.md)
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
 
 </retro-global>
 ````

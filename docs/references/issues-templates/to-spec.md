@@ -52,7 +52,12 @@ A description of the things that are out of scope for this spec.
 
 ## 👨🏻‍🍳 For the agent
 
-See [👨🏻‍🍳 For the agent](for-the-agent.md)
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
 
 </spec-template>
 ````

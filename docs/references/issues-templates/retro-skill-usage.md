@@ -48,7 +48,12 @@ That's the whole fix: one line.
 
 ## 👨🏻‍🍳 For the agent
 
-See [👨🏻‍🍳 For the agent](for-the-agent.md)
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
 
 </retro-skill-usage>
 ````

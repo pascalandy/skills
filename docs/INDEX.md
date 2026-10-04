@@ -13,7 +13,7 @@ date_updated: 2026-10-04
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 30 | **Last updated:** 2026-10-04
+> **Total pages:** 29 | **Last updated:** 2026-10-04
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -32,7 +32,6 @@ date_updated: 2026-10-04
 |------|-------------|
 | `references/checks.md` | How `just check`, signoff, merge, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
-| `references/issues-templates/for-the-agent.md` | The `👨🏻‍🍳 For the agent` section every issue template ends with: free form, with suggested subsections |
 | `references/issues-templates/retro-global.md` | Issue template copied from `andy-mode ; retro-global`, to compare with the other three |
 | `references/issues-templates/retro-skill-usage.md` | Issue template copied from `andy-mode ; retro-skill-usage`, with the CMO and FMO sections |
 | `references/issues-templates/to-spec.md` | Spec template copied from `matt-mode ; to-spec` |
