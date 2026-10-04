@@ -9,16 +9,21 @@ Verbatim copy of the title and body rules in `authoring/andy/andy-mode/playbooks
 **Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. Letter the Decision options as in Approaches considered, so the end user can answer with one letter. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
 
 ````md
-## CMO: The problem, simply
+## CMO: The problem
 
+### Problem Statement
+
+The problem that the user is facing, from the user's perspective.
+
+REF: #<PR or issue>
+
+### Analogy
 <An everyday analogy in one or two sentences.>
 
 - **What should happen:** <in the analogy's terms>
 - **What happened in #<PR>:** <what the agent did, in the analogy's terms>
 
 <Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.>
-
-REF: #<PR or issue>
 
 ### Why it happened
 
