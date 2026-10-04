@@ -46,10 +46,12 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 
 - A reference to each blocking ticket, or "None (can start immediately)".
 
-<details>
-<summary>👨🏻‍🍳 Details for the agent</summary>
+## 👨🏻‍🍳 For the agent
 
-<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.>
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc.
 
 </details>
 

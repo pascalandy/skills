@@ -6,9 +6,10 @@ Verbatim copy of the title and body rules in `authoring/andy/andy-mode/playbooks
 
 **Title.** Use Conventional Commits in the form `type(skill): subject`. Use `fix` when the skill is wrong or contradictory, `docs` when it is only unclear, and `feat` when a step is missing. Write the subject as the behavior the skill should have, in plain words and the imperative, for example `fix(commit): keep a move and its pointer updates in one commit`. Do not add a trailing period.
 
-**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
+**Body.** Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
 
 ````md
+<retro-skill-usage>
 ## CMO: The problem
 
 ### Problem Statement
@@ -18,6 +19,7 @@ The problem that the user is facing, from the user's perspective.
 REF: #<PR or issue>
 
 ### Analogy
+
 <An everyday analogy in one or two sentences.>
 
 - **What should happen:** <in the analogy's terms>
@@ -48,22 +50,27 @@ That's the whole fix: one line.
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
 
-<details>
-<summary>👨🏻‍🍳 Details for the agent</summary>
+## 👨🏻‍🍳 For the agent
 
-<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs. The subsections below are suggestions: keep, rename, or drop them.>
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc.
+
+
+The subsections below are suggestions: keep, rename, or drop them
 
 ### <The evidence, such as the conflicting rules>
 
-<File and line numbers, and the real commits, steps, or output that show the failure.>
+File and line numbers, and the real commits, steps, or output that show the failure.
 
 ### Acceptance cases
 
-1. <case → expected result; mark the one that is the bug>
+1. case → expected result; mark the one that is the bug
 
 ### Edge cases
 
-- <edge case → how the fix handles it>
+- edge case → how the fix handles it
 
 ### Approaches considered
 
@@ -73,7 +80,9 @@ That's the whole fix: one line.
 
 ### Out of scope
 
-<What this fix leaves alone.>
+What this fix leaves alone.
 
 </details>
-````
+
+</retro-skill-usage>
+```

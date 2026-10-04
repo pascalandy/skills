@@ -53,14 +53,12 @@ A list of testing decisions that were made. Include:
 
 A description of the things that are out of scope for this spec.
 
-## Further Notes
-
-Any further notes about the feature.
+## 👨🏻‍🍳 For the agent
 
 <details>
-<summary>👨🏻‍🍳 Details for the agent</summary>
+<summary>👨🏻‍🍳 Details</summary>
 
-<Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs.>
+Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc.
 
 </details>
 
