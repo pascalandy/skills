@@ -2876,17 +2876,20 @@ def _rewrite(
     kept: list[str] = []
     skip_value = False
     skip_values = False
-    for token in options:
+    for token, following in zip(options, [*options[1:], "-"]):
         if skip_value or (skip_values and not token.startswith("-")):
             skip_value = False
             continue
         skip_values = False
         name = token.split("=", 1)[0]
+        # A multi-value option with no value, such as the --url `just ttr` puts
+        # first, adds nothing to the rerun
+        if "=" not in token and values.get(name) and following.startswith("-"):
+            continue
         if name in dropped:
             if "=" not in token and name in values:
-                # A multi-value option may have no value, as in `--url --url A`
+                skip_value = True
                 skip_values = values[name]
-                skip_value = not skip_values
             continue
         kept.append(token)
     return [*kept, *add, *rest]
