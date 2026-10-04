@@ -25,7 +25,7 @@ What the agent was doing and what it ran into: a failure, a detour, or a missing
 
 The check, file, or tool already in place, if any, and why it fell short: missing, unwired, or silently broken.
 
-## FMO: Start, Stop, Continue
+## Start, Stop, Continue (FMO)
 
 - **Start:** <what the agent or its environment starts doing>
 - **Stop:** <what it stops doing>

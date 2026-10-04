@@ -2,7 +2,7 @@
 
 ````md
 <retro-skill-usage>
-## CMO: The problem
+## The problem (CMO)
 
 **Problem Statement:** Restate my goal and the problem in your own words
 
@@ -25,7 +25,7 @@ Map the analogy back to the real event: the commit, file, or step, and what it b
 
 The rule in the skill that caused it, in plain words, and the conflict or gap in it.
 
-## FMO (future Mode of operation)
+## The change (FMO)
 
 Change one line in `<authoring path to the skill file>`, under `<## Section>`. It currently says:
 
