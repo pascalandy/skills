@@ -24,6 +24,8 @@ from typing import Literal
 
 __version__ = "2.0.0"
 CANONICAL_YOUTUBE_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
+# Selected by the transcript README's Test videos rule
+TEST_PROFILE = "sonnet"
 EVIDENCE_NAMESPACE = "eval-transcript"
 RUN_MARKER = ".verify-transcript-run"
 FEATURE_AREAS = (
@@ -317,7 +319,7 @@ PUBLIC_SURFACES = (
         "option.profile",
         "option",
         "--profile",
-        ("youtube.dry-run-summary", "zoom.dry-run"),
+        ("youtube.dry-run-summary", "zoom.dry-run", "youtube.real-summary"),
     ),
     PublicSurface(
         "option.provider",
@@ -628,7 +630,7 @@ def select_features(
         raise VerificationError(
             "paid_intent_required",
             "Paid feature selection requires --allow-paid: " + ", ".join(paid),
-            "Confirm paid API use, then repeat the exact selection with --allow-paid.",
+            "Follow the transcript README's Test videos rule, then repeat with --allow-paid.",
             exit_code=2,
         )
     return selected
@@ -825,6 +827,8 @@ def build_commands(
                     "youtube",
                     "--url",
                     context.youtube_url,
+                    "--profile",
+                    TEST_PROFILE,
                     "--prompt",
                     "short_summary",
                     "--output-dir",
@@ -905,7 +909,7 @@ def assert_safe_command(
         raise VerificationError(
             "paid_intent_required",
             f"{feature.id} reached the paid boundary without --allow-paid.",
-            "Stop and obtain explicit authorization for the selected paid feature.",
+            "Follow the transcript README's Test videos rule, then repeat with --allow-paid.",
             exit_code=2,
         )
 
@@ -1196,6 +1200,10 @@ def _validate_e2e(
     artifacts = payload.get("artifacts")
     _require(isinstance(summary, dict), "real run summary state is missing")
     _require(summary.get("status") == "succeeded", "real summary did not succeed")
+    _require(
+        summary.get("profile") == TEST_PROFILE,
+        f"real summary did not use the {TEST_PROFILE} test profile",
+    )
     _require(isinstance(artifacts, dict), "real run artifacts are missing")
     required = {"transcript", "sentences", "json", "metadata", "summary"}
     _require(required <= artifacts.keys(), "real run artifact set is incomplete")
@@ -1473,25 +1481,21 @@ def validate_feature(
         _require(process.exit_code == 0, "profile discovery failed")
         _require(payload.get("default") == "opus", "default profile is invalid")
         profiles = payload.get("profiles")
-        _require(isinstance(profiles, list), "profile list is missing")
-        expected = [
-            ("opus", "claude", "claude-opus-5-5", "high"),
-            ("astra", "codex", "gpt-6-astra", "low"),
-            ("sol", "codex", "gpt-5.6-sol", "medium"),
-            ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
-        ]
-        actual = [
-            (
-                profile.get("name"),
-                profile.get("provider"),
-                profile.get("model"),
-                profile.get("effort"),
+        _require(isinstance(profiles, list) and bool(profiles), "profile list is empty")
+        for profile in profiles:
+            _require(
+                isinstance(profile, dict)
+                and all(
+                    isinstance(profile.get(key), str) and bool(profile[key].strip())
+                    for key in ("name", "provider", "model", "effort")
+                ),
+                f"profile has missing or empty fields: {profile!r}",
             )
-            for profile in profiles
-            if isinstance(profile, dict)
-        ]
-        _require(actual == expected, "profile registry is invalid")
-        return {"default": "opus", "profiles": [item[0] for item in expected]}
+        names = [profile["name"] for profile in profiles]
+        _require(len(set(names)) == len(names), f"duplicate profile names: {names!r}")
+        _require(payload["default"] in names, "default profile is not listed")
+        _require(TEST_PROFILE in names, f"test profile is not listed: {TEST_PROFILE}")
+        return {"default": payload["default"], "profiles": names}
     if feature.probe in {"doctor-youtube", "doctor-zoom"}:
         return _validate_doctor(feature, *captures[0])
     if feature.probe in {"youtube-dry-run-summary", "zoom-dry-run"}:

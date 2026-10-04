@@ -43,7 +43,7 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `option.path` | `zoom.dry-run` |
 | `option.source` | `diagnostics.youtube`, `diagnostics.zoom` |
 | `option.no-summary` | `dry-runs.transcript-only` |
-| `option.profile` | `youtube.dry-run-summary`, `zoom.dry-run` |
+| `option.profile` | `youtube.dry-run-summary`, `zoom.dry-run`, `youtube.real-summary` |
 | `option.provider` | `youtube.dry-run-summary` |
 | `option.prompt` | `youtube.dry-run-summary` |
 | `option.model` | `youtube.dry-run-summary` |

@@ -27,7 +27,7 @@ Preconditions:
 - Keep custom output under the eval-created scratch root
 
 - **Prompt values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.prompts --json`. Require all three bundled prompt names and input kinds
-- **Profile values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.profiles --json`. Require `opus`, `astra`, `sol`, and `glm` in order, with `opus` as the default
+- **Profile values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.profiles --json`. Require complete profiles with unique names, including the default and the test profile
 - **Model values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.models --json`. Require Claude, Codex, and OpenRouter defaults inside non-empty model lists
 - **Recovery.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery --json`. Require the current `transcript list models --provider codex` guidance on `stderr`
 - **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require disabled summary fields and the configured timeout for both sources

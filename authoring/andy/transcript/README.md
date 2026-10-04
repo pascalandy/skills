@@ -9,7 +9,7 @@ The CLI uses subcommands, validates source input before execution, returns struc
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
 - Zoom recordings under `~/Documents/Zoom` for Zoom mode
-- When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile, or `pi` for the `astra`, `sol`, and `glm` profiles
+- When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - Deepgram API key in the macOS keyring
 - The `andy-mode` skill installed beside this one for Zoom summaries, which use the `synthese-rencontre` prompt of its `distill-prompt` route
@@ -211,6 +211,12 @@ uvx yt-dlp@2026.7.4 --skip-download --print duration "<youtube-url>"
 
 The length prints in seconds.
 
+Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `medium` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
+
+Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
+
+Run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`, and Linux has no Arc profile. Both fall back to anonymous access, which YouTube usually refuses. From SSH or Linux, hand the closeout commands to a local Mac session.
+
 ## Validation model
 
 Use these evidence names consistently:
@@ -266,6 +272,7 @@ Run the canonical YouTube Agent QA path:
 ```bash
 uv run <skill_dir>/scripts/transcript.py run youtube \
   --url "https://www.youtube.com/watch?v=EIEc43CxIvY" \
+  --profile sonnet \
   --prompt short_summary \
   --output-dir <temporary-dir> \
   --json
@@ -276,6 +283,7 @@ When a change touches the queue, also run both [test videos](#test-videos) as on
 ```bash
 uv run <skill_dir>/scripts/transcript.py run youtube \
   --url "https://www.youtube.com/watch?v=EIEc43CxIvY" "https://www.youtube.com/watch?v=QwpTAk_IiyU" \
+  --profile sonnet \
   --prompt short_summary \
   --output-dir <temporary-dir>
 ```
@@ -283,9 +291,10 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
 A real Zoom run is not part of the closeout for now, even when a change affects Zoom: Pascal does not use Zoom. Zoom mode stays supported, and its coverage is the automated tests plus the free `zoom.dry-run` and `diagnostics.zoom` features of `verify-transcript`. Report Zoom E2E as `NOT RUN`. To exercise Zoom anyway, run:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
+uv run <skill_dir>/scripts/transcript.py run zoom --latest --profile sonnet --json
 uv run <skill_dir>/scripts/transcript.py run zoom \
   --path "2026-05-03 14.46.55 Réunion Zoom de Camille Exemple" \
+  --profile sonnet \
   --json
 ```
 

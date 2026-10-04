@@ -120,9 +120,7 @@ def test_paid_selection_requires_feature_and_gate():
     assert caught.value.code == "paid_intent_required"
     assert caught.value.exit_code == 2
 
-    selected = verify_transcript.select_features(
-        ("youtube.real-summary",), False, True
-    )
+    selected = verify_transcript.select_features(("youtube.real-summary",), False, True)
     assert [feature.id for feature in selected] == ["youtube.real-summary"]
 
 
@@ -257,12 +255,8 @@ def test_public_surface_inventory_matches_help_contracts():
 
 
 def test_response_contract_enforces_json_streams():
-    success = verify_transcript.CapturedProcess(
-        (), 0, '{"ok":true}\n', "", 0.1, False
-    )
-    failure = verify_transcript.CapturedProcess(
-        (), 2, "", '{"ok":false}\n', 0.1, False
-    )
+    success = verify_transcript.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
+    failure = verify_transcript.CapturedProcess((), 2, "", '{"ok":false}\n', 0.1, False)
 
     assert verify_transcript.parse_expected_output(
         success, verify_transcript.OutputExpectation("stdout-json", (0,))
@@ -304,9 +298,7 @@ def test_a_wrong_exit_code_names_the_error_transcript_reported(stderr, verdict):
 def test_a_doctor_report_is_read_from_the_stream_its_exit_code_names():
     by_exit = verify_transcript.OutputExpectation("json-by-exit", (0, 1))
     ready = verify_transcript.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
-    unready = verify_transcript.CapturedProcess(
-        (), 1, "", '{"ok":false}\n', 0.1, False
-    )
+    unready = verify_transcript.CapturedProcess((), 1, "", '{"ok":false}\n', 0.1, False)
 
     assert verify_transcript.parse_expected_output(ready, by_exit) == {"ok": True}
     assert verify_transcript.parse_expected_output(unready, by_exit) == {"ok": False}
@@ -381,6 +373,35 @@ def test_process_helper_captures_streams_and_exit(tmp_path: Path):
     assert captured.stdout == "public output\n"
     assert captured.stderr == "useful error\n"
     assert captured.timed_out is False
+
+
+def test_profile_discovery_accepts_new_profiles_but_rejects_duplicate_names(tmp_path):
+    context = make_context(tmp_path)
+    feature = next(
+        feature
+        for feature in verify_transcript.FEATURES
+        if feature.id == "configuration.profiles"
+    )
+    payload = {
+        "default": "opus",
+        "profiles": [
+            {"name": name, "provider": "claude", "model": "a-model", "effort": "medium"}
+            for name in ("opus", "sonnet", "new-profile")
+        ],
+    }
+    process = verify_transcript.CapturedProcess((), 0, "", "", 0.1, False)
+    try:
+        assert verify_transcript.validate_feature(
+            feature, (), ((process, payload),), context
+        ) == {"default": "opus", "profiles": ["opus", "sonnet", "new-profile"]}
+
+        payload["profiles"].append(payload["profiles"][-1])
+        with pytest.raises(AssertionError, match="duplicate profile names"):
+            verify_transcript.validate_feature(
+                feature, (), ((process, payload),), context
+            )
+    finally:
+        verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
 
 
 def test_doctor_validator_rejects_crossed_source():
@@ -460,7 +481,7 @@ def test_e2e_validator_records_verified_upload_without_transcript_content(
         "ok": True,
         "source": "youtube",
         "output_dir": str(published),
-        "summary": {"status": "succeeded"},
+        "summary": {"status": "succeeded", "profile": "sonnet"},
         "artifacts": {key: str(path) for key, path in artifact_paths.items()},
     }
     process = verify_transcript.CapturedProcess((), 0, "", "", 1.0, False)
@@ -482,6 +503,30 @@ def test_e2e_validator_records_verified_upload_without_transcript_content(
         assert "sha256" in manifest_text
         assert observations["audio_upload"] == {"status": "complete", "bytes": 1024}
         assert json.loads(manifest_text)["audio_upload"] == observations["audio_upload"]
+    finally:
+        verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
+
+
+def test_the_paid_run_summarizes_with_the_sonnet_profile(tmp_path: Path):
+    context = make_context(tmp_path, allow_paid=True)
+    feature = next(
+        feature
+        for feature in verify_transcript.FEATURES
+        if feature.id == "youtube.real-summary"
+    )
+    plan = verify_transcript.build_commands(feature, context)[0]
+    payload = {
+        "ok": True,
+        "source": "youtube",
+        "summary": {"status": "succeeded", "profile": "opus"},
+        "artifacts": {},
+    }
+    process = verify_transcript.CapturedProcess((), 0, "", "", 1.0, False)
+
+    try:
+        assert plan.args[plan.args.index("--profile") + 1] == "sonnet"
+        with pytest.raises(AssertionError, match="sonnet test profile"):
+            verify_transcript._validate_e2e(feature, plan, process, payload, context)
     finally:
         verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
 

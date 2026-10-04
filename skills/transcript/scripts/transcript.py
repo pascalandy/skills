@@ -471,6 +471,8 @@ INFERENCE_PROFILES = {
     "astra": InferenceProfile(PROVIDER_CODEX, "gpt-6-astra", "low"),
     "sol": InferenceProfile(PROVIDER_CODEX, "gpt-5.6-sol", "medium"),
     "glm": InferenceProfile(PROVIDER_OPENROUTER, "z-ai/glm-5.3-flash", "medium"),
+    # The README's Test videos rule runs every paid test on this profile
+    "sonnet": InferenceProfile(PROVIDER_CLAUDE, "claude-sonnet-5-5", "medium"),
 }
 DEFAULT_PROFILE = "opus"
 DEFAULT_PROVIDER = INFERENCE_PROFILES[DEFAULT_PROFILE].provider
