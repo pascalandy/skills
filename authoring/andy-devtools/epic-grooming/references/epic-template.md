@@ -4,7 +4,7 @@ Step 4 writes every issue as an issue entry, and Step 5 builds each Epic from th
 
 ## Issue entry
 
-The user reads this entry instead of the issue, so it must stand alone: a plain-words name, then what happens today and what changes after. The number goes in parentheses, for bookkeeping only. Mark the entry `text` when only prose changes and `code + tests` when the fix touches a script; prose needs no behavior test.
+The user reads this entry instead of the issue, so it must stand alone: a plain-words name, then what happens today and what changes after. The number goes in parentheses, for bookkeeping only. Mark the entry `text` when only prose changes and `code + tests` when the fix touches a script.
 
 ```md
 - **<the problem, in plain words>** (#<number>) · <text | code + tests>
@@ -31,7 +31,7 @@ Title: `Epic <N> · <the outcome, in plain words>`
 
 ## Issues
 
-Each issue is marked **text** (only prose changes, no test) or **code + tests**.
+Each issue is marked **text** (only prose changes) or **code + tests**.
 
 ### <group: a pipeline step or subsystem>
 

@@ -46,7 +46,7 @@ Done when the user approves the proposal.
 
 **5. Package.** After the approval, write to GitHub:
 
-1. List the open issues again. Place each one that arrived since the proposal, or add it to the left-out list with the reason
+1. List the open issues again, and verify each one that arrived since the proposal as in Step 2. Place it only when an Epic's outcome covers it and it needs no decision from the user, and flag it in the report as added after the approval; otherwise add it to the left-out list with the reason
 2. Number each new Epic after the highest `Epic N` title among all Epic issues, closed ones included
 3. Create each new Epic from the template, labeled `4-epic:parent`
 4. Attach each member as a sub-issue and label it as `label-for-issues` describes. A `2-type:postmortem` issue takes the work type its title names: `fix` gives bug, `feat` gives feature, and any other prefix gives task
