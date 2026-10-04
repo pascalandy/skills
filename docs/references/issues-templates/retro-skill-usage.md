@@ -42,34 +42,7 @@ That's the whole fix: one line.
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
 
-## 👨🏻‍🍳 For the agent
-
-<details>
-<summary>👨🏻‍🍳 Details</summary>
-
-### <The evidence, such as the conflicting rules>
-
-File and line numbers, and the real commits, steps, or output that show the failure.
-
-### Acceptance cases
-
-1. case → expected result; mark the one that is the bug
-
-### Edge cases
-
-- edge case → how the fix handles it
-
-### Approaches considered
-
-- **A. <approach>:** <why not>
-- **B. <approach> (recommended):** <why>
-- **C. Ignore it:** <the cost of leaving the skill as it is>
-
-### Out of scope
-
-What this fix leaves alone.
-
-</details>
-
 </retro-skill-usage>
 ````
+
+Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section

@@ -45,12 +45,7 @@ A list of testing decisions that were made. Include:
 
 A description of the things that are out of scope for this spec.
 
-## 👨🏻‍🍳 For the agent
-
-<details>
-<summary>👨🏻‍🍳 Details</summary>
-
-</details>
-
 </spec-template>
 ````
+
+Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section

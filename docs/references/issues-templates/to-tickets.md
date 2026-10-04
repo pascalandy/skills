@@ -14,13 +14,10 @@
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2
 
-<details>
-<summary>👨🏻‍🍳 Details for the agent</summary>
-
-</details>
-
 </local-ticket-template>
 ````
+
+Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section
 
 ````md
 <issue-template>
@@ -42,12 +39,7 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 
 - A reference to each blocking ticket, or "None (can start immediately)".
 
-## 👨🏻‍🍳 For the agent
-
-<details>
-<summary>👨🏻‍🍳 Details</summary>
-
-</details>
-
 </issue-template>
 ````
+
+Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section

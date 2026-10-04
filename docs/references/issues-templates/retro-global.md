@@ -24,12 +24,7 @@ As an agent working in `<repo>`, I want <…>, so that <…>
 
 <The scenario that failed and the outcome that proves the fix.>
 
-## 👨🏻‍🍳 For the agent
-
-<details>
-<summary>👨🏻‍🍳 Details</summary>
-
-</details>
-
 </retro-global>
 ````
+
+Ends with the [👨🏻‍🍳 For the agent](for-the-agent.md) section
