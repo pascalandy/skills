@@ -4,9 +4,7 @@
 <retro-skill-usage>
 ## CMO: The problem
 
-### Problem Statement
-
-The problem that the user is facing, from the user's perspective.
+**Problem Statement:** The problem that the user is facing, from the user's perspective.
 
 REF: #<PR or issue>
 
