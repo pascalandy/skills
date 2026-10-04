@@ -26,6 +26,10 @@ File and line numbers, and the real commits, steps, or output that show the fail
 - **B. <approach> (recommended):** <why>
 - **C. Ignore it:** <the cost of leaving the skill as it is>
 
+### Blast radius
+
+Which agents, repos, or workflows the change reaches, why it is safe or risky, and the continuing cost if nothing changes.
+
 ### Out of scope
 
 What this fix leaves alone.
