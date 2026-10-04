@@ -213,9 +213,9 @@ The length prints in seconds.
 
 Every real test run also passes `--profile sonnet`, Claude Sonnet 5.5 at `medium` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
 
-Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. Any other paid run, such as a long video or another profile, still needs his go-ahead.
+Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 
-Run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`. Linux has no Arc profile. In both cases yt-dlp falls back to anonymous access, YouTube refuses it, and the run fails before any paid request. From such a machine, hand the closeout commands to a local Mac session.
+Run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`, and Linux has no Arc profile. Both fall back to anonymous access, which YouTube usually refuses. From such a machine, hand the closeout commands to a local Mac session.
 
 ## Validation model
 
