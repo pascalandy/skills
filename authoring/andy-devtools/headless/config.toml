@@ -1,7 +1,7 @@
 # Defaults for scripts/headless.py. A --model or --effort flag wins over this file.
-# harness: the CLI the launcher runs when the command names none; it runs codex
-# and claude, while pi and opencode wait for #281
-# provider: Pi and OpenCode only; Codex and Claude Code pick their own
+# harness: the CLI the launcher runs when the command names none; it runs codex,
+# claude, and grok, while pi and opencode wait for #281
+# provider: Pi and OpenCode only; Codex, Claude Code, and Grok pick their own
 harness = "codex"
 
 [codex]
@@ -10,6 +10,10 @@ reasoning-level = "high"
 
 [claude]
 model = "claude-opus-5-5"
+reasoning-level = "xhigh"
+
+[grok]
+model = "grok-4.7"
 reasoning-level = "xhigh"
 
 [pi]
