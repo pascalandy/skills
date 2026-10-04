@@ -16,7 +16,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 #### Step by step
 
 - Run these steps in order, and finish each one before you start the next
-- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, assistant on each PR, Code review, Docs, Checks, and Merge gate steps, and say so in the report
+- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, Code review on each PR, Code review, Docs, Checks, and Merge gate steps, and say so in the report
 
 **STEP: Execute**
 - Use 🧰 poteto-mode to implement everything we agreed on, and open the PRs
