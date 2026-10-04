@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run the CI verdict: the checks in CHECKS, in order; success prints nothing."""
+"""Run the CI verdict: the checks in CHECKS, in order, answered in one JSON line."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import run, run_git, run_script
@@ -26,6 +27,8 @@ Each check is one row of CHECKS in scripts/check.py; add a row to add a check.
 A check that names a path under authoring/ runs only when this branch, compared
 with origin/main, or the working tree changes that skill, or scripts/check.py.
 A failing check does not stop the others; its output is replayed on stderr.
+The answer is one JSON line: {"ok":true} on stdout, or {"ok":false,...} at the
+end of stderr; docs/references/script-output.md explains how to read it.
 
 examples:
   just check
@@ -422,7 +425,7 @@ def repo_batch(checks: list[Check]) -> Command:
     return pytest(paths, parallel=any(not check.cheap for check in checks))
 
 
-def verdict(args: argparse.Namespace) -> str:
+def verdict(args: argparse.Namespace) -> dict[str, Any]:
     validate_repo_tests(CHECKS)
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
     if args.list:
@@ -434,7 +437,7 @@ def verdict(args: argparse.Namespace) -> str:
                 continue
             for command in check.commands:
                 log.info("%s: %s", check.name, shlex.join(command))
-        return "\n".join(check.name for check in selected)
+        return {"checks": [check.name for check in selected]}
     if not args.only and not args.sweep:
         selected = in_scope(selected)
 
@@ -465,7 +468,7 @@ def verdict(args: argparse.Namespace) -> str:
                 for name in failed
             )
         )
-    return ""
+    return {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -491,9 +494,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--list",
         action="store_true",
-        help="print the check names and exit; -v adds their commands on stderr",
+        help="answer with the check names and exit; -v adds their commands on stderr",
     )
-    return run_script(parser, verdict, argv, debug="CHECK_DEBUG")
+    return run_script(parser, verdict, argv, debug="CHECK_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import run_script
@@ -112,8 +113,8 @@ def check_file(path: Path) -> list[str]:
     return errors
 
 
-def check() -> str:
-    """Check every SKILL.md under authoring/; success prints nothing."""
+def check() -> dict[str, Any]:
+    """Check every SKILL.md under authoring/."""
     paths = sorted(AUTHORING.glob("**/SKILL.md"))
     if not paths:
         raise ScriptError("no SKILL.md files found under authoring/")
@@ -123,7 +124,7 @@ def check() -> str:
         errors.extend(check_file(path))
     if errors:
         raise ScriptError(*errors)
-    return ""
+    return {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -133,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )
-    return run_script(parser, lambda args: check(), argv)
+    return run_script(parser, lambda args: check(), argv, json_answer=True)
 
 
 if __name__ == "__main__":
