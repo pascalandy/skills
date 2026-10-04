@@ -56,6 +56,7 @@ transcript-cli *args:
 
 # Run the checks that cover changed inputs
 [group('checks')]
+[no-exit-message]
 check *args:
     @uv run --quiet scripts/check.py "$@"
 
@@ -67,6 +68,7 @@ signoff *args:
 
 # Check SKILL.md frontmatter quoting
 [group('checks')]
+[no-exit-message]
 check-frontmatter *args:
     @uv run --quiet scripts/check_frontmatter.py "$@"
 

@@ -9,13 +9,14 @@ import os
 import signal
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Any
 
 import _common
 import pytest
-from _cli import Parser, TemporaryError, exit_codes
+from _cli import INTERRUPTED, Interrupted, Parser, TemporaryError, exit_codes
 from _common import run_script, stop
 
 
@@ -84,6 +85,54 @@ def test_under_json_and_debug_the_error_object_still_ends_stderr() -> None:
     assert (code, stdout) == (1, "")
     assert "Traceback" in stderr
     assert json.loads("\n".join(lines[start:])) == {"errors": ["RuntimeError: boom"]}
+
+
+def answered(
+    work: Callable[[argparse.Namespace], str | Mapping[str, Any]], *argv: str
+) -> tuple[int, str, str]:
+    parser = Parser(prog="just tool", exit_codes=exit_codes({75: "retry"}))
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = run_script(
+            parser, work, list(argv), debug="TOOL_DEBUG", json_answer=True
+        )
+    return code, stdout.getvalue(), stderr.getvalue()
+
+
+def interrupted(_: argparse.Namespace) -> str:
+    raise Interrupted(INTERRUPTED)
+
+
+def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
+    assert answered(lambda _: {"checks": ["lint"]}) == (
+        0,
+        '{"ok":true,"checks":["lint"]}\n',
+        "",
+    )
+    assert answered(busy) == (
+        75,
+        "",
+        '{"ok":false,"mode":"apply","errors":["the lock is held"],"retry":"just tool"}\n',
+    )
+    assert answered(broken) == (
+        1,
+        "",
+        '{"ok":false,"errors":["RuntimeError: boom"],"rerun":"just tool --debug"}\n',
+    )
+    assert answered(interrupted) == (130, "", '{"ok":false,"errors":["interrupted"]}\n')
+
+
+def test_a_json_answer_covers_usage_errors_and_ends_stderr_after_a_traceback() -> None:
+    code, stdout, stderr = answered(broken, "--debug")
+
+    assert answered(broken, "--bogus") == (
+        2,
+        "",
+        '{"ok":false,"errors":["unrecognized arguments: --bogus"],"help":"just tool --help"}\n',
+    )
+    assert (code, stdout) == (1, "")
+    assert "Traceback" in stderr
+    assert stderr.endswith('\n{"ok":false,"errors":["RuntimeError: boom"]}\n')
 
 
 def started(script: str, tmp_path: Path) -> subprocess.Popen[str]:

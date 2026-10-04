@@ -50,14 +50,18 @@ def test_a_stale_copy_fails_until_fix_rewrites_only_its_block(repo: Path) -> Non
         "",
         (
             "update\tauthoring/content/stale/scripts/tool.py\n"
-            "error: 1 pasted cli block differs from scripts/_cli.py; "
-            "run: uv run scripts/check_cli_block.py --fix\n"
+            '{"ok":false,"errors":["1 pasted cli block differs from scripts/_cli.py; '
+            'run: uv run scripts/check_cli_block.py --fix"]}\n'
         ),
     )
-    assert run("--fix") == (0, "update\tauthoring/content/stale/scripts/tool.py\n", "")
+    assert run("--fix") == (
+        0,
+        '{"ok":true,"changes":[["update","authoring/content/stale/scripts/tool.py"]]}\n',
+        "",
+    )
     assert stale.read_text(encoding="utf-8") == script(BLOCK)
     assert current.read_text(encoding="utf-8") == script(BLOCK)
-    assert run() == (0, "", "")
+    assert run() == (0, '{"ok":true}\n', "")
 
 
 def test_a_copy_without_its_end_marker_is_named(repo: Path) -> None:
@@ -67,5 +71,5 @@ def test_a_copy_without_its_end_marker_is_named(repo: Path) -> None:
 
     assert (code, stdout) == (1, "")
     assert stderr.startswith(
-        "error: authoring/content/cut/scripts/tool.py has no whole cli block"
+        '{"ok":false,"errors":["authoring/content/cut/scripts/tool.py has no whole cli block'
     )

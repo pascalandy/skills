@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NoReturn
 
 from _cli import (
     INTERRUPTED,
@@ -217,21 +217,46 @@ def exclusive(path: Path, timeout: float) -> Iterator[None]:
         yield
 
 
+# How a run prints its outcome: one JSON line (docs/references/script-output.md),
+# the indented object of a script's --json flag, or text. Only "line" remains
+# once every script answers in JSON (#492)
+Form = Literal["line", "json", "text"]
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0. Success goes to
+    stdout; a failure goes to stderr, after its diagnostics, and leaves stdout
+    empty.
+    """
+    line = json.dumps(dict(ok=code == 0, **fields), separators=(",", ":"))
+    print(line, file=sys.stderr if code else sys.stdout)
+    return code
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
 def run_script(
     parser: Parser,
-    work: Callable[[argparse.Namespace], str],
+    work: Callable[[argparse.Namespace], str | Mapping[str, Any]],
     argv: Sequence[str] | None = None,
     *,
     debug: str | None = None,
+    json_answer: bool = False,
 ) -> int:
     """Parse arguments, run `work`, and turn its outcome into output and an exit code.
 
-    `work` returns what stdout holds on success, or "" for nothing, and raises
-    ScriptError, UsageError, or TemporaryError for expected failures. A failure
-    leaves stdout empty; under --json, it is one JSON object on stderr. `debug`
-    names the script's <NAME>_DEBUG variable and adds --debug; without it the
-    script never prints a traceback. Call it from `main()` and pass the result
-    to `SystemExit`.
+    With `json_answer`, every outcome is one JSON line, even a usage error or an
+    interrupt: `work` returns the data beside `ok`, usually {}. Otherwise `work`
+    returns what stdout holds on success, or "" for nothing, and a failure under
+    --json is one indented JSON object on stderr; #492 removes this older form.
+    `work` raises ScriptError, UsageError, or TemporaryError for expected
+    failures, and a failure leaves stdout empty. `debug` names the script's
+    <NAME>_DEBUG variable and adds --debug; without it the script never prints
+    a traceback. Call it from `main()` and pass the result to `SystemExit`.
     """
     argv = list(sys.argv[1:] if argv is None else argv)
     parser.add_argument(
@@ -250,9 +275,18 @@ def run_script(
         parser.print_help()
         return 0
 
-    # Known before parsing, so even a usage error or an interrupt is JSON
-    as_json = "--json" in parser._option_string_actions and given(argv, "--json")
-    parser.json_errors = as_json
+    # Known before parsing, so even a usage error or an interrupt takes this form
+    form: Form = (
+        "line"
+        if json_answer
+        else "json"
+        if "--json" in parser._option_string_actions and given(argv, "--json")
+        else "text"
+    )
+    parser.json_errors = form == "json"
+    if form == "line":
+        # The pasted cli block prints its own usage errors; report() owns this one
+        parser.error = usage_error
     command = shlex.join([*parser.prog.split(), *argv])
     tracing = False
     with signals_interrupt():
@@ -273,35 +307,42 @@ def run_script(
                 force=True,
             )
             output = work(args)
+            if isinstance(output, Mapping):
+                return answer(0, output)
             if output:
                 print(output)
             return 0
         except KeyboardInterrupt as stop:
             code = getattr(stop, "code", INTERRUPTED)
             word = "interrupted" if code == INTERRUPTED else "terminated"
-            print(json.dumps({"errors": [word]}) if as_json else word, file=sys.stderr)
+            if form == "line":
+                return answer(code, {"errors": [word]})
+            print(
+                json.dumps({"errors": [word]}) if form == "json" else word,
+                file=sys.stderr,
+            )
             return code
         except ScriptError as error:
-            return report(error, parser, as_json, command)
+            return report(error, parser, form, command)
         except Exception as error:
             # The traceback comes first, so the error, or its JSON object, ends stderr
             log.debug("unexpected failure", exc_info=True)
             unexpected = ScriptError(f"{type(error).__name__}: {error}")
             return report(
-                unexpected, parser, as_json, command, rerun=bool(debug) and not tracing
+                unexpected, parser, form, command, rerun=bool(debug) and not tracing
             )
 
 
 def report(
     error: ScriptError,
     parser: Parser,
-    as_json: bool,
+    form: Form,
     command: str,
     rerun: bool = False,
 ) -> int:
-    """Print a failure on stderr, one JSON object under --json, and return its
-    exit code. Hints name the command to run next: help for a usage error,
-    retry for a temporary failure, and rerun with --debug for a bug."""
+    """Print a failure on stderr in the run's form, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
     messages = [str(message) for message in error.args]
     hints: dict[str, str] = {}
     if isinstance(error, UsageError):
@@ -310,12 +351,14 @@ def report(
         hints["retry"] = command
     elif rerun:
         hints["rerun"] = f"{command} --debug"
-    if as_json:
-        failure = {**error.report, "errors": messages, **hints}
+    failure = {**error.report, "errors": messages, **hints}
+    if form == "json":
         print(json.dumps(failure, indent=2), file=sys.stderr)
         return error.code
     if error.detail:
         print(error.detail, file=sys.stderr)
+    if form == "line":
+        return answer(error.code, failure)
     if isinstance(error, UsageError):
         parser.print_usage(sys.stderr)
     for message in messages:
