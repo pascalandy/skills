@@ -12,16 +12,16 @@ REF: #<PR or issue>
 
 ### Analogy
 
-<An everyday analogy in one or two sentences.>
+An everyday analogy in one or two sentences.
 
 - **What should happen:** <in the analogy's terms>
 - **What happened in #<PR>:** <what the agent did, in the analogy's terms>
 
-<Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.>
+Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.
 
 ### Why it happened
 
-<The rule in the skill that caused it, in plain words, and the conflict or gap in it.>
+The rule in the skill that caused it, in plain words, and the conflict or gap in it.
 
 ## FMO (future Mode of operation)
 
