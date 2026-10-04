@@ -8,26 +8,7 @@ kind: "dev"
 
 A config is sound when its schema accepts it and none of its facts contradict each other. Steps 1 to 5 apply to a new schema and to a change. For a review, check the schema and the code that reads it against each step, then report each broken rule with its file, its fix, and whether the fix makes an existing config invalid (step 4).
 
-Requires `uv`; confirm with `uv --version`. Step 5 runs `check-jsonschema` through `uvx`, with nothing to install.
-
-## Skeleton
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Project config",
-  "description": "One config.json per project folder, validated by `just check`.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schema_version", "id", "state"],
-  "properties": {
-    "$schema": { "const": "../config.schema.json" },
-    "schema_version": { "const": 1 },
-    "id": { "description": "UUID v4, set once and never changed.", "type": "string", "format": "uuid" },
-    "state": { "description": "active: work in progress. closed: delivered and archived.", "enum": ["active", "closed"] }
-  }
-}
-```
+Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)); confirm with `uv --version`. Step 5 runs `check-jsonschema` through `uvx`, with nothing to install.
 
 ## Steps
 
@@ -70,3 +51,22 @@ Requires `uv`; confirm with `uv --version`. Step 5 runs `check-jsonschema` throu
    - Tests keep one invalid config per rule from steps 1 and 2, each expected to fail
 
    Done when the check passes on every config and fails on each invalid config
+
+## Skeleton
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project config",
+  "description": "One config.json per project folder, validated by `just check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "state"],
+  "properties": {
+    "$schema": { "const": "../config.schema.json" },
+    "schema_version": { "const": 1 },
+    "id": { "description": "UUID v4, set once and never changed.", "type": "string", "format": "uuid" },
+    "state": { "description": "active: work in progress. closed: delivered and archived.", "enum": ["active", "closed"] }
+  }
+}
+```
