@@ -285,7 +285,8 @@ def run_script(
     )
     parser.json_errors = form == "json"
     if form == "line":
-        # The pasted cli block prints its own usage errors; report() owns this one
+        # Parser.error, in the pasted cli block, prints usage errors itself;
+        # raising sends this one through report()
         parser.error = usage_error
     command = shlex.join([*parser.prog.split(), *argv])
     tracing = False
