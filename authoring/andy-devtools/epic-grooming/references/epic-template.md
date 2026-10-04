@@ -24,10 +24,11 @@ Example:
 
 Title: `Epic <N> · <the outcome, in plain words>`
 
-Number the steps in work order, one issue entry per step. When a step groups several issues, give it a short `###` heading and list its entries under it. Out of this Epic names each neighboring work and its owner; add below it what the next planner needs, such as a fix that quotes text that has since changed. Drop the "Before this batch" line when no Epic was kept.
+Number the steps in work order, one issue entry per step. When a step groups several issues, give it a short `###` heading and list its entries under it. Out of this Epic names neighboring work and the Epic or issue that owns it; add below it what the next planner needs, such as a fix that quotes text that has since changed. Drop the "Before this batch" line when no Epic was kept.
 
 ````md
 <epic-grooming>
+
 ## The problem (CMO)
 
 What goes wrong today, in plain words, with observed frequency and cost.
