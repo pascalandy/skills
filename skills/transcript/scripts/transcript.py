@@ -1998,8 +1998,8 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         "--url",
         dest="urls",
         required=True,
-        # `just ttr` adds its own --url, so `just ttr --url A` sends an empty one;
-        # parse_args() still requires one URL in all
+        # `just ttr` puts its own --url first, so `just ttr --url A` sends an empty one;
+        # parse_args() requires at least one URL across every --url
         nargs="*",
         action="extend",
         metavar="URL",

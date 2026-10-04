@@ -66,7 +66,7 @@ Finder and preview are opt-in. A normal run has no GUI side effect and does not 
 just ttr "https://www.youtube.com/watch?v=VIDEO_A" "https://www.youtube.com/watch?v=VIDEO_B"
 ```
 
-The recipe puts its own `--url` first, and an empty `--url` adds no URL, so `just ttr --url URL_A --url URL_B` and `just ttr --profile sonnet --url URL_A` work too.
+The recipe puts its own `--url` first. A `--url` with no value adds no URL, so `just ttr --url URL_A --url URL_B` and `just ttr --profile sonnet --url URL_A` work too.
 
 The queue runs one URL at a time, so uploads never share bandwidth.
 
