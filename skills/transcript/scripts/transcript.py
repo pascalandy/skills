@@ -3240,6 +3240,22 @@ def _run(
     return 0
 
 
+def _queue_fix(argv: Sequence[str], failed: Sequence[tuple[str, Failure]]) -> str:
+    """The command that reruns only the failed URLs. When every URL's own fix
+    repairs the command the same way, such as a longer --timeout, it keeps
+    that repair."""
+    urls = [url for url, _ in failed]
+    repairs = {
+        tuple(_rewrite(shlex.split(error.fix)[1:], drop={"--url"}))
+        for _, error in failed
+    }
+    if len(repairs) == 1:
+        (repair,) = repairs
+        if repair[:2] == ("run", "youtube"):
+            return _rerun(repair, add=("--url", *urls))
+    return _rerun(argv, drop={"--url"}, add=("--url", *urls))
+
+
 def _run_queue(
     args: argparse.Namespace,
     argv: Sequence[str],
@@ -3294,13 +3310,16 @@ def _run_queue(
                 results.append({"url": url, **_failure_object(error)})
                 failed.append((url, error))
                 if not args.json:
+                    # A failed summary still published the transcript folder
+                    if "output_dir" in error.report:
+                        print(error.report["output_dir"], flush=True)
                     report_failure(error, as_json=False, warnings=warnings)
                 continue
             finally:
                 QUEUE_POSITION.reset(position)
             results.append({"url": url, **run.payload})
             if not args.json:
-                print_result_path(run.final_dir, preview_follows=False)
+                print(run.final_dir, flush=True)
             if args.open:
                 open_folder(run.final_dir, run.budget)
     except KeyboardInterrupt as stop:
@@ -3313,13 +3332,15 @@ def _run_queue(
         if args.json:
             _print_json({"ok": True, **report}, warnings)
         return 0
+    published = sum("output_dir" in result for result in results)
     temporary = all(error.code == TEMPORARY for _, error in failed)
     raise Failure(
         "queue_failed",
         f"{len(failed)} of {len(urls)} URLs failed; "
-        f"{len(urls) - len(failed)} published",
-        _rerun(argv, drop={"--url"}, add=("--url", *(url for url, _ in failed))),
-        code=TEMPORARY if temporary else 1,
+        f"{published} published a result folder",
+        _queue_fix(argv, failed),
+        # 75 promises that rerunning the same command bills nothing again
+        code=TEMPORARY if temporary and not published else 1,
         label="retry" if temporary else "rerun",
         result=report,
     )

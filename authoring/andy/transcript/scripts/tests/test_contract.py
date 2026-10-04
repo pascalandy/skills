@@ -765,11 +765,11 @@ QUEUE = ["https://youtu.be/aaa", "https://youtu.be/bbb", "https://youtu.be/ccc"]
 
 
 def fake_queue(
-    monkeypatch: pytest.MonkeyPatch, *, failing: Exception | None = None
+    monkeypatch: pytest.MonkeyPatch, *, failing: dict[str, Exception] | None = None
 ) -> list[str]:
     """Stand in for a YouTube run whose title and video ID follow each URL;
-    `failing`, when given, is what Deepgram raises for the `bbb` video. Returns
-    the list that records each Deepgram key read."""
+    `failing` maps a video ID to what Deepgram raises for it. Returns the list
+    that records each Deepgram key read."""
     reads: list[str] = []
 
     def describe(url, *_args):
@@ -781,8 +781,8 @@ def fake_queue(
         return transcript.DownloadedAudio(audio, "anonymous")
 
     def transcribe(audio_path, *_args):
-        if failing is not None and audio_path.stem == "bbb":
-            raise failing
+        if audio_path.stem in (failing or {}):
+            raise (failing or {})[audio_path.stem]
         return deepgram_response(f"Words of {audio_path.stem}")
 
     fake_youtube(monkeypatch, download=download, transcribe=transcribe)
@@ -791,6 +791,15 @@ def fake_queue(
         transcript, "validate_env", lambda *_args: reads.append("key") or "secret"
     )
     return reads
+
+
+def deepgram_status(status: int) -> httpx.HTTPStatusError:
+    """The error Deepgram's client raises for an HTTP `status` reply."""
+    return httpx.HTTPStatusError(
+        str(status),
+        request=httpx.Request("POST", "https://api.deepgram.com"),
+        response=httpx.Response(status),
+    )
 
 
 def video_ids(out: str) -> list[str]:
@@ -825,14 +834,7 @@ def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
 def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    fake_queue(
-        monkeypatch,
-        failing=httpx.HTTPStatusError(
-            "boom",
-            request=httpx.Request("POST", "https://api.deepgram.com"),
-            response=httpx.Response(500),
-        ),
-    )
+    fake_queue(monkeypatch, failing={"bbb": deepgram_status(500)})
     options = ["--no-summary", "--output-dir", str(tmp_path)]
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
@@ -843,36 +845,93 @@ def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
     assert lines[0].startswith("[2/3] error: ")
     assert lines[1:] == [
         "[2/3] fix: transcript doctor --source youtube",
-        "error: 1 of 3 URLs failed; 2 published",
+        "error: 1 of 3 URLs failed; 2 published a result folder",
         "rerun: "
         + shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]]),
     ]
 
 
-@exits("transcript", 75)
-def test_a_queue_whose_failures_are_safe_to_retry_exits_75(
+@exits("transcript", 75, 1)
+def test_a_queue_exits_75_only_when_it_billed_nothing(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    fake_queue(
-        monkeypatch,
-        failing=httpx.HTTPStatusError(
-            "busy",
-            request=httpx.Request("POST", "https://api.deepgram.com"),
-            response=httpx.Response(503),
-        ),
-    )
     options = ["--no-summary", "--output-dir", str(tmp_path)]
-    retry = shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]])
+    busy = {"aaa": deepgram_status(503), "bbb": deepgram_status(503)}
 
+    fake_queue(monkeypatch, failing=busy)
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
 
-    assert code == 75
+    retry_both = ["transcript", "run", "youtube", *options, "--url", *QUEUE[:2]]
+    assert (code, out) == (75, "")
+    assert err.splitlines()[-2:] == [
+        "error: 2 of 2 URLs failed; 0 published a result folder",
+        f"retry: {shlex.join(retry_both)}",
+    ]
+
+    fake_queue(monkeypatch, failing={"bbb": deepgram_status(503)})
+    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+
+    retry = shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]])
+    assert code == 1
     assert video_ids(out) == ["aaa"]
     assert err.splitlines()[1:] == [
         f"[2/2] retry: {retry}",
-        "error: 1 of 2 URLs failed; 1 published",
+        "error: 1 of 2 URLs failed; 1 published a result folder",
         f"retry: {retry}",
     ]
+
+
+@exits("transcript", 1)
+def test_a_failed_summary_still_lists_its_published_transcript(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def summarize(_provider, transcript_path, _prompt, summary_path, *_args):
+        if "bbb" in str(transcript_path):
+            raise transcript.SummaryCLIError("quota")
+        summary_path.write_text("# Summary\n", encoding="utf-8")
+
+    monkeypatch.setattr(transcript, "run_summary_prompt", summarize)
+
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", *QUEUE[:2], "--output-dir", str(tmp_path)
+    )
+
+    assert code == 1
+    assert video_ids(out) == ["aaa", "bbb"]
+    assert [path.name.rsplit("_", 1)[1] for path in sorted(tmp_path.iterdir())] == [
+        "aaa",
+        "bbb",
+    ]
+    assert "error: 1 of 2 URLs failed; 2 published a result folder" in err
+
+
+def test_the_final_hint_keeps_the_repair_each_url_needs(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+    now = [0.0]
+
+    def slow_for_bbb(url, output_dir, *_args, **_kwargs):
+        if url == QUEUE[1]:
+            now[0] += 10_000.0
+        audio = output_dir / f"{url[-3:]}.mp3"
+        audio.write_bytes(b"audio")
+        return transcript.DownloadedAudio(audio, "anonymous")
+
+    monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(transcript, "download_audio", slow_for_bbb)
+    options = ["--no-summary", "--output-dir", str(tmp_path), "--timeout", "1m"]
+
+    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+
+    repaired = ["--no-summary", "--output-dir", str(tmp_path), "--timeout", "2m"]
+    assert code == 1
+    assert video_ids(out) == ["aaa"]
+    assert err.splitlines()[-1] == "retry: " + shlex.join(
+        ["transcript", "run", "youtube", *repaired, "--url", QUEUE[1]]
+    )
 
 
 def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
@@ -891,14 +950,7 @@ def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
         tmp_path / "ok",
     ]
 
-    fake_queue(
-        monkeypatch,
-        failing=httpx.HTTPStatusError(
-            "boom",
-            request=httpx.Request("POST", "https://api.deepgram.com"),
-            response=httpx.Response(500),
-        ),
-    )
+    fake_queue(monkeypatch, failing={"bbb": deepgram_status(500)})
     code, out, err = cli(capsys, *argv, "--output-dir", str(tmp_path / "failed"))
 
     report = json.loads(err)

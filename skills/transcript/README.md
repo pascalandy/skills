@@ -72,8 +72,9 @@ A queue runs one URL at a time. Uploads never share bandwidth, and a failed URL 
 - It checks the summary CLI and reads the Deepgram key once, then gives each URL its own `--timeout` budget and its own result folder
 - A repeated URL runs once, with a warning, so Deepgram never bills the same audio twice
 - On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`. Lines from `-v` and `--debug` carry the same prefix
-- Each result folder prints on `stdout` as soon as it is published, even when a later URL fails, so paid results are never hidden
-- A failed URL prints `[2/4] error:` and its own fix on `stderr`, and the queue moves on. After the last URL, `error: 1 of 4 URLs failed; 3 published` and a command that reruns only the failed URLs end `stderr`. The run exits `1`, or `75` when every failure was safe to retry
+- Each result folder prints on `stdout` as soon as it is published, even when a later URL fails. A URL whose summary failed still prints its transcript folder, so paid results are never hidden
+- A failed URL prints `[2/4] error:` and its own fix on `stderr`, and the queue moves on. After the last URL, `error: 1 of 4 URLs failed; 3 published a result folder` ends `stderr`, followed by a command that reruns only the failed URLs. That command keeps a repair they share, such as a longer `--timeout`
+- The run exits `75` only when every URL failed before any paid request, so rerunning the same command is safe. Any other failure exits `1`
 - An interrupt stops the queue once the current URL is cleaned up. Under `--json`, its error object lists the finished URLs, and its hint reruns the URLs that did not finish
 - `--preview` takes one URL, because each summary would print between the result paths
 
