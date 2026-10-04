@@ -279,22 +279,31 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
 
 
 @pytest.mark.parametrize("target", ["codex", "claude", "grok"])
-def test_a_review_points_to_its_answer_file_instead_of_printing_it(env, repo, target):
-    done = launch(env, repo, target, "--review-only")
+@pytest.mark.parametrize("mode", ["--review-only", "--code-review", "--review-fix"])
+def test_stdout_delivers_the_answer_for_each_mode(env, repo, target, mode):
+    prompt = "Review README.md."
+    args = ()
+    if mode == "--code-review":
+        prompt = None
+        args = ("--base", "HEAD") if target == "claude" else ("--uncommitted",)
+    answer = "# Review\n\n" + "A finding with its reason.\n" * 80 + "End of review."
+    done = launch(env, repo, target, mode, *args, prompt=prompt, STUB_ANSWER=answer)
 
     assert done.returncode == 0, done.stderr
-    lines = done.stdout.splitlines()
-    assert len(lines) == 6
-    run, answer = lines[4:]
-    assert answer == f"answer: {Path(run.removeprefix('run: ')) / 'answer.md'}"
-    assert Path(answer.removeprefix("answer: ")).read_text() == "No findings."
-
-
-def test_a_fix_prints_its_answer_after_the_summary(env, repo):
-    done = launch(env, repo, "codex", "--review-fix")
-
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.endswith("/answer.md\n\nNo findings.\n")
+    lines = done.stdout.splitlines()[:6]
+    assert [line.split(": ", 1)[0] for line in lines] == [
+        "model",
+        "effort",
+        "session",
+        "changed",
+        "run",
+        "answer",
+    ]
+    run = Path(lines[4].removeprefix("run: "))
+    assert lines[5] == f"answer: {run / 'answer.md'}"
+    assert (run / "answer.md").read_text(encoding="utf-8") == answer
+    suffix = f"\n\n{answer}\n" if mode == "--review-fix" else "\n"
+    assert done.stdout == "\n".join(lines) + suffix
 
 
 def test_grok_prints_the_model_that_answered_not_the_one_requested(env, repo):
@@ -637,8 +646,6 @@ def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
 
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:2] == ["model: gpt-6.1-sol", "effort: xhigh"]
-    assert len(done.stdout.splitlines()) == 6
-    assert done.stdout.splitlines()[-1].endswith("/answer.md")
     [call] = calls(env)
     assert call["argv"][:2] == ["exec", "review"]
     assert call["argv"][2:6] == [
