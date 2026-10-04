@@ -14,7 +14,9 @@ REF: #<PR or issue>
 
 ### Analogy
 
-An everyday analogy in one or two sentences.
+Assume the user find your answer hard to parse, and he can't tell which parts of the problem you're actually solving. So I'm not sure what is the part of it that is the analysis and *what is the part that is actionable* that can help to take decisions.
+
+Please give me a simpler, easy-to-digest, "explain like I'm 12y/o" description of how you plan to fix these problems?
 
 - **What should happen:** <in the analogy's terms>
 - **What happened in #<PR>:** <what the agent did, in the analogy's terms>
