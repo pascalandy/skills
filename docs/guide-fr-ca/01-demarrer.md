@@ -20,7 +20,7 @@ Pour un essai, colle-la plutôt au début d'une conversation. Elle ne vaut alors
 marketing ; écris un titre pour ma boulangerie à Montréal
 ```
 
-**Le mot "marketing" lance `corey-mode`, qui choisit automatiquement le playbook `copywriting`.** Tu nommes le domaine, et le mode trouve la méthode parmi ses 50 playbooks, sans que tu en connaisses un seul. C'est là toute la valeur.
+**Le mot "marketing" lance `corey-mode`, qui choisit automatiquement le playbook `copywriting`.** Tu nommes le domaine, et le mode trouve la méthode parmi ses 50 playbooks, sans que tu en connaisses un seul. C'est là que toute la magie s'opère à ta place.
 
 L'agent propose des titres, justifie chacun et demande ce qui manque pour les préciser. Certains agents annoncent le playbook en tête de réponse, comme `Route: copywriting`.
 
