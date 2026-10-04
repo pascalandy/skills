@@ -7,60 +7,77 @@ Step 4 writes every issue as an issue entry, and Step 5 builds each Epic from th
 The user reads this entry instead of the issue, so it must stand alone: a plain-words name, then what happens today and what changes after. The number goes in parentheses, for bookkeeping only. Mark the entry `text` when only prose changes and `code + tests` when the fix touches code.
 
 ```md
-- **<the problem, in plain words>** (#<number>) · <text | code + tests>
-  - Today: <what happens now, with observed frequency and cost. State what is unknown>
-  - After: <what changes once the fix lands>
+1. **<the problem, in plain words>** (#<number>) · <text | code + tests>
+   - **Today:** <what happens now, with observed frequency and cost. State what is unknown>
+   - **After:** <what changes once the fix lands>
 ```
 
 Example:
 
 ```md
-- **A silent `just check`** (#430) · text
-  - Today: when every check passes, `just check` prints nothing. The agent thinks the output got lost and reruns it three or four times. It happened twice
-  - After: the agent recognizes silence as success and runs passing checks once
+1. **A silent `just check`** (#430) · text
+   - **Today:** when every check passes, `just check` prints nothing. The agent thinks the output got lost and reruns it three or four times. It happened twice
+   - **After:** the agent recognizes silence as success and runs passing checks once
 ```
 
 ## Epic issue
 
 Title: `Epic <N> · <the outcome, in plain words>`
 
-```md
-## Order
+Number the steps in work order, one issue entry per step. When a step groups several issues, give it a short `###` heading and list its entries under it. Out of this Epic names each neighboring work and its owner; add below it what the next planner needs, such as a fix that quotes text that has since changed. Drop the "Before this batch" line when no Epic was kept.
 
-Batch of <the Package date, YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
+````md
+<epic-grooming>
+## The problem (CMO)
 
-1. Epic <N> · <outcome> (#<number>)
-2. **Epic <N> · <outcome> (#<number>), this Epic**
+What goes wrong today, in plain words, with observed frequency and cost.
 
-Before this batch: <the kept open Epics, by Epic number. Drop this line when no Epic was kept.>
+REF: #<issue>, #<issue>
 
-<One sentence: why this place, such as an Epic it needs first, or its return against the others.>
+## The outcome (FMO)
 
-## Why this Epic
+What is true once the Epic is done: the rule or the result, in plain words.
 
-<Two or three sentences: the system the members touch, and what goes wrong today.>
+## Steps
 
-## Issues
-
-Each issue is marked **text** (only prose changes) or **code + tests**.
-
-### <group: a pipeline step or subsystem>
-
-<issue entries>
-
-## Good to know
-
-<Facts the next planner needs, such as a fix that quotes text that has since changed. Drop this section when it is empty.>
+1. **<the problem, in plain words>** (#<number>) · <text | code + tests>
+   - **Today:** <what happens now, with observed frequency and cost>
+   - **After:** <what changes once the fix lands>
+2. **<the problem, in plain words>** (#<number>) · <text | code + tests>
+   - **Today:** <…>
+   - **After:** <…>
 
 ## Done when
 
 <An outcome someone can check.> Every member is closed with evidence of its fix on the default branch or a documented cleanup reason.
 
-## Out of this Epic
+## Order
+
+Batch of <YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
+
+1. Epic <N> · <outcome> (#<number>)
+2. **Epic <N> · <outcome> (#<number>), this Epic**
+
+Before this batch: <the kept open Epics, by Epic number>
+
+<One sentence: why this place.>
+
+## 👨🏻‍🍳 For the agent
+
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+### Out of this Epic
 
 - <Neighboring work, and the Epic or issue that owns it>
 
-<The signature the user sets>
-```
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
 
-The Order section places the Epic in its batch. Leave out how to work the Epic, such as the order of its members, PR order, or review steps.
+</details>
+
+<The signature the user sets>
+
+</epic-grooming>
+````
+
+The Order section places the Epic in its batch. Leave out how to work the Epic, such as PR order or review steps.

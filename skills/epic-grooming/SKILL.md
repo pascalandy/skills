@@ -37,7 +37,7 @@ Flag a closed issue that the set refers to and that was closed as completed with
 **4. Propose.** Present the tiers, the new batch in its order, and the cleanup, including Epic closures, reopenings, closing-reason corrections, and member moves. Starting over adds every Epic recorded in Step 1 to the closures. Change nothing on GitHub yet.
 
 - Group by outcome: one Epic per result, with a completion criterion someone can check. Group neither by skill nor by priority
-- When keeping the open Epics, place an issue in one whose outcome covers it; open a new Epic otherwise. A small feature that `label-for-issues` keeps standalone goes on the left-out list with that reason. Inside an Epic, group the issues by pipeline step or subsystem
+- When keeping the open Epics, place an issue in one whose outcome covers it; open a new Epic otherwise. A small feature that `label-for-issues` keeps standalone goes on the left-out list with that reason. Inside an Epic, order the issues as steps, in work order
 - Order the new batch: an Epic that another needs goes first, then order by return, using the Rank tiers. Give each place a one-sentence reason
 - Account for each candidate issue once in the proposal, under an Epic, the cleanup list, or the left-out list with its reason
 - Write each issue as an issue entry from the template, so the user decides without opening the issue
