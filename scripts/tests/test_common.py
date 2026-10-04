@@ -134,6 +134,7 @@ def lying(_: argparse.Namespace) -> str:
 
 
 def test_ok_follows_the_exit_code_whatever_work_returns() -> None:
+    assert answered(lambda _: {"ok": False}) == (0, '{"ok":true}\n', "")
     assert answered(lying) == (
         1,
         "",

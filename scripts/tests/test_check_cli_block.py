@@ -67,9 +67,11 @@ def test_a_stale_copy_fails_until_fix_rewrites_only_its_block(repo: Path) -> Non
 def test_a_copy_without_its_end_marker_is_named(repo: Path) -> None:
     paste(repo, "cut", BLOCK.replace(check_cli_block.END, ""))
 
-    code, stdout, stderr = run("--fix")
-
-    assert (code, stdout) == (1, "")
-    assert stderr.startswith(
-        '{"ok":false,"errors":["authoring/content/cut/scripts/tool.py has no whole cli block'
+    assert run("--fix") == (
+        1,
+        "",
+        (
+            '{"ok":false,"errors":["authoring/content/cut/scripts/tool.py has no whole cli block; '
+            "paste scripts/_cli.py from '# >>> cli-block' through '# <<< cli-block'\"]}\n"
+        ),
     )
