@@ -283,7 +283,9 @@ def test_a_review_points_to_its_answer_file_instead_of_printing_it(env, repo, ta
     done = launch(env, repo, target, "--review-only")
 
     assert done.returncode == 0, done.stderr
-    *_, run, answer = done.stdout.splitlines()
+    lines = done.stdout.splitlines()
+    assert len(lines) == 6
+    run, answer = lines[4:]
     assert answer == f"answer: {Path(run.removeprefix('run: ')) / 'answer.md'}"
     assert Path(answer.removeprefix("answer: ")).read_text() == "No findings."
 
@@ -635,6 +637,7 @@ def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
 
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:2] == ["model: gpt-6.1-sol", "effort: xhigh"]
+    assert len(done.stdout.splitlines()) == 6
     assert done.stdout.splitlines()[-1].endswith("/answer.md")
     [call] = calls(env)
     assert call["argv"][:2] == ["exec", "review"]
