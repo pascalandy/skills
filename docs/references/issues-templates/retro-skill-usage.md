@@ -2,11 +2,11 @@
 
 Verbatim copy of the title and body rules in `authoring/andy/andy-mode/playbooks/retro-skill-usage.md` (`andy-mode ; retro-skill-usage`), taken 2026-10-04. Published with labels `2-type:postmortem` and `1-needs-triage`
 
-**Readers.** The end user reads the visible part to understand the problem and decide. The agent that fixes it reads the collapsed details. Write the visible part so a 12-year-old could follow it: an everyday analogy, short sentences, plain words. Call the actors "the agent" and "the end user". Keep analysis (CMO) apart from action (FMO, Decision).
+**Readers.** The end user reads the visible part to understand the problem and decide. The agent that fixes it reads the collapsed details. Write the visible part so a 12-year-old could follow it: an everyday analogy, short sentences, plain words. Call the actors "the agent" and "the end user". Keep analysis (CMO) apart from action (FMO).
 
 **Title.** Use Conventional Commits in the form `type(skill): subject`. Use `fix` when the skill is wrong or contradictory, `docs` when it is only unclear, and `feat` when a step is missing. Write the subject as the behavior the skill should have, in plain words and the imperative, for example `fix(commit): keep a move and its pointer updates in one commit`. Do not add a trailing period.
 
-**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. Letter the Decision options as in Approaches considered, so the end user can answer with one letter. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
+**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
 
 ````md
 ## CMO: The problem
@@ -43,17 +43,10 @@ That's the whole fix: one line.
 
 ## How we'll know it works
 
-1. **Before the change:** <rerun the failing scenario with the current skill, in three fresh sessions when the result depends on the agent's choices>. If <it never fails>, the problem doesn't repeat: choose <ignore letter>
+1. **Before the change:** <rerun the failing scenario with the current skill, in three fresh sessions when the result depends on the agent's choices>. If <it never fails>, the problem doesn't repeat
 2. **After the change:** <the same scenario and the result that proves the fix>
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
-
-## Decision
-
-- **<letter>) Fix it (recommended):** <why it matters beyond this one case>
-- **<letter>) Ignore it:** <the honest case for doing nothing>
-
-Test 1 settles it: <which result means ignore>.
 
 <details>
 <summary>👨🏻‍🍳 Details for the agent</summary>
