@@ -1,6 +1,6 @@
 # Epic template
 
-Read before Step 4: the proposal writes every issue as an issue entry, and Step 5 builds each Epic from the whole template.
+Step 4 writes every issue as an issue entry, and Step 5 builds each Epic from the whole template.
 
 ## Issue entry
 
@@ -53,4 +53,4 @@ Each issue is marked **text** (only prose changes, no test) or **code + tests**.
 <The signature the user sets>
 ```
 
-Leave out how to work the Epic, such as PR order or review steps, and any decision still open.
+Leave out how to work the Epic, such as PR order or review steps.

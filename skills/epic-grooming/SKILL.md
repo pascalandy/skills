@@ -23,15 +23,15 @@ Epic grooming:
 
 **1. Scope.** By default, take the open issues that belong to no Epic, plus every open Epic and the state of its members; use the overview and Epic filters of `label-for-issues`. When the user names another set, such as a label, take that set and the open Epics. Read each issue's body and comments, and each Epic's body and sub-issues. Done when every issue and Epic in scope is read.
 
-**2. Verify.** Fetch the default branch, then check each issue against its current files and the recently merged PRs. Give each issue one verdict with its evidence:
+**2. Verify.** Fetch the default branch, then check each issue against that branch's current files and the recently merged PRs. Give each issue one verdict with its evidence:
 
 - **Holds**: the problem is still in the current files
 - **Fixed**: a merged change already solves it; cite the PR or commit
 - **Stale fix**: the problem holds, but its proposed fix quotes text that has since changed
 
-Also flag a closed issue that the set refers to and that was closed as completed while its fix never landed, and an open Epic whose members are all closed. Done when every issue has a verdict.
+Also flag a closed issue that the set refers to and that was closed as completed while its fix never landed, and an open Epic whose members are all closed, to close once its completion criterion holds. Done when every issue has a verdict.
 
-**3. Rank.** Find the patterns across the issues: the skills or areas that keep collecting findings, and the recent PRs that left a gap or opened one. Rank by return: how often the problem recurred and what each occurrence cost, against the work the fix takes. Group the issues that one change fixes. Tier the result as P1 (at most three), P2, and P3, and list the issues to close or mark as duplicates, each with its reason. Done when every issue that holds sits in one tier or on the close list.
+**3. Rank.** Find the patterns across the issues: the skills or areas that keep collecting findings, and the recent PRs that left a problem unsolved or created one. Rank by return: how often the problem recurred and what each occurrence cost, against the work the fix takes. Group the issues that one change fixes. Tier the result as P1 (at most three), P2, and P3, and list the issues to close or mark as duplicates, each with its reason. Done when every issue that holds sits in one tier or on the close list.
 
 **4. Propose.** Present the tiers, the Epics, and the cleanup, and change nothing on GitHub yet.
 
@@ -51,7 +51,7 @@ Done when the user approves the proposal.
 3. Create each new Epic from the template, labeled `4-epic:parent`
 4. Attach each member as a sub-issue and label it as `label-for-issues` describes. A `2-type:postmortem` issue takes the work type its title names: `fix` gives bug, `feat` gives feature, and any other prefix gives task
 5. When an existing Epic gains or loses a member, update its body so it still describes every member
-6. Close each issue on the cleanup list with a comment that gives the reason and the evidence. Close as completed only when the fix landed; otherwise close as not planned
+6. Close each issue on the cleanup list, label it as `label-for-issues` describes, and comment the reason and the evidence. Close as completed only when the fix landed, as duplicate when another issue covers it, and as not planned otherwise
 7. Read back with the `label-for-issues` filters: each Epic lists exactly its planned members, no member lacks a parent, and every issue in the set is in an Epic, closed, or on the left-out list
 8. Report a table of each Epic with its member count and URL, then the cleanup and the left-out issues
 
