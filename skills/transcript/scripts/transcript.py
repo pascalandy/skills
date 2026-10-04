@@ -364,9 +364,10 @@ class Failure(ScriptError):
 
 class QueueInterrupted(Interrupted):
     """A signal stopped a queue: `results` holds the URLs it finished, and
-    `rerun` the hint that reruns only the URLs it did not."""
+    `rerun` the command that reruns only the URLs it did not, or None when
+    every URL has a result."""
 
-    def __init__(self, code: int, results: list[dict], rerun: str) -> None:
+    def __init__(self, code: int, results: list[dict], rerun: str | None) -> None:
         super().__init__(code)
         self.results = results
         self.rerun = rerun
@@ -3350,9 +3351,7 @@ def _run_queue(
     except KeyboardInterrupt as stop:
         pending = urls[len(results) :]
         rerun = (
-            _rerun(argv, drop={"--url"}, add=("--url", *pending))
-            if pending
-            else "nothing to rerun: every URL has a result"
+            _rerun(argv, drop={"--url"}, add=("--url", *pending)) if pending else None
         )
         code = getattr(stop, "code", INTERRUPTED)
         raise QueueInterrupted(code, results, rerun) from stop
@@ -3447,9 +3446,14 @@ def run_guarded(
             word = "interrupted" if code == INTERRUPTED else "terminated"
             if not as_json:
                 print(word, file=sys.stderr)
+                if isinstance(stop, QueueInterrupted) and stop.rerun:
+                    print(f"rerun: {stop.rerun}", file=sys.stderr)
                 return code
             rerun, result = (
-                (stop.rerun, {"results": stop.results})
+                (
+                    stop.rerun or "nothing to rerun: every URL has a result",
+                    {"results": stop.results},
+                )
                 if isinstance(stop, QueueInterrupted)
                 else (_rerun(argv, prog=prog), None)
             )

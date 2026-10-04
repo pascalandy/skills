@@ -75,7 +75,7 @@ The queue runs one URL at a time, so uploads never share bandwidth.
 - A failed URL prints `[2/4] error:` and its own fix, and the queue moves on. A failed publication, such as a full disk, stops the queue instead, because every later URL would bill Deepgram and fail the same way
 - After the last URL, `error: 1 of 4 URLs failed; 3 published a result folder` and a command that reruns only the failed or unrun URLs end `stderr`. That command keeps a repair they share, such as a longer `--timeout`
 - The run exits `75` only when nothing was published and every failure came before any paid request, so rerunning the same command is safe. Any other failure exits `1`
-- An interrupt stops the queue once the current URL is cleaned up. Under `--json`, its error object lists the finished URLs, and its hint reruns the rest
+- An interrupt stops the queue once the current URL is cleaned up, then prints a command that reruns the URLs that did not finish. Under `--json`, the error object also lists the finished URLs
 
 Several URLs always give the queue output, even when they name one video. With `--json`, `results` contains each single-run payload or failure object, plus its `url`. See [Output and JSON](#output-and-json). A failed queue sends this object to `stderr` with `ok: false` and `queue_failed`. A dry run lists the queue as `source.urls`.
 

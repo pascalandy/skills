@@ -1127,6 +1127,31 @@ def test_an_interrupted_queue_reports_what_it_published_and_what_remains(
     )
 
 
+def test_an_interrupted_queue_names_the_urls_left_on_a_terminal_too(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def interrupt_on_second(url, output_dir, *_args, **_kwargs):
+        if url == QUEUE[1]:
+            raise transcript.Interrupted(130)
+        audio = output_dir / "aaa.mp3"
+        audio.write_bytes(b"audio")
+        return transcript.DownloadedAudio(audio, "anonymous")
+
+    monkeypatch.setattr(transcript, "download_audio", interrupt_on_second)
+    options = ["--no-summary", "--output-dir", str(tmp_path)]
+
+    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
+
+    assert (code, video_ids(out)) == (130, ["aaa"])
+    assert err.splitlines()[-2:] == [
+        "interrupted",
+        "rerun: "
+        + shlex.join(["transcript", "run", "youtube", *options, "--url", *QUEUE[1:]]),
+    ]
+
+
 def test_an_interrupt_after_the_last_url_has_nothing_to_rerun(
     tmp_path, monkeypatch, capsys
 ) -> None:
