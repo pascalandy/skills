@@ -2,7 +2,9 @@
 
 Use this reference when `opensrc` fails, the local cache looks inconsistent, or the task needs listing/removal/cleanup behavior.
 
-Before running these commands in any shell, initialize and validate `OPENSRC_HOME` and `OPENSRC_ROOT` using [Cache Location](../SKILL.md#cache-location). That section owns the destination; do not pick another cache or rely on the current directory.
+Before running these commands in any shell, confirm the [Prerequisites](../SKILL.md#prerequisites), then initialize and validate `OPENSRC_HOME` and `OPENSRC_ROOT` using [Cache Location](../SKILL.md#cache-location). That section owns the destination; do not pick another cache or rely on the current directory.
+
+For repairs that use `trash`, confirm it with `command -v trash` first. If missing, stop and give the user `sudo pacman -S trash-cli` on Arch Linux or `brew install trash` on macOS.
 
 ## Help Surface
 

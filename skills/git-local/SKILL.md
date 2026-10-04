@@ -20,15 +20,20 @@ Confirm each tool before the first cache operation. If one is missing, stop and 
 | `opensrc` | `mise use -g npm:opensrc` | `PNPM_HOME="$HOME/Library/pnpm" "$HOME/Library/pnpm/bin/pnpm" add -g --config.minimum-release-age=10080 --config.strict-dep-builds=true --allow-build=opensrc opensrc` | `opensrc --version` |
 | `just` | `mise use -g just` | `brew install just` | `just --version` |
 | `uv` | `mise use -g uv` | `brew install uv` | `uv --version` |
-| `gh`, signed in | `mise use -g gh`, then `gh auth login` | `brew install gh`, then `gh auth login` | `gh auth status` |
+| `gh`, signed in to GitHub | `mise use -g gh`, then `gh auth login --hostname github.com` | `brew install gh`, then `gh auth login --hostname github.com` | `gh auth status --active --hostname github.com` |
+| `rg`, for code search | `mise use -g ripgrep` | `brew install ripgrep` | `rg --version` |
+
+The install commands assume `mise` on Linux, and Homebrew and pnpm on macOS.
 
 ## Cache Location
 
 Each machine has at most one cache. Before any cache operation, resolve it in that shell, replacing any inherited `OPENSRC_HOME`:
 
-1. If the user names a cache path for this task, use it. It must be the `opensrc` folder of a SKILLS_MONO checkout, written without a trailing slash, because the refresh recipe lives in its parent
+1. If the user names a cache path for this task, use it
 2. Otherwise load the `fleet` skill. Find the local machine in its `fleet.toml` with the rule its `SKILL.md` states, and use `$HOME/` followed by that machine's `opensrc` key
-3. If neither gives a path, stop and report that this machine has no declared cache
+3. If `fleet` is unavailable, the local machine is unmatched, or its `opensrc` key is absent, stop and ask for an explicit cache path
+
+The resolved path must be absolute, physical, and end in `/opensrc` without a trailing slash. Its parent must be a SKILLS_MONO checkout containing the `opensrc-sync` recipe.
 
 ```bash
 export OPENSRC_HOME="<resolved path>"
@@ -40,12 +45,13 @@ OPENSRC_ROOT="${OPENSRC_HOME%/opensrc}"
 Verify that the cache directory exists, its physical path matches `OPENSRC_HOME`, and the refresh recipe is available:
 
 ```bash
-test -d "$OPENSRC_HOME" &&
+test "${OPENSRC_HOME##*/}" = opensrc &&
+  test -d "$OPENSRC_HOME" &&
   test "$(cd "$OPENSRC_HOME" && pwd -P)" = "$OPENSRC_HOME" &&
   just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" --show opensrc-sync
 ```
 
-If validation fails or a prerequisite is missing, stop and report it. Do not search for another workspace, create a replacement, or fall back to the current directory, `~/opensrc`, or the CLI's default `~/.opensrc`. Do not change shell profiles or the tool installation to configure the cache.
+If validation fails, stop and report it. Do not search for another workspace, create a replacement, or fall back to the current directory, `~/opensrc`, or the CLI's default `~/.opensrc`. Do not change shell profiles or the tool installation to configure the cache.
 
 Read repository locations from `$OPENSRC_HOME/sources.json` or `opensrc list --json`. Match `repos[].name` to `github.com/<owner>/<repo>` and resolve its `path` relative to `OPENSRC_HOME`. Existing snapshots may use `repos/github.com/<owner>/<repo>`; new downloads may add a version directory. Do not guess that last component. Before using a recorded path, verify that it resolves inside `OPENSRC_HOME` and contains source files.
 
@@ -69,7 +75,7 @@ Use this skill when:
    - `github.com/owner/repo` -> `owner/repo`
    - `owner/repo` stays as-is
    - Strip any trailing `.git` suffix
-2. Resolve and validate this machine's cache using [Cache Location](#cache-location). Look up the recorded repository path and check for files other than `.DS_Store`. If an unregistered directory already exists for that repository, inspect it and load the troubleshooting reference before fetching over it.
+2. Confirm the [Prerequisites](#prerequisites), then resolve and validate this machine's cache using [Cache Location](#cache-location). Look up the recorded repository path and check for files other than `.DS_Store`. If an unregistered directory already exists for that repository, inspect it and load the [troubleshooting reference](references/opensrc-operations.md) before fetching over it.
 
 3. If the path exists and contains files other than `.DS_Store`, refresh it through the SKILLS_MONO justfile before reading:
 
@@ -84,7 +90,7 @@ OPENSRC_HOME="$OPENSRC_HOME" opensrc fetch <owner>/<repo>
 ```
 
 5. After a successful refresh or fetch, reread the recorded path into `repo_path`; it may have changed to include a version directory. Verify its physical location is inside `OPENSRC_HOME` and that it contains source files before using it. If the operation fails, report the failure rather than claiming the cache is current or trying another destination.
-6. Optionally open the resolved repository in the local file manager when a graphical session is available:
+6. Optionally open the resolved repository in the local file manager when a graphical session is available. Skip this step if the opener is unavailable.
 
 ```bash
 case "$(uname -s)" in
@@ -102,7 +108,7 @@ Follow the lookup and refresh sequence in [Workflow](#workflow). A repository me
 
 ## Troubleshooting
 
-When `opensrc` fails, the cache looks inconsistent, or you need to list/remove/clean fetched sources, load `references/opensrc-operations.md` from this skill directory.
+When `opensrc` fails, the cache looks inconsistent, or you need to list, remove, or clean fetched sources, read [OpenSrc Operations](references/opensrc-operations.md).
 
 ## Branches, Tags, and Git History
 
