@@ -5,22 +5,11 @@ Feel free to add more section(s) as needed or to say N/A if not applicable
 ````md
 <issue-template>
 
-## The problem (CMO)
+## Parent
 
-**Area:** <Navigation, Automated checks, Steering files, Tool economy, No-ops, or Information access>
+A reference to the parent issue on the tracker (if the source was an existing issue, otherwise omit this section).
 
-**Problem Statement:** As an agent working in `<repo>`, I want <…>, so that <…>
-
-REF: #<PR or issue>
-
-### Analogy
-
-An everyday analogy in one or two sentences.
-
-- **What should happen:** <in the analogy's terms>
-- **What happened in #<PR>:** <what the agent did, in the analogy's terms>
-
-## FMO
+## What to build
 
 The end-to-end behaviour this ticket makes work, from the user's perspective, not layer-by-layer implementation.
 
@@ -29,9 +18,9 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 - [ ] Criterion 1
 - [ ] Criterion 2
 
-REF: #<PR or issue>
-
 ## Blocked by
+
+- A reference to each blocking ticket, or "None (can start immediately)".
 
 ## 👨🏻‍🍳 For the agent
 
