@@ -1,55 +1,57 @@
-# Issue template: retro-global
+# Issue template: epic-grooming
+
+Title: `Epic <N> · <the outcome, in plain words>`
 
 ````md
 <epic-grooming>
-## CMO : le problème, simplement
+## The problem (CMO)
 
-Quand tout passe, `just check` n'affiche rien et rend le code 0. Derrière un filtre qui condense la sortie, l'agent croit que la sortie s'est perdue et relance la commande 3 ou 4 fois. C'est arrivé dans 3 sessions sur 3.
+What goes wrong today, in plain words, with observed frequency and cost.
 
-REF: #424, #444, #482
+REF: #<issue>, #<issue>
 
-## FMO : la règle
+## The outcome (FMO)
 
-Pascal veut la réponse la plus courte possible, binaire, et la même pour chaque script.
+What is true once the Epic is done: the rule or the result, in plain words.
 
-- **Tout est parfait :** `{"ok":true}`, code 0
-- **Sinon :** `{"ok":false,"errors":["…"]}`, code différent de 0, et chaque erreur dit quoi faire
-- `ok` dit toujours la même chose que le code de sortie
-- Un succès avec un avertissement n'est pas un succès
+## Steps
 
-Les décisions prises le 2026-10-04 et leur pourquoi sont dans #493.
+1. **<the problem, in plain words>** (#<number>) · <text | code + tests>
+   - **Today:** <what happens now, with observed frequency and cost>
+   - **After:** <what changes once the fix lands>
+2. **<the problem, in plain words>** (#<number>) · <text | code + tests>
+   - **Today:** <…>
+   - **After:** <…>
 
-## Les étapes
+## Done when
 
-On prouve d'abord la règle sur `just check`, avec une doc solide, jusqu'à l'UAT de Pascal. Après l'UAT, l'Epic 6 applique la même règle à tout le reste.
+<An outcome someone can check.> Every member is closed with evidence of its fix on the default branch or a documented cleanup reason.
 
-1. **`just check` répond `{"ok":true}`** (#430) · code + tests
-   - **Aujourd'hui :** rien ne s'affiche quand tout passe
-   - **Après :** `{"ok":true}`, et le format commun à tous les scripts existe dans `scripts/_common.py`
-2. **La doc solide** (#493) · texte
-   - **Aujourd'hui :** le contrat des scripts impose le silence en cas de succès, et les décisions de ce chantier ne sont écrites nulle part
-   - **Après :** la page `docs/references/script-output.md` décrit la règle, comment lire la réponse, le comment et le pourquoi de chaque décision, et quels scripts suivent déjà la règle
-3. **Pascal teste, on fusionne sur `main`, puis UAT en production** (#496) · Pascal
-   - Pascal teste la PR des étapes 1 et 2
-   - On fusionne sur `main`, et `just merge` déploie sur om1, mbp et mini
-   - Pascal valide `just check` dans son travail réel, puis ferme le billet
+## Order
 
-Les étapes 1 et 2 partent dans la même PR.
+Batch of <YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
 
-## Critère de fin
+1. Epic <N> · <outcome> (#<number>)
+2. **Epic <N> · <outcome> (#<number>), this Epic**
 
-Pascal ferme le billet d'UAT (#496). L'Epic 6 se débloque alors.
+Before this batch: <the kept open Epics, by Epic number>
 
-</details>
+<One sentence: why this place.>
 
 ## 👨🏻‍🍳 For the agent
 
 <details>
 <summary>👨🏻‍🍳 Details</summary>
 
+### Out of this Epic
+
+- <Neighboring work, and the Epic or issue that owns it>
+
 Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
 
 </details>
+
+<The signature the user sets>
 
 </epic-grooming>
 ````
