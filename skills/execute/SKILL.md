@@ -54,7 +54,8 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 
 **STEP: Checks**
 - On each PR's final commit, run the project's local checks and wait for its GitHub checks. Fix each failure in the PR that owns the code, push, and repeat
-- Done when checks are green on every PR's final commit (or the repo has no CI and you say so), or each failing check is reported as blocked, with the reason
+- If the repo has no CI, say so in the report
+- Done when local checks and any GitHub checks are green on every PR's final commit, or each failing check is reported as blocked, with the reason
 
 **STEP: Report**
 - PR links and links to the issues you filed
@@ -95,4 +96,4 @@ Ask question(s) in the format of 🧰 oem's "When You Need Me".
 - After my answers, apply them and resume at the earliest step they change
 
 If nothing is left to decide, say:
-- ⛳ Implemented. [high-level summary of what landed]
+- ⛳ Implemented. [high-level summary of what you completed]
