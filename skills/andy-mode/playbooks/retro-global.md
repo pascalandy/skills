@@ -17,7 +17,7 @@ Review the coding agent's **environment** so future runs go better. This is not 
 
 - **Navigation**: how easy was it for the agent to find the right files? Are there hidden dependencies between files? Would a **navigation pointer**, such as a "Read on demand" line in the repo's `AGENTS.md`, make it easier? _Use when_ the session took a long time to find a piece of information.
 - **Automated checks**: could a check have caught a mistake the agent made? Read the repo's `justfile` (usually `just check`) and `lefthook.yml` first, so a check that exists but sits unwired or silently broken is the finding, not a reinvention. A repo with no **guardrail** (no `just check`, or no lefthook hook running it) is itself a finding. _Use when_ the agent made a mistake a check could have caught, or the repo has no guardrail.
-- **Coding standards**: standards live in skills (`coding-language`, `coding-standard`, the `principle-*` skills). Classify the violation first: a **mechanical** one (a fixed syntactic pattern, a banned API, an import shape, a file-location rule) gets a deterministic check in `just check`, reported under the Automated checks area. A **judgement call** no check can replace stays a rule in the skill that states it: leave it to `retro-skill-usage` when the agent loaded that skill in this session and the fix fits one line, and report it here otherwise. Load `writing-for-agents` before proposing edits to a skill or steering file. _Use when_ a review missed a mistake, or the agent broke a rule a skill states.
+- **Coding standards**: standards live in skills (`coding-language`, `coding-standard`, the `principle-*` skills). Report mechanically checkable violations under Automated checks, with a deterministic check in `just check`. For judgement calls, leave findings that meet `retro-skill-usage`'s criteria to that route and report the rest here. Load `writing-for-agents` before proposing edits to a skill or steering file. _Use when_ a review missed a mistake, or the agent broke a rule a skill states.
 - **Steering files**: should always-loaded instructions move behind a pointer, into a skill, or into a check? These load every turn: the global `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and `~/.config/opencode/AGENTS.md`, the repo's `AGENTS.md`, the agent's memory index (`MEMORY.md`), and every skill description. _Use when_ one of them is large, or a skill fired when it should not have, or failed to fire.
 - **Tool economy**: did the agent make expensive tool calls that could be streamlined? Is any custom tooling (a CLI, an MCP server, a `just` recipe) particularly token-inefficient? _Use when_ the agent made an expensive tool call.
 - **No-ops**: look for instructions in steering files or skills that don't change the agent's behavior. Distinguish a useless instruction from one the agent failed to follow. _Use when_ the steering files are large and unwieldy.
@@ -47,7 +47,7 @@ REF: <#N in the issue's repository, owner/repo#N in another>
 An everyday analogy in one or two sentences, explain like I'm 12, so the end user can tell the analysis from what is actionable.
 
 - **What should happen:** <in the analogy's terms>
-- **What happened in <PR>:** <what the agent did, in the analogy's terms>
+- **What happened in <PR or session>:** <what the agent did, in the analogy's terms>
 
 ### What we saw
 
