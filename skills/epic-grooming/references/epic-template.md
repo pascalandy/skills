@@ -8,7 +8,7 @@ The user reads this entry instead of the issue, so it must stand alone: a plain-
 
 ```md
 - **<the problem, in plain words>** (#<number>) · <text | code + tests>
-  - Today: <what happens now, with the evidence that sizes it: how often, what it cost>
+  - Today: <what happens now, with observed frequency and cost. State what is unknown>
   - After: <what changes once the fix lands>
 ```
 
@@ -17,7 +17,7 @@ Example:
 ```md
 - **A silent `just check`** (#430) · text
   - Today: when every check passes, `just check` prints nothing. The agent thinks the output got lost and reruns it three or four times. It happened twice
-  - After: `AGENTS.md` says that silence means every check passed
+  - After: the agent recognizes silence as success and runs passing checks once
 ```
 
 ## Epic issue
@@ -43,12 +43,11 @@ Each issue is marked **text** (only prose changes) or **code + tests**.
 
 ## Done when
 
-<An outcome someone can check.> Each issue is closed, with its fix on the default branch.
+<An outcome someone can check.> Every member is closed with evidence of its fix on the default branch or a documented cleanup reason.
 
 ## Out of this Epic
 
 - <Neighboring work, and the Epic or issue that owns it>
-- How to implement and review these issues: decided when this Epic is planned
 
 <The signature the user sets>
 ```
