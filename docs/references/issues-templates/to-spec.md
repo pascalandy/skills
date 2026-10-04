@@ -1,14 +1,11 @@
 # Issue template: to-spec
 
-Feel free to add more section(s) as needed or to say N/A if not applicable
-
-
 ````md
 <spec-template>
 
 ## Problem Statement
 
-The problem that the user is facing, from the user's perspective. Restate my goal and the problem in your own words
+The problem that the user is facing, from the user's perspective.
 
 ## Solution
 

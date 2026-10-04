@@ -4,7 +4,7 @@
 <retro-skill-usage>
 ## The problem (CMO)
 
-**Problem Statement:** Restate my goal and the problem in your own words
+**Problem Statement:** <the end user's goal and the problem, restated plainly>
 
 List the **use cases**, edge cases included
 

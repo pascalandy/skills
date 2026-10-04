@@ -1,7 +1,5 @@
 # Issue template: to-tickets
 
-Feel free to add more section(s) as needed or to say N/A if not applicable
-
 ````md
 <issue-template>
 
