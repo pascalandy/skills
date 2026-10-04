@@ -175,7 +175,7 @@ The transport check requires Arc. It skips anonymous access, downloads temporary
 
 ## Test videos
 
-A run on a real video bills Deepgram for every minute of audio and waits on the summary model, so every real run in a test uses a video from this table. Each one is public, short, and from Framework's official channel:
+Real test runs use these short, public videos from Framework's official channel to limit Deepgram cost and summary wait time:
 
 | Video | Length | Use |
 |---|---|---|
