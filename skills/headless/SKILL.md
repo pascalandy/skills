@@ -6,12 +6,12 @@ kind: "dev"
 
 # Headless CLI agents
 
-Run Codex, Claude Code, or Grok as a child agent with `scripts/headless.py`, so every headless run is deterministic: one command shape, a required mode flag, defaults from one file, and fixed exit codes. The launcher waits for the child, checks the result, and prints the answer. `<skill-dir>` below is the directory that holds this file. The launcher does not run OpenCode or Pi yet (#281); read [OpenCode](references/opencode/MetaSkill.md) or [Pi](references/pi/MetaSkill.md) for those.
+Run Codex, Claude Code, or Grok as a child agent with `scripts/headless.py`, so every headless run is deterministic: one command shape, a required mode flag, defaults from one file, and fixed exit codes. The launcher waits for the child, checks the result, and saves the answer to a file whose path it prints. `<skill-dir>` below is the directory that holds this file. The launcher does not run OpenCode or Pi yet (#281); read [OpenCode](references/opencode/MetaSkill.md) or [Pi](references/pi/MetaSkill.md) for those.
 
 1. Pick the mode the request asks for: `--review-only`, `--review-fix`, or `--code-review`, the CLI's own reviewer
 2. For `--review-only` and `--review-fix`, write the task to a prompt file in a `mktemp -d` folder: the scope, the criteria, the expected result, and the check results the child should trust. Paste any fact the child cannot look up. For `--code-review`, pick the diff it reviews, as [Code review](#code-review) describes
 3. Run the matching command below and wait for it to exit, as [Wait for a run](#wait-for-a-run) describes. If the CLI it names is not installed, say so, show the command, give the same prompt file to the session's own subagent tool with the same access, and report that the requested model did not review
-4. Read the result before you report
+4. Read the answer before you report, as [Read the result](#read-the-result) describes
 
 ## Review only
 
@@ -102,7 +102,7 @@ A model or reasoning level named in the request overrides the file through `--mo
 
 ## Read the result
 
-On success, stdout starts with five lines, then the answer:
+On success, stdout starts with six lines:
 
 ```text
 model: gpt-6-luna
@@ -110,9 +110,12 @@ effort: medium
 session: 01a0f7d4-cbcf-7162-869b-94b331ed56b0
 changed: nothing
 run: /tmp/headless-codex-review-only.8gcz_axu
+answer: /tmp/headless-codex-review-only.8gcz_axu/answer.md
 ```
 
-`model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed. The run folder keeps `prompt.md`, `answer.md`, and the child's logs; read `answer.md` there when your tool cut the output.
+`model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed. The run folder also keeps `prompt.md` and the child's logs.
+
+After `--review-only` or `--code-review`, stdout stops there. Read the `answer` file with your file-reading tool, since an output filter such as RTK cuts long stdout. After `--review-fix`, the answer follows the six lines, and the file keeps it whole.
 
 Read the whole answer before deciding the run succeeded. A one-line "no findings" without criteria is weak evidence: add the criteria and check results, then rerun.
 

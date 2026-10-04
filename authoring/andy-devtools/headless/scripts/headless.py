@@ -5,8 +5,9 @@
 # ///
 """Run Codex, Claude Code, or Grok Build as a child agent that reviews
 read-only, reviews and fixes, or runs the CLI's own code review, then print the
-model that ran, its session, the files it changed, and its answer. One command
-shape per run keeps headless use deterministic."""
+model that ran, its session, the files it changed, and the file that holds its
+answer; a fix also prints the answer. One command shape per run keeps headless
+use deterministic."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -277,8 +278,8 @@ examples:
 Without a CLI name, the launcher runs the config's harness, and --code-review
 runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
 flags under --code-review. On success, stdout holds the model, effort, session,
-changed, and run lines, a blank line, then the answer. The run folder keeps the
-prompt, the answer, and the child's logs."""
+changed, run, and answer lines; --review-fix adds a blank line, then the answer.
+The run folder keeps the prompt, the answer, and the child's logs."""
 
 
 @dataclass(frozen=True)
@@ -1013,6 +1014,7 @@ def summary(result: Result) -> str:
             f"session: {result.session or 'unknown'}",
             f"changed: {', '.join(result.changed) or 'nothing'}",
             f"run: {result.run_dir}",
+            f"answer: {Path(result.run_dir) / 'answer.md'}",
         ]
     )
 
@@ -1299,11 +1301,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return report(
                 ScriptError(f"{type(error).__name__}: {error}"), parser, as_json
             )
-    print(
-        json.dumps(asdict(result), indent=2)
-        if as_json
-        else f"{summary(result)}\n\n{result.answer}"
-    )
+    if as_json:
+        print(json.dumps(asdict(result), indent=2))
+    elif result.mode in READ_ONLY:
+        # A review is the deliverable, and output filters such as RTK cut long
+        # stdout, so the caller reads it whole from the answer file
+        print(summary(result))
+    else:
+        print(f"{summary(result)}\n\n{result.answer}")
     return 0
 
 
