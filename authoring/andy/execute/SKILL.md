@@ -49,11 +49,11 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 
 **STEP: Docs**
 - Run 🧰 andy-mode ; docs on the stack's final diff, and commit its edits to the layer they belong to
+- Until the merge, run this step again on each later fix that changes documented behavior
 - Done when each doc that describes a behavior the stack changes matches the new behavior, and its edits are pushed
 
 **STEP: Checks**
 - Run poteto's Babysit playbook in `drive` mode on each PR, from the bottom of the stack up
-- When a fix changes documented behavior, run the Docs step on it again
 - Done when checks are green on every PR's final commit (or the repo has no CI and you say so), or each failing check is reported as blocked, with the reason
 
 **STEP: Report**
@@ -68,8 +68,8 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Ask me whether to merge (see below), and end your reply on that question
 - When I say merge, land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs. The merge command can exit 0 after a failed deploy, so read its output and report a failed deploy
 - Done when either:
-	- I said merge, and each PR is merged and its deploy succeeded
-	- or I said not to merge
+	- I said merge, each PR is merged, and its deploy succeeded or you reported the failed deploy
+	- or I said not to merge. A "not yet" keeps this step open
 
 **STEP: Close**
 - Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. From each, file at most 2 issues: the fixes with the most bang for the buck
