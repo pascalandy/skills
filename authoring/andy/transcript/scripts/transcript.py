@@ -226,6 +226,7 @@ import time
 import unicodedata
 from collections.abc import Callable, Iterable
 from contextlib import suppress
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -257,6 +258,9 @@ DOCTOR_EXIT_CODES = exit_codes(
 )
 
 log = logging.getLogger("transcript")
+# `[2/4] ` while a queue runs its second of four URLs, so each stderr line and
+# spinner names the URL it belongs to; empty for a single run
+QUEUE_POSITION: ContextVar[str] = ContextVar("queue_position", default="")
 
 
 class SummaryCLIError(Exception):
@@ -356,6 +360,16 @@ class Failure(ScriptError):
         self.code = code
         self.label = label
         self.usage = usage
+
+
+class QueueInterrupted(Interrupted):
+    """A signal stopped a queue: `results` holds the URLs it finished, and
+    `remaining` the arguments that rerun only the URLs it did not."""
+
+    def __init__(self, code: int, results: list[dict], remaining: list[str]) -> None:
+        super().__init__(code)
+        self.results = results
+        self.remaining = remaining
 
 
 class TranscriptParser(Parser):
@@ -628,6 +642,17 @@ class StagedPublication:
             shutil.rmtree(self.staging_dir)
 
 
+@dataclass(frozen=True)
+class PublishedRun:
+    """A published result folder, its JSON payload, and the run's remaining
+    budget for opening or previewing it."""
+
+    final_dir: Path
+    payload: dict
+    summary: SummaryOutcome
+    budget: RunBudget
+
+
 @dataclass
 class ProgressStep:
     """Completion detail and handled outcome for one reported operation."""
@@ -669,7 +694,7 @@ class StderrHandler(logging.Handler):
             text = f"warning: {text}"
         elif record.levelno < logging.INFO:
             text = f"debug: {text}"
-        print(text, file=sys.stderr)
+        print(f"{QUEUE_POSITION.get()}{text}", file=sys.stderr)
 
 
 def configure_logging(*, verbose: bool, debug: bool, as_json: bool) -> list[str]:
@@ -743,9 +768,11 @@ class ExecutionReporter:
                 redirect_stderr=True,
             )
             progress.start()
-            progress.add_task(label, total=None)
+            progress.add_task(f"{QUEUE_POSITION.get()}{label}", total=None)
         elif self._live is not None:
-            status = self._live.status(f"{label}...", spinner="dots")
+            status = self._live.status(
+                f"{QUEUE_POSITION.get()}{label}...", spinner="dots"
+            )
 
         try:
             if progress is not None:
@@ -1365,6 +1392,9 @@ def validate_env(budget: RunBudget) -> str:
     return api_key
 
 
+YOUTUBE_URL_PLACEHOLDER = "https://www.youtube.com/watch?v=VIDEO_ID"
+
+
 def validate_youtube_url(url: str) -> bool:
     """Validate YouTube URL format."""
     patterns = [
@@ -1854,8 +1884,8 @@ def _add_run_options(
         default=float(WORKFLOW_TOTAL_TIMEOUT),
         metavar="DURATION",
         help=(
-            "Total workflow deadline: 30s, 5m, 2h, or seconds "
-            f"(default: {WORKFLOW_TOTAL_TIMEOUT}s)"
+            "Workflow deadline for each video or recording: 30s, 5m, 2h, or "
+            f"seconds (default: {WORKFLOW_TOTAL_TIMEOUT}s)"
         ),
     )
 
@@ -1940,15 +1970,28 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
     youtube = _command_parser(
         sources,
         "youtube",
-        help_text="Transcribe one YouTube video",
-        description="Download and transcribe one YouTube video's audio.",
+        help_text="Transcribe one or more YouTube videos",
+        description=(
+            "Download and transcribe each YouTube video's audio, one URL at a "
+            "time. A failed URL does not stop the others, and each result "
+            "folder prints as soon as it is published."
+        ),
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
+  transcript run youtube --url URL_A URL_B URL_C
   transcript run youtube --url URL --no-summary --dry-run --json
   transcript run youtube --url URL --profile sol --prompt short_summary""",
         codes=EXIT_CODES,
     )
-    youtube.add_argument("--url", required=True, metavar="URL", help="YouTube URL")
+    youtube.add_argument(
+        "--url",
+        dest="urls",
+        required=True,
+        nargs="+",
+        action="extend",
+        metavar="URL",
+        help="YouTube URL; give several, or repeat --url, to queue them",
+    )
     youtube.set_defaults(zoom=False, zoom_custom_path=None)
     _add_run_options(youtube, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT)
 
@@ -2122,6 +2165,11 @@ def parse_args(
         args.output_dir = None
     else:
         args.zoom_export_path = None
+        urls = list(dict.fromkeys(args.urls))
+        args.repeated_urls = len(args.urls) - len(urls)
+        args.urls = urls
+        # A queue sets each URL's own `url` as it runs it
+        args.url = urls[0] if len(urls) == 1 else None
 
     summary_options = {
         "--profile": args.profile,
@@ -2160,6 +2208,11 @@ def parse_args(
     if args.json and args.preview:
         source_parser.error(
             "--preview cannot be combined with --json because both use stdout"
+        )
+    if args.preview and len(getattr(args, "urls", ())) > 1:
+        source_parser.error(
+            "--preview takes one URL, because each summary would print "
+            "between the result paths"
         )
 
     return args
@@ -2333,8 +2386,10 @@ def _print_discovery(args: argparse.Namespace, prompts: list[PromptSpec]) -> boo
     return bool(args.list_models or args.list_profiles or args.list_prompts)
 
 
-def _print_json(payload: dict) -> None:
-    """Write exactly one compact JSON document to stdout."""
+def _print_json(payload: dict, warnings: Sequence[str] = ()) -> None:
+    """Write exactly one compact JSON document to stdout, with any warnings."""
+    if warnings:
+        payload = {**payload, "warnings": list(warnings)}
     sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     sys.stdout.write("\n")
 
@@ -2346,7 +2401,11 @@ def _dry_run_payload(
 ) -> dict:
     """Describe a run without reading secrets, calling APIs, or writing files."""
     if plan.source_kind == "youtube":
-        source = {"kind": "youtube", "url": args.url}
+        source = (
+            {"kind": "youtube", "url": args.urls[0]}
+            if len(args.urls) == 1
+            else {"kind": "youtube", "urls": args.urls}
+        )
         output_dir = (args.output_dir or OUTPUT_DIR).expanduser()
     else:
         source = {
@@ -2380,11 +2439,12 @@ def _print_dry_run(
     args: argparse.Namespace,
     plan: RunPlan,
     prompt: PromptSpec | None,
+    warnings: Sequence[str],
 ) -> None:
     """Print one dry-run plan in the selected output format."""
     payload = _dry_run_payload(args, plan, prompt)
     if args.json:
-        _print_json(payload)
+        _print_json(payload, warnings)
         return
     # Like a real run, stdout is where the result goes; the plan is -v detail
     log.info("Dry run: no secrets, network calls, or writes")
@@ -2631,7 +2691,7 @@ def _validate_source_selection(plan: RunPlan, args: argparse.Namespace) -> None:
         if not validate_youtube_url(args.url):
             raise SourceCLIError(
                 f"Invalid YouTube URL: {args.url}",
-                ("--url", "https://www.youtube.com/watch?v=VIDEO_ID"),
+                ("--url", YOUTUBE_URL_PLACEHOLDER),
             )
         return
 
@@ -2767,25 +2827,21 @@ def _generate_summary(
 
 
 @functools.cache
-def _value_options() -> frozenset[str]:
-    """Every option that takes a value, read from the parser, so a rerun hint
-    that drops an option drops its value too."""
-    return frozenset(
-        option
+def _value_options() -> dict[str, bool]:
+    """Every option that takes a value, and whether it takes several, read from
+    the parser, so a rerun hint that drops an option drops its values too."""
+    return {
+        option: action.nargs in ("+", "*")
         for parser in _all_parsers(build_parser())
         for option, action in parser._option_string_actions.items()
         if action.nargs != 0
-    )
+    }
 
 
-def _rerun(
-    argv: Sequence[str],
-    drop: Iterable[str] = (),
-    add: Sequence[str] = (),
-    *,
-    prog: str = PROG,
-) -> str:
-    """The user's command without the `drop` options, with `add` appended.
+def _rewrite(
+    argv: Sequence[str], drop: Iterable[str] = (), add: Sequence[str] = ()
+) -> list[str]:
+    """`argv` without the `drop` options and their values, with `add` appended.
 
     Arguments after `--` are positional, so they stay last and untouched.
     """
@@ -2795,18 +2851,34 @@ def _rerun(
         cut = options.index("--")
         options, rest = options[:cut], options[cut:]
     dropped = set(drop)
+    values = _value_options()
     kept: list[str] = []
     skip_value = False
+    skip_values = False
     for token in options:
-        if skip_value:
+        if skip_value or (skip_values and not token.startswith("-")):
             skip_value = False
             continue
+        skip_values = False
         name = token.split("=", 1)[0]
         if name in dropped:
-            skip_value = "=" not in token and name in _value_options()
+            if "=" not in token and name in values:
+                skip_value = True
+                skip_values = values[name]
             continue
         kept.append(token)
-    return shlex.join([prog, *kept, *add, *rest])
+    return [*kept, *add, *rest]
+
+
+def _rerun(
+    argv: Sequence[str],
+    drop: Iterable[str] = (),
+    add: Sequence[str] = (),
+    *,
+    prog: str = PROG,
+) -> str:
+    """The user's command without the `drop` options, with `add` appended."""
+    return shlex.join([prog, *_rewrite(argv, drop, add)])
 
 
 def _without_summary(argv: Sequence[str]) -> str:
@@ -2842,16 +2914,20 @@ def _live_console(args: argparse.Namespace) -> Console | None:
     return Console(stderr=True)
 
 
+def _failure_object(error: Failure) -> dict:
+    """The JSON object that reports `error`, with what the failed run produced."""
+    return {
+        **error.report,
+        "ok": False,
+        "error": {"code": error.kind, "message": str(error), "hint": error.fix},
+    }
+
+
 def report_failure(error: Failure, *, as_json: bool, warnings: list[str]) -> int:
     """Print one failure on stderr, one JSON object under --json, and return its
     exit code. The last line names the command that fixes it."""
-    message = str(error)
     if as_json:
-        failure = {
-            **error.report,
-            "ok": False,
-            "error": {"code": error.kind, "message": message, "hint": error.fix},
-        }
+        failure = _failure_object(error)
         if warnings:
             failure["warnings"] = warnings
         print(
@@ -2863,8 +2939,9 @@ def report_failure(error: Failure, *, as_json: bool, warnings: list[str]) -> int
         print(error.detail, file=sys.stderr)
     if error.usage is not None:
         error.usage.print_usage(sys.stderr)
-    print(f"error: {message}", file=sys.stderr)
-    print(f"{error.label}: {error.fix}", file=sys.stderr)
+    position = QUEUE_POSITION.get()
+    print(f"{position}error: {error}", file=sys.stderr)
+    print(f"{position}{error.label}: {error.fix}", file=sys.stderr)
     if error.usage is not None:
         print(f"run '{error.usage.prog} --help'", file=sys.stderr)
     return error.code
@@ -2887,17 +2964,16 @@ def _show_help(parser: TranscriptParser, topic: Sequence[str]) -> int:
     return 0
 
 
-def _run(
+def _resolve_run(
     args: argparse.Namespace,
     argv: Sequence[str],
     prompts: list[PromptSpec],
-    warnings: list[str],
     source_parser: argparse.ArgumentParser,
-) -> int:
-    """Transcribe one source, publish its result folder, and print where it went."""
+) -> tuple[RunPlan, PromptSpec | None]:
+    """Resolve the summary plan and its prompt, or fail as a usage error."""
     try:
         plan = resolve_run_plan(args)
-        selected_prompt = _resolve_prompt_for_run(plan, args, prompts)
+        return plan, _resolve_prompt_for_run(plan, args, prompts)
     except ConfigurationError as error:
         raise Failure(
             "invalid_configuration",
@@ -2909,46 +2985,53 @@ def _run(
     except SummaryCLIError as error:
         raise Failure("preflight_failed", str(error), _without_summary(argv)) from error
 
-    try:
-        _validate_source_selection(plan, args)
-    except SourceCLIError as error:
-        replacement = error.replacement or (
-            ("--url", "https://www.youtube.com/watch?v=VIDEO_ID")
-            if plan.source_kind == "youtube"
-            else ("--latest",)
-        )
-        raise Failure(
-            "invalid_source",
-            str(error),
-            _rerun(argv, drop={"--url", "--path", "--latest"}, add=replacement),
-            code=USAGE,
-            usage=source_parser,
-        ) from error
-    except SourceUnavailableError as error:
-        raise Failure(
-            "source_unavailable", str(error), f"{PROG} doctor --source zoom"
-        ) from error
 
-    if args.dry_run:
-        _print_dry_run(args, plan, selected_prompt)
-        return 0
-
-    budget = RunBudget.start(args.timeout)
-    log.debug(f"workflow deadline: {args.timeout:g}s")
-    reporter = ExecutionReporter(_live_console(args))
-    reporter.run_configuration(plan, selected_prompt)
-    doctor = f"{PROG} doctor --source {plan.source_kind}"
-
+def _run_preflight(
+    plan: RunPlan,
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    budget: RunBudget,
+    reporter: ExecutionReporter,
+) -> str:
+    """Check the summary CLI and read the Deepgram key, once per command."""
     try:
         with reporter.step("Preflight"):
-            api_key = _preflight(plan, budget)
-        asset, artifacts = _acquire_and_transcribe(
-            plan, args, api_key, budget, reporter
-        )
+            return _preflight(plan, budget)
     except SummaryCLIError as error:
         raise Failure("preflight_failed", str(error), _without_summary(argv)) from error
     except CredentialError as error:
         raise Failure("preflight_failed", str(error), KEYRING_COMMAND) from error
+    except (WorkflowTimeoutError, subprocess.TimeoutExpired, TimeoutError) as error:
+        raise Failure(
+            "temporary_failure",
+            f"{str(error) or 'Timed out'} before any paid request",
+            _longer_timeout(argv, args.timeout),
+            code=TEMPORARY,
+            label="retry",
+        ) from error
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        message = _clean_subprocess_diagnostic(str(error)) or type(error).__name__
+        raise Failure(
+            "preflight_failed", message, f"{PROG} doctor --source {plan.source_kind}"
+        ) from error
+
+
+def _transcribe_and_publish(
+    plan: RunPlan,
+    selected_prompt: PromptSpec | None,
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    api_key: str,
+    budget: RunBudget,
+    reporter: ExecutionReporter,
+) -> PublishedRun:
+    """Transcribe one source and publish its result folder, or raise the Failure
+    whose hint reruns `argv`."""
+    doctor = f"{PROG} doctor --source {plan.source_kind}"
+    try:
+        asset, artifacts = _acquire_and_transcribe(
+            plan, args, api_key, budget, reporter
+        )
     except DeepgramError as error:
         if error.retry_safe:
             raise Failure(
@@ -2981,7 +3064,8 @@ def _run(
             ) from error
         raise Failure("transcription_failed", str(error), doctor) from error
     except (WorkflowTimeoutError, subprocess.TimeoutExpired, TimeoutError) as error:
-        # Only work before any paid request lands here: YouTube or the keyring
+        # Only work before any paid request lands here: YouTube, or the deadline
+        # check that runs before Deepgram
         raise Failure(
             "temporary_failure",
             f"{str(error) or 'Timed out'} before any paid request",
@@ -3076,22 +3160,67 @@ def _run(
             _other_profile(argv, plan),
             result=payload,
         )
+    return PublishedRun(final_dir, payload, outcome, budget)
 
-    preview_follows = plan.preview and outcome.path is not None
+
+def _run(
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    prompts: list[PromptSpec],
+    warnings: list[str],
+    source_parser: argparse.ArgumentParser,
+) -> int:
+    """Transcribe one source, publish its result folder, and print where it went."""
+    plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
+
+    try:
+        _validate_source_selection(plan, args)
+    except SourceCLIError as error:
+        replacement = error.replacement or (
+            ("--url", YOUTUBE_URL_PLACEHOLDER)
+            if plan.source_kind == "youtube"
+            else ("--latest",)
+        )
+        raise Failure(
+            "invalid_source",
+            str(error),
+            _rerun(argv, drop={"--url", "--path", "--latest"}, add=replacement),
+            code=USAGE,
+            usage=source_parser,
+        ) from error
+    except SourceUnavailableError as error:
+        raise Failure(
+            "source_unavailable", str(error), f"{PROG} doctor --source zoom"
+        ) from error
+
+    if args.dry_run:
+        _print_dry_run(args, plan, selected_prompt, warnings)
+        return 0
+
+    budget = RunBudget.start(args.timeout)
+    log.debug(f"workflow deadline: {args.timeout:g}s")
+    reporter = ExecutionReporter(_live_console(args))
+    reporter.run_configuration(plan, selected_prompt)
+    api_key = _run_preflight(plan, args, argv, budget, reporter)
+    run = _transcribe_and_publish(
+        plan, selected_prompt, args, argv, api_key, budget, reporter
+    )
+
+    preview_follows = plan.preview and run.summary.path is not None
     if args.json:
-        _print_json({**payload, **({"warnings": warnings} if warnings else {})})
+        _print_json(run.payload, warnings)
     else:
-        print_result_path(final_dir, preview_follows=preview_follows)
+        print_result_path(run.final_dir, preview_follows=preview_follows)
     if args.open:
-        open_folder(final_dir, budget)
-    if outcome.path and plan.preview:
-        final_summary_path = final_dir / outcome.path.name
+        open_folder(run.final_dir, run.budget)
+    if run.summary.path and plan.preview:
+        final_summary_path = run.final_dir / run.summary.path.name
         if final_summary_path.exists():
             with reporter.step("Summary preview") as step:
                 try:
                     render_markdown_with_glow(
                         final_summary_path,
-                        budget,
+                        run.budget,
                         color=color_enabled(sys.stdout, args.no_color),
                     )
                 except (
@@ -3106,9 +3235,94 @@ def _run(
                         f"{diagnostic or type(error).__name__}"
                     )
                     step.detail = "saved without preview"
-    elif outcome.status == "skipped":
+    elif run.summary.status == "skipped":
         reporter.skip("Summary preview", "no summary generated (--no-summary)")
     return 0
+
+
+def _run_queue(
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    prompts: list[PromptSpec],
+    warnings: list[str],
+    source_parser: argparse.ArgumentParser,
+) -> int:
+    """Transcribe each YouTube URL in turn and print each result folder once it
+    is published. A failed URL reports its own error and fix, then the queue
+    moves on; the exit code and final error count every failure."""
+    plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
+    urls: list[str] = args.urls
+    invalid = [url for url in urls if not validate_youtube_url(url)]
+    if invalid:
+        valid = [url for url in urls if url not in invalid]
+        raise Failure(
+            "invalid_source",
+            f"Invalid YouTube URL: {', '.join(invalid)}",
+            _rerun(
+                argv,
+                drop={"--url"},
+                add=("--url", *(valid or [YOUTUBE_URL_PLACEHOLDER])),
+            ),
+            code=USAGE,
+            usage=source_parser,
+        )
+
+    if args.dry_run:
+        _print_dry_run(args, plan, selected_prompt, warnings)
+        return 0
+
+    log.debug(f"workflow deadline for each URL: {args.timeout:g}s")
+    reporter = ExecutionReporter(_live_console(args))
+    reporter.run_configuration(plan, selected_prompt)
+    api_key = _run_preflight(plan, args, argv, RunBudget.start(args.timeout), reporter)
+    results: list[dict] = []
+    failed: list[tuple[str, Failure]] = []
+    try:
+        for number, url in enumerate(urls, start=1):
+            position = QUEUE_POSITION.set(f"[{number}/{len(urls)}] ")
+            try:
+                run = _transcribe_and_publish(
+                    plan,
+                    selected_prompt,
+                    argparse.Namespace(**{**vars(args), "url": url}),
+                    _rewrite(argv, drop={"--url"}, add=("--url", url)),
+                    api_key,
+                    RunBudget.start(args.timeout),
+                    reporter,
+                )
+            except Failure as error:
+                results.append({"url": url, **_failure_object(error)})
+                failed.append((url, error))
+                if not args.json:
+                    report_failure(error, as_json=False, warnings=warnings)
+                continue
+            finally:
+                QUEUE_POSITION.reset(position)
+            results.append({"url": url, **run.payload})
+            if not args.json:
+                print_result_path(run.final_dir, preview_follows=False)
+            if args.open:
+                open_folder(run.final_dir, run.budget)
+    except KeyboardInterrupt as stop:
+        remaining = _rewrite(argv, drop={"--url"}, add=("--url", *urls[len(results) :]))
+        code = getattr(stop, "code", INTERRUPTED)
+        raise QueueInterrupted(code, results, remaining) from stop
+
+    report = {"command": "run", "source": "youtube", "results": results}
+    if not failed:
+        if args.json:
+            _print_json({"ok": True, **report}, warnings)
+        return 0
+    temporary = all(error.code == TEMPORARY for _, error in failed)
+    raise Failure(
+        "queue_failed",
+        f"{len(failed)} of {len(urls)} URLs failed; "
+        f"{len(urls) - len(failed)} published",
+        _rerun(argv, drop={"--url"}, add=("--url", *(url for url, _ in failed))),
+        code=TEMPORARY if temporary else 1,
+        label="retry" if temporary else "rerun",
+        result=report,
+    )
 
 
 def _dispatch(
@@ -3127,6 +3341,11 @@ def _dispatch(
     if args.command == "doctor":
         return _run_doctor(args)
     source_parser = _subcommands(_subcommands(parser)["run"])[args.source]
+    if args.source == "youtube" and args.repeated_urls:
+        # A repeated URL would bill Deepgram twice for the same audio
+        log.warning(f"Skipped {args.repeated_urls} repeated URL(s)")
+    if args.source == "youtube" and len(args.urls) > 1:
+        return _run_queue(args, argv, prompts, warnings, source_parser)
     return _run(args, argv, prompts, warnings, source_parser)
 
 
@@ -3166,8 +3385,18 @@ def run_guarded(
             if not as_json:
                 print(word, file=sys.stderr)
                 return code
+            rerun, result = (
+                (stop.remaining, {"results": stop.results})
+                if isinstance(stop, QueueInterrupted)
+                else (argv, None)
+            )
             stopped = Failure(
-                word, word, _rerun(argv, prog=prog), code=code, label="rerun"
+                word,
+                word,
+                _rerun(rerun, prog=prog),
+                code=code,
+                label="rerun",
+                result=result,
             )
             return report_failure(stopped, as_json=True, warnings=warnings)
         except Failure as error:

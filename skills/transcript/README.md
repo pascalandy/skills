@@ -58,6 +58,29 @@ For Zoom, `--path` accepts a folder name under `~/Documents/Zoom` or a full fold
 
 Finder and preview are opt-in. A normal run has no GUI side effect and does not render the generated Markdown.
 
+## Queue several videos
+
+`--url` takes several YouTube URLs, and it can repeat. `just ttr` passes every URL it receives:
+
+```bash
+just ttr "https://www.youtube.com/watch?v=VIDEO_A" "https://www.youtube.com/watch?v=VIDEO_B"
+```
+
+A queue runs one URL at a time. Uploads never share bandwidth, and a failed URL never stops the others.
+
+- Before any work, the queue checks every URL. One invalid URL exits `2`, and nothing runs
+- It checks the summary CLI and reads the Deepgram key once, then gives each URL its own `--timeout` budget and its own result folder
+- A repeated URL runs once, with a warning, so Deepgram never bills the same audio twice
+- On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`. Lines from `-v` and `--debug` carry the same prefix
+- Each result folder prints on `stdout` as soon as it is published, even when a later URL fails, so paid results are never hidden
+- A failed URL prints `[2/4] error:` and its own fix on `stderr`, and the queue moves on. After the last URL, `error: 1 of 4 URLs failed; 3 published` and a command that reruns only the failed URLs end `stderr`. The run exits `1`, or `75` when every failure was safe to retry
+- An interrupt stops the queue once the current URL is cleaned up. Under `--json`, its error object lists the finished URLs, and its hint reruns the URLs that did not finish
+- `--preview` takes one URL, because each summary would print between the result paths
+
+With `--json`, the queue prints one object after the last URL: `ok`, `command`, `source`, and `results`. Each entry of `results` is the single-run payload from [Output and JSON](#output-and-json), or its failure object, plus the entry's `url`.
+
+When a URL fails, the object goes to `stderr` with `ok: false` and the error code `queue_failed`. A dry run lists the queue as `source.urls`.
+
 ## Discovery and diagnostics
 
 Discovery never reads credentials or starts network work. `doctor` checks local requirements without paid API calls:
@@ -72,7 +95,7 @@ For a run with changed source or summary settings, inspect the plan first with `
 
 ## Output and JSON
 
-`stdout` holds the result only: the published folder path, discovery values, or the dry run's output parent. A failure leaves `stdout` empty.
+`stdout` holds the result only: the published folder path, discovery values, or the dry run's output parent. A failure leaves `stdout` empty, except that a queue keeps the folders it published before the failure.
 
 `stderr` stays empty on success unless a warning needs action, such as browser access falling back to anonymous. `-v` adds the run plan and one line per step; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off.
 
@@ -124,7 +147,7 @@ For a slow connection or a long recording, allow more than the default workflow 
 just ttr "https://www.youtube.com/watch?v=VIDEO_ID" --timeout 20m
 ```
 
-Concurrent uploads share the available bandwidth. Run them sequentially when the connection is slow.
+Concurrent runs share the available bandwidth. Queue the URLs in one run instead, as in [Queue several videos](#queue-several-videos), which uploads one at a time.
 
 A successful repeated command creates a new result folder. This preserves prior artifacts but means a full run is intentionally not idempotent. Use `--dry-run` for plan verification and do not replay a timed-out run until its output location has been checked.
 
@@ -250,6 +273,15 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
   --json
 ```
 
+When a change touches the queue, also run both [test videos](#test-videos) as one queue in a pseudo-terminal, without `--json`, so the spinner shows:
+
+```bash
+uv run <skill_dir>/scripts/transcript.py run youtube \
+  --url "https://www.youtube.com/watch?v=EIEc43CxIvY" "https://www.youtube.com/watch?v=QwpTAk_IiyU" \
+  --prompt short_summary \
+  --output-dir <temporary-dir>
+```
+
 A real Zoom run is not part of the closeout for now, even when a change affects Zoom: Pascal does not use Zoom. Zoom mode stays supported, and its coverage is the automated tests plus the free `zoom.dry-run` and `diagnostics.zoom` features of `verify-transcript`. Report Zoom E2E as `NOT RUN`. To exercise Zoom anyway, run:
 
 ```bash
@@ -267,7 +299,8 @@ Before deciding E2E:
 - verify the exit code and JSON document agree with `meta.txt` and every listed artifact
 - confirm a `--json` success left `stderr` empty
 - confirm default success has no summary preview and does not open Finder
-- confirm YouTube creates one folder under the chosen output parent
+- confirm YouTube creates one folder per URL under the chosen output parent
+- for a queue, confirm `stdout` lists the folders in URL order and the spinner named `[1/2]` and `[2/2]` and left nothing behind
 - confirm Zoom creates one meeting folder under the chosen output parent when a real Zoom run was made
 - confirm the relevant Checks and Automated tests passed
 
