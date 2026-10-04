@@ -14,7 +14,7 @@ sync *args:
 
 alias ttr := transcript
 
-# Transcribe one YouTube URL
+# Transcribe YouTube videos sequentially
 [group('commands')]
 transcript url *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"

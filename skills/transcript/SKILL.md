@@ -9,13 +9,16 @@ configuration-is-needed: true
 
 Transcribe YouTube or Zoom audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
 
-Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Give a real run a 600-second process timeout. The CLI enforces its own 570-second workflow deadline by default.
+Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
 
 ## Choose the command
 
 ```bash
 # YouTube
 uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --json
+
+# YouTube queue
+uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url-a>" "<youtube-url-b>" --json
 
 # Latest Zoom meeting
 uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
@@ -84,7 +87,7 @@ uv run <skill_dir>/scripts/transcript.py --help
 
 Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Exit `75` means a temporary failure before any paid request; rerunning the same command is safe. Exits `130` and `143` mean the run was interrupted. Read the error `code`, `message`, and `hint`; the hint is the command that fixes it. Never rerun an exit `1` run automatically, because Deepgram may already have billed the audio.
 
-Report the result folder and summary status. After a summary failure, the transcript is still published: read `output_dir` from the `stderr` JSON. Do not paste the generated summary into chat unless the user asks.
+Report the result folder and summary status. After a summary failure, the transcript is still published: read `output_dir` from the `stderr` JSON. A run with several URLs reports each one in `results`, with its own `url`, `output_dir`, or `error`. Do not paste the generated summary into chat unless the user asks.
 
 ## YouTube transport check
 
