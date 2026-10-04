@@ -27,7 +27,7 @@ Read [workspace conventions](workspace.md) before the first artifact write or wh
 Use the complete upstream spec and ticket templates, with these changes in every spec and ticket:
 
 - In the spec's Problem Statement, restate the user's goal and the problem in your own words
-- Number the user stories from `US_101`, as `- US_101: As an <actor>, I want a <feature>, so that <benefit>`, then list the use cases, edge cases included
+- Number the spec's user stories from `US_101`, as `- US_101: As an <actor>, I want a <feature>, so that <benefit>`, then list the use cases, edge cases included
 - Answer N/A in a section that does not apply, unless the template says to omit it, and add a section when the work needs one
 - End with this block, in place of the spec's Further Notes. It holds what the agent doing the work needs; the human reading the issue can skip it
 
