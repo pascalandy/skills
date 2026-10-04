@@ -24,6 +24,7 @@ Draft one issue per finding for https://github.com/pascalandy/skills. Write in t
 
 ````md
 <retro-skill-usage>
+
 ## The problem (CMO)
 
 **Problem Statement:** <the end user's goal and the problem, restated plainly>
