@@ -9,7 +9,7 @@ The CLI uses subcommands, validates source input before execution, returns struc
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
 - Zoom recordings under `~/Documents/Zoom` for Zoom mode
-- When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile, or `pi` for the `astra`, `sol`, and `glm` profiles
+- When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - Deepgram API key in the macOS keyring
 - The `andy-mode` skill installed beside this one for Zoom summaries, which use the `synthese-rencontre` prompt of its `distill-prompt` route
