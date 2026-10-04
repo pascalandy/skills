@@ -25,7 +25,7 @@ An agent runs the command and reads the line. It adds nothing after the command,
 
 A script tests the exit code, or pipes stdout to `jq -e .ok`:
 
-| stdout | `jq -e .ok` exits |
+| stdout | `jq -e .ok` exits, with jq 1.8 |
 |---|---|
 | `{"ok":true}` | 0 |
 | `{"ok":false,…}` | 1 |

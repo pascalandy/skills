@@ -34,7 +34,7 @@ Exit codes, all listed in `--help`:
 Help and errors:
 
 - `-h`, `--help`: help on stdout, exit 0, with 2–5 examples. It wins over every other argument before `--`, including unknown flags
-- A usage error prints short usage, the error, and `run '<name> --help'` on stderr, then exits 2
+- A usage error prints short usage, the error, and `run '<name> --help'` on stderr, then exits 2. A script that answers in JSON puts the error and `"help":"<name> --help"` in its line instead
 - An error says what failed, then the exact command that fixes it. Stack traces appear only with `--debug`
 
 Parsing:
