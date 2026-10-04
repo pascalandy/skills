@@ -163,6 +163,7 @@ A mode's routes run through that mode's SKILL.md.
 - `coding-standard`: Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior.
 - `commit`: Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
+- `epic-grooming`: Use only when explicitly invoked as `epic-grooming`, to rank open GitHub issues and group them into Epics.
 - `execute`: Use only when explicitly invoked as `execute` or `implement`, or by a clear go-ahead to implement an agreed plan.
 - `gh-stack`: Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.
 - `git-local`: Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries.
