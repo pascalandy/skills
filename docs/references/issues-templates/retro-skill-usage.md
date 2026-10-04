@@ -1,13 +1,5 @@
 # Issue template: retro-skill-usage
 
-Verbatim copy of the title and body rules in `authoring/andy/andy-mode/playbooks/retro-skill-usage.md` (`andy-mode ; retro-skill-usage`), taken 2026-10-04. Published with labels `2-type:postmortem` and `1-needs-triage`
-
-**Readers.** The end user reads the visible part to understand the problem and decide. The agent that fixes it reads the collapsed details. Write the visible part so a 12-year-old could follow it: an everyday analogy, short sentences, plain words. Call the actors "the agent" and "the end user". Keep analysis (CMO) apart from action (FMO).
-
-**Title.** Use Conventional Commits in the form `type(skill): subject`. Use `fix` when the skill is wrong or contradictory, `docs` when it is only unclear, and `feat` when a step is missing. Write the subject as the behavior the skill should have, in plain words and the imperative, for example `fix(commit): keep a move and its pointer updates in one commit`. Do not add a trailing period.
-
-**Body.** Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
-
 ````md
 <retro-skill-usage>
 ## CMO: The problem
@@ -54,11 +46,6 @@ That's the whole fix: one line.
 
 <details>
 <summary>👨🏻‍🍳 Details</summary>
-
-<!-- Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc. -->
-
-
-<!-- The subsections below are suggestions: keep, rename, or drop them -->
 
 ### <The evidence, such as the conflicting rules>
 

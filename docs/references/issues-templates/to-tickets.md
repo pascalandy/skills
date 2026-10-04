@@ -1,7 +1,5 @@
 # Issue template: to-tickets
 
-Verbatim copy of the two ticket templates in `authoring/matt/matt-mode/playbooks/to-tickets/to-tickets.md` (`matt-mode ; to-tickets`), taken 2026-10-04. The playbook sets no title rule beyond "short descriptive name". Published with label `ready-for-agent`
-
 ````md
 <local-ticket-template>
 
@@ -18,8 +16,6 @@ Verbatim copy of the two ticket templates in `authoring/matt/matt-mode/playbooks
 
 <details>
 <summary>👨🏻‍🍳 Details for the agent</summary>
-
-<!-- Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs. -->
 
 </details>
 
@@ -51,11 +47,7 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 <details>
 <summary>👨🏻‍🍳 Details</summary>
 
-<!-- Free form, for the agent doing the work; the human reading the issue can skip it: technical details, non-functional requirements, links to related issues or PRs, etc. -->
-
 </details>
 
 </issue-template>
 ````
-
-In either form, avoid specific file paths or code snippets: they go stale fast. Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note briefly that it came from a prototype. Trim to the decision-rich parts, not a working demo, just the important bits.
