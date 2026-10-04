@@ -2859,6 +2859,15 @@ def _value_options() -> dict[str, bool]:
     }
 
 
+NEGATIVE_NUMBER = argparse.ArgumentParser()._negative_number_matcher
+
+
+def _starts_option(token: str) -> bool:
+    """Whether argparse reads `token` as an option; a lone `-` and a negative
+    number such as `-1` are values."""
+    return token.startswith("-") and token != "-" and not NEGATIVE_NUMBER.match(token)
+
+
 def _rewrite(
     argv: Sequence[str], drop: Iterable[str] = (), add: Sequence[str] = ()
 ) -> list[str]:
@@ -2876,15 +2885,19 @@ def _rewrite(
     kept: list[str] = []
     skip_value = False
     skip_values = False
-    for token, following in zip(options, [*options[1:], "-"]):
-        if skip_value or (skip_values and not token.startswith("-")):
+    for token, following in zip(options, [*options[1:], None]):
+        if skip_value or (skip_values and not _starts_option(token)):
             skip_value = False
             continue
         skip_values = False
         name = token.split("=", 1)[0]
         # A multi-value option with no value, such as the --url `just ttr` puts
         # first, adds nothing to the rerun
-        if "=" not in token and values.get(name) and following.startswith("-"):
+        if (
+            "=" not in token
+            and values.get(name)
+            and (following is None or _starts_option(following))
+        ):
             continue
         if name in dropped:
             if "=" not in token and name in values:
