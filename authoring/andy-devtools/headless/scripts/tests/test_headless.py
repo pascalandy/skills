@@ -216,7 +216,6 @@ def test_codex_review_runs_unsandboxed_and_prints_the_model_that_ran(env, repo):
         "session: stub-codex-session",
         "changed: nothing",
     ]
-    assert done.stdout.endswith("\n\nNo findings.\n")
     [call] = calls(env)
     assert call["argv"][:4] == [
         "exec",
@@ -261,7 +260,6 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
     lines = review.stdout.splitlines()
     assert lines[:2] == ["model: grok-4.7", "effort: xhigh"]
     assert lines[3] == "changed: nothing"
-    assert review.stdout.endswith("\n\nNo findings.\n")
     review_call, fix_call = calls(env)
     argv = review_call["argv"]
     assert argv[:2] == ["--cwd", str(repo)]
@@ -278,6 +276,23 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
     assert "--sandbox" not in argv and "--sandbox" not in fix_call["argv"]
     assert fix_call["stdin"].startswith("Mode: review and fix.")
     assert review_call["trust"] == fix_call["trust"] == "0"
+
+
+@pytest.mark.parametrize("target", ["codex", "claude", "grok"])
+def test_a_review_points_to_its_answer_file_instead_of_printing_it(env, repo, target):
+    done = launch(env, repo, target, "--review-only")
+
+    assert done.returncode == 0, done.stderr
+    *_, run, answer = done.stdout.splitlines()
+    assert answer == f"answer: {Path(run.removeprefix('run: ')) / 'answer.md'}"
+    assert Path(answer.removeprefix("answer: ")).read_text() == "No findings."
+
+
+def test_a_fix_prints_its_answer_after_the_summary(env, repo):
+    done = launch(env, repo, "codex", "--review-fix")
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.endswith("/answer.md\n\nNo findings.\n")
 
 
 def test_grok_prints_the_model_that_answered_not_the_one_requested(env, repo):
@@ -620,6 +635,7 @@ def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
 
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:2] == ["model: gpt-6.1-sol", "effort: xhigh"]
+    assert done.stdout.splitlines()[-1].endswith("/answer.md")
     [call] = calls(env)
     assert call["argv"][:2] == ["exec", "review"]
     assert call["argv"][2:6] == [
