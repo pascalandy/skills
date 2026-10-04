@@ -16,29 +16,38 @@ Cite evidence for each finding: the skill file and line (or section) the agent f
 
 Draft one issue per finding for https://github.com/pascalandy/skills. Write in the language of the conversation and keep the template's headings.
 
-**Readers.** The end user reads the visible part to understand the problem and decide. The agent that fixes it reads the collapsed details. Write the visible part so a 12-year-old could follow it: an everyday analogy, short sentences, plain words. Call the actors "the agent" and "the end user". Keep analysis (CMO) apart from action (FMO, Decision).
+**Readers.** The end user reads the visible part to understand the problem and decide. The agent that fixes it reads the collapsed details. Write the visible part so a 12-year-old could follow it: an everyday analogy, short sentences, plain words. Call the actors "the agent" and "the end user". Keep analysis (CMO) apart from action (FMO).
 
 **Title.** Use Conventional Commits in the form `type(skill): subject`. Use `fix` when the skill is wrong or contradictory, `docs` when it is only unclear, and `feat` when a step is missing. Write the subject as the behavior the skill should have, in plain words and the imperative, for example `fix(commit): keep a move and its pointer updates in one commit`. Do not add a trailing period.
 
-**Body.** Follow this template. [#216](https://github.com/pascalandy/skills/issues/216) is a real example. Keep the visible part under about 45 lines, and drop a details subsection that has nothing to say. Letter the Decision options as in Approaches considered, so the end user can answer with one letter. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
+**Body.** Follow this template. Keep the visible part under about 45 lines. Answer N/A in a section that does not apply, and add a section when the finding needs one. When the fix adds a line, replace the FMO's change block with "Add one line in `<path>`, under `<## Section>`, after this line:", quote the whole sentence or line it follows, then give the new line.
 
 ````md
-## CMO: The problem, simply
+<retro-skill-usage>
+## The problem (CMO)
 
-<An everyday analogy in one or two sentences.>
+**Problem Statement:** <the end user's goal and the problem, restated plainly>
+
+List the **use cases**, edge cases included
+
+What's out of scope
+
+REF: #<PR or issue>
+
+### Analogy
+
+An everyday analogy in one or two sentences, explain like I'm 12, so the end user can tell the analysis from what is actionable.
 
 - **What should happen:** <in the analogy's terms>
 - **What happened in #<PR>:** <what the agent did, in the analogy's terms>
 
-<Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.>
-
-REF: #<PR or issue>
+Map the analogy back to the real event: the commit, file, or step, and what it broke. Say plainly how bad it was.
 
 ### Why it happened
 
-<The rule in the skill that caused it, in plain words, and the conflict or gap in it.>
+The rule in the skill that caused it, in plain words, and the conflict or gap in it.
 
-## FMO (future Mode of operation)
+## The change (FMO)
 
 Change one line in `<authoring path to the skill file>`, under `<## Section>`. It currently says:
 
@@ -52,44 +61,21 @@ That's the whole fix: one line.
 
 ## How we'll know it works
 
-1. **Before the change:** <rerun the failing scenario with the current skill, in three fresh sessions when the result depends on the agent's choices>. If <it never fails>, the problem doesn't repeat: choose <ignore letter>
+1. **Before the change:** <the recorded evidence from the session, or a rerun of the scenario when it is cheap>
 2. **After the change:** <the same scenario and the result that proves the fix>
 3. **Nothing else changes:** <a nearby case that must keep its current result>
 4. `just check` passes
 
-## Decision
-
-- **<letter>) Fix it (recommended):** <why it matters beyond this one case>
-- **<letter>) Ignore it:** <the honest case for doing nothing>
-
-Test 1 settles it: <which result means ignore>.
+## 👨🏻‍🍳 For the agent
 
 <details>
-<summary>Details for the agent</summary>
+<summary>👨🏻‍🍳 Details</summary>
 
-### <The evidence, such as the conflicting rules>
-
-<File and line numbers, and the real commits, steps, or output that show the failure.>
-
-### Acceptance cases
-
-1. <case → expected result; mark the one that is the bug>
-
-### Edge cases
-
-- <edge case → how the fix handles it>
-
-### Approaches considered
-
-- **A. <approach>:** <why not>
-- **B. <approach> (recommended):** <why>
-- **C. Ignore it:** <the cost of leaving the skill as it is>
-
-### Out of scope
-
-<What this fix leaves alone.>
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
 
 </details>
+
+</retro-skill-usage>
 ````
 
 Before publishing:
