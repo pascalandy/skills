@@ -2860,22 +2860,15 @@ def _value_options() -> dict[str, bool]:
 
 
 @functools.cache
-def _option_names() -> frozenset[str]:
-    """Every option string the parser knows, such as `--url` and `-n`."""
-    return frozenset(
-        option
+def _multi_value_parsers() -> dict[str, argparse.ArgumentParser]:
+    """Each option that takes several values, such as `--url`, with the parser
+    that reads them."""
+    return {
+        option: parser
         for parser in _all_parsers(build_parser())
-        for option in parser._option_string_actions
-    )
-
-
-def _is_known_option(token: str) -> bool:
-    """Whether `token` is one of the parser's options, alone, as `--name=value`,
-    or leading a cluster of short flags such as `-vn`."""
-    names = _option_names()
-    return token.split("=", 1)[0] in names or (
-        not token.startswith("--") and token[:2] in names
-    )
+        for option, action in parser._option_string_actions.items()
+        if action.nargs in ("+", "*")
+    }
 
 
 def _rewrite(
@@ -2901,13 +2894,10 @@ def _rewrite(
             continue
         skip_values = False
         name = token.split("=", 1)[0]
-        # A multi-value option followed by another option has no value, such as
-        # the --url `just ttr` puts first, so it adds nothing to the rerun
-        if (
-            "=" not in token
-            and values.get(name)
-            and (following is None or _is_known_option(following))
-        ):
+        # A multi-value option has no value when its parser reads the next token
+        # as an option, as with the --url `just ttr` puts first
+        owner = None if "=" in token else _multi_value_parsers().get(name)
+        if owner and (following is None or owner._parse_optional(following)):
             continue
         if name in dropped:
             if "=" not in token and name in values:
