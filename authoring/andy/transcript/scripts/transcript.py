@@ -2859,13 +2859,23 @@ def _value_options() -> dict[str, bool]:
     }
 
 
-NEGATIVE_NUMBER = argparse.ArgumentParser()._negative_number_matcher
+@functools.cache
+def _option_names() -> frozenset[str]:
+    """Every option string the parser knows, such as `--url` and `-n`."""
+    return frozenset(
+        option
+        for parser in _all_parsers(build_parser())
+        for option in parser._option_string_actions
+    )
 
 
-def _starts_option(token: str) -> bool:
-    """Whether argparse reads `token` as an option; a lone `-` and a negative
-    number such as `-1` are values."""
-    return token.startswith("-") and token != "-" and not NEGATIVE_NUMBER.match(token)
+def _is_known_option(token: str) -> bool:
+    """Whether `token` is one of the parser's options, alone, as `--name=value`,
+    or leading a cluster of short flags such as `-vn`."""
+    names = _option_names()
+    return token.split("=", 1)[0] in names or (
+        not token.startswith("--") and token[:2] in names
+    )
 
 
 def _rewrite(
@@ -2886,17 +2896,17 @@ def _rewrite(
     skip_value = False
     skip_values = False
     for token, following in zip(options, [*options[1:], None]):
-        if skip_value or (skip_values and not _starts_option(token)):
+        if skip_value or (skip_values and not token.startswith("-")):
             skip_value = False
             continue
         skip_values = False
         name = token.split("=", 1)[0]
-        # A multi-value option with no value, such as the --url `just ttr` puts
-        # first, adds nothing to the rerun
+        # A multi-value option followed by another option has no value, such as
+        # the --url `just ttr` puts first, so it adds nothing to the rerun
         if (
             "=" not in token
             and values.get(name)
-            and (following is None or _starts_option(following))
+            and (following is None or _is_known_option(following))
         ):
             continue
         if name in dropped:
