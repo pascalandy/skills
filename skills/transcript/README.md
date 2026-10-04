@@ -165,19 +165,30 @@ Normal YouTube runs try browser authentication first. When Arc's `~/Library/Appl
 
 Arc's `Default` profile must have a valid YouTube session. If the session expires, sign in again to YouTube in Arc. Arc can remain open. YouTube Premium does not replace browser authentication. The script does not export cookies or modify Arc, Chrome, or Keychain.
 
-The canonical transport check fixture is:
-
-```text
-https://www.youtube.com/watch?v=EIEc43CxIvY
-```
-
-Run the free transport check:
+Run the free transport check on the canonical video from [Test videos](#test-videos):
 
 ```bash
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
 The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass prints nothing and exits `0`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the Arc adapter ran. It does not prove the full user flow.
+
+## Test videos
+
+Real test runs use these short, public videos from Framework's official channel to limit Deepgram cost and summary wait time:
+
+| Video | Length | Use |
+|---|---|---|
+| `https://www.youtube.com/watch?v=EIEc43CxIvY` | 4 min 57 s | Canonical video: the transport check, `verify-transcript`, and the E2E closeout |
+| `https://www.youtube.com/watch?v=QwpTAk_IiyU` | 2 min 36 s | Second video, for a test that needs two different videos |
+
+To test with another video, pick a public one under 5 minutes, read its length without downloading it, then add its row here:
+
+```bash
+uvx yt-dlp@2026.7.4 --skip-download --print duration "<youtube-url>"
+```
+
+The length prints in seconds.
 
 ## Validation model
 
