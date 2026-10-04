@@ -1,32 +1,28 @@
 # Le guide
 
-Ces skills donnent leur meilleur quand tu arrêtes d'écrire de longues demandes. Tu dis ce que tu veux, l'agent s'aligne avec toi, puis il suit les étapes d'un playbook. Ce guide t'apprend ce réflexe avec des demandes à copier.
+Mes skills donnent leur meilleur quand tu arrêtes de microgérer l'agent. Tu dis ce que tu veux et tu termines par `plan`. L'agent s'aligne avec toi, puis il exécute au `go`. Ce guide enseigne ce réflexe avec des demandes réelles.
 
-Il te faut une application d'IA qui peut ouvrir des pages web, comme ChatGPT ou Claude, sur ton téléphone ou ton ordinateur. Tu n'ouvres jamais de terminal.
+Prérequis : une application d'IA qui ouvre des pages web, comme ChatGPT ou Claude. Aucun terminal.
 
-Au programme :
+1. [Activer les skills](./01-demarrer.md). Une phrase dans tes instructions personnalisées.
+2. [Planifier, puis dire go](./02-planifier-puis-go.md). Ma façon de travailler.
+3. [Nommer un mode, puis la tâche](./03-modes.md). Comment une demande trouve son playbook.
+4. [Réfléchir avant de décider](./04-reflechir.md). `grilling`, `research`, `sparring` et `think`.
+5. [Écrire et réviser](./05-ecrire.md). `unslop`, `write-with-clarity`, `storytelling`, `concise` et `2nd-pass`.
+6. [Faire du marketing avec `corey-mode`](./06-marketing.md). 50 playbooks, à commencer par ton contexte produit.
+7. [Produire un document à montrer](./07-montrer.md). Résumés, présentations et schémas avec `html-mode`.
+8. [Recettes et pièges](./08-recettes-et-pieges.md). Des demandes à copier, des erreurs à éviter.
 
-1. [Activer les skills en une phrase](./01-demarrer.md). La phrase par défaut dans ChatGPT, ou dans une seule conversation pour un essai.
-2. [Planifier, puis dire go](./02-planifier-puis-go.md). Ma façon de travailler : `plan` pour s'aligner avec l'agent, `go` pour qu'il exécute.
-3. [Nommer un mode, puis la tâche](./03-modes.md). Comment une demande arrive au bon playbook, et les cinq mots à connaître.
-4. [Réfléchir avant de décider](./04-reflechir.md). `grilling`, `research` et deux routes d'`andy-mode` pour mieux décider.
-5. [Écrire et réviser avec l'agent](./05-ecrire.md). `unslop`, `concise`, `2nd-pass` et deux routes d'`andy-mode` pour des textes clairs et des histoires.
-6. [Faire du marketing avec `corey-mode`](./06-marketing.md). Le contexte de ton produit d'abord, puis des pages, des courriels et des plans.
-7. [Transformer ton travail en document à montrer](./07-montrer.md). Résumés d'une page, présentations et schémas avec `html-mode`.
-8. [Recettes et pièges](./08-recettes-et-pieges.md). Des demandes à copier et les erreurs à éviter.
-
-Lis les pages dans l'ordre la première fois. Ensuite, chaque page se lit seule.
+Lis les pages dans l'ordre la première fois. Ensuite, chacune se lit seule.
 
 In English: [the guide](../guide/README.md).
 
 ## Si tu ne retiens qu'une chose
 
-Termine ta demande par `plan` :
-
 ```text
 Je veux envoyer une infolettre mensuelle à mes clients. plan
 ```
 
-L'agent reformule ton but et te pose ses questions. Réponds-y jusqu'à ce qu'il te dise qu'il ne reste aucune question. Tape alors `go`, et l'agent exécute le plan sur lequel vous vous êtes entendus.
+Pas besoin de nommer un playbook ni de décrire les étapes. `plan` oblige l'agent à reformuler ton but et à poser ses questions avant d'agir. Quand il n'en reste aucune, tu tapes `go`.
 
-Suite : [Activer les skills en une phrase](./01-demarrer.md).
+Suite : [Activer les skills](./01-demarrer.md).

@@ -1,18 +1,6 @@
 # Nommer un mode, puis la tâche
 
-La plupart du travail passe par trois modes. Dans cette page, tu apprends les cinq mots du guide, tu vois comment une demande arrive au bon playbook et tu écris des demandes que l'agent dirige au bon endroit.
-
-## Apprends cinq mots
-
-Ces cinq mots reviennent à chaque page :
-
-- **Agent** : l'IA de ton application
-- **Skill** : des instructions écrites que l'agent suit pour un type de tâche, comme `plan`
-- **Mode** : un skill qui ouvre une famille de routes, comme `corey-mode`
-- **Route** : une tâche dans un mode, comme `copywriting`
-- **Playbook** : les étapes écrites d'une route
-
-## Vois ce que devient ta demande
+Trois modes portent l'essentiel du travail. Un mode regroupe des routes, et chaque route suit un playbook, c'est-à-dire des étapes écrites que l'agent applique.
 
 ```mermaid
 flowchart TD
@@ -28,52 +16,40 @@ flowchart TD
     F --> H
 ```
 
-L'agent lit ta demande, trouve le mode, puis ouvre la route. Si tu ne nommes aucun mode, l'agent cherche un skill seul qui correspond, comme `plan` ou `grilling`.
-
-## Écris la demande : mode, point-virgule, tâche
-
-Écris le mode, puis un point-virgule, puis la route, puis ce que tu veux :
+## Écris le mode, un point-virgule, puis la route
 
 ```text
-corey-mode ; cro. Voici le texte de ma page d'accueil. Pourquoi les visiteurs ne prennent-ils pas rendez-vous?
+corey-mode ; cro. Voici le texte de ma page d'accueil. Pourquoi personne ne prend rendez-vous?
 ```
 
 ```text
-andy-mode ; think. Est-ce que je passe ma petite équipe à la semaine de quatre jours?
+andy-mode ; think. Est-ce que je passe mon équipe à la semaine de quatre jours?
 ```
 
 ```text
-html-mode ; diagram. Montre comment une commande passe de notre site web à la livraison.
+html-mode ; diagram. Montre le trajet d'une commande, du site web à la livraison.
 ```
 
-Les noms des modes et des routes restent en anglais, parce que l'agent cherche ces noms exacts dans la liste. Écris `corey-mode ; copywriting`, pas `corey-mode ; rédaction`. Le reste de ta demande peut être en français.
+Garde les noms de modes et de routes en anglais, parce que l'agent cherche ces noms exacts dans la liste. Le reste de la demande peut être en français.
 
-Chaque mode réagit un peu différemment :
+- `corey-mode` démarre dès que le mot "marketing" apparaît. Sans route, il choisit celle qui convient, ou te fait trancher entre deux.
+- `andy-mode` exige son nom, un point-virgule et une route. La dictée vocale passe : "indie mode" et "endymode" comptent.
+- `html-mode` démarre quand tu demandes une page ou une présentation HTML, et choisit lui-même son playbook.
 
-- `corey-mode` démarre dès que ta demande contient le mot "marketing", alors `marketing ; cro` marche comme `corey-mode ; cro`. Sans nom de route, il choisit la route qui convient. Si deux routes conviennent, il nomme les deux et te demande de choisir.
-- `andy-mode` démarre seulement si tu le nommes, suivi d'un point-virgule et d'une route. Les graphies de la dictée vocale comme "indie mode" ou "endymode" comptent aussi, ce qui aide sur un téléphone.
-- `html-mode` démarre quand tu demandes une page ou une présentation HTML. Il choisit lui-même son playbook.
+## Trouve la route
 
-## Trouve la route qu'il te faut
-
-Les routes de chaque mode figurent, avec une ligne chacune, dans [la liste des skills](../references/remote-skills-general.md). Pas besoin de la lire. Demande plutôt à l'agent :
+[La liste des skills](../references/remote-skills-general.md) décrit chaque route en une ligne. Plus simple, demande :
 
 ```text
-Quelle route de corey-mode convient à une série de courriels de bienvenue pour mes nouveaux clients?
+Quelle route de corey-mode convient à une série de courriels de bienvenue?
 ```
 
-L'agent lit la liste et nomme la route, ici `emails`. Tu demandes ensuite le travail.
+L'agent répond `emails`.
 
-## Appelle un skill sans mode
+## Appelle un skill seul
 
-Certains skills fonctionnent seuls : `plan`, `grilling`, `research`, `unslop`, `concise` et `2nd-pass`. Nomme le skill dans ta demande :
+`plan`, `grilling`, `research`, `unslop`, `concise` et `2nd-pass` fonctionnent sans mode. Nomme-les dans la demande.
 
-```text
-grilling. Mets à l'épreuve mon plan d'ouvrir une deuxième succursale au printemps.
-```
-
-Les pages 4 et 5 montrent les autres.
-
-**Piège :** n'énumère pas plusieurs skills dans une demande, comme "utilise sparring, puis storytelling, puis copywriting". Donne le but et laisse le mode choisir. Nomme une route seulement quand tu en veux une précise, et lance l'étape suivante après avoir lu le premier résultat.
+**Piège :** énumérer les skills, comme "utilise sparring, puis storytelling, puis copywriting". Donne le but. Nomme une route seulement pour imposer un choix.
 
 Suite : [Réfléchir avant de décider](./04-reflechir.md).

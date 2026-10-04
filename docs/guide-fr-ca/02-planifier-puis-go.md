@@ -1,59 +1,46 @@
 # Planifier, puis dire go
 
-Ma façon de travailler tient en deux mots : `plan` et `go`. Dans cette page, tu vois pourquoi, puis tu suis une vraie demande jusqu'au `go`.
+Ma façon de travailler tient en deux mots. `plan` aligne l'agent sur ce que je veux. `go` lance le travail.
 
-## Pourquoi je finis toujours par `plan`
-
-Peu importe ma demande, je la termine par `plan`. Même quand je pense que c'est facile. Une demande laisse toujours des trous, et un agent qui devine les comble à sa façon. Avec `plan`, l'agent et moi nous alignons avant qu'il fasse quoi que ce soit.
-
-## 1. Termine ta demande par `plan`
+## Termine chaque demande par `plan`
 
 ```text
 Je veux envoyer une infolettre mensuelle à mes clients. plan
 ```
 
-## 2. Réponds aux questions de l'agent
+Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `plan` l'oblige à s'aligner avant d'agir.
 
-L'agent n'exécute rien encore. Il te répond avec :
+L'agent n'exécute rien. Il reformule ton but, liste les cas à couvrir et ce qui est hors périmètre, puis pose les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu.
 
-- ton but, reformulé dans ses mots
-- les cas à couvrir, y compris les cas limites
-- ce qui est hors périmètre
-- les questions que toi seul peux trancher
+## Réponds jusqu'à zéro question
 
-Pour l'infolettre, il demande par exemple quel outil d'envoi tu utilises, combien de clients sont sur ta liste et qui écrit le contenu. Réponds dans tes mots. Un seul message peut répondre à toutes les questions.
+Un seul message peut répondre à tout. L'agent revoit son plan à chaque réponse et repose une question tant qu'une décision reste ouverte. Il présente ensuite le plan :
 
-## 3. Continue jusqu'à zéro question
+- **CMO** : le fonctionnement actuel et ce qui coince
+- **FMO** : le fonctionnement visé
+- **How we'll know it works** : les vérifications
+- **Premortem** : les causes d'échec probables et la parade prévue
 
-Après chaque réponse, l'agent revoit tout son plan. S'il reste une décision ouverte, il pose une nouvelle question. Sinon, il présente son plan sous des titres en anglais :
-
-- **CMO** : comment ça marche aujourd'hui, et ce qui coince
-- **FMO** : comment ça marchera après
-- **How we'll know it works** : les vérifications qui prouveront que ça marche
-- **Premortem** : ce qui pourrait mal tourner, et ce que le plan prévoit contre ça
-
-Il termine par une ligne comme celle-ci :
+Puis il conclut :
 
 ```text
 👍 Zéro question restante. Dites « execute » ou « go » 🚀
 ```
 
-## 4. Dis `go`
-
-Lis le plan. S'il te convient, tape :
+## Tape `go`
 
 ```text
 go
 ```
 
-C'est là que la magie opère. L'agent exécute le plan sur lequel vous vous êtes entendus, au lieu de deviner. Si un point cloche, dis-le plutôt que `go`, et l'agent revoit son plan.
+L'agent exécute le plan convenu, sans deviner. Si un point cloche, dis-le au lieu de taper `go`, et il revoit le plan.
 
-`plan` marche aussi avec un mode. L'agent s'aligne d'abord avec toi, puis suit le playbook quand tu dis `go` :
+`plan` se combine avec un mode. L'alignement vient d'abord, le playbook suit au `go` :
 
 ```text
 marketing ; launch. Je lance un service de tenue de livres par texto. plan
 ```
 
-**Piège :** taper `go` sans lire le plan. Le plan sert à attraper une mauvaise idée pendant qu'elle coûte encore peu.
+**Piège :** taper `go` sans lire le plan. Le plan existe pour attraper une mauvaise idée pendant qu'elle coûte peu.
 
 Suite : [Nommer un mode, puis la tâche](./03-modes.md).
