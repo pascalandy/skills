@@ -4,7 +4,11 @@
 <retro-skill-usage>
 ## CMO: The problem
 
-**Problem Statement:** The problem that the user is facing, from the user's perspective.
+**Problem Statement:** Restate my goal and the problem in your own words
+
+List the **use cases**, edge cases included
+
+What's out of scope
 
 REF: #<PR or issue>
 
