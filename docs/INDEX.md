@@ -1,23 +1,30 @@
 ---
 name: Docs
-description: Script conventions, checks, installs, releases, the remote skill lists, and the skill count, read on demand from AGENTS.md
+description: The public guide, plus script conventions, checks, installs, releases, the remote skill lists, and the skill count, read on demand from AGENTS.md
 schema_version: 3
 tags:
   - area/ea
   - kind/wiki
   - status/open
 date_created: 2026-09-26
-date_updated: 2026-10-03
+date_updated: 2026-10-04
 ---
 
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 8 | **Last updated:** 2026-10-02
+> **Total pages:** 25 | **Last updated:** 2026-10-04
 
-`AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need
+`AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
 ## Wiki Map
+
+### kind/guide
+
+| File | Description |
+|------|-------------|
+| `guide/README.md` | Public tutorial in seven pages for readers who use a chat app such as ChatGPT or Claude: paste one sentence, then use the modes and skills |
+| `guide-fr-ca/README.md` | The tutorial in Canadian French, in eight pages. It leads: new guide content lands here first, as `AGENTS.md` in this folder says |
 
 ### kind/doc
 
