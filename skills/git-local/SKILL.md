@@ -2,6 +2,7 @@
 name: "git-local"
 description: "Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries."
 kind: "dev"
+configuration-is-needed: true
 ---
 
 For code-level analysis or implementation, prefer the local repository cache over browsing individual source files online or making repeated `gh` API queries. Continue using `gh` for issues, pull requests, and repository metadata that do not require a local copy of the code.
