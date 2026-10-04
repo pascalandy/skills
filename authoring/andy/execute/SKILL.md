@@ -15,7 +15,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 #### Step by step
 
 - Run these steps in order, and finish each one before you start the next
-- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, Codex on each PR, Code review, and Merge gate steps, and say so in the report
+- When the agreed work involves no PR, such as issue edits only, skip the Blast-radius, Codex on each PR, Code review, Docs, Checks, and Merge gate steps, and say so in the report
 
 **STEP: Execute**
 
@@ -47,6 +47,14 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Review its diff, then commit each change to its layer with $gh-stack and push
 - Done when each change is committed and pushed, or dropped with a reason
 
+**STEP: Docs**
+- Run 🧰 andy-mode ; docs on the stack's final diff, and commit its edits to the layer they belong to
+- Done when each doc that describes a behavior the stack changes matches the new behavior, and its edits are pushed
+
+**STEP: Checks**
+- Drive each PR to green with poteto's Babysit playbook in `drive` mode
+- Done when checks are green on every PR's final commit (or the repo has no CI and you say so), or each failing check is reported as blocked, with the reason
+
 **STEP: Report**
 - PR links and links to the issues you filed
 - Every change you made outside what we agreed, and why
@@ -56,13 +64,9 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when the report includes every item above
 
 **STEP: Merge gate**
-- Land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs, when all of these hold:
-	- confidence to merge is at least 94%
-	- every agreed item is implemented, none blocked
-	- checks are green on every PR's final commit (or the repo has no CI and you say so)
-	- no medium or high finding is open
-- Otherwise, ask me about the next steps (see below)
-- Done when each PR is merged and its deploy succeeded. The merge command can exit 0 after a failed deploy, so read its output and report a failed deploy
+- Ask me whether to merge (see below), and end your reply on that question
+- When I say merge, land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs. The merge command can exit 0 after a failed deploy, so read its output and report a failed deploy
+- Done when I answered and, if I said merge, each PR is merged and its deploy succeeded
 
 **STEP: Close**
 - Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. From each, file at most 2 issues: the fixes with the most bang for the buck
@@ -74,13 +78,12 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Use Codex for 🧰 headless runs, and show the command in a code block before you run it
 	- Where Codex is missing, as in a cloud environment, skip those runs and say so in the report
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
-- Whenever a change alters documented behavior, run 🧰 andy-mode ; docs and commit its edits to the layer they belong to
 - As you see fit, leave comments on the PRs to help me understand what happened
-- Keep going without me. You may push your own stack branches (`--force-with-lease` is fine), open and update PRs and issues, and merge when the merge gate allows it
+- Keep going without me. You may push your own stack branches (`--force-with-lease` is fine), and open and update PRs and issues
 - Stop and ask only when:
 	- a contradiction or an unavailable live step blocks you (report it)
 	- you need a decision from me
-	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The merge gate's merge and the deploy it runs are allowed, and so are the Close step's retro issues in any of my repositories
+	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The Merge gate's deploy and the Close step's retro issues in any of my repositories are allowed
 		- After a squash merge or merge commit, deleting a branch whose tip still matches the PR's head commit at merge time is not deleting data
 
 #### Questions
