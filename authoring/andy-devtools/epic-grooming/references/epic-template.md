@@ -25,6 +25,17 @@ Example:
 Title: `Epic <N> · <the outcome, in plain words>`
 
 ```md
+## Order
+
+Batch of <the Package date, YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
+
+1. Epic <N> · <outcome> (#<number>)
+2. **Epic <N> · <outcome> (#<number>), this Epic**
+
+Before this batch: <the kept open Epics, by Epic number. Drop this line when no Epic was kept.>
+
+<One sentence: why this place, such as an Epic it needs first, or its return against the others.>
+
 ## Why this Epic
 
 <Two or three sentences: the system the members touch, and what goes wrong today.>
@@ -52,4 +63,4 @@ Each issue is marked **text** (only prose changes) or **code + tests**.
 <The signature the user sets>
 ```
 
-Leave out how to work the Epic, such as PR order or review steps.
+The Order section places the Epic in its batch. Leave out how to work the Epic, such as the order of its members, PR order, or review steps.
