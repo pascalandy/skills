@@ -20,7 +20,9 @@ In English: [the guide](../guide/README.md).
 ## Si tu ne retiens qu'une chose
 
 ```text
-Je veux envoyer une infolettre mensuelle à mes clients. plan
+Je veux envoyer une infolettre mensuelle à mes clients.
+
+plan
 ```
 
 Pas besoin de nommer un playbook ni de décrire les étapes. `plan` oblige l'agent à reformuler ton but et à poser ses questions avant d'agir. Quand il n'en reste aucune, tu tapes `go`.

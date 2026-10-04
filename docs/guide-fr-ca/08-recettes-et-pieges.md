@@ -23,7 +23,9 @@ andy-mode ; sparring. Les restaurateurs paieront chaque mois pour une tenue de l
 Si l'idée tient :
 
 ```text
-marketing ; launch. Lancement de la tenue de livres par texto. plan
+marketing ; launch. Lancement de la tenue de livres par texto.
+
+plan
 ```
 
 ```text

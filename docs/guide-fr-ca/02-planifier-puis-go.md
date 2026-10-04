@@ -5,7 +5,9 @@ Ma façon de travailler tient en deux mots. `plan` aligne l'agent sur ce que je 
 ## Termine chaque demande par `plan`
 
 ```text
-Je veux envoyer une infolettre mensuelle à mes clients. plan
+Je veux envoyer une infolettre mensuelle à mes clients.
+
+plan
 ```
 
 Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `plan` l'oblige à s'aligner avant d'agir.
@@ -38,7 +40,9 @@ L'agent exécute le plan convenu, sans deviner. Si un point cloche, dis-le au li
 `plan` se combine avec un mode. L'alignement vient d'abord, le playbook suit au `go` :
 
 ```text
-marketing ; launch. Je lance un service de tenue de livres par texto. plan
+marketing ; launch. Je lance un service de tenue de livres par texto.
+
+plan
 ```
 
 **Piège :** taper `go` sans lire le plan. Le plan existe pour attraper une mauvaise idée pendant qu'elle coûte peu.
