@@ -27,7 +27,7 @@ Title: `Epic <N> · <the outcome, in plain words>`
 ```md
 ## Order
 
-Batch of <YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
+Batch of <the Package date, YYYY-MM-DD>, Epic <position> of <count>. Work the batch in this order:
 
 1. Epic <N> · <outcome> (#<number>)
 2. **Epic <N> · <outcome> (#<number>), this Epic**
