@@ -20,12 +20,13 @@ Confirm each tool before the first cache operation. If one is missing, stop and 
 | `opensrc` | `mise use -g npm:opensrc` | `PNPM_HOME="$HOME/Library/pnpm" "$HOME/Library/pnpm/bin/pnpm" add -g --config.minimum-release-age=10080 --config.strict-dep-builds=true --allow-build=opensrc opensrc` | `opensrc --version` |
 | `just` | `mise use -g just` | `brew install just` | `just --version` |
 | `uv` | `mise use -g uv` | `brew install uv` | `uv --version` |
+| `gh`, signed in | `mise use -g gh`, then `gh auth login` | `brew install gh`, then `gh auth login` | `gh auth status` |
 
 ## Cache Location
 
 Each machine has at most one cache. Before any cache operation, resolve it in that shell, replacing any inherited `OPENSRC_HOME`:
 
-1. If the user names a cache path for this task, use it
+1. If the user names a cache path for this task, use it. It must be the `opensrc` folder of a SKILLS_MONO checkout, written without a trailing slash, because the refresh recipe lives in its parent
 2. Otherwise load the `fleet` skill. Find the local machine in its `fleet.toml` with the rule its `SKILL.md` states, and use `$HOME/` followed by that machine's `opensrc` key
 3. If neither gives a path, stop and report that this machine has no declared cache
 

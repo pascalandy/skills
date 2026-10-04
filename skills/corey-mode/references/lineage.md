@@ -18,10 +18,10 @@ Upstream `tools/`, `evals/`, the README, `AGENTS.md`, `VERSIONS.md`, and the plu
 
 ## Refresh from upstream
 
-The source is the opensrc cache that the `git-local` skill keeps current. Its snapshot has no Git history, so the revision comes from the cache's `sync-state.json`. Refresh the cache first, then run these from the skills repository checkout:
+The source is the opensrc cache that the `git-local` skill keeps current. Its snapshot has no Git history, so the revision comes from the cache's `sync-state.json`. Refresh the cache with `git-local` first. Then, in one shell, set `OPENSRC_HOME` as its Cache Location resolves it, since a value inherited from another shell may name a stale cache, and run these from the skills repository checkout:
 
 ```sh
-upstream="$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main"
+upstream="$OPENSRC_HOME/$(jq -r '.repos[] | select(.name == "github.com/coreyhaines31/marketingskills") | .path' "$OPENSRC_HOME/sources.json")"
 revision="$(jq -r '.repos["github.com/coreyhaines31/marketingskills"].commitSha' "$OPENSRC_HOME/sync-state.json")"
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision"
