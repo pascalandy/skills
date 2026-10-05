@@ -10,10 +10,8 @@ from pathlib import Path
 import api_keys_validation
 import pytest
 
-# Answers only the exact lookup the validator owes chezmoi. Holds the entries
-# FAKE_KEYRING lists, answers FAKE_EMPTY with nothing, refuses FAKE_REFUSE with
-# a message that quotes a value, and never answers FAKE_HANG, like a locked
-# keychain waiting on a prompt
+# Answers only the exact lookup, so a wrong keyring user fails the tests. A
+# locked keychain can wait indefinitely for an unlock prompt
 FAKE_CHEZMOI = """\
 #!/bin/sh
 if [ $# -ne 5 ] || [ "$1 $2 $3 $5" != "secret keyring get --user=api_key" ]; then
@@ -145,10 +143,11 @@ def test_a_keyring_that_does_not_answer_stops_the_run(
     monkeypatch.setattr(api_keys_validation, "TIMEOUT", 0.5)
 
     assert run() == (
-        1,
+        75,
         "",
         (
             '{"ok":false,"errors":["the keyring did not answer within 0.5s for '
-            'TRELLO_API_KEY; unlock it, then rerun: just api-keys-validation"]}\n'
+            'TRELLO_API_KEY; unlock it, then rerun: just api-keys-validation"],'
+            '"retry":"just api-keys-validation"}\n'
         ),
     )

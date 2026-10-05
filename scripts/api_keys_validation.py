@@ -14,7 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, exit_codes
+from _cli import Parser, ScriptError, TemporaryError, exit_codes
 from _common import frontmatter_value, main_checkout, run, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,7 +34,11 @@ examples:
   just api-keys-validation --verbose"""
 
 EXIT_CODES = exit_codes(
-    {0: "the keyring holds every entry", 1: "an entry is missing or unreadable"}
+    {
+        0: "the keyring holds every entry",
+        1: "an entry is missing or unreadable",
+        75: "the keyring timed out; safe to retry",
+    }
 )
 
 log = logging.getLogger("api-keys-validation")
@@ -80,7 +84,7 @@ def problem(entry: str, readers: list[str]) -> str | None:
             timeout=TIMEOUT,
         )
     except subprocess.TimeoutExpired:
-        raise ScriptError(
+        raise TemporaryError(
             f"the keyring did not answer within {TIMEOUT:g}s for {entry}; "
             "unlock it, then rerun: just api-keys-validation"
         ) from None
