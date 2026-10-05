@@ -223,6 +223,16 @@ class Plan:
     warnings: list[str] = field(default_factory=list)
 
 
+OPENROUTER_KEYRING = [
+    "chezmoi",
+    "secret",
+    "keyring",
+    "get",
+    "--service=openrouter",
+    "--user=api_key",
+]
+
+
 def codex_home() -> Path:
     return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
 
@@ -240,10 +250,31 @@ def plan_ready() -> tuple[bool, str]:
     return True, "Codex ChatGPT login"
 
 
+def openrouter_key() -> tuple[str, str]:
+    """The OpenRouter key and where it came from, or "" and how to add one.
+
+    The keyring entry comes first; the variable is the fallback for machines
+    without chezmoi.
+    """
+    try:
+        found = subprocess.run(
+            OPENROUTER_KEYRING, capture_output=True, text=True, timeout=15, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        found = None
+    if found is not None and found.returncode == 0 and found.stdout.strip():
+        return found.stdout.strip(), "the keyring holds the OpenRouter key"
+    if key := os.environ.get("OPENROUTER_API_KEY"):
+        return key, "OPENROUTER_API_KEY is set"
+    return "", (
+        "no OpenRouter key; run `chezmoi secret keyring set --service=openrouter "
+        "--user=api_key`, or set OPENROUTER_API_KEY"
+    )
+
+
 def api_ready() -> tuple[bool, str]:
-    if os.environ.get("OPENROUTER_API_KEY"):
-        return True, "OPENROUTER_API_KEY is set"
-    return False, "OPENROUTER_API_KEY is not set"
+    key, note = openrouter_key()
+    return bool(key), note
 
 
 def choose_backend(job: Job) -> tuple[str, str]:
@@ -558,7 +589,7 @@ def api_post(route: str, body: dict[str, Any]) -> dict[str, Any]:
         f"{API_BASE}/{route}",
         data=json.dumps(body).encode(),
         headers={
-            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+            "Authorization": f"Bearer {openrouter_key()[0]}",
             "Content-Type": "application/json",
         },
     )
@@ -577,7 +608,7 @@ def api_post(route: str, body: dict[str, Any]) -> dict[str, Any]:
                 detail = {"message": payload[:300]}
             code = detail.get("code") or detail.get("type") or error.code
             hint = {
-                401: "check OPENROUTER_API_KEY",
+                401: "check the OpenRouter key in the keyring or OPENROUTER_API_KEY",
                 402: "check your OpenRouter credit balance",
                 403: "check OpenRouter account and provider access",
             }.get(
