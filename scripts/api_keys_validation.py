@@ -84,16 +84,18 @@ def problem(entry: str, readers: list[str]) -> str | None:
             f"the keyring did not answer within {TIMEOUT:g}s for {entry}; "
             "unlock it, then rerun: just api-keys-validation"
         ) from None
+    if result.returncode == 0 and result.stdout.strip():
+        return None
+    where = f"{entry} ({', '.join(readers)})"
+    add = f"add it: chezmoi secret keyring set --service={entry} --user={USER}"
+    # chezmoi's own text never reaches the output, in case a backend echoes a value
     if result.returncode == 0:
-        if result.stdout.strip():
-            return None
-        reason = "the entry is empty"
-    else:
-        said = result.stderr.strip().splitlines()
-        reason = said[-1] if said else f"chezmoi exited {result.returncode}"
+        return f"{where}: the entry is empty; {add}"
+    if "not found" in result.stderr:
+        return f"{where}: not in the keyring; {add}"
     return (
-        f"{entry} ({', '.join(readers)}): {reason}; "
-        f"add it: chezmoi secret keyring set --service={entry} --user={USER}"
+        f"{where}: the keyring refused the lookup (chezmoi exit {result.returncode}); "
+        "unlock it, or run this in the machine's own terminal"
     )
 
 

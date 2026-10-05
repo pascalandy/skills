@@ -10,16 +10,24 @@ from pathlib import Path
 import api_keys_validation
 import pytest
 
-# Holds the entries FAKE_KEYRING lists, answers FAKE_EMPTY with nothing, and
-# never answers FAKE_HANG, like a locked keychain waiting on a prompt
+# Answers only the exact lookup the validator owes chezmoi. Holds the entries
+# FAKE_KEYRING lists, answers FAKE_EMPTY with nothing, refuses FAKE_REFUSE with
+# a message that quotes a value, and never answers FAKE_HANG, like a locked
+# keychain waiting on a prompt
 FAKE_CHEZMOI = """\
 #!/bin/sh
-for arg; do
-  case $arg in --service=*) service=${arg#--service=} ;; esac
-done
+if [ $# -ne 5 ] || [ "$1 $2 $3 $5" != "secret keyring get --user=api_key" ]; then
+  echo "unexpected call: $*" >&2
+  exit 64
+fi
+service=${4#--service=}
 case ",$FAKE_KEYRING," in *",$service,"*) echo "s3cret-$service"; exit 0 ;; esac
 if [ "$service" = "$FAKE_HANG" ]; then exec sleep 30; fi
 if [ "$service" = "$FAKE_EMPTY" ]; then exit 0; fi
+if [ "$service" = "$FAKE_REFUSE" ]; then
+  echo "keychain refused near s3cret-$service" >&2
+  exit 1
+fi
 echo "chezmoi: secret not found in keyring" >&2
 exit 1
 """
@@ -59,7 +67,7 @@ def machine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     chezmoi.write_text(FAKE_CHEZMOI, encoding="utf-8")
     chezmoi.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}/usr/bin{os.pathsep}/bin")
-    for variable in ("FAKE_KEYRING", "FAKE_EMPTY", "FAKE_HANG"):
+    for variable in ("FAKE_KEYRING", "FAKE_EMPTY", "FAKE_REFUSE", "FAKE_HANG"):
         monkeypatch.delenv(variable, raising=False)
     return tmp_path
 
@@ -91,11 +99,12 @@ def test_a_full_keyring_answers_ok_and_prints_no_value(
     )
 
 
-def test_each_missing_entry_names_its_skills_and_the_command_that_adds_it(
+def test_each_failed_entry_names_its_skills_and_the_fix_without_chezmoi_text(
     machine: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("FAKE_KEYRING", "TRELLO_API_KEY,typesafe_ai")
+    monkeypatch.setenv("FAKE_KEYRING", "TRELLO_API_KEY")
     monkeypatch.setenv("FAKE_EMPTY", "TRELLO_TOKEN")
+    monkeypatch.setenv("FAKE_REFUSE", "typesafe_ai")
 
     assert run() == (
         1,
@@ -104,8 +113,10 @@ def test_each_missing_entry_names_its_skills_and_the_command_that_adds_it(
             '{"ok":false,"errors":['
             '"TRELLO_TOKEN (andy-mode/trello): the entry is empty; '
             'add it: chezmoi secret keyring set --service=TRELLO_TOKEN --user=api_key",'
-            '"deepgram (transcript, verify-transcript): chezmoi: secret not found in keyring; '
-            'add it: chezmoi secret keyring set --service=deepgram --user=api_key"]}\n'
+            '"deepgram (transcript, verify-transcript): not in the keyring; '
+            'add it: chezmoi secret keyring set --service=deepgram --user=api_key",'
+            '"typesafe_ai (typesafe-ai): the keyring refused the lookup (chezmoi exit 1); '
+            "unlock it, or run this in the machine's own terminal\"]}\n"
         ),
     )
 
