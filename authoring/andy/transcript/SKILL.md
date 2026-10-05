@@ -87,7 +87,7 @@ uv run <skill_dir>/scripts/transcript.py --help
 
 Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Exit `75` means a temporary failure before any paid request; rerunning the same command is safe. Exits `130` and `143` mean the run was interrupted. Read the error `code`, `message`, and `hint`; the hint is the command that fixes it. Never rerun an exit `1` run automatically, because Deepgram may already have billed the audio.
 
-Report the result folder and summary status. After a summary failure, the transcript is still published: read `output_dir` from the `stderr` JSON. A run with several URLs reports each one in `results`, with its own `url`, `output_dir`, or `error`. Do not paste the generated summary into chat unless the user asks.
+Report the result folder and summary status. A failure after the folder appears keeps it, with its metadata naming the failed stage: read `output_dir` from the `stderr` JSON. A run with several URLs reports each one in `results`, with its own `url`, `output_dir`, or `error`. Do not paste the generated summary into chat unless the user asks.
 
 ## YouTube transport check
 

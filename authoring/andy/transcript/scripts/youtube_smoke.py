@@ -3,6 +3,7 @@
 # dependencies = [
 #     "httpx",
 #     "yt-dlp==2026.7.4",
+#     "pycryptodomex",
 #     "rich",
 # ]
 # ///
@@ -158,7 +159,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> int:
             code=TEMPORARY,
             label="retry",
         ) from error
-    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
         raise Failure(
             "transport_failed",
             f"YouTube smoke failed: {error}",

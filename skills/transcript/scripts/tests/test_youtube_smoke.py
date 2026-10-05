@@ -95,10 +95,10 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
         assert auth_mode == "arc-required"
-        audio_path = output_dir / "audio.mp3"
+        audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
         observed_audio_paths.append(audio_path)
-        return transcript.DownloadedAudio(audio_path, "arc")
+        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
 
     def fake_run(command, **kwargs):
         assert command[0] == "ffprobe"
@@ -136,10 +136,10 @@ def test_smoke_cleans_temporary_audio_when_ffprobe_fails(monkeypatch) -> None:
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
         assert auth_mode == "arc-required"
-        audio_path = output_dir / "audio.mp3"
+        audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
         observed_audio_paths.append(audio_path)
-        return transcript.DownloadedAudio(audio_path, "arc")
+        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
@@ -165,9 +165,9 @@ def test_smoke_bounds_ffprobe_with_the_global_budget(monkeypatch) -> None:
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
         assert auth_mode == "arc-required"
-        audio_path = output_dir / "audio.mp3"
+        audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio_path, "arc")
+        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
 
     def timeout(_command, **kwargs):
         observed_timeouts.append(kwargs["timeout"])
