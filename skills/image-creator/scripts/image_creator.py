@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import io
 import json
 import math
@@ -250,11 +251,12 @@ def plan_ready() -> tuple[bool, str]:
     return True, "Codex ChatGPT login"
 
 
+@functools.cache
 def openrouter_key() -> tuple[str, str]:
     """The OpenRouter key and where it came from, or "" and how to add one.
 
     The keyring entry comes first; the variable is the fallback for machines
-    without chezmoi.
+    without chezmoi. One lookup per run, so readiness and the request agree.
     """
     try:
         found = subprocess.run(
@@ -759,7 +761,8 @@ EPILOG_GENERATE = (
     + """
 backend auto: always the Codex plan, including high and max.
 Select GPT Image 2.5 explicitly with --model flare/sunburst or --backend openrouter.
-OpenRouter requires OPENROUTER_API_KEY; there is no automatic paid fallback.
+OpenRouter reads its key from the keyring entry openrouter, then from
+OPENROUTER_API_KEY; there is no automatic paid fallback.
 The plan fixes model, quality, and size; --size is applied by cropping and resizing.
 
 examples:

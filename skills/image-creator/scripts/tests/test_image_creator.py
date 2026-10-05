@@ -25,10 +25,15 @@ printf '{"type":"thread.started","thread_id":"%s"}\\n' "$id"
 printf 'TRACE codex_http_client::transport: POST to https://chatgpt.com/backend-api/codex/images/generations: %s\\n' "$FAKE_TRACE_BODY" >&2
 """
 
-# Shadows a real chezmoi, so no test reads this machine's keyring; it holds an
-# OpenRouter key only when FAKE_KEYRING_OPENROUTER is set
+# Shadows a real chezmoi, so no test reads this machine's keyring. It answers
+# only the exact OpenRouter lookup, and holds a key only when
+# FAKE_KEYRING_OPENROUTER is set
 FAKE_CHEZMOI = """#!/bin/sh
 echo "$*" >> "$FAKE_CHEZMOI_LOG"
+if [ "$*" != "secret keyring get --service=openrouter --user=api_key" ]; then
+  echo "unexpected call: $*" >&2
+  exit 64
+fi
 if [ -n "$FAKE_KEYRING_OPENROUTER" ]; then echo "$FAKE_KEYRING_OPENROUTER"; exit 0; fi
 echo "chezmoi: secret not found in keyring" >&2
 exit 1
@@ -51,6 +56,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("FAKE_KEYRING_OPENROUTER", raising=False)
     monkeypatch.setenv("FAKE_CHEZMOI_LOG", str(tmp_path / "chezmoi.log"))
+    image_creator.openrouter_key.cache_clear()
     (tmp_path / "bin").mkdir()
     chezmoi = tmp_path / "bin" / "chezmoi"
     chezmoi.write_text(FAKE_CHEZMOI)
@@ -301,14 +307,15 @@ def test_the_keyring_key_wins_over_the_variable(
 
     monkeypatch.setattr(image_creator.urllib.request, "urlopen", respond)
     out = env / "out.png"
-    code, _, err = run(
+    code, stdout, err = run(
         capsys, "generate", "--model", "flare", "--prompt", "poster", "--out", str(out)
     )
     assert (code, err) == (0, "")
+    assert "sk-keyring" not in stdout
     assert sent == ["Bearer sk-keyring"]
-    assert (env / "chezmoi.log").read_text().splitlines()[0] == (
+    assert (env / "chezmoi.log").read_text().splitlines() == [
         "secret keyring get --service=openrouter --user=api_key"
-    )
+    ]
     assert run(capsys, "doctor", "--json")[1] == (
         '{"plan": {"ready": false, "detail": "codex is not on PATH"}, '
         '"openrouter": {"ready": true, "detail": "the keyring holds the OpenRouter key"}}\n'
