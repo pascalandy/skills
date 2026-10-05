@@ -31,7 +31,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when each 2nd-pass finding is fixed or reported
 
 **STEP: Code review on each PR**
-- On each PR, post a NEW top-level conversation comment containing exactly this single line:
+- On each PR, the trigger comment is this single line
 
 	```txt
 	Paula Review PR
@@ -110,7 +110,9 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - The first nonempty line must be exactly Paula Review PR or Paula Review Stack, with no extra text or punctuation on that line
 - Publish through the authorized pascalandy account on open PRs in pascalandy/skills. Post stack requests on the top PR, with PRs:, Base:, Base-SHA: and Head-SHA: populated from current remote values
 - Request at most 4 reviews per PR and 4 reviews for the whole stack. If either limit is reached before its completion criteria are met, or Paula is unavailable, report the blocker; do not treat it as a pass
-- If Paula answers BLOCKED or STALE, resolve the stated problem before requesting another review
+- BLOCKED or STALE does not count as a completed review
+- For a PR, if Paula already answered BLOCKED for the current head SHA, report the blocker to me. Do not request another review of that same SHA or create an empty commit to bypass deduplication
+- For a stack, resolve the stated problem, refresh the remote values, and request another review
 - Paula performs static review and reports findings; the implementation agent owns fixes and tests
 - A Paula review does not authorize merging. Follow the project’s separate checks and merge-approval requirements
 
