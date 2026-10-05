@@ -24,7 +24,25 @@ For `to-tickets`, honor an explicit destination; otherwise, default to GitHub us
 
 Read [workspace conventions](workspace.md) before the first artifact write or when resuming a map. Interpret upstream `/setup-matt-pocock-skills` references as resolving those conventions. No setup command or installation is required to start. Prefer the supplied destination and existing configuration. The local fallback is a tracker adapter, not a different specification format.
 
-Use the complete upstream spec and ticket templates. Record agreed implementation and testing decisions using the supplied evidence. Inspect existing code and primary sources to resolve factual questions. Keep proposed technical choices visibly distinct from decisions the user has made.
+Use the complete upstream spec and ticket templates, with these adaptations:
+
+- In the spec's Problem Statement, restate the user's goal and the problem in your own words
+- Number the spec's user stories `US_101`, `US_102`, and onward, as `- US_101: As an <actor>, I want a <feature>, so that <benefit>`. List the use cases, including edge cases, under User Stories
+- Answer N/A in a section that does not apply, unless the template says to omit it, and add a section when the work needs one
+- For specs, replace Further Notes with this block and carry its notes over; for tickets, append the block. It holds what the agent doing the work needs and the other sections do not cover; the human reading the issue can skip it
+
+```md
+## 👨🏻‍🍳 For the agent
+
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
+```
+
+Record agreed implementation and testing decisions using the supplied evidence. Inspect existing code and primary sources to resolve factual questions. Keep proposed technical choices visibly distinct from decisions the user has made.
 
 ## Runtime and dependencies
 

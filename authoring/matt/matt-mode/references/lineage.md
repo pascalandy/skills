@@ -22,7 +22,7 @@ Each file tracked by this lock has one canonical runtime copy. Internal procedur
 
 The importer removes the opening skill frontmatter, except a procedure's one-line `description`, which the remote skill lists show, and rewrites file links affected by relocation. It preserves the remaining upstream instructions and supporting assets. Upstream agent registration metadata is excluded because the local entrypoints own invocation. There are no editorial patches, compressed replacement procedures, or duplicate local spec and ticket templates.
 
-Read [local adaptations](local-adaptations.md) for differences in authorization, tracker configuration, planning scope and research capabilities. Standalone wrappers document their own integration differences. These files are handwritten and remain outside the importer. Fidelity of the text does not mean that every upstream environment assumption applies unchanged.
+Read [local adaptations](local-adaptations.md) for differences in authorization, tracker configuration, issue format, planning scope and research capabilities. Standalone wrappers document their own integration differences. These files are handwritten and remain outside the importer. Fidelity of the text does not mean that every upstream environment assumption applies unchanged.
 
 ## Refresh from an upstream checkout
 
