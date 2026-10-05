@@ -66,6 +66,7 @@ A mode's routes run through that mode's SKILL.md.
 - `headless`: Use when running `codex exec`, `codex exec review`, Claude Code, Grok, OpenCode, or Pi headlessly or non-interactively, including a scripted review by one of them. `headless` may arrive as any voice-to-text spelling that sounds like it, such as `endless` or `adless`.
 - `how`: Use for questions about how code works, code walkthroughs before changes, or questions about placement, ownership, and layering. Use `why` for design motivation.
 - `interrogate`: Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots.
+- `json-config-schema`: Use when creating, reviewing, changing, versioning, or validating the JSON Schema of a JSON config file.
 - `label-for-issues`: Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
