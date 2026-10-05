@@ -37,6 +37,7 @@ def test_a_failing_check_signs_nothing(github: Sandbox) -> None:
     result = github.run("signoff.py", FAKE_CHECK_EXIT="1")
 
     assert result.returncode == 1
+    assert '{"ok":false,"errors":["lint failed"]}' in result.stderr
     assert "just check failed" in result.stderr
     assert github.statuses() == {}
 
@@ -118,6 +119,7 @@ def test_signs_nothing_when_github_moves_during_the_checks(github: Sandbox) -> N
 
     assert result.returncode == 1
     assert "origin/feature moved" in result.stderr
+    assert '{"ok":true}' not in result.stderr, "the check's verdict is not signoff's"
     assert github.statuses() == {}
 
 

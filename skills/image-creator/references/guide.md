@@ -6,7 +6,7 @@ Two modes: Codex plan by default, OpenRouter for explicitly requested GPT Image 
 
 Default to the Codex plan with `gpt-image-2`. A request for higher quality, or the presence of an API key, never switches to paid generation. If the plan is unavailable, stop with the readiness error.
 
-Only an explicit request for 2.5 selects OpenRouter. Use `--model flare` for generic 2.5 or Flare, `--model sunburst` for Sunburst. These flags select `--backend openrouter`, require `OPENROUTER_API_KEY`, and bill the OpenRouter account. Both generation and edits use `POST https://openrouter.ai/api/v1/images`.
+Only an explicit request for 2.5 selects OpenRouter. Use `--model flare` for generic 2.5 or Flare, `--model sunburst` for Sunburst. These flags select `--backend openrouter`, read the key from the keyring entry `openrouter`, user `api_key`, then from `OPENROUTER_API_KEY`, and bill the OpenRouter account. Both generation and edits use `POST https://openrouter.ai/api/v1/images`.
 
 Choose a preset, then set dimensions for the destination. For comparisons, specify backend, model, quality, size, and candidate count explicitly. Inspect the resolved request with `--dry-run --json` before generating.
 

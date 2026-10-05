@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-03
+date_updated: 2026-10-04
 ---
 
 Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
@@ -16,9 +16,9 @@ Every CLI in `scripts/` follows this contract. A skill-local script may follow i
 
 ## Baseline
 
-Every script meets all of these. No exception waives an exit code, the Rule of Silence, or help behavior.
+Every script meets all of these. No exception waives an exit code, the output rule, or help behavior.
 
-Output follows the Rule of Silence: when nothing needs saying, print nothing
+Output follows [[script-output]]: one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`. A new script answers that way from the start. An older script its State section does not mark "now" still follows the Rule of Silence: when nothing needs saying, print nothing
 
 - stdout holds the primary result only: data, IDs, paths, or change lines. No banners or status lines
 - A failure leaves stdout empty. Under `--json`, the error is one JSON object on stderr
@@ -34,7 +34,7 @@ Exit codes, all listed in `--help`:
 Help and errors:
 
 - `-h`, `--help`: help on stdout, exit 0, with 2–5 examples. It wins over every other argument before `--`, including unknown flags
-- A usage error prints short usage, the error, and `run '<name> --help'` on stderr, then exits 2
+- A usage error prints short usage, the error, and `run '<name> --help'` on stderr, then exits 2. A script that answers in JSON puts the error and `"help":"<name> --help"` in its line instead
 - An error says what failed, then the exact command that fixes it. Stack traces appear only with `--debug`
 
 Parsing:
@@ -60,7 +60,7 @@ Add a row's flags only when the script has the matching behavior.
 | is installed as a command or has a release version | `--version`: one line on stdout, `<name> <version>` |
 | has steps worth reporting | `-v`, `--verbose`: progress and step details on stderr |
 | has failures worth diagnosing: network, locks, or subprocesses | `--debug`, also `<NAME>_DEBUG=1`: internals, timings, and stack traces on stderr |
-| has output read by programs or agents | `--json`: stdout is one JSON object and nothing else |
+| has output read by programs or agents, and does not answer in JSON yet | `--json`: stdout is one JSON object and nothing else |
 | emits color | `--no-color` |
 | changes state | `-n`, `--dry-run`: preview in the same format as a real run |
 | asks for confirmation | `-y`, `--yes`; `--no-input`: never prompt, and a missing value exits 2 naming the flag |
@@ -80,7 +80,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state prints one change line per change, `<action>\t<object>`, with an optional third tab-separated detail. A real run and its dry run print the same lines; a no-op prints nothing. `--check` is a dry run that exits 1 when a change is pending, with the change lines on stderr. Hooks stay silent
+A script that answers in JSON lists its changes under `changes`, as [[script-output]] shows. An older command that changes state prints one change line per change, `<action>\t<object>`, with an optional third tab-separated detail. A real run and its dry run print the same lines; a no-op prints nothing. `--check` is a dry run that exits 1 when a change is pending, with the change lines on stderr. Hooks stay silent
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 
@@ -111,7 +111,7 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 
 `scripts/_cli.py` holds the contract pieces: the parser, the help pre-scan, signal handling, `<NAME>_DEBUG`, color detection, the duration parser, the exit-code table, and `ScriptError` (1), `UsageError` (2), and `TemporaryError` (75). Everything below its `cli-block` marker is the block a skill script pastes whole; `just check --only cli-block` fails when a copy differs, and `uv run scripts/check_cli_block.py --fix` rewrites the copies. Keep the block on the standard library and Python 3.10
 
-`scripts/_common.py` builds the `scripts/` entry point on it. Build a `Parser` with the script's `exit_codes(...)` table, then return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. `work` returns what stdout holds, or "" to stay silent, and raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, prints output only on success, and turns each outcome into its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
+`scripts/_common.py` builds the `scripts/` entry point on it. Build a `Parser` with the script's `exit_codes(...)` table, then return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. With `json_answer=True`, `work` returns the data beside `ok`, usually `{}`, and `run_script` answers in one JSON line; an older script's `work` returns what stdout holds, or "" to stay silent. `work` raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, prints output only on success, and turns each outcome into its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
 
 Use only the standard library unless a dependency earns its place. Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool through `uv run --quiet`; branching and chaining belong in the script. Bare `just` lists recipes in file order: the `commands` group, most-run first, then the `checks` group; hook-only recipes are `[private]`. `scripts/tests/test_justfile.py` enforces it
 
@@ -123,5 +123,6 @@ Repository test modules live in `scripts/tests/` as `test_<stem>.py`. Each modul
 
 ## Related
 
+- [[script-output]]
 - [[checks]]
 - [[release]]
