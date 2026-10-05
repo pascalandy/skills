@@ -23,6 +23,7 @@ ROOT = SCRIPTS.parent
 
 # Each scripts/ entry point and the name its usage line prints
 ENTRIES = {
+    "scripts/api_keys_validation.py": "just api-keys-validation",
     "scripts/check.py": "just check",
     "scripts/check_cli_block.py": "scripts/check_cli_block.py",
     "scripts/check_frontmatter.py": "just check-frontmatter",

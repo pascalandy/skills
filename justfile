@@ -54,6 +54,12 @@ remote-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py "$@"
 
+# Check that this machine's keyring holds every API key the skills name; presence, not validity
+[group('commands')]
+[no-exit-message]
+api-keys-validation *args:
+    @uv run --quiet scripts/api_keys_validation.py "$@"
+
 # Run the checks that cover changed inputs
 [group('checks')]
 [no-exit-message]

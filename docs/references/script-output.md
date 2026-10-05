@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-10-04
-date_updated: 2026-10-04
+date_updated: 2026-10-05
 ---
 
 A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written. [State](#state) lists the scripts here that follow it today
@@ -100,7 +100,7 @@ The rule rolls out script by script, after Pascal validates `just check` in prod
 
 | Script | Answers in one JSON line |
 |---|---|
-| `just check`, `just check-frontmatter`, `scripts/check_cli_block.py` | now |
+| `just check`, `just check-frontmatter`, `scripts/check_cli_block.py`, `just api-keys-validation` | now |
 | `just signoff`, `just release-check`, `just skills-discover`, `just replay-routing` | #489 |
 | `just compile-skills`, `just remote-skills`, `just install-skills`, `just sync`, `scripts/sync_private.py`, `just sync-fleet`, `just merge` | #490 |
 | scripts inside skills | #494 |

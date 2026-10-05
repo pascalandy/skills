@@ -2,6 +2,7 @@
 name: "verify-transcript"
 description: "Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check."
 kind: "dev"
+api-key: "deepgram"
 ---
 
 # Verify transcript
