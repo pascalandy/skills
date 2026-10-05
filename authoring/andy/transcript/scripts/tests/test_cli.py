@@ -205,7 +205,7 @@ class TestDryRun:
         )
         monkeypatch.setattr(
             transcript,
-            "_acquire_and_transcribe",
+            "_acquire_source",
             lambda *_args: pytest.fail("dry-run started media work"),
         )
 
@@ -360,7 +360,9 @@ class TestDoctor:
 
 
 class TestStructuredRunResult:
-    def test_payload_names_every_published_artifact(self, tmp_path) -> None:
+    def test_payload_names_every_saved_artifact(self, tmp_path) -> None:
+        from datetime import UTC, datetime
+
         import transcript
 
         result_dir = tmp_path / "result"
@@ -381,14 +383,20 @@ class TestStructuredRunResult:
                 effort="medium",
                 summarize=True,
             ),
-            final_dir=result_dir,
+            folder=transcript.ResultFolder(
+                path=result_dir,
+                asset=transcript.SourceAsset(
+                    "youtube", "A video", "https://youtu.be/abc", raw, "abc"
+                ),
+                prompt=None,
+                started=datetime.now(UTC),
+            ),
             saved_files={
                 "transcript": raw,
                 "sentences": sentences,
                 "json": raw_json,
             },
             outcome=transcript.SummaryOutcome(status="succeeded", path=summary),
-            metadata_path=meta,
         )
 
         assert payload["ok"] is True
@@ -408,16 +416,11 @@ class TestStructuredRunResult:
         import transcript
 
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
 
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
+        def fake_download(_url, output_dir, *_args, **_kwargs):
+            audio = output_dir / "audio.webm"
             audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
+            return transcript.DownloadedAudio(audio, "anonymous", "A video", "abc")
 
         monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(
