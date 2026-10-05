@@ -13,7 +13,7 @@ date_updated: 2026-10-04
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 26 | **Last updated:** 2026-10-04
+> **Total pages:** 29 | **Last updated:** 2026-10-04
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -32,6 +32,9 @@ date_updated: 2026-10-04
 |------|-------------|
 | `references/checks.md` | How `just check`, signoff, merge, commit hooks, and the manual CI workflow fit together, and how to change them |
 | `references/install-skills.md` | Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for `just install-skills` |
+| `references/issues-templates/epic-grooming.md` | Epic 5 (#485), the Epic shape to turn into the `epic-grooming` template |
+| `references/issues-templates/to-spec.md` | Spec template copied from `matt-mode ; to-spec` |
+| `references/issues-templates/to-tickets.md` | Ticket templates copied from `matt-mode ; to-tickets` |
 | `references/release.md` | Steps to publish a tagged release |
 | `references/remote-skills-dev.md` | Generated list of the `dev` skills only |
 | `references/remote-skills-general.md` | Generated list of the `general` skills only, for someone who never writes code |

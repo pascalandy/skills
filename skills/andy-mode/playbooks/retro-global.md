@@ -17,7 +17,7 @@ Review the coding agent's **environment** so future runs go better. This is not 
 
 - **Navigation**: how easy was it for the agent to find the right files? Are there hidden dependencies between files? Would a **navigation pointer**, such as a "Read on demand" line in the repo's `AGENTS.md`, make it easier? _Use when_ the session took a long time to find a piece of information.
 - **Automated checks**: could a check have caught a mistake the agent made? Read the repo's `justfile` (usually `just check`) and `lefthook.yml` first, so a check that exists but sits unwired or silently broken is the finding, not a reinvention. A repo with no **guardrail** (no `just check`, or no lefthook hook running it) is itself a finding. _Use when_ the agent made a mistake a check could have caught, or the repo has no guardrail.
-- **Coding standards**: standards live in skills (`coding-language`, `coding-standard`, the `principle-*` skills). Should a skill gain, drop, or clarify a rule? Classify the violation first: a **mechanical** one (a fixed syntactic pattern, a banned API, an import shape, a file-location rule) gets a deterministic check in `just check`, not a rule in prose. Keep skill rules for **judgement calls** no check can replace. Load `writing-for-agents` before proposing edits to a skill or steering file. _Use when_ a review missed a mistake, or the agent broke a rule a skill states.
+- **Coding standards**: standards live in skills (`coding-language`, `coding-standard`, the `principle-*` skills). Report mechanically checkable violations under Automated checks, with a deterministic check in `just check`. For judgement calls, leave findings that meet `retro-skill-usage`'s criteria to that route and report the rest here. Load `writing-for-agents` before proposing edits to a skill or steering file. _Use when_ a review missed a mistake, or the agent broke a rule a skill states.
 - **Steering files**: should always-loaded instructions move behind a pointer, into a skill, or into a check? These load every turn: the global `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and `~/.config/opencode/AGENTS.md`, the repo's `AGENTS.md`, the agent's memory index (`MEMORY.md`), and every skill description. _Use when_ one of them is large, or a skill fired when it should not have, or failed to fire.
 - **Tool economy**: did the agent make expensive tool calls that could be streamlined? Is any custom tooling (a CLI, an MCP server, a `just` recipe) particularly token-inefficient? _Use when_ the agent made an expensive tool call.
 - **No-ops**: look for instructions in steering files or skills that don't change the agent's behavior. Distinguish a useless instruction from one the agent failed to follow. _Use when_ the steering files are large and unwieldy.
@@ -29,13 +29,57 @@ Draft one issue per finding in the repository that owns the change: the project 
 
 **Titles.** Use Conventional Commits in the form `type(scope): subject`, where the scope names the area to change, for example `feat(lefthook): run just check before push`. Use `fix` when an instruction or check is wrong, `docs` when an instruction is only unclear or a pointer is missing, and `feat` when a check, step, or tool is missing. Keep the subject short and imperative, naming the change. Name a real symbol when one carries the change, such as a recipe, file, or flag. Do not add a trailing period.
 
-**Body.** The issue is a briefing for whoever triages and fixes it. Use these sections in order. Drop a section when it has nothing to say.
+**Body.** Follow this template. The end user reads the visible part to decide; the agent that fixes it reads the collapsed details. Answer N/A in a section that does not apply, and add a section when the finding needs one.
 
-- `## Why`. Open with the user story: "As an agent working in `<repo>`, I want …, so that …". Then, in one or two short paragraphs, say what you were trying to do, what went wrong and the evidence, how you worked around it, and the change you propose.
-- `## Scope`. Use bullets to list the files, recipes, hooks, or tools to change. Name both sides of a move or rename. State what is in and out only when the boundary matters.
-- `## Tradeoffs`. Name only alternative fixes a reviewer would otherwise ask about.
-- `## Blast Radius`. In one to three sentences, name which agents, repos, or workflows the change reaches, why it is safe or risky, and the continuing cost if nothing changes.
-- `## Verification`. Name the scenario that failed and the outcome that proves the fix, so whoever fixes it can rerun it.
+````md
+<retro-global>
+
+## The problem (CMO)
+
+**Area:** <Navigation, Automated checks, Coding standards, Steering files, Tool economy, No-ops, or Information access>
+
+**Problem Statement:** As an agent working in `<repo>`, I want <…>, so that <…>
+
+REF: <#N in the issue's repository, owner/repo#N in another>
+
+### Analogy
+
+An everyday analogy in one or two sentences, explain like I'm 12, so the end user can tell the analysis from what is actionable.
+
+- **What should happen:** <in the analogy's terms>
+- **What happened in <PR or session>:** <what the agent did, in the analogy's terms>
+
+### What we saw
+
+What the agent was doing and what it ran into: a failure, a detour, or a missing piece. Say plainly what it cost: time, tokens, or a wrong result.
+
+### What exists today
+
+The check, file, or tool already in place, if any, and why it fell short: missing, unwired, or silently broken.
+
+## Start, Stop, Continue (FMO)
+
+- **Start:** <what the agent or its environment starts doing>
+- **Stop:** <what it stops doing>
+- **Continue:** <what already works and must keep working>
+
+## How we'll know it works
+
+1. **Today:** <how to see the problem or the gap now>
+2. **After the change:** <the same check and the result that proves it>
+3. **Nothing else changes:** <the Continue case keeps its current result>
+
+## 👨🏻‍🍳 For the agent
+
+<details>
+<summary>👨🏻‍🍳 Details</summary>
+
+Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
+
+</details>
+
+</retro-global>
+````
 
 Before publishing:
 
