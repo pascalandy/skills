@@ -16,6 +16,7 @@ from conftest import commit, skill
 FAIL = (sys.executable, "-c", "print('boom'); raise SystemExit(3)")
 MARK = (sys.executable, "-c", "open('ran', 'w').close()")
 TALK = (sys.executable, "-c", "print('child says hi')")
+OK = '{"ok":true}\n'
 
 
 @pytest.fixture
@@ -46,36 +47,38 @@ def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
 
     assert (code, stdout) == (1, "")
     assert "boom" in stderr
-    assert stderr.endswith("error: broken failed; rerun: just check --only broken\n")
+    assert stderr.endswith(
+        '{"ok":false,"errors":["broken failed; rerun: just check --only broken"]}\n'
+    )
     assert (root / "ran").exists(), "the later check must still run"
 
 
-def test_only_runs_the_named_checks_and_success_prints_nothing(
+def test_only_runs_the_named_checks_and_success_answers_ok(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     checks = [Check("broken", FAIL), Check("fine", MARK)]
 
-    assert verdict(monkeypatch, capfd, checks, "--only", "fine") == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks, "--only", "fine") == (0, OK, "")
 
 
-def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_empty(
+def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_for_the_answer(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     code, stdout, stderr = verdict(monkeypatch, capfd, [Check("talk", TALK)], "-v")
 
-    assert (code, stdout) == (0, "")
+    assert (code, stdout) == (0, OK)
     assert stderr.startswith("==> talk: ")
     assert stderr.endswith("child says hi\n")
 
 
-def test_list_prints_names_and_verbose_adds_commands_on_stderr(
+def test_list_answers_the_names_and_verbose_adds_commands_on_stderr(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     checks = [Check("fine", MARK), Check("talk", TALK)]
 
     code, stdout, stderr = verdict(monkeypatch, capfd, checks, "--list", "-v")
 
-    assert (code, stdout) == (0, "fine\ntalk\n")
+    assert (code, stdout) == (0, '{"ok":true,"checks":["fine","talk"]}\n')
     assert stderr.splitlines()[0].startswith(f"fine: {sys.executable} -c ")
 
 
@@ -108,7 +111,7 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
         ),
     ]
 
-    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert sorted(p.name for p in root.glob("*-ran")) == [
         "alpha-ran",
         "gamma-ran",
@@ -116,7 +119,7 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
         "repo-ran",
     ]
 
-    assert verdict(monkeypatch, capfd, checks, "--sweep") == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks, "--sweep") == (0, OK, "")
     assert (root / "beta-ran").exists()
 
 
@@ -197,7 +200,7 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
         monkeypatch, capfd, checks, "--only", "test-alpha", "--only", "test-beta"
     )
 
-    assert (code, stdout, stderr) == (0, "", "")
+    assert (code, stdout, stderr) == (0, OK, "")
     assert pytest_calls(routing_repo) == [
         [
             "--from",
@@ -221,7 +224,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
     checks = registered_checks(routing_repo)
     publish_base(routing_repo, "notes.txt")
 
-    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert pytest_calls(routing_repo) == [
         [
             "--from",
@@ -295,7 +298,7 @@ def test_repository_dependency_changes_select_their_test_modules(
     checks = registered_checks(routing_repo)
     publish_base(routing_repo, changed_path)
 
-    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert [
         arg for arg in pytest_calls(routing_repo)[0] if arg.startswith("scripts/tests/")
     ] == expected
@@ -314,7 +317,7 @@ def test_unregistered_repository_test_fails_before_running_or_listing(
     assert verdict(monkeypatch, capfd, checks, *args) == (
         1,
         "",
-        "error: test check registry is incomplete; unregistered repository tests: scripts/tests/test_new.py\n",
+        '{"ok":false,"errors":["test check registry is incomplete; unregistered repository tests: scripts/tests/test_new.py"]}\n',
     )
 
 
@@ -328,7 +331,7 @@ def test_duplicate_and_stale_registry_entries_fail_before_listing(
     assert verdict(monkeypatch, capfd, checks, "--list") == (
         1,
         "",
-        "error: test check registry is incomplete; duplicate repository tests: scripts/tests/test_known.py\n",
+        '{"ok":false,"errors":["test check registry is incomplete; duplicate repository tests: scripts/tests/test_known.py"]}\n',
     )
 
     checks.pop()
@@ -336,7 +339,7 @@ def test_duplicate_and_stale_registry_entries_fail_before_listing(
     assert verdict(monkeypatch, capfd, checks, "--list") == (
         1,
         "",
-        "error: test check registry is incomplete; missing repository tests: scripts/tests/test_known.py\n",
+        '{"ok":false,"errors":["test check registry is incomplete; missing repository tests: scripts/tests/test_known.py"]}\n',
     )
 
 
@@ -359,7 +362,7 @@ def test_shared_test_dependencies_run_every_repository_module(
     checks = registered_checks(routing_repo)
     publish_base(routing_repo, changed_path)
 
-    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert [
         arg for arg in pytest_calls(routing_repo)[0] if arg.startswith("scripts/tests/")
     ] == [row.test_path for row in checks]
@@ -372,7 +375,7 @@ def test_missing_origin_main_runs_every_repository_module(
 ) -> None:
     checks = registered_checks(routing_repo)
 
-    assert verdict(monkeypatch, capfd, checks) == (0, "", "")
+    assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert [
         arg for arg in pytest_calls(routing_repo)[0] if arg.startswith("scripts/tests/")
     ] == [row.test_path for row in checks]
@@ -389,7 +392,7 @@ def test_verbose_list_shows_the_actual_cheap_test_command(
         monkeypatch, capfd, checks, "--only", "test-commands", "--list", "-v"
     ) == (
         0,
-        "test-commands\n",
+        '{"ok":true,"checks":["test-commands"]}\n',
         "repository-tests: uvx --from pytest@9.1.1 pytest scripts/tests/test_commands.py\n",
     )
     assert not (routing_repo / "pytest-calls").exists()
@@ -409,7 +412,7 @@ def test_failed_batch_names_an_executable_rerun_and_continues(
     assert (code, stdout) == (1, "")
     assert "batch boom" in stderr
     assert stderr.endswith(
-        "error: repository-tests failed; rerun: just check --only test-alpha --only test-beta\n"
+        '{"ok":false,"errors":["repository-tests failed; rerun: just check --only test-alpha --only test-beta"]}\n'
     )
     assert (routing_repo / "ran").exists()
 

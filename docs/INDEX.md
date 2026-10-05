@@ -13,7 +13,7 @@ date_updated: 2026-10-04
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 26 | **Last updated:** 2026-10-04
+> **Total pages:** 27 | **Last updated:** 2026-10-04
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -38,4 +38,5 @@ date_updated: 2026-10-04
 | `references/remote-skills-general.md` | Generated list of the `general` skills only, for someone who never writes code |
 | `references/remote-skills.md` | Generated name and description of every skill in `skills/`, grouped by kind with modes first, each with its routes and their descriptions, for agents that cannot load these skills |
 | `references/script-conventions.md` | The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it |
+| `references/script-output.md` | How a script answers in one JSON line, how agents and scripts read the answer, and why each choice was made |
 | `references/skill-count.md` | Generated count of skills per `authoring/` category and kind, to spot skills that appeared or vanished |

@@ -2,13 +2,33 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 SCRIPTS = Path(__file__).parent.parent
+# A child given a scratch HOME, in a terminal without the XDG variables, would
+# make mise's shims, such as uv, read ~/.config/mise/config.toml as an untrusted
+# project config, or look up tool versions on GitHub and warn on stderr, so
+# mise keeps its real folders, as in verify-skills. mise reads an empty value as
+# unset, and caches under ~/Library/Caches on macOS
+for variable, xdg, default in (
+    ("MISE_CONFIG_DIR", "XDG_CONFIG_HOME", ".config"),
+    ("MISE_DATA_DIR", "XDG_DATA_HOME", ".local/share"),
+    ("MISE_STATE_DIR", "XDG_STATE_HOME", ".local/state"),
+    (
+        "MISE_CACHE_DIR",
+        "XDG_CACHE_HOME",
+        "Library/Caches" if sys.platform == "darwin" else ".cache",
+    ),
+):
+    if not os.environ.get(variable):
+        base = os.environ.get(xdg) or str(Path.home() / default)
+        os.environ[variable] = str(Path(base) / "mise")
 # Tests replace HOME, which hides the global git config, so commits the scripts
 # make need an identity from the environment.
 GIT_IDENTITY = {

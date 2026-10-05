@@ -25,6 +25,20 @@ printf '{"type":"thread.started","thread_id":"%s"}\\n' "$id"
 printf 'TRACE codex_http_client::transport: POST to https://chatgpt.com/backend-api/codex/images/generations: %s\\n' "$FAKE_TRACE_BODY" >&2
 """
 
+# Shadows a real chezmoi, so no test reads this machine's keyring. It answers
+# only the exact OpenRouter lookup, and holds a key only when
+# FAKE_KEYRING_OPENROUTER is set
+FAKE_CHEZMOI = """#!/bin/sh
+echo "$*" >> "$FAKE_CHEZMOI_LOG"
+if [ "$*" != "secret keyring get --service=openrouter --user=api_key" ]; then
+  echo "unexpected call: $*" >&2
+  exit 64
+fi
+if [ -n "$FAKE_KEYRING_OPENROUTER" ]; then echo "$FAKE_KEYRING_OPENROUTER"; exit 0; fi
+echo "chezmoi: secret not found in keyring" >&2
+exit 1
+"""
+
 
 def png_bytes(width: int, height: int, mode: str = "RGB") -> bytes:
     buffer = io.BytesIO()
@@ -40,7 +54,13 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("FAKE_KEYRING_OPENROUTER", raising=False)
+    monkeypatch.setenv("FAKE_CHEZMOI_LOG", str(tmp_path / "chezmoi.log"))
+    image_creator.openrouter_key.cache_clear()
     (tmp_path / "bin").mkdir()
+    chezmoi = tmp_path / "bin" / "chezmoi"
+    chezmoi.write_text(FAKE_CHEZMOI)
+    chezmoi.chmod(chezmoi.stat().st_mode | stat.S_IEXEC)
     return tmp_path
 
 
@@ -168,6 +188,7 @@ def test_openrouter_key_never_changes_the_default_mode(
     assert code == 0
     receipt = json.loads(stdout)
     assert receipt["backend"] == "plan"
+    assert not (plan_login / "chezmoi.log").exists()
     if intent is None:
         assert receipt["intent"] == "high"
         assert receipt["outputs"] == [str(plan_login / f"out-{i}.png") for i in (1, 2)]
@@ -267,6 +288,59 @@ def test_explicit_model_uses_openrouter_image_protocol(
     assert receipt["backend"] == "openrouter"
     assert receipt["usage"]["cost"] == 0.013
     assert out.read_bytes() == original
+
+
+def test_the_keyring_key_wins_over_the_variable(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_KEYRING_OPENROUTER", "sk-keyring")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-env")
+    image = png_bytes(1024, 1024)
+    sent: list[str | None] = []
+
+    def respond(request: urllib.request.Request, timeout: int) -> io.BytesIO:
+        sent.append(request.get_header("Authorization"))
+        body = {"data": [{"b64_json": base64.b64encode(image).decode()}]}
+        return io.BytesIO(json.dumps(body).encode())
+
+    monkeypatch.setattr(image_creator.urllib.request, "urlopen", respond)
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys, "generate", "--model", "flare", "--prompt", "poster", "--out", str(out)
+    )
+    assert (code, err) == (0, "")
+    assert "sk-keyring" not in stdout
+    assert sent == ["Bearer sk-keyring"]
+    assert (env / "chezmoi.log").read_text().splitlines() == [
+        "secret keyring get --service=openrouter --user=api_key"
+    ]
+    assert run(capsys, "doctor", "--json")[1] == (
+        '{"plan": {"ready": false, "detail": "codex is not on PATH"}, '
+        '"openrouter": {"ready": true, "detail": "the keyring holds the OpenRouter key"}}\n'
+    )
+
+
+def test_without_any_openrouter_key_the_error_says_how_to_add_one(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, _, err = run(
+        capsys,
+        "generate",
+        "--model",
+        "flare",
+        "--prompt",
+        "poster",
+        "--out",
+        str(env / "out.png"),
+        "--dry-run",
+    )
+    assert code == 2
+    assert (
+        "OpenRouter backend unavailable: no OpenRouter key; run `chezmoi secret "
+        "keyring set --service=openrouter --user=api_key`, or set OPENROUTER_API_KEY"
+    ) in err
 
 
 def test_explicit_openrouter_defaults_to_high_intent(

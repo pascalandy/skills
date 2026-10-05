@@ -1,6 +1,7 @@
 ---
 description: "Manage Trello boards, lists, and cards through the Trello REST API."
 configuration-is-needed: true
+api-key: "TRELLO_API_KEY, TRELLO_TOKEN"
 ---
 
 # Trello Skill

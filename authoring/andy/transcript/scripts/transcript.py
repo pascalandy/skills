@@ -3,6 +3,7 @@
 # dependencies = [
 #     "httpx",
 #     "yt-dlp==2026.7.4",
+#     "pycryptodomex",
 #     "rich",
 # ]
 # ///
@@ -239,7 +240,7 @@ from rich.markdown import Markdown
 from rich.progress import Progress, ProgressColumn, SpinnerColumn, Task, TextColumn
 from rich.text import Text
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 
 PROG = "transcript"
 DEBUG_ENV = "TRANSCRIPT_DEBUG"
@@ -248,7 +249,7 @@ GRACE = 10.0
 
 EXIT_CODES = exit_codes(
     {
-        1: "failure; a failed summary still publishes the transcript",
+        1: "failure; the result folder keeps what the run saved",
         TEMPORARY: "temporary failure before any paid request; safe to retry",
     }
 )
@@ -586,10 +587,12 @@ class YtDlpResult:
 
 @dataclass(frozen=True)
 class DownloadedAudio:
-    """Downloaded audio path and the YouTube access method that produced it."""
+    """Downloaded audio, the video it came from, and the YouTube access method."""
 
     path: Path
     method: YtDlpMethod
+    title: str
+    video_id: str
 
 
 @dataclass(frozen=True)
@@ -623,33 +626,73 @@ class RunBudget:
         return min(remaining, maximum) if maximum is not None else remaining
 
 
+@dataclass
+class ResultFolder:
+    """A visible result folder and the run state its metadata reports.
+
+    The folder appears before the paid transcription, and each stage rewrites
+    the metadata, so a reader always sees how far the run got. Zoom names each
+    file after the folder, through `base_stem`.
+    """
+
+    path: Path
+    asset: SourceAsset
+    prompt: PromptSpec | None
+    started: datetime
+    base_stem: str | None = None
+    transcript_status: str = "in progress"
+    transcript_error: str | None = None
+    audio_bytes: int | None = None
+    summary_status: str = "pending"
+    usage: dict | None = None
+    summary_error: str | None = None
+
+    @property
+    def metadata_path(self) -> Path:
+        return self.path / (
+            f"{self.base_stem}.meta.txt" if self.base_stem else "meta.txt"
+        )
+
+    def save_metadata(self) -> None:
+        lines = [
+            f"Title: {self.asset.title}",
+            f"Date: {self.started.strftime('%Y_%m_%d %Hh%M')}",
+            f"Source: {self.asset.source}",
+        ]
+        if self.asset.youtube_method is not None:
+            lines.append(f"YouTube audio method: {self.asset.youtube_method}")
+        lines.append(f"Transcript status: {self.transcript_status}")
+        if self.audio_bytes is not None:
+            lines.append(f"Audio upload: complete ({self.audio_bytes} bytes)")
+        if self.transcript_error:
+            lines.append(f"Transcript error: {self.transcript_error}")
+        lines.append(f"Prompt: {self.prompt.path if self.prompt else 'none'}")
+        lines.append(f"Summary status: {self.summary_status}")
+        if self.summary_status in {"succeeded", "failed", "skipped"}:
+            lines.append(format_summary_meta(self.usage))
+        if self.summary_error:
+            lines.append(f"Summary error: {self.summary_error}")
+        write_text_atomic(self.metadata_path, "\n".join(lines) + "\n")
+
+    def stop(self, status: Literal["failed", "interrupted"], error: str = "") -> None:
+        """Record why the run stopped in the stage it reached. A metadata write
+        failure is ignored, so the original failure stays the one reported."""
+        if self.transcript_status == "in progress":
+            self.transcript_status = status
+            self.transcript_error = error or None
+            if self.prompt is not None:
+                self.summary_status = "not started"
+        elif self.prompt is not None:
+            self.summary_status = status
+            self.summary_error = error or None
+        with suppress(OSError):
+            self.save_metadata()
+
+
 @dataclass(frozen=True)
-class StagedPublication:
-    """Adjacent staging directory and the final directory it will become."""
+class SavedRun:
+    """A saved run's JSON payload and summary outcome."""
 
-    staging_dir: Path
-    final_dir: Path
-    base_stem: str | None
-
-    def publish(self) -> None:
-        """Expose the complete result with one directory rename."""
-        if self.final_dir.exists():
-            raise FileExistsError(
-                f"Output appeared before publication: {self.final_dir}"
-            )
-        self.staging_dir.rename(self.final_dir)
-
-    def cleanup(self) -> None:
-        """Remove an unpublished staging tree without touching final results."""
-        if self.staging_dir.exists():
-            shutil.rmtree(self.staging_dir)
-
-
-@dataclass(frozen=True)
-class PublishedRun:
-    """A published result folder, its JSON payload, and summary outcome."""
-
-    final_dir: Path
     payload: dict
     summary: SummaryOutcome
 
@@ -1053,26 +1096,6 @@ def _clean_subprocess_diagnostic(text: str) -> str:
     return " ".join(without_controls.split())[:2000]
 
 
-def get_video_info(url: str, budget: RunBudget) -> dict:
-    """Get video title and ID using yt-dlp."""
-    result = run_ytdlp(["--get-title", "--get-id"], url, budget).process
-
-    if not result.stdout.strip():
-        raise ValueError("Could not retrieve video info")
-
-    lines = result.stdout.strip().split("\n")
-    if len(lines) < 2:
-        raise ValueError("Could not retrieve video title and ID")
-
-    title = lines[0]
-    video_id = lines[1]
-
-    if not title or title == "NA":
-        raise ValueError("Video may be private, deleted, or unavailable")
-
-    return {"title": title, "video_id": video_id}
-
-
 def clean_title(title: str) -> str:
     """Clean video title for filesystem use."""
     cleaned = re.sub(r"[^a-zA-Z0-9 ]", "", title)
@@ -1080,14 +1103,24 @@ def clean_title(title: str) -> str:
     return cleaned[:50]
 
 
-def _select_unique_output_path(output_root: Path, base_name: str) -> Path:
-    """Select an unused visible result name without reserving it."""
+def make_unique_dir(output_root: Path, base_name: str) -> Path:
+    """Create a folder named `base_name`, or `base_name-N` when that name is
+    taken. Creating the folder reserves its name, so two runs never share one."""
+    output_root.mkdir(parents=True, exist_ok=True)
     for index in range(1, 1000):
         suffix = "" if index == 1 else f"-{index}"
         candidate = output_root / f"{base_name}{suffix}"
-        if not candidate.exists():
-            return candidate
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        return candidate
     raise RuntimeError(f"Could not find a unique output folder for: {base_name}")
+
+
+# The best audio-only stream up to 64 kbit/s, usually Opus. Speech needs no more,
+# and Deepgram takes it as is, so no transcode slows the run
+YTDLP_AUDIO_FORMAT = "ba[abr<=64]/ba/b"
 
 
 def download_audio(
@@ -1097,28 +1130,50 @@ def download_audio(
     *,
     auth_mode: YtDlpAuthMode = "normal",
 ) -> DownloadedAudio:
-    """Download audio from YouTube as MP3."""
-    output_template = str(output_dir / "audio.%(ext)s")
+    """Download native YouTube audio, and its video's title and ID, in one
+    yt-dlp call."""
     result = run_ytdlp(
-        ["-x", "--audio-format", "mp3", "--audio-quality", "0", "-o", output_template],
+        [
+            "-f",
+            YTDLP_AUDIO_FORMAT,
+            "-o",
+            str(output_dir / "audio.%(ext)s"),
+            "--no-simulate",
+            "--print",
+            "after_move:%(.{id,title,filepath})j",
+        ],
         url,
         budget,
         auth_mode=auth_mode,
     )
-    audio_path = output_dir / "audio.mp3"
-    if not audio_path.exists():
+    try:
+        info = json.loads(result.process.stdout.strip().splitlines()[-1])
+    except (IndexError, json.JSONDecodeError) as error:
+        raise ValueError("yt-dlp did not describe the downloaded audio") from error
+    title, video_id = info.get("title"), info.get("id")
+    if not title or not video_id:
+        raise ValueError("Video may be private, deleted, or unavailable")
+    audio_path = Path(info.get("filepath") or "")
+    if not audio_path.is_file():
         raise FileNotFoundError("Audio download failed")
-    return DownloadedAudio(audio_path, result.method)
+    return DownloadedAudio(audio_path, result.method, title, video_id)
+
+
+AUDIO_CONTENT_TYPES = {
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".mp3": "audio/mp3",
+    ".webm": "audio/webm",
+    ".opus": "audio/ogg",
+    ".ogg": "audio/ogg",
+}
 
 
 def get_audio_content_type(audio_path: Path) -> str:
     """Return the best Deepgram content type for a local audio file."""
-    suffix = audio_path.suffix.lower()
-    if suffix == ".m4a":
-        return "audio/mp4"
-    if suffix == ".mp3":
-        return "audio/mp3"
-    return "application/octet-stream"
+    return AUDIO_CONTENT_TYPES.get(
+        audio_path.suffix.lower(), "application/octet-stream"
+    )
 
 
 def transcribe_audio(
@@ -1283,7 +1338,7 @@ def save_outputs(
 
 
 def open_folder(path: Path, budget: RunBudget) -> None:
-    """Open a completed output folder in Finder on macOS."""
+    """Open a result folder in Finder on macOS."""
     if platform.system() == "Darwin":
         try:
             run_child(
@@ -1292,7 +1347,7 @@ def open_folder(path: Path, budget: RunBudget) -> None:
                 timeout=budget.remaining("Finder", POST_RUN_TIMEOUT),
             )
         except (subprocess.TimeoutExpired, OSError) as error:
-            # The result is already published; a GUI nicety cannot fail the run
+            # A GUI nicety cannot fail the run
             log.warning(
                 "Could not open the output folder in Finder: "
                 f"{error or type(error).__name__}"
@@ -1331,13 +1386,6 @@ def render_markdown_with_glow(
     if result.returncode != 0:
         log.info("glow failed; rendering markdown with rich")
         markdown.print(Markdown(markdown_text))
-
-
-def print_result_path(result_dir: Path, *, preview_follows: bool) -> None:
-    """Print the result path and separate an interactive Markdown preview."""
-    print(result_dir)
-    if preview_follows and sys.stdout.isatty():
-        print()
 
 
 def ensure_cli_available(command_name: str) -> None:
@@ -1464,16 +1512,6 @@ def zoom_output_base_name(meeting_dir: Path) -> str:
     if match:
         return f"{match.group('date')} {match.group('name')}"
     return folder_name
-
-
-def unique_zoom_base_stem(export_root: Path, base_name: str) -> str:
-    """Return a base stem whose Zoom output folder does not already exist."""
-    for index in range(1, 1000):
-        suffix = "" if index == 1 else f"-{index}"
-        candidate = f"{base_name}{suffix}"
-        if not (export_root / candidate).exists():
-            return candidate
-    raise RuntimeError(f"Could not find a unique output folder for: {base_name}")
 
 
 def resolve_zoom_prompt() -> PromptSpec:
@@ -1881,7 +1919,7 @@ def _add_run_options(
     output.add_argument(
         "--open",
         action="store_true",
-        help="Open the published result folder in Finder",
+        help="Open the result folder in Finder as soon as it appears",
     )
     output.add_argument(
         "-n",
@@ -1984,8 +2022,8 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help_text="Transcribe one or more YouTube videos",
         description=(
             "Download and transcribe each YouTube video's audio, one URL at a "
-            "time. Each result folder prints as soon as it is published, and a "
-            "failed URL lets the others run unless its publication failed."
+            "time. Each result folder prints as soon as it appears, and a "
+            "failed URL lets the others run unless its result could not be saved."
         ),
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
@@ -2309,35 +2347,6 @@ def _transcribe_source(
     response = transcribe_audio(asset.audio_path, api_key, budget)
     plain, timestamped, json_data = parse_transcript(response)
     return TranscriptArtifacts(plain, timestamped, json_data, audio_bytes)
-
-
-def _write_metadata(
-    *,
-    output_dir: Path,
-    asset: SourceAsset,
-    audio_bytes: int,
-    base_stem: str | None,
-    prompt: PromptSpec | None,
-    status: str,
-    usage_stats: dict | None,
-    summary_error: str | None,
-) -> None:
-    """Persist an explicit complete, skipped, or partial run status."""
-    lines = [
-        f"Title: {asset.title}",
-        f"Date: {datetime.now(UTC).astimezone().strftime('%Y_%m_%d %Hh%M')}",
-        f"Source: {asset.source}",
-        f"Audio upload: complete ({audio_bytes} bytes)",
-        f"Prompt: {prompt.path if prompt else 'none'}",
-        f"Summary status: {status}",
-        format_summary_meta(usage_stats),
-    ]
-    if asset.youtube_method is not None:
-        lines.insert(3, f"YouTube audio method: {asset.youtube_method}")
-    if summary_error:
-        lines.append(f"Summary error: {summary_error}")
-    filename = f"{base_stem}.meta.txt" if base_stem else "meta.txt"
-    write_text_atomic(output_dir / filename, "\n".join(lines) + "\n")
 
 
 def _print_discovery(args: argparse.Namespace, prompts: list[PromptSpec]) -> bool:
@@ -2672,21 +2681,20 @@ def _run_doctor(args: argparse.Namespace) -> int:
 def _run_result_payload(
     *,
     plan: RunPlan,
-    final_dir: Path,
+    folder: ResultFolder,
     saved_files: dict[str, Path],
     outcome: SummaryOutcome,
-    metadata_path: Path,
 ) -> dict:
-    """Describe a published run with paths that remain valid after staging."""
-    artifacts = {kind: str(final_dir / path.name) for kind, path in saved_files.items()}
-    artifacts["metadata"] = str(final_dir / metadata_path.name)
+    """Describe a run whose transcript is saved, with each artifact's path."""
+    artifacts = {kind: str(path) for kind, path in saved_files.items()}
+    artifacts["metadata"] = str(folder.metadata_path)
     if outcome.path is not None:
-        artifacts["summary"] = str(final_dir / outcome.path.name)
+        artifacts["summary"] = str(outcome.path)
     return {
         "ok": outcome.status != "failed",
         "command": "run",
         "source": plan.source_kind,
-        "output_dir": str(final_dir),
+        "output_dir": str(folder.path),
         "summary": {
             "status": outcome.status,
             "profile": plan.profile if plan.summarize else None,
@@ -2725,92 +2733,158 @@ def _validate_source_selection(plan: RunPlan, args: argparse.Namespace) -> None:
     args.resolved_zoom_audio = find_zoom_audio(meeting_dir)
 
 
-def _acquire_and_transcribe(
+def _acquire_source(
     plan: RunPlan,
     args: argparse.Namespace,
-    api_key: str,
+    audio_dir: Path,
     budget: RunBudget,
     reporter: ExecutionReporter,
-) -> tuple[SourceAsset, TranscriptArtifacts]:
-    """Resolve source media, transcribe it, and always clean downloaded audio."""
-    temporary_audio: tempfile.TemporaryDirectory[str] | None = None
-    try:
-        if plan.source_kind == "zoom":
-            with reporter.step("Zoom audio") as step:
-                meeting_dir = args.resolved_zoom_meeting
-                audio_path = args.resolved_zoom_audio
-                step.detail = audio_path.name
-            asset = SourceAsset(
-                kind="zoom",
-                title=meeting_dir.name,
-                source=str(audio_path),
-                audio_path=audio_path,
-                video_id="zoom",
-                meeting_dir=meeting_dir,
-            )
-        else:
-            with reporter.step("YouTube information"):
-                info = retry_request(
-                    lambda: get_video_info(args.url, budget),
-                    deadline=budget.deadline,
-                )
-            temporary_audio = tempfile.TemporaryDirectory(prefix="transcript-audio-")
-            with reporter.step("Audio download") as step:
-                downloaded = retry_request(
-                    lambda: download_audio(
-                        args.url, Path(temporary_audio.name), budget
-                    ),
-                    deadline=budget.deadline,
-                )
-                step.detail = f"method={downloaded.method}"
-            asset = SourceAsset(
-                kind="youtube",
-                title=info["title"],
-                source=args.url,
-                audio_path=downloaded.path,
-                video_id=info["video_id"],
-                youtube_method=downloaded.method,
-            )
-        # A deadline that has already passed stops the run before any paid
-        # request, so it stays safe to retry
-        budget.remaining("Deepgram transcription")
-        with reporter.step("Deepgram transcription") as step:
-            # From here on, a failure may follow a paid request
-            try:
-                artifacts = _transcribe_source(asset, api_key, budget)
-            except (httpx.HTTPError, WorkflowTimeoutError) as error:
-                raise DeepgramError(error) from error
-            step.detail = f"words={len(artifacts.plain.split())}"
-        return asset, artifacts
-    finally:
-        if temporary_audio is not None:
-            temporary_audio.cleanup()
+) -> SourceAsset:
+    """Resolve the Zoom recording, or download YouTube audio into `audio_dir`."""
+    if plan.source_kind == "zoom":
+        with reporter.step("Zoom audio") as step:
+            meeting_dir = args.resolved_zoom_meeting
+            audio_path = args.resolved_zoom_audio
+            step.detail = audio_path.name
+        return SourceAsset(
+            kind="zoom",
+            title=meeting_dir.name,
+            source=str(audio_path),
+            audio_path=audio_path,
+            video_id="zoom",
+            meeting_dir=meeting_dir,
+        )
+    with reporter.step("Audio download") as step:
+        downloaded = retry_request(
+            lambda: download_audio(args.url, audio_dir, budget),
+            deadline=budget.deadline,
+        )
+        step.detail = f"method={downloaded.method}"
+    return SourceAsset(
+        kind="youtube",
+        title=downloaded.title,
+        source=args.url,
+        audio_path=downloaded.path,
+        video_id=downloaded.video_id,
+        youtube_method=downloaded.method,
+    )
 
 
-def _create_staged_publication(
-    plan: RunPlan, args: argparse.Namespace, asset: SourceAsset
-) -> StagedPublication:
-    """Create hidden adjacent staging while leaving the final name unconsumed."""
+def _create_result_folder(
+    plan: RunPlan,
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    asset: SourceAsset,
+    prompt: PromptSpec | None,
+) -> ResultFolder:
+    """Create the visible result folder with its first metadata, before any paid
+    request. A folder whose first metadata write fails is removed."""
+    started = datetime.now(UTC).astimezone()
     if plan.source_kind == "youtube":
         output_root = args.output_dir.expanduser() if args.output_dir else OUTPUT_DIR
-        date_formatted = datetime.now(UTC).astimezone().strftime("%Y_%m_%d_%Hh%M")
+        date_formatted = started.strftime("%Y_%m_%d_%Hh%M")
         base_name = f"{date_formatted}_{clean_title(asset.title)}_{asset.video_id}"
-        base_stem = None
     else:
         if asset.meeting_dir is None:
             raise RuntimeError("Zoom source is missing its meeting directory")
         output_root = (args.zoom_export_path or ZOOM_EXPORT_DIR).expanduser()
         base_name = zoom_output_base_name(asset.meeting_dir)
-        base_stem = unique_zoom_base_stem(output_root, base_name)
 
-    output_root.mkdir(parents=True, exist_ok=True)
-    final_dir = _select_unique_output_path(output_root, base_name)
-    if base_stem is not None:
-        base_stem = final_dir.name
-    staging_dir = Path(
-        tempfile.mkdtemp(prefix=f".{final_dir.name}.staging-", dir=output_root)
+    path: Path | None = None
+    try:
+        path = make_unique_dir(output_root, base_name)
+        folder = ResultFolder(
+            path,
+            asset,
+            prompt,
+            started,
+            base_stem=path.name if plan.source_kind == "zoom" else None,
+            summary_status="pending" if prompt is not None else "skipped",
+        )
+        folder.save_metadata()
+    except (OSError, RuntimeError) as error:
+        if path is not None:
+            with suppress(OSError):
+                path.rmdir()
+        raise Failure(
+            "publication_failed",
+            f"Could not create the result folder: {error}",
+            _other_output_dir(argv),
+        ) from error
+    return folder
+
+
+def _transcribe(
+    asset: SourceAsset,
+    api_key: str,
+    budget: RunBudget,
+    reporter: ExecutionReporter,
+) -> TranscriptArtifacts:
+    """Send the audio to Deepgram; from its request on, a failure may be billed."""
+    # A deadline that has already passed stops the run before any paid
+    # request, so it stays safe to retry
+    budget.remaining("Deepgram transcription")
+    with reporter.step("Deepgram transcription") as step:
+        try:
+            artifacts = _transcribe_source(asset, api_key, budget)
+        except (httpx.HTTPError, WorkflowTimeoutError) as error:
+            raise DeepgramError(error) from error
+        step.detail = f"words={len(artifacts.plain.split())}"
+    return artifacts
+
+
+# Every error acquiring or transcribing audio; _transcription_failure reports each
+TRANSCRIPTION_ERRORS = (
+    ValueError,
+    OSError,
+    RuntimeError,
+    httpx.HTTPError,
+    subprocess.SubprocessError,
+)
+
+
+def _transcription_failure(
+    error: Exception, plan: RunPlan, args: argparse.Namespace, argv: Sequence[str]
+) -> Failure:
+    """The Failure that reports an error while acquiring or transcribing audio."""
+    match error:
+        case DeepgramError(retry_safe=True):
+            return Failure(
+                "temporary_failure",
+                f"Deepgram did not take the audio: {error}",
+                _rerun(argv),
+                code=TEMPORARY,
+                label="retry",
+            )
+        case DeepgramError(timed_out=True):
+            return Failure(
+                "transcription_timeout",
+                f"{error}. Deepgram may have received the audio, so a rerun "
+                "transcribes it again",
+                _longer_timeout(argv, args.timeout),
+            )
+        case YtDlpError(temporary=True):
+            return Failure(
+                "temporary_failure",
+                str(error),
+                _rerun(argv),
+                code=TEMPORARY,
+                label="retry",
+            )
+        case TimeoutError() | subprocess.TimeoutExpired():
+            # Only work before any paid request lands here: YouTube, or the
+            # deadline check that runs before Deepgram
+            return Failure(
+                "temporary_failure",
+                f"{str(error) or 'Timed out'} before any paid request",
+                _longer_timeout(argv, args.timeout),
+                code=TEMPORARY,
+                label="retry",
+            )
+    message = _clean_subprocess_diagnostic(str(error)) or type(error).__name__
+    return Failure(
+        "transcription_failed", message, f"{PROG} doctor --source {plan.source_kind}"
     )
-    return StagedPublication(staging_dir, final_dir, base_stem)
 
 
 def _generate_summary(
@@ -2928,6 +3002,11 @@ def _longer_timeout(argv: Sequence[str], seconds: float) -> str:
     """The user's command with twice its workflow deadline."""
     minutes = math.ceil(seconds * 2 / 60)
     return _rerun(argv, drop={"--timeout"}, add=("--timeout", f"{minutes}m"))
+
+
+def _other_output_dir(argv: Sequence[str]) -> str:
+    """The user's command with a placeholder for a writable --output-dir."""
+    return _rerun(argv, drop={"--output-dir"}, add=("--output-dir", "WRITABLE_DIR"))
 
 
 def _other_profile(argv: Sequence[str], plan: RunPlan) -> str:
@@ -3054,7 +3133,7 @@ def _run_preflight(
         ) from error
 
 
-def _transcribe_and_publish(
+def _transcribe_and_save(
     plan: RunPlan,
     selected_prompt: PromptSpec | None,
     args: argparse.Namespace,
@@ -3062,141 +3141,98 @@ def _transcribe_and_publish(
     api_key: str,
     budget: RunBudget,
     reporter: ExecutionReporter,
-) -> PublishedRun:
-    """Transcribe one source and publish its result folder. Each Failure's hint
-    reruns `argv`, so a queue passes the arguments of one URL."""
-    doctor = f"{PROG} doctor --source {plan.source_kind}"
-    try:
-        asset, artifacts = _acquire_and_transcribe(
-            plan, args, api_key, budget, reporter
-        )
-    except DeepgramError as error:
-        if error.retry_safe:
-            raise Failure(
-                "temporary_failure",
-                f"Deepgram did not take the audio: {error}",
-                _rerun(argv),
-                code=TEMPORARY,
-                label="retry",
-            ) from error
-        if error.timed_out:
-            raise Failure(
-                "transcription_timeout",
-                f"{error}. Deepgram may have received the audio, so a rerun "
-                "transcribes it again. No result folder was published",
-                _longer_timeout(argv, args.timeout),
-            ) from error
-        raise Failure(
-            "transcription_failed",
-            f"{error}. No result folder was published",
-            doctor,
-        ) from error
-    except YtDlpError as error:
-        if error.temporary:
-            raise Failure(
-                "temporary_failure",
-                str(error),
-                _rerun(argv),
-                code=TEMPORARY,
-                label="retry",
-            ) from error
-        raise Failure("transcription_failed", str(error), doctor) from error
-    except (WorkflowTimeoutError, subprocess.TimeoutExpired, TimeoutError) as error:
-        # Only work before any paid request lands here: YouTube, or the deadline
-        # check that runs before Deepgram
-        raise Failure(
-            "temporary_failure",
-            f"{str(error) or 'Timed out'} before any paid request",
-            _longer_timeout(argv, args.timeout),
-            code=TEMPORARY,
-            label="retry",
-        ) from error
-    except ValueError as error:
-        raise Failure(
-            "transcription_failed",
-            f"{error}. No result folder was published",
-            doctor,
-        ) from error
-    except (
-        httpx.HTTPError,
-        OSError,
-        RuntimeError,
-        subprocess.SubprocessError,
-    ) as error:
-        message = _clean_subprocess_diagnostic(str(error)) or type(error).__name__
-        raise Failure(
-            "transcription_failed",
-            f"{message}. No result folder was published",
-            doctor,
-        ) from error
+) -> SavedRun:
+    """Transcribe one source into a new result folder.
 
-    publication: StagedPublication | None = None
+    The folder and its metadata appear, and its path prints, as soon as the
+    source is known; the transcript files, then the summary, join it as each
+    stage ends. Each Failure's hint reruns `argv`, so a queue passes the
+    arguments of one URL.
+    """
+    with tempfile.TemporaryDirectory(prefix="transcript-audio-") as audio_dir:
+        try:
+            asset = _acquire_source(plan, args, Path(audio_dir), budget, reporter)
+        except TRANSCRIPTION_ERRORS as error:
+            raise _transcription_failure(error, plan, args, argv) from error
+        folder = _create_result_folder(plan, args, argv, asset, selected_prompt)
+        if not args.json:
+            print(folder.path, flush=True)
+        try:
+            if args.open:
+                open_folder(folder.path, budget)
+            artifacts = _transcribe(asset, api_key, budget, reporter)
+        except KeyboardInterrupt:
+            folder.stop("interrupted")
+            raise
+        except TRANSCRIPTION_ERRORS as error:
+            failure = _transcription_failure(error, plan, args, argv)
+            folder.stop("failed", str(failure))
+            failure.report.update(
+                command="run", source=plan.source_kind, output_dir=str(folder.path)
+            )
+            raise failure from error
+
     try:
-        publication = _create_staged_publication(plan, args, asset)
-        output_dir = publication.staging_dir
-        base_stem = publication.base_stem
         saved_files = save_outputs(
-            output_dir,
+            folder.path,
             artifacts.plain,
             artifacts.timestamped,
             artifacts.json_data,
-            base_stem=base_stem,
+            base_stem=folder.base_stem,
         )
+        folder.transcript_status = "complete"
+        folder.audio_bytes = artifacts.audio_bytes
+        folder.save_metadata()
         if selected_prompt is None:
             reporter.skip("Summary generation", "disabled by --no-summary")
-            outcome = _generate_summary(
-                plan, selected_prompt, saved_files, output_dir, base_stem, budget
-            )
+            outcome = SummaryOutcome(status="skipped")
         else:
+            folder.summary_status = "running"
+            folder.save_metadata()
             with reporter.step("Summary generation") as step:
                 outcome = _generate_summary(
-                    plan, selected_prompt, saved_files, output_dir, base_stem, budget
+                    plan,
+                    selected_prompt,
+                    saved_files,
+                    folder.path,
+                    folder.base_stem,
+                    budget,
                 )
                 step.detail = f"status={outcome.status}"
                 step.failed = outcome.status == "failed"
-        with reporter.step("Publication"):
-            _write_metadata(
-                output_dir=output_dir,
-                asset=asset,
-                audio_bytes=artifacts.audio_bytes,
-                base_stem=base_stem,
-                prompt=selected_prompt,
-                status=outcome.status,
-                usage_stats=outcome.usage,
-                summary_error=outcome.error,
-            )
-            publication.publish()
+        folder.summary_status = outcome.status
+        folder.usage = outcome.usage
+        folder.summary_error = outcome.error
+        folder.save_metadata()
+    except KeyboardInterrupt:
+        folder.stop("interrupted")
+        raise
     except (OSError, RuntimeError) as error:
+        folder.stop("failed", str(error))
         raise Failure(
             "publication_failed",
-            f"{error}. No partial result folder was kept",
-            _rerun(argv, drop={"--output-dir"}, add=("--output-dir", "WRITABLE_DIR")),
+            f"Could not save the result: {error}",
+            _other_output_dir(argv),
+            result={
+                "command": "run",
+                "source": plan.source_kind,
+                "output_dir": str(folder.path),
+            },
         ) from error
-    finally:
-        if publication is not None:
-            publication.cleanup()
 
-    final_dir = publication.final_dir
-    metadata_name = (
-        f"{publication.base_stem}.meta.txt" if publication.base_stem else "meta.txt"
-    )
     payload = _run_result_payload(
-        plan=plan,
-        final_dir=final_dir,
-        saved_files=saved_files,
-        outcome=outcome,
-        metadata_path=final_dir / metadata_name,
+        plan=plan, folder=folder, saved_files=saved_files, outcome=outcome
     )
     if outcome.status == "failed":
         reporter.skip("Summary preview", "summary generation failed")
         raise Failure(
             "summary_failed",
             f"Summary generation failed: {outcome.error}. "
-            f"The transcript is saved in {final_dir}",
+            f"The transcript is saved in {folder.path}",
             _other_profile(argv, plan),
             result=payload,
         )
-    return PublishedRun(final_dir, payload, outcome)
+    return SavedRun(payload, outcome)
 
 
 def _run(
@@ -3206,7 +3242,7 @@ def _run(
     warnings: list[str],
     source_parser: argparse.ArgumentParser,
 ) -> int:
-    """Transcribe one source, publish its result folder, and print where it went."""
+    """Transcribe one source into its result folder, printing the folder first."""
     plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
 
     try:
@@ -3238,45 +3274,35 @@ def _run(
     reporter = ExecutionReporter(_live_console(args))
     reporter.run_configuration(plan, selected_prompt)
     api_key = _run_preflight(plan, args, argv, budget, reporter)
-    try:
-        run = _transcribe_and_publish(
-            plan, selected_prompt, args, argv, api_key, budget, reporter
-        )
-    except Failure as error:
-        # A failed summary still published the transcript folder
-        if args.open and "output_dir" in error.report:
-            open_folder(Path(error.report["output_dir"]), budget)
-        raise
+    run = _transcribe_and_save(
+        plan, selected_prompt, args, argv, api_key, budget, reporter
+    )
 
-    preview_follows = plan.preview and run.summary.path is not None
     if args.json:
         _print_json(run.payload, warnings)
-    else:
-        print_result_path(run.final_dir, preview_follows=preview_follows)
-    if args.open:
-        open_folder(run.final_dir, budget)
     if run.summary.path and plan.preview:
-        final_summary_path = run.final_dir / run.summary.path.name
-        if final_summary_path.exists():
-            with reporter.step("Summary preview") as step:
-                try:
-                    render_markdown_with_glow(
-                        final_summary_path,
-                        budget,
-                        color=color_enabled(sys.stdout, args.no_color),
-                    )
-                except (
-                    OSError,
-                    RuntimeError,
-                    subprocess.SubprocessError,
-                    UnicodeError,
-                ) as error:
-                    diagnostic = _clean_subprocess_diagnostic(str(error))
-                    log.warning(
-                        "Summary preview unavailable; the saved result is intact: "
-                        f"{diagnostic or type(error).__name__}"
-                    )
-                    step.detail = "saved without preview"
+        if sys.stdout.isatty():
+            # A blank line separates the folder path from the preview
+            print()
+        with reporter.step("Summary preview") as step:
+            try:
+                render_markdown_with_glow(
+                    run.summary.path,
+                    budget,
+                    color=color_enabled(sys.stdout, args.no_color),
+                )
+            except (
+                OSError,
+                RuntimeError,
+                subprocess.SubprocessError,
+                UnicodeError,
+            ) as error:
+                diagnostic = _clean_subprocess_diagnostic(str(error))
+                log.warning(
+                    "Summary preview unavailable; the saved result is intact: "
+                    f"{diagnostic or type(error).__name__}"
+                )
+                step.detail = "saved without preview"
     elif run.summary.status == "skipped":
         reporter.skip("Summary preview", "no summary generated (--no-summary)")
     return 0
@@ -3307,7 +3333,7 @@ def _run_queue(
     source_parser: argparse.ArgumentParser,
 ) -> int:
     """Transcribe each URL in order. A failed URL reports its own fix and the
-    queue moves on, unless its result could not be published."""
+    queue moves on, unless its result could not be saved."""
     plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
     urls: list[str] = args.urls
     invalid = [url for url in urls if not validate_youtube_url(url)]
@@ -3340,7 +3366,7 @@ def _run_queue(
             position = QUEUE_POSITION.set(f"[{number}/{len(urls)}] ")
             budget = RunBudget.start(args.timeout)
             try:
-                run = _transcribe_and_publish(
+                run = _transcribe_and_save(
                     plan,
                     selected_prompt,
                     argparse.Namespace(**{**vars(args), "url": url}),
@@ -3352,23 +3378,13 @@ def _run_queue(
             except Failure as error:
                 results.append({"url": url, **_failure_object(error)})
                 failed.append((url, error))
-                # A failed summary still published the transcript folder
-                published = error.report.get("output_dir")
-                if published and not args.json:
-                    print(published, flush=True)
                 if not args.json:
                     report_failure(error, as_json=False, warnings=warnings)
-                if published and args.open:
-                    open_folder(Path(published), budget)
                 if error.kind == "publication_failed":
-                    # Every later URL would bill Deepgram, then fail the same way
+                    # Every later URL would fail to save the same way
                     break
             else:
                 results.append({"url": url, **run.payload})
-                if not args.json:
-                    print(run.final_dir, flush=True)
-                if args.open:
-                    open_folder(run.final_dir, budget)
             finally:
                 QUEUE_POSITION.reset(position)
     except KeyboardInterrupt as stop:
@@ -3384,17 +3400,17 @@ def _run_queue(
         if args.json:
             _print_json({"ok": True, **report}, warnings)
         return 0
-    published = sum("output_dir" in result for result in results)
+    # Only a URL whose transcript was saved lists its artifacts
+    transcribed = sum("artifacts" in result for result in results)
     pending = urls[len(results) :]
     temporary = all(error.code == TEMPORARY for _, error in failed)
     message = (
-        f"{len(failed)} of {len(urls)} URLs failed; "
-        f"{published} published a result folder"
+        f"{len(failed)} of {len(urls)} URLs failed; {transcribed} saved a transcript"
     )
     if pending:
         message += (
             f". The queue stopped before the last {len(pending)}, which would "
-            "fail to publish the same way"
+            "fail to save the same way"
         )
     raise Failure(
         "queue_failed",
@@ -3405,7 +3421,7 @@ def _run_queue(
             [*(url for url, _ in failed), *pending],
         ),
         # 75 promises that rerunning the same command bills nothing again
-        code=TEMPORARY if temporary and not published else 1,
+        code=TEMPORARY if temporary and not transcribed else 1,
         label="retry" if temporary else "rerun",
         result=report,
     )

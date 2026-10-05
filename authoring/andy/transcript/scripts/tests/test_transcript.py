@@ -539,32 +539,6 @@ class TestProgressReporting:
         assert "\x1b" not in output
 
     @pytest.mark.parametrize(
-        "interactive,expected_suffix",
-        [(True, "\n\n"), (False, "\n")],
-    )
-    def test_result_path_spacing_before_summary_preview(
-        self, tmp_path, monkeypatch, capsys, interactive, expected_suffix
-    ) -> None:
-        import transcript
-
-        monkeypatch.setattr(transcript.sys.stdout, "isatty", lambda: interactive)
-
-        transcript.print_result_path(tmp_path, preview_follows=True)
-
-        assert capsys.readouterr().out == f"{tmp_path}{expected_suffix}"
-
-    def test_result_path_prints_on_one_line_however_long(
-        self, tmp_path, capsys
-    ) -> None:
-        import transcript
-
-        result = tmp_path / ("2026-05-03 14.46.55 Camille Exemple, réunion longue " * 3)
-
-        transcript.print_result_path(result, preview_follows=False)
-
-        assert capsys.readouterr().out == f"{result}\n"
-
-    @pytest.mark.parametrize(
         "argv,expected",
         [
             (
@@ -619,16 +593,8 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args, **_kwargs):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "arc")
+        # On a terminal, a blank line separates the folder path from the preview
+        monkeypatch.setattr(transcript.sys.stdout, "isatty", lambda: True)
 
         def fake_summary(
             _provider, _transcript_path, _prompt_path, output_path, *_args
@@ -644,7 +610,11 @@ class TestProgressReporting:
             assert markdown_path.parent.parent == tmp_path
             print(markdown_path.read_text(encoding="utf-8"))
 
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
+        monkeypatch.setattr(
+            transcript,
+            "download_audio",
+            lambda _url, output_dir, *_a, **_k: downloaded(output_dir, method="arc"),
+        )
         monkeypatch.setattr(
             transcript, "transcribe_audio", lambda *_args: deepgram_response()
         )
@@ -671,11 +641,9 @@ class TestProgressReporting:
         starts = [line for line in stderr_lines if line.startswith("Starting ")]
         expected_starts = [
             "Starting Preflight...",
-            "Starting YouTube information...",
             "Starting Audio download...",
             "Starting Deepgram transcription...",
             "Starting Summary generation...",
-            "Starting Publication...",
         ]
         if expect_preview:
             expected_starts.append("Starting Summary preview...")
@@ -694,6 +662,7 @@ class TestProgressReporting:
             == 1
         )
         assert stdout_lines[0] == str(output_dir)
+        assert (stdout_lines[1:2] == [""]) is expect_preview
         metadata = (output_dir / "meta.txt").read_text()
         assert "YouTube audio method: arc" in metadata
         assert "Summary status: succeeded" in metadata
@@ -743,7 +712,7 @@ class TestProgressReporting:
         metadata = next(next(exports.iterdir()).glob("*.meta.txt")).read_text()
         assert "YouTube audio method:" not in metadata
 
-    def test_preview_failure_keeps_published_result_successful(
+    def test_preview_failure_keeps_saved_result_successful(
         self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
@@ -751,16 +720,6 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
 
         def fake_summary(
             _provider, _transcript_path, _prompt_path, output_path, *_args
@@ -935,29 +894,22 @@ class TestZoomHelpers:
 
         assert find_latest_zoom_meeting(tmp_path) == older
 
-    def test_unique_zoom_base_stem_suffixes_on_folder_collision(self, tmp_path) -> None:
-        from transcript import unique_zoom_base_stem
+    def test_make_unique_dir_suffixes_on_folder_collision(self, tmp_path) -> None:
+        from transcript import make_unique_dir
 
-        (tmp_path / "2026-05-03 14.46.55 Camille Exemple").mkdir()
+        name = "2026-05-03 14.46.55 Camille Exemple"
+        (tmp_path / name).mkdir()
 
-        assert (
-            unique_zoom_base_stem(tmp_path, "2026-05-03 14.46.55 Camille Exemple")
-            == "2026-05-03 14.46.55 Camille Exemple-2"
-        )
+        assert make_unique_dir(tmp_path, name) == tmp_path / f"{name}-2"
+        assert (tmp_path / f"{name}-2").is_dir()
 
-    def test_unique_zoom_base_stem_allows_same_named_file_in_parent(
-        self, tmp_path
-    ) -> None:
-        from transcript import unique_zoom_base_stem
+    def test_make_unique_dir_allows_same_named_file_in_parent(self, tmp_path) -> None:
+        from transcript import make_unique_dir
 
-        (tmp_path / "2026-05-03 14.46.55 Camille Exemple.md").write_text(
-            "old", encoding="utf-8"
-        )
+        name = "2026-05-03 14.46.55 Camille Exemple"
+        (tmp_path / f"{name}.md").write_text("old", encoding="utf-8")
 
-        assert (
-            unique_zoom_base_stem(tmp_path, "2026-05-03 14.46.55 Camille Exemple")
-            == "2026-05-03 14.46.55 Camille Exemple"
-        )
+        assert make_unique_dir(tmp_path, name) == tmp_path / name
 
 
 class TestNormalizePromptName:
@@ -1460,6 +1412,22 @@ def deepgram_response(transcript_text: str = "Hello world") -> dict:
     }
 
 
+def downloaded(
+    output_dir: Path, video_id: str = "abc", method: str = "anonymous"
+) -> object:
+    """Write fake audio named after its video and describe it as yt-dlp does."""
+    import transcript
+
+    audio = output_dir / f"{video_id}.webm"
+    audio.write_bytes(b"audio")
+    return transcript.DownloadedAudio(audio, method, f"Video {video_id}", video_id)
+
+
+def fake_download(_url, output_dir: Path, *_args, **_kwargs) -> object:
+    """Stand in for download_audio."""
+    return downloaded(output_dir)
+
+
 class TestDeepgramContract:
     def test_rejects_success_response_without_complete_upload(
         self, tmp_path, monkeypatch
@@ -1553,6 +1521,15 @@ class TestDeepgramContract:
             )
         ]
 
+    @pytest.mark.parametrize(
+        ("name", "content_type"),
+        [("audio.webm", "audio/webm"), ("audio.m4a", "audio/mp4")],
+    )
+    def test_native_audio_keeps_its_content_type(self, name, content_type) -> None:
+        import transcript
+
+        assert transcript.get_audio_content_type(Path(name)) == content_type
+
     def test_parses_valid_response(self) -> None:
         import transcript
 
@@ -1585,7 +1562,7 @@ class TestDeepgramContract:
 
 
 class TestOutputLifecycle:
-    def test_youtube_pipeline_never_reuses_a_published_directory(
+    def test_youtube_pipeline_never_reuses_a_result_folder(
         self, tmp_path, monkeypatch
     ) -> None:
         import transcript
@@ -1597,19 +1574,8 @@ class TestOutputLifecycle:
             transcript, "render_markdown_with_glow", lambda *_args: None
         )
         monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A title", "video_id": "abc"},
-        )
-        monkeypatch.setattr(
             transcript, "transcribe_audio", lambda *_args: deepgram_response()
         )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
-
         monkeypatch.setattr(transcript, "download_audio", fake_download)
         argv = [
             "run",
@@ -1626,6 +1592,67 @@ class TestOutputLifecycle:
         results = [path for path in tmp_path.iterdir() if path.is_dir()]
         assert len(results) == 2
         assert len({path.name for path in results}) == 2
+
+    def test_each_stage_shows_in_the_folder_before_the_next_starts(
+        self, tmp_path, monkeypatch, capsys
+    ) -> None:
+        import transcript
+
+        seen: dict[str, tuple[str, list[str], str]] = {}
+
+        def snapshot(stage: str) -> None:
+            (folder,) = tmp_path.iterdir()
+            seen[stage] = (
+                capsys.readouterr().out,
+                sorted(path.name for path in folder.iterdir()),
+                (folder / "meta.txt").read_text(),
+            )
+
+        def fake_transcribe(*_args):
+            snapshot("deepgram")
+            return deepgram_response()
+
+        def fake_summary(_provider, _transcript, _prompt, output_path, *_args):
+            snapshot("summary")
+            output_path.write_text("# Summary\n", encoding="utf-8")
+            return {
+                "provider": "claude",
+                "model": "claude-opus-5-5",
+                "reasoning_effort": "high",
+            }
+
+        monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
+        monkeypatch.setattr(transcript, "ensure_cli_available", lambda _name: None)
+        monkeypatch.setattr(transcript, "download_audio", fake_download)
+        monkeypatch.setattr(transcript, "transcribe_audio", fake_transcribe)
+        monkeypatch.setattr(transcript, "run_summary_prompt", fake_summary)
+
+        code = transcript.main(
+            [
+                "run",
+                "youtube",
+                "--url",
+                "https://youtu.be/abc",
+                "--output-dir",
+                str(tmp_path),
+            ]
+        )
+
+        (folder,) = tmp_path.iterdir()
+        printed, files, meta = seen["deepgram"]
+        assert (code, printed, files) == (0, f"{folder}\n", ["meta.txt"])
+        assert "Transcript status: in progress" in meta
+        assert "Summary status: pending" in meta
+        _printed, files, meta = seen["summary"]
+        assert files == [
+            "meta.txt",
+            "raw_sentences.txt",
+            "raw_transcript.json",
+            "raw_transcript.txt",
+        ]
+        assert "Transcript status: complete" in meta
+        assert "Summary status: running" in meta
+        assert "Summary status: succeeded" in (folder / "meta.txt").read_text()
 
 
 class TestRetryPolicy:
@@ -1679,15 +1706,9 @@ class TestRetryPolicy:
             transcript, "render_markdown_with_glow", lambda *_args: None
         )
 
-        def fake_video_info(_url, _budget):
-            now[0] += 100
-            return {"title": "A video", "video_id": "abc"}
-
-        def fake_download(_url, output_dir, _budget):
-            now[0] += 100
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
+        def slow_download(_url, output_dir, *_args, **_kwargs):
+            now[0] += 200
+            return downloaded(output_dir)
 
         def fake_transcribe(_path, _key, _budget):
             now[0] += transcript.WORKFLOW_TOTAL_TIMEOUT - 250
@@ -1702,8 +1723,7 @@ class TestRetryPolicy:
                 returncode=0,
             )
 
-        monkeypatch.setattr(transcript, "get_video_info", fake_video_info)
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
+        monkeypatch.setattr(transcript, "download_audio", slow_download)
         monkeypatch.setattr(transcript, "transcribe_audio", fake_transcribe)
         monkeypatch.setattr(transcript, "run_child", fake_subprocess_run)
 
@@ -1799,6 +1819,55 @@ class TestRetryPolicy:
         assert all(0 < timeout <= 20 for timeout in subprocess_timeouts)
         assert subprocess_timeouts[1] < subprocess_timeouts[0]
         assert 0 < http_timeouts[0] <= 18
+
+
+class TestDownloadAudio:
+    def _ytdlp_prints(self, transcript, tmp_path, monkeypatch, info: dict) -> list:
+        """Make the Arc attempt succeed and print `info` as yt-dlp's last line."""
+        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
+        arc_profile.mkdir(parents=True)
+        commands = []
+
+        def fake_run(command, **_kwargs):
+            commands.append(command)
+            stdout = f"[download] 100%\n{json.dumps(info)}\n"
+            return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
+        monkeypatch.setattr(transcript, "run_child", fake_run)
+        return commands
+
+    def test_one_call_downloads_native_audio_and_describes_its_video(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        import transcript
+
+        audio = tmp_path / "audio.webm"
+        audio.write_bytes(b"audio")
+        info = {"id": "abc", "title": "A video", "filepath": str(audio)}
+        commands = self._ytdlp_prints(transcript, tmp_path, monkeypatch, info)
+
+        result = transcript.download_audio(
+            "url", tmp_path, transcript.RunBudget(float("inf"))
+        )
+
+        (command,) = commands
+        assert result == transcript.DownloadedAudio(audio, "arc", "A video", "abc")
+        assert command[command.index("-f") + 1] == "ba[abr<=64]/ba/b"
+        assert "--no-simulate" in command
+        assert "-x" not in command
+
+    def test_a_video_without_a_title_is_unavailable(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        import transcript
+
+        self._ytdlp_prints(transcript, tmp_path, monkeypatch, {"id": "abc"})
+
+        with pytest.raises(ValueError, match="private, deleted, or unavailable"):
+            transcript.download_audio(
+                "url", tmp_path, transcript.RunBudget(float("inf"))
+            )
 
 
 class TestYouTubeAuthenticationOrder:
@@ -2108,6 +2177,7 @@ class TestPipelines:
         monkeypatch.setattr(
             transcript, "render_markdown_with_glow", lambda *_args: None
         )
+        monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(
             transcript, "transcribe_audio", lambda *_args: deepgram_response()
         )
@@ -2116,18 +2186,6 @@ class TestPipelines:
         import transcript
 
         self._isolate_external_boundaries(transcript, monkeypatch)
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
-
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
 
         code = transcript.main(
             [
@@ -2185,18 +2243,6 @@ class TestPipelines:
         self._isolate_external_boundaries(transcript, monkeypatch)
         monkeypatch.setattr(
             transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
-
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
-        monkeypatch.setattr(
-            transcript,
             "run_summary_prompt",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(
                 transcript.SummaryCLIError("model unavailable")
@@ -2227,17 +2273,6 @@ class TestPipelines:
         import transcript
 
         self._isolate_external_boundaries(transcript, monkeypatch)
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
-
         selected_inputs = []
 
         def fake_summary(_provider, transcript_path, *_args):
@@ -2248,7 +2283,6 @@ class TestPipelines:
                 "reasoning_effort": "medium",
             }
 
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(transcript, "run_summary_prompt", fake_summary)
 
         code = transcript.main(
@@ -2267,7 +2301,7 @@ class TestPipelines:
         assert code == 0
         assert selected_inputs[0].name == "raw_sentences.txt"
 
-    def test_malformed_deepgram_response_is_runtime_failure_for_zoom(
+    def test_malformed_deepgram_response_marks_the_zoom_folder_failed(
         self, tmp_path, monkeypatch
     ) -> None:
         import transcript
@@ -2292,29 +2326,21 @@ class TestPipelines:
             ]
         )
 
+        (folder,) = (tmp_path / "exports").iterdir()
+        (meta,) = folder.iterdir()
         assert code == 1
-        assert not (tmp_path / "exports").exists()
+        assert meta.name.endswith(".meta.txt")
+        assert "Transcript status: failed" in meta.read_text()
 
 
-class TestTransactionalPublication:
-    def _isolate_youtube(self, transcript, tmp_path, monkeypatch) -> None:
+class TestResultFolder:
+    def _isolate_youtube(self, transcript, monkeypatch) -> None:
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda _command: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
         monkeypatch.setattr(
             transcript, "render_markdown_with_glow", lambda *_args: None
         )
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-
-        def fake_download(_url, output_dir, *_args):
-            audio = output_dir / "audio.mp3"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous")
-
         monkeypatch.setattr(transcript, "download_audio", fake_download)
         monkeypatch.setattr(
             transcript,
@@ -2322,49 +2348,45 @@ class TestTransactionalPublication:
             lambda *_args: deepgram_response(),
         )
 
-    @pytest.mark.parametrize("failed_write", [1, 2, 3])
-    def test_artifact_write_failure_leaves_no_result_and_reuses_suffix(
-        self, failed_write, tmp_path, monkeypatch
+    def test_a_transcript_write_failure_keeps_the_folder_marked_failed(
+        self, tmp_path, monkeypatch, capsys
     ) -> None:
         import transcript
 
-        self._isolate_youtube(transcript, tmp_path, monkeypatch)
+        self._isolate_youtube(transcript, monkeypatch)
         original_write = transcript.write_text_atomic
-        calls = 0
 
-        def fail_selected_write(path, content):
-            nonlocal calls
-            calls += 1
-            if calls == failed_write:
-                raise OSError(f"artifact {failed_write} failed")
+        def fail_transcript_write(path, content):
+            if path.name == "raw_sentences.txt":
+                raise OSError("disk full")
             original_write(path, content)
 
-        monkeypatch.setattr(transcript, "write_text_atomic", fail_selected_write)
-        argv = [
-            "run",
-            "youtube",
-            "--url",
-            "https://youtu.be/abc",
-            "--output-dir",
-            str(tmp_path),
-            "--no-summary",
-        ]
+        monkeypatch.setattr(transcript, "write_text_atomic", fail_transcript_write)
 
-        assert transcript.main(argv) == 1
-        assert list(tmp_path.iterdir()) == []
+        code = transcript.main(
+            [
+                "run",
+                "youtube",
+                "--url",
+                "https://youtu.be/abc",
+                "--output-dir",
+                str(tmp_path),
+            ]
+        )
 
-        monkeypatch.setattr(transcript, "write_text_atomic", original_write)
-        assert transcript.main(argv) == 0
-        results = list(tmp_path.iterdir())
-        assert len(results) == 1
-        assert not results[0].name.endswith("-2")
+        (folder,) = tmp_path.iterdir()
+        meta = (folder / "meta.txt").read_text()
+        assert code == 1
+        assert "error: Could not save the result: disk full" in capsys.readouterr().err
+        assert "Transcript status: failed" in meta
+        assert "Summary status: not started" in meta
 
-    def test_failed_summary_publishes_raw_and_metadata_without_partial_summary(
+    def test_failed_summary_keeps_raw_and_metadata_without_partial_summary(
         self, tmp_path, monkeypatch
     ) -> None:
         import transcript
 
-        self._isolate_youtube(transcript, tmp_path, monkeypatch)
+        self._isolate_youtube(transcript, monkeypatch)
 
         def fail_after_partial_write(*args, **_kwargs):
             output_path = args[3]
@@ -2389,31 +2411,6 @@ class TestTransactionalPublication:
         assert (result / "raw_transcript.txt").is_file()
         assert "Summary status: failed" in (result / "meta.txt").read_text()
         assert not list(result.glob("*.md"))
-        assert not any(path.name.startswith(".") for path in tmp_path.iterdir())
-
-    def test_metadata_write_failure_cleans_staging_and_leaves_suffix_available(
-        self, tmp_path, monkeypatch
-    ) -> None:
-        import transcript
-
-        self._isolate_youtube(transcript, tmp_path, monkeypatch)
-        monkeypatch.setattr(
-            transcript,
-            "_write_metadata",
-            lambda **_kwargs: (_ for _ in ()).throw(OSError("metadata failed")),
-        )
-        argv = [
-            "run",
-            "youtube",
-            "--url",
-            "https://youtu.be/abc",
-            "--output-dir",
-            str(tmp_path),
-            "--no-summary",
-        ]
-
-        assert transcript.main(argv) == 1
-        assert list(tmp_path.iterdir()) == []
 
 
 class TestPreflightAndCleanup:
@@ -2470,8 +2467,10 @@ class TestPreflightAndCleanup:
         monkeypatch.setattr(transcript.shutil, "which", lambda _command: None)
         monkeypatch.setattr(
             transcript,
-            "get_video_info",
-            lambda *_args: pytest.fail("media work started before summary preflight"),
+            "download_audio",
+            lambda *_args, **_kwargs: pytest.fail(
+                "media work started before summary preflight"
+            ),
         )
 
         code = transcript.main(
@@ -2494,34 +2493,15 @@ class TestPreflightAndCleanup:
     ) -> None:
         import transcript
 
-        cleaned = []
-        temporary_audio = tmp_path / "temporary-audio"
-        temporary_audio.mkdir()
+        audio_dirs: list[Path] = []
 
-        class FakeTemporaryDirectory:
-            name = str(temporary_audio)
-
-            def __init__(self, **_kwargs):
-                pass
-
-            def cleanup(self):
-                cleaned.append(True)
+        def failed_download(_url, output_dir, *_args, **_kwargs):
+            audio_dirs.append(output_dir)
+            (output_dir / "audio.webm.part").write_bytes(b"partial")
+            raise OSError("download failed")
 
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
-        monkeypatch.setattr(transcript, "ensure_cli_available", lambda _command: None)
-        monkeypatch.setattr(
-            transcript,
-            "get_video_info",
-            lambda *_args: {"title": "A video", "video_id": "abc"},
-        )
-        monkeypatch.setattr(
-            transcript.tempfile, "TemporaryDirectory", FakeTemporaryDirectory
-        )
-        monkeypatch.setattr(
-            transcript,
-            "download_audio",
-            lambda *_args: (_ for _ in ()).throw(OSError("download failed")),
-        )
+        monkeypatch.setattr(transcript, "download_audio", failed_download)
 
         code = transcript.main(
             [
@@ -2536,7 +2516,8 @@ class TestPreflightAndCleanup:
         )
 
         assert code == 1
-        assert cleaned == [True]
+        assert not audio_dirs[0].exists()
+        assert list(tmp_path.iterdir()) == []
 
     def test_ytdlp_failure_returns_one_with_clean_actionable_diagnostic(
         self, tmp_path, monkeypatch, capsys
