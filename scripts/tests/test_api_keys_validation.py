@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import io
+import json
 import os
+import subprocess
+import sys
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -19,13 +22,13 @@ if [ $# -ne 5 ] || [ "$1 $2 $3 $5" != "secret keyring get --user=api_key" ]; the
   exit 64
 fi
 service=${4#--service=}
-case ",$FAKE_KEYRING," in *",$service,"*) echo "s3cret-$service"; exit 0 ;; esac
-if [ "$service" = "$FAKE_HANG" ]; then exec sleep 30; fi
-if [ "$service" = "$FAKE_EMPTY" ]; then exit 0; fi
 if [ "$service" = "$FAKE_REFUSE" ]; then
   echo "keychain refused near s3cret-$service" >&2
   exit 1
 fi
+case ",$FAKE_KEYRING," in *",$service,"* | *",*,"*) echo "s3cret-$service"; exit 0 ;; esac
+if [ "$service" = "$FAKE_HANG" ]; then exec sleep 30; fi
+if [ "$service" = "$FAKE_EMPTY" ]; then exit 0; fi
 echo "chezmoi: secret not found in keyring" >&2
 exit 1
 """
@@ -151,3 +154,23 @@ def test_a_keyring_that_does_not_answer_stops_the_run(
             '"retry":"just api-keys-validation"}\n'
         ),
     )
+
+
+def test_no_value_reaches_the_process_streams(
+    machine: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Run the script as a process over this repository's own skills, so a raw
+    write to a file descriptor, or a chezmoi child that inherits one, shows."""
+    monkeypatch.setenv("FAKE_KEYRING", "*")
+    monkeypatch.setenv("FAKE_REFUSE", "deepgram")
+
+    result = subprocess.run(
+        [sys.executable, api_keys_validation.__file__, "--verbose"],
+        capture_output=True,
+        check=False,
+    )
+
+    assert b"s3cret" not in result.stdout + result.stderr
+    assert (result.returncode, result.stdout) == (1, b"")
+    errors = json.loads(result.stderr.splitlines()[-1])["errors"]
+    assert [error.split(" (")[0] for error in errors] == ["deepgram"]
