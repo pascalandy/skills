@@ -31,25 +31,32 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when each 2nd-pass finding is fixed or reported
 
 **STEP: Code review on each PR**
-- On each PR, post a new comment:
-	- "Paula Review PR. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md Then use $poteto-mode to do an adversarial code review of the full diff from Base-SHA to Head-SHA, including deleted lines and the surrounding code, not only added lines. Do not edit files. List each finding with its location and reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values
-- Then babysit, wait for Paula
-- Fix or explicitly dismiss each finding. Push changes and request a max of 4 reviews when needed
-- Done when each PR has a review of its latest head or has had four, or Paula is unavailable and you say so in the report
+- On each PR, post a NEW top-level conversation comment containing exactly this single line:
 
-**STEP: Blast-radius**
-- On the top PR, post a new comment:
-	- "Paula Review PR but now focus on impacts. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md . Then use $poteto-mode and $blast-radius on the PRs below: the full diff from Base-SHA to Head-SHA, including deleted lines and the surrounding code, not only added lines. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it? Do not edit files. List each finding with its location and reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values
-- While it runs, write your own premortem. What could go wrong? Are we adding debt or code smells?
-- Then babysit, wait for Paula
-- Done when each medium or high finding from the review and both premortems is fixed and pushed to its layer, or dismissed with a written reason
+	```txt
+	Paula Review PR
+	```
 
-**STEP: Code review | across the whole stack**
-- On the top PR, post a new comment:
-	- "Paula Review Stack. Load my skills: https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md . Then use $poteto-mode to review this stack: the full diff from Base-SHA to Head-SHA, including deleted lines and the surrounding code, not only added lines. The solution works; find what would make it great and pristine while keeping it simple. Do not edit files. List each finding with its location and reason." followed by `PRs:`, `Base:`, `Base-SHA:` and `Head-SHA:` using the current remote values
-- Then babysit, wait for Paula
-- Fix or explicitly dismiss each finding. Push changes and request a max of 4 reviews when needed
-- Done when the latest stack is reviewed and findings are resolved or accepted
+- Then babysit, wait for “Revue Paula” covering the PR’s latest head SHA. If that SHA already has a Paula review, use it; Paula does not publish duplicates
+	- Fix or explicitly dismiss each finding with a reason. After pushing fixes, post a NEW trigger comment
+	- Request at most 4 reviews per PR. If the limit is reached or Paula is unavailable, report the blocker; do not treat it as a pass
+	- Done when every PR’s latest head is reviewed and every finding is fixed or explicitly dismissed
+
+**STEP: Code review across the whole stack**
+- After all changes are pushed, post a NEW top-level Conversation comment on the TOP PR using these five lines. Replace every placeholder with current remote values:
+
+	```txt
+	Paula Review Stack
+	PRs: <PR numbers from bottom to top, e.g. #502 #503 #504>
+	Base: <base branch of the bottom PR, e.g. main>
+	Base-SHA: <full 40-character current base SHA of the bottom PR>
+	Head-SHA: <full 40-character current head SHA of the top PR>
+	```
+
+- Then babysit, wait for “Revue Paula — Stack” linked to that trigger comment and covering the current base and all PR heads
+- Fix or explicitly dismiss each finding with a reason. Commit fixes to their owning layers, restack and push, then post a NEW stack comment with refreshed remote values
+- Request at most 4 stack reviews. If the limit is reached or Paula is unavailable, report the blocker; do not treat it as a pass
+- Done when the current stack is reviewed and every finding is fixed or explicitly dismissed
 
 **STEP: Docs**
 - Run 🧰 andy-mode ; docs on the stack's final diff, and commit its edits to the layer they belong to
@@ -70,14 +77,15 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 - Done when the report includes every item above
 
 **STEP: Merge gate**
-- Ask me whether to merge (see below), and end your reply on that question
+- HITL: Ask the user whether to merge (see below), and end your reply on that question
 - When I say merge, land the stack with poteto's Shipping playbook, through the project's merge command and any deploy it runs. The merge command can exit 0 after a failed deploy, so read its output and report a failed deploy
 - Done when either:
 	- I said merge, each PR is merged, and its deploy succeeded or you reported the failed deploy
 	- or I said not to merge. A "not yet" keeps this step open
 
 **STEP: Close**
-- Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. From each, file at most 2 issues: the fixes with the most bang for the buck
+- Run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global
+	- From each, file at most 2 issues: the fixes with the most bang for the buck
 - Done when both retros are complete, the selected issues are filed, and you've said goodbye
 
 #### Rules
@@ -91,6 +99,16 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 	- you need a decision from me
 	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The Merge gate's deploy and the Close step's retro issues in any of my repositories are allowed
 		- After a squash merge or merge commit, deleting a branch whose tip still matches the PR's head commit at merge time is not deleting data
+
+Github comment rules:
+
+- The first nonempty line must be exactly Paula Review PR or Paula Review Stack
+- Do not include quotation marks, punctuation, bullets, indentation or code fences in the actual GitHub comment
+- Publish through the authorized pascalandy account on open PRs in pascalandy/skills
+- A push or an edited comment does not trigger a review; create a NEW comment
+- BLOCKED or STALE requires resolving the stated problem and posting a NEW trigger
+- Paula performs static review and reports findings; the implementation agent owns fixes and tests
+- A Paula review does not authorize merging. Follow the project’s separate checks and merge-approval requirements
 
 #### Questions
 
