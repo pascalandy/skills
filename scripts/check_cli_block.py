@@ -11,6 +11,7 @@ import logging
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import run_script
@@ -67,7 +68,7 @@ def copies() -> list[Path]:
     return found
 
 
-def check(fix: bool) -> str:
+def check(fix: bool) -> dict[str, Any]:
     canonical = block(CANONICAL.read_text(encoding="utf-8"), "scripts/_cli.py")[0]
     stale: list[str] = []
     for path in copies():
@@ -79,14 +80,14 @@ def check(fix: bool) -> str:
         if fix:
             fixed = text[: copy.start()] + canonical + text[copy.end() :]
             path.write_text(fixed, encoding="utf-8")
-        stale.append(f"update\t{label}")
+        stale.append(label)
     if stale and not fix:
         raise ScriptError(
             f"{len(stale)} pasted cli block{'s differ' if len(stale) > 1 else ' differs'}"
             " from scripts/_cli.py; run: uv run scripts/check_cli_block.py --fix",
-            detail="\n".join(stale),
+            detail="\n".join(f"update\t{label}" for label in stale),
         )
-    return "\n".join(stale)
+    return {"changes": [["update", label] for label in stale]} if stale else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,9 +100,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fix",
         action="store_true",
-        help="rewrite each stale copy and print one line per copy it changed",
+        help="rewrite each stale copy and list each under changes",
     )
-    return run_script(parser, lambda args: check(args.fix), argv)
+    return run_script(parser, lambda args: check(args.fix), argv, json_answer=True)
 
 
 if __name__ == "__main__":

@@ -187,9 +187,10 @@ def check_and_sign(sha: str, timeout: float) -> None:
     name = branch()
     log.info("run just check on %s", sha[:7])
     with worktree_at(sha) as checkout:
-        # stdout joins stderr, so this script's stdout holds only its change line
+        # Its stdout holds only its {"ok":true}, which would read as this
+        # script's verdict; a failure's output and verdict stay on stderr
         check = (sys.executable, str(checkout / "scripts/check.py"))
-        checked = run(check, cwd=checkout, env=EXACT, stdout=sys.stderr)
+        checked = run(check, cwd=checkout, env=EXACT, stdout=subprocess.DEVNULL)
     if checked.returncode:
         raise ScriptError(f"just check failed on {sha[:7]}; nothing was signed off")
     if remote_tip(name, timeout) != sha:

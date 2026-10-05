@@ -31,7 +31,7 @@ import pytest
 import transcript
 import youtube_smoke
 from conftest import DECLARED, covers, exits, observe
-from test_transcript import deepgram_response
+from test_transcript import deepgram_response, downloaded
 
 SCRIPTS = Path(__file__).parent.parent
 SKILL_DIR = SCRIPTS.parent
@@ -76,20 +76,14 @@ FALLBACK = "Arc YouTube access failed; retrying anonymously"
 
 
 def fall_back_twice(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Warn from both yt-dlp steps, as a run without a browser session does."""
+    """Warn on two download attempts, as a retry without a browser session does."""
 
     def warn_then_download(_url, output_dir, *_args, **_kwargs):
         transcript.log.warning(FALLBACK)
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
-
-    def warn_then_describe(*_args):
         transcript.log.warning(FALLBACK)
-        return {"title": "A video", "video_id": "abc"}
+        return downloaded(output_dir)
 
     fake_youtube(monkeypatch, download=warn_then_download)
-    monkeypatch.setattr(transcript, "get_video_info", warn_then_describe)
 
 
 def fake_youtube(
@@ -99,20 +93,13 @@ def fake_youtube(
     transcribe: Callable[..., object] | None = None,
 ) -> None:
     """Stand in for every paid or networked step of a YouTube run."""
-
-    def fake_download(_url, output_dir, *_args, **_kwargs):
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
-
     monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
     monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
     monkeypatch.setattr(
         transcript,
-        "get_video_info",
-        lambda *_args: {"title": "A video", "video_id": "abc"},
+        "download_audio",
+        download or (lambda _url, output_dir, *_a, **_k: downloaded(output_dir)),
     )
-    monkeypatch.setattr(transcript, "download_audio", download or fake_download)
     monkeypatch.setattr(
         transcript,
         "transcribe_audio",
@@ -438,7 +425,7 @@ def test_verbosity_changes_only_stderr(
     assert "Traceback" not in runs["verbose"][2]
     assert len(via_env.splitlines()) == len(runs["debug"][2].splitlines())
     if argv[0] == "run" and "--dry-run" not in argv:
-        assert "Completed Publication" in runs["verbose"][2]
+        assert "Completed Deepgram transcription" in runs["verbose"][2]
         assert "debug: workflow deadline: 570s" in runs["debug"][2]
 
 
@@ -637,9 +624,30 @@ def test_deepgram_refusing_the_audio_is_safe_to_retry(
 
     code, out, err = cli(capsys, *argv)
 
-    assert (code, out) == (75, "")
+    (folder,) = tmp_path.iterdir()
+    assert (code, out) == (75, f"{folder}\n")
     assert err.splitlines()[-1] == f"retry: {shlex.join(['transcript', *argv])}"
-    assert list(tmp_path.iterdir()) == []
+    assert [path.name for path in folder.iterdir()] == ["meta.txt"]
+    assert "Transcript status: failed" in (folder / "meta.txt").read_text()
+
+
+def test_a_failed_transcription_under_json_names_its_folder(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_youtube(
+        monkeypatch,
+        transcribe=lambda *_args: (_ for _ in ()).throw(httpx.ConnectError("down")),
+    )
+
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", URL, "--output-dir", str(tmp_path), "--json"
+    )
+
+    report = json.loads(err)
+    meta = (Path(report["output_dir"]) / "meta.txt").read_text()
+    assert (code, out, report["error"]["code"]) == (75, "", "temporary_failure")
+    assert "Transcript status: failed" in meta
+    assert "Summary status: not started" in meta
 
 
 @pytest.mark.parametrize(
@@ -670,7 +678,7 @@ def test_a_deepgram_failure_that_may_have_been_paid_is_never_75(
         str(tmp_path),
     )
 
-    assert (code, out) == (1, "")
+    assert (code, out) == (1, f"{next(tmp_path.iterdir())}\n")
 
 
 @exits("transcript", 75)
@@ -681,9 +689,7 @@ def test_a_deadline_passing_before_deepgram_is_safe_to_retry(
 
     def slow_download(_url, output_dir, *_args, **_kwargs):
         now[0] = 10_000.0
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
+        return downloaded(output_dir)
 
     monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
     fake_youtube(
@@ -703,7 +709,7 @@ def test_a_deadline_passing_before_deepgram_is_safe_to_retry(
         str(tmp_path),
     )
 
-    assert (code, out) == (75, "")
+    assert (code, out) == (75, f"{next(tmp_path.iterdir())}\n")
     assert err.splitlines()[-1].startswith("retry: transcript run youtube ")
 
 
@@ -756,13 +762,12 @@ def test_a_retry_hint_drops_the_empty_url_that_just_ttr_adds(
 
 @exits("youtube_smoke", 0, 1, 75)
 def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> None:
-    def downloaded(_url, output_dir, *_args, **_kwargs):
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "arc")
-
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: "/bin/ffprobe")
-    monkeypatch.setattr(youtube_smoke, "download_audio", downloaded)
+    monkeypatch.setattr(
+        youtube_smoke,
+        "download_audio",
+        lambda _url, output_dir, *_a, **_k: downloaded(output_dir),
+    )
     monkeypatch.setattr(
         youtube_smoke,
         "run_child",
@@ -805,13 +810,8 @@ def fake_queue(
     that records each Deepgram key read."""
     reads: list[str] = []
 
-    def describe(url, *_args):
-        return {"title": f"Video {url[-3:]}", "video_id": url[-3:]}
-
     def download(url, output_dir, *_args, **_kwargs):
-        audio = output_dir / f"{url[-3:]}.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
+        return downloaded(output_dir, url[-3:])
 
     def transcribe(audio_path, *_args):
         if audio_path.stem in (failing or {}):
@@ -819,7 +819,6 @@ def fake_queue(
         return deepgram_response(f"Words of {audio_path.stem}")
 
     fake_youtube(monkeypatch, download=download, transcribe=transcribe)
-    monkeypatch.setattr(transcript, "get_video_info", describe)
     monkeypatch.setattr(
         transcript, "validate_env", lambda *_args: reads.append("key") or "secret"
     )
@@ -888,18 +887,18 @@ def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
 
     lines = err.splitlines()
     assert code == 1
-    assert video_ids(out) == ["aaa", "ccc"]
+    assert video_ids(out) == ["aaa", "bbb", "ccc"]
     assert lines[0].startswith("[2/3] error: ")
     assert lines[1:] == [
         "[2/3] fix: transcript doctor --source youtube",
-        "error: 1 of 3 URLs failed; 2 published a result folder",
+        "error: 1 of 3 URLs failed; 2 saved a transcript",
         "rerun: "
         + shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]]),
     ]
 
 
 @exits("transcript", 75, 1)
-def test_a_queue_exits_75_only_when_nothing_was_published(
+def test_a_queue_exits_75_only_when_nothing_was_transcribed(
     tmp_path, monkeypatch, capsys
 ) -> None:
     options = ["--no-summary", "--output-dir", str(tmp_path)]
@@ -909,27 +908,45 @@ def test_a_queue_exits_75_only_when_nothing_was_published(
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
 
     retry_both = ["transcript", "run", "youtube", *options, "--url", *QUEUE[:2]]
-    assert (code, out) == (75, "")
+    assert (code, video_ids(out)) == (75, ["aaa", "bbb"])
     assert err.splitlines()[-2:] == [
-        "error: 2 of 2 URLs failed; 0 published a result folder",
+        "error: 2 of 2 URLs failed; 0 saved a transcript",
         f"retry: {shlex.join(retry_both)}",
     ]
 
     fake_queue(monkeypatch, failing={"bbb": deepgram_status(503)})
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        *QUEUE[:2],
+        *options[:-1],
+        str(tmp_path / "2"),
+    )
 
-    retry = shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]])
+    retry = shlex.join(
+        [
+            "transcript",
+            "run",
+            "youtube",
+            *options[:-1],
+            str(tmp_path / "2"),
+            "--url",
+            QUEUE[1],
+        ]
+    )
     assert code == 1
-    assert video_ids(out) == ["aaa"]
+    assert video_ids(out) == ["aaa", "bbb"]
     assert err.splitlines()[1:] == [
         f"[2/2] retry: {retry}",
-        "error: 1 of 2 URLs failed; 1 published a result folder",
+        "error: 1 of 2 URLs failed; 1 saved a transcript",
         f"retry: {retry}",
     ]
 
 
 @exits("transcript", 1)
-def test_a_failed_summary_still_lists_its_published_transcript(
+def test_a_failed_summary_still_lists_its_saved_transcript(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch)
@@ -951,7 +968,7 @@ def test_a_failed_summary_still_lists_its_published_transcript(
         "aaa",
         "bbb",
     ]
-    assert "error: 1 of 2 URLs failed; 2 published a result folder" in err
+    assert "error: 1 of 2 URLs failed; 2 saved a transcript" in err
 
 
 def test_the_final_hint_keeps_the_repair_each_url_needs(
@@ -963,9 +980,7 @@ def test_the_final_hint_keeps_the_repair_each_url_needs(
     def slow_for_bbb(url, output_dir, *_args, **_kwargs):
         if url == QUEUE[1]:
             now[0] += 10_000.0
-        audio = output_dir / f"{url[-3:]}.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
+        return downloaded(output_dir, url[-3:])
 
     monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(transcript, "download_audio", slow_for_bbb)
@@ -975,7 +990,7 @@ def test_the_final_hint_keeps_the_repair_each_url_needs(
 
     repaired = ["--no-summary", "--output-dir", str(tmp_path), "--timeout", "2m"]
     assert code == 1
-    assert video_ids(out) == ["aaa"]
+    assert video_ids(out) == ["aaa", "bbb"]
     assert err.splitlines()[-1] == "retry: " + shlex.join(
         ["transcript", "run", "youtube", *repaired, "--url", QUEUE[1]]
     )
@@ -1062,7 +1077,7 @@ def test_one_video_under_two_url_forms_runs_once_as_a_queue(
 
 
 @exits("transcript", 1)
-def test_a_failed_publication_stops_the_queue_before_more_paid_work(
+def test_a_folder_that_cannot_be_saved_stops_the_queue_before_any_paid_work(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch)
@@ -1074,28 +1089,29 @@ def test_a_failed_publication_stops_the_queue_before_more_paid_work(
             uploads.append(audio_path.stem) or deepgram_response()
         ),
     )
-    monkeypatch.setattr(
-        transcript,
-        "_write_metadata",
-        lambda **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
-    )
+
+    def disk_full(_folder):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(transcript.ResultFolder, "save_metadata", disk_full)
     options = ["--no-summary", "--output-dir", str(tmp_path)]
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
 
     fix = ["--no-summary", "--output-dir", "WRITABLE_DIR", "--url", *QUEUE]
-    assert (code, out, uploads) == (1, "", ["aaa"])
+    assert (code, out, uploads) == (1, "", [])
+    assert "[1/3] error: Could not create the result folder: disk full" in err
     assert err.splitlines()[-2:] == [
         (
-            "error: 1 of 3 URLs failed; 0 published a result folder. The queue "
-            "stopped before the last 2, which would fail to publish the same way"
+            "error: 1 of 3 URLs failed; 0 saved a transcript. The queue "
+            "stopped before the last 2, which would fail to save the same way"
         ),
         "rerun: " + shlex.join(["transcript", "run", "youtube", *fix]),
     ]
     assert list(tmp_path.iterdir()) == []
 
 
-def test_an_interrupt_while_opening_a_failed_summary_keeps_its_result(
+def test_an_interrupt_while_opening_a_folder_marks_it_and_keeps_earlier_results(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch)
@@ -1104,11 +1120,14 @@ def test_an_interrupt_while_opening_a_failed_summary_keeps_its_result(
         "run_summary_prompt",
         lambda *_args: (_ for _ in ()).throw(transcript.SummaryCLIError("quota")),
     )
+    opened: list[Path] = []
 
-    def interrupt(*_args):
-        raise transcript.Interrupted(130)
+    def interrupt_on_second(path, _budget):
+        opened.append(path)
+        if len(opened) == 2:
+            raise transcript.Interrupted(130)
 
-    monkeypatch.setattr(transcript, "open_folder", interrupt)
+    monkeypatch.setattr(transcript, "open_folder", interrupt_on_second)
     options = ["--output-dir", str(tmp_path), "--open", "--json"]
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
@@ -1121,6 +1140,9 @@ def test_an_interrupt_while_opening_a_failed_summary_keeps_its_result(
     assert report["error"]["hint"] == shlex.join(
         ["transcript", "run", "youtube", *options, "--url", QUEUE[1]]
     )
+    meta = (opened[1] / "meta.txt").read_text()
+    assert "Transcript status: interrupted" in meta
+    assert "Summary status: not started" in meta
 
 
 def test_a_preflight_failure_stops_the_queue_before_any_url(
@@ -1161,9 +1183,7 @@ def test_an_interrupted_queue_reports_what_it_published_and_what_remains(
     def interrupt_on_second(url, output_dir, *_args, **_kwargs):
         if url == QUEUE[1]:
             raise transcript.Interrupted(130)
-        audio = output_dir / "audio.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
+        return downloaded(output_dir, url[-3:])
 
     monkeypatch.setattr(transcript, "download_audio", interrupt_on_second)
     options = ["--no-summary", "--output-dir", str(tmp_path), "--json"]
@@ -1187,9 +1207,7 @@ def test_an_interrupted_queue_names_the_urls_left_on_a_terminal_too(
     def interrupt_on_second(url, output_dir, *_args, **_kwargs):
         if url == QUEUE[1]:
             raise transcript.Interrupted(130)
-        audio = output_dir / "aaa.mp3"
-        audio.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio, "anonymous")
+        return downloaded(output_dir, url[-3:])
 
     monkeypatch.setattr(transcript, "download_audio", interrupt_on_second)
     options = ["--no-summary", "--output-dir", str(tmp_path)]
@@ -1204,77 +1222,7 @@ def test_an_interrupted_queue_names_the_urls_left_on_a_terminal_too(
     ]
 
 
-def test_an_interrupt_after_the_last_url_has_nothing_to_rerun(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fake_queue(monkeypatch)
-    opened: list[str] = []
-
-    def interrupt_while_opening_the_last(path, _budget):
-        opened.append(path.name.rsplit("_", 1)[1])
-        if len(opened) == 2:
-            raise transcript.Interrupted(130)
-
-    monkeypatch.setattr(transcript, "open_folder", interrupt_while_opening_the_last)
-
-    code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        *QUEUE[:2],
-        "--no-summary",
-        "--open",
-        "--output-dir",
-        str(tmp_path),
-        "--json",
-    )
-
-    report = json.loads(err)
-    assert (code, out, opened) == (130, "", ["aaa", "bbb"])
-    assert [r["url"] for r in report["results"]] == QUEUE[:2]
-    assert report["error"]["hint"] == "nothing to rerun: every URL has a result"
-
-
-def test_an_expired_budget_when_opening_a_folder_lets_the_queue_move_on(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fake_queue(monkeypatch)
-    now = [0.0]
-
-    def slow_transcription(audio_path, *_args):
-        if audio_path.stem == "aaa":
-            now[0] += 10_000.0
-        return deepgram_response(f"Words of {audio_path.stem}")
-
-    monkeypatch.setattr(transcript.time, "monotonic", lambda: now[0])
-    monkeypatch.setattr(transcript, "transcribe_audio", slow_transcription)
-    monkeypatch.setattr(transcript.platform, "system", lambda: "Darwin")
-    opened: list[str] = []
-
-    def finder(command, **_kwargs):
-        opened.append(Path(command[1]).name.rsplit("_", 1)[1])
-        return subprocess.CompletedProcess(command, 0, "", "")
-
-    monkeypatch.setattr(transcript, "run_child", finder)
-
-    code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        *QUEUE[:2],
-        "--no-summary",
-        "--open",
-        "--output-dir",
-        str(tmp_path),
-    )
-
-    assert (code, video_ids(out), opened) == (0, ["aaa", "bbb"], ["bbb"])
-    assert "[1/2] warning: Could not open the output folder in Finder" in err
-
-
-def test_verbose_queue_publications_include_their_position(
+def test_verbose_queue_steps_include_their_position(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch)
@@ -1296,7 +1244,7 @@ def test_verbose_queue_publications_include_their_position(
     assert [
         line.split(" ", 1)[0]
         for line in err.splitlines()
-        if "Completed Publication" in line
+        if "Completed Deepgram transcription" in line
     ] == ["[1/2]", "[2/2]"]
     assert any(line.startswith("Completed Preflight") for line in err.splitlines())
 

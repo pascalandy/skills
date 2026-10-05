@@ -30,11 +30,15 @@ def run(*argv: str) -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def test_quoted_frontmatter_passes_silently(authoring: Path) -> None:
+def test_quoted_frontmatter_answers_ok(authoring: Path) -> None:
     write(authoring, "example", 'name: "example"\nkeywords: ["foo, bar", 3]\n')
 
-    assert run() == (0, "", "")
-    assert run("--verbose") == (0, "", "check authoring/devtools/example/SKILL.md\n")
+    assert run() == (0, '{"ok":true}\n', "")
+    assert run("--verbose") == (
+        0,
+        '{"ok":true}\n',
+        "check authoring/devtools/example/SKILL.md\n",
+    )
 
 
 def test_commas_inside_quoted_inline_items_keep_their_quotes(authoring: Path) -> None:
@@ -48,7 +52,7 @@ def test_commas_inside_quoted_inline_items_keep_their_quotes(authoring: Path) ->
         1,
         "",
         (
-            "error: authoring/devtools/example/SKILL.md:3: invalid "
-            "inline list string items must be double-quoted\n"
+            '{"ok":false,"errors":["authoring/devtools/example/SKILL.md:3: invalid '
+            'inline list string items must be double-quoted"]}\n'
         ),
     )

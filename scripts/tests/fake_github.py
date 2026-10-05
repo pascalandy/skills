@@ -35,7 +35,12 @@ with open(os.environ["FAKE_CHECKS"], "a") as log:
     log.write(tree.stdout)
 if hook := os.environ.get("FAKE_CHECK_HOOK"):
     subprocess.run(hook, shell=True, check=True)
-sys.exit(int(os.environ.get("FAKE_CHECK_EXIT", "0")))
+code = int(os.environ.get("FAKE_CHECK_EXIT", "0"))
+if code:
+    print('{"ok":false,"errors":["lint failed"]}', file=sys.stderr)
+else:
+    print('{"ok":true}')
+sys.exit(code)
 """
 DEPLOY = """\
 import os, sys

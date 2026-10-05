@@ -73,10 +73,10 @@ The queue runs one URL at a time, so uploads never share bandwidth.
 - Before any work, it checks every URL, and one invalid URL exits `2` with nothing run. It checks the summary CLI and reads the Deepgram key once, and each URL gets its own `--timeout` budget and result folder
 - A repeated video runs once, with a warning. The queue compares video IDs, so `youtu.be/ID` and `watch?v=ID&t=30` never bill the same audio twice
 - On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`, and so do the `-v` and `--debug` lines
-- Each published folder prints on `stdout` at once, even when a later URL fails. A URL whose summary failed still prints its transcript folder
-- A failed URL prints `[2/4] error:` and its own fix, and the queue moves on. A failed publication, such as a full disk, stops the queue instead, because every later URL would bill Deepgram and fail the same way
-- After the last URL, `error: 1 of 4 URLs failed; 3 published a result folder` and a command that reruns only the failed or unrun URLs end `stderr`. That command keeps a repair they share, such as a longer `--timeout`
-- The run exits `75` only when nothing was published and every failure came before any paid request, so rerunning the same command is safe. Any other failure exits `1`
+- Each result folder prints on `stdout` as soon as it appears, before Deepgram starts, and stays there when its URL or a later one fails
+- A failed URL prints `[2/4] error:` and its own fix, and the queue moves on. A result that cannot be saved, such as on a full disk, stops the queue instead, because every later URL would fail to save the same way
+- After the last URL, `error: 1 of 4 URLs failed; 3 saved a transcript` and a command that reruns only the failed or unrun URLs end `stderr`. That command keeps a repair they share, such as a longer `--timeout`
+- The run exits `75` only when no URL saved a transcript and every failure came before any paid request, so rerunning the same command is safe. Any other failure exits `1`
 - An interrupt stops the queue once the current URL is cleaned up, then prints a command that reruns the URLs that did not finish. Under `--json`, the error object also lists the finished URLs
 
 Several URLs always give the queue output, even when they name one video. With `--json`, `results` contains each single-run payload or failure object, plus its `url`. See [Output and JSON](#output-and-json). A failed queue sends this object to `stderr` with `ok: false` and `queue_failed`. A dry run lists the queue as `source.urls`.
@@ -95,7 +95,7 @@ For a run with changed source or summary settings, inspect the plan first with `
 
 ## Output and JSON
 
-`stdout` holds the result only: the published folder path, discovery values, or the dry run's output parent. A failure leaves `stdout` empty, except that a queue keeps the folders it published before the failure.
+Without `--json`, `stdout` holds the result only: the result folder path, printed as soon as the folder appears, discovery values, or the dry run's output parent. The path stays when a later step fails; a failure before the folder appears leaves `stdout` empty.
 
 `stderr` stays empty on success unless a warning needs action, such as browser access falling back to anonymous. `-v` adds the run plan and one line per step; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off.
 
@@ -127,17 +127,17 @@ A successful run payload includes:
 }
 ```
 
-A summary failure still publishes the raw artifacts and records the reason in metadata. The run exits `1` with the same payload, plus its `error`, on `stderr`, so the published folder stays findable.
+A failure after the result folder appears keeps the folder, and its metadata records the failed stage and the reason. The `stderr` object carries `output_dir`, so the folder stays findable. A summary failure exits `1` with the full payload, plus its `error`, because the raw artifacts are saved.
 
 Exit `75` means a temporary failure before any paid request, such as a network error reaching YouTube or Deepgram refusing the audio; rerunning the same command is safe. A failure after the Deepgram upload started exits `1`, because Deepgram may have transcribed, and billed, the audio.
 
 ## Safety and reruns
 
-Input and configuration validation run before credentials, paid APIs, or output writes. Publication uses a hidden adjacent staging directory and one final rename. A publication failure removes staging. YouTube temporary audio is always removed.
+Input and configuration validation run before credentials, paid APIs, or output writes. The result folder appears once the audio is ready, before Deepgram starts. Each file in it is written through a hidden temporary file and one rename, so a reader never sees a partial file. YouTube temporary audio is always removed.
 
 Deepgram upload failures are not replayed automatically because the service may have accepted the request before the client timed out. Follow the returned hint instead of blindly retrying.
 
-Audio uploads use 64 KiB blocks and declare the full file size with `Content-Length`. The CLI checks the sent byte count before accepting a successful response. With `-v`, human output reports `Audio upload complete` before waiting for the transcription response. This confirms that the client sent every block; publication still requires a valid Deepgram transcription. Published metadata records `Audio upload: complete (N bytes)`, which `verify-transcript` checks and retains in its evidence.
+Audio uploads use 64 KiB blocks and declare the full file size with `Content-Length`. The CLI checks the sent byte count before accepting a successful response. With `-v`, human output reports `Audio upload complete` before waiting for the transcription response. This confirms that the client sent every block; saving the transcript still requires a valid Deepgram transcription. The metadata of a saved transcript records `Audio upload: complete (N bytes)`, which `verify-transcript` checks and retains in its evidence.
 
 The 300-second write timeout applies to each block, so a slow upload can take more than 300 seconds while making progress. The workflow budget is checked between blocks. A stalled upload reports a lower bound on the bytes sent because its last block may have been partially transmitted. A timeout after the upload started returns `transcription_timeout`; its hint reruns the command with twice the `--timeout`.
 
@@ -149,17 +149,15 @@ just ttr "https://www.youtube.com/watch?v=VIDEO_ID" --timeout 20m
 
 For several videos, use [Queue several videos](#queue-several-videos).
 
-A successful repeated command creates a new result folder. This preserves prior artifacts but means a full run is intentionally not idempotent. Use `--dry-run` for plan verification and do not replay a timed-out run until its output location has been checked.
+Each run creates a new result folder, and a failed run keeps its own, so a rerun never touches an earlier result. A full run is intentionally not idempotent. Use `--dry-run` for plan verification and do not replay a timed-out run until its metadata shows how far it got.
 
 ## Output files
 
-Each YouTube run creates a timestamped folder containing:
+Each YouTube run creates a timestamped folder. Its files appear in this order:
 
-- `{prompt}.md` when summary generation succeeds
-- `raw_transcript.txt`
-- `raw_sentences.txt`
-- `raw_transcript.json`
-- `meta.txt`
+- `meta.txt`, with the folder
+- `raw_transcript.txt`, `raw_sentences.txt`, and `raw_transcript.json`, once Deepgram answers
+- `{prompt}.md`, when summary generation succeeds
 
 Each Zoom run creates one meeting folder under the output parent. The name removes `Réunion Zoom de`:
 
@@ -180,11 +178,20 @@ The Zoom files use the folder name as their base:
 └── {base}.meta.txt
 ```
 
-The Markdown file exists only after successful summary generation. Name collisions receive `-2`, `-3`, and later suffixes. Metadata records summary status. YouTube metadata also records the successful audio method as `anonymous`, `arc`, or `chrome`.
+Zoom files appear in the same order. Name collisions receive `-2`, `-3`, and later suffixes.
+
+The metadata holds the title, date, and source from the moment the folder appears. Each stage rewrites it, so it always shows how far the run got:
+
+- `Transcript status`: `in progress`, `complete`, `failed`, or `interrupted`
+- `Summary status`: `pending`, `running`, `succeeded`, `failed`, `skipped`, `not started`, or `interrupted`
+
+YouTube metadata also records the audio method that worked: `anonymous`, `arc`, or `chrome`.
 
 ## YouTube transport
 
 Normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously and warns on `stderr`, or in the `warnings` list under `--json`.
+
+One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
 Arc's `Default` profile must have a valid YouTube session. If the session expires, sign in again to YouTube in Arc. Arc can remain open. YouTube Premium does not replace browser authentication. The script does not export cookies or modify Arc, Chrome, or Keychain.
 
