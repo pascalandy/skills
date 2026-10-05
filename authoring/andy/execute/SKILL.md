@@ -37,7 +37,9 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 	Paula Review PR
 	```
 
-- Then babysit, wait for “Revue Paula” covering the PR’s latest head SHA. If that SHA already has a Paula review, use it; Paula does not publish duplicates
+- First, check whether “Revue Paula” already covers the PR’s current head SHA. If it does, use that review; do not post another trigger or wait for a duplicate
+- Otherwise, post a NEW top-level Conversation comment containing exactly Paula Review PR
+- Then babysit, wait for the review covering that head SHA
 	- Fix or explicitly dismiss each finding with a reason. After pushing fixes, post a NEW trigger comment
 	- Request at most 4 reviews per PR. If the limit is reached or Paula is unavailable, report the blocker; do not treat it as a pass
 	- Done when every PR’s latest head is reviewed and every finding is fixed or explicitly dismissed
@@ -100,13 +102,15 @@ Post a status update at each step: "📍 [what is going on] / [step name]"
 	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The Merge gate's deploy and the Close step's retro issues in any of my repositories are allowed
 		- After a squash merge or merge commit, deleting a branch whose tip still matches the PR's head commit at merge time is not deleting data
 
-Github comment rules:
+#### Github comment rules:
 
-- The first nonempty line must be exactly Paula Review PR or Paula Review Stack
-- Do not include quotation marks, punctuation, bullets, indentation or code fences in the actual GitHub comment
-- Publish through the authorized pascalandy account on open PRs in pascalandy/skills
-- A push or an edited comment does not trigger a review; create a NEW comment
-- BLOCKED or STALE requires resolving the stated problem and posting a NEW trigger
+- Before requesting a review, check for an existing Paula review covering the current PR head or the current stack’s base and all PR heads. Use it if present; do not wait for a duplicate
+- To request a review, create a NEW top-level Conversation comment using the appropriate PR or stack format. A push or an edited comment does not trigger a review
+- Post the comment as plain text, with no code fences, indentation, quotation marks or bullet markers. Preserve the colons and # signs required by the stack fields
+- The first nonempty line must be exactly Paula Review PR or Paula Review Stack, with no extra text or punctuation on that line
+- Publish through the authorized pascalandy account on open PRs in pascalandy/skills. Post stack requests on the top PR, with PRs:, Base:, Base-SHA: and Head-SHA: populated from current remote values
+- Request at most 4 reviews per PR and 4 reviews for the whole stack. If either limit is reached before its completion criteria are met, or Paula is unavailable, report the blocker; do not treat it as a pass
+- If Paula answers BLOCKED or STALE, resolve the stated problem before requesting another review
 - Paula performs static review and reports findings; the implementation agent owns fixes and tests
 - A Paula review does not authorize merging. Follow the project’s separate checks and merge-approval requirements
 
