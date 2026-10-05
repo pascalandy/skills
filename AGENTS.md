@@ -22,6 +22,8 @@ A mode is a skill named `*-mode` with a `playbooks/` folder of routes; `just rem
 
 Set `configuration-is-needed: true` in a skill's frontmatter when a public user must set something up before it works, such as a key read from Pascal's keyring, a private service, or a folder on his machine; put it in a route's playbook instead when only that route needs it. A public tool whose install the skill documents does not count. Omit the key otherwise. No script reads it; `rg -l 'configuration-is-needed' authoring` lists the flagged files
 
+Set `api-key: "<service>"` in the same place when the skill reads an API key or token, even on an optional path, naming the service it belongs to, such as `"deepgram"`, so each machine can be checked for that key. A login such as `codex login` does not count. Omit the field otherwise. No script reads it; `rg '^api-key:' authoring` lists each skill and its service
+
 `scripts/tests/test_skill_invocation.py` checks every authored skill for metadata that disables agent invocation
 
 If generated output is wrong, fix `authoring/` or the compile script, then rerun `just compile-skills`
