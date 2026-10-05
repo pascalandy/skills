@@ -3,6 +3,7 @@ name: "tavily"
 description: "Use only when explicitly invoked as `tavily`."
 kind: "general"
 configuration-is-needed: true
+api-key: "tavily"
 ---
 
 # Tavily REST API

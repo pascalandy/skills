@@ -2,6 +2,7 @@
 name: "image-creator"
 description: "Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter."
 kind: "general"
+api-key: "openrouter"
 ---
 
 # Image Creator
