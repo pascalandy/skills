@@ -752,10 +752,9 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         futures: list[Future[Outcome]] = []
         try:
             with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
-                futures = [
-                    pool.submit(attempt, machine, source, mode) for machine in machines
-                ]
                 try:
+                    for machine in machines:
+                        futures.append(pool.submit(attempt, machine, source, mode))
                     outcomes = [future.result() for future in futures]
                 except KeyboardInterrupt:
                     stop_children()
