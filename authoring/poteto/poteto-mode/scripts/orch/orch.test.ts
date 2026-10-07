@@ -21,6 +21,7 @@ import {
 } from "./store.ts";
 
 const SCRIPT = join(import.meta.dir, "orch.ts");
+const ANSWER = join(import.meta.dir, "../answer.ts");
 const directories: string[] = [];
 const handles: Store[] = [];
 
@@ -576,6 +577,24 @@ describe("Store", () => {
 });
 
 describe("orch CLI", () => {
+  it("delivers all diagnostics and its answer before an immediate exit", () => {
+    const diagnostic = `${"x".repeat(1_000_000)}\n`;
+    for (const code of [0, 1]) {
+      const result = Bun.spawnSync([
+        process.execPath,
+        "-e",
+        `import { answer, processIo } from ${JSON.stringify(ANSWER)};
+processIo.stderr("x".repeat(1_000_000) + "\\n");
+process.exit(answer(processIo, ${code}, ${code === 0 ? "{}" : '{ errors: ["failed"] }'}));`,
+      ]);
+      expect(result.exitCode).toBe(code);
+      expect(result.stdout.toString()).toBe(code === 0 ? '{"ok":true}\n' : "");
+      expect(result.stderr.toString()).toBe(
+        diagnostic + (code === 0 ? "" : '{"ok":false,"errors":["failed"]}\n')
+      );
+    }
+  });
+
   it("prints commander help and answers a usage error with exit 2", async () => {
     const help = runCli(["--help"]);
     expect(help.code).toBe(0);
