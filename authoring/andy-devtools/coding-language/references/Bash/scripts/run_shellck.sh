@@ -1,10 +1,49 @@
 #!/usr/bin/env bash
+# Lint shell scripts with shellcheck. Answers in one JSON line: {"ok":true} on
+# stdout, or {"ok":false,"errors":[...]} as the last line of stderr, after the
+# linter's own diagnostics.
 set -euo pipefail
 
-if ! command -v shellcheck >/dev/null 2>&1; then
-	echo "shellck: shellcheck not found (install with brew install shellcheck)" >&2
-	exit 1
-fi
+usage() {
+	cat <<'EOF'
+usage: run_shellck.sh [path ...]
+
+Lint each shell script under the given files and folders, or under scripts/ when
+none is given. A file counts as a shell script by its extension (.sh, .bash,
+.zsh, .command) or its shebang.
+
+Answers {"ok":true} on stdout, or {"ok":false,"errors":[...]} as the last line of
+stderr, after shellcheck's diagnostics.
+
+Exit codes: 0 clean or nothing to lint; 1 shellcheck found problems or is
+missing; 2 usage error
+EOF
+}
+
+# Print $1 as a JSON string; quotes, backslashes, and control characters escaped
+json() {
+	local text=$1 out='' char i
+	for ((i = 0; i < ${#text}; i++)); do
+		char=${text:i:1}
+		case $char in
+		\" | \\) out+=\\$char ;;
+		[[:cntrl:]])
+			printf -v char '\\u%04x' "'$char"
+			out+=$char
+			;;
+		*) out+=$char ;;
+		esac
+	done
+	printf '"%s"' "$out"
+}
+
+# fail <exit code> <error> [help]: answer as the last line of stderr, then exit
+fail() {
+	local help=''
+	[[ -z "${3-}" ]] || help=",\"help\":$(json "$3")"
+	printf '{"ok":false,"errors":[%s]%s}\n' "$(json "$2")" "$help" >&2
+	exit "$1"
+}
 
 is_shell_file() {
 	local path="$1"
@@ -44,27 +83,31 @@ add_target() {
 		fi
 		return
 	fi
-	echo "shellck: path not found: $path" >&2
-	exit 2
+	fail 2 "path not found: $path" "run_shellck.sh --help"
 }
+
+case ${1-} in
+-h | --help)
+	usage
+	exit 0
+	;;
+esac
+
+command -v shellcheck >/dev/null 2>&1 ||
+	fail 1 "shellcheck not found; install it with brew install shellcheck, then rerun"
 
 TARGETS=()
 if [[ $# -gt 0 ]]; then
 	for arg in "$@"; do
 		add_target "$arg"
 	done
+elif [[ -d "scripts" ]]; then
+	add_targets_from_dir "scripts"
 else
-	if [[ -d "scripts" ]]; then
-		add_targets_from_dir "scripts"
-	else
-		echo "shellck: no targets provided and scripts/ not found" >&2
-		exit 2
-	fi
+	fail 2 "no path given and scripts/ not found; pass the files or folders to lint" "run_shellck.sh --help"
 fi
 
-if [[ ${#TARGETS[@]} -eq 0 ]]; then
-	echo "shellck: no shell scripts found" >&2
-	exit 0
+if [[ ${#TARGETS[@]} -gt 0 ]] && ! shellcheck -x "${TARGETS[@]}" >&2; then
+	fail 1 "shellcheck found problems in ${#TARGETS[@]} file(s) checked; fix what it reports above, then rerun"
 fi
-
-shellcheck -x "${TARGETS[@]}"
+printf '{"ok":true}\n'
