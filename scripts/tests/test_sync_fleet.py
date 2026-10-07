@@ -424,16 +424,21 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     assert git(behind, "rev-parse", "HEAD") == head != before
 
 
-def test_hooks_warn_without_blocking_git_when_the_registry_is_missing(
+def test_a_hook_fails_in_a_main_checkout_without_the_registry(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
+    worktree = hub.parent / "worktree"
+    git(hub, "worktree", "add", "-q", str(worktree))
 
     result = run(hub, homes, bin_dir, "--hook", "post-commit")
+    elsewhere = run(worktree, homes, bin_dir, "--hook", "post-commit")
 
-    assert result.returncode == 0
-    assert "no fleet.toml" in result.stderr
+    assert (result.returncode, result.stdout) == (1, "")
+    [error] = json.loads(result.stderr)["errors"]
+    assert error.startswith("no fleet.toml in ")
     assert not (hub.parent / "hub-home/.claude").exists()
+    assert (elsewhere.returncode, elsewhere.stdout, elsewhere.stderr) == (0, OK, "")
 
 
 def test_a_worktree_syncs_with_the_main_checkouts_registry_and_skips_hooks(

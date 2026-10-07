@@ -174,7 +174,7 @@ def test_overlapping_applies_leave_the_newest_tree_installed(
     } == {"# alpha\n\nnew\n"}
 
 
-def test_every_private_package_installs_and_replaces_a_public_namesake(
+def test_every_private_package_installs_and_a_public_namesake_stops_the_install(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
@@ -193,25 +193,25 @@ def test_every_private_package_installs_and_replaces_a_public_namesake(
     skill(root / "content", "alpha", "private")
     skill(root / "content", "gamma", "private")
     shadowed = run(repo, home)
-    assert shadowed.returncode == 0, shadowed.stderr
-    for name in ("alpha", "gamma"):
-        assert (
-            f"warning: skill '{name}' is public and private; installing the private copy "
-            f"{root / 'content' / name}. Remove authoring/content/{name} to keep it "
-            "private, or delete the private copy to publish it"
-        ) in shadowed.stderr
+    assert (shadowed.returncode, shadowed.stdout) == (1, "")
+    assert shadowed.stderr == failed(
+        *(
+            f"skill '{name}' is public and private; remove authoring/content/{name} "
+            f"to keep it private, or delete {root / 'content' / name} to publish it, "
+            "then rerun: just install-skills"
+            for name in ("alpha", "gamma")
+        )
+    )
+    assert not any((home / target / "gamma").exists() for target in MAC)
+    shutil.rmtree(root / "content" / "alpha")
+    shutil.rmtree(repo / "authoring/content/gamma")
+    resolved = run(repo, home)
+    assert (resolved.returncode, resolved.stderr) == (0, "")
     assert {
         (home / target / name / "SKILL.md").read_text(encoding="utf-8")
         for target in MAC
         for name in ("alpha", "gamma")
-    } == {"# alpha\n\nprivate\n", "# gamma\n\nprivate\n"}
-    shutil.rmtree(root / "content" / "alpha")
-    published = run(repo, home)
-    assert published.returncode == 0, published.stderr
-    assert "skill 'alpha'" not in published.stderr
-    assert {
-        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8") for target in MAC
-    } == {"# alpha\n\nold\n"}
+    } == {"# alpha\n\nold\n", "# gamma\n\nprivate\n"}
 
 
 def test_a_worktree_installs_the_main_checkouts_private_skills(
@@ -330,7 +330,7 @@ def test_a_skill_without_a_kind_installs_the_compiled_kind_unknown(
     )
 
 
-def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
+def test_an_apply_deletes_folders_holding_only_caches_and_fails_on_other_leftovers(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
@@ -356,15 +356,15 @@ def test_an_apply_deletes_authoring_folders_a_move_left_holding_only_caches(
     assert run(repo, home, "--dry-run").returncode == 0
     assert (repo / "authoring/retired").exists()
     applied = run(repo, home)
-    assert (applied.returncode, applied.stderr) == (
-        0,
-        (
-            "warning: authoring/kept holds only ignored files, such as "
-            "authoring/kept/.env; delete it once nothing in it is needed\n"
-            "warning: authoring/linked holds only ignored files, such as "
-            "authoring/linked/.vscode/node_modules; delete it once nothing in it is needed\n"
-        ),
-    )
+    assert (applied.returncode, applied.stdout) == (1, "")
+    answer = json.loads(applied.stderr)
+    assert answer["errors"] == [
+        "installed, but authoring/kept holds only ignored files, such as "
+        + "authoring/kept/.env; delete it once nothing in it is needed",
+        "installed, but authoring/linked holds only ignored files, such as "
+        + "authoring/linked/.vscode/node_modules; delete it once nothing in it is needed",
+    ]
+    assert ["add", "~/.claude/skills/solo"] in answer["changes"]
     assert {
         folder: (repo / folder).exists()
         for folder in (
@@ -412,7 +412,7 @@ def test_an_apply_keeps_external_files_behind_a_category_symlink(
     assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
 
-def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
+def test_a_leftover_the_apply_cannot_delete_fails_once_the_install_ran(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
@@ -431,13 +431,13 @@ def test_a_leftover_the_apply_cannot_delete_warns_and_the_install_still_runs(
     finally:
         cache.chmod(0o700)
         locked.chmod(0o700)
-    assert (applied.returncode, applied.stderr) == (
-        0,
-        (
-            "warning: could not delete authoring/retired: Permission denied\n"
-            "warning: could not delete authoring/sealed: Permission denied\n"
-        ),
-    )
+    assert (applied.returncode, applied.stdout) == (1, "")
+    assert json.loads(applied.stderr)["errors"] == [
+        "installed, but could not delete authoring/retired: Permission denied; "
+        + "delete it by hand",
+        "installed, but could not delete authoring/sealed: Permission denied; "
+        + "delete it by hand",
+    ]
     assert sealed_cache.is_file()
     assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
@@ -474,11 +474,12 @@ raise SystemExit(install_skills.main())
 
     applied = run(repo, home, script=driver.name)
 
-    assert applied.returncode == 0, applied.stderr
+    assert (applied.returncode, applied.stdout) == (1, "")
     assert saved.read_text(encoding="utf-8") == "work saved during cleanup\n"
-    assert applied.stderr == (
-        "warning: could not delete authoring/retired: Directory not empty\n"
-    )
+    assert json.loads(applied.stderr)["errors"] == [
+        "installed, but could not delete authoring/retired: Directory not empty; "
+        + "delete it by hand"
+    ]
     assert not cache.exists()
     assert all((home / target / "alpha/SKILL.md").is_file() for target in MAC)
 
@@ -495,7 +496,7 @@ def test_shallow_clone_is_refused(sandbox: tuple[Path, Path]) -> None:
     assert "git fetch --unshallow" in refused.stderr
 
 
-def test_symlink_at_a_target_blocks_apply_and_a_preview_warns(
+def test_symlink_at_a_target_blocks_apply_and_fails_a_preview_too(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
@@ -514,11 +515,10 @@ def test_symlink_at_a_target_blocks_apply_and_a_preview_warns(
     assert (blocked.returncode, blocked.stdout) == (1, "")
     assert blocked.stderr == failed(conflict)
     assert not (home / ".agents").exists()
-    assert preview.returncode == 0
-    assert {"kind": "add", "target": ".agents/skills", "name": "alpha"} in report(
-        preview
-    )
-    assert preview.stderr == f"warning: {conflict}\n"
+    assert (preview.returncode, preview.stdout) == (1, "")
+    answer = json.loads(preview.stderr)
+    assert answer["errors"] == [conflict]
+    assert ["add", "~/.agents/skills/alpha"] in answer["changes"]
 
 
 def test_om1_exclusion_and_inactive_mac_target(sandbox: tuple[Path, Path]) -> None:

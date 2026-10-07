@@ -95,7 +95,8 @@ CHANGES = ("add", "update", "remove")
 EXIT_CODES = exit_codes(
     {
         0: "installed, or nothing to change",
-        1: "a conflict blocks the install, or --check found pending changes",
+        1: "a conflict or a skill both public and private blocks the install, "
+        "--check found pending changes, or a leftover folder needs you",
         75: "another install still held the lock after --timeout",
     }
 )
@@ -105,9 +106,10 @@ such as ["add","~/.claude/skills/andy-mode"], where the action is add,
 update, or remove, and {"ok":true} when nothing changes. A dry run answers the
 same and writes nothing; --check fails when an installed entry differs, with
 the changes beside the error. A conflict, a symlink or wrong type at a target
-path, blocks the install. An apply also deletes each authoring/ or skills/
-folder a move left holding only caches, and warns about one holding other
-ignored files or one it cannot delete. -v logs how many entries each target
+path, or a skill both public and private blocks the install, and fails a dry
+run too. An apply also deletes each authoring/ or skills/ folder a move left
+holding only caches; one holding other ignored files, or one it cannot
+delete, fails the run once the install is done. -v logs how many entries each target
 holds current.
 
 profiles:
@@ -268,8 +270,8 @@ def skill_sources(
     stage: Path, private_root: Path | None, profile: str
 ) -> dict[str, Source]:
     """Stage public packages under `stage`, add every private package, and drop
-    the profile's exclusions. A private package replaces a public one of the
-    same name, so a skill moving between the repositories never stops an install."""
+    the profile's exclusions. A name that is both public and private stops the
+    install, since only the user knows which copy to keep."""
     sources: dict[str, Source] = {}
     public: dict[str, Path] = {}
     for name, entries in compile_skills.collect().items():
@@ -282,16 +284,17 @@ def skill_sources(
                 *source.parts[: len(source.parts) - len(relative.parts)]
             )
         sources[name] = Source(package, "public", digest(package))
+    both: list[str] = []
     for name, package in private_packages(private_root).items():
         if name in sources:
-            log.warning(
-                "warning: skill %r is public and private; installing the private copy "
-                "%s. Remove %s to keep it private, or delete the private copy to publish it",
-                name,
-                package,
-                public[name].relative_to(ROOT),
+            both.append(
+                f"skill {name!r} is public and private; remove "
+                f"{public[name].relative_to(ROOT)} to keep it private, or delete "
+                f"{package} to publish it, then rerun: just install-skills"
             )
         sources[name] = Source(package, "private", digest(package))
+    if both:
+        raise ScriptError(*both)
     if not sources:
         raise ScriptError("no public skills found; run just compile-skills")
     return {
@@ -535,9 +538,9 @@ def install_lock() -> Path:
     return ROOT / common.strip() / "install-skills.lock"
 
 
-def prune(folder: Path) -> None:
+def prune(folder: Path) -> str | None:
     """Delete a folder holding DISPOSABLE entries and nothing else but empty
-    folders, or warn about the first other entry, a symlink included. A folder
+    folders, or return what to do about the first other entry, a symlink included. A folder
     without a DISPOSABLE entry stays, since git deletes the folders a pull
     empties and only one made since lacks a cache. Delete the entries without
     following symlinks, then each folder deepest first. A file saved outside
@@ -559,17 +562,15 @@ def prune(folder: Path) -> None:
         ]
         names[:] = [name for name in names if name not in DISPOSABLE]
         if kept:
-            log.warning(
-                "warning: %s holds only ignored files, such as %s; "
-                "delete it once nothing in it is needed",
-                folder.relative_to(ROOT),
-                (here / kept[0]).relative_to(ROOT),
+            return (
+                f"{folder.relative_to(ROOT)} holds only ignored files, such as "
+                f"{(here / kept[0]).relative_to(ROOT)}; delete it once nothing in "
+                "it is needed"
             )
-            return
     if errors:
         raise errors[0]
     if not disposable:
-        return
+        return None
     for path in disposable:
         if path.is_dir():
             shutil.rmtree(path)
@@ -578,12 +579,13 @@ def prune(folder: Path) -> None:
     for here in reversed(folders):
         here.rmdir()
     log.info("prune %s", folder.relative_to(ROOT))
+    return None
 
 
-def prune_leftovers() -> None:
+def prune_leftovers() -> list[str]:
     """Prune each skills/ folder, and each authoring/ category or package
-    folder, that holds no file git lists. A folder it cannot delete gets a
-    warning, since the install it follows already succeeded."""
+    folder, that holds no file git lists; return what to do about each folder
+    it had to keep or could not delete."""
     compiled = {path.parts[1] for path in compile_skills.git_files("skills")}
     candidates = [
         folder
@@ -603,17 +605,19 @@ def prune_leftovers() -> None:
                 for package in sorted(folder.iterdir())
                 if (folder.name, package.name) not in listed
             ]
+    problems: list[str] = []
     for folder in candidates:
         if folder.is_symlink() or not folder.is_dir():
             continue
         try:
-            prune(folder)
+            if problem := prune(folder):
+                problems.append(problem)
         except OSError as error:
-            log.warning(
-                "warning: could not delete %s: %s",
-                folder.relative_to(ROOT),
-                error.strerror or error,
+            problems.append(
+                f"could not delete {folder.relative_to(ROOT)}: "
+                f"{error.strerror or error}; delete it by hand"
             )
+    return problems
 
 
 def install(args: argparse.Namespace) -> dict[str, Any]:
@@ -682,18 +686,24 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
                 "run: just install-skills",
                 report={"changes": changes},
             )
-        if preview:
-            for conflict in conflicts:
-                log.warning("warning: %s", conflict)
-            return output
         if conflicts:
-            raise ScriptError(*conflicts)
+            # A preview fails as the install would, and still lists the changes
+            raise ScriptError(*conflicts, report=output if preview else None)
+        if preview:
+            return output
         compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
         try:
-            prune_leftovers()
+            leftovers = prune_leftovers()
         except (OSError, ScriptError) as error:
-            log.warning("warning: could not prune leftover skill folders: %s", error)
+            leftovers = [
+                f"could not prune leftover skill folders: {error}; "
+                + "see why with just install-skills --debug"
+            ]
+        if leftovers:
+            raise ScriptError(
+                *(f"installed, but {problem}" for problem in leftovers), report=output
+            )
         return output
 
 
@@ -720,7 +730,7 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         "--dry-run",
         action="store_true",
-        help="print the changes an install would make, and warn about conflicts, without writing",
+        help="answer the changes an install would make, without writing; a conflict fails it as it would fail the install",
     )
     mode.add_argument(
         "--check",

@@ -41,8 +41,8 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 2. It reuses a green `signoff` on the head, or runs the `just signoff` steps once
 3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
 4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
-5. It reads the PR back, then warns when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
-6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync; the run warns and still exits 0, since the merge landed
+5. It reads the PR back, then fails when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
+6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync. When the merge landed but the deploy failed or was withheld, the run exits 1, says that the merge landed, and lists it under `changes`
 
 `just merge --dry-run` runs step 1 and answers what a run would do, without deploying. A rerun on a merged PR runs only the deploy. It never deletes the branch
 
@@ -52,9 +52,9 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 | Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, run `gh stack merge <stack> --yes --squash`, then `just deploy` |
 | GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
 | Interrupted | `just merge` again; on a merged PR it only deploys |
-| Warning: `just deploy` did not reach every machine | Fix what it names, then `just deploy` |
-| Warning: `main` holds a tree the checks did not run on | `just check` on an up-to-date `main`, then `just deploy` |
-| Warning: the main checkout holds code `main` never had | Put it back on a commit of `main`, with no changes under `scripts/` or the justfile, then `just deploy` there |
+| The merge landed, but `just deploy` did not reach every machine | Fix what its answer names, then `just deploy` |
+| The merge landed, but `main` holds a tree the checks did not run on | `just check` on an up-to-date `main`, then `just deploy` |
+| The merge landed, but the main checkout holds code `main` never had | Put it back on a commit of `main`, with no changes under `scripts/` or the justfile, then `just deploy` there |
 
 ## The signoff rule
 

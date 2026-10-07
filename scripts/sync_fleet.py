@@ -276,16 +276,6 @@ def registry() -> Path:
     return found[0]
 
 
-def has_registry() -> bool:
-    """For hooks: warn, never block git, when the registry cannot be found."""
-    try:
-        registry()
-    except ScriptError as error:
-        log.warning("warning: %s; the fleet does not sync", error)
-        return False
-    return True
-
-
 def load_registry(path: Path) -> list[Machine]:
     if not path.is_file():
         raise ScriptError(
@@ -664,13 +654,15 @@ def hook(event: list[str]) -> dict[str, Any]:
     has the private clone, never in a worktree. A pull that brings commits
     installs here and syncs the other machines. A commit installs here; the
     other machines sync once a push lands it on GitHub. Without the registry,
-    an event that would act warns and never blocks git.
+    an event that would act fails, since the fleet would stop syncing unseen;
+    a pre-push then stops the push.
     """
     name, *rest = event
     if ROOT != main_checkout(ROOT) or not sync_private.is_clone():
         return {}
     if name == "pre-push":
-        if (sha := pushed_main(sys.stdin.read().splitlines())) and has_registry():
+        if sha := pushed_main(sys.stdin.read().splitlines()):
+            registry()
             background("--after-push", sha)
         return {}
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
@@ -686,8 +678,7 @@ def hook(event: list[str]) -> dict[str, Any]:
         name == "post-rewrite" and rest[:1] != ["rebase"]
     ):
         return {}
-    if not has_registry():
-        return {}
+    registry()
     installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
