@@ -38,7 +38,7 @@ Commit hooks never sign off: git has no hook after a push, and GitHub accepts a 
 Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-merges exactly the commit the checks ran on:
 
 1. It refuses in seconds when the PR is a draft or targets another branch, when the working tree has changes, when HEAD is not the PR head on GitHub, or when the branch lacks the tip of `main`
-2. It reuses a green `signoff` on the head, or runs the `just signoff` steps once
+2. It reuses a green `signoff` on the head, or runs the `just signoff` steps once. A later failure still lists that signoff under `changes`
 3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
 4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
 5. It reads the PR back, then fails when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
