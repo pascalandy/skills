@@ -473,6 +473,11 @@ def first_line(text: str) -> str:
     return next((line.strip() for line in text.splitlines() if line.strip()), "")
 
 
+def rendered_files(results: list[tuple[Example, Path, str]]) -> list[str]:
+    """The SVG of each example that rendered, which a failure still answers."""
+    return [str(svg) for _, svg, error in results if not error]
+
+
 def render(args: argparse.Namespace) -> dict[str, Any]:
     """Render every example, then answer with the files written, or fail on
     each example that did not render."""
@@ -524,7 +529,8 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
                 raise ScriptError(
                     f"{example.path}:{example.line}: mmdc timed out after "
                     f"{TIMEOUT} seconds; check that mmdc renders a small diagram, "
-                    "then run this command again"
+                    "then run this command again",
+                    report={"files": rendered_files(results)},
                 ) from None
             error = ""
             if rendered.returncode or not svg.is_file():
@@ -538,7 +544,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         if args.gallery:
             gallery(results, output / "index.html")
     except OSError as error:
-        raise ScriptError(str(error)) from None
+        raise ScriptError(
+            str(error), report={"files": rendered_files(results)}
+        ) from None
     failed = [
         f"{example.path}:{example.line}: did not render: "
         f"{first_line(error).rstrip(':')}; fix the cause in mmdc's message "
@@ -546,7 +554,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         for example, _, error in results
         if error
     ]
-    files = [str(svg) for _, svg, error in results if not error]
+    files = rendered_files(results)
     if args.gallery:
         files.append(str(output / "index.html"))
     if failed:
