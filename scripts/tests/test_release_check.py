@@ -179,7 +179,8 @@ class ReleaseCheckTests(unittest.TestCase):
             contents = notes.read_text(encoding="utf-8")
 
         self.assertEqual((result, stderr), (0, ""))
-        self.assertEqual(json.loads(stdout), {"ok": True, "file": str(notes)})
+        # The answer names the resolved path; macOS's /var is /private/var
+        self.assertEqual(json.loads(stdout), {"ok": True, "file": str(notes.resolve())})
         self.assertEqual(contents, "### Added\n\n- Initial snapshot\n")
 
     def test_notes_on_stdout_is_a_usage_error(self) -> None:
