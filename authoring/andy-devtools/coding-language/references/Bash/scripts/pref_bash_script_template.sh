@@ -221,7 +221,12 @@ answer() {
 			printf '%s\n' "${ts} [${SCRIPT_NAME}] ERROR: ${message}" >>"${LOG_FILE}" || true
 		fi
 	done
-	printf '{"ok":false,"errors":[%s]}\n' "${errors}" >&2
+	# Why: A usage error names the help command beside its errors.
+	local help=""
+	if [[ "${code}" -eq 2 ]]; then
+		help=",\"help\":$(fct_json_string "${SCRIPT_NAME} --help")"
+	fi
+	printf '{"ok":false,"errors":[%s]%s}\n' "${errors}" "${help}" >&2
 }
 
 # ==============================================================================
@@ -234,9 +239,6 @@ die() {
 	local message="${1:-Unknown error}"
 	local exit_code="${2:-1}"
 
-	if [[ "${exit_code}" -eq 2 ]]; then
-		message="${message}; run ${SCRIPT_NAME} --help"
-	fi
 	answer "${exit_code}" "${message}"
 	# Why: The answer is the last line, so the ERR trap must not add another.
 	trap - ERR

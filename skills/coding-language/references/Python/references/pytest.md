@@ -63,12 +63,16 @@ import json
 
 
 def answer(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
-    """The one-line answer: stdout on success, else the last line of stderr."""
+    """The one-line answer: stdout on success, else the last line of stderr.
+    Its ok must agree with the exit code."""
     if result.returncode == 0:
         assert result.stdout.count("\n") == 1, result.stdout
-        return json.loads(result.stdout)
-    assert result.stdout == ""
-    return json.loads(result.stderr.splitlines()[-1])
+        found = json.loads(result.stdout)
+    else:
+        assert result.stdout == ""
+        found = json.loads(result.stderr.splitlines()[-1])
+    assert found["ok"] is (result.returncode == 0)
+    return found
 ```
 
 ### Processing Input
@@ -93,7 +97,9 @@ def test_missing_input_reports_error(tmp_path: Path) -> None:
     missing = tmp_path / "missing.txt"
     result = run(str(missing), "--output", str(tmp_path / "out.txt"))
     assert result.returncode == 1
-    assert answer(result)["errors"] == [f"input file not found: {missing}"]
+    assert answer(result)["errors"] == [
+        f"input file not found: {missing}; pass an existing file"
+    ]
 ```
 
 The arguments are valid, and the test expects exit 1 with a specific error, so a usage error (exit 2) cannot satisfy it.
@@ -157,7 +163,7 @@ def test_uppercases_text(tmp_path: Path, text: str, expected: str) -> None:
     source = tmp_path / "in.txt"
     source.write_text(text, encoding="utf-8")
     output = tmp_path / "out.txt"
-    run(str(source), "--output", str(output))
+    assert answer(run(str(source), "--output", str(output)))["ok"] is True
     assert output.read_text(encoding="utf-8") == expected
 ```
 
