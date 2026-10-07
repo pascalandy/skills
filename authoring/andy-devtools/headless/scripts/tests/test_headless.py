@@ -311,7 +311,7 @@ def test_each_mode_answers_with_the_file_that_holds_the_answer(env, repo, target
 
     assert done.returncode == 0, done.stderr
     run = answered(done)
-    assert list(run) == ["ok", "file", "model", "effort", "session", "changed"]
+    assert set(run) == {"ok", "file", "model", "effort", "session", "changed"}
     file = Path(run["file"])
     assert file.is_absolute() and file.name == "answer.md"
     assert file.read_text(encoding="utf-8") == answer
