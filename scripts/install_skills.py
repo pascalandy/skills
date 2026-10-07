@@ -31,7 +31,14 @@ from typing import Any
 
 import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes, run_script
-from _common import FRONTMATTER, exclusive, frontmatter_description, run, swap
+from _common import (
+    FRONTMATTER,
+    exclusive,
+    frontmatter_description,
+    receipt,
+    run,
+    swap,
+)
 from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -509,7 +516,9 @@ def execute(
     sources: dict[str, Source],
     commands: dict[str, Source],
     actions: list[Action],
+    done: list[list[str]],
 ) -> None:
+    """Apply each action and append its change to `done` once it lands."""
     for action in actions:
         destination = home / action.target / action.name
         if action.kind in ("add", "update"):
@@ -522,6 +531,9 @@ def execute(
                 destination.unlink()
             else:
                 shutil.rmtree(destination)
+        else:
+            continue
+        done.append([action.kind, f"~/{action.target}/{action.name}"])
 
 
 def install_lock() -> Path:
@@ -685,7 +697,10 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
         if preview:
             return output
         compile_skills.compile_tree()
-        execute(home, {**sources, **codex}, commands, actions)
+        # A failure midway still answers the entries already installed
+        done: list[list[str]] = []
+        with receipt(done):
+            execute(home, {**sources, **codex}, commands, actions, done)
         try:
             leftovers = prune_leftovers()
         except (OSError, ScriptError) as error:

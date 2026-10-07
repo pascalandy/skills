@@ -38,6 +38,13 @@ if [ "$host" = down ]; then
     echo "ssh: connect to host down port 22: Connection refused" >&2
     exit 255
 fi
+# stopper waits until synced has installed, then interrupts the fleet run
+if [ "$host" = stopper ]; then
+    until [ -e "$FLEET_HOMES/synced/installed" ]; do sleep 0.1; done
+    sleep 2
+    kill -INT "$PPID"
+    sleep 30
+fi
 if [ "$host" = locked ]; then
     echo "tester@locked: Permission denied (publickey)." >&2
     exit 255
@@ -69,7 +76,10 @@ if [ "$FLEET_OLD_INSTALLER" = conflict ]; then
     echo "WARNING:install-skills:warning: ~/.claude/skills/alpha is a symlink or file; move it aside, then rerun: just install-skills" >&2
     exit 0
 fi
-exec "$FLEET_PYTHON" scripts/install_skills.py "$@"
+"$FLEET_PYTHON" scripts/install_skills.py "$@"
+code=$?
+touch "$HOME/installed"
+exit $code
 """
 
 
@@ -621,6 +631,25 @@ def test_a_failed_install_keeps_the_machines_completed_changes(
             )
             == "saved before failure"
         )
+
+
+def test_an_interrupt_keeps_the_machines_that_already_synced(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    synced = machine(homes, "synced", hub.parent / "skills.git")
+    change(hub)
+    register(hub, "synced", "stopper")
+
+    result = run(hub, homes, bin_dir)
+
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["interrupted"],
+        "changes": [["sync", "synced", git(hub, "rev-parse", "HEAD")[:7]]],
+    }
+    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 
 def test_others_reports_the_coordinators_private_save(

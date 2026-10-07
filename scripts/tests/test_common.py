@@ -72,6 +72,28 @@ def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
     assert answered(interrupted) == (130, "", '{"ok":false,"errors":["interrupted"]}\n')
 
 
+def test_an_interrupt_or_a_bug_answers_the_changes_its_exception_carries() -> None:
+    def stopped(_: argparse.Namespace) -> dict[str, Any]:
+        with _common.receipt([["pull", "main", "a..b"]]):
+            raise KeyboardInterrupt
+
+    def crashed(_: argparse.Namespace) -> dict[str, Any]:
+        error = RuntimeError("boom")
+        error.report = "not a mapping"  # pyright: ignore[reportAttributeAccessIssue]
+        raise error
+
+    assert answered(stopped) == (
+        130,
+        "",
+        '{"ok":false,"errors":["interrupted"],"changes":[["pull","main","a..b"]]}\n',
+    )
+    assert answered(crashed) == (
+        1,
+        "",
+        '{"ok":false,"errors":["RuntimeError: boom"],"rerun":"just tool --debug"}\n',
+    )
+
+
 def test_ok_follows_the_exit_code_whatever_work_returns() -> None:
     assert answered(lambda _: {"ok": False}) == (0, '{"ok":true}\n', "")
     assert answered(lying) == (

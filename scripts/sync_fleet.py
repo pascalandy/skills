@@ -61,6 +61,7 @@ from _common import (
     changes_in,
     exclusive,
     is_network_failure,
+    keep_changes,
     main_checkout,
     run,
     run_git,
@@ -749,12 +750,27 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
             local or socket.gethostname().split(".")[0],
         )
         with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
+            futures = [
+                pool.submit(attempt, machine, source, mode) for machine in machines
+            ]
             try:
-                outcomes = list(
-                    pool.map(lambda machine: attempt(machine, source, mode), machines)
-                )
-            except KeyboardInterrupt:
+                outcomes = [future.result() for future in futures]
+            except KeyboardInterrupt as stop:
                 stop_children()
+                # The answer keeps the machines that synced before the interrupt
+                finished = [
+                    future.result()
+                    for future in futures
+                    if future.done()
+                    and not future.cancelled()
+                    and future.exception() is None
+                ]
+                for outcome in finished:
+                    if outcome.changes:
+                        changed_machines[outcome.machine] = None
+                keep_changes(
+                    stop, [["sync", name, source.sha[:7]] for name in changed_machines]
+                )
                 raise
     problems = [outcome for outcome in outcomes if outcome.status not in FINE]
     if args.notify:

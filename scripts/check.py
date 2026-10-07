@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes, run_script
-from _common import run, run_git
+from _common import replay, run, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -377,7 +377,7 @@ def failure(check: Check, verbose: bool) -> str | None:
             if verbose:
                 return ""
             print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
-            sys.stderr.write(result.stdout)
+            replay(result.stdout)
             return result.stdout
     return None
 

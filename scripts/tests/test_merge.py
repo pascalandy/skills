@@ -245,6 +245,22 @@ def test_a_failed_deploy_fails_the_run_and_lists_what_landed(github: Sandbox) ->
     assert github.main_subject() == "✨ feat: add feature (#7)"
 
 
+def test_an_interrupted_deploy_still_answers_the_merge(github: Sandbox) -> None:
+    head = github.git("rev-parse", "HEAD")
+    github.open_pr()
+    github.sign(head)
+
+    result = github.run("merge.py", FAKE_DEPLOY_INTERRUPT="1")
+
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["interrupted"],
+        "changes": [["merge", "#7", head[:7]]],
+    }
+    assert github.main_subject() == "✨ feat: add feature (#7)"
+
+
 def test_a_partial_deploy_lists_the_machines_it_reached(github: Sandbox) -> None:
     head = github.git("rev-parse", "HEAD")
     github.open_pr()

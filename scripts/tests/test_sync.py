@@ -88,6 +88,34 @@ def test_pulls_then_runs_the_pulled_private_sync_and_installs(
     assert installed.read_text() == "# alpha\n\npulled\n"
 
 
+def test_an_interrupt_after_the_pull_still_answers_the_pull(
+    sandbox: tuple[Path, Path], behind: tuple[Path, Path], tmp_path: Path
+) -> None:
+    seed, _ = sandbox
+    repo, home = behind
+    # The pulled private sync interrupts the run that started it
+    (seed / "scripts/sync_private.py").write_text(
+        "import os, signal, time\nos.kill(os.getppid(), signal.SIGINT)\ntime.sleep(30)\n"
+    )
+    commit(seed)
+    subprocess.run(
+        ["git", "push", "-q", str(tmp_path / "skills.git"), "main"],
+        cwd=seed,
+        check=True,
+    )
+    before = git(repo, "rev-parse", "--short=7", "HEAD")
+
+    result = run(repo, home)
+
+    after = git(repo, "rev-parse", "--short=7", "HEAD")
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["interrupted"],
+        "changes": [["pull", "main", f"{before}..{after}"]],
+    }
+
+
 def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
     behind: tuple[Path, Path],
 ) -> None:

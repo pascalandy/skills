@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_script
-from _common import changes_in, main_checkout, replay, run, run_git
+from _common import changes_in, main_checkout, receipt, replay, run, run_git
 from signoff import (
     ROOT,
     branch,
@@ -315,7 +315,8 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
         )
     require_contains_main(sha, args.timeout)
     changes = []
-    try:
+    # The answer keeps a signoff or a merge that landed, whatever stops the run
+    with receipt(changes):
         if not signed_off(sha, args.timeout):
             if not args.dry_run:
                 check_and_sign(sha, args.timeout)
@@ -328,11 +329,6 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
         land(pr, sha, args.timeout)
         changes.append(["merge", f"#{pr.number}", sha[:7]])
         deployed = deploy(sha, args)
-    except ScriptError as error:
-        reached = error.report.get("changes", [])
-        if changes or reached:
-            error.report["changes"] = [*changes, *reached]
-        raise
     return {"changes": [*changes, *deployed]}
 
 

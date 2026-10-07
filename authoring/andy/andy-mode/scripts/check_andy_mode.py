@@ -318,16 +318,25 @@ def run_script(
         except KeyboardInterrupt as stop:
             code = getattr(stop, "code", INTERRUPTED)
             word = "interrupted" if code == INTERRUPTED else "terminated"
-            return answer(code, {"errors": [word]})
+            return answer(code, {"errors": [word], **carried(stop)})
         except ScriptError as error:
             return answer_failure(error, parser, command)
         except Exception as error:
             # The traceback comes first, so the answer ends stderr
             logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
-            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            unexpected = ScriptError(
+                f"{type(error).__name__}: {error}", report=carried(error)
+            )
             return answer_failure(
                 unexpected, parser, command, rerun=bool(debug) and not tracing
             )
+
+
+def carried(error: BaseException) -> dict[str, Any]:
+    """The `report` an exception carries, such as the changes a run already
+    made before an interrupt or a bug, or {} when it carries none."""
+    report = getattr(error, "report", None)
+    return dict(report) if isinstance(report, Mapping) else {}
 
 
 def answer_failure(

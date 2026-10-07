@@ -22,7 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_script
-from _common import answer_in, changes_in, is_network_failure, replay, run, run_git
+from _common import (
+    answer_in,
+    changes_in,
+    is_network_failure,
+    receipt,
+    replay,
+    run,
+    run_git,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -120,7 +128,9 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         f"{args.timeout:g}",
     ]
     changes: list[list[str]] = []
-    try:
+    # A failed step, an interrupt, or a bug still answers what the steps
+    # before it changed
+    with receipt(changes):
         if args.dry_run or args.check:
             flags = ["--dry-run" if args.dry_run else "--check"]
         else:
@@ -139,12 +149,6 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
             *flags,
             *levels,
         )
-    except ScriptError as error:
-        # A failed step still answers what the steps before it changed
-        done = [*changes, *error.report.get("changes", [])]
-        if done:
-            error.report["changes"] = done
-        raise
     return {"changes": changes} if changes else {}
 
 

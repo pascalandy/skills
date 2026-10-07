@@ -17,7 +17,7 @@ A script answers in one line of JSON, so an agent or another script knows the ou
 This section is the normative definition. Other pages and skills link here instead of restating it
 
 - Everything passed: `{"ok":true}` on stdout, exit code 0
-- Anything else: stdout stays empty, the last line of stderr is `{"ok":false,"errors":["…"]}`, and the exit code is not 0. Each error says what failed and the command that fixes it
+- Anything else: stdout stays empty, the last line of stderr is `{"ok":false,"errors":["…"]}`, on a line of its own after any diagnostic, and the exit code is not 0. Each error says what failed and the command that fixes it
 - `ok` always agrees with the exit code
 - A success with a warning is not a success: what needs action fails the command, and the rest moves to `-v`
 - `--help` and `--version` are documentation and stay text on stdout, exit 0 (decision 9)
@@ -53,10 +53,12 @@ Every answer uses only these keys beside a command's own data, so a caller never
 | `help` | a usage error, exit 2 | `<name> --help` |
 | `retry` | a temporary failure, exit 75 | the same command, safe to run again as is |
 | `rerun` | an unexpected error | the same command with `--debug` |
-| `changes` | a command that changes state, on success, dry run, `--check`, or a failure after a change landed | one array per change, `[action, object]` with an optional detail |
+| `changes` | a command that changes state, on success, dry run, `--check`, or a failure, interrupt, or bug after a change landed | one array per change, `[action, object]` with an optional detail |
 | `file`, `files` | a command whose job is content, on success or failure | the path it wrote, or a list of what it wrote: paths, or objects with a `path` and the command's details, as `image-creator` answers |
 
 Any other key is the data the command exists to return, such as `checks` for `just check --list` (decision 6). A new key that means the same as one above reuses that name
+
+In a failed apply, `changes` and `files` hold what already happened, whatever stopped the run: a failure, an interrupt, or a bug. In a preview, `--dry-run` or `--check`, `changes` holds what an apply would do
 
 ## Examples
 
@@ -95,6 +97,8 @@ $ uv run scripts/check_cli_block.py --fix
 ## How this repository does it
 
 - `answer()` prints the line and derives `ok` from the exit code. `run_script()` sends every outcome through it. Both live in the cli block of `scripts/_cli.py`, so a skill script that pastes the block answers the same way: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
+- A command that changes state appends each change as it lands, inside `receipt()` from `scripts/_common.py`, so a failure, an interrupt, or a bug still answers it. `run_script()` answers the `report` any exception carries
+- A command that replays a child's output goes through `replay()` from `scripts/_common.py`, which ends the child's last line, so the answer stays the last line
 - Each `justfile` recipe that runs such a script carries `[no-exit-message]`, for decision 10
 - The lock, decision 13: `scripts/tests/test_cli_contract.py` fails when a script in `scripts/` writes to stdout anywhere but in `answer()`, logs a warning, or answers a usage error in another form, and `scripts/tests/test_justfile.py` fails when a recipe that runs one lacks `[no-exit-message]`. pyright checks that `work` returns a dict
 - A pytest or pyright warning fails `just check`: `scripts/check.py` runs pytest with `-W error` and pyright with `--warnings` (#487). When a dependency starts to warn, filter that one warning in its check, with a comment that says why
@@ -109,7 +113,7 @@ Decided on 2026-10-04, while planning #430
 4. **A success goes to stdout; a failure leaves stdout empty and ends stderr, after the diagnostics.** Failures already worked this way, and the code that reported them is reused
 5. **One line rather than indented JSON.** The verdict is always the last line, so `tail -n1 | jq` works. Indented JSON grows with its lists, to about 48 lines for `just check --sweep`. Pascal compared one line, indented, and one key per line, and chose the line
 6. **Data only when it is the command's job**: `--list`, `--dry-run`, or `changes` for a command that changes state. The checks that ran stay visible with `-v`. A change is an array such as `["install","andy-mode"]`, which costs fewer tokens than an object
-7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something. A failure also keeps the data a caller needs to recover: the `changes` that already happened, such as a merge that landed before its deploy failed, or the `files` a run wrote before it failed
+7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something. A failure also keeps the data a caller needs to recover: the `changes` that already happened, such as a merge that landed before its deploy failed, or the `files` a run wrote before it failed. An interrupt or a bug keeps them too
 8. **A warning is never a success.** What needs action fails the command, and the rest moves to `-v`. This covers pytest and pyright warnings too (#487). `just merge` exits 1 when the merge landed but the deploy missed a machine, since a rerun only deploys (#491)
 9. **No `--json` flag, since JSON is the default. `--help` and `--version` stay text**, because they are documentation. `--version` prints one line, `<name> <version>`, the form tools read by convention. Pascal confirmed `--version` on 2026-10-07
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line

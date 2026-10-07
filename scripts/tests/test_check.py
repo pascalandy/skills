@@ -53,6 +53,23 @@ def test_a_failure_reports_its_output_and_rerun_without_stopping_later_checks(
     assert (root / "ran").exists(), "the later check must still run"
 
 
+def test_a_failure_whose_output_lacks_a_final_newline_keeps_the_answer_a_line(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    glued = (
+        sys.executable,
+        "-c",
+        "print('fatal: broken', end=''); raise SystemExit(1)",
+    )
+
+    code, stdout, stderr = verdict(monkeypatch, capfd, [Check("partial", glued)])
+
+    assert (code, stdout) == (1, "")
+    *_, detail, last = stderr.splitlines()
+    assert detail == "fatal: broken"
+    assert json.loads(last)["ok"] is False
+
+
 def test_only_runs_the_named_checks_and_success_answers_ok(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:

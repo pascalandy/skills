@@ -77,7 +77,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too
+A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too. A script in `scripts/` appends each change as it lands, inside `receipt()` from `scripts/_common.py`, so a failure, an interrupt, or a bug still answers the changes already made
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 

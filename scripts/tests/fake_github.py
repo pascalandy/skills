@@ -43,10 +43,13 @@ else:
 sys.exit(code)
 """
 DEPLOY = """\
-import os, sys
+import os, signal, sys, time
 
 with open(os.environ["FAKE_DEPLOYS"], "a") as log:
     log.write(os.getcwd() + "\\n")
+if os.environ.get("FAKE_DEPLOY_INTERRUPT"):
+    os.kill(os.getppid(), signal.SIGINT)
+    time.sleep(30)
 code = int(os.environ.get("FAKE_DEPLOY_EXIT", "0"))
 sys.stderr.write(os.environ.get("FAKE_DEPLOY_STDERR", ""))
 if os.environ.get("FAKE_DEPLOY_PARTIAL"):

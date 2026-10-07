@@ -762,6 +762,27 @@ def test_apply_and_preview_answer_each_change_and_check_counts_each_target(
     assert "~/.claude/commands: 1 of 1 current\n" in checked.stderr
 
 
+def test_a_failure_midway_answers_the_entries_already_installed(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    blocked = home / ".claude/skills"
+    blocked.mkdir(parents=True)
+    blocked.chmod(0o500)
+    try:
+        result = run(repo, home)
+    finally:
+        blocked.chmod(0o700)
+
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["errors"][0].startswith("PermissionError: ")
+    done = [path for _, path in answer["changes"]]
+    assert done, "the targets before ~/.claude/skills were installed"
+    assert all((home / path[2:]).exists() for path in done)
+    assert not any(path.startswith("~/.claude/skills/") for path in done)
+
+
 def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
     sandbox: tuple[Path, Path],
 ) -> None:

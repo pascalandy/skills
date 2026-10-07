@@ -247,6 +247,30 @@ def changes_in(lines: Iterable[str]) -> list[list[str]]:
     return found
 
 
+def keep_changes(error: BaseException, changes: list[list[str]]) -> None:
+    """List the changes a run already made ahead of those its error reports, so
+    its answer keeps them whatever stopped it: a failure, an interrupt, or a bug.
+    run_script() answers the `report` of any exception."""
+    if not changes:
+        return
+    report = getattr(error, "report", None)
+    if not isinstance(report, dict):
+        report = {}
+        error.report = report  # pyright: ignore[reportAttributeAccessIssue]
+    report["changes"] = [*changes, *report.get("changes", [])]
+
+
+@contextmanager
+def receipt(changes: list[list[str]]) -> Iterator[None]:
+    """Run a block that appends each change to `changes` as it happens, and
+    keep them in the answer when the block stops early."""
+    try:
+        yield
+    except BaseException as error:
+        keep_changes(error, changes)
+        raise
+
+
 def replay(output: str) -> None:
     """Forward a child's output to stderr with its last line ended, so the
     answer printed after it stays a line of its own."""
