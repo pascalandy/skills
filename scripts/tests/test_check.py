@@ -441,7 +441,7 @@ def test_failed_batch_names_an_executable_rerun_and_continues(
         (
             "FAILED scripts/tests/test_alpha.py::test_one - assert False\n"
             + "ERROR scripts/tests/test_beta.py - ImportError\n"
-            + "1 failed, 1 error during collection",
+            + "1 failed, 1 passed, 1 error",
             "--only test-alpha --only test-beta --only test-gamma",
         ),
         (

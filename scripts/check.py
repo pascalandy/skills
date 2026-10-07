@@ -440,11 +440,15 @@ FAILED_TEST = re.compile(
 )
 
 
+# pytest's summary line for a module it could not collect, which names no test
+COLLECTION_ERROR = re.compile(r"^ERROR scripts/tests/test_\w+\.py(?!::)", re.MULTILINE)
+
+
 def failed_tests(output: str, tests: list[Check]) -> list[Check]:
     """The modules pytest's summary names, or every module when it cannot tell:
     after a collection error, which its summary names without a test, or a
     verbose run."""
-    if "during collection" in output:
+    if COLLECTION_ERROR.search(output):
         return tests
     named = set(FAILED_TEST.findall(output))
     found = [test for test in tests if test.test_path in named]
