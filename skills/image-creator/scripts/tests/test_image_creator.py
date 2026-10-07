@@ -831,5 +831,39 @@ def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
 
     assert code == 1
     answer = failure(stdout, err)
-    assert answer["errors"][0].startswith("OpenRouter returned an image that is not")
+    assert answer["errors"][0].startswith("OpenRouter returned 1 image(s) that are not")
     assert "rerun" not in answer
+
+
+def test_a_malformed_candidate_still_saves_its_valid_sibling(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {"data": [{"b64_json": good}, {"b64_json": "%%"}]},
+    )
+
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "x",
+        "--out",
+        str(env / "x.png"),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert [Path(item["path"]).name for item in answer["files"]] == ["x-1.png"]
+    assert any(
+        error.startswith("OpenRouter returned 1 image(s)") for error in answer["errors"]
+    )
