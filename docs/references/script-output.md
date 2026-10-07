@@ -54,7 +54,7 @@ Every answer uses only these keys beside a command's own data, so a caller never
 | `retry` | a temporary failure, exit 75 | the same command, safe to run again as is |
 | `rerun` | an unexpected error | the same command with `--debug` |
 | `changes` | a command that changes state, on success, dry run, `--check`, or a failure after a change landed | one array per change, `[action, object]` with an optional detail |
-| `file`, `files` | a command whose job is content, on success or failure | the path or paths it wrote |
+| `file`, `files` | a command whose job is content, on success or failure | the path it wrote, or a list of what it wrote: paths, or objects with a `path` and the command's details, as `image-creator` answers |
 
 Any other key is the data the command exists to return, such as `checks` for `just check --list` (decision 6). A new key that means the same as one above reuses that name
 
