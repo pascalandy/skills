@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-04
+date_updated: 2026-10-07
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
@@ -69,6 +69,8 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
 
 A skill check whose commands name a path under `authoring/` belongs to the package holding that path. `just check` selects it when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them selects it too. The direct repository validators always run. When git cannot compare with `origin/main`, every check runs. `--only NAME` runs a named check regardless of changed paths. `--sweep` runs every check, including unrelated suites, for release or diagnosis. `--verbose` names each skipped check
+
+poteto-mode's TypeScript tests and typecheck stay outside `just check`, which runs only its Python worktree-audit test: they need Bun, which neither the machines nor the manual CI workflow install. A change to those CLIs runs them by hand from `authoring/poteto/poteto-mode/scripts/`, without a global install: `pnpm dlx bun@1.4.2 install --frozen-lockfile`, `pnpm dlx bun@1.4.2 test orch watch-pr`, and `pnpm dlx bun@1.4.2 run typecheck`. Its PR names each command and its result
 
 The root test suite has one `test-<stem>` check for each `scripts/tests/test_<stem>.py` module. Underscores in `<stem>` become hyphens in the check name. The registry fails before running checks if a test module has no route or a route is stale or duplicated. `just check` always includes the two cheap project-rule tests, `test-commands` and `test-skill-invocation`. It selects other root test modules when their file or a declared `reads` dependency changes. Changes to `scripts/check.py`, `scripts/_cli.py`, `scripts/_common.py`, `pytest.ini`, or `scripts/tests/conftest.py` select every root test module. Selected root modules run in one pytest process. When it fails, the rerun command names only the modules pytest reports as failed, or every module of the batch when its output cannot tell, as after a collection error. Use `just check --only test-sync-fleet` to rerun one module
 

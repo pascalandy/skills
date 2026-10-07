@@ -146,19 +146,21 @@ rows=$(git worktree list --porcelain | awk '/^worktree /{print $2}' | while read
 		recent=$([ $(((now - last_ts) / 86400)) -le 4 ] && echo yes || echo no)
 	fi
 
-	case "$dirty" in wip:*) bucket=hold-wip ;; *)
-		case "$pr" in *OPEN*) bucket=hold-open-pr ;; *)
-			if [ "$recent" = yes ]; then
-				bucket=verify-recent-chat
-			elif [ "$recent" = unknown ]; then
-				bucket=review
-			elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then
-				bucket=safe
-			else bucket=review; fi
-			;;
-		esac
-		;;
-	esac
+	# No case here: inside $(...), macOS's Bash 3.2 parses a case pattern only
+	# with its opening parenthesis, which shfmt removes
+	if [ "${dirty#wip:}" != "$dirty" ]; then
+		bucket=hold-wip
+	elif [ "${pr#*OPEN}" != "$pr" ]; then
+		bucket=hold-open-pr
+	elif [ "$recent" = yes ]; then
+		bucket=verify-recent-chat
+	elif [ "$recent" = unknown ]; then
+		bucket=review
+	elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then
+		bucket=safe
+	else
+		bucket=review
+	fi
 
 	printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
 		"$size" "$age" "$merged" "$dirty" "$remote" "$pr" "$last" "$bucket" "$wt"

@@ -81,6 +81,9 @@ class WorktreeAuditTests(unittest.TestCase):
                 time.strftime("%Y-%m-%d", time.localtime(recent.stat().st_mtime)),
             )
             self.assertEqual(after["bucket"], "verify-recent-chat")
+            (worktree / "draft.txt").write_text("draft\n")
+            subprocess.run(["git", "-C", str(worktree), "add", "draft.txt"], check=True)
+            self.assertEqual(audit()["bucket"], "hold-wip")
 
     def test_failures_answer_on_stderr(self):
         with tempfile.TemporaryDirectory() as directory:
