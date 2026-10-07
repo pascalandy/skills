@@ -50,12 +50,15 @@ trap 'fail 130 interrupted' INT
 trap 'fail 143 terminated' TERM
 trap 'fail 1 "unexpected failure at line $LINENO of $0"' ERR
 
-case ${1-} in
--h | --help)
-	help
-	exit 0
-	;;
-esac
+for arg in "$@"; do
+	case $arg in
+	--) break ;;
+	-h | --help)
+		help
+		exit 0
+		;;
+	esac
+done
 [ "$#" -eq 6 ] || fail 2 "expected 6 arguments, got $#" "$0 --help"
 
 logfile="$1"
