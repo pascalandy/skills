@@ -56,7 +56,20 @@ A hung child raises `subprocess.TimeoutExpired` after `TIMEOUT`, which fails the
 
 Each test proves one observable behavior with a literal expected value. An exit code alone, or a passing `--help`, does not prove the script did its work.
 
-The examples test a `tool.py` that prints an input file uppercased. When the file is missing, it exits 1 with `error: input file not found: PATH`.
+The examples test a `tool.py` that writes an input file uppercased to `--output FILE` and answers in one JSON line, as [script-output](https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md) defines. Assert all of it: the content file, the answer, an empty stdout on failure, the last line of stderr, and the exit code. This helper reads the answer wherever it went:
+
+```python
+import json
+
+
+def answer(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
+    """The one-line answer: stdout on success, else the last line of stderr."""
+    if result.returncode == 0:
+        assert result.stdout.count("\n") == 1, result.stdout
+        return json.loads(result.stdout)
+    assert result.stdout == ""
+    return json.loads(result.stderr.splitlines()[-1])
+```
 
 ### Processing Input
 
@@ -64,24 +77,26 @@ The examples test a `tool.py` that prints an input file uppercased. When the fil
 def test_uppercases_input_file(tmp_path: Path) -> None:
     source = tmp_path / "in.txt"
     source.write_text("hello\n", encoding="utf-8")
-    result = run(str(source))
+    output = tmp_path / "out.txt"
+    result = run(str(source), "--output", str(output))
     assert result.returncode == 0
-    assert result.stdout == "HELLO\n"
+    assert answer(result) == {"ok": True, "file": str(output)}
+    assert output.read_text(encoding="utf-8") == "HELLO\n"
 ```
 
-A script that exits 0 without reading the file fails the `stdout` assertion.
+A script that exits 0 without reading the file fails the content assertion.
 
 ### Runtime Failure
 
 ```python
 def test_missing_input_reports_error(tmp_path: Path) -> None:
     missing = tmp_path / "missing.txt"
-    result = run(str(missing))
+    result = run(str(missing), "--output", str(tmp_path / "out.txt"))
     assert result.returncode == 1
-    assert f"error: input file not found: {missing}" in result.stderr
+    assert answer(result)["errors"] == [f"input file not found: {missing}"]
 ```
 
-The arguments are valid, and the test expects exit 1 with a specific diagnostic, so an argument error (exit 2, `usage:` on stderr) cannot satisfy it.
+The arguments are valid, and the test expects exit 1 with a specific error, so a usage error (exit 2) cannot satisfy it.
 
 ### Usage Errors
 
@@ -89,7 +104,7 @@ The arguments are valid, and the test expects exit 1 with a specific diagnostic,
 def test_unknown_flag_is_usage_error() -> None:
     result = run("--no-such-flag")
     assert result.returncode == 2
-    assert "usage:" in result.stderr
+    assert answer(result)["help"] == "tool.py --help"
 ```
 
 ### Environment Variables
@@ -105,9 +120,9 @@ def test_missing_api_key_reports_error(tmp_path: Path) -> None:
     source.write_text("hello\n", encoding="utf-8")
     env = os.environ.copy()
     env.pop("API_KEY", None)
-    result = run(str(source), env=env)
+    result = run(str(source), "--output", str(tmp_path / "out.txt"), env=env)
     assert result.returncode == 1
-    assert "error: API_KEY is not set" in result.stderr
+    assert answer(result)["errors"] == ["API_KEY is not set; export it, then rerun"]
 ```
 
 ## Fixtures
@@ -125,8 +140,10 @@ def source(tmp_path: Path) -> Path:
     return path
 
 
-def test_uppercases_fixture_file(source: Path) -> None:
-    assert run(str(source)).stdout == "HELLO\n"
+def test_uppercases_fixture_file(source: Path, tmp_path: Path) -> None:
+    output = tmp_path / "out.txt"
+    assert answer(run(str(source), "--output", str(output)))["ok"] is True
+    assert output.read_text(encoding="utf-8") == "HELLO\n"
 ```
 
 ## Parametrized Tests
@@ -139,7 +156,9 @@ def test_uppercases_fixture_file(source: Path) -> None:
 def test_uppercases_text(tmp_path: Path, text: str, expected: str) -> None:
     source = tmp_path / "in.txt"
     source.write_text(text, encoding="utf-8")
-    assert run(str(source)).stdout == expected
+    output = tmp_path / "out.txt"
+    run(str(source), "--output", str(output))
+    assert output.read_text(encoding="utf-8") == expected
 ```
 
 ## Direct Tests
@@ -182,7 +201,7 @@ scripts/tests/test_tool.py::test_uppercases_input_file PASSED
 
 # Failure
 scripts/tests/test_tool.py::test_uppercases_input_file FAILED
->       assert result.stdout == "HELLO\n"
+>       assert output.read_text(encoding="utf-8") == "HELLO\n"
 E       AssertionError: assert '' == 'HELLO\n'
 
 # Summary
@@ -203,7 +222,7 @@ my-skill/
 ## Best Practices
 
 1. **One observable behavior per test** - Name it: `test_missing_input_reports_error`
-2. **Assert literal output** - Compare `stdout`, `stderr`, or written files with exact expected values
+2. **Assert literal output** - Compare written files, the JSON answer, an empty stdout on failure, and the last line of stderr with exact expected values
 3. **Make failures deterministic** - Trigger runtime errors with valid arguments, such as a missing file under `tmp_path`
 4. **Bound every subprocess** - Keep the helper's `timeout`
 5. **Subprocess for CLI, direct for internals** - Import a function when a subprocess adds nothing
@@ -226,7 +245,7 @@ my-skill/
 
 - Use `-v` for verbose output
 - Use `-s` to see print statements
-- Compare the literal expected value with `result.stdout` and `result.stderr`
+- Compare the literal expected value with the written file and the answer from `answer(result)`
 
 ## Resources
 

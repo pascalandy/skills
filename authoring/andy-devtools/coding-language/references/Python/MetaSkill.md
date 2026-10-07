@@ -139,19 +139,23 @@ Agents run these scripts, so keep output small and failures obvious:
 
 - Standard library first (`argparse`, `logging`, `pathlib`, `json`, `subprocess`); add a dependency only when it earns its place
 - When one does: `httpx` for HTTP, `pydantic-settings` for typed config, `polars` or `duckdb` for data
+- Answer every run in one JSON line, as [script-output](https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md) defines. Read it before you decide what a script prints; it overrides any other output advice
+  - Success: `{"ok":true}` on stdout, exit 0, with the data the command exists to return beside `ok`
+  - Failure: stdout stays empty, the last line of stderr is `{"ok":false,"errors":["…"]}`, and the exit code is not 0. Each error says what failed and the command that fixes it
+- Write content, such as a report or an image, to a file, and name it in the answer: `{"ok":true,"file":"report.md"}`
 - `-h, --help` prints usage with examples and changes nothing
-- Quiet by default: one line on stdout on success
-- `-v, --verbose` adds per-item detail and tracebacks on stderr
+- `-v, --verbose` adds progress and per-item detail on stderr
+- `--debug` adds internals and tracebacks on stderr. Without it, a bug answers its error and a `rerun` hint with `--debug`, never a traceback
 - `--dry-run` for anything that writes or deletes
-- Failures print `error: <what went wrong and how to fix it>` on stderr, then `rerun with --verbose for details`
 - Build incrementally: write `--help` first and run it, then add one feature at a time and run again
 
-| Code | Meaning              |
-| ---- | -------------------- |
-| 0    | Success              |
-| 1    | Runtime failure      |
-| 2    | Bad usage            |
-| 130  | Interrupted (Ctrl+C) |
+| Code | Meaning                           |
+| ---- | --------------------------------- |
+| 0    | Success                           |
+| 1    | Runtime failure                   |
+| 2    | Bad usage                         |
+| 75   | Temporary failure, safe to retry  |
+| 130  | Interrupted (Ctrl+C)              |
 
 ## Tests
 
