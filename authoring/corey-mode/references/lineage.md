@@ -35,7 +35,7 @@ upstream="$OPENSRC_HOME/$(jq -er '.repos[] | select(.name == "github.com/coreyha
 revision="$(jq -er '.repos["github.com/coreyhaines31/marketingskills"].commitSha' "$OPENSRC_HOME/sync-state.json")"
 ```
 
-5. Preview the import with `--dry-run`, inspect its output, then apply and check it. Stop on a failed command
+5. Preview the import with `--dry-run`, inspect the `changes` it answers, then apply and check it. Stop on a failed command
 
 ```sh
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
