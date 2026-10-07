@@ -15,11 +15,13 @@ here and stop the run.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import re
 import socket
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
 from _common import exclusive, is_network_failure, main_checkout, run_git, run_script
@@ -30,9 +32,10 @@ PRIVATE = main_checkout(ROOT) / "_skills_private"
 LABEL = "_skills_private"
 TIMEOUT = 300.0
 EPILOG = """\
-Each run prints one line per change: clone, commit, pull, or push, a tab,
-_skills_private, a tab, and a detail. A dry run skips the network, so it
-lists only the clone or commit a run would make.
+A run answers {"ok":true,"changes":[...]}, one [action, _skills_private,
+detail] per change, where the action is clone, commit, pull, or push, and
+{"ok":true} when nothing changes. A dry run skips the network, so it lists
+only the clone or commit a run would make.
 
 examples:
   uv run scripts/sync_private.py
@@ -110,8 +113,8 @@ def github_head(timeout: float = TIMEOUT) -> str:
     return listed.stdout.split()[0]
 
 
-def sync(dry_run: bool = False, timeout: float = TIMEOUT) -> list[str]:
-    """Clone, save, pull, and push; return one line per change. Runs from one
+def sync(dry_run: bool = False, timeout: float = TIMEOUT) -> list[list[str]]:
+    """Clone, save, pull, and push; return one [action, LABEL, detail] per change. Runs from one
     repository take turns, each waiting up to `timeout` seconds."""
     if dry_run:
         return save_and_pull(dry_run=True, timeout=timeout)
@@ -120,7 +123,7 @@ def sync(dry_run: bool = False, timeout: float = TIMEOUT) -> list[str]:
         return save_and_pull(dry_run=False, timeout=timeout)
 
 
-def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
+def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
     host = socket.gethostname().split(".")[0]
     _, status = state()
     if status == "missing":
@@ -136,7 +139,7 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
                     cloned,
                     "check that the private repository exists and you can read it",
                 )
-        return [f"clone\t{LABEL}\t{url}"]
+        return [["clone", LABEL, url]]
     if status == "plain":
         raise ScriptError(
             f"{PRIVATE} is not a clone of the private repository; move it aside, "
@@ -147,7 +150,9 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
         raise ScriptError(
             f"{PRIVATE} is on {branch or 'a detached HEAD'}; switch it to main, then rerun"
         )
-    changes = [f"commit\t{LABEL}\tsave edits from {host}"] if status == "dirty" else []
+    changes = (
+        [["commit", LABEL, f"save edits from {host}"]] if status == "dirty" else []
+    )
     if dry_run:
         return changes
     if status == "dirty":
@@ -182,7 +187,7 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
         )
     after = git("rev-parse", "HEAD").stdout.strip()
     if after != before:
-        changes.append(f"pull\t{LABEL}\t{before[:7]}..{after[:7]}")
+        changes.append(["pull", LABEL, f"{before[:7]}..{after[:7]}"])
     ahead = git("rev-list", "--count", "@{upstream}..HEAD").stdout.strip()
     if ahead not in ("", "0"):
         log.info("push %s", LABEL)
@@ -193,9 +198,14 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[str]:
                 pushed,
                 f"fix the clone at {PRIVATE}, then rerun",
             )
-        changes.append(f"push\t{LABEL}\t{ahead} commit{'s' if ahead != '1' else ''}")
+        changes.append(["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"])
     log.debug("private repository at %s", after)
     return changes
+
+
+def work(args: argparse.Namespace) -> dict[str, Any]:
+    changes = sync(args.dry_run, args.timeout)
+    return {"changes": changes} if changes else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -217,12 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long to wait for another sync, and for each clone, pull, or push (default: 5m)",
     )
-    return run_script(
-        parser,
-        lambda args: "\n".join(sync(args.dry_run, args.timeout)),
-        argv,
-        debug="SYNC_PRIVATE_DEBUG",
-    )
+    return run_script(parser, work, argv, debug="SYNC_PRIVATE_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":

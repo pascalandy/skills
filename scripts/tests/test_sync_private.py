@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import shutil
 import socket
@@ -66,6 +67,12 @@ def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return result
 
 
+def changed(*changes: list[str]) -> str:
+    return (
+        json.dumps({"ok": True, "changes": list(changes)}, separators=(",", ":")) + "\n"
+    )
+
+
 def quiet(result: subprocess.CompletedProcess[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
@@ -75,17 +82,20 @@ def test_clones_then_saves_edits_every_machine_receives(
 ) -> None:
     one, two, remote = machines
 
-    assert quiet(run(one)) == (0, f"clone\t_skills_private\t{remote}\n", "")
-    assert quiet(run(two)) == (0, f"clone\t_skills_private\t{remote}\n", "")
-    assert quiet(run(two)) == (0, "", ""), "a current clone is a no-op"
+    clone = ["clone", "_skills_private", str(remote)]
+    assert quiet(run(one)) == (0, changed(clone), "")
+    assert quiet(run(two)) == (0, changed(clone), "")
+    assert quiet(run(two)) == (0, '{"ok":true}\n', ""), "a current clone is a no-op"
     (one / "_skills_private/content/secret/SKILL.md").write_text("from one\n")
     skill(one / "_skills_private/content", "added")
-    commit_line = f"commit\t_skills_private\tsave edits from {HOST}\n"
-    assert quiet(run(one, "-n")) == (0, commit_line, "")
-    assert quiet(run(one)) == (0, f"{commit_line}push\t_skills_private\t1 commit\n", "")
+    commit = ["commit", "_skills_private", f"save edits from {HOST}"]
+    assert quiet(run(one, "-n")) == (0, changed(commit), "")
+    push = ["push", "_skills_private", "1 commit"]
+    assert quiet(run(one)) == (0, changed(commit, push), "")
     before = git(two / "_skills_private", "rev-parse", "--short=7", "HEAD")
     after = git(remote, "rev-parse", "--short=7", "main")
-    assert quiet(run(two)) == (0, f"pull\t_skills_private\t{before}..{after}\n", "")
+    pull = ["pull", "_skills_private", f"{before}..{after}"]
+    assert quiet(run(two)) == (0, changed(pull), "")
 
     received = two / "_skills_private/content"
     assert (received / "secret/SKILL.md").read_text() == "from one\n"
@@ -139,7 +149,7 @@ def test_dry_run_names_the_clone_and_changes_nothing(
 
     result = run(one, "--dry-run")
 
-    assert quiet(result) == (0, f"clone\t_skills_private\t{remote}\n", "")
+    assert quiet(result) == (0, changed(["clone", "_skills_private", str(remote)]), "")
     assert not (one / "_skills_private").exists()
 
 
@@ -153,14 +163,12 @@ def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
         fcntl.flock(held, fcntl.LOCK_EX)
         result = run(one, "--timeout", "1s")
 
-    assert quiet(result) == (
-        75,
-        "",
-        (
-            f"error: another run still holds {lock} after 1s\n"
-            "retry: scripts/sync_private.py --timeout 1s\n"
-        ),
-    )
+    assert (result.returncode, result.stdout) == (75, "")
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "errors": [f"another run still holds {lock} after 1s"],
+        "retry": "scripts/sync_private.py --timeout 1s",
+    }
     assert not (one / "_skills_private").exists()
 
 
@@ -175,11 +183,12 @@ def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
     missing = run(one)
 
     assert (offline.returncode, offline.stdout) == (75, "")
-    assert "error: could not clone http://127.0.0.1:9/skills-private.git: " in (
-        offline.stderr
+    answer = json.loads(offline.stderr.splitlines()[-1])
+    assert answer["errors"][0].startswith(
+        "could not clone http://127.0.0.1:9/skills-private.git: "
     )
-    assert offline.stderr.endswith("retry: scripts/sync_private.py\n")
+    assert answer["retry"] == "scripts/sync_private.py"
     assert (missing.returncode, missing.stdout) == (1, "")
-    assert missing.stderr.endswith(
-        "; check that the private repository exists and you can read it\n"
+    assert json.loads(missing.stderr.splitlines()[-1])["errors"][0].endswith(
+        "; check that the private repository exists and you can read it"
     )

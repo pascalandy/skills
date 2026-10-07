@@ -96,12 +96,11 @@ Decided on 2026-10-04, while planning #430
 
 ## State
 
-The rule rolls out script by script, after Pascal validates `just check` in production (#496). A script not marked "now" still follows the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`. That object stays until #490, because `scripts/sync_fleet.py` reads the installer's failures in that form
+The rule rolls out script by script, after Pascal validates `just check` in production (#496). A script not marked "now" still follows the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`
 
 | Script | Answers in one JSON line |
 |---|---|
-| `just check`, `just check-frontmatter`, `scripts/check_cli_block.py`, `just api-keys-validation`, `just signoff`, `just release-check`, `just skills-discover`, `just replay-routing` | now |
-| `just compile-skills`, `just remote-skills`, `just install-skills`, `just sync`, `scripts/sync_private.py`, `just sync-fleet`, `just merge` | #490 |
+| every entry point in `scripts/` | now |
 | scripts inside skills | #494 |
 
 #492 removes this section once every script follows the rule

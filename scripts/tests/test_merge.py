@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shlex
 import subprocess
 import sys
@@ -9,6 +10,15 @@ from pathlib import Path
 
 import pytest
 from fake_github import Sandbox
+
+OK = '{"ok":true}\n'
+SYNCED = ["sync", "mbp", "abc1234"]
+
+
+def changed(*changes: list[str]) -> str:
+    return (
+        json.dumps({"ok": True, "changes": list(changes)}, separators=(",", ":")) + "\n"
+    )
 
 
 @pytest.fixture
@@ -25,7 +35,7 @@ def test_merges_a_signed_off_head_without_new_checks(github: Sandbox) -> None:
 
     assert (result.returncode, result.stdout) == (
         0,
-        f"merge\t#7\t{head[:7]}\nsynced\tmbp\n",
+        changed(["merge", "#7", head[:7]], SYNCED),
     )
     assert github.main_subject() == "✨ feat: add feature (#7)"
     assert github.git("--git-dir", str(github.origin), "diff", "main", head) == ""
@@ -41,7 +51,7 @@ def test_signs_off_an_unsigned_head_once_then_merges(github: Sandbox) -> None:
 
     assert (result.returncode, result.stdout) == (
         0,
-        f"signoff\t{head[:7]}\nmerge\t#7\t{head[:7]}\nsynced\tmbp\n",
+        changed(["signoff", head[:7]], ["merge", "#7", head[:7]], SYNCED),
     )
     assert github.statuses() == {head: "success"}
     assert github.checks_run() == 1
@@ -114,7 +124,7 @@ def test_warns_when_main_moves_just_before_the_merge(github: Sandbox) -> None:
 
     result = github.run("merge.py")
 
-    assert (result.returncode, result.stdout) == (0, f"merge\t#7\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, changed(["merge", "#7", head[:7]]))
     assert "holds a tree the checks did not run on" in result.stderr
     assert github.main_subject() == "✨ feat: add feature (#7)"
     assert github.deploys() == []
@@ -132,6 +142,21 @@ def test_a_merge_call_lost_to_the_network_stays_retryable(github: Sandbox) -> No
     assert github.main_subject() == "seed"
 
 
+def test_reads_the_deploy_of_a_main_checkout_from_before_490(
+    github: Sandbox,
+) -> None:
+    head = github.git("rev-parse", "HEAD")
+    github.open_pr()
+    github.sign(head)
+
+    result = github.run("merge.py", FAKE_DEPLOY_LEGACY="1")
+
+    assert (result.returncode, result.stdout) == (
+        0,
+        changed(["merge", "#7", head[:7]], ["synced", "mbp", "abc1234"]),
+    )
+
+
 def test_a_rerun_after_the_merge_only_deploys_again(github: Sandbox) -> None:
     github.open_pr()
     github.sign(github.git("rev-parse", "HEAD"))
@@ -140,7 +165,7 @@ def test_a_rerun_after_the_merge_only_deploys_again(github: Sandbox) -> None:
 
     result = github.run("merge.py")
 
-    assert (result.returncode, result.stdout) == (0, "synced\tmbp\n")
+    assert (result.returncode, result.stdout) == (0, changed(SYNCED))
     assert github.git("--git-dir", str(github.origin), "rev-parse", "main") == merged
     assert len(github.deploys()) == 2
 
@@ -178,7 +203,7 @@ def test_a_rerun_deploys_a_stack_layer_that_landed_on_main(github: Sandbox) -> N
 
     result = github.run("merge.py")
 
-    assert (result.returncode, result.stdout) == (0, "synced\tmbp\n")
+    assert (result.returncode, result.stdout) == (0, changed(SYNCED))
     assert len(github.deploys()) == 2
 
 
@@ -189,7 +214,7 @@ def test_a_failed_deploy_warns_without_failing_the_merge(github: Sandbox) -> Non
 
     result = github.run("merge.py", FAKE_DEPLOY_EXIT="75")
 
-    assert (result.returncode, result.stdout) == (0, f"merge\t#7\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, changed(["merge", "#7", head[:7]]))
     assert "the merge landed, but just deploy did not reach" in result.stderr
     assert github.main_subject() == "✨ feat: add feature (#7)"
 
@@ -214,7 +239,7 @@ def test_a_failed_deploy_gate_warns_without_hiding_the_merge(
 
     result = github.run("merge.py")
 
-    output = "" if rerun else f"merge\t#7\t{head[:7]}\n"
+    output = OK if rerun else changed(["merge", "#7", head[:7]])
     assert (result.returncode, result.stdout) == (0, output)
     assert "the merge landed, but just deploy" in result.stderr
     assert "git fetch origin failed" in result.stderr
@@ -241,7 +266,7 @@ def test_deploys_nothing_from_an_unsafe_main_checkout(
 
     result = github.run("merge.py")
 
-    assert (result.returncode, result.stdout) == (0, f"merge\t#7\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, changed(["merge", "#7", head[:7]]))
     assert "just merge did not deploy" in result.stderr
     assert github.main_subject() == "✨ feat: add feature (#7)"
     assert github.deploys() == []
@@ -255,7 +280,7 @@ def test_a_dry_run_changes_nothing(github: Sandbox) -> None:
 
     assert (result.returncode, result.stdout) == (
         0,
-        f"signoff\t{head[:7]}\nmerge\t#7\t{head[:7]}\n",
+        changed(["signoff", head[:7]], ["merge", "#7", head[:7]]),
     )
     assert github.statuses() == {}
     assert github.checks_run() == 0

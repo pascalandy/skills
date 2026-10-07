@@ -15,7 +15,7 @@
 
 ## Driving it with just
 
-- **Check both.** Run the block. It prints `compile-check: exit 0` and `remote-check: exit 0`, and both `.out` files are empty.
+- **Check both.** Run the block. It prints `compile-check: exit 0` and `remote-check: exit 0`, and both `.out` files read `{"ok":true}`.
 
 ```bash
 ( . "${RUN:?}/env" && cd "$CHECKOUT" &&
@@ -23,7 +23,7 @@
   record remote-check just remote-skills --check )
 ```
 
-- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated lists there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` holds one `add` line per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` line per list page. `compile-after.out` is empty.
+- **Rebuild deleted output.** Run the block. It copies the checkout to `$RUN/checkout`, deletes `skills/` and the generated lists there, and rebuilds them. It prints `compile-write: exit 0`, `remote-write: exit 0`, and `compile-after: exit 0`. `compile-write.out` lists under `changes` one `add` per skill plus one for `docs/references/skill-count.md`, and `remote-write.out` one `add` per list page. `compile-after.out` reads `{"ok":true}`.
 
 ```bash
 ( . "${RUN:?}/env" &&

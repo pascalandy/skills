@@ -19,18 +19,21 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import is_network_failure, run, run_git, run_script
+from _common import changes_in, is_network_failure, run, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 EPILOG = """\
-A run prints the change lines of each step: `pull<TAB>main<TAB>old..new` when
-main moved, then those of scripts/sync_private.py and just install-skills.
+A run answers {"ok":true,"changes":[...]}: ["pull","main","OLD..NEW"] when
+main moved, then the changes of scripts/sync_private.py and just
+install-skills; {"ok":true} when nothing changed. When a step fails, its own
+answer comes just before this one.
 
 examples:
-  just sync             # prints one line per change
+  just sync             # pull, save and pull the private clone, then install
   just sync --dry-run   # preview the install without pulling
   just sync --check     # exit 1 if this machine's skills differ from the checkout"""
 EXIT_CODES = exit_codes(
@@ -51,8 +54,8 @@ def git(*args: str, timeout: float | None = None) -> subprocess.CompletedProcess
     return run_git(*args, cwd=ROOT, timeout=timeout, env=env)
 
 
-def pull_main(timeout: float) -> list[str]:
-    """Fast-forward main to its upstream; return the change line when it moved."""
+def pull_main(timeout: float) -> list[list[str]]:
+    """Fast-forward main to its upstream; return the change when it moved."""
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
     if branch != "main":
         raise ScriptError(
@@ -77,14 +80,14 @@ def pull_main(timeout: float) -> list[str]:
             detail=(merged.stderr + merged.stdout).strip(),
         )
     after = git("rev-parse", "HEAD").stdout.strip()
-    return [f"pull\tmain\t{before[:7]}..{after[:7]}"] if after != before else []
+    return [["pull", "main", f"{before[:7]}..{after[:7]}"]] if after != before else []
 
 
-def step(name: str, *command: str) -> list[str]:
+def step(name: str, *command: str) -> list[list[str]]:
     """Run one step as its own process, so it runs the code the pull brought.
 
-    Its stderr passes through; its stdout is returned, to print once every step
-    has succeeded.
+    Its stderr passes through; the changes its answer lists are returned, to
+    report once every step has succeeded.
     """
     log.info("run %s", name)
     log.debug("%s", shlex.join(command))
@@ -95,38 +98,39 @@ def step(name: str, *command: str) -> list[str]:
     if finished.returncode < 0:
         raise ScriptError(f"{name} was killed by signal {-finished.returncode}")
     if finished.returncode:
-        # The step has said what failed and how to fix it
-        raise ScriptError()
-    return finished.stdout.splitlines()
+        raise ScriptError(
+            f"{name} failed; fix what its answer above says, then rerun just sync"
+        )
+    return changes_in(finished.stdout.splitlines())
 
 
-def sync(args: argparse.Namespace) -> str:
+def sync(args: argparse.Namespace) -> dict[str, Any]:
     levels = [
         *(["--verbose"] if args.verbose else []),
         *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
         "--timeout",
         f"{args.timeout:g}",
     ]
-    lines: list[str] = []
+    changes: list[list[str]] = []
     if args.dry_run or args.check:
         flags = ["--dry-run" if args.dry_run else "--check"]
     else:
-        lines += pull_main(args.timeout)
-        lines += step(
+        changes += pull_main(args.timeout)
+        changes += step(
             "scripts/sync_private.py",
             sys.executable,
             str(SCRIPTS / "sync_private.py"),
             *levels,
         )
         flags = []
-    lines += step(
+    changes += step(
         "just install-skills",
         sys.executable,
         str(SCRIPTS / "install_skills.py"),
         *flags,
         *levels,
     )
-    return "\n".join(lines)
+    return {"changes": changes} if changes else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -154,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long each network step or lock may take (default: 5m)",
     )
-    return run_script(parser, sync, argv, debug="SYNC_DEBUG")
+    return run_script(parser, sync, argv, debug="SYNC_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":

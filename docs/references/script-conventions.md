@@ -80,7 +80,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A script that answers in JSON lists its changes under `changes`, as [[script-output]] shows. An older command that changes state prints one change line per change, `<action>\t<object>`, with an optional third tab-separated detail. A real run and its dry run print the same lines; a no-op prints nothing. `--check` is a dry run that exits 1 when a change is pending, with the change lines on stderr. Hooks stay silent
+A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`, which until #492 also reads the change lines, `<action>\t<object>`, of a machine that still runs code from before #490
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 

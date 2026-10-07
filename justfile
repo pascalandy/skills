@@ -41,11 +41,13 @@ install-skills *args:
 
 # Compile authoring/ packages into skills/
 [group('commands')]
+[no-exit-message]
 compile-skills *args:
     @uv run --quiet scripts/compile_skills.py "$@"
 
 # Rebuild the skill lists that agents without these skills read on GitHub
 [group('commands')]
+[no-exit-message]
 remote-skills *args:
     @uv run --quiet scripts/remote_skills.py "$@"
 

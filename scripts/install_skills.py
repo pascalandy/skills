@@ -23,11 +23,11 @@ import stat
 import subprocess
 import sys
 import tempfile
-from collections import Counter
 from collections.abc import Iterable
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes
@@ -100,12 +100,15 @@ EXIT_CODES = exit_codes(
     }
 )
 EPILOG = """\
-Each run prints one line per change: add, update, or remove, then a tab and
-the installed path. A dry run prints the same lines and writes nothing; a run
-with nothing to change prints nothing. A conflict, a symlink or wrong type at
-a target path, blocks the install and is reported on stderr. An apply also
-deletes each authoring/ or skills/ folder a move left holding only caches,
-and warns about one holding other ignored files or one it cannot delete.
+A run answers {"ok":true,"changes":[...]}, one [action, path] per change,
+such as ["add","~/.claude/skills/andy-mode"], where the action is add,
+update, or remove, and {"ok":true} when nothing changes. A dry run answers the
+same and writes nothing; --check fails when an installed entry differs, with
+the changes beside the error. A conflict, a symlink or wrong type at a target
+path, blocks the install. An apply also deletes each authoring/ or skills/
+folder a move left holding only caches, and warns about one holding other
+ignored files or one it cannot delete. -v logs how many entries each target
+holds current.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -120,7 +123,7 @@ examples:
   just install-skills --dry-run
   just install-skills
   just install-skills --private-root ~/private-skills
-  just install-skills --check --json"""
+  just install-skills --check"""
 log = logging.getLogger("install-skills")
 
 
@@ -525,50 +528,11 @@ def execute(
                 shutil.rmtree(destination)
 
 
-def summarize(actions: list[Action], expected: dict[str, int]) -> list[dict]:
-    """Count each target's actions against the number of names it should hold."""
-    summary: list[dict] = []
-    for target in dict.fromkeys(action.target for action in actions):
-        counts = Counter(action.kind for action in actions if action.target == target)
-        summary.append(
-            {
-                "target": target,
-                "expected": expected[target],
-                "current": counts["current"],
-                "counts": dict(counts),
-            }
-        )
-    return summary
-
-
 def install_lock() -> Path:
     """One lock per repository, shared by its worktrees and outside the home,
     so a run that fails validation still writes nothing there."""
     common = os.fsdecode(compile_skills.git("rev-parse", "--git-common-dir"))
     return ROOT / common.strip() / "install-skills.lock"
-
-
-def report(
-    actions: list[Action],
-    profile: str,
-    groups: list[Group],
-    synced: tuple[int, int],
-    preview: bool,
-) -> dict:
-    """The --json object: counts per target and every action."""
-    skills, commands = synced
-    expected = {
-        target: len(group.sources) for group in groups for target in group.targets
-    }
-    return {
-        "profile": profile,
-        "mode": "preview" if preview else "apply",
-        "skills": skills,
-        "commands": commands,
-        "counts": dict(Counter(action.kind for action in actions)),
-        "targets": summarize(actions, expected),
-        "actions": [action.__dict__ for action in actions],
-    }
 
 
 def prune(folder: Path) -> None:
@@ -652,7 +616,7 @@ def prune_leftovers() -> None:
             )
 
 
-def install(args: argparse.Namespace) -> str:
+def install(args: argparse.Namespace) -> dict[str, Any]:
     home = Path.home()
     preview = args.dry_run or args.check
     # An apply waits for any other one before it reads the working tree, so
@@ -690,42 +654,40 @@ def install(args: argparse.Namespace) -> str:
             },
         )
         actions = [action for group in groups for action in plan(home, group)]
-        summary = report(
-            actions, args.profile, groups, (len(sources), len(commands)), preview
-        )
-        for target in summary["targets"]:
-            log.info(
-                "~/%s: %d of %d current",
-                target["target"],
-                target["current"],
-                target["expected"],
+        expected = {
+            target: len(group.sources) for group in groups for target in group.targets
+        }
+        for target in dict.fromkeys(action.target for action in actions):
+            current = sum(
+                action.target == target and action.kind == "current"
+                for action in actions
             )
-        changes = "\n".join(
-            f"{action.kind}\t~/{action.target}/{action.name}"
+            log.info("~/%s: %d of %d current", target, current, expected[target])
+        changes = [
+            [action.kind, f"~/{action.target}/{action.name}"]
             for action in actions
             if action.kind in CHANGES
-        )
+        ]
         conflicts = [
             f"{action.detail}; move it aside, then rerun: just install-skills"
             for action in actions
             if action.kind == "conflict"
         ]
-        output = json.dumps(summary, indent=2) if args.json else changes
+        output = {"changes": changes} if changes else {}
         pending = [action for action in actions if action.kind != "current"]
         if args.check and pending:
             raise ScriptError(
                 *conflicts,
                 f"{len(pending)} installed entries differ from the checkout; "
                 "run: just install-skills",
-                detail=changes,
-                report=summary,
+                report={"changes": changes},
             )
         if preview:
             for conflict in conflicts:
                 log.warning("warning: %s", conflict)
             return output
         if conflicts:
-            raise ScriptError(*conflicts, report=summary)
+            raise ScriptError(*conflicts)
         compile_skills.compile_tree()
         execute(home, {**sources, **codex}, commands, actions)
         try:
@@ -763,12 +725,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="dry run that exits 1 when an installed entry differs, listing the changes on stderr",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="print the per-target report as one JSON object",
+        help="dry run that exits 1 when an installed entry differs, listing the changes beside the error",
     )
     parser.add_argument(
         "--timeout",
@@ -779,7 +736,9 @@ def main(argv: list[str] | None = None) -> int:
     # Syncs started before this version pass -q to the installer they pulled;
     # accept it silently until every machine runs this one
     parser.add_argument("-q", "--quiet", action="store_true", help=argparse.SUPPRESS)
-    return run_script(parser, install, argv, debug="INSTALL_SKILLS_DEBUG")
+    return run_script(
+        parser, install, argv, debug="INSTALL_SKILLS_DEBUG", json_answer=True
+    )
 
 
 if __name__ == "__main__":

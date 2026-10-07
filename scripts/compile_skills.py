@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import (
@@ -37,11 +38,12 @@ COUNT = Path("docs/references/skill-count.md")
 TOP_LEVEL = "(top level)"
 
 EPILOG = """\
-Each run prints one line per skill it changes: add, update, or remove, then a
-tab and skills/<name>. It also writes docs/references/skill-count.md, the
-skills per category and kind, and prints a line when that page changes. A dry
-run prints the same lines and changes nothing; a run with nothing to change
-prints nothing.
+A run answers {"ok":true,"changes":[...]}, one [action, path] per skill it
+changes, such as ["update","skills/andy-mode"], and {"ok":true} when nothing
+changes. It also writes docs/references/skill-count.md, the skills per
+category and kind, and lists that page when it changes. A dry run answers the
+same and changes nothing; --check fails when a change is pending, with the
+changes beside the error.
 
 examples:
   just compile-skills
@@ -182,8 +184,8 @@ def build_expected() -> dict[Path, Path]:
     }
 
 
-def changes(expected: dict[Path, Path]) -> list[str]:
-    """One `<action>\tskills/<name>` line per skill whose generated copy differs."""
+def changes(expected: dict[Path, Path]) -> list[list[str]]:
+    """One [action, skills/<name>] per skill whose generated copy differs."""
     actual = {
         path
         for path in git_files("skills")
@@ -220,8 +222,14 @@ def changes(expected: dict[Path, Path]) -> list[str]:
     present = {path.parts[1] for path in actual}
     wanted = {path.parts[1] for path in expected}
     return [
-        f"{'add' if name not in present else 'remove' if name not in wanted else 'update'}"
-        f"\tskills/{name}"
+        [
+            "add"
+            if name not in present
+            else "remove"
+            if name not in wanted
+            else "update",
+            f"skills/{name}",
+        ]
         for name in sorted(stale)
     ]
 
@@ -257,10 +265,10 @@ def count_page(expected: dict[Path, Path], compiled: int) -> str:
     )
 
 
-def compile_tree(*, dry_run: bool = False) -> list[str]:
+def compile_tree(*, dry_run: bool = False) -> list[list[str]]:
     """Rebuild skills/ and the skill-count page from authoring/ when they
-    differ; return one change line per skill or page, and change nothing on a
-    dry run."""
+    differ; return one change per skill or page, and change nothing on a dry
+    run."""
     if OUTPUT.is_symlink() or (OUTPUT.exists() and not OUTPUT.is_dir()):
         raise ScriptError(
             "skills/ must be a directory, not a file or symlink; "
@@ -291,22 +299,22 @@ def compile_tree(*, dry_run: bool = False) -> list[str]:
     target = ROOT / COUNT
     current = target.read_text(encoding="utf-8") if target.is_file() else None
     if page != current:
-        lines.append(f"{'add' if current is None else 'update'}\t{COUNT.as_posix()}")
+        lines.append(["add" if current is None else "update", COUNT.as_posix()])
         if not dry_run:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(page, encoding="utf-8")
     return lines
 
 
-def work(args: argparse.Namespace) -> str:
+def work(args: argparse.Namespace) -> dict[str, Any]:
     lines = compile_tree(dry_run=args.dry_run or args.check)
     if args.check and lines:
         raise ScriptError(
             "skills/ or the skill count differs from authoring/; "
             "run: just compile-skills",
-            detail="\n".join(lines),
+            report={"changes": lines},
         )
-    return "\n".join(lines)
+    return {"changes": lines} if lines else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -330,9 +338,11 @@ def main(argv: list[str] | None = None) -> int:
         "--check",
         action="store_true",
         help="dry run that exits 1 when skills/ or the skill count differs, "
-        "listing the changes on stderr",
+        "listing the changes beside the error",
     )
-    return run_script(parser, work, argv, debug="COMPILE_SKILLS_DEBUG")
+    return run_script(
+        parser, work, argv, debug="COMPILE_SKILLS_DEBUG", json_answer=True
+    )
 
 
 if __name__ == "__main__":

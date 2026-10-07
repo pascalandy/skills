@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -77,13 +78,11 @@ def test_pulls_then_runs_the_pulled_private_sync_and_installs(
 
     result = run(repo, home)
 
-    lines = result.stdout.splitlines()
     assert (result.returncode, result.stderr) == (0, "")
-    assert (
-        lines[0]
-        == f"pull\tmain\t{before}..{git(repo, 'rev-parse', '--short=7', 'HEAD')}"
-    )
-    assert "add\t~/.claude/skills/alpha" in lines
+    changes = json.loads(result.stdout)["changes"]
+    after = git(repo, "rev-parse", "--short=7", "HEAD")
+    assert changes[0] == ["pull", "main", f"{before}..{after}"]
+    assert ["add", "~/.claude/skills/alpha"] in changes
     assert (repo / "pulled-private-sync-ran").is_file()
     installed = home / ".claude/skills/alpha/SKILL.md"
     assert installed.read_text() == "# alpha\n\npulled\n"
@@ -99,7 +98,9 @@ def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(
 
     assert (result.returncode, result.stdout) == (1, "")
     assert "authoring/content/alpha/SKILL.md" in result.stderr
-    assert result.stderr.endswith("then rerun just sync\n")
+    assert json.loads(result.stderr.splitlines()[-1])["errors"][0].endswith(
+        "then rerun just sync"
+    )
     assert not (repo / "pulled-private-sync-ran").exists()
     assert not (home / ".claude").exists()
 
@@ -112,11 +113,11 @@ def test_refuses_a_checkout_off_main_before_pulling_or_installing(
 
     result = run(repo, home)
 
-    assert (result.returncode, result.stdout, result.stderr) == (
-        1,
-        "",
-        "error: this checkout is on feature; switch to main, then rerun just sync\n",
-    )
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "errors": ["this checkout is on feature; switch to main, then rerun just sync"],
+    }
     assert not (repo / "_skills_private").exists()
     assert not (home / ".claude").exists()
 
@@ -131,10 +132,16 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
 
     assert (preview.returncode, preview.stderr) == (0, "")
     # The profile, and so the target list, depends on the host
-    assert "add\t~/.claude/skills/alpha" in preview.stdout.splitlines()
-    # Nothing is installed yet, so the check lists the work on stderr
+    changes = json.loads(preview.stdout)["changes"]
+    assert ["add", "~/.claude/skills/alpha"] in changes
+    # Nothing is installed yet, so the installer's check fails with the same
+    # changes, and the sync's own answer follows it
     assert (check.returncode, check.stdout) == (1, "")
-    assert check.stderr.startswith(preview.stdout)
+    installer, verdict = map(json.loads, check.stderr.splitlines()[-2:])
+    assert installer["changes"] == changes
+    assert verdict["errors"] == [
+        "just install-skills failed; fix what its answer above says, then rerun just sync"
+    ]
     assert not (repo / "_skills_private").exists()
     assert not (home / ".claude").exists()
 
@@ -149,6 +156,7 @@ def test_a_fetch_that_cannot_reach_origin_exits_75_before_installing(
     result = run(repo, home, "--timeout", "30s")
 
     assert (result.returncode, result.stdout) == (75, "")
-    assert result.stderr.startswith("error: could not fetch main: ")
-    assert result.stderr.endswith("retry: just sync --timeout 30s\n")
+    answer = json.loads(result.stderr)
+    assert answer["errors"][0].startswith("could not fetch main: ")
+    assert answer["retry"] == "just sync --timeout 30s"
     assert not (home / ".claude").exists()

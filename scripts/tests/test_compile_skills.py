@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -19,7 +20,22 @@ COUNT_HEAD = (
     "<!-- Generated from authoring/ by `just compile-skills`; do not edit -->\n\n"
     "| Category | General | Dev | Unknown | Total |\n|---|---|---|---|---|\n"
 )
-COUNT_CHANGED = "update\tdocs/references/skill-count.md\n"
+OK = '{"ok":true}\n'
+COUNT_CHANGED = ["update", "docs/references/skill-count.md"]
+
+
+STALE = "skills/ or the skill count differs from authoring/; run: just compile-skills"
+
+
+def failed(error: str, **fields: object) -> str:
+    answer = {"ok": False, "errors": [error], **fields}
+    return json.dumps(answer, separators=(",", ":")) + "\n"
+
+
+def changed(*changes: list[str]) -> str:
+    return (
+        json.dumps({"ok": True, "changes": list(changes)}, separators=(",", ":")) + "\n"
+    )
 
 
 class CompileSkillsTests(unittest.TestCase):
@@ -80,9 +96,9 @@ class CompileSkillsTests(unittest.TestCase):
             (cache / "junk.pyc").write_bytes(b"runtime cache")
             result, stdout, stderr = self.check()
 
-        self.assertEqual((result, stdout, stderr), (0, "", ""))
+        self.assertEqual((result, stdout, stderr), (0, OK, ""))
 
-    def test_dry_run_prints_the_lines_a_real_run_prints_then_a_rerun_is_silent(
+    def test_dry_run_answers_the_changes_a_real_run_makes_then_a_rerun_has_none(
         self,
     ) -> None:
         with self.repository() as (root, source, _):
@@ -91,7 +107,9 @@ class CompileSkillsTests(unittest.TestCase):
             added.parent.mkdir()
             added.write_text("# Fresh\n", encoding="utf-8")
             subprocess.run(["git", "add", "authoring"], cwd=root, check=True)
-            lines = "update\tskills/example\nadd\tskills/fresh\n" + COUNT_CHANGED
+            lines = changed(
+                ["update", "skills/example"], ["add", "skills/fresh"], COUNT_CHANGED
+            )
 
             self.assertEqual(self.cli("-vn")[:2], (0, lines))
             self.assertEqual(
@@ -99,7 +117,7 @@ class CompileSkillsTests(unittest.TestCase):
             )
             self.assertEqual(self.cli(), (0, lines, ""))
             self.assertEqual((root / "skills/fresh/SKILL.md").read_text(), "# Fresh\n")
-            self.assertEqual(self.cli(), (0, "", ""))
+            self.assertEqual(self.cli(), (0, OK, ""))
 
     def test_check_reports_content_missing_extra_and_mode_drift(self) -> None:
         cases = {
@@ -148,10 +166,12 @@ class CompileSkillsTests(unittest.TestCase):
 
         self.assertEqual((result, stdout), (1, ""))
         self.assertEqual(
-            stderr,
-            "update\tskills/example\n"
-            "error: skills/ or the skill count differs from authoring/; "
-            "run: just compile-skills\n",
+            json.loads(stderr),
+            {
+                "ok": False,
+                "errors": [STALE],
+                "changes": [["update", "skills/example"]],
+            },
         )
 
     def test_the_count_page_tallies_each_category_by_kind(self) -> None:
@@ -184,7 +204,7 @@ class CompileSkillsTests(unittest.TestCase):
             source.parent.rename(moved)
             subprocess.run(["git", "add", "-A", "authoring"], cwd=root, check=True)
 
-            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertEqual(self.cli(), (0, changed(COUNT_CHANGED), ""))
             self.assertEqual(
                 (root / "docs/references/skill-count.md").read_text(),
                 COUNT_HEAD + "| content | 0 | 0 | 1 | 1 |\n"
@@ -201,14 +221,9 @@ class CompileSkillsTests(unittest.TestCase):
 
             self.assertEqual(
                 self.check(),
-                (
-                    1,
-                    "",
-                    COUNT_CHANGED + "error: skills/ or the skill count differs "
-                    "from authoring/; run: just compile-skills\n",
-                ),
+                (1, "", failed(STALE, changes=[COUNT_CHANGED])),
             )
-            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertEqual(self.cli(), (0, changed(COUNT_CHANGED), ""))
             self.assertEqual(count.read_text(), expected)
 
     def test_check_and_a_run_agree_on_a_stray_skill_in_skills(self) -> None:
@@ -218,13 +233,13 @@ class CompileSkillsTests(unittest.TestCase):
             stray.write_text("# Stray\n", encoding="utf-8")
 
             self.assertEqual(self.check()[:2], (1, ""))
-            self.assertEqual(self.cli(), (0, COUNT_CHANGED, ""))
+            self.assertEqual(self.cli(), (0, changed(COUNT_CHANGED), ""))
             self.assertTrue(
                 (root / "docs/references/skill-count.md")
                 .read_text()
                 .endswith("\nauthoring 1 · skills 2\n")
             )
-            self.assertEqual(self.check(), (0, "", ""))
+            self.assertEqual(self.check(), (0, OK, ""))
 
     def test_a_skill_without_a_kind_publishes_kind_unknown(self) -> None:
         untagged = '---\nname: "example"\ndescription: "Use for x."\n---\n# Example\n'
@@ -250,9 +265,12 @@ class CompileSkillsTests(unittest.TestCase):
                 self.cli(),
                 (
                     0,
-                    (
-                        "add\tskills/crlf\nupdate\tskills/example\nadd\tskills/solo\n"
-                        "add\tskills/tagged\n" + COUNT_CHANGED
+                    changed(
+                        ["add", "skills/crlf"],
+                        ["update", "skills/example"],
+                        ["add", "skills/solo"],
+                        ["add", "skills/tagged"],
+                        COUNT_CHANGED,
                     ),
                     "",
                 ),
@@ -279,7 +297,7 @@ class CompileSkillsTests(unittest.TestCase):
                 '---\nname: "tagged"\nkind: "dev"\n---\n',
             )
             self.assertEqual(source.read_text(encoding="utf-8"), untagged)
-            self.assertEqual(self.check(), (0, "", ""))
+            self.assertEqual(self.check(), (0, OK, ""))
 
     def test_a_package_inside_another_package_fails(self) -> None:
         with self.repository() as (root, _, _):
@@ -291,9 +309,9 @@ class CompileSkillsTests(unittest.TestCase):
             (
                 1,
                 "",
-                (
-                    "error: authoring/devtools/example is a package inside the package "
-                    "authoring/devtools; move one of them\n"
+                failed(
+                    "authoring/devtools/example is a package inside the package "
+                    "authoring/devtools; move one of them"
                 ),
             ),
         )
@@ -310,9 +328,9 @@ class CompileSkillsTests(unittest.TestCase):
             (
                 1,
                 "",
-                (
-                    "error: duplicate skill name 'example': authoring/content/example "
-                    "and authoring/devtools/example; rename one package\n"
+                failed(
+                    "duplicate skill name 'example': authoring/content/example "
+                    "and authoring/devtools/example; rename one package"
                 ),
             ),
         )

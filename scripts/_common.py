@@ -14,7 +14,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Literal, NoReturn
@@ -242,6 +242,35 @@ def answer(code: int, fields: Mapping[str, Any]) -> int:
     return code
 
 
+# What a script older than #490 printed for each change: an action, a tab, and
+# its object. A machine mid-deploy may still run one; #492 stops reading it
+CHANGE_LINE = re.compile(r"(clone|commit|pull|push|add|update|remove|synced|ready)\t")
+
+
+def answer_in(lines: Iterable[str]) -> dict[str, Any] | None:
+    """The last JSON answer among a child's output lines, such as {"ok":true}."""
+    for line in reversed(list(lines)):
+        if line.startswith('{"ok":'):
+            with suppress(ValueError):
+                found = json.loads(line)
+                if isinstance(found, dict):
+                    return found
+    return None
+
+
+def changes_in(lines: Iterable[str]) -> list[list[str]]:
+    """The changes a child reports: the `changes` of each JSON answer it prints,
+    or each change line of a script older than #490."""
+    found: list[list[str]] = []
+    for line in lines:
+        if line.startswith('{"ok":'):
+            with suppress(ValueError):
+                found += json.loads(line).get("changes", [])
+        elif CHANGE_LINE.match(line):
+            found.append(line.split("\t"))
+    return found
+
+
 def usage_error(message: str) -> NoReturn:
     raise UsageError(message)
 
@@ -361,7 +390,7 @@ def report(
         hints["retry"] = command
     elif rerun:
         hints["rerun"] = f"{command} --debug"
-    failure = {**error.report, "errors": messages, **hints}
+    failure = {"errors": messages, **error.report, **hints}
     if form == "json":
         print(json.dumps(failure, indent=2), file=sys.stderr)
         return error.code

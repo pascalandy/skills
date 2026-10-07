@@ -59,6 +59,10 @@ HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
 FAKE_JUST = """#!/bin/sh
 echo "$@" >> "$HOME/just.log"
 shift
+if [ -n "$FLEET_OLD_INSTALLER" ]; then
+    printf 'update\\t~/.claude/skills/alpha\\n'
+    exit 0
+fi
 exec "$FLEET_PYTHON" scripts/install_skills.py "$@"
 """
 
@@ -69,6 +73,15 @@ def login_path(home: Path, bin_dir: Path) -> None:
     inherited entries behind /opt/homebrew/bin and the real just."""
     home.mkdir(parents=True, exist_ok=True)
     (home / ".profile").write_text(f'PATH="{bin_dir}:$PATH"\n')
+
+
+OK = '{"ok":true}\n'
+
+
+def changed(*changes: list[str]) -> str:
+    return (
+        json.dumps({"ok": True, "changes": list(changes)}, separators=(",", ":")) + "\n"
+    )
 
 
 def git(repo: Path, *args: str) -> str:
@@ -149,9 +162,9 @@ def change(hub: Path, name: str = "change.txt", push: bool = True) -> str:
 
 
 def run(
-    hub: Path, homes: Path, bin_dir: Path, *args: str, stdin: str = ""
+    hub: Path, homes: Path, bin_dir: Path, *args: str, stdin: str = "", **extra: str
 ) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, **GIT_IDENTITY}
+    env = {**os.environ, **GIT_IDENTITY, **extra}
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["FLEET_HOMES"] = str(homes)
     env["FLEET_PYTHON"] = sys.executable
@@ -206,32 +219,26 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         hub, "behind", "dirty", "editor", "branch", "ahead", "plain", "linked", "down"
     )
 
-    result = run(hub, homes, bin_dir, "--json")
+    result = run(hub, homes, bin_dir, "-v")
 
     assert (result.returncode, result.stdout) == (1, "")
-    report = json.loads(result.stderr)
-    assert report["sha"] == head
+    log = result.stderr.splitlines()
+    assert f"GitHub main at {head[:7]}" in result.stderr
     not_a_clone = (
         "~/projects/skills/_skills_private is not a clone of the private repo; "
         "move it aside, then rerun"
     )
-    assert [
-        (entry["machine"], entry["status"], entry["detail"])
-        for entry in report["machines"]
-    ] == [
-        ("behind", "synced", f"synced at {head[:7]}"),
-        ("dirty", "needs-you", "checkout has uncommitted skill changes"),
-        ("editor", "synced", f"synced at {head[:7]}"),
-        ("branch", "needs-you", "checkout is on feature, not main"),
-        ("ahead", "needs-you", "checkout has commits GitHub lacks; push them"),
-        ("plain", "needs-you", not_a_clone),
-        ("linked", "needs-you", not_a_clone),
-        (
-            "down",
-            "offline",
-            "ssh: connect to host down port 22: Connection refused",
-        ),
-    ]
+    assert {
+        f"behind: synced: synced at {head[:7]}",
+        "dirty: needs-you: checkout has uncommitted skill changes",
+        f"editor: synced: synced at {head[:7]}",
+        "branch: needs-you: checkout is on feature, not main",
+        "ahead: needs-you: checkout has commits GitHub lacks; push them",
+        f"plain: needs-you: {not_a_clone}",
+        f"linked: needs-you: {not_a_clone}",
+        "down: offline: ssh: connect to host down port 22: Connection refused",
+    } <= set(log)
+    errors = json.loads(log[-1])["errors"]
     assert git(behind, "rev-parse", "HEAD") == head
     assert git(editor, "rev-parse", "HEAD") == head
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
@@ -257,11 +264,10 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert (
         "dirty needs-you: checkout has uncommitted skill changes; "
         "fix it on dirty, then rerun just sync-fleet dirty"
-    ) in report["errors"]
-    assert any(error.startswith("down offline:") for error in report["errors"])
-    behind_changes = report["machines"][0]["changes"]
-    assert behind_changes[0] == f"move {before[:7]} to {head[:7]}"
-    assert "add\t~/.claude/skills/secret" in behind_changes
+    ) in errors
+    assert any(error.startswith("down offline:") for error in errors)
+    assert f"behind: move {before[:7]} to {head[:7]}" in log
+    assert "behind: add\t~/.claude/skills/secret" in log
 
 
 def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
@@ -282,16 +288,15 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     shutil.rmtree(homes / "stale/.claude/skills/alpha")
 
     result = run(hub, homes, bin_dir, "-n")
-    preview = json.loads(run(hub, homes, bin_dir, "-n", "--json").stdout)
+    preview = run(hub, homes, bin_dir, "-n", "-v")
 
     assert (result.returncode, result.stdout, result.stderr) == (
         0,
-        f"ready\tbehind\t{head[:7]}\nready\tstale\t{head[:7]}\n",
+        changed(["sync", "behind", head[:7]], ["sync", "stale", head[:7]]),
         "",
     )
-    assert preview["machines"][2]["changes"] == [
-        "~/.claude/skills has 1 of 2 current (add 1)"
-    ]
+    assert preview.stdout == result.stdout
+    assert "stale: ~/.claude/skills waits for add 1" in preview.stderr.splitlines()
     assert git(behind, "rev-parse", "HEAD") == before
     assert not (homes / "stale/.claude/skills/alpha").exists()
 
@@ -300,13 +305,13 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     saving = run(hub, homes, bin_dir, "-n")
 
     assert (saving.returncode, saving.stderr) == (0, "")
-    assert saving.stdout == "".join(
-        f"ready\t{name}\t{head[:7]}\n" for name in ("behind", "current", "stale")
+    assert saving.stdout == changed(
+        *(["sync", name, head[:7]] for name in ("behind", "current", "stale"))
     )
     assert git(hub / "_skills_private", "status", "--porcelain") != ""
 
 
-def test_check_is_silent_when_converged_and_names_each_difference(
+def test_check_answers_ok_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
     hub, homes, bin_dir = fleet
@@ -316,7 +321,7 @@ def test_check_is_silent_when_converged_and_names_each_difference(
     register(hub, "synced", "lagging")
     assert run(hub, homes, bin_dir).returncode == 0
     converged = run(hub, homes, bin_dir, "--check")
-    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
+    assert (converged.returncode, converged.stdout, converged.stderr) == (0, OK, "")
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
     (lagging / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
@@ -330,22 +335,35 @@ def test_check_is_silent_when_converged_and_names_each_difference(
 
     result = run(hub, homes, bin_dir, "--check")
 
-    assert result.returncode == 1
-    assert result.stdout == ""
-    errors = sorted(
-        line for line in result.stderr.splitlines() if line.startswith("error:")
-    )
+    assert (result.returncode, result.stdout) == (1, "")
+    errors = sorted(json.loads(result.stderr)["errors"])
     assert len(errors) == 2
     lagging_error, synced_error = errors
-    assert lagging_error.startswith("error: lagging drift: checkout is behind ")
+    assert lagging_error.startswith("lagging drift: checkout is behind ")
     assert "private repo has uncommitted edits" in lagging_error
     assert f", GitHub at {github[:7]}" in lagging_error
-    assert "~/.claude/skills has 1 of 2 current (update 1)" in lagging_error
+    assert "~/.claude/skills waits for update 1" in lagging_error
     assert synced_error.startswith(
-        f"error: synced drift: private repo is at {git(hub / '_skills_private', 'rev-parse', 'HEAD')[:7]}, "
+        f"synced drift: private repo is at {git(hub / '_skills_private', 'rev-parse', 'HEAD')[:7]}, "
         f"GitHub at {github[:7]}"
     )
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+
+
+def test_check_reads_the_changes_of_an_installer_from_before_490(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "old", hub.parent / "skills.git")
+    register(hub, "old")
+    assert run(hub, homes, bin_dir).returncode == 0
+
+    result = run(hub, homes, bin_dir, "--check", FLEET_OLD_INSTALLER="1")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr)["errors"] == [
+        "old drift: ~/.claude/skills waits for update 1; rerun just sync-fleet old"
+    ]
 
 
 def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
@@ -368,13 +386,13 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
 
     head = change(hub, push=False)
     committed = run(hub, homes, bin_dir, "--hook", "post-commit")
-    assert (committed.returncode, committed.stdout, committed.stderr) == (0, "", "")
+    assert (committed.returncode, committed.stdout, committed.stderr) == (0, OK, "")
     assert (home / ".claude/skills/alpha/SKILL.md").is_file()
     assert not fleet_log.exists()
 
     refs = f"refs/heads/main {head} refs/heads/main {before}\n"
     pushing = run(hub, homes, bin_dir, "--hook", "pre-push", stdin=refs)
-    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
+    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, OK, "")
     git(hub, "push", "-q", "origin", "main")
 
     deadline = time.monotonic() + 60
@@ -411,9 +429,9 @@ def test_a_worktree_syncs_with_the_main_checkouts_registry_and_skips_hooks(
     pushing = run(worktree, homes, bin_dir, "--hook", "pre-push", stdin=refs)
 
     assert (result.returncode, result.stdout) == (75, "")
-    assert result.stderr.splitlines()[0] == f"offline\tdown\t{head[:7]}"
+    assert json.loads(result.stderr)["errors"][0].startswith("down offline: ")
     assert not (worktree / "_skills_private").exists()
-    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, "", "")
+    assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, OK, "")
     assert not fleet_log.exists()
 
 
@@ -436,7 +454,7 @@ def test_brings_the_machine_it_runs_on_to_github_main(
 
     assert (result.returncode, result.stdout, result.stderr) == (
         0,
-        f"synced\t{here}\t{github[:7]}\n",
+        changed(["sync", here, github[:7]]),
         "",
     )
     assert git(hub, "rev-parse", "HEAD") == github != before
@@ -453,11 +471,9 @@ def test_a_run_whose_only_failures_are_offline_machines_exits_75(
     result = run(hub, homes, bin_dir, "--dry-run")
 
     assert (result.returncode, result.stdout) == (75, "")
-    assert (
-        result.stderr.splitlines()[0]
-        == f"offline\tdown\t{git(hub, 'rev-parse', '--short=7', 'HEAD')}"
-    )
-    assert result.stderr.endswith("retry: just sync-fleet --dry-run\n")
+    answer = json.loads(result.stderr)
+    assert answer["errors"][0].startswith("down offline: ")
+    assert answer["retry"] == "just sync-fleet --dry-run"
 
 
 def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> None:
@@ -467,8 +483,11 @@ def test_an_unknown_machine_is_a_usage_error(fleet: tuple[Path, Path, Path]) -> 
     result = run(hub, homes, bin_dir, "mpb")
 
     assert (result.returncode, result.stdout) == (2, "")
-    assert "error: unknown machine mpb; the registry lists mbp\n" in result.stderr
-    assert result.stderr.endswith("run 'just sync-fleet --help'\n")
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "errors": ["unknown machine mpb; the registry lists mbp"],
+        "help": "just sync-fleet --help",
+    }
 
 
 def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
@@ -477,22 +496,15 @@ def test_a_machine_that_refuses_the_login_is_a_failure_not_a_retry(
     hub, homes, bin_dir = fleet
     register(hub, "down", "locked")
 
-    result = run(hub, homes, bin_dir, "--dry-run", "--json")
+    result = run(hub, homes, bin_dir, "--dry-run")
 
     assert (result.returncode, result.stdout) == (1, "")
-    outcomes = {m["machine"]: m for m in json.loads(result.stderr)["machines"]}
-    assert (outcomes["down"]["status"], outcomes["down"]["temporary"]) == (
-        "offline",
-        True,
-    )
-    assert outcomes["locked"] == {
-        "machine": "locked",
-        "status": "failed",
-        "detail": "tester@locked: Permission denied (publickey).",
-        "targets": [],
-        "changes": [],
-        "temporary": False,
-    }
+    assert sorted(json.loads(result.stderr)["errors"]) == [
+        "down offline: ssh: connect to host down port 22: Connection refused; "
+        + "it catches up at the next sync, or rerun just sync-fleet down",
+        "locked failed: tester@locked: Permission denied (publickey).; "
+        + "rerun just sync-fleet locked --debug",
+    ]
 
 
 def test_a_check_that_loses_the_machine_midway_exits_75(
@@ -505,9 +517,8 @@ def test_a_check_that_loses_the_machine_midway_exits_75(
     result = run(hub, homes, bin_dir, "--check")
 
     assert (result.returncode, result.stdout) == (75, "")
-    assert (
-        "error: flaky offline: Connection to flaky closed by remote host.; "
-        in result.stderr
+    assert json.loads(result.stderr)["errors"][0].startswith(
+        "flaky offline: Connection to flaky closed by remote host.; "
     )
 
 
@@ -535,12 +546,12 @@ def test_a_failed_install_step_reports_the_installers_own_error(
     (homes / "broken/.config").write_text("not a directory\n")
     register(hub, "broken")
 
-    result = run(hub, homes, bin_dir, "--check", "--json")
+    result = run(hub, homes, bin_dir, "--check")
 
     assert (result.returncode, result.stdout) == (1, "")
-    [outcome] = json.loads(result.stderr)["machines"]
-    assert outcome["status"] == "failed"
-    assert "has a file ancestor" in outcome["detail"]
+    [error] = json.loads(result.stderr)["errors"]
+    assert error.startswith("broken failed: ")
+    assert "has a file ancestor" in error
 
 
 def test_an_interrupt_kills_a_group_whose_leader_exits_first(
