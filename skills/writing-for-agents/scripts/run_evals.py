@@ -921,6 +921,12 @@ def launch(args: argparse.Namespace) -> dict[str, Any]:
     except ScriptError as error:
         error.report.update(folders)
         raise
+    except Exception as error:
+        log.debug("unexpected failure", exc_info=True)
+        raise ScriptError(
+            f"{type(error).__name__}: {error}; see the traceback with --debug",
+            report=folders,
+        ) from error
     finally:
         children.stop_all()
         pool.shutdown(wait=True, cancel_futures=True)
