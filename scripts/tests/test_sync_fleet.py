@@ -559,6 +559,31 @@ def test_a_failed_install_step_reports_the_installers_own_error(
     assert "has a file ancestor" in error
 
 
+def test_a_failed_install_keeps_the_machines_completed_private_changes(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    broken = machine(homes, "broken", hub.parent / "skills.git")
+    git(
+        broken, "clone", "-q", str(hub.parent / "skills-private.git"), "_skills_private"
+    )
+    (broken / "_skills_private/content/secret/SKILL.md").write_text(
+        "saved before failure\n"
+    )
+    (homes / "broken/.config").write_text("not a directory\n")
+    register(hub, "broken")
+
+    result = run(hub, homes, bin_dir)
+
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    assert answer["changes"] == [["sync", "broken", git(hub, "rev-parse", "HEAD")[:7]]]
+    assert git(
+        hub.parent / "skills-private.git", "show", "main:content/secret/SKILL.md"
+    ) == ("saved before failure")
+
+
 def test_an_interrupt_kills_a_group_whose_leader_exits_first(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

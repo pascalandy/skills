@@ -536,9 +536,11 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 temporary=is_network_failure(pushed.stderr),
             )
     code, lines = remote(machine, APPLY, machine.path, head, source.sha)
-    if code:
-        return failure(machine.name, code, lines)
     changes = ["\t".join(change) for change in changes_in(lines)]
+    if code:
+        outcome = failure(machine.name, code, lines)
+        outcome.changes = changes
+        return outcome
     if head != source.sha:
         changes.insert(0, f"move {head[:7]} to {source.sha[:7]}")
     return Outcome(
