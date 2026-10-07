@@ -731,8 +731,10 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
                 try:
                     saved = sync_private.sync(timeout=args.timeout)
                 except BaseException as error:
-                    if getattr(error, "report", {}).get("changes"):
-                        error.report["changes"] = [["sync", coordinator, sha]]  # pyright: ignore[reportAttributeAccessIssue]
+                    # The coordinator's own saves answer as one sync row
+                    report = getattr(error, "report", None)
+                    if isinstance(report, dict) and report.get("changes"):
+                        report["changes"] = [["sync", coordinator, sha]]
                     raise
                 if saved:
                     changed_machines[coordinator] = None

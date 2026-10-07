@@ -683,6 +683,58 @@ def test_an_interrupt_while_it_notifies_keeps_the_machines_that_synced(
     ]
 
 
+@pytest.mark.parametrize("boundary", ["pull", "listing", "notify"])
+@pytest.mark.parametrize("failure", ["KeyboardInterrupt", "RuntimeError"])
+def test_a_stopped_coordinator_keeps_its_private_save(
+    fleet: tuple[Path, Path, Path], boundary: str, failure: str
+) -> None:
+    hub, homes, bin_dir = fleet
+    host = socket.gethostname().split(".")[0]
+    register(hub, host, "locked")
+    private = hub / "_skills_private"
+    before = git(private, "rev-parse", "HEAD")
+    (private / "content/secret/SKILL.md").write_text("saved before stopping\n")
+    (hub / "scripts/stopped_coordinator.py").write_text(
+        "import sys\n"
+        "import sync_fleet\n"
+        "import sync_private\n"
+        f"def stop(*args, **kwargs):\n    raise {failure}('coordinator stopped')\n"
+        f"boundary = {boundary!r}\n"
+        "if boundary == 'notify':\n"
+        "    sync_fleet.notify = stop\n"
+        "else:\n"
+        "    module = sync_private if boundary == 'pull' else sync_fleet\n"
+        "    command = 'pull' if boundary == 'pull' else 'ls-tree'\n"
+        "    real = module.git\n"
+        "    def git(*args, **kwargs):\n"
+        "        if args[0] == command:\n"
+        "            stop()\n"
+        "        return real(*args, **kwargs)\n"
+        "    module.git = git\n"
+        "sys.exit(sync_fleet.main())\n"
+    )
+
+    result = run(
+        hub, homes, bin_dir, "--others", "--notify", script="stopped_coordinator.py"
+    )
+
+    assert (result.returncode, result.stdout) == (
+        130 if failure == "KeyboardInterrupt" else 1,
+        "",
+    )
+    assert git(private, "rev-parse", "HEAD") != before
+    assert (
+        git(private, "show", "HEAD:content/secret/SKILL.md") == "saved before stopping"
+    )
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["errors"] == (
+        ["interrupted"]
+        if failure == "KeyboardInterrupt"
+        else ["RuntimeError: coordinator stopped"]
+    )
+    assert answer["changes"] == [["sync", host, git(hub, "rev-parse", "HEAD")[:7]]]
+
+
 def test_a_bug_in_one_worker_keeps_the_machines_that_synced(
     fleet: tuple[Path, Path, Path],
 ) -> None:
