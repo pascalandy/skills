@@ -210,6 +210,8 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
             "pytest",
             "-W",
             "error",
+            "-r",
+            "fE",
             "-n",
             "auto",
             "scripts/tests/test_alpha.py",
@@ -234,6 +236,8 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             "pytest",
             "-W",
             "error",
+            "-r",
+            "fE",
             "scripts/tests/test_commands.py",
             "scripts/tests/test_skill_invocation.py",
         ]
@@ -397,7 +401,7 @@ def test_verbose_list_shows_the_actual_cheap_test_command(
     ) == (
         0,
         '{"ok":true,"checks":["test-commands"]}\n',
-        "repository-tests: uvx --from pytest@9.1.1 pytest -W error scripts/tests/test_commands.py\n",
+        "repository-tests: uvx --from pytest@9.1.1 pytest -W error -r fE scripts/tests/test_commands.py\n",
     )
     assert not (routing_repo / "pytest-calls").exists()
 

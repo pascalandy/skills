@@ -126,6 +126,9 @@ def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Co
         "pytest",
         "-W",
         "error",
+        # The rerun reads the FAILED and ERROR summary lines, whatever PYTEST_ADDOPTS says
+        "-r",
+        "fE",
         *(("-n", "auto") if parallel else ()),
         *(path if isinstance(path, tuple) else (path,)),
     )
