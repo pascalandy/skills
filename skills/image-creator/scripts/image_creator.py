@@ -1223,7 +1223,9 @@ def build_parser() -> tuple[Parser, dict[str, Parser]]:
         epilog="run image_creator.py <command> --help for each command's flags",
         exit_codes=EXIT_CODES,
     )
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     sub = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
     generate = sub.add_parser(
         "generate", help="create a new image", epilog=EPILOG_GENERATE + ANSWER,
