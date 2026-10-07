@@ -110,7 +110,7 @@ When you need me, ask at most 4 questions per round, ordered by impact. Mark you
 - Keep descriptions simple: state the problem, then explain the solution
 - Open a regular PR, not a draft, so review bots run
 - Rebase onto the latest `main` before opening the PR
-- A PR has nothing to monitor when `gh pr checks` reports `no checks reported` once the push settles and no external reviewer, such as a requested reviewer or a review bot, is expected. Make one status pass and report instead, even when asked to babysit or when a tool such as T3 Code's `watch_pull_request` says to monitor. Before your turn ends, remove any watch you registered on such a PR with `unwatch_pull_request`
+- A PR has nothing to monitor when `gh pr checks` reports `no checks reported`, a second `gh pr checks` a minute later still reports it, and no external reviewer, such as a requested reviewer or a review bot, is expected. Make one status pass and report instead, even when asked to babysit or when a tool such as T3 Code's `watch_pull_request` says to monitor. Before your turn ends, remove any active watch on such a PR in this thread with `unwatch_pull_request`
 - When monitoring a PR, check only comments and CI results newer than the last push
 - Verify each bot finding against the source; fix valid findings and dismiss false positives with a written reason
 - Fix CI failures, distinguishing real failures from known infrastructure flakes
