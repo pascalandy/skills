@@ -155,7 +155,7 @@ function createProgram(io: Io): Command {
     .usage("[--store <dir>] [--force] [-v] <command>")
     .addHelpText(
       "after",
-      '\nEach command answers one JSON line: {"ok":true,...} on stdout, or\n{"ok":false,"errors":[...]} as the last line of stderr.\n\nExit codes:\n  0    success\n  1    failure, a missing unit, gate, or ledger row included\n  2    usage error\n  130  interrupted'
+      '\nEach command answers one JSON line: {"ok":true,...} on stdout, or\n{"ok":false,"errors":[...]} as the last line of stderr.\n\nExit codes:\n  0    success\n  1    failure, a missing unit, gate, or ledger row included\n  2    usage error\n  130  interrupted\n  143  terminated'
     )
     .configureOutput({
       writeOut: io.stdout,

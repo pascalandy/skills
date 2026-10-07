@@ -1,6 +1,6 @@
 import { writeSync } from "node:fs";
 
-// Every entry point answers in one compact JSON line with `ok` first: a
+// Every entry point answers in one compact JSON line: a
 // success on stdout, a failure as the last line of stderr with stdout empty.
 // `ok` is true exactly when the exit code is 0.
 export interface Io {

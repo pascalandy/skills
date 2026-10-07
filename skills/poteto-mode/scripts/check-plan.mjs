@@ -38,9 +38,10 @@ Options:
   -v, --verbose  print each PR section's box counts on stderr
   -h, --help     show this help
 
-Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error`;
+Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error;
+130 interrupted; 143 terminated`;
 
-// One compact JSON line, `ok` first: a success on stdout, a failure as the last
+// One compact JSON line: a success on stdout, a failure as the last
 // line of stderr with stdout empty
 function answer(code, fields = {}) {
 	// U+2028 and U+2029 stay escaped, so a line reader keeps the answer whole

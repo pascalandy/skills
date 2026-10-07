@@ -83,11 +83,11 @@ export function parseArgs(
 ): CliOptions {
   const program = new Command("watch-pr")
     .description(
-      'Watch one pull request, a connected stack, or an immutable queued stack.\nEach poll\'s verdict goes to stderr as one JSON line; the run ends with\n{"ok":true,"verdict":{...}} on stdout.'
+      'Watch one pull request, a connected stack, or an immutable queued stack.\nProgress verdicts go to stderr as one JSON line; the run ends with\n{"ok":true,"verdict":{...}} on stdout.'
     )
     .addHelpText(
       "after",
-      "\nExit codes:\n  0    answered a verdict, a blocker or a timeout included\n  1    GitHub could not be read, or the watcher failed\n  2    usage error\n  130  interrupted"
+      "\nExit codes:\n  0    answered a verdict, a blocker or a timeout included\n  1    GitHub could not be read, or the watcher failed\n  2    usage error\n  130  interrupted\n  143  terminated"
     )
     .configureOutput({
       writeOut: io.stdout,

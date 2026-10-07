@@ -59,8 +59,10 @@ function install(): void {
     { cwd: scriptsDirectory }
   );
   if (result.exitCode !== 0) {
-    processIo.stderr(result.stdout.toString());
-    processIo.stderr(result.stderr.toString());
+    for (const output of [result.stdout, result.stderr]) {
+      const text = output.toString();
+      if (text) processIo.stderr(text.endsWith("\n") ? text : `${text}\n`);
+    }
     fail(`bun install --frozen-lockfile exited with status ${result.exitCode}`);
   }
   if (!existsSync(commanderPackagePath)) {

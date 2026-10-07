@@ -20,11 +20,11 @@ Options:
   -v, --verbose  report a failed fetch of origin/main on stderr
   -h, --help     show this help
 
-Exit codes: 0 success; 1 failure; 2 usage error; 130 interrupted
+Exit codes: 0 success; 1 failure; 2 usage error; 130 interrupted; 143 terminated
 HELP
 }
 
-# One compact JSON line on stderr, `ok` first, then exit with the given code.
+# One compact JSON line on stderr, then exit with the given code.
 # Quotes, backslashes, and control characters are escaped for JSON
 fail() {
 	local text=$2 out='' char i

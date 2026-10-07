@@ -306,7 +306,7 @@ describe("main", () => {
     });
     expect(harness.stdout).toHaveLength(1);
     const answer = JSON.parse(harness.stdout[0]);
-    expect(Object.keys(answer)).toEqual(["ok", "verdict"]);
+    expect(Object.keys(answer).sort()).toEqual(["ok", "verdict"]);
     expect(answer).toMatchObject({
       ok: true,
       verdict: { kind: "READY", terminal: true, scope: { kind: "stack" } },
@@ -408,7 +408,7 @@ describe("main", () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);
     expect(await main(["--help"], harness.runtime)).toBe(0);
-    expect(harness.stdout.join("")).toContain("goes to stderr as one JSON line");
+    expect(harness.stdout.join("")).toContain("go to stderr as one JSON line");
     expect(harness.stderr).toEqual([]);
     expect(reader.calls).toEqual([]);
   });
