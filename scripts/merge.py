@@ -357,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         help="how long each call to GitHub, and the wait for GitHub to accept "
         "the merge, may take (default: 1m)",
     )
-    return run_script(parser, merge, argv, debug="MERGE_DEBUG", json_answer=True)
+    return run_script(parser, merge, argv, debug="MERGE_DEBUG")
 
 
 if __name__ == "__main__":

@@ -181,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long each network step or lock may take (default: 5m)",
     )
-    return run_script(parser, sync, argv, debug="SYNC_DEBUG", json_answer=True)
+    return run_script(parser, sync, argv, debug="SYNC_DEBUG")
 
 
 if __name__ == "__main__":

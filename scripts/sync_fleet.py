@@ -834,7 +834,7 @@ def main(argv: list[str] | None = None) -> int:
         help="how long to wait for another sync from this machine, and for the "
         "private clone's network steps (default: 30m)",
     )
-    return run_script(parser, work, argv, debug="SYNC_FLEET_DEBUG", json_answer=True)
+    return run_script(parser, work, argv, debug="SYNC_FLEET_DEBUG")
 
 
 if __name__ == "__main__":

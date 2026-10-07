@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 
 from conftest import SCRIPTS
@@ -11,6 +12,8 @@ from conftest import SCRIPTS
 ROOT = SCRIPTS.parent
 # A shell operator means the recipe decides or chains; that belongs in scripts/
 OPERATORS = ("&&", "||", ";", "|")
+# A recipe that runs one of the repository's scripts, not a skill's
+SCRIPT = re.compile(r"(?<![\w/])scripts/\w+\.py")
 
 
 def just(*args: str) -> subprocess.CompletedProcess[str]:
@@ -60,3 +63,21 @@ def test_bare_just_lists_commands_then_checks_without_hook_plumbing() -> None:
         "[checks]",
     ]
     assert not [line for line in menu if line.startswith("sync-hook")]
+
+
+def test_every_recipe_that_runs_a_script_ends_with_its_answer() -> None:
+    # Without the attribute, just adds "error: Recipe failed" after the answer
+    recipes = json.loads(just("--dump", "--dump-format", "json").stdout)["recipes"]
+    bare = [
+        name
+        for name, recipe in recipes.items()
+        if any(
+            SCRIPT.search(part)
+            for line in recipe["body"]
+            for part in line
+            if isinstance(part, str)
+        )
+        and "no-exit-message" not in recipe["attributes"]
+    ]
+
+    assert bare == []

@@ -523,7 +523,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="answer with the check names and exit; -v adds their commands on stderr",
     )
-    return run_script(parser, verdict, argv, debug="CHECK_DEBUG", json_answer=True)
+    return run_script(parser, verdict, argv, debug="CHECK_DEBUG")
 
 
 if __name__ == "__main__":

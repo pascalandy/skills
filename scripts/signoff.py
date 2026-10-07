@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         default="1m",
         help="how long each call to GitHub may take (default: 1m)",
     )
-    return run_script(parser, signoff, argv, debug="SIGNOFF_DEBUG", json_answer=True)
+    return run_script(parser, signoff, argv, debug="SIGNOFF_DEBUG")
 
 
 if __name__ == "__main__":
