@@ -107,8 +107,11 @@ The arguments are valid, and the test expects exit 1 with a specific error, so a
 ### Usage Errors
 
 ```python
-def test_unknown_flag_is_usage_error() -> None:
-    result = run("--no-such-flag")
+def test_unknown_flag_is_usage_error(tmp_path: Path) -> None:
+    # Valid arguments beside the unknown flag, so argparse reports only the flag
+    result = run(
+        str(tmp_path / "in.txt"), "--output", str(tmp_path / "out.txt"), "--no-such-flag"
+    )
     assert result.returncode == 2
     found = answer(result)
     assert found["errors"] == ["unrecognized arguments: --no-such-flag"]
