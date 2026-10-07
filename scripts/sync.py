@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import changes_in, is_network_failure, run, run_git, run_script
+from _common import answer_in, changes_in, is_network_failure, run, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -86,20 +86,28 @@ def pull_main(timeout: float) -> list[list[str]]:
 def step(name: str, *command: str) -> list[list[str]]:
     """Run one step as its own process, so it runs the code the pull brought.
 
-    Its stderr passes through; the changes its answer lists are returned, to
-    report once every step has succeeded.
+    Its stderr is replayed once it ends; the changes its answer lists are
+    returned, or carried by the error when it fails.
     """
     log.info("run %s", name)
     log.debug("%s", shlex.join(command))
     # An interrupt passes SIGTERM on to the step, so it cleans up too
-    finished = run(command, cwd=ROOT, stdout=subprocess.PIPE, text=True)
+    finished = run(
+        command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    sys.stderr.write(finished.stderr)
+    # A failed step, such as a private pull that conflicts after the edits were
+    # committed, still answers what it changed
+    failed = answer_in(finished.stderr.splitlines()) or {}
+    report = {"changes": failed["changes"]} if failed.get("changes") else None
     if finished.returncode == 75:
-        raise TemporaryError(f"{name} could not finish")
+        raise TemporaryError(f"{name} could not finish", report=report)
     if finished.returncode < 0:
         raise ScriptError(f"{name} was killed by signal {-finished.returncode}")
     if finished.returncode:
         raise ScriptError(
-            f"{name} failed; fix what its answer above says, then rerun just sync"
+            f"{name} failed; fix what its answer above says, then rerun just sync",
+            report=report,
         )
     return changes_in(finished.stdout.splitlines())
 
@@ -133,8 +141,9 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         )
     except ScriptError as error:
         # A failed step still answers what the steps before it changed
-        if changes:
-            error.report["changes"] = changes
+        done = [*changes, *error.report.get("changes", [])]
+        if done:
+            error.report["changes"] = done
         raise
     return {"changes": changes} if changes else {}
 
