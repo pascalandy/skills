@@ -283,7 +283,11 @@ class AnswerTests(RunFixture):
 
         self.assertEqual(doctor[:2], (1, ""))
         self.assertIs(doctor[2]["ok"], False)
-        self.assertIn("doctor.ffmpeg unmet: FFmpeg is available", doctor[2]["errors"])
+        self.assertIn(
+            'doctor.ffmpeg unmet: FFmpeg is available; expected "resolved '
+            + 'executable", observed null',
+            doctor[2]["errors"],
+        )
         self.assertEqual(drive[:2], (1, ""))
         self.assertEqual(
             drive[2]["errors"],
@@ -292,6 +296,7 @@ class AnswerTests(RunFixture):
                 (
                     "conversion.platform skipped: The real-media scenario was not "
                     "run because doctor found an unmet requirement"
+                    + '; expected "all doctor checks passed", observed "scenario not started"'
                 ),
             ],
         )

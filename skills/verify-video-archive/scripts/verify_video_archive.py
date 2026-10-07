@@ -3176,10 +3176,20 @@ def run_all(
     checkout: Path, evidence_parent: Path | None, selected: str
 ) -> tuple[Path, dict[str, object]]:
     manifest_path = launch(checkout, evidence_parent)
-    doctor(manifest_path)
-    drive(manifest_path, selected)
-    summary = evidence(manifest_path)
-    cleanup(manifest_path)
+    try:
+        doctor(manifest_path)
+        drive(manifest_path, selected)
+        summary = evidence(manifest_path)
+        cleanup(manifest_path)
+    except (
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        subprocess.SubprocessError,
+    ) as error:
+        # The manifest of a run that stopped midway stays readable
+        raise ScriptError(str(error), report={"file": str(manifest_path)}) from error
     return manifest_path, summary
 
 
@@ -3200,8 +3210,8 @@ commands:
       {"ok":true,"file":"MANIFEST"}
 
 A check that did not pass fails the command: stdout stays empty and stderr ends
-with {"ok":false,"errors":["ID STATUS: SUMMARY",...]}, one error per check, and
-run adds "file". Read each check's expected and observed values in MANIFEST, or
+with {"ok":false,"errors":["ID STATUS: SUMMARY; expected E, observed O",...]},
+one error per check, and run adds "file". Read each check's expected and observed values in MANIFEST, or
 add -v to print them on stderr.
 
 examples:
@@ -3271,15 +3281,15 @@ def require_passed(
     file; -v prints every check with its expected and observed values."""
     errors: list[str] = []
     for item in checks:
+        expected = json.dumps(item.get("expected"), default=str)
+        observed = json.dumps(item.get("observed"), default=str)
         line = f"{item.get('id')} {item.get('status')}: {item.get('summary')}"
-        log.info(
-            "%s; expected %s; observed %s",
-            line,
-            json.dumps(item.get("expected"), default=str),
-            json.dumps(item.get("observed"), default=str),
-        )
+        log.info("%s; expected %s; observed %s", line, expected, observed)
         if item.get("status") != "passed":
-            errors.append(line)
+            # The summary names what the check wants, so the observed value says why
+            errors.append(
+                f"{line}; expected {expected[:200]}, observed {observed[:200]}"
+            )
     errors += [
         f"{item} is missing or changed in the evidence bundle" for item in missing
     ]
