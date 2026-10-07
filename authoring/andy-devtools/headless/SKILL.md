@@ -112,7 +112,7 @@ On success, stdout holds one JSON line:
 
 Read the whole answer before deciding the run succeeded. A one-line "no findings" without criteria is weak evidence: add the criteria and check results, then rerun.
 
-On failure, stdout stays empty and the last line of stderr is `{"ok":false,"errors":[…]}`, one message per cause. Exit 1 means the child failed, gave no answer, was denied a tool, or changed the checkout under `--review-only` or `--code-review`, or the config is invalid. Once the child has run, that line also carries `file` and the other fields above. Change the cause before a retry. Exit 2 is a usage error, such as an effort the CLI does not accept.
+On failure, stdout stays empty and the last line of stderr is `{"ok":false,"errors":[…]}`, one message per cause. Exit 1 means the child failed, gave no answer, was denied a tool, or changed the checkout under `--review-only` or `--code-review`, or the config is invalid. When the child finished and the launcher read its result, that line also carries `file` and the other fields above; a timeout or an interrupt carries only `errors`. Change the cause before a retry. Exit 2 is a usage error, such as an effort the CLI does not accept.
 
 For a follow-up round on the same thread, pass the `session` to `--resume`. A fresh run gives an independent opinion.
 
