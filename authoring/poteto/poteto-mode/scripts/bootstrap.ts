@@ -34,6 +34,17 @@ function fail(message: string): never {
 }
 
 export function ensureDependenciesInstalled(): void {
+  try {
+    install();
+  } catch (error) {
+    // A read-only scripts folder throws here; the answer stays one JSON line
+    fail(
+      `could not prepare the dependencies: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function install(): void {
   const installKey = currentInstallKey();
   if (
     existsSync(commanderPackagePath) &&

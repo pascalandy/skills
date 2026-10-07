@@ -45,6 +45,7 @@ fail() {
 
 prs=""
 trap 'rm -f "$prs"; fail 130 interrupted' INT
+trap 'rm -f "$prs"; fail 143 terminated' TERM
 
 verbose=0
 args=()

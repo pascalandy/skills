@@ -51,9 +51,18 @@ function answer(code, fields = {}) {
 			offset += fs.writeSync(code === 0 ? 1 : 2, line, offset);
 		} catch (error) {
 			if (error.code !== "EAGAIN") throw error;
+			// The reader is behind; wait a millisecond rather than spin
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
 		}
 	}
 	process.exit(code);
+}
+
+for (const [signal, code, word] of [
+	["SIGINT", 130, "interrupted"],
+	["SIGTERM", 143, "terminated"],
+]) {
+	process.on(signal, () => answer(code, { errors: [word] }));
 }
 
 const args = process.argv.slice(2);
