@@ -3,7 +3,7 @@ in one JSON line.
 
 test_cli.py tests the parser and the contract behavior once; this suite checks
 each script is wired to it, that doc lines running a script use only flags its
-help lists, and that nothing but run_script writes the answer. The contract is
+help lists, and that nothing but answer() writes to stdout. The contract is
 in docs/references/script-conventions.md, the output in script-output.md.
 """
 
@@ -227,7 +227,7 @@ def test_only_the_answer_writes_to_stdout_and_no_script_warns() -> None:
     found = []
     for path in sorted(SCRIPTS.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        allowed = "answer" if path.name == "_common.py" else ""
+        allowed = "answer" if path.name == "_cli.py" else ""
         found += [
             f"{path.name}:{line} writes to stdout"
             for line in stdout_writes(source, allowed)

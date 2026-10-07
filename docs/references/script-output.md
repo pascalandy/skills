@@ -73,7 +73,7 @@ $ uv run scripts/check_cli_block.py --fix
 
 ## How this repository does it
 
-- `answer()` in `scripts/_common.py` prints the line and derives `ok` from the exit code. `run_script()` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
+- `answer()` prints the line and derives `ok` from the exit code. It lives in the cli block of `scripts/_cli.py`, so a skill script that pastes the block answers the same way. `run_script()` in `scripts/_common.py` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
 - Each `justfile` recipe that runs such a script carries `[no-exit-message]`, for decision 10
 - The lock, decision 13: `scripts/tests/test_cli_contract.py` fails when a script in `scripts/` writes to stdout anywhere but in `answer()`, logs a warning, or answers a usage error in another form, and `scripts/tests/test_justfile.py` fails when a recipe that runs one lacks `[no-exit-message]`. pyright checks that `work` returns a dict
 - A pytest or pyright warning fails `just check`: `scripts/check.py` runs pytest with `-W error` and pyright with `--warnings` (#487). When a dependency starts to warn, filter that one warning in its check, with a comment that says why
@@ -96,6 +96,7 @@ Decided on 2026-10-04, while planning #430
 12. **rtk passes the line through unchanged.** Checked on 2026-10-04 with a one-line and an indented object from a `just` recipe, on success and on failure; `rtk proxy` prints the same lines, so agents need no workaround
 13. **The lock lives in `test_cli_contract.py`, not in a new check** (#492), because that test already lists every script
 14. **Rejected: a sentence in `AGENTS.md` that explains the silence** (the first proposal in #430), because it fixes one script in one repository. **Rejected: text in a terminal and JSON elsewhere**, because the agent and the human would see two different outputs
+15. **A script whose job is content writes the content to a file and answers with its path**, such as `{"ok":true,"file":"…"}`, so the line stays one line an agent reads whole. A script that streams events, such as a watcher, writes them to stderr and ends with its answer on stdout. Pascal decided on 2026-10-06 that skill scripts follow the rule too, these included (#494)
 
 ## State
 

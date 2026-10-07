@@ -25,6 +25,7 @@ from _cli import (
     ScriptError,
     TemporaryError,
     UsageError,
+    answer,
     env_flag,
     given,
     signals_interrupt,
@@ -220,20 +221,6 @@ def exclusive(path: Path, timeout: float) -> Iterator[None]:
                     ) from None
                 time.sleep(0.1)
         yield
-
-
-def answer(code: int, fields: Mapping[str, Any]) -> int:
-    """Print the one JSON line a script answers with, and return `code`.
-
-    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
-    says. Success goes to stdout; a failure goes to stderr, after its
-    diagnostics, and leaves stdout empty.
-    """
-    body = {"ok": code == 0, **fields}
-    body["ok"] = code == 0
-    line = json.dumps(body, separators=(",", ":"))
-    print(line, file=sys.stderr if code else sys.stdout)
-    return code
 
 
 # What a script older than #490 printed for each change: an action, a tab, and

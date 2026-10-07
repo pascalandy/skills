@@ -115,6 +115,21 @@ class Parser(argparse.ArgumentParser):
         self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
 
 
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
 def given(
     argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
 ) -> bool:
