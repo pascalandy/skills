@@ -2218,9 +2218,10 @@ def run_verify(args: argparse.Namespace, skill_dir: Path) -> dict[str, object]:
     result = {"file": str(Path(str(report["evidence_dir"])) / "result.json")}
     if report["ok"]:
         return result
+    paid_options = f" --allow-paid --youtube-url {shlex.quote(args.youtube_url)}"
     errors = [
         f"{feature['id']}: {feature['error']['message']}; rerun: verify-transcript "
-        f"verify --feature {feature['id']}{' --allow-paid' if feature['paid'] else ''}"
+        f"verify --feature {feature['id']}{paid_options if feature['paid'] else ''}"
         for feature in report["features"]
         if feature["verdict"] == "FAIL"
     ]

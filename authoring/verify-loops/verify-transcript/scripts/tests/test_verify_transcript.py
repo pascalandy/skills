@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -745,3 +746,39 @@ def test_a_command_prints_its_own_help(capsys):
     assert verify_transcript.main(["verify", "--help"]) == 0
 
     assert capsys.readouterr().out.startswith("usage: verify-transcript verify ")
+
+
+def test_a_paid_feature_rerun_preserves_the_requested_video(
+    tmp_path, monkeypatch, capsys
+):
+    url = "https://www.youtube.com/watch?v=custom&t=12"
+
+    def unavailable(feature, plan, context):
+        raise OSError("video unavailable")
+
+    monkeypatch.setattr(verify_transcript, "capture_command", unavailable)
+    code = verify_transcript.main(
+        [
+            "verify",
+            "--feature",
+            "youtube.real-summary",
+            "--allow-paid",
+            "--youtube-url",
+            url,
+            "--evidence-root",
+            str(tmp_path),
+        ]
+    )
+
+    out, err = capsys.readouterr()
+    assert (code, out) == (1, "")
+    payload = json.loads(err.splitlines()[-1])
+    assert Path(payload["file"]).is_file()
+    [error] = payload["errors"]
+    command = shlex.split(error.split("; rerun: ")[1])
+    rerun = verify_transcript.build_parser().parse_args(command[1:])
+    assert (rerun.feature, rerun.allow_paid, rerun.youtube_url) == (
+        ["youtube.real-summary"],
+        True,
+        url,
+    )
