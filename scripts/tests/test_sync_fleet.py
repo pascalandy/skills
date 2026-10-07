@@ -238,7 +238,12 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         f"linked: needs-you: {not_a_clone}",
         "down: offline: ssh: connect to host down port 22: Connection refused",
     } <= set(log)
-    errors = json.loads(log[-1])["errors"]
+    answer = json.loads(log[-1])
+    errors = answer["errors"]
+    assert answer["changes"] == [
+        ["sync", "behind", head[:7]],
+        ["sync", "editor", head[:7]],
+    ]
     assert git(behind, "rev-parse", "HEAD") == head
     assert git(editor, "rev-parse", "HEAD") == head
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"

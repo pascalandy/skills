@@ -752,17 +752,19 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
                 if outcome.status in ("needs-you", "failed")
             ]
         )
-    if problems:
-        temporary = all(outcome.temporary for outcome in problems)
-        raise (TemporaryError if temporary else ScriptError)(
-            *(advice(outcome) for outcome in problems)
-        )
     changes = [
         ["sync", outcome.machine, source.sha[:7]]
         for outcome in outcomes
         if outcome.changes
     ]
-    return {"changes": changes} if changes else {}
+    answer = {"changes": changes} if changes else {}
+    if problems:
+        # The machines that did sync stay in the answer of a partial failure
+        temporary = all(outcome.temporary for outcome in problems)
+        raise (TemporaryError if temporary else ScriptError)(
+            *(advice(outcome) for outcome in problems), report=answer
+        )
+    return answer
 
 
 def main(argv: list[str] | None = None) -> int:
