@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { answer, processIo } from "./answer.ts";
 
 const scriptsDirectory = import.meta.dir;
 const nodeModulesDirectory = join(scriptsDirectory, "node_modules");
@@ -22,6 +23,16 @@ function currentInstallKey(): string {
     .digest("hex");
 }
 
+function fail(message: string): never {
+  process.exit(
+    answer(processIo, 1, {
+      errors: [
+        `${message}; run: cd ${scriptsDirectory} && bun install --frozen-lockfile`,
+      ],
+    })
+  );
+}
+
 export function ensureDependenciesInstalled(): void {
   const installKey = currentInstallKey();
   if (
@@ -37,16 +48,12 @@ export function ensureDependenciesInstalled(): void {
     { cwd: scriptsDirectory }
   );
   if (result.exitCode !== 0) {
-    process.stdout.write(result.stdout);
+    process.stderr.write(result.stdout);
     process.stderr.write(result.stderr);
-    throw new Error(
-      `bun install --frozen-lockfile exited with status ${result.exitCode}`
-    );
+    fail(`bun install --frozen-lockfile exited with status ${result.exitCode}`);
   }
   if (!existsSync(commanderPackagePath)) {
-    throw new Error(
-      "bun install --frozen-lockfile completed without installing commander"
-    );
+    fail("bun install --frozen-lockfile completed without installing commander");
   }
 
   writeFileSync(installKeyPath, `${installKey}\n`);

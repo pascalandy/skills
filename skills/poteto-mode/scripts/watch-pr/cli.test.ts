@@ -4,12 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type CliRuntime, main, parseArgs } from "./cli.ts";
 import { fakeReader, passingCheck } from "./fakes.test-helper.ts";
-import { renderJson, renderPretty } from "./render.ts";
-import type { GitHubReader, WatcherVerdict } from "./types.ts";
-import { parsePrNumber } from "./types.ts";
+import { WatcherQueryError } from "./github.ts";
+import type { GitHubReader } from "./types.ts";
 
 const silentIo = { stdout: () => {}, stderr: () => {} };
 const WATCH_PR = join(import.meta.dir, "watch-pr");
+
+function lastLine(text: string): unknown {
+  return JSON.parse(text.trimEnd().split("\n").at(-1) ?? "");
+}
 
 interface FakeGhOptions {
   readonly authError?: boolean;
@@ -21,6 +24,7 @@ interface FakeGhOptions {
 async function runCliWithFakeGh(options: FakeGhOptions = {}): Promise<{
   readonly code: number;
   readonly stdout: string;
+  readonly stderr: string;
   readonly calls: readonly string[];
 }> {
   const directory = await mkdtemp(join(tmpdir(), "watch-pr-test-"));
@@ -83,7 +87,6 @@ esac
     "--pr",
     "121",
     ...(options.statusOnly === false ? [] : ["--status-only"]),
-    "--pretty",
     "--interval",
     "0.01",
     "--timeout",
@@ -102,6 +105,7 @@ esac
   const output = {
     code: result.exitCode,
     stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
     calls: (await readFile(calls, "utf8")).trim().split("\n"),
   };
   await rm(directory, { recursive: true, force: true });
@@ -142,7 +146,6 @@ describe("parseArgs", () => {
       mode: "single",
       stackPrs: [],
       statusOnly: false,
-      pretty: false,
       polling: {
         interval: 60,
         sweepInterval: 300,
@@ -168,7 +171,6 @@ describe("parseArgs", () => {
         "--max-query-errors",
         "3",
         "--allow-draft",
-        "--pretty",
       ],
       silentIo
     );
@@ -181,7 +183,6 @@ describe("parseArgs", () => {
       maxQueryErrors: 3,
       allowDraft: true,
     });
-    expect(parsed.pretty).toBe(true);
   });
 
   it("rejects every invalid mode and numeric shape as usage", async () => {
@@ -197,60 +198,13 @@ describe("parseArgs", () => {
     ];
     for (const argv of invalid) {
       const harness = testRuntime(fakeReader());
-      expect(await main(argv, harness.runtime)).toBe(64);
+      expect(await main(argv, harness.runtime)).toBe(2);
       expect(harness.stdout).toEqual([]);
-      expect(harness.stderr.join("")).toContain("error:");
+      expect(lastLine(harness.stderr.join(""))).toMatchObject({
+        ok: false,
+        help: "watch-pr --help",
+      });
     }
-  });
-});
-
-describe("rendering", () => {
-  const context = {
-    owner: "owner",
-    repo: "repo",
-    number: parsePrNumber(1),
-  };
-  const status = {
-    schemaVersion: 1,
-    sequence: 1,
-    observedAt: "2026-07-26T00:00:00.000Z",
-    mode: "single",
-    kind: "STATUS",
-    terminal: true,
-    exitCode: 0,
-    reason: "status-only",
-    rows: [
-      {
-        kind: "merged",
-        context,
-        facts: {
-          context,
-          mergeable: "MERGEABLE",
-          mergeStateStatus: "CLEAN",
-          reviewDecision: "APPROVED",
-          headRefOid: "head",
-          headRefName: "feature",
-          baseRefName: "main",
-          state: "MERGED",
-          mergedAt: "now",
-          isDraft: false,
-        },
-      },
-    ],
-  } satisfies WatcherVerdict;
-
-  it("emits compact valid JSON by default", () => {
-    const rendered = renderJson(status);
-    expect(rendered.endsWith("\n")).toBe(true);
-    expect(JSON.parse(rendered)).toEqual(status);
-  });
-
-  it("renders the Markdown table from the same verdict only", () => {
-    const rendered = renderPretty(status);
-    expect(rendered).toContain("| PR | CI | Review | Merge |");
-    expect(rendered).toContain(
-      "| [#1](https://github.com/owner/repo/pull/1) | \u2014 | \u2014 | ✅ merged |"
-    );
   });
 });
 
@@ -258,19 +212,36 @@ describe("main", () => {
   it("accepts an authoritative empty check set in one status-only pass", async () => {
     const result = await runCliWithFakeGh();
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain(
-      "| [#121](https://github.com/owner/repo/pull/121) | ✅ | ✅ | ✅ |"
-    );
-    expect(result.stdout).not.toContain("RETRY");
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      verdict: {
+        kind: "STATUS",
+        rows: [
+          {
+            kind: "open",
+            context: { owner: "owner", repo: "repo", number: 121 },
+            threads: [],
+            ci: { kind: "ci-clean" },
+            facts: { mergeable: "MERGEABLE", isDraft: false },
+          },
+        ],
+      },
+    });
     expect(result.calls).toHaveLength(5);
   });
 
   it("fails a status-only authentication error without retrying", async () => {
     const result = await runCliWithFakeGh({ authError: true });
-    expect(result.code).toBe(7);
-    expect(result.stdout).toContain("BLOCKER: status-query");
-    expect(result.stdout).toContain("failures=1");
-    expect(result.stdout).not.toContain("RETRY");
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).not.toContain("RETRY");
+    expect(lastLine(result.stderr)).toEqual({
+      ok: false,
+      errors: [
+        "GitHub status query failed (1 in a row): authentication failed; check gh auth status and the PR number, then rerun watch-pr",
+      ],
+    });
     expect(result.calls).toHaveLength(1);
   });
 
@@ -279,20 +250,17 @@ describe("main", () => {
       {
         mergeable: "MERGEABLE",
         mergeStateStatus: "CLEAN",
-        code: 0,
-        output: "READY:",
+        verdict: { kind: "READY" },
       },
       {
         mergeable: "MERGEABLE",
         mergeStateStatus: "BLOCKED",
-        code: 4,
-        output: "BLOCKER: failing-checks",
+        verdict: { kind: "BLOCKER", blocker: { kind: "failing-checks" } },
       },
       {
         mergeable: "UNKNOWN",
         mergeStateStatus: "UNKNOWN",
-        code: 4,
-        output: "BLOCKER: failing-checks",
+        verdict: { kind: "BLOCKER", blocker: { kind: "failing-checks" } },
       },
     ] as const;
     for (const item of cases) {
@@ -301,18 +269,86 @@ describe("main", () => {
         mergeStateStatus: item.mergeStateStatus,
         statusOnly: false,
       });
-      expect(result.code).toBe(item.code);
-      expect(result.stdout).toContain(item.output);
+      expect(result.code).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        ok: true,
+        verdict: item.verdict,
+      });
     }
   });
 
-  it("returns EX_USAGE 64 and writes usage errors only to stderr", async () => {
+  it("answers a usage error on stderr with exit 2", async () => {
     const harness = testRuntime(fakeReader());
-    expect(await main(["--interval", "0"], harness.runtime)).toBe(64);
+    expect(await main(["--interval", "0"], harness.runtime)).toBe(2);
     expect(harness.stdout).toEqual([]);
-    expect(harness.stderr.join("")).toContain(
-      "option '--interval <seconds>' argument '0' is invalid"
+    expect(harness.stderr).toEqual([
+      `${JSON.stringify({
+        ok: false,
+        errors: [
+          "option '--interval <seconds>' argument '0' is invalid. must be greater than zero",
+        ],
+        help: "watch-pr --help",
+      })}\n`,
+    ]);
+  });
+
+  it("streams each poll to stderr and answers the verdict on stdout", async () => {
+    const harness = testRuntime(fakeReader());
+    const code = await main(
+      ["--owner", "owner", "--repo", "repo", "--pr", "1", "--stack"],
+      harness.runtime
     );
+    expect(code).toBe(0);
+    expect(harness.stderr).toHaveLength(1);
+    expect(JSON.parse(harness.stderr[0])).toMatchObject({
+      kind: "STATUS",
+      terminal: false,
+      reason: "poll",
+    });
+    expect(harness.stdout).toHaveLength(1);
+    const answer = JSON.parse(harness.stdout[0]);
+    expect(Object.keys(answer)).toEqual(["ok", "verdict"]);
+    expect(answer).toMatchObject({
+      ok: true,
+      verdict: { kind: "READY", terminal: true, scope: { kind: "stack" } },
+    });
+    expect(answer.verdict).not.toHaveProperty("exitCode");
+  });
+
+  it("fails when GitHub stays unreadable until the deadline", async () => {
+    const harness = testRuntime({
+      ...fakeReader(),
+      async pullRequest() {
+        throw new WatcherQueryError({
+          kind: "command-exit",
+          retryable: true,
+          code: 1,
+          detail: "HTTP 502",
+        });
+      },
+    });
+    let now = 0;
+    const runtime = {
+      ...harness.runtime,
+      clock: { ...harness.runtime.clock, now: () => (now += 10) },
+    };
+    const code = await main(
+      ["--owner", "owner", "--repo", "repo", "--pr", "1", "--timeout", "1"],
+      runtime
+    );
+    expect(code).toBe(1);
+    expect(harness.stdout).toEqual([]);
+    expect(harness.stderr).toHaveLength(2);
+    expect(JSON.parse(harness.stderr[0])).toMatchObject({
+      kind: "RETRY",
+      consecutiveFailures: 1,
+    });
+    expect(JSON.parse(harness.stderr[1])).toEqual({
+      ok: false,
+      errors: [
+        "GitHub status stayed unavailable until --timeout: HTTP 502; check gh auth status and the PR number, then rerun watch-pr",
+      ],
+    });
   });
 
   it("bypasses the queue machine for queued-stack status-only", async () => {
@@ -333,17 +369,15 @@ describe("main", () => {
     );
     expect(code).toBe(0);
     expect(harness.stdout).toHaveLength(1);
-    const verdict: unknown = JSON.parse(harness.stdout[0]);
-    expect(verdict).toMatchObject({
-      kind: "STATUS",
-      terminal: true,
-      exitCode: 0,
-      mode: "queued-stack",
+    expect(harness.stderr).toEqual([]);
+    expect(JSON.parse(harness.stdout[0])).toMatchObject({
+      ok: true,
+      verdict: { kind: "STATUS", terminal: true, mode: "queued-stack" },
     });
     expect(harness.stdout[0]).not.toContain('"kind":"QUEUE"');
   });
 
-  it("returns exit 4 for a hidden GitHub-side CI refusal", async () => {
+  it("answers a hidden GitHub-side CI refusal as a blocker", async () => {
     const reader = fakeReader({
       facts: { mergeStateStatus: "BLOCKED" },
       fastPath: { kind: "checks", checks: [passingCheck()] },
@@ -354,14 +388,16 @@ describe("main", () => {
       ["--owner", "owner", "--repo", "repo", "--pr", "1"],
       harness.runtime
     );
-    expect(code).toBe(4);
+    expect(code).toBe(0);
     expect(harness.stdout).toHaveLength(1);
     expect(JSON.parse(harness.stdout[0])).toMatchObject({
-      kind: "BLOCKER",
-      exitCode: 4,
-      blocker: {
-        kind: "failing-checks",
-        ci: { kind: "ci-github-rejected" },
+      ok: true,
+      verdict: {
+        kind: "BLOCKER",
+        blocker: {
+          kind: "failing-checks",
+          ci: { kind: "ci-github-rejected" },
+        },
       },
     });
   });
@@ -370,7 +406,8 @@ describe("main", () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);
     expect(await main(["--help"], harness.runtime)).toBe(0);
-    expect(harness.stdout.join("")).toContain("JSON (NDJSON while polling)");
+    expect(harness.stdout.join("")).toContain("goes to stderr as one JSON line");
+    expect(harness.stderr).toEqual([]);
     expect(reader.calls).toEqual([]);
   });
 });

@@ -28,13 +28,45 @@ const HOW_TO_READ_MARKERS = [
 const PERF_ITEMS = ["Metric.", "Probe.", "Baseline.", "Rule."];
 const BOX = /^\s*- \[[ x]\] (.*)$/;
 
-const file = process.argv[2];
-if (!file) {
-	console.error("Usage: node check-plan.mjs <plan.md>");
-	process.exit(2);
+const HELP = `Usage: node check-plan.mjs [-v] <plan.md>
+
+Check a plan against the skeleton in poteto-mode's playbooks/multi-phase-plan.md.
+Answers {"ok":true} on stdout, or {"ok":false,"errors":[...]} as the last line
+of stderr, one error per plan line to fix.
+
+Options:
+  -v, --verbose  print each PR section's box counts on stderr
+  -h, --help     show this help
+
+Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error`;
+
+// One compact JSON line, `ok` first: a success on stdout, a failure as the last
+// line of stderr with stdout empty
+function answer(code, fields = {}) {
+	const line = `${JSON.stringify({ ok: code === 0, ...fields })}\n`;
+	(code === 0 ? process.stdout : process.stderr).write(line);
+	process.exit(code);
 }
 
-const raw = fs.readFileSync(file, "utf8").split(/\r?\n/);
+const args = process.argv.slice(2);
+if (args.includes("-h") || args.includes("--help")) {
+	console.log(HELP);
+	process.exit(0);
+}
+const verbose = args.some((arg) => arg === "-v" || arg === "--verbose");
+const paths = args.filter((arg) => arg !== "-v" && arg !== "--verbose");
+const usage = (message) => answer(2, { errors: [message], help: "check-plan.mjs --help" });
+const unknown = paths.find((arg) => arg.startsWith("-"));
+if (unknown) usage(`unknown option ${unknown}`);
+if (paths.length !== 1) usage(paths.length ? `expected one plan path, got ${paths.length}` : "missing the plan path");
+const file = paths[0];
+
+let raw;
+try {
+	raw = fs.readFileSync(file, "utf8").split(/\r?\n/);
+} catch (error) {
+	answer(1, { errors: [`cannot read ${file}: ${error.message}`] });
+}
 const problems = [];
 const fail = (line, message) => problems.push(`${file}:${line}: ${message}`);
 
@@ -180,7 +212,8 @@ if (closeIndex !== -1) {
 	if (!tail.some((s) => s.title.includes("Prototype evidence"))) fail(close.n, 'no "## Appendix ... Prototype evidence" section');
 }
 
-for (const line of report) console.log(line);
-console.log(`${prSections.length} PR sections, ${problems.length} problems`);
-for (const p of problems) console.error(p);
-process.exit(problems.length ? 1 : 0);
+if (verbose) {
+	for (const line of report) console.error(line);
+	console.error(`${prSections.length} PR sections, ${problems.length} problems`);
+}
+answer(problems.length ? 1 : 0, problems.length ? { errors: problems } : {});

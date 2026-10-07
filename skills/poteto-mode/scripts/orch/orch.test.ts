@@ -232,6 +232,10 @@ esac
   return { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` };
 }
 
+function lastLine(text: string): unknown {
+  return JSON.parse(text.trimEnd().split("\n").at(-1) ?? "");
+}
+
 function runCli(
   args: readonly string[],
   env: Readonly<Record<string, string | undefined>> = process.env
@@ -332,22 +336,11 @@ describe("Store", () => {
   it("records, replaces, checks, and summarizes typed ledger verdicts", async () => {
     const { store } = await initializedStore();
 
-    try {
-      await store.ledger.check({ pr: 184530, sha: "abc123" });
-      throw new Error("expected ledger check to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(NotFoundError);
-      if (error instanceof NotFoundError) {
-        expect(error.output).toEqual({
-          compact: "NOT-VERIFIED",
-          json: {
-            pr: "184530",
-            sha: "abc123",
-            verdict: "NOT-VERIFIED",
-          },
-        });
-      }
-    }
+    const unverified = store.ledger.check({ pr: 184530, sha: "abc123" });
+    await expect(unverified).rejects.toBeInstanceOf(NotFoundError);
+    await expect(unverified).rejects.toThrow(
+      "PR 184530 at abc123 is NOT-VERIFIED"
+    );
     expect(() => parseVerdict("looks-good")).toThrow("verdict must be");
 
     const recorded = await store.ledger.record({
@@ -583,7 +576,7 @@ describe("Store", () => {
 });
 
 describe("orch CLI", () => {
-  it("prints commander help and rejects invalid parsing with exit 1", async () => {
+  it("prints commander help and answers a usage error with exit 2", async () => {
     const help = runCli(["--help"]);
     expect(help.code).toBe(0);
     expect(help.stdout).toContain("Commands:");
@@ -597,28 +590,74 @@ describe("orch CLI", () => {
 
     const directory = await makeDirectory();
     const invalid = runCli(["--store", directory, "unit", "add", "u1"]);
-    expect(invalid.code).toBe(1);
-    expect(invalid.stderr).toContain("required option '--track <track>'");
+    expect(invalid.code).toBe(2);
+    expect(invalid.stdout).toBe("");
+    expect(invalid.stderr).toBe(
+      `${JSON.stringify({
+        ok: false,
+        errors: ["required option '--track <track>' not specified"],
+        help: "orch --help",
+      })}\n`
+    );
   });
 
-  it("accepts ORCH_STORE and emits complete JSON", async () => {
+  it("accepts ORCH_STORE and answers each command's data beside ok", async () => {
     const directory = await makeDirectory();
     const env = { ...process.env, ORCH_STORE: directory };
-    expect(runCli(["init"], env).code).toBe(0);
-
-    const added = runCli(
-      ["unit", "add", "u1", "--track", "build", "--json"],
-      env
+    const init = runCli(["init"], env);
+    expect(init.code).toBe(0);
+    expect(init.stdout).toBe(
+      `${JSON.stringify({ ok: true, store: directory })}\n`
     );
+
+    const added = runCli(["unit", "add", "u1", "--track", "build"], env);
     expect(added.code).toBe(0);
+    expect(added.stderr).toBe("");
     expect(JSON.parse(added.stdout)).toEqual({
-      id: "u1",
-      track: "build",
-      state: "pending",
-      branch: "",
-      pr: "",
-      sha: "",
-      brief: "",
+      ok: true,
+      unit: {
+        id: "u1",
+        track: "build",
+        state: "pending",
+        branch: "",
+        pr: "",
+        sha: "",
+        brief: "",
+      },
+    });
+
+    expect(JSON.parse(runCli(["unit", "list"], env).stdout)).toEqual({
+      ok: true,
+      units: [expect.objectContaining({ id: "u1" })],
+    });
+    expect(
+      runCli(
+        [
+          "gate",
+          "park",
+          "release",
+          "--question",
+          "Ship?",
+          "--options",
+          "ship,wait",
+          "--default",
+          "wait",
+        ],
+        env
+      ).code
+    ).toBe(0);
+    const status = runCli(["status"], env);
+    expect(status.code).toBe(0);
+    expect(JSON.parse(status.stdout)).toEqual({
+      ok: true,
+      file: join(directory, "status.md"),
+      summary: {
+        unitStates: { pending: 1 },
+        ledgerVerdicts: {},
+        frontierGeneration: 0,
+        openGateIds: ["release"],
+      },
+      changed: "first render",
     });
   });
 
@@ -638,7 +677,6 @@ describe("orch CLI", () => {
       [
         "--store",
         store,
-        "--json",
         "frontier",
         "set",
         "--repo",
@@ -650,7 +688,7 @@ describe("orch CLI", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({
+    expect(JSON.parse(result.stdout).frontier).toEqual({
       generation: 1,
       prs: [
         {
@@ -719,7 +757,7 @@ describe("orch CLI", () => {
       ],
       env
     );
-    expect(missingNumber.code).toBe(1);
+    expect(missingNumber.code).toBe(2);
     expect(missingNumber.stderr).toContain(
       "requires a comma-separated PR list"
     );
@@ -738,11 +776,13 @@ describe("orch CLI", () => {
       env
     );
     expect(failedLookup.code).toBe(1);
+    expect(failedLookup.stdout).toBe("");
+    expect(lastLine(failedLookup.stderr)).toMatchObject({ ok: false });
     expect(failedLookup.stderr).toContain("gh pr view 99 failed");
     expect(failedLookup.stderr).toContain("pull request lookup failed");
   });
 
-  it("maps user and not-found outcomes to the preserved exit codes", async () => {
+  it("answers usage errors with exit 2 and other failures with exit 1", async () => {
     const directory = await makeDirectory();
     expect(runCli(["--store", directory, "init"]).code).toBe(0);
 
@@ -752,10 +792,12 @@ describe("orch CLI", () => {
       "frontier",
       "set",
     ]);
-    expect(missingRepo.code).toBe(1);
-    expect(missingRepo.stderr).toContain(
-      "set --repo <dir> or ORCH_REPO"
-    );
+    expect(missingRepo.code).toBe(2);
+    expect(lastLine(missingRepo.stderr)).toEqual({
+      ok: false,
+      errors: ["set --repo <dir> or ORCH_REPO"],
+      help: "orch --help",
+    });
 
     const userError = runCli([
       "--store",
@@ -767,7 +809,10 @@ describe("orch CLI", () => {
       "build",
     ]);
     expect(userError.code).toBe(1);
-    expect(userError.stderr).toContain("unit id must not be empty");
+    expect(lastLine(userError.stderr)).toEqual({
+      ok: false,
+      errors: ["unit id must not be empty"],
+    });
 
     const missingUnit = runCli([
       "--store",
@@ -776,24 +821,28 @@ describe("orch CLI", () => {
       "get",
       "missing",
     ]);
-    expect(missingUnit.code).toBe(2);
-    expect(missingUnit.stderr).toContain("unit missing not found");
+    expect(missingUnit.code).toBe(1);
+    expect(missingUnit.stdout).toBe("");
+    expect(lastLine(missingUnit.stderr)).toEqual({
+      ok: false,
+      errors: ["unit missing not found"],
+    });
 
     const missingLedger = runCli([
       "--store",
       directory,
-      "--json",
       "ledger",
       "check",
       "184530",
       "abc123",
     ]);
-    expect(missingLedger.code).toBe(2);
-    expect(JSON.parse(missingLedger.stdout)).toEqual({
-      pr: "184530",
-      sha: "abc123",
-      verdict: "NOT-VERIFIED",
+    expect(missingLedger.code).toBe(1);
+    expect(missingLedger.stdout).toBe("");
+    expect(lastLine(missingLedger.stderr)).toEqual({
+      ok: false,
+      errors: [
+        "PR 184530 at abc123 is NOT-VERIFIED: the ledger has no row for this head; verify it, then run orch ledger record 184530 abc123 <verdict> --evidence <path>",
+      ],
     });
-    expect(missingLedger.stderr).toBe("");
   });
 });

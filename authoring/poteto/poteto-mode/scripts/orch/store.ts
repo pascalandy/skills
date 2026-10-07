@@ -219,21 +219,9 @@ export interface Store {
   readonly close: () => Promise<void>;
 }
 
-export interface NotFoundOutput {
-  readonly compact: string;
-  readonly json: unknown;
-}
-
 export class UserError extends Error {}
 export class UsageError extends UserError {}
-export class NotFoundError extends UserError {
-  public constructor(
-    message: string,
-    public readonly output?: NotFoundOutput
-  ) {
-    super(message);
-  }
-}
+export class NotFoundError extends UserError {}
 
 function errorCode(error: unknown): string | null {
   if (
@@ -1423,10 +1411,9 @@ export function openStore(
           (value) => value.pr === pr && value.sha === sha
         );
         if (row === undefined) {
-          throw new NotFoundError("NOT-VERIFIED", {
-            compact: "NOT-VERIFIED",
-            json: { pr, sha, verdict: "NOT-VERIFIED" },
-          });
+          throw new NotFoundError(
+            `PR ${pr} at ${sha} is NOT-VERIFIED: the ledger has no row for this head; verify it, then run orch ledger record ${pr} ${sha} <verdict> --evidence <path>`
+          );
         }
         return row;
       },

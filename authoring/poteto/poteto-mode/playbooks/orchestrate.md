@@ -78,7 +78,7 @@ A dependency is a context relay, not just ordering. Undeclared upstream context 
 - Critical sections you finish first: authoring a brief, a stack operation, a conflict decision, writing a gate, updating ledger or frontier.
 - Each drain classifies every pointer (landed, needs-verify, failed, zombie, noise), writes the resulting rows through `orch unit add`, `orch unit set`, and `orch ledger record`, runs `orch status`, then spawns the next wave in one message.
 - Account for every spawned child at its track's rollup: arrived, respawned, or its scope explicitly absorbed. Silently redoing a missing child's work hides both the wasted spend and the coverage gap its result existed to close.
-- A drain turn ends with the three lines from `orch status`: counts against the states, what changed, gates open. Detail lives in `status.md`. The full reply contract applies at checkpoints and close.
+- A drain turn ends with what `orch status` answers: its `summary` of counts against the states and open gates, and what `changed`. Detail lives in the `status.md` its `file` names. The full reply contract applies at checkpoints and close.
 
 #### Stack safety
 

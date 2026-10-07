@@ -1,19 +1,13 @@
 #!/usr/bin/env bun
 
+import { resolve } from "node:path";
+import { answer, answerSignals, processIo, type Io } from "../answer.ts";
 import { ensureDependenciesInstalled } from "../bootstrap.ts";
 import {
-  NotFoundError,
   UsageError,
   openStore,
   parseVerdict,
-  type Counts,
-  type Frontier,
-  type InboxPointer,
-  type OpenGate,
-  type StandingLine,
-  type StatusReport,
   type Store,
-  type Unit,
   type Verdict,
 } from "./store.ts";
 
@@ -26,16 +20,9 @@ const {
 } = await import("commander");
 type Command = InstanceType<typeof CommanderCommand>;
 
-const DISPLAY_LIMIT = 4;
-
-interface Io {
-  readonly stdout: (value: string) => void;
-  readonly stderr: (value: string) => void;
-}
-
 interface GlobalOptions {
   readonly store?: string;
-  readonly json: boolean;
+  readonly verbose: boolean;
   readonly force: boolean;
 }
 
@@ -104,102 +91,6 @@ function prList(value: string): readonly number[] {
   return parts.map(positiveInteger);
 }
 
-function countLine(value: Counts): string {
-  const entries = Object.entries(value);
-  return entries.length === 0
-    ? "none"
-    : entries.map(([name, count]) => `${name}=${count}`).join(", ");
-}
-
-function unitLine(unit: Unit): string {
-  return [
-    unit.id,
-    unit.track,
-    unit.state,
-    unit.branch,
-    unit.pr,
-    unit.sha,
-    unit.brief,
-  ].join("\t");
-}
-
-function pointerLine(pointer: InboxPointer): string {
-  return [
-    pointer.ts,
-    pointer.agent,
-    pointer.unit,
-    pointer.status,
-    pointer.report,
-  ].join("\t");
-}
-
-function gateLine(gate: OpenGate): string {
-  return [
-    gate.id,
-    gate.question,
-    gate.options,
-    gate.defaultAnswer,
-  ].join("\t");
-}
-
-function compactRows<T>(
-  rows: readonly T[],
-  format: (row: T) => string,
-  empty: string,
-  limit: number | null = DISPLAY_LIMIT
-): string {
-  if (rows.length === 0) {
-    return empty;
-  }
-  const visible = limit === null ? rows : rows.slice(0, limit);
-  const lines = visible.map(format);
-  if (limit !== null && rows.length > limit) {
-    lines.push(`... ${rows.length - limit} more; use --json`);
-  }
-  return lines.join("\n");
-}
-
-function frontierLine(value: Frontier): string {
-  const prs =
-    value.prs.length === 0
-      ? "none"
-      : value.prs
-          .map(
-            (row) =>
-              `${row.branches}#${row.pr}@${row.sha}:${row.state}`
-          )
-          .join(",");
-  return `generation=${value.generation} prs=${prs} lowest-unmerged=${value.lowestUnmerged ?? "none"}`;
-}
-
-function statusLines(report: StatusReport): string {
-  const visible = report.summary.openGateIds.slice(0, DISPLAY_LIMIT);
-  const more =
-    report.summary.openGateIds.length > DISPLAY_LIMIT
-      ? `,+${report.summary.openGateIds.length - DISPLAY_LIMIT} more`
-      : "";
-  return [
-    `counts: units=${report.units.length}; states=${countLine(report.summary.unitStates)}; ledger=${countLine(report.summary.ledgerVerdicts)}`,
-    `changed: ${report.changed}`,
-    `gates open: ${report.summary.openGateIds.length}${
-      visible.length > 0 ? `; ids=${visible.join(",")}${more}` : ""
-    }`,
-  ].join("\n");
-}
-
-function emit<T>(
-  io: Io,
-  json: boolean,
-  value: T,
-  compact: (result: T) => string,
-  jsonValue: (result: T) => unknown = (result) => result
-): void {
-  const rendered = json
-    ? JSON.stringify(jsonValue(value), null, 2)
-    : compact(value);
-  io.stdout(rendered.endsWith("\n") ? rendered : `${rendered}\n`);
-}
-
 function storeDirectory(program: Command): string {
   const value = program.opts<GlobalOptions>().store;
   if (value === undefined || value.trim().length === 0) {
@@ -220,23 +111,30 @@ async function runStore<T>(
   program: Command,
   io: Io,
   operation: (store: Store) => Promise<T>,
-  compact: (result: T) => string,
-  jsonValue?: (result: T) => unknown
+  fields: (
+    result: T,
+    directory: string
+  ) => Readonly<Record<string, unknown>>
 ): Promise<void> {
   const options = program.opts<GlobalOptions>();
-  const store = openStore(storeDirectory(program), {
+  const directory = storeDirectory(program);
+  const note = (text: string): void => {
+    if (options.verbose) io.stderr(`${text}\n`);
+  };
+  const store = openStore(directory, {
     force: options.force,
     onLockStolen: (holder) =>
-      io.stderr(`stealing store lock held by pid ${holder}\n`),
+      note(`stealing store lock held by pid ${holder}`),
     onStaleLock: (holder) =>
-      io.stderr(`replacing stale store lock (pid ${holder} is dead)\n`),
+      note(`replacing stale store lock (pid ${holder} is dead)`),
   });
+  let result: T;
   try {
-    const result = await operation(store);
-    emit(io, options.json, result, compact, jsonValue);
+    result = await operation(store);
   } finally {
     await store.close();
   }
+  answer(io, 0, fields(result, directory));
 }
 
 function leaf(parent: Command, name: string, description: string): Command {
@@ -254,25 +152,32 @@ function requireSubcommand(program: Command): never {
 function createProgram(io: Io): Command {
   const program = new CommanderCommand("orch")
     .description("Plain-file orchestrate bookkeeping")
-    .usage("[--store <dir>] [--json] [--force] <command>")
-    .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
+    .usage("[--store <dir>] [--force] [-v] <command>")
+    .addHelpText(
+      "after",
+      '\nEach command answers one JSON line: {"ok":true,...} on stdout, or\n{"ok":false,"errors":[...]} as the last line of stderr.\n\nExit codes:\n  0    success\n  1    failure, a missing unit, gate, or ledger row included\n  2    usage error\n  130  interrupted'
+    )
+    .configureOutput({
+      writeOut: io.stdout,
+      writeErr: io.stderr,
+      outputError: () => {},
+    })
     .exitOverride()
-    .showHelpAfterError()
     .allowExcessArguments(false)
     .addOption(
       new Option("--store <dir>", "store directory (or ORCH_STORE)").env(
         "ORCH_STORE"
       )
     )
-    .option("--json", "print complete rows as JSON", false)
-    .option("--force", "steal an existing store lock", false);
+    .option("--force", "steal an existing store lock", false)
+    .option("-v, --verbose", "report lock recovery on stderr", false);
 
   leaf(program, "init", "initialize the store").action(() =>
     runStore(
       program,
       io,
       (store) => store.init(),
-      (result) => `initialized ${result.store}`
+      (result) => result
     )
   );
 
@@ -293,7 +198,7 @@ function createProgram(io: Io): Command {
             track: options.track,
             brief: options.brief,
           }),
-        unitLine
+        (unit) => ({ unit })
       )
     );
   leaf(unit, "set <id>", "update a unit")
@@ -313,11 +218,16 @@ function createProgram(io: Io): Command {
             pr: options.pr,
             sha: options.sha,
           }),
-        unitLine
+        (unit) => ({ unit })
       )
     );
   leaf(unit, "get <id>", "get a unit").action((id: string) =>
-    runStore(program, io, (store) => store.units.get(id), unitLine)
+    runStore(
+      program,
+      io,
+      (store) => store.units.get(id),
+      (unit) => ({ unit })
+    )
   );
   leaf(unit, "list", "list units")
     .option("--state <state>", "filter by state")
@@ -327,11 +237,16 @@ function createProgram(io: Io): Command {
         program,
         io,
         (store) => store.units.list(options),
-        (rows) => compactRows(rows, unitLine, "(no units)")
+        (units) => ({ units })
       )
     );
   leaf(unit, "counts", "count units by state").action(() =>
-    runStore(program, io, (store) => store.units.counts(), countLine)
+    runStore(
+      program,
+      io,
+      (store) => store.units.counts(),
+      (counts) => ({ counts })
+    )
   );
 
   const ledger = program
@@ -362,7 +277,7 @@ function createProgram(io: Io): Command {
               evidence: options.evidence,
               verifier: options.verifier,
             }),
-          (row) => `${row.pr}\t${row.sha}\t${row.verdict}`
+          (row) => ({ row })
         )
     );
   leaf(ledger, "check", "check a verification verdict")
@@ -373,11 +288,16 @@ function createProgram(io: Io): Command {
         program,
         io,
         (store) => store.ledger.check({ pr, sha }),
-        (row) => row.verdict
+        (row) => ({ row })
       )
     );
   leaf(ledger, "summary", "count verification verdicts").action(() =>
-    runStore(program, io, (store) => store.ledger.summary(), countLine)
+    runStore(
+      program,
+      io,
+      (store) => store.ledger.summary(),
+      (counts) => ({ counts })
+    )
   );
 
   const inbox = program
@@ -403,9 +323,7 @@ function createProgram(io: Io): Command {
               status,
               report: options.report,
             }),
-          (result) =>
-            `${result.pointer.unit}\t${result.pointer.status}\t${result.filename}`,
-          (result) => result.pointer
+          (result) => ({ pointer: result.pointer })
         )
     );
   leaf(inbox, "drain", "drain inbox pointers")
@@ -416,7 +334,7 @@ function createProgram(io: Io): Command {
         io,
         (store) =>
           options.peek ? store.inbox.peek() : store.inbox.drain(),
-        (rows) => compactRows(rows, pointerLine, "(empty)", null)
+        (pointers) => ({ pointers })
       )
     );
   leaf(inbox, "count", "count inbox pointers").action(() =>
@@ -424,7 +342,6 @@ function createProgram(io: Io): Command {
       program,
       io,
       (store) => store.inbox.count(),
-      String,
       (count) => ({ count })
     )
   );
@@ -448,7 +365,7 @@ function createProgram(io: Io): Command {
             options: options.options,
             defaultAnswer: options.default,
           }),
-        (result) => `${result.id}\topen`
+        (gate) => ({ gate })
       )
     );
   leaf(gate, "list", "list open decision gates").action(() =>
@@ -456,7 +373,7 @@ function createProgram(io: Io): Command {
       program,
       io,
       (store) => store.gates.list(),
-      (rows) => compactRows(rows, gateLine, "(no open gates)")
+      (gates) => ({ gates })
     )
   );
   leaf(gate, "resolve <id>", "resolve a decision gate")
@@ -466,7 +383,7 @@ function createProgram(io: Io): Command {
         program,
         io,
         (store) => store.gates.resolve({ id, answer: options.answer }),
-        (result) => `${result.id}\tresolved\t${result.answer}`
+        (gate) => ({ gate })
       )
     );
 
@@ -495,15 +412,30 @@ function createProgram(io: Io): Command {
             repo: frontierRepo(options),
             prs: options.prs,
           }),
-        frontierLine
+        (frontier) => ({ frontier })
       )
     );
   leaf(frontier, "show", "show the frontier").action(() =>
-    runStore(program, io, (store) => store.frontier.show(), frontierLine)
+    runStore(
+      program,
+      io,
+      (store) => store.frontier.show(),
+      (frontier) => ({ frontier })
+    )
   );
 
-  leaf(program, "status", "render status.md and print a summary").action(() =>
-    runStore(program, io, (store) => store.status.render(), statusLines)
+  leaf(program, "status", "render status.md and answer its summary").action(
+    () =>
+      runStore(
+        program,
+        io,
+        (store) => store.status.render(),
+        (report, directory) => ({
+          file: resolve(directory, "status.md"),
+          summary: report.summary,
+          changed: report.changed,
+        })
+      )
   );
 
   const standing = program
@@ -515,12 +447,7 @@ function createProgram(io: Io): Command {
       program,
       io,
       (store) => store.standing.show(),
-      (rows) =>
-        compactRows(
-          rows,
-          (item: StandingLine) => `${item.number}. ${item.line}`,
-          "(no standing orders)"
-        )
+      (orders) => ({ orders })
     )
   );
   leaf(standing, "add <line>", "add a standing order").action((line: string) =>
@@ -528,7 +455,7 @@ function createProgram(io: Io): Command {
       program,
       io,
       (store) => store.standing.add({ line }),
-      (item) => `${item.number}. ${item.line}`
+      (order) => ({ order })
     )
   );
 
@@ -536,43 +463,33 @@ function createProgram(io: Io): Command {
   return program;
 }
 
-function handleError(error: unknown, program: Command, io: Io): number {
+function handleError(error: unknown, io: Io): number {
   if (error instanceof CommanderError) {
-    return error.exitCode === 0 ? 0 : 1;
+    if (error.exitCode === 0) return 0;
+    return answer(io, 2, {
+      errors: [error.message.replace(/^error: /, "")],
+      help: "orch --help",
+    });
   }
-  const json = program.opts<GlobalOptions>().json;
-  if (error instanceof NotFoundError) {
-    const output = error.output;
-    if (output === undefined) {
-      io.stderr(`error: ${error.message}\n`);
-    } else {
-      emit(io, json, output.json, () => output.compact);
-    }
-    return 2;
-  }
-  io.stderr(`error: ${message(error)}\n`);
-  if (error instanceof UsageError) {
-    io.stderr(program.helpInformation());
-  }
-  return 1;
+  if (error instanceof UsageError)
+    return answer(io, 2, { errors: [error.message], help: "orch --help" });
+  return answer(io, 1, { errors: [message(error)] });
 }
 
 export async function main(
   argv: readonly string[],
-  io: Io = {
-    stdout: (value) => process.stdout.write(value),
-    stderr: (value) => process.stderr.write(value),
-  }
+  io: Io = processIo
 ): Promise<number> {
   const program = createProgram(io);
   try {
     await program.parseAsync(argv, { from: "user" });
     return 0;
   } catch (error) {
-    return handleError(error, program, io);
+    return handleError(error, io);
   }
 }
 
 if (import.meta.main) {
+  answerSignals();
   process.exitCode = await main(process.argv.slice(2));
 }
