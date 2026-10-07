@@ -217,10 +217,6 @@ class TestCLIValidation:
         _, stderr, code = run_script("   ")
         assert code == 2
 
-    def test_max_results_zero_exits_2(self) -> None:
-        _, _, code = run_script("test", "-n", "0")
-        assert code == 2
-
     def test_max_results_21_exits_2(self) -> None:
         _, _, code = run_script("test", "-n", "21")
         assert code == 2
@@ -241,8 +237,8 @@ class TestCLIValidation:
 
     def test_validation_errors_answer_on_stderr(self) -> None:
         """A usage error leaves stdout empty and ends stderr with its answer."""
-        stdout, stderr, _ = run_script("test", "-n", "0")
-        assert stdout == ""  # stdout must be clean
+        stdout, stderr, code = run_script("test", "-n", "0")
+        assert (code, stdout) == (2, "")
         assert json.loads(stderr.splitlines()[-1]) == {
             "ok": False,
             "errors": ["--max-results must be 1-20, got 0"],
