@@ -441,3 +441,22 @@ class TestEndToEndWithRealTranscript:
         assert "VaultWarden OpenCode Summary" in output_file.read_text(encoding="utf-8")
         copied_input = run_dir / f"{slug}_raw{E2E_INPUT_PATH.suffix}"
         assert copied_input.exists()
+
+
+def test_a_failed_model_call_answers_the_files_already_written(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    claude = bin_dir / "claude"
+    claude.write_text("#!/bin/sh\necho 'model refused' >&2\nexit 1\n")
+    claude.chmod(0o755)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    input_file = tmp_path / "article.md"
+    input_file.write_text("hello world\n", encoding="utf-8")
+
+    result = run_script(str(input_file), "--no-open", env=env)
+
+    assert result[2] != 0
+    files = answer(*result)["files"]
+    assert [Path(path).name for path in files] == ["article_raw.md"]

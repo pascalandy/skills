@@ -1303,17 +1303,26 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
 
     started_at = datetime.now().astimezone()
     t0 = time.monotonic()
-    usage = run_llm(plan, output_file)
-    duration = time.monotonic() - t0
-
-    write_meta(
-        run_folder_path,
-        plan,
-        usage,
-        started_at,
-        duration,
-        output_file,
-    )
+    try:
+        usage = run_llm(plan, output_file)
+        duration = time.monotonic() - t0
+        write_meta(
+            run_folder_path,
+            plan,
+            usage,
+            started_at,
+            duration,
+            output_file,
+        )
+    # A model call may have been paid for, so the files it left stay listed
+    except ScriptError as error:
+        error.report["files"] = sorted(map(str, run_folder_path.iterdir()))
+        raise
+    except Exception as error:
+        raise ScriptError(
+            f"{type(error).__name__}: {error}; see the traceback with --debug",
+            report={"files": sorted(map(str, run_folder_path.iterdir()))},
+        ) from error
 
     log.info("wrote %s in %.1fs", output_file, duration)
 
