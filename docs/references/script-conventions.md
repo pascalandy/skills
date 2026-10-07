@@ -77,7 +77,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too. A script in `scripts/` appends each change as it lands, inside `receipt()` from `scripts/_common.py`, so a failure, an interrupt, or a bug still answers the changes already made
+A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too. A script in `scripts/` that changes what a user owns, such as a checkout, the installed skills, or a remote, appends each change as it lands, inside `receipt()` from `scripts/_common.py`, so a failure, an interrupt, or a bug still answers the changes already made. A generator such as `compile_skills.py` needs none, since a rerun writes the same output
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 
@@ -113,7 +113,7 @@ Code kept only so a machine that still runs older scripts keeps syncing. Each ro
 Each kind of script reaches the contract through one path. Then `just check` confirms it
 
 - A script in `scripts/`: import from `_cli`, build a `Parser`, and return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. Add it to `ENTRIES` in `scripts/tests/test_cli_contract.py`, and give it a one-line `justfile` recipe with `[no-exit-message]`
-- A Python script in a skill: paste the block below the `cli-block` marker of `scripts/_cli.py` whole, then use it the same way. `uv run scripts/check_cli_block.py` confirms the copy
+- A Python script in a skill: paste the block below the `cli-block` marker of `scripts/_cli.py` whole, then use it the same way. `uv run scripts/check_cli_block.py` confirms the copy. To keep what it wrote when an interrupt or a bug stops it, it sets the exception's `report` to the `files` or `changes` so far and re-raises; `run_script()` answers that report
 - A Bash script: start from the Bash template of `coding-language`, `references/Bash/scripts/pref_bash_script_template.sh`
 - Another language: no shared code. Its tests assert the same boundary through the command: the exit code, an empty stdout on failure, the answer as the last line of stderr, and a usage error that exits 2 with `help`
 
