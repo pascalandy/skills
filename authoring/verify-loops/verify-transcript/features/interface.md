@@ -5,23 +5,23 @@ The agent interface covers command discovery, exact verifier IDs, output streams
 ## Sub-features
 
 - `interface.help-version` verifies the full help tree, visible options, command choices, and version output
-- `interface.structured-recovery` verifies usage, source, and configuration failures as JSON on `stderr`
+- `interface.structured-recovery` verifies usage, source, and configuration failures as one JSON line that ends `stderr`
 - `dry-runs.transcript-only` verifies `--no-summary`, timeout overrides, output isolation, and zero side effects for both sources
 
 ## How to get to it (user POV)
 
 - Run `transcript --help` or a nested command with `--help`
 - Run `transcript --version`
-- Add `--json` for machine-readable discovery, diagnostics, plans, runs, and failures
-- Run `verify-transcript features --json` and copy an exact value from `features[].id`
+- Read the one JSON line each command answers with: discovery values, diagnostics, plans, run files, and failures
+- Run `verify-transcript features` and copy an exact value from `features[].id`
 
 ## Driving it with verify-transcript
 
 Run the public-boundary checks:
 
-- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.help-version --json`
-- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery --json`
-- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`
+- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.help-version`
+- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery`
+- Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only`
 
 The inventory assigns every public behavior to an executable feature or an explicit exclusion.
 
@@ -50,7 +50,6 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `option.effort` | `youtube.dry-run-summary` |
 | `option.output-dir` | `dry-runs.transcript-only` |
 | `option.dry-run` | `dry-runs.transcript-only` |
-| `option.json` | `dry-runs.transcript-only` |
 | `option.timeout` | `dry-runs.transcript-only` |
 | `option.open` | Would open Finder |
 | `option.preview` | Would render an interactive preview |
@@ -77,8 +76,8 @@ The inventory assigns every public behavior to an executable feature or an expli
 ## Gotchas
 
 - Help and version are text on `stdout`
-- Successful JSON and a ready doctor report are on `stdout`, with an empty `stderr`
-- An unready doctor report exits `1` and moves to `stderr`, with an `error` object beside its checks
-- Fatal JSON is on `stderr` with exit `1`, `2`, `75`, `130`, or `143`; its `error.hint` is the command that fixes it
+- A success is one JSON line on `stdout`; only a real run also writes to `stderr`, the result folder it streams
+- An unready doctor exits `1` with one error per failed check
+- A failure's answer ends `stderr` with exit `1`, `2`, `75`, `130`, or `143`; each error ends with the command that fixes it, or a usage error adds `help`
 - The verifier detects a new help command or option until this inventory assigns it an owner or exclusion
 - The verifier never drives `--open`, `--preview`, private Zoom media, or an unapproved paid path

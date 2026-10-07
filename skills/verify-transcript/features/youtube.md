@@ -12,7 +12,7 @@ YouTube mode validates a public video URL, resolves a summary plan, attempts a b
 
 ## How to get to it (user POV)
 
-- Run `transcript run youtube --url <URL> --json`
+- Run `transcript run youtube --url <URL>`
 - Add `--dry-run` to inspect the plan without downloading or transcribing
 - Add `--profile` or `--prompt` to change summary settings
 
@@ -20,15 +20,15 @@ YouTube mode validates a public video URL, resolves a summary plan, attempts a b
 
 Preconditions:
 
-- `verify-transcript doctor --json` locates `transcript` and `uv`
+- `verify-transcript doctor` locates `transcript` and `uv`
 - A real run has a valid Deepgram credential, pinned yt-dlp, `ffmpeg`, `ffprobe`, and a signed-in `claude`
 - Follow the transcript README's `Test videos` rule for paid calls
 
-- **Free plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require exit `0`, `side_effects: []`, the canonical URL, the configured summary plan, and a planned output path that remains absent
-- **Transcript-only plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require the canonical URL, disabled summary fields, a timeout override, and no output creation
-- **Recovery.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery --json`. Require invalid source and configuration errors on `stderr`
-- **Diagnostics.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.youtube --json`. Require a consistent JSON report and inspect `readiness_ok`
-- **Real flow.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.real-summary --allow-paid --json`. Require a `PASS` verdict, five non-empty artifacts, a successful summary, consistent metadata, and retained hashes. Require `Audio upload: complete (N bytes)` in `meta.txt` with positive `N` and matching `audio_upload` evidence containing `status: complete` and `bytes: N` in the artifact manifest and observations
+- **Free plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary`. Require exit `0`, the canonical URL, the configured summary plan, and a planned output path that remains absent
+- **Transcript-only plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only`. Require the canonical URL, disabled summary fields, a timeout override, and no output creation
+- **Recovery.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery`. Require invalid source and configuration errors on `stderr`
+- **Diagnostics.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.youtube`. Require an answer that agrees with its exit code and inspect `readiness_ok`
+- **Real flow.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.real-summary --allow-paid`. Require a `PASS` verdict, an answer that lists five non-empty files in one result folder, that folder streamed on `stderr`, a successful `sonnet` summary, consistent metadata, and retained hashes. Require `Audio upload: complete (N bytes)` in `meta.txt` with positive `N` and matching `audio_upload` evidence containing `status: complete` and `bytes: N` in the artifact manifest and observations
 
 ## Gotchas
 

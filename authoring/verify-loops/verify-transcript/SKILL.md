@@ -25,17 +25,17 @@ Resolve `VERIFY_DIR` from this skill's directory. Do not depend on the caller's 
 Check the verifier before a run when the layout or local tools look wrong.
 
 ```bash
-uv run "$VERIFY_DIR/scripts/verify_transcript.py" doctor --json
+uv run "$VERIFY_DIR/scripts/verify_transcript.py" doctor
 ```
 
-`doctor` checks `uv`, all seven Feature Map pages, and the adjacent `transcript` public script. It does not call Deepgram, a summary model, YouTube, or Zoom.
+`doctor` checks `uv`, all seven Feature Map pages, and the adjacent `transcript` public script. It answers `{"ok":true}`, or one error per failed check, and `-v` lists every check. It does not call Deepgram, a summary model, YouTube, or Zoom.
 
 ## Drive
 
 Run all free checks with one command.
 
 ```bash
-uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --json
+uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify
 ```
 
 The default run covers help and version output, structured recovery, transcript-only planning, discovery, configuration, diagnostics, YouTube dry-run planning, and Zoom source and summary planning. A valid diagnostic response can pass even when the machine is not ready. Read each diagnostic feature's `readiness_ok` observation.
@@ -43,8 +43,8 @@ The default run covers help and version output, structured recovery, transcript-
 Search the Feature Map before a focused check. Copy exact selectable values from `features[].id`. Matching Markdown pages are in `documents[]`.
 
 ```bash
-uv run "$VERIFY_DIR/scripts/verify_transcript.py" features zoom --json
-uv run "$VERIFY_DIR/scripts/verify_transcript.py" features --json
+uv run "$VERIFY_DIR/scripts/verify_transcript.py" features zoom
+uv run "$VERIFY_DIR/scripts/verify_transcript.py" features
 ```
 
 Read [features/README.md](features/README.md) for the index. Each feature page names its public command, expected state, and proof.
@@ -54,15 +54,14 @@ The paid end-to-end check runs the canonical test video with the `sonnet` profil
 ```bash
 uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify \
   --feature youtube.real-summary \
-  --allow-paid \
-  --json
+  --allow-paid
 ```
 
 Paid work requires both the paid feature ID and `--allow-paid`. The flag alone does not select paid work. `--all` also selects the paid feature and therefore requires `--allow-paid`.
 
 ## Evidence
 
-Every verification returns a `verdict` and `evidence_dir`. The default evidence root remains `${XDG_STATE_HOME:-~/.local/state}/eval-transcript/runs`. Runs retained before the skill rename stay in the same history.
+Every command answers in one JSON line. A verification answers `file`, the run's `result.json`, which records the `verdict` and `evidence_dir`; a failed feature is also one entry of `errors`, with the command that reruns it. `-v` prints each feature's verdict as it ends. The default evidence root remains `${XDG_STATE_HOME:-~/.local/state}/eval-transcript/runs`. Runs retained before the skill rename stay in the same history.
 
 Each case retains:
 
@@ -85,7 +84,7 @@ Do not delete evidence as part of verification. If the user asks to remove old e
 
 After changing Deepgram uploads, run this bounded verification loop:
 
-1. Run the verifier doctor above and set `TRANSCRIPT_DIR` to the skill directory reported by its `transcript_skill` check, whether source or applied
+1. Run the verifier doctor above with `-v` and set `TRANSCRIPT_DIR` to the directory its `transcript_skill` line names, whether source or applied
 2. Run the upload contract tests below, then the verifier helper tests
 3. Run the default free verification and inspect its verdict and evidence
 4. Run the `youtube.real-summary` feature above and require its `audio_upload` evidence

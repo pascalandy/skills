@@ -16,6 +16,7 @@ alias ttr := transcript
 
 # Transcribe YouTube videos sequentially
 [group('commands')]
+[no-exit-message]
 transcript url *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"
 
@@ -53,6 +54,7 @@ remote-skills *args:
 
 # Run any transcript command, such as `--help` or `doctor`
 [group('commands')]
+[no-exit-message]
 transcript-cli *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py "$@"
 

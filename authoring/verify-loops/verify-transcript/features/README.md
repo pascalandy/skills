@@ -1,18 +1,18 @@
 # Transcript verification map
 
-This directory maps the public behavior of `transcript` to exact `verify-transcript` commands and observable proof. Run `verify_transcript.py features <query> --json` to get selectable IDs in `features[].id` and matching pages in `documents[]`.
+This directory maps the public behavior of `transcript` to exact `verify-transcript` commands and observable proof. Run `verify_transcript.py features <query>` to get selectable IDs in `features[].id` and matching pages in `documents[]`.
 
 ## Baseline preconditions
 
 - Resolve `verify_transcript.py` relative to the `verify-transcript` skill directory
-- Run `verify_transcript.py doctor --json` when layout discovery or local tools look wrong
+- Run `verify_transcript.py doctor` when layout discovery or local tools look wrong
 - Use the default free verification before a paid feature
 - For paid checks, follow the transcript README's `Test videos` rule
 
 ## Driving conventions
 
 - Drive only the public `transcript.py` subprocess
-- Use JSON mode for stable assertions
+- Read the one JSON line transcript answers with for stable assertions
 - Pass every transcript run an eval-owned `--output-dir`
 - Treat `readiness_ok: false` as a machine-readiness observation when the diagnostic contract itself passes
 - Keep paid checks sequential

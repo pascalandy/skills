@@ -5,15 +5,364 @@
 # ///
 """Verify transcript through its public CLI and retain structured evidence."""
 
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
-import hashlib
 import json
+import logging
 import os
 import re
-import shutil
+import shlex
 import signal
-import subprocess
 import sys
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the messages; `report` is the
+    object `--json` prints on stderr beside them.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    line = json.dumps(body, separators=(",", ":"))
+    print(line, file=sys.stderr if code else sys.stdout)
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def command_parsers(parser: argparse.ArgumentParser) -> list[argparse.ArgumentParser]:
+    """The parser of every command below `parser`, at any depth."""
+    found: list[argparse.ArgumentParser] = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for command in dict.fromkeys(action.choices.values()):
+                found += [command, *command_parsers(command)]
+    return found
+
+
+def named_command(
+    parser: argparse.ArgumentParser, argv: Sequence[str]
+) -> argparse.ArgumentParser:
+    """The deepest command `argv` names, whose help -h asks for."""
+    for arg in argv:
+        if arg == "--":
+            break
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
+                parser = action.choices[arg]
+                break
+    return parser
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def usage_error_for(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
+    """The error method of `parser`: a usage error whose help hint names it, so
+    a command's mistake points to that command's help."""
+
+    def error(message: str) -> NoReturn:
+        raise UsageError(message, report={"help": f"{parser.prog} --help"})
+
+    return error
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # A command's parser takes -v and --debug too, after the command; SUPPRESS
+    # keeps a flag given before it
+    for each in (parser, *command_parsers(parser)):
+        default = False if each is parser else argparse.SUPPRESS
+        if "-v" not in each._option_string_actions:
+            each.add_argument(
+                "-v",
+                "--verbose",
+                action="store_true",
+                default=default,
+                help="print progress and step details on stderr",
+            )
+        if debug and "--debug" not in each._option_string_actions:
+            each.add_argument(
+                "--debug",
+                action="store_true",
+                default=default,
+                help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+            )
+        # Parser.error prints usage errors itself; raising sends each one
+        # through answer_failure(). The root reports unknown arguments, which
+        # belong to the command argv names
+        named = named_command(parser, argv) if each is parser else each
+        each.error = usage_error_for(named)  # pyright: ignore[reportAttributeAccessIssue]
+    if given(argv, "-h", "--help", parser=parser):
+        named_command(parser, argv).print_help()
+        return 0
+
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError) and "help" not in error.report:
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
+import hashlib
+import shutil
+import subprocess
 import tempfile
 import time
 import uuid
@@ -22,12 +371,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 CANONICAL_YOUTUBE_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
 # Selected by the transcript README's Test videos rule
 TEST_PROFILE = "sonnet"
+EXIT_CODES = exit_codes({1: "a feature failed, or the verifier could not run"})
 EVIDENCE_NAMESPACE = "eval-transcript"
 RUN_MARKER = ".verify-transcript-run"
+
+log = logging.getLogger("verify-transcript")
 FEATURE_AREAS = (
     "interface",
     "youtube",
@@ -40,9 +392,9 @@ FEATURE_AREAS = (
 
 Layout = Literal["source", "applied"]
 Verdict = Literal["PASS", "FAIL"]
-# "json-by-exit" reads stdout on exit 0 and stderr otherwise, as a doctor
-# report moves to stderr when a check fails
-OutputKind = Literal["stdout-json", "stderr-json", "json-by-exit", "stdout-text"]
+# "answer" is the one JSON line transcript answers with: stdout on exit 0, the
+# last line of stderr otherwise. "text" is help or version on stdout
+OutputKind = Literal["answer", "text"]
 SurfaceKind = Literal["command", "option", "behavior"]
 ProbeKind = Literal[
     "help-version",
@@ -59,26 +411,6 @@ ProbeKind = Literal[
 ]
 
 
-class CLIArgumentParser(argparse.ArgumentParser):
-    """Return structured usage errors when JSON mode is active."""
-
-    json_errors = False
-
-    def error(self, message: str) -> None:
-        hint = f"Run '{self.prog} --help' for valid arguments and examples."
-        if self.json_errors:
-            payload = {
-                "ok": False,
-                "error": {
-                    "code": "invalid_usage",
-                    "message": message,
-                    "hint": hint,
-                },
-            }
-            self.exit(2, json.dumps(payload, ensure_ascii=False) + "\n")
-        self.exit(2, f"Error: {message}\nHint: {hint}\n")
-
-
 class VerificationError(RuntimeError):
     """Describe an actionable verifier failure before feature execution."""
 
@@ -88,6 +420,12 @@ class VerificationError(RuntimeError):
         self.message = message
         self.hint = hint
         self.exit_code = exit_code
+
+    @property
+    def line(self) -> str:
+        """The message, then the hint that fixes it, as one error."""
+        hint = self.hint.rstrip(".")
+        return f"{self.message.rstrip('.')}; {hint[:1].lower()}{hint[1:]}"
 
 
 @dataclass(frozen=True)
@@ -115,6 +453,8 @@ class FeatureSpec:
 class OutputExpectation:
     kind: OutputKind
     exit_codes: tuple[int, ...]
+    # A real run streams its result folder on stderr before it answers
+    events: bool = False
 
 
 @dataclass(frozen=True)
@@ -122,7 +462,7 @@ class CommandPlan:
     id: str
     args: tuple[str, ...]
     output_dir: Path | None = None
-    expectation: OutputExpectation = OutputExpectation("stdout-json", (0,))
+    expectation: OutputExpectation = OutputExpectation("answer", (0,))
 
 
 @dataclass(frozen=True)
@@ -164,7 +504,7 @@ class RunContext:
 
 # Options every transcript command accepts, before or after its name
 GLOBAL_OPTIONS = frozenset(
-    {"--help", "--verbose", "--debug", "--json", "--no-color", "--no-progress"}
+    {"--help", "--verbose", "--debug", "--no-color", "--no-progress"}
 )
 
 RUN_OPTIONS = GLOBAL_OPTIONS | {
@@ -357,7 +697,6 @@ PUBLIC_SURFACES = (
         "--dry-run",
         ("dry-runs.transcript-only",),
     ),
-    PublicSurface("option.json", "option", "--json", ("dry-runs.transcript-only",)),
     PublicSurface(
         "option.timeout",
         "option",
@@ -616,7 +955,7 @@ def select_features(
         raise VerificationError(
             "unknown_feature",
             "Unknown feature ID: " + ", ".join(unknown),
-            "Run 'verify-transcript features --json' and use one of features[].id.",
+            "Run 'verify-transcript features' and use one of features[].id.",
             exit_code=2,
         )
     if select_all:
@@ -653,13 +992,13 @@ def build_commands(
     """Build fixed public commands from the typed feature registry."""
     output_dir = context.scratch_dir / "output" / _slug(feature.id)
     if feature.probe == "help-version":
-        text_output = OutputExpectation("stdout-text", (0,))
+        text_output = OutputExpectation("text", (0,))
         return tuple(
             CommandPlan(contract.id, contract.args, expectation=text_output)
             for contract in HELP_CONTRACTS
         ) + (CommandPlan("version", ("--version",), expectation=text_output),)
     if feature.probe == "structured-recovery":
-        error_output = OutputExpectation("stderr-json", (2,))
+        error_output = OutputExpectation("answer", (2,))
         plans = (
             (
                 "invalid-usage",
@@ -699,7 +1038,6 @@ def build_commands(
                     "--output-dir",
                     str(output_dir / plan_id),
                     "--dry-run",
-                    "--json",
                 ),
                 output_dir / plan_id,
                 error_output,
@@ -723,7 +1061,6 @@ def build_commands(
                     "--timeout",
                     "42",
                     "--dry-run",
-                    "--json",
                 ),
                 youtube_output,
             ),
@@ -740,44 +1077,43 @@ def build_commands(
                     "--timeout",
                     "43",
                     "--dry-run",
-                    "--json",
                 ),
                 zoom_output,
             ),
         )
     if feature.probe == "prompts":
-        return (CommandPlan("prompts", ("list", "prompts", "--json")),)
+        return (CommandPlan("prompts", ("list", "prompts")),)
     if feature.probe == "profiles":
-        return (CommandPlan("profiles", ("list", "profiles", "--json")),)
+        return (CommandPlan("profiles", ("list", "profiles")),)
     if feature.probe == "models":
         return (
             CommandPlan(
                 "models-claude",
-                ("list", "models", "--provider", "claude", "--json"),
+                ("list", "models", "--provider", "claude"),
             ),
             CommandPlan(
                 "models-codex",
-                ("list", "models", "--provider", "codex", "--json"),
+                ("list", "models", "--provider", "codex"),
             ),
             CommandPlan(
                 "models-openrouter",
-                ("list", "models", "--provider", "openrouter", "--json"),
+                ("list", "models", "--provider", "openrouter"),
             ),
         )
     if feature.probe == "doctor-youtube":
         return (
             CommandPlan(
                 "doctor-youtube",
-                ("doctor", "--source", "youtube", "--json"),
-                expectation=OutputExpectation("json-by-exit", (0, 1)),
+                ("doctor", "--source", "youtube"),
+                expectation=OutputExpectation("answer", (0, 1)),
             ),
         )
     if feature.probe == "doctor-zoom":
         return (
             CommandPlan(
                 "doctor-zoom",
-                ("doctor", "--source", "zoom", "--json"),
-                expectation=OutputExpectation("json-by-exit", (0, 1)),
+                ("doctor", "--source", "zoom"),
+                expectation=OutputExpectation("answer", (0, 1)),
             ),
         )
     if feature.probe == "youtube-dry-run-summary":
@@ -796,7 +1132,6 @@ def build_commands(
                     "--output-dir",
                     str(output_dir),
                     "--dry-run",
-                    "--json",
                 ),
                 output_dir,
             ),
@@ -813,7 +1148,6 @@ def build_commands(
                     "--output-dir",
                     str(output_dir),
                     "--dry-run",
-                    "--json",
                 ),
                 output_dir,
             ),
@@ -833,9 +1167,9 @@ def build_commands(
                     "short_summary",
                     "--output-dir",
                     str(output_dir),
-                    "--json",
                 ),
                 output_dir,
+                OutputExpectation("answer", (0,), events=True),
             ),
         )
     raise AssertionError(f"Unhandled probe: {feature.probe}")
@@ -867,7 +1201,7 @@ def assert_safe_command(
             f"{feature.id} requests a GUI side effect: {', '.join(forbidden)}",
             "Remove GUI flags from verification commands.",
         )
-    if plan.expectation.kind == "stdout-text":
+    if plan.expectation.kind == "text":
         if args != ("--version",) and args[-1] != "--help":
             raise VerificationError(
                 "unsafe_command",
@@ -875,12 +1209,6 @@ def assert_safe_command(
                 "Text verification is limited to transcript help and version output.",
             )
         return
-    if "--json" not in args:
-        raise VerificationError(
-            "unsafe_command",
-            f"{feature.id} does not use transcript's JSON interface.",
-            "Fix the registry before running this feature.",
-        )
     if args[0] != "run":
         return
     if "--output-dir" not in args or plan.output_dir is None:
@@ -976,43 +1304,51 @@ def _parse_json_document(content: str, stream: str) -> dict[str, object]:
 
 
 def _reported_error(stderr: str) -> str:
-    """`: <code>: <message>` from transcript's JSON error on stderr, or nothing."""
+    """`: <errors>` from the answer that ends transcript's stderr, or nothing."""
     try:
-        payload = json.loads(stderr)
-    except json.JSONDecodeError:
+        payload = json.loads(stderr.splitlines()[-1])
+    except (IndexError, json.JSONDecodeError):
         return ""
-    error = payload.get("error") if isinstance(payload, dict) else None
-    if not isinstance(error, dict):
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    if not isinstance(errors, list) or not all(isinstance(e, str) for e in errors):
         return ""
-    code, message = error.get("code"), error.get("message")
-    if not isinstance(code, str) or not isinstance(message, str):
-        return ""
-    return f": {code}: {message}"
+    return f": {'; '.join(errors)}" if errors else ""
 
 
 def parse_expected_output(
     process: CapturedProcess, expectation: OutputExpectation
 ) -> dict[str, object]:
-    """Parse only the declared public stream and enforce its exit contract."""
+    """Parse only the declared public stream and enforce its exit contract.
+
+    Help and version are text on stdout. Every other command answers in one
+    JSON line whose `ok` agrees with the exit code: alone on stdout on exit 0,
+    and ending stderr otherwise (docs/references/script-output.md).
+    """
     if process.exit_code not in expectation.exit_codes:
         raise AssertionError(
             f"transcript exited {process.exit_code}; expected {expectation.exit_codes}"
             + _reported_error(process.stderr)
         )
-    kind = expectation.kind
-    if kind == "json-by-exit":
-        kind = "stdout-json" if process.exit_code == 0 else "stderr-json"
-    if kind == "stdout-json":
-        _require(not process.stderr, "stdout JSON command wrote to stderr")
-        _require(bool(process.stdout.strip()), "stdout JSON output is empty")
-        return _parse_json_document(process.stdout, "stdout")
-    if kind == "stderr-json":
-        _require(not process.stdout, "stderr JSON command wrote to stdout")
-        _require(bool(process.stderr.strip()), "stderr JSON output is empty")
-        return _parse_json_document(process.stderr, "stderr")
-    _require(not process.stderr, "text command wrote to stderr")
-    _require(bool(process.stdout.strip()), "text output is empty")
-    return {"text": process.stdout}
+    if expectation.kind == "text":
+        _require(not process.stderr, "text command wrote to stderr")
+        _require(bool(process.stdout.strip()), "text output is empty")
+        return {"text": process.stdout}
+    if process.exit_code == 0:
+        _require(
+            expectation.events or not process.stderr,
+            "a successful command wrote to stderr",
+        )
+        _require(process.stdout.count("\n") == 1, "stdout is not one JSON line")
+        payload = _parse_json_document(process.stdout, "stdout")
+    else:
+        _require(not process.stdout, "a failed command wrote to stdout")
+        _require(bool(process.stderr.strip()), "a failed command left stderr empty")
+        payload = _parse_json_document(process.stderr.splitlines()[-1], "stderr")
+    _require(
+        payload.get("ok") is (process.exit_code == 0),
+        "the answer's ok disagrees with the exit code",
+    )
+    return payload
 
 
 def capture_command(
@@ -1066,15 +1402,9 @@ def _validate_doctor(
     process: CapturedProcess,
     payload: dict[str, object],
 ) -> dict[str, object]:
-    checks = payload.get("checks")
-    counts = payload.get("counts")
-    _require(payload.get("command") == "doctor", "doctor command field is invalid")
-    _require(isinstance(checks, list) and bool(checks), "doctor checks are missing")
-    _require(isinstance(counts, dict), "doctor counts are missing")
-    check_names = {check.get("name") for check in checks if isinstance(check, dict)}
+    """A ready doctor answers ok alone; an unready one names each failed check of
+    its own source with its fix."""
     if feature.probe == "doctor-youtube":
-        expected_source = "youtube"
-        expected_summary = True
         expected_checks = {
             "deepgram_credential",
             "claude",
@@ -1085,29 +1415,25 @@ def _validate_doctor(
             "youtube_browser",
         }
     else:
-        expected_source = "zoom"
-        expected_summary = True
         expected_checks = {"deepgram_credential", "claude", "pi", "zoom_recordings"}
-    _require(payload.get("source") == expected_source, "doctor source is invalid")
+    readiness_ok = process.exit_code == 0
+    if readiness_ok:
+        _require(payload == {"ok": True}, "a ready doctor answered more than ok")
+        return {"readiness_ok": True, "failed_checks": []}
+    errors = payload.get("errors")
     _require(
-        payload.get("summary") is expected_summary, "doctor summary mode is invalid"
+        isinstance(errors, list)
+        and bool(errors)
+        and all(isinstance(error, str) for error in errors),
+        "an unready doctor answered no errors",
     )
-    _require(expected_checks <= check_names, "doctor source checks are incomplete")
-    expected = {
-        status: sum(
-            isinstance(check, dict) and check.get("status") == status
-            for check in checks
-        )
-        for status in ("pass", "warn", "fail")
-    }
-    _require(counts == expected, "doctor counts do not match its checks")
-    readiness_ok = expected["fail"] == 0
-    _require(payload.get("ok") is readiness_ok, "doctor ok disagrees with checks")
+    failed = [error.split(":", 1)[0] for error in errors]
     _require(
-        process.exit_code == (0 if readiness_ok else 1),
-        "doctor exit code disagrees with readiness",
+        set(failed) <= expected_checks,
+        f"doctor source is invalid: it reported {', '.join(failed)}",
     )
-    return {"readiness_ok": readiness_ok, "counts": expected}
+    _require(all("; fix: " in error for error in errors), "a doctor error names no fix")
+    return {"readiness_ok": False, "failed_checks": failed}
 
 
 def _validate_dry_run(
@@ -1118,8 +1444,6 @@ def _validate_dry_run(
 ) -> dict[str, object]:
     _require(process.exit_code == 0, f"{feature.id} exited {process.exit_code}")
     _require(payload.get("ok") is True, f"{feature.id} did not report ok")
-    _require(payload.get("dry_run") is True, f"{feature.id} is not a dry run")
-    _require(payload.get("side_effects") == [], f"{feature.id} reports side effects")
     _require(
         payload.get("timeout_seconds") == 570.0,
         f"{feature.id} did not resolve the default timeout",
@@ -1175,7 +1499,7 @@ def _validate_dry_run(
             summary.get("prompt") == "synthese-rencontre",
             "Zoom summary prompt is invalid",
         )
-    return {"source": source, "summary": summary, "side_effects": []}
+    return {"source": source, "summary": summary}
 
 
 def _sha256(path: Path) -> str:
@@ -1184,6 +1508,34 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# Each file a YouTube run saves, by the end of its name
+ARTIFACT_NAMES = {
+    "metadata": "meta.txt",
+    "transcript": "raw_transcript.txt",
+    "sentences": "raw_sentences.txt",
+    "json": "raw_transcript.json",
+    "summary": ".md",
+}
+
+
+def _artifacts(files: object) -> dict[str, Path]:
+    """The files a run answered with, by kind; each kind once."""
+    _require(
+        isinstance(files, list) and all(isinstance(path, str) for path in files),
+        "real run answered no files",
+    )
+    artifacts: dict[str, Path] = {}
+    for path in files:
+        kinds = [kind for kind, end in ARTIFACT_NAMES.items() if path.endswith(end)]
+        _require(len(kinds) == 1, f"real run answered an unknown file: {path}")
+        _require(kinds[0] not in artifacts, f"real run answered two {kinds[0]} files")
+        artifacts[kinds[0]] = Path(path).resolve()
+    _require(
+        artifacts.keys() == ARTIFACT_NAMES.keys(), "real run file set is incomplete"
+    )
+    return artifacts
 
 
 def _validate_e2e(
@@ -1195,29 +1547,23 @@ def _validate_e2e(
 ) -> dict[str, object]:
     _require(process.exit_code == 0, f"{feature.id} exited {process.exit_code}")
     _require(payload.get("ok") is True, "real run did not report success")
-    _require(payload.get("source") == "youtube", "real run source is not YouTube")
-    summary = payload.get("summary")
-    artifacts = payload.get("artifacts")
-    _require(isinstance(summary, dict), "real run summary state is missing")
-    _require(summary.get("status") == "succeeded", "real summary did not succeed")
-    _require(
-        summary.get("profile") == TEST_PROFILE,
-        f"real summary did not use the {TEST_PROFILE} test profile",
-    )
-    _require(isinstance(artifacts, dict), "real run artifacts are missing")
-    required = {"transcript", "sentences", "json", "metadata", "summary"}
-    _require(required <= artifacts.keys(), "real run artifact set is incomplete")
+    artifacts = _artifacts(payload.get("files"))
     _require(plan.output_dir is not None, "real run has no isolated output root")
-    published_dir = Path(str(payload.get("output_dir"))).resolve()
+    published_dir = artifacts["metadata"].parent
     _require(
         _is_within(published_dir, plan.output_dir), "published output escaped isolation"
     )
+    _require(
+        any(
+            Path(line).resolve() == published_dir
+            for line in process.stderr.splitlines()
+            if line.startswith("/")
+        ),
+        "real run did not stream its result folder on stderr",
+    )
     manifest: dict[str, object] = {}
-    for kind in sorted(required):
-        artifact = Path(str(artifacts[kind])).resolve()
-        _require(
-            _is_within(artifact, published_dir), f"{kind} escaped published output"
-        )
+    for kind, artifact in sorted(artifacts.items()):
+        _require(artifact.parent == published_dir, f"{kind} escaped published output")
         _require(artifact.is_file(), f"{kind} artifact does not exist")
         size = artifact.stat().st_size
         _require(size > 0, f"{kind} artifact is empty")
@@ -1226,16 +1572,24 @@ def _validate_e2e(
             "bytes": size,
             "sha256": _sha256(artifact),
         }
-    transcript_json = json.loads(
-        Path(str(artifacts["json"])).read_text(encoding="utf-8")
-    )
+    transcript_json = json.loads(artifacts["json"].read_text(encoding="utf-8"))
     _require(
         isinstance(transcript_json, list) and bool(transcript_json),
         "raw transcript JSON is not a non-empty paragraph list",
     )
-    metadata = Path(str(artifacts["metadata"])).read_text(encoding="utf-8")
+    metadata = artifacts["metadata"].read_text(encoding="utf-8")
+    url = plan.args[plan.args.index("--url") + 1]
+    _require(
+        f"Source: {url}" in metadata.splitlines(),
+        "metadata does not name the YouTube URL",
+    )
     _require(
         "Summary status: succeeded" in metadata, "metadata summary status is invalid"
+    )
+    model = re.search(r"^Claude: (\S+) \(reasoning: \w+\)$", metadata, re.MULTILINE)
+    _require(
+        model is not None and TEST_PROFILE in model.group(1),
+        f"real summary did not use the {TEST_PROFILE} test profile",
     )
     upload = re.search(
         r"^Audio upload: complete \(([1-9]\d*) bytes\)$", metadata, re.MULTILINE
@@ -1330,36 +1684,37 @@ def _validate_structured_recovery(
     commands: tuple[CommandPlan, ...],
     captures: tuple[tuple[CapturedProcess, dict[str, object]], ...],
 ) -> dict[str, object]:
-    expected_codes = {
-        "invalid-usage": "invalid_usage",
-        "invalid-source": "invalid_source",
-        "invalid-configuration": "invalid_configuration",
+    """Each invalid run answers one error naming what failed, the command that
+    fixes it when one exists, and the help of the command it came from."""
+    expected_errors = {
+        "invalid-usage": "unrecognized arguments: --unknown-option",
+        "invalid-source": "Invalid YouTube URL: https://example.com/video; fix: ",
+        "invalid-configuration": ("; fix: transcript list models --provider codex"),
     }
     observations = {}
     for plan, (_process, payload) in zip(commands, captures, strict=True):
-        _require(payload.get("ok") is False, f"{plan.id} did not report failure")
-        error = payload.get("error")
-        _require(isinstance(error, dict), f"{plan.id} returned no error object")
+        errors = payload.get("errors")
         _require(
-            error.get("code") == expected_codes[plan.id],
-            f"{plan.id} returned the wrong error code",
+            isinstance(errors, list)
+            and len(errors) == 1
+            and isinstance(errors[0], str),
+            f"{plan.id} returned no single error",
         )
-        _require(bool(error.get("message")), f"{plan.id} returned no message")
-        _require(bool(error.get("hint")), f"{plan.id} returned no hint")
+        (error,) = errors
+        _require(
+            expected_errors[plan.id] in error, f"{plan.id} returned the wrong error"
+        )
+        _require(
+            payload.get("help") == "transcript run youtube --help",
+            f"{plan.id} returned no help command",
+        )
         if plan.id == "invalid-configuration":
-            message = str(error["message"])
-            _require(
-                "transcript list models --provider codex" in message,
-                "model recovery does not name the current discovery command",
-            )
-            _require(
-                "--list-models" not in message, "model recovery uses legacy syntax"
-            )
+            _require("--list-models" not in error, "model recovery uses legacy syntax")
         _require(
             plan.output_dir is not None and not plan.output_dir.exists(),
             f"{plan.id} created its output directory",
         )
-        observations[plan.id] = {"code": error["code"], "hint": error["hint"]}
+        observations[plan.id] = {"error": error, "help": payload["help"]}
     return {"errors": observations}
 
 
@@ -1370,8 +1725,6 @@ def _validate_transcript_only(
     plans = {}
     for plan, (_process, payload) in zip(commands, captures, strict=True):
         _require(payload.get("ok") is True, f"{plan.id} did not report success")
-        _require(payload.get("dry_run") is True, f"{plan.id} is not a dry run")
-        _require(payload.get("side_effects") == [], f"{plan.id} reports side effects")
         _require(plan.output_dir is not None, f"{plan.id} has no isolated output")
         _require(
             Path(str(payload.get("output_dir"))).resolve() == plan.output_dir.resolve(),
@@ -1419,7 +1772,7 @@ def _validate_transcript_only(
             "summary": summary,
             "timeout_seconds": expected_timeout,
         }
-    return {"plans": plans, "side_effects": []}
+    return {"plans": plans}
 
 
 def validate_feature(
@@ -1613,6 +1966,7 @@ def run_verification(
     try:
         for feature in selected:
             results.append(run_feature(feature, context))
+            log.info(f"{results[-1]['verdict']} {feature.id}")
     finally:
         try:
             safe_cleanup(scratch, run_id)
@@ -1704,7 +2058,7 @@ def feature_entries(skill_dir: Path, query: str | None) -> list[dict[str, object
                 "areas": list(feature.areas),
                 "pages": [str(page_path) for page_path in page_paths],
                 "verify_command": (
-                    f"verify-transcript verify --feature {feature.id}{paid_flag} --json"
+                    f"verify-transcript verify --feature {feature.id}{paid_flag}"
                 ),
             }
         )
@@ -1735,15 +2089,20 @@ def feature_entries(skill_dir: Path, query: str | None) -> list[dict[str, object
     return entries
 
 
-def doctor_report(skill_dir: Path) -> dict[str, object]:
+def doctor_checks(skill_dir: Path) -> list[dict[str, str]]:
+    """Each check of the verifier's own setup; a failed one names its fix."""
     checks = []
     try:
         located = locate_transcript_skill(skill_dir)
     except VerificationError as error:
         checks.append(
-            {"name": "transcript_skill", "status": "fail", "message": error.message}
+            {
+                "name": "transcript_skill",
+                "status": "fail",
+                "message": error.message.rstrip("."),
+                "fix": f"install transcript beside verify-transcript. {error.hint}",
+            }
         )
-        located = None
     else:
         checks.append(
             {
@@ -1753,63 +2112,133 @@ def doctor_report(skill_dir: Path) -> dict[str, object]:
             }
         )
     uv_path = shutil.which("uv")
-    checks.append(
-        {
-            "name": "uv",
-            "status": "pass" if uv_path else "fail",
-            "message": f"uv is available at {uv_path}"
-            if uv_path
-            else "uv is not on PATH",
-        }
-    )
+    if uv_path:
+        checks.append(
+            {"name": "uv", "status": "pass", "message": f"uv is at {uv_path}"}
+        )
+    else:
+        checks.append(
+            {
+                "name": "uv",
+                "status": "fail",
+                "message": "uv is not on PATH",
+                "fix": "install uv: https://docs.astral.sh/uv/getting-started/installation/",
+            }
+        )
     feature_dir = skill_dir / "features"
     missing = [
         area for area in FEATURE_AREAS if not (feature_dir / f"{area}.md").is_file()
     ]
-    checks.append(
-        {
-            "name": "feature_map",
-            "status": "pass" if not missing else "fail",
-            "message": (
-                f"All {len(FEATURE_AREAS)} feature pages are available"
-                if not missing
-                else "Missing feature pages: " + ", ".join(missing)
-            ),
-        }
+    if missing:
+        checks.append(
+            {
+                "name": "feature_map",
+                "status": "fail",
+                "message": "Missing feature pages: " + ", ".join(missing),
+                "fix": "reinstall the verify-transcript skill",
+            }
+        )
+    else:
+        checks.append(
+            {
+                "name": "feature_map",
+                "status": "pass",
+                "message": f"All {len(FEATURE_AREAS)} feature pages are available",
+            }
+        )
+    return checks
+
+
+def run_doctor(skill_dir: Path) -> dict[str, object]:
+    """List every check with -v, and fail with one error per failed check."""
+    checks = doctor_checks(skill_dir)
+    for check in checks:
+        log.info(f"[{check['status'].upper()}] {check['name']}: {check['message']}")
+    failed = [check for check in checks if check["status"] == "fail"]
+    if failed:
+        raise ScriptError(
+            *(
+                f"{check['name']}: {check['message']}; fix: {check['fix']}"
+                for check in failed
+            )
+        )
+    return {}
+
+
+def search_features(skill_dir: Path, query: str | None) -> dict[str, object]:
+    """The selectable features and Feature Map pages that match `query`."""
+    entries = feature_entries(skill_dir, query)
+    documents = feature_documents(skill_dir, query)
+    if query is not None and not (entries or documents):
+        raise ScriptError(
+            f"no feature or Feature Map page matches {query!r}; "
+            "run 'verify-transcript features' to list them all"
+        )
+    return {"features": entries, "documents": documents}
+
+
+def run_verify(args: argparse.Namespace, skill_dir: Path) -> dict[str, object]:
+    """Run the selected features and answer the run's result.json; a failed
+    feature is one error, with the command that reruns it."""
+    selected = select_features(tuple(args.feature), args.all, args.allow_paid)
+    paid_selected = any(feature.paid for feature in selected)
+    if args.youtube_url != CANONICAL_YOUTUBE_URL and not paid_selected:
+        raise VerificationError(
+            "unused_option",
+            "--youtube-url only applies to a selected paid YouTube feature.",
+            "Select youtube.real-summary and add --allow-paid, or omit --youtube-url.",
+            exit_code=USAGE,
+        )
+    report = run_verification(
+        selected=selected,
+        located=locate_transcript_skill(skill_dir),
+        evidence_root=args.evidence_root,
+        allow_paid=args.allow_paid,
+        youtube_url=args.youtube_url,
     )
-    failures = sum(check["status"] == "fail" for check in checks)
-    return {
-        "ok": failures == 0,
-        "command": "doctor",
-        "checks": checks,
-        "counts": {"pass": len(checks) - failures, "fail": failures},
-    }
+    result = {"file": str(Path(str(report["evidence_dir"])) / "result.json")}
+    if report["ok"]:
+        return result
+    errors = [
+        f"{feature['id']}: {feature['error']['message']}; rerun: verify-transcript "
+        f"verify --feature {feature['id']}{' --allow-paid' if feature['paid'] else ''}"
+        for feature in report["features"]
+        if feature["verdict"] == "FAIL"
+    ]
+    if cleanup := report.get("cleanup_error"):
+        errors.append(f"cleanup: {cleanup['message']}; {cleanup['hint']}")
+    raise ScriptError(*errors, report=result)
 
 
-def build_parser(*, json_errors: bool = False) -> CLIArgumentParser:
-    CLIArgumentParser.json_errors = json_errors
-    parser = CLIArgumentParser(
+def build_parser() -> Parser:
+    parser = Parser(
         prog="verify-transcript",
-        description="Verify transcript through its public CLI and retain evidence.",
-        epilog="""Examples:
-  verify-transcript verify --json
-  verify-transcript features zoom --json
-  verify-transcript verify --feature youtube.real-summary --allow-paid --json
-""",
+        exit_codes=EXIT_CODES,
+        description=(
+            "Verify transcript through its public CLI and retain evidence. "
+            "Each command answers in one JSON line."
+        ),
+        epilog="""examples:
+  verify-transcript verify
+  verify-transcript features zoom
+  verify-transcript verify --feature youtube.real-summary --allow-paid""",
     )
     parser.add_argument(
         "--version", action="version", version=f"verify-transcript {__version__}"
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    doctor = commands.add_parser("doctor", help="Check that this verifier can run")
-    doctor.add_argument("--json", action="store_true", help="Write one JSON document")
-
-    features = commands.add_parser("features", help="Search the transcript Feature Map")
+    commands.add_parser(
+        "doctor", help="Check that this verifier can run", exit_codes=EXIT_CODES
+    )
+    features = commands.add_parser(
+        "features", help="Search the transcript Feature Map", exit_codes=EXIT_CODES
+    )
     features.add_argument("query", nargs="?", help="Case-insensitive search text")
-    features.add_argument("--json", action="store_true", help="Write one JSON document")
 
-    verify = commands.add_parser("verify", help="Run public-interface verification")
+    verify = commands.add_parser(
+        "verify", help="Run public-interface verification", exit_codes=EXIT_CODES
+    )
     verify.add_argument("--feature", action="append", default=[], metavar="ID")
     verify.add_argument(
         "--all", action="store_true", help="Select free and paid features"
@@ -1832,114 +2261,35 @@ def build_parser(*, json_errors: bool = False) -> CLIArgumentParser:
         metavar="DIR",
         help="Parent for retained per-run evidence",
     )
-    verify.add_argument("--json", action="store_true", help="Write one JSON document")
     return parser
 
 
-def _print_json(payload: object, *, stream: object = sys.stdout) -> None:
-    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), file=stream)
-
-
-def _emit_error(error: VerificationError, json_mode: bool) -> None:
-    if json_mode:
-        _print_json(
-            {
-                "ok": False,
-                "error": {
-                    "code": error.code,
-                    "message": error.message,
-                    "hint": error.hint,
-                },
-            },
-            stream=sys.stderr,
-        )
-    else:
-        print(
-            f"Error {error.code}: {error.message}\nHint: {error.hint}", file=sys.stderr
-        )
-
-
-def main(argv: list[str] | None = None) -> int:
-    raw_argv = sys.argv[1:] if argv is None else argv
-    if not raw_argv:
-        raw_argv = ["--help"]
-    json_mode = "--json" in raw_argv
-    args = build_parser(json_errors=json_mode).parse_args(raw_argv)
+def work(args: argparse.Namespace) -> dict[str, object]:
+    """Run the command `args` names and return the fields beside `ok`."""
     skill_dir = verify_skill_dir()
     try:
         if args.command == "doctor":
-            report = doctor_report(skill_dir)
-            if args.json:
-                _print_json(report)
-            else:
-                print("PASS" if report["ok"] else "FAIL")
-                for check in report["checks"]:
-                    print(
-                        f"{check['status'].upper()} {check['name']}: {check['message']}"
-                    )
-            return 0 if report["ok"] else 1
+            return run_doctor(skill_dir)
         if args.command == "features":
-            entries = feature_entries(skill_dir, args.query)
-            documents = feature_documents(skill_dir, args.query)
-            report = {
-                "ok": bool(entries or documents) or args.query is None,
-                "command": "features",
-                "query": args.query,
-                "features": entries,
-                "documents": documents,
-            }
-            if args.json:
-                _print_json(report)
-            else:
-                for entry in entries:
-                    print(
-                        f"{entry['id']}\t{entry['title']}\t"
-                        f"paid={str(entry['paid']).lower()}"
-                    )
-            return 0 if report["ok"] else 1
-        requested = tuple(args.feature)
-        selected = select_features(requested, args.all, args.allow_paid)
-        paid_selected = any(feature.paid for feature in selected)
-        if args.youtube_url != CANONICAL_YOUTUBE_URL and not paid_selected:
-            raise VerificationError(
-                "unused_option",
-                "--youtube-url only applies to a selected paid YouTube feature.",
-                "Select youtube.real-summary and add --allow-paid, or omit --youtube-url.",
-                exit_code=2,
-            )
-        located = locate_transcript_skill(skill_dir)
-        report = run_verification(
-            selected=selected,
-            located=located,
-            evidence_root=args.evidence_root,
-            allow_paid=args.allow_paid,
-            youtube_url=args.youtube_url,
-        )
-        if args.json:
-            _print_json(report)
-        else:
-            print(f"{report['verdict']} {report['evidence_dir']}")
-        return 0 if report["ok"] else 1
+            return search_features(skill_dir, args.query)
+        return run_verify(args, skill_dir)
     except VerificationError as error:
-        _emit_error(error, json_mode)
-        return error.exit_code
-    except KeyboardInterrupt:
-        error = VerificationError(
-            "interrupted",
-            "Verification was interrupted.",
-            "Inspect the retained evidence before rerunning paid work.",
-            exit_code=130,
-        )
-        _emit_error(error, json_mode)
-        return error.exit_code
+        failure = UsageError if error.exit_code == USAGE else ScriptError
+        raise failure(error.line) from error
     except OSError as error:
-        wrapped = VerificationError(
-            "runtime_error",
-            str(error),
-            "Run 'verify-transcript doctor --json' and fix the reported requirement.",
-        )
-        _emit_error(wrapped, json_mode)
-        return wrapped.exit_code
+        raise ScriptError(
+            f"{error}; run 'verify-transcript doctor -v' and fix what it reports"
+        ) from error
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run one command and answer it in one JSON line; return its exit code."""
+    argv = list(sys.argv[1:] if argv is None else argv) or ["--help"]
+    try:
+        return run_script(build_parser(), work, argv)
+    except SystemExit as stop:
+        # --version prints its line and exits, as --help does
+        return stop.code if isinstance(stop.code, int) else 1
 
 
 if __name__ == "__main__":

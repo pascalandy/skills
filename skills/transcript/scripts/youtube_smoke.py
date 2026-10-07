@@ -25,6 +25,7 @@ from transcript import (
     Failure,
     Parser,
     RunBudget,
+    UsageError,
     WorkflowTimeoutError,
     YtDlpError,
     _clean_subprocess_diagnostic,
@@ -32,10 +33,9 @@ from transcript import (
     download_audio,
     duration,
     exit_codes,
-    given,
     log,
     run_child,
-    run_guarded,
+    run_script,
     validate_youtube_url,
 )
 
@@ -83,7 +83,7 @@ def build_parser() -> Parser:
         exit_codes=EXIT_CODES,
         description=(
             "Download YouTube audio through the Arc adapter and validate it with "
-            "ffprobe, without Deepgram or AI. A pass prints nothing."
+            'ffprobe, without Deepgram or AI. A pass answers {"ok":true}.'
         ),
         epilog=f"""examples:
   {PROG}
@@ -95,17 +95,6 @@ def build_parser() -> Parser:
         nargs="?",
         default=CANONICAL_TRANSPORT_URL,
         help=f"YouTube fixture URL (default: {CANONICAL_TRANSPORT_URL})",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Print progress and step details on stderr",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help=f"Print internals, timings, and tracebacks on stderr; also {DEBUG_ENV}=1",
     )
     parser.add_argument(
         "--timeout",
@@ -120,8 +109,10 @@ def build_parser() -> Parser:
     return parser
 
 
-def check(args: argparse.Namespace, argv: Sequence[str]) -> int:
+def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     """Download into a temporary directory, validate, and always clean it."""
+    if not validate_youtube_url(args.url):
+        raise UsageError(f"invalid YouTube URL: {args.url!r}")
     rerun = _rerun(argv, prog=PROG)
     if not shutil.which("ffprobe"):
         raise Failure(
@@ -168,30 +159,15 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> int:
         ) from error
 
     log.info("Arc adapter exercised; audio stream verified")
-    return 0
+    return {}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the transport check and return its exit code, as listed in --help."""
+    """Run the transport check and answer it in one JSON line; return its exit
+    code, as listed in --help."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser()
-    if given(argv, "-h", "--help", parser=parser):
-        parser.print_help()
-        return 0
-
-    def parse() -> argparse.Namespace:
-        args = parser.parse_args(argv)
-        if not validate_youtube_url(args.url):
-            parser.error(f"invalid YouTube URL: {args.url!r}")
-        return args
-
-    return run_guarded(
-        argv,
-        parse,
-        lambda args, _warnings: check(args, argv),
-        prog=PROG,
-        debug_env=DEBUG_ENV,
-        as_json=False,
+    return run_script(
+        build_parser(), lambda args: check(args, argv), argv, debug=DEBUG_ENV
     )
 
 

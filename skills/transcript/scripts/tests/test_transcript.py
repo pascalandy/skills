@@ -44,9 +44,7 @@ class TestHelp:
         assert "glm" in stdout
         assert "--provider {claude,codex,openrouter}" in stdout
         assert "--preview" in stdout
-        assert "Render the saved Markdown summary after publication" in " ".join(
-            stdout.split()
-        )
+        assert "Render the saved Markdown summary on stderr" in " ".join(stdout.split())
         assert "opencode" not in stdout.lower()
         assert "(default: follow_along_note)" in " ".join(stdout.split())
 
@@ -62,12 +60,12 @@ class TestHelp:
 
 
 class TestListPrompts:
-    """list prompts should print prompt names from references/prompts/."""
+    """list prompts should answer the prompt names in references/prompts/."""
 
     def test_lists_bundled_prompts(self) -> None:
         stdout, _stderr, code = run_script("list", "prompts")
         assert code == 0
-        prompt_names = stdout.strip().splitlines()
+        prompt_names = [prompt["name"] for prompt in json.loads(stdout)["prompts"]]
         assert len(prompt_names) >= 1
         # follow_along_note is the default, must exist
         assert "follow_along_note" in prompt_names
@@ -77,12 +75,12 @@ class TestListPrompts:
         stdout, _stderr, code = run_script("list", "prompts")
         assert code == 0
         expected = sorted(p.stem for p in PROMPTS_DIR.glob("*.md"))
-        actual = sorted(stdout.strip().splitlines())
+        actual = sorted(prompt["name"] for prompt in json.loads(stdout)["prompts"])
         assert actual == expected
 
 
 class TestListModels:
-    """list models should print model names."""
+    """list models should answer model names."""
 
     def test_default_provider_models(self, monkeypatch, capsys) -> None:
         import transcript
@@ -100,17 +98,17 @@ class TestListModels:
         assert transcript.main(["list", "models"]) == 0
         captured = capsys.readouterr()
         assert captured.err == ""
-        assert captured.out.splitlines() == ["z-model", "a-model"]
+        assert json.loads(captured.out)["models"] == ["z-model", "a-model"]
 
     def test_openrouter_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "openrouter")
         assert code == 0
-        assert stdout.strip().splitlines() == ["z-ai/glm-5.3-flash"]
+        assert json.loads(stdout)["models"] == ["z-ai/glm-5.3-flash"]
 
     def test_codex_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "codex")
         assert code == 0
-        assert stdout.strip().splitlines() == [
+        assert json.loads(stdout)["models"] == [
             "gpt-6-astra",
             "gpt-5.6-sol",
         ]
@@ -132,12 +130,11 @@ class TestProfiles:
         )
         monkeypatch.setattr(transcript, "DEFAULT_PROFILE", "a-last")
 
-        assert transcript.main(["list", "profiles", "--json"]) == 0
+        assert transcript.main(["list", "profiles"]) == 0
         captured = capsys.readouterr()
         assert captured.err == ""
         assert json.loads(captured.out) == {
             "ok": True,
-            "command": "list profiles",
             "default": "a-last",
             "profiles": [
                 {
@@ -192,14 +189,12 @@ class TestProfiles:
             "--model",
             "custom-model",
             "--dry-run",
-            "--json",
         )
 
         assert code == 2
-        assert (
+        assert json.loads(stderr)["errors"] == [
             "--provider, --model, and --effort must be provided together"
-            in (json.loads(stderr)["error"]["message"])
-        )
+        ]
 
 
 class TestPureDiscovery:
@@ -325,7 +320,7 @@ class TestRunPlan:
     def test_rejects_ignored_or_contradictory_options(self, argv) -> None:
         import transcript
 
-        with pytest.raises(SystemExit) as error:
+        with pytest.raises(transcript.Failure) as error:
             transcript.parse_args(argv)
 
         assert error.value.code == 2
@@ -339,7 +334,7 @@ class TestProgressReporting:
     ) -> None:
         import transcript
 
-        transcript.configure_logging(verbose=True, debug=False, as_json=False)
+        transcript.configure_logging(verbose=True, debug=False)
         now = iter([10.0, 12.345])
         reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
@@ -354,7 +349,7 @@ class TestProgressReporting:
     def test_default_step_prints_nothing_without_a_terminal(self, capsys) -> None:
         import transcript
 
-        transcript.configure_logging(verbose=False, debug=False, as_json=False)
+        transcript.configure_logging(verbose=False, debug=False)
         reporter = transcript.ExecutionReporter()
 
         with reporter.step("Deepgram transcription"):
@@ -368,7 +363,7 @@ class TestProgressReporting:
         import transcript
         from rich.console import Console
 
-        transcript.configure_logging(verbose=True, debug=False, as_json=False)
+        transcript.configure_logging(verbose=True, debug=False)
         events = []
         console = Console(file=io.StringIO(), force_terminal=True)
 
@@ -399,7 +394,7 @@ class TestProgressReporting:
     def test_handled_step_failure_is_not_reported_as_completed(self, capsys) -> None:
         import transcript
 
-        transcript.configure_logging(verbose=True, debug=False, as_json=False)
+        transcript.configure_logging(verbose=True, debug=False)
         now = iter([10.0, 12.345])
         reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
@@ -523,7 +518,7 @@ class TestProgressReporting:
     ) -> None:
         import transcript
 
-        transcript.configure_logging(verbose=True, debug=False, as_json=False)
+        transcript.configure_logging(verbose=True, debug=False)
         now = iter([10.0, 12.345])
         reporter = transcript.ExecutionReporter(clock=lambda: next(now))
 
@@ -594,7 +589,7 @@ class TestProgressReporting:
         monkeypatch.setattr(transcript, "ensure_cli_available", lambda *_args: None)
         monkeypatch.setattr(transcript, "open_folder", lambda *_args: None)
         # On a terminal, a blank line separates the folder path from the preview
-        monkeypatch.setattr(transcript.sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr(transcript.sys.stderr, "isatty", lambda: True)
 
         def fake_summary(
             _provider, _transcript_path, _prompt_path, output_path, *_args
@@ -608,7 +603,7 @@ class TestProgressReporting:
 
         def fake_preview(markdown_path, _budget, **_kwargs):
             assert markdown_path.parent.parent == tmp_path
-            print(markdown_path.read_text(encoding="utf-8"))
+            print(markdown_path.read_text(encoding="utf-8"), file=sys.stderr)
 
         monkeypatch.setattr(
             transcript,
@@ -630,13 +625,13 @@ class TestProgressReporting:
                 "--output-dir",
                 str(tmp_path),
                 "-v",
+                "--no-progress",
                 *preview_args,
             ]
         )
 
         captured = capsys.readouterr()
         stderr_lines = captured.err.splitlines()
-        stdout_lines = captured.out.splitlines()
         assert code == 0
         starts = [line for line in stderr_lines if line.startswith("Starting ")]
         expected_starts = [
@@ -649,20 +644,19 @@ class TestProgressReporting:
             expected_starts.append("Starting Summary preview...")
         assert starts == expected_starts
         assert any("method=arc" in line for line in stderr_lines)
-        assert not any("Visible summary" in line for line in stderr_lines)
-        assert any("Visible summary" in line for line in stdout_lines) is expect_preview
+        assert "Visible summary" not in captured.out
+        assert any("Visible summary" in line for line in stderr_lines) is expect_preview
         assert not any(
             "summary generation failed" in line.lower() for line in stderr_lines
         )
         if not expect_preview:
             assert not any("Summary preview" in line for line in stderr_lines)
         output_dir = next(path for path in tmp_path.iterdir() if path.is_dir())
-        assert (
-            captured.out.count(str(output_dir)) + captured.err.count(str(output_dir))
-            == 1
+        assert stderr_lines.count(str(output_dir)) == 1
+        assert ("" in stderr_lines) is expect_preview
+        assert json.loads(captured.out)["files"][-1] == str(
+            output_dir / "follow_along_note.md"
         )
-        assert stdout_lines[0] == str(output_dir)
-        assert (stdout_lines[1:2] == [""]) is expect_preview
         metadata = (output_dir / "meta.txt").read_text()
         assert "YouTube audio method: arc" in metadata
         assert "Summary status: succeeded" in metadata
@@ -751,16 +745,16 @@ class TestProgressReporting:
                 "--preview",
                 "--output-dir",
                 str(tmp_path),
+                "-v",
             ]
         )
 
+        err = capsys.readouterr().err
         assert code == 0
         result = next(path for path in tmp_path.iterdir() if path.is_dir())
         assert (result / "follow_along_note.md").read_text() == "# Saved summary\n"
-        assert (
-            "warning: Summary preview unavailable; the saved result is intact"
-            in capsys.readouterr().err
-        )
+        assert "Summary preview unavailable; the saved result is intact" in err
+        assert "warning:" not in err
 
 
 # ---------------------------------------------------------------------------
@@ -1329,15 +1323,13 @@ class TestUnsupportedSummaryProviders:
             "--effort",
             "low",
             "--dry-run",
-            "--json",
         )
 
         assert code == 2
         assert stdout == ""
-        error = json.loads(stderr)["error"]
-        assert error["code"] == "invalid_usage"
-        assert "argument --provider: invalid choice" in error["message"]
-        assert provider in error["message"]
+        (error,) = json.loads(stderr)["errors"]
+        assert "argument --provider: invalid choice" in error
+        assert provider in error
 
 
 class TestProviderEfforts:
@@ -1355,16 +1347,16 @@ class TestProviderEfforts:
             "--effort",
             effort,
             "--dry-run",
-            "--json",
         )
 
         assert code == 2
         assert stdout == ""
-        error = json.loads(stderr)["error"]
-        assert error["code"] == "invalid_configuration"
-        assert error["message"] == (
-            f"Invalid claude effort: {effort}. Valid: low, medium, high, xhigh, max"
-        )
+        assert json.loads(stderr)["errors"] == [
+            (
+                f"Invalid claude effort: {effort}. Valid: low, medium, high, xhigh, max; "
+                "fix: transcript list profiles"
+            )
+        ]
 
 
 class TestPromptContracts:
@@ -1603,7 +1595,7 @@ class TestOutputLifecycle:
         def snapshot(stage: str) -> None:
             (folder,) = tmp_path.iterdir()
             seen[stage] = (
-                capsys.readouterr().out,
+                capsys.readouterr().err,
                 sorted(path.name for path in folder.iterdir()),
                 (folder / "meta.txt").read_text(),
             )
@@ -1914,6 +1906,7 @@ class TestYouTubeAuthenticationOrder:
     ) -> None:
         import transcript
 
+        caplog.set_level(logging.INFO, logger="transcript")
         arc_profile = tmp_path / "Arc" / "User Data" / "Default"
         arc_profile.mkdir(parents=True)
         responses = [
@@ -1985,6 +1978,7 @@ class TestYouTubeAuthenticationOrder:
     ) -> None:
         import transcript
 
+        caplog.set_level(logging.INFO, logger="transcript")
         responses = [
             SimpleNamespace(returncode=1, stdout="", stderr="Chrome failed"),
             SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr=""),
@@ -2377,7 +2371,13 @@ class TestResultFolder:
         (folder,) = tmp_path.iterdir()
         meta = (folder / "meta.txt").read_text()
         assert code == 1
-        assert "error: Could not save the result: disk full" in capsys.readouterr().err
+        assert json.loads(capsys.readouterr().err.splitlines()[-1])["errors"] == [
+            (
+                "Could not save the result: disk full; "
+                "fix: transcript run youtube --url https://youtu.be/abc "
+                "--output-dir WRITABLE_DIR"
+            )
+        ]
         assert "Transcript status: failed" in meta
         assert "Summary status: not started" in meta
 

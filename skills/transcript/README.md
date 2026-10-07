@@ -2,7 +2,7 @@
 
 `scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free `claude` or `pi` process.
 
-The CLI uses subcommands, validates source input before execution, returns structured output, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/references/script-conventions.md` of the `pascalandy/skills` repository.
+The CLI uses subcommands, validates source input before execution, answers each command in one JSON line, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/references/script-conventions.md` of the `pascalandy/skills` repository.
 
 ## Runtime requirements
 
@@ -39,7 +39,7 @@ uv run <skill_dir>/scripts/transcript.py run zoom --help
 Use profiles for every normal model choice. A profile binds the provider, model, and reasoning effort into one named configuration.
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py list profiles --json
+uv run <skill_dir>/scripts/transcript.py list profiles
 ```
 
 The registry lists profiles in preference order. The order does not define a fallback chain. One run selects one profile. If that inference fails, the run fails.
@@ -71,63 +71,46 @@ The recipe puts its own `--url` first. A `--url` with no value adds no URL, so `
 The queue runs one URL at a time, so uploads never share bandwidth.
 
 - Before any work, it checks every URL, and one invalid URL exits `2` with nothing run. It checks the summary CLI and reads the Deepgram key once, and each URL gets its own `--timeout` budget and result folder
-- A repeated video runs once, with a warning. The queue compares video IDs, so `youtu.be/ID` and `watch?v=ID&t=30` never bill the same audio twice
+- A repeated video runs once, which `-v` reports. The queue compares video IDs, so `youtu.be/ID` and `watch?v=ID&t=30` never bill the same audio twice
 - On a terminal, the spinner names the URL's place, as in `[2/4] Deepgram transcription...`, and so do the `-v` and `--debug` lines
-- Each result folder prints on `stdout` as soon as it appears, before Deepgram starts, and stays there when its URL or a later one fails
-- A failed URL prints `[2/4] error:` and its own fix, and the queue moves on. A result that cannot be saved, such as on a full disk, stops the queue instead, because every later URL would fail to save the same way
-- After the last URL, `error: 1 of 4 URLs failed; 3 saved a transcript` and a command that reruns only the failed or unrun URLs end `stderr`. That command keeps a repair they share, such as a longer `--timeout`
+- Each result folder prints on `stderr` as soon as it appears, before Deepgram starts
+- A failed URL prints `[2/4] error:` on `stderr`, with its own fix, and the queue moves on. A result that cannot be saved, such as on a full disk, stops the queue instead, because every later URL would fail to save the same way
+- After the last URL, the answer's `errors` name each failed URL with its fix, then `1 of 4 URLs failed; 3 saved a transcript` and a command that reruns only the failed or unrun URLs. That command keeps a repair they share, such as a longer `--timeout`
 - The run exits `75` only when no URL saved a transcript and every failure came before any paid request, so rerunning the same command is safe. Any other failure exits `1`
-- An interrupt stops the queue once the current URL is cleaned up, then prints a command that reruns the URLs that did not finish. Under `--json`, the error object also lists the finished URLs
+- An interrupt stops the queue once the current URL is cleaned up. Its answer lists the files of the finished URLs and a command that reruns the URLs that did not finish
 
-Several URLs always give the queue output, even when they name one video. With `--json`, `results` contains each single-run payload or failure object, plus its `url`. See [Output and JSON](#output-and-json). A failed queue sends this object to `stderr` with `ok: false` and `queue_failed`. A dry run lists the queue as `source.urls`.
+Several URLs always run as a queue, even when they name one video. Its answer lists the files of every URL, in URL order; see [Output](#output). A dry run lists the queue as `source.urls`.
 
 ## Discovery and diagnostics
 
 Discovery never reads credentials or starts network work. `doctor` checks local requirements without paid API calls:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py doctor --source youtube --json
+uv run <skill_dir>/scripts/transcript.py doctor --source youtube
 ```
 
-Checks have `pass`, `warn`, or `fail` status. A healthy report goes to `stdout`; a report with a failed check goes to `stderr` and exits `1`. It never contains the Deepgram credential.
+Each check has a `pass`, `warn`, or `fail` status, which `-v` lists. Each failed check is one error with its fix, and exits `1`. A `warn` check, such as a missing `pi`, needs nothing for the default profile, so it never fails `doctor`. No output contains the Deepgram credential.
 
-For a run with changed source or summary settings, inspect the plan first with `--dry-run --json`. Dry-run source validation is real and read-only. It checks a YouTube URL or resolves Zoom media, but it does not read secrets, call an API, or create files.
+For a run with changed source or summary settings, inspect the plan first with `--dry-run`. Dry-run source validation is real and read-only. It checks a YouTube URL or resolves Zoom media, but it does not read secrets, call an API, or create files.
 
-## Output and JSON
+## Output
 
-Without `--json`, `stdout` holds the result only: the result folder path, printed as soon as the folder appears, discovery values, or the dry run's output parent. The path stays when a later step fails; a failure before the folder appears leaves `stdout` empty.
+Every command answers in one JSON line, as `docs/references/script-output.md` of the `pascalandy/skills` repository describes. Success is `{"ok":true,…}` on `stdout` with exit `0`. A failure leaves `stdout` empty, ends `stderr` with `{"ok":false,"errors":[…]}`, and exits non-zero. Each error says what failed, then the command that fixes it after `fix:`, `retry:`, or `rerun:`; a usage error without one adds `help`, the help command of the command it came from. `--help` and `--version` stay text.
 
-`stderr` stays empty on success unless a warning needs action, such as browser access falling back to anonymous. `-v` adds the run plan and one line per step; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off.
+- A run answers the `files` it saved, in the order they appeared; the folder holding them is the result folder
+- `list` answers its values, such as `profiles` and their `default`
+- A dry run answers its plan: `source`, `summary`, `output_dir`, and `timeout_seconds`
+- `doctor` answers `{"ok":true}`, or one error per failed check
 
-With `--json`, success is one JSON object on `stdout`, and warnings join it as a `warnings` list. A failure is one JSON object on `stderr` with `ok: false` and an `error` object holding `code`, `message`, and `hint`. The hint is the command that fixes the error. With `-v` or `--debug`, their lines come first, and the JSON object still ends `stderr`.
+While a run works, `stderr` shows each result folder as soon as it appears, before Deepgram starts, so the path is usable at once. Nothing else reaches `stderr` by default. `-v` adds the run plan, one line per step, and what needs no action, such as browser access falling back to anonymous; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off. `--preview` renders the summary on `stderr` too.
 
-A successful run payload includes:
+A successful run answers:
 
 ```json
-{
-  "ok": true,
-  "command": "run",
-  "source": "youtube",
-  "output_dir": "/absolute/result/path",
-  "summary": {
-    "status": "succeeded",
-    "profile": "opus",
-    "provider": "claude",
-    "model": "claude-opus-5-5",
-    "effort": "high",
-    "error": null
-  },
-  "artifacts": {
-    "transcript": "/absolute/result/path/raw_transcript.txt",
-    "sentences": "/absolute/result/path/raw_sentences.txt",
-    "json": "/absolute/result/path/raw_transcript.json",
-    "metadata": "/absolute/result/path/meta.txt",
-    "summary": "/absolute/result/path/follow_along_note.md"
-  }
-}
+{"ok":true,"files":["/absolute/result/path/meta.txt","/absolute/result/path/raw_transcript.txt","/absolute/result/path/raw_sentences.txt","/absolute/result/path/raw_transcript.json","/absolute/result/path/follow_along_note.md"]}
 ```
 
-A failure after the result folder appears keeps the folder, and its metadata records the failed stage and the reason. The `stderr` object carries `output_dir`, so the folder stays findable. A summary failure exits `1` with the full payload, plus its `error`, because the raw artifacts are saved.
+A failure after the result folder appears keeps the folder, and its metadata records the failed stage and the reason. The answer still lists the `files` saved, so the folder stays findable. A summary failure exits `1` and lists the raw transcript files, because they are saved.
 
 Exit `75` means a temporary failure before any paid request, such as a network error reaching YouTube or Deepgram refusing the audio; rerunning the same command is safe. A failure after the Deepgram upload started exits `1`, because Deepgram may have transcribed, and billed, the audio.
 
@@ -135,11 +118,11 @@ Exit `75` means a temporary failure before any paid request, such as a network e
 
 Input and configuration validation run before credentials, paid APIs, or output writes. The result folder appears once the audio is ready, before Deepgram starts. Each file in it is written through a hidden temporary file and one rename, so a reader never sees a partial file. YouTube temporary audio is always removed.
 
-Deepgram upload failures are not replayed automatically because the service may have accepted the request before the client timed out. Follow the returned hint instead of blindly retrying.
+Deepgram upload failures are not replayed automatically because the service may have accepted the request before the client timed out. Follow the command its error names instead of blindly retrying.
 
 Audio uploads use 64 KiB blocks and declare the full file size with `Content-Length`. The CLI checks the sent byte count before accepting a successful response. With `-v`, human output reports `Audio upload complete` before waiting for the transcription response. This confirms that the client sent every block; saving the transcript still requires a valid Deepgram transcription. The metadata of a saved transcript records `Audio upload: complete (N bytes)`, which `verify-transcript` checks and retains in its evidence.
 
-The 300-second write timeout applies to each block, so a slow upload can take more than 300 seconds while making progress. The workflow budget is checked between blocks. A stalled upload reports a lower bound on the bytes sent because its last block may have been partially transmitted. A timeout after the upload started returns `transcription_timeout`; its hint reruns the command with twice the `--timeout`.
+The 300-second write timeout applies to each block, so a slow upload can take more than 300 seconds while making progress. The workflow budget is checked between blocks. A stalled upload reports a lower bound on the bytes sent because its last block may have been partially transmitted. A timeout after the upload started fails with an error whose fix reruns the command with twice the `--timeout`.
 
 For a slow connection or a long recording, allow more than the default workflow deadline for downloading, uploading, transcription, and summarization:
 
@@ -189,7 +172,7 @@ YouTube metadata also records the audio method that worked: `anonymous`, `arc`, 
 
 ## YouTube transport
 
-Normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously and warns on `stderr`, or in the `warnings` list under `--json`.
+Normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
@@ -201,7 +184,7 @@ Run the free transport check on the canonical video from [Test videos](#test-vid
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass prints nothing and exits `0`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the Arc adapter ran. It does not prove the full user flow.
+The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the Arc adapter ran. It does not prove the full user flow.
 
 ## Test videos
 
@@ -247,11 +230,11 @@ uv run python -m py_compile <skill_dir>/scripts/transcript.py
 uv run <skill_dir>/scripts/transcript.py --help
 uv run <skill_dir>/scripts/transcript.py run youtube --help
 uv run <skill_dir>/scripts/transcript.py run zoom --help
-uv run <skill_dir>/scripts/transcript.py list prompts --json
-uv run <skill_dir>/scripts/transcript.py list profiles --json
-uv run <skill_dir>/scripts/transcript.py list models --provider claude --json
-uv run <skill_dir>/scripts/transcript.py list models --provider codex --json
-uv run <skill_dir>/scripts/transcript.py doctor --source youtube --json
+uv run <skill_dir>/scripts/transcript.py list prompts
+uv run <skill_dir>/scripts/transcript.py list profiles
+uv run <skill_dir>/scripts/transcript.py list models --provider claude
+uv run <skill_dir>/scripts/transcript.py list models --provider codex
+uv run <skill_dir>/scripts/transcript.py doctor --source youtube
 ```
 
 Run the free authenticated transport check:
@@ -283,11 +266,10 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
   --url "https://www.youtube.com/watch?v=EIEc43CxIvY" \
   --profile sonnet \
   --prompt short_summary \
-  --output-dir <temporary-dir> \
-  --json
+  --output-dir <temporary-dir>
 ```
 
-When a change touches the queue, also run both [test videos](#test-videos) as one queue in a pseudo-terminal, without `--json`, so the spinner shows:
+When a change touches the queue, also run both [test videos](#test-videos) as one queue in a pseudo-terminal, so the spinner shows:
 
 ```bash
 uv run <skill_dir>/scripts/transcript.py run youtube \
@@ -300,11 +282,10 @@ uv run <skill_dir>/scripts/transcript.py run youtube \
 A real Zoom run is not part of the closeout for now, even when a change affects Zoom: Pascal does not use Zoom. Zoom mode stays supported, and its coverage is the automated tests plus the free `zoom.dry-run` and `diagnostics.zoom` features of `verify-transcript`. Report Zoom E2E as `NOT RUN`. To exercise Zoom anyway, run:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py run zoom --latest --profile sonnet --json
+uv run <skill_dir>/scripts/transcript.py run zoom --latest --profile sonnet
 uv run <skill_dir>/scripts/transcript.py run zoom \
   --path "2026-05-03 14.46.55 Réunion Zoom de Camille Exemple" \
-  --profile sonnet \
-  --json
+  --profile sonnet
 ```
 
 Before deciding E2E:
@@ -312,11 +293,11 @@ Before deciding E2E:
 - confirm each pseudo-terminal log is complete and not truncated
 - read every log from start to finish
 - classify every `failed`, `error`, `warning`, `skipped`, `timeout`, `unavailable`, and `traceback` line
-- verify the exit code and JSON document agree with `meta.txt` and every listed artifact
-- confirm a `--json` success left `stderr` empty
+- verify the exit code and the answer agree with `meta.txt` and every listed file
+- confirm a success left only the result folder on `stderr`
 - confirm default success has no summary preview and does not open Finder
 - confirm YouTube creates one folder per URL under the chosen output parent
-- for a queue, confirm `stdout` lists the folders in URL order and the spinner named `[1/2]` and `[2/2]` and left nothing behind
+- for a queue, confirm `stderr` showed the folders, and the answer lists their files, in URL order, and the spinner named `[1/2]` and `[2/2]` and left nothing behind
 - confirm Zoom creates one meeting folder under the chosen output parent when a real Zoom run was made
 - confirm the relevant Checks and Automated tests passed
 
