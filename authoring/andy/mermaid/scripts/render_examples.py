@@ -546,11 +546,12 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         for example, _, error in results
         if error
     ]
-    if failed:
-        raise ScriptError(*failed)
-    files = [str(svg) for _, svg, _ in results]
+    files = [str(svg) for _, svg, error in results if not error]
     if args.gallery:
         files.append(str(output / "index.html"))
+    if failed:
+        # The examples that rendered stay inspectable
+        raise ScriptError(*failed, report={"files": files})
     return {"files": files}
 
 
