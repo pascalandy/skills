@@ -534,7 +534,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
                 ) from None
             error = ""
             if rendered.returncode or not svg.is_file():
-                error = (rendered.stderr or rendered.stdout or "No SVG output").strip()
+                error = (rendered.stderr or rendered.stdout).strip() or "No SVG output"
             results.append((example, svg, error))
             if error:
                 print(f"FAIL {example.path}:{example.line} -> {svg}", file=sys.stderr)
