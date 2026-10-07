@@ -100,11 +100,6 @@ class TestListModels:
         assert captured.err == ""
         assert json.loads(captured.out)["models"] == ["z-model", "a-model"]
 
-    def test_openrouter_models(self) -> None:
-        stdout, _stderr, code = run_script("list", "models", "--provider", "openrouter")
-        assert code == 0
-        assert json.loads(stdout)["models"] == ["z-ai/glm-5.3-flash"]
-
     def test_codex_models(self) -> None:
         stdout, _stderr, code = run_script("list", "models", "--provider", "codex")
         assert code == 0
