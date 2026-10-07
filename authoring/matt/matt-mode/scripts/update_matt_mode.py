@@ -379,6 +379,12 @@ class Registry:
     files: tuple[FileRecord, ...]
 
 
+# How to repair a generated file that drifted from the lock
+REGENERATE = (
+    "; regenerate with: update_matt_mode.py update --upstream DIR --revision SHA"
+)
+
+
 def fail(message: str) -> NoReturn:
     raise ImportError(message)
 
@@ -932,16 +938,16 @@ def verify_imports(root: Path, upstream: Path | None = None) -> list[str]:
             errors.append(str(error))
             continue
         if digest is None:
-            errors.append(f"missing generated file: {destination}")
+            errors.append(f"missing generated file: {destination}{REGENERATE}")
         elif digest != record.rendered_sha256:
-            errors.append(f"changed generated file: {destination}")
+            errors.append(f"changed generated file: {destination}{REGENERATE}")
     try:
         actual = generated_inventory(root, registry)
     except ImportError as error:
         errors.append(str(error))
         actual = set()
     for destination in sorted(actual - set(expected)):
-        errors.append(f"untracked generated file: {destination}")
+        errors.append(f"untracked generated file: {destination}{REGENERATE}")
 
     if upstream is not None:
         try:
@@ -1013,16 +1019,28 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
         )
         return {"changes": changes}
 
-    for record in writes:
-        atomic_write(local_path(root, record.destination), record.content)
-    for destination in removals:
-        path = local_path(root, destination)
-        try:
-            path.unlink()
-        except OSError as error:
-            fail(f"cannot remove stale generated file {destination}: {error}")
-        prune_empty_parents(path, root)
-    atomic_write(lock_file, lock_content)
+    # Each change is listed once done, so a failure answers what already changed
+    done: list[list[str]] = []
+    try:
+        for record, change in zip(writes, changes):
+            atomic_write(local_path(root, record.destination), record.content)
+            done.append(change)
+        for destination, change in zip(removals, changes[len(writes) :]):
+            path = local_path(root, destination)
+            try:
+                path.unlink()
+            except OSError as error:
+                fail(f"cannot remove stale generated file {destination}: {error}")
+            prune_empty_parents(path, root)
+            done.append(change)
+        atomic_write(lock_file, lock_content)
+    except ScriptError as error:
+        raise ImportError(*error.args, report={"changes": done}) from error
+    except OSError as error:
+        raise ImportError(
+            f"cannot write Matt mode: {error}; fix that path, then rerun update",
+            report={"changes": done},
+        ) from error
     log.info("updated Matt mode from %s to %s", registry.revision, args.revision)
     return {"changes": changes}
 

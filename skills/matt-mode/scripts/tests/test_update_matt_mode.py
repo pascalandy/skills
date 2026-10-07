@@ -160,8 +160,34 @@ def test_a_changed_generated_file_fails_the_check_on_stderr(
     assert updater.main(["check", "--root", str(bucket)]) == 1
     assert answered(capsys) == (
         "",
-        {"ok": False, "errors": [f"changed generated file: {PLAYBOOK}"]},
+        {
+            "ok": False,
+            "errors": [f"changed generated file: {PLAYBOOK}{updater.REGENERATE}"],
+        },
     )
+
+
+def test_a_failed_write_answers_the_changes_already_made(
+    upstream: tuple[Path, str],
+    bucket: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, revision = upstream
+    write = updater.atomic_write
+
+    def full_disk(path: Path, content: bytes) -> None:
+        if path.name == "LICENSE":
+            raise OSError(28, "No space left on device")
+        write(path, content)
+
+    monkeypatch.setattr(updater, "atomic_write", full_disk)
+    update = ["update", "--upstream", str(checkout), "--revision", revision]
+
+    assert updater.main([*update, "--root", str(bucket)]) == 1
+    answer = answered(capsys)[1]
+    assert answer["changes"] == [["add", PLAYBOOK]]
+    assert str(answer["errors"]).startswith("['cannot write Matt mode: ")
 
 
 def test_a_usage_error_in_a_command_answers_with_the_help_command(
