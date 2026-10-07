@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
-from typing import cast
+from typing import Any, cast
 
 SCRIPT = Path(__file__).parents[1] / "verify_video_archive.py"
 
@@ -30,7 +30,9 @@ def load_driver() -> ModuleType:
 driver = load_driver()
 
 
-class RunIsolationTests(unittest.TestCase):
+class RunFixture(unittest.TestCase):
+    """A launched run on a fixture checkout, cleaned up after each test."""
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.evidence_parent = Path(self.temporary.name) / "evidence"
@@ -76,6 +78,8 @@ class RunIsolationTests(unittest.TestCase):
                 pass
         self.temporary.cleanup()
 
+
+class RunIsolationTests(RunFixture):
     def test_each_scenario_has_distinct_owned_paths_and_checkout_bridge(self) -> None:
         seen: set[str] = set()
         for feature in driver.FEATURES:
@@ -222,6 +226,125 @@ class RunIsolationTests(unittest.TestCase):
         self.assertEqual(record["exit_status"], 0)
         self.assertEqual(record["terminal_width"], 48)
         self.assertIn("No work: 0 videos found.", transcript)
+
+
+class AnswerTests(RunFixture):
+    """Each command answers in one JSON line; no case here touches real media."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Only git on PATH: doctor finds no media tools, so drive starts no scenario
+        self.bin = Path(self.temporary.name) / "bin"
+        self.bin.mkdir()
+        git = shutil.which("git")
+        assert git is not None
+        (self.bin / "git").symlink_to(git)
+
+    def answer(self, *args: str) -> tuple[int, str, dict[str, Any]]:
+        """The exit code, stdout, and the JSON line that ends the output."""
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            env={**os.environ, "PATH": str(self.bin)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        stream = result.stderr if result.returncode else result.stdout
+        if not result.returncode:
+            self.assertEqual(result.stderr, "")
+        return (
+            result.returncode,
+            result.stdout,
+            json.loads(stream.splitlines()[-1]),
+        )
+
+    def test_launch_answers_the_manifest_it_writes(self) -> None:
+        code, stdout, answer = self.answer(
+            "launch",
+            "--checkout",
+            str(self.checkout),
+            "--evidence-root",
+            str(self.evidence_parent),
+        )
+        manifest = Path(answer["file"])
+        driver.cleanup(manifest)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.count("\n"), 1)
+        self.assertEqual(answer, {"ok": True, "file": str(manifest)})
+        self.assertTrue(manifest.is_absolute())
+        self.assertTrue(manifest.is_file())
+
+    def test_unmet_checks_fail_with_one_error_each(self) -> None:
+        manifest = str(self.manifest_path)
+
+        doctor = self.answer("doctor", "--manifest", manifest)
+        drive = self.answer("drive", "--manifest", manifest, "--feature", "conversion")
+
+        self.assertEqual(doctor[:2], (1, ""))
+        self.assertIs(doctor[2]["ok"], False)
+        self.assertIn("doctor.ffmpeg unmet: FFmpeg is available", doctor[2]["errors"])
+        self.assertEqual(drive[:2], (1, ""))
+        self.assertEqual(
+            drive[2]["errors"],
+            [
+                *doctor[2]["errors"],
+                (
+                    "conversion.platform skipped: The real-media scenario was not "
+                    "run because doctor found an unmet requirement"
+                ),
+            ],
+        )
+
+    def test_run_names_the_manifest_beside_its_errors(self) -> None:
+        code, stdout, answer = self.answer(
+            "run",
+            "--checkout",
+            str(self.checkout),
+            "--evidence-root",
+            str(self.evidence_parent),
+            "--feature",
+            "conversion",
+        )
+        manifest = Path(answer["file"])
+
+        self.assertEqual((code, stdout), (1, ""))
+        self.assertIn("conversion.platform skipped", str(answer["errors"]))
+        self.assertEqual(driver.load_manifest(manifest)["phase"], "cleaned")
+
+    def test_cleanup_answers_the_root_it_removes(self) -> None:
+        run_root = self.manifest["paths"]["run_root"]
+
+        first = self.answer("cleanup", "--manifest", str(self.manifest_path))
+        second = self.answer("cleanup", "--manifest", str(self.manifest_path))
+
+        self.assertEqual(
+            first, (0, first[1], {"ok": True, "changes": [["remove", run_root]]})
+        )
+        self.assertEqual(second, (0, '{"ok":true}\n', {"ok": True}))
+
+    def test_a_verifier_error_answers_what_to_run_first(self) -> None:
+        answer = self.answer("drive", "--manifest", str(self.manifest_path))
+
+        self.assertEqual(
+            answer, (1, "", {"ok": False, "errors": ["run doctor before drive"]})
+        )
+
+    def test_a_usage_error_answers_the_help_command(self) -> None:
+        answer = self.answer("drive", "--feature", "conversion")
+
+        self.assertEqual(
+            answer,
+            (
+                2,
+                "",
+                {
+                    "ok": False,
+                    "errors": ["the following arguments are required: --manifest"],
+                    "help": "verify-video-archive --help",
+                },
+            ),
+        )
 
 
 class VerdictTests(unittest.TestCase):

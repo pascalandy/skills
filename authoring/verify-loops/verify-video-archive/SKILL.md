@@ -17,7 +17,8 @@ checkout. After skill installation, you can invoke
 
 ## Launch
 
-Create a new run. The command prints the retained manifest path.
+Create a new run. The command answers `{"ok":true,"file":"<manifest>"}`,
+where `file` is the retained manifest path.
 
 ```bash
 VERIFY_DIR="<verify-video-archive-skill-dir>"
@@ -26,7 +27,7 @@ uv run --no-project python "$VERIFY_DIR/scripts/verify_video_archive.py" \
   launch --checkout "$CHECKOUT"
 ```
 
-Copy the printed `manifest` value into `MANIFEST`. Launch creates a unique
+Copy the `file` value into `MANIFEST`. Launch creates a unique
 disposable root and a separate evidence root. Each scenario gets its own home,
 input roots, archive, state, journal, and scratch directories.
 
@@ -138,6 +139,7 @@ manifest survive.
 ## Helpers
 
 Run the whole lifecycle when you do not need to inspect the run before cleanup.
+Its answer names the manifest in `file`, also when a check fails.
 
 ```bash
 uv run --no-project python "$VERIFY_DIR/scripts/verify_video_archive.py" \

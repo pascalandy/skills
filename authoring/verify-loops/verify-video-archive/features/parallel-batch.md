@@ -29,7 +29,8 @@ uv run --no-project python "$VERIFY_DIR/scripts/verify_video_archive.py" \
   run --checkout "$CHECKOUT" --feature parallel-batch
 ```
 
-Run this command on both target machines. Retain each printed manifest path.
+Run this command on both target machines. Retain the manifest path that each
+answer names in `file`.
 Run Evidence again after moving the bundle to prove that every referenced file
 and SHA-256 remains valid.
 
