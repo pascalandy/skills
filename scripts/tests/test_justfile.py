@@ -12,8 +12,8 @@ from conftest import SCRIPTS
 ROOT = SCRIPTS.parent
 # A shell operator means the recipe decides or chains; that belongs in scripts/
 OPERATORS = ("&&", "||", ";", "|")
-# A recipe that runs one of the repository's scripts, not a skill's
-SCRIPT = re.compile(r"(?<![\w/])scripts/\w+\.py")
+# A recipe that runs a script, from scripts/ or from a skill
+SCRIPT = re.compile(r"scripts/(?:[\w-]+/)*[\w-]+\.py")
 
 
 def just(*args: str) -> subprocess.CompletedProcess[str]:

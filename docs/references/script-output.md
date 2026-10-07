@@ -10,7 +10,7 @@ date_created: 2026-10-04
 date_updated: 2026-10-07
 ---
 
-A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written. [State](#state) lists the scripts here that follow it today
+A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written.
 
 ## The rule
 
@@ -88,19 +88,15 @@ Decided on 2026-10-04, while planning #430
 4. **A success goes to stdout; a failure leaves stdout empty and ends stderr, after the diagnostics.** Failures already worked this way, and the code that reported them is reused
 5. **One line rather than indented JSON.** The verdict is always the last line, so `tail -n1 | jq` works. Indented JSON grows with its lists, to about 48 lines for `just check --sweep`. Pascal compared one line, indented, and one key per line, and chose the line
 6. **Data only when it is the command's job**: `--list`, `--dry-run`, or `changes` for a command that changes state. The checks that ran stay visible with `-v`. A change is an array such as `["install","andy-mode"]`, which costs fewer tokens than an object
-7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something
+7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something. A failure also keeps the data a caller needs to recover: the `changes` that already happened, such as a merge that landed before its deploy failed, or the `files` a run wrote before it failed
 8. **A warning is never a success.** What needs action fails the command, and the rest moves to `-v`. This covers pytest and pyright warnings too (#487). `just merge` exits 1 when the merge landed but the deploy missed a machine, since a rerun only deploys (#491)
 9. **No `--json` flag, since JSON is the default. `--help` stays text**, because it is documentation
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line
 11. **An agent reads the line; a script reads the exit code or `jq -e .ok`**, as [Read the answer](#read-the-answer) shows. A script never parses text, and an agent that hides the line is back to silence
-12. **rtk passes the line through unchanged.** Checked on 2026-10-04 with a one-line and an indented object from a `just` recipe, on success and on failure; `rtk proxy` prints the same lines, so agents need no workaround
+12. **rtk passes a short line through unchanged, and cuts a long one.** Checked on 2026-10-04 with short answers, on success and on failure. On 2026-10-07, rtk 0.49.0 cut the 714-byte answer of `rtk just check --list` to about 150 characters and added `[full output: rtk recall ID]`. An agent that sees that footer runs the recall, or reruns the command as `rtk proxy <command>`, to read the whole line. A script reads the exit code or `jq`, never rtk's output
 13. **The lock lives in `test_cli_contract.py`, not in a new check** (#492), because that test already lists every script
 14. **Rejected: a sentence in `AGENTS.md` that explains the silence** (the first proposal in #430), because it fixes one script in one repository. **Rejected: text in a terminal and JSON elsewhere**, because the agent and the human would see two different outputs
 15. **A script whose job is content writes the content to a file and answers with its path**, such as `{"ok":true,"file":"…"}`, so the line stays one line an agent reads whole. A script that streams events, such as a watcher, writes them to stderr and ends with its answer on stdout. Pascal decided on 2026-10-06 that skill scripts follow the rule too, these included (#494)
-
-## State
-
-Every entry point in `scripts/` follows the rule, and the lock keeps it that way. Scripts inside skills follow it skill by skill (#494); until a skill's script does, it keeps the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`
 
 ## Related
 

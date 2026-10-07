@@ -18,11 +18,11 @@ Every CLI in `scripts/` follows this contract. A skill-local script may follow i
 
 Every script meets all of these. No exception waives an exit code, the output rule, or help behavior.
 
-Output follows [[script-output]]: one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`. Every script in `scripts/` and every new script answers that way. A skill script the State section of [[script-output]] has not reached yet still follows the Rule of Silence: when nothing needs saying, print nothing
+Output follows [[script-output]]: every script, in `scripts/` or in a skill, answers in one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`
 
-- stdout holds the primary result only: data, IDs, paths, or change lines. No banners or status lines
-- A failure leaves stdout empty. Under `--json`, the error is one JSON object on stderr
-- stderr holds every diagnostic. By default, only errors and warnings that need action
+- stdout holds the answer of a success and nothing else. No banners or status lines
+- A failure leaves stdout empty, and its answer is the last line of stderr
+- stderr holds every diagnostic. By default, only what explains a failure
 - Without a terminal, or with `NO_COLOR` set or `TERM=dumb`: no color, spinners, or progress bars
 
 Exit codes, all listed in `--help`:
@@ -60,7 +60,6 @@ Add a row's flags only when the script has the matching behavior.
 | is installed as a command or has a release version | `--version`: one line on stdout, `<name> <version>` |
 | has steps worth reporting | `-v`, `--verbose`: progress and step details on stderr |
 | has failures worth diagnosing: network, locks, or subprocesses | `--debug`, also `<NAME>_DEBUG=1`: internals, timings, and stack traces on stderr |
-| has output read by programs or agents, and does not answer in JSON yet | `--json`: stdout is one JSON object and nothing else |
 | emits color | `--no-color` |
 | changes state | `-n`, `--dry-run`: preview in the same format as a real run |
 | asks for confirmation | `-y`, `--yes`; `--no-input`: never prompt, and a missing value exits 2 naming the flag |
@@ -68,8 +67,6 @@ Add a row's flags only when the script has the matching behavior.
 | calls networks or APIs, or takes locks | exit `75` for a temporary, safe-to-retry failure; `--timeout <duration>` with a default |
 | reads or writes files | `-` as a filename for stdin or stdout; `-o`, `--output <file>` |
 | has subcommands | `<name> help <cmd>`, `<name> <cmd> --help`, and `<name> <cmd> -h` print the same text; global flags work before and after the subcommand; an unknown subcommand exits 2 and suggests the closest match; subcommands need their full name |
-| has line-oriented output | `--plain`: tab-separated, no color |
-| has several output formats | `--format <fmt>` in place of `--json` |
 | reads config files | `-c`, `--config <path>`; precedence: flag, env, project, `~/.config/<name>/`, system |
 | has named environments | `--profile <name>` |
 | shows progress bars | `--no-progress` |
@@ -91,7 +88,6 @@ A duration is `30s`, `5m`, `2h`, or bare seconds
 Opt-in flags that would give no real choice are left out, and a script outside the shared block's language drops only a Parsing item its language cannot express. Each exception gets one line:
 
 - `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
-- Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
 - `just check-frontmatter`, `just compile-skills`, `just remote-skills`: no `-r`; each walks one fixed tree
 - `just compile-skills`, `just install-skills`, `just remote-skills`: no `-o` or `-`; they write fixed paths: `skills/` and the skill count, the agent directories, and the skill lists
 - `just install-skills`: no `--force`; it would delete entries the installer does not own
@@ -100,12 +96,9 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
-- `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
-- `transcript`: no `--plain`; `list` already prints one item per line, tab-separated and colorless
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
-- `transcript`: a JSON error keeps `{"ok": false, "error": {"code", "message", "hint"}}`, which its agents and `verify-transcript` read, instead of the shared `errors` list; `hint` is the command that fixes it
 
 ## Shared code
 
