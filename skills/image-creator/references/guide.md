@@ -8,7 +8,7 @@ Default to the Codex plan with `gpt-image-2`. A request for higher quality, or t
 
 Only an explicit request for 2.5 selects OpenRouter. Use `--model flare` for generic 2.5 or Flare, `--model sunburst` for Sunburst. These flags select `--backend openrouter`, read the key from the keyring entry `openrouter`, user `api_key`, then from `OPENROUTER_API_KEY`, and bill the OpenRouter account. Both generation and edits use `POST https://openrouter.ai/api/v1/images`.
 
-Choose a preset, then set dimensions for the destination. For comparisons, specify backend, model, quality, size, and candidate count explicitly. Inspect the resolved request with `--dry-run --json` before generating.
+Choose a preset, then set dimensions for the destination. For comparisons, specify backend, model, quality, size, and candidate count explicitly. Inspect the resolved request with `--dry-run` before generating.
 
 ## 2. Tiers
 
@@ -45,8 +45,8 @@ OpenRouter controls below apply only after explicit 2.5 selection. On the plan, 
 | `--out` | `output_format` | `.png`, `.jpg`/`.jpeg`, `.webp` |
 | `--candidates` | `n` | 1–10 variants; API default is one, billed per image |
 | repeated `--image` | `input_references` | Up to 16 edit inputs, sent as data URLs |
-| `--dry-run --json` | no request | Resolved settings and estimated image-output cost |
-| `--json` | receipt | Requested settings, returned metadata, usage, files, warnings |
+| `--dry-run` | no request | Answers the resolved settings and estimated image-output cost |
+| `-v` | none | Receipt on stderr: requested settings, returned metadata, usage, files |
 
 OpenRouter also exposes `output_compression` and provider options such as `moderation`; the CLI fixes JPEG/WebP compression at 85. Consult [OpenRouter image generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation) for controls beyond CLI help.
 
@@ -77,7 +77,7 @@ Choose aspect ratio for composition, then pixels for display, print, or cropping
 
 OpenRouter bills separately from the Codex plan. Equal listed token rates do not guarantee equal cost per image; token use varies by model, quality, and request.
 
-The CLI's `--dry-run --json` uses OpenAI's published calculator as an image-output estimate, not an OpenRouter quote. Add inputs, candidates, and retries. Verify actual charges with OpenRouter `usage.cost` and compare cost per accepted image.
+The CLI's `--dry-run` uses OpenAI's published calculator as an image-output estimate, not an OpenRouter quote. Add inputs, candidates, and retries. Verify actual charges with the answer's `cost`, OpenRouter's `usage.cost`, and compare cost per accepted image.
 
 ### 3.5 Latency
 
@@ -113,7 +113,7 @@ Constraints: <must keep>; no other text, no logo, no watermark
 
 ### 5.1 Checks
 
-View every candidate at full resolution. Automated warnings cover file properties and returned metadata, not visual correctness.
+View every candidate at full resolution. The CLI's own checks cover file properties and returned metadata, not visual correctness; a mismatch fails the run.
 
 - Required objects appear in the right places and counts; excluded elements are absent
 - Every text string, number, chart relationship, and label is correct
@@ -146,7 +146,7 @@ Retry `429` and transient `5xx` with backoff. For invalid requests or moderation
 
 The default uses Codex built-in image generation with `gpt-image-2` through the user's plan. The backend controls generation settings. `--quality` alone cannot select a paid mode and is rejected on the plan; request 2.5 explicitly first.
 
-High/Max request two/three candidates. `--aspect` guides the prompt; `--size` crops and resizes the result. That can remove content or interpolate pixels without generating native detail. Inspect the saved image and receipt before delivery.
+High/Max request two/three candidates. `--aspect` guides the prompt; `--size` crops and resizes the result. That can remove content or interpolate pixels without generating native detail. Inspect the saved image before delivery; `-v` names each upscale.
 
 ## 8. Test evidence
 

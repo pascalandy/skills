@@ -10,16 +10,325 @@ See ../references/guide.md for the rationale behind each choice.
 
 from __future__ import annotations
 
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
+import json
+import logging
+import os
+import re
+import shlex
+import signal
+import sys
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the messages; `report` is the
+    object `--json` prints on stderr beside them.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print progress and step details on stderr",
+    )
+    if debug:
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+        )
+    if given(argv, "-h", "--help", parser=parser):
+        parser.print_help()
+        return 0
+
+    # Parser.error, in the pasted cli block, prints usage errors itself;
+    # raising sends this one through answer_failure()
+    parser.error = usage_error
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError):
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
 import base64
 import functools
 import io
-import json
 import math
-import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.error
@@ -27,11 +336,12 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, NoReturn
 
 from PIL import Image
 
 __version__ = "0.1.0"
+
+log = logging.getLogger("image-creator")
 
 # ---------------------------------------------------------------------------
 # Settings owned by this CLI
@@ -85,12 +395,8 @@ TRANSPARENT_LINE = (
 )
 
 
-class UsageError(Exception):
-    """Bad flags or inputs; exit 2."""
-
-
-class RunError(Exception):
-    """The request could not be completed; exit 1."""
+class RunError(ScriptError):
+    """The request could not be completed, or an image it wrote needs attention; exit 1."""
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +527,8 @@ class Plan:
     api_body: dict[str, Any] | None = None
     target_size: tuple[int, int] | None = None
     estimated_output_tokens: int | None = None
-    warnings: list[str] = field(default_factory=list)
+    # What needs action; any problem fails the run once its images are written
+    problems: list[str] = field(default_factory=list)
 
 
 OPENROUTER_KEYRING = [
@@ -387,9 +694,7 @@ def resolve(job: Job) -> Plan:
     if size:
         plan.estimated_output_tokens = output_tokens(size[0], size[1], quality) * count
         if size[0] * size[1] > EXPERIMENTAL_PIXELS:
-            plan.warnings.append(
-                f"{size[0]}x{size[1]} is above 2560x1440, which OpenAI marks experimental"
-            )
+            log.info("%dx%d is above 2560x1440, which OpenAI marks experimental", *size)
     return plan
 
 
@@ -534,10 +839,12 @@ def plan_generate_one(
             continue
         if event.get("type") == "thread.started":
             thread_id = event.get("thread_id")
-    detail = f"\n{result.stderr[-2000:]}" if verbose else ""
+    detail = result.stderr[-2000:].rstrip() if verbose else ""
+    log_hint = "" if verbose else "; rerun with --verbose for Codex's log"
     if result.returncode != 0 or not thread_id:
         raise RunError(
-            f"codex exec failed with exit {result.returncode}; run `codex login status`{detail}"
+            f"codex exec failed with exit {result.returncode}; run `codex login status`{log_hint}",
+            detail=detail,
         )
     folder = codex_home() / "generated_images" / thread_id
     produced = (
@@ -547,7 +854,8 @@ def plan_generate_one(
     )
     if not produced:
         raise RunError(
-            f"Codex returned no image; the controller may have skipped the tool, retry once{detail}"
+            f"Codex returned no image; the controller may have skipped the tool, retry once{log_hint}",
+            detail=detail,
         )
     sent = sent_prompt(result.stderr)
     meta = {
@@ -567,7 +875,7 @@ def plan_run(plan: Plan, job: Job, verbose: bool) -> tuple[list[bytes], dict[str
         results = [f.result() for f in futures]
     calls = [meta for _, meta in results]
     if any(call["prompt_verbatim"] is False for call in calls):
-        plan.warnings.append(
+        plan.problems.append(
             "Codex changed the prompt before sending it; inspect the result"
         )
     return [data for data, _ in results], {"calls": calls}
@@ -659,13 +967,17 @@ def api_run(plan: Plan, job: Job) -> tuple[list[bytes], dict[str, Any]]:
 
 
 def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
+    """Run or preview one request and return the fields its answer carries.
+
+    A dry run answers the resolved request. A run answers the files it wrote;
+    the full receipt goes to -v. A problem fails the run once every delivered
+    image is written, with those files beside the errors.
+    """
     plan = resolve(job)
+    log.info("backend %s: %s", plan.backend, plan.reason)
     receipt: dict[str, Any] = {
-        "command": job.command,
         "intent": job.intent,
         "backend": plan.backend,
-        "backend_reason": plan.reason,
-        "candidates": plan.count,
         "outputs": [str(p) for p in plan.paths],
         "prompt": plan.final_prompt,
     }
@@ -684,8 +996,6 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
     if plan.target_size:
         receipt["target_size"] = f"{plan.target_size[0]}x{plan.target_size[1]}"
     if dry_run:
-        receipt["dry_run"] = True
-        receipt["warnings"] = plan.warnings
         return receipt
 
     images, meta = (
@@ -693,7 +1003,7 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
     )
     receipt.update(meta)
     if len(images) != plan.count:
-        plan.warnings.append(
+        plan.problems.append(
             f"requested {plan.count} images but received {len(images)}; inspect the outputs"
         )
     if plan.api_body:
@@ -704,37 +1014,52 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
                 and actual is not None
                 and actual != expected
             ):
-                plan.warnings.append(
+                plan.problems.append(
                     f"requested {key}={expected}, API reported {actual}"
                 )
     files = []
     for data, path in zip(images, plan.paths, strict=False):
         target = plan.target_size if plan.backend == "plan" else None
-        plan.warnings += save_image(data, path, plan.output_format, target)
+        for note in save_image(data, path, plan.output_format, target):
+            log.info("%s: %s", path.name, note)
         info = describe(path)
         if plan.target_size and (info["width"], info["height"]) != plan.target_size:
-            plan.warnings.append(
+            plan.problems.append(
                 f"{path.name} is {info['width']}x{info['height']}, "
                 f"requested {plan.target_size[0]}x{plan.target_size[1]}"
             )
         if job.transparent and "alpha" not in info:
-            plan.warnings.append(
+            plan.problems.append(
                 f"{path.name} has no alpha channel; retry with a transparent background"
             )
         elif job.transparent and info["alpha"]["fully_opaque"]:
-            plan.warnings.append(
+            plan.problems.append(
                 f"{path.name} is fully opaque; retry with a transparent background"
             )
         files.append(info)
     receipt["outputs"] = [f["path"] for f in files]
     receipt["files"] = files
-    receipt["warnings"] = plan.warnings
-    return receipt
+    log.info("receipt %s", json.dumps(receipt))
+    fields: dict[str, Any] = {
+        "files": [{k: f[k] for k in ("path", "width", "height")} for f in files],
+        "backend": plan.backend,
+    }
+    cost = (meta.get("usage") or {}).get("cost")
+    if cost is not None:
+        fields["cost"] = cost
+    if plan.problems:
+        raise RunError(*plan.problems, report={"files": fields["files"]})
+    return fields
 
 
 def doctor() -> dict[str, Any]:
     has_plan, plan_note = plan_ready()
     has_api, api_note = api_ready()
+    if not (has_plan or has_api):
+        raise RunError(
+            f"plan backend unavailable: {plan_note}",
+            f"OpenRouter backend unavailable: {api_note}",
+        )
     return {
         "plan": {"ready": has_plan, "detail": plan_note},
         "openrouter": {"ready": has_api, "detail": api_note},
@@ -767,7 +1092,7 @@ The plan fixes model, quality, and size; --size is applied by cropping and resiz
 
 examples:
   image_creator.py generate --prompt "Minimal poster ..." --out poster.png
-  image_creator.py generate --intent max --aspect 16:9 --prompt-file brief.txt --out hero.png --json
+  image_creator.py generate --intent max --aspect 16:9 --prompt-file brief.txt --out hero.png --dry-run
   image_creator.py generate --intent draft --out idea.jpg --prompt "Three layout ideas for ..."
   image_creator.py generate --transparent --out logo.png --prompt "Flat vector logo ..."
 """
@@ -781,10 +1106,21 @@ examples:
     --prompt "Image 1 is the scene; image 2 is the subject. ..."
 """
 
+ANSWER = """
+answer: one JSON line on stdout, such as
+  {"ok":true,"files":[{"path":"/abs/hero.png","width":2048,"height":1152}],"backend":"plan"}
+OpenRouter adds "cost"; --dry-run answers the resolved request and estimated cost.
+A failure, including a written image that needs attention, leaves stdout empty
+and ends stderr with {"ok":false,"errors":[...]}, plus "files" once images exist.
+-v adds the full receipt on stderr."""
 
-class Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> NoReturn:
-        self.exit(2, f"error: {message}\nrun with --help for usage\n")
+EXIT_CODES = exit_codes(
+    {
+        1: "the request failed, a written image needs attention, or no backend is ready",
+        2: "bad usage, or the selected backend is not ready",
+    }
+)
+DEBUG_ENV = "IMAGE_CREATOR_DEBUG"
 
 
 def add_job_options(parser: argparse.ArgumentParser) -> None:
@@ -834,31 +1170,46 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="print the resolved request; make no call",
-    )
-    parser.add_argument(
-        "--json", action="store_true", help="print the full receipt as JSON"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="details and Codex logs on failure"
+        help="answer the resolved request; make no call",
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def add_shared_flags(parser: argparse.ArgumentParser) -> None:
+    """Accept run_script's -v and --debug after the command too. SUPPRESS keeps a
+    flag given before the command from being reset to False."""
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="print the receipt, notes, and Codex logs on stderr",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help=f"print tracebacks on stderr; also {DEBUG_ENV}=1",
+    )
+
+
+def build_parser() -> tuple[Parser, dict[str, Parser]]:
+    """The parser and each command's own parser, whose usage errors answer in JSON."""
     parser = Parser(
         prog="image_creator.py",
         description="Generate or edit images with GPT Image through a ChatGPT plan or the OpenRouter API.",
+        epilog="run image_creator.py <command> --help for each command's flags",
+        exit_codes=EXIT_CODES,
     )
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
     generate = sub.add_parser(
-        "generate", help="create a new image", epilog=EPILOG_GENERATE,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        "generate", help="create a new image", epilog=EPILOG_GENERATE + ANSWER,
+        exit_codes=EXIT_CODES,
     )  # fmt: skip
     add_job_options(generate)
     edit = sub.add_parser(
-        "edit", help="edit or combine input images", epilog=EPILOG_EDIT,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        "edit", help="edit or combine input images", epilog=EPILOG_EDIT + ANSWER,
+        exit_codes=EXIT_CODES,
     )  # fmt: skip
     edit.add_argument(
         "--image",
@@ -868,9 +1219,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="input image; repeat, order matters",
     )
     add_job_options(edit)
-    check = sub.add_parser("doctor", help="report which backends are ready")
-    check.add_argument("--json", action="store_true", help="print JSON")
-    return parser
+    doctor_parser = sub.add_parser(
+        "doctor", help="report which backends are ready", exit_codes=EXIT_CODES,
+        epilog='answer: {"ok":true,"plan":{"ready":…,"detail":…},"openrouter":{…}}',
+    )  # fmt: skip
+    commands = {"generate": generate, "edit": edit, "doctor": doctor_parser}
+    for command in commands.values():
+        add_shared_flags(command)
+        # run_script routes the main parser's usage errors; a command's own
+        # parser raises the same way, so its errors answer in JSON too
+        command.error = usage_error
+    return parser, commands
 
 
 def edit_shape(path: Path) -> tuple[tuple[int, int] | None, str | None]:
@@ -929,51 +1288,21 @@ def job_from_args(args: argparse.Namespace) -> Job:
     )
 
 
-def summary_line(receipt: dict[str, Any]) -> str:
-    if receipt.get("dry_run"):
-        return f"dry run: {receipt['backend']} backend would write {' '.join(receipt['outputs'])}"
-    files = receipt["files"]
-    sizes = ", ".join(
-        f"{Path(f['path']).name} {f['width']}x{f['height']}" for f in files
-    )
-    seconds = receipt.get("seconds") or max(
-        (c["seconds"] for c in receipt.get("calls", [])), default=0
-    )
-    return f"wrote {sizes} via {receipt['backend']} in {seconds}s"
+def work(args: argparse.Namespace) -> dict[str, Any]:
+    if args.command == "doctor":
+        return doctor()
+    return run_job(job_from_args(args), args.dry_run, args.verbose)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    verbose = getattr(args, "verbose", False)
-    try:
-        if args.command == "doctor":
-            report = doctor()
-            if args.json:
-                print(json.dumps(report))
-            else:
-                print(
-                    "; ".join(
-                        f"{name}: {'ready' if r['ready'] else 'missing'} ({r['detail']})"
-                        for name, r in report.items()
-                    )
-                )
-            return 0 if any(r["ready"] for r in report.values()) else 1
-        receipt = run_job(job_from_args(args), args.dry_run, verbose)
-    except UsageError as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 2
-    except RunError as error:
-        print(f"error: {error}", file=sys.stderr)
-        if not verbose:
-            print("rerun with --verbose for details", file=sys.stderr)
-        return 1
-    except KeyboardInterrupt:
-        return 130
-    for warning in receipt.get("warnings", []):
-        print(f"warning: {warning}", file=sys.stderr)
-    print(json.dumps(receipt, indent=2) if args.json else summary_line(receipt))
-    return 0
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser, commands = build_parser()
+    # run_script prints the main help for -h anywhere; a command's -h prints its own
+    named = next((arg for arg in argv if not arg.startswith("-")), None)
+    if named in commands and given(argv, "-h", "--help", parser=commands[named]):
+        commands[named].print_help()
+        return 0
+    return run_script(parser, work, argv, debug=DEBUG_ENV)
 
 
 if __name__ == "__main__":
