@@ -183,6 +183,7 @@ step() {
             echo "main did not fast-forward to GitHub's commit"
             return 12
         }
+        printf '{"ok":true,"changes":[["move","%.7s","%.7s"]]}\\n' "$now" "$3"
     fi
     uv run --quiet scripts/sync_private.py 2>&1 || return
     just install-skills 2>&1
@@ -541,8 +542,6 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         outcome = failure(machine.name, code, lines)
         outcome.changes = changes
         return outcome
-    if head != source.sha:
-        changes.insert(0, f"move {head[:7]} to {source.sha[:7]}")
     return Outcome(
         machine.name, "synced", f"synced at {source.sha[:7]}", changes=changes
     )
@@ -712,6 +711,8 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
     local = next((machine.name for machine in fleet if machine.is_local()), None)
+    coordinator = local or socket.gethostname().split(".")[0]
+    changed_machines: dict[str, None] = {}
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
     # Queue behind any other sync from here, so each run sends the newest commit.
@@ -720,7 +721,15 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         # This machine pushes its private edits before any machine pulls, even
         # when it is not selected.
         if mode == "apply":
-            for change in sync_private.sync(timeout=args.timeout):
+            try:
+                saved = sync_private.sync(timeout=args.timeout)
+            except ScriptError as error:
+                if error.report.get("changes"):
+                    error.report["changes"] = [["sync", coordinator, source.sha[:7]]]
+                raise
+            if saved:
+                changed_machines[coordinator] = None
+            for change in saved:
                 log.info("%s", "\t".join(change))
         # A check needs the private clone; a preview compares with it when here,
         # and counts the edits a sync would save from it before others pull
@@ -728,6 +737,8 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
             source = Source(source.sha, sync_private.github_head(args.timeout))
         if mode == "preview" and sync_private.is_clone():
             saves = bool(sync_private.sync(dry_run=True))
+            if saves:
+                changed_machines[coordinator] = None
             source = Source(source.sha, source.private, saves)
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
@@ -754,11 +765,10 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
                 if outcome.status in ("needs-you", "failed")
             ]
         )
-    changes = [
-        ["sync", outcome.machine, source.sha[:7]]
-        for outcome in outcomes
-        if outcome.changes
-    ]
+    for outcome in outcomes:
+        if outcome.changes:
+            changed_machines[outcome.machine] = None
+    changes = [["sync", name, source.sha[:7]] for name in changed_machines]
     answer = {"changes": changes} if changes else {}
     if problems:
         # The machines that did sync stay in the answer of a partial failure

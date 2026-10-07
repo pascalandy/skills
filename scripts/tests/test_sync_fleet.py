@@ -241,6 +241,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     answer = json.loads(log[-1])
     errors = answer["errors"]
     assert answer["changes"] == [
+        ["sync", socket.gethostname().split(".")[0], head[:7]],
         ["sync", "behind", head[:7]],
         ["sync", "editor", head[:7]],
     ]
@@ -271,7 +272,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
         "fix it on dirty, then rerun just sync-fleet dirty"
     ) in errors
     assert any(error.startswith("down offline:") for error in errors)
-    assert f"behind: move {before[:7]} to {head[:7]}" in log
+    assert f"behind: move\t{before[:7]}\t{head[:7]}" in log
     assert "behind: add\t~/.claude/skills/secret" in log
 
 
@@ -311,7 +312,8 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
 
     assert (saving.returncode, saving.stderr) == (0, "")
     assert saving.stdout == changed(
-        *(["sync", name, head[:7]] for name in ("behind", "current", "stale"))
+        ["sync", socket.gethostname().split(".")[0], head[:7]],
+        *(["sync", name, head[:7]] for name in ("behind", "current", "stale")),
     )
     assert git(hub / "_skills_private", "status", "--porcelain") != ""
 
@@ -559,17 +561,22 @@ def test_a_failed_install_step_reports_the_installers_own_error(
     assert "has a file ancestor" in error
 
 
-def test_a_failed_install_keeps_the_machines_completed_private_changes(
-    fleet: tuple[Path, Path, Path],
+@pytest.mark.parametrize("behind", [False, True])
+def test_a_failed_install_keeps_the_machines_completed_changes(
+    fleet: tuple[Path, Path, Path], behind: bool
 ) -> None:
     hub, homes, bin_dir = fleet
     broken = machine(homes, "broken", hub.parent / "skills.git")
     git(
         broken, "clone", "-q", str(hub.parent / "skills-private.git"), "_skills_private"
     )
-    (broken / "_skills_private/content/secret/SKILL.md").write_text(
-        "saved before failure\n"
-    )
+    before = git(broken, "rev-parse", "HEAD")
+    if behind:
+        change(hub)
+    else:
+        (broken / "_skills_private/content/secret/SKILL.md").write_text(
+            "saved before failure\n"
+        )
     (homes / "broken/.config").write_text("not a directory\n")
     register(hub, "broken")
 
@@ -579,9 +586,44 @@ def test_a_failed_install_keeps_the_machines_completed_private_changes(
     answer = json.loads(result.stderr.splitlines()[-1])
     assert answer["ok"] is False
     assert answer["changes"] == [["sync", "broken", git(hub, "rev-parse", "HEAD")[:7]]]
-    assert git(
-        hub.parent / "skills-private.git", "show", "main:content/secret/SKILL.md"
-    ) == ("saved before failure")
+    if behind:
+        assert git(broken, "rev-parse", "HEAD") != before
+        assert git(broken, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+    else:
+        assert (
+            git(
+                hub.parent / "skills-private.git",
+                "show",
+                "main:content/secret/SKILL.md",
+            )
+            == "saved before failure"
+        )
+
+
+def test_others_reports_the_coordinators_private_save(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    host = socket.gethostname().split(".")[0]
+    register(hub, host)
+    private = hub / "_skills_private"
+    before = git(private, "rev-parse", "HEAD")
+    (private / "content/secret/SKILL.md").write_text("saved from the coordinator\n")
+    expected = changed(["sync", host, git(hub, "rev-parse", "HEAD")[:7]])
+
+    preview = run(hub, homes, bin_dir, "--others", "--dry-run")
+
+    assert (preview.returncode, preview.stdout, preview.stderr) == (0, expected, "")
+    assert git(private, "rev-parse", "HEAD") == before
+
+    result = run(hub, homes, bin_dir, "--others")
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, expected, "")
+    assert git(private, "rev-parse", "HEAD") != before
+    assert (
+        git(hub.parent / "skills-private.git", "show", "main:content/secret/SKILL.md")
+        == "saved from the coordinator"
+    )
 
 
 def test_an_interrupt_kills_a_group_whose_leader_exits_first(
