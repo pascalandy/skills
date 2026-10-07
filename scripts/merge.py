@@ -315,25 +315,24 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
         )
     require_contains_main(sha, args.timeout)
     changes = []
-    if not signed_off(sha, args.timeout):
-        changes.append(["signoff", sha[:7]])
-        if not args.dry_run:
-            check_and_sign(sha, args.timeout)
-    changes.append(["merge", f"#{pr.number}", sha[:7]])
-    if args.dry_run:
-        return {"changes": changes}
-    wait_until_mergeable(pr.number, sha, args.timeout)
-    # main can move while the checks run
-    require_contains_main(sha, args.timeout)
-    land(pr, sha, args.timeout)
     try:
+        if not signed_off(sha, args.timeout):
+            if not args.dry_run:
+                check_and_sign(sha, args.timeout)
+            changes.append(["signoff", sha[:7]])
+        if args.dry_run:
+            return {"changes": [*changes, ["merge", f"#{pr.number}", sha[:7]]]}
+        wait_until_mergeable(pr.number, sha, args.timeout)
+        # main can move while the checks run
+        require_contains_main(sha, args.timeout)
+        land(pr, sha, args.timeout)
+        changes.append(["merge", f"#{pr.number}", sha[:7]])
         deployed = deploy(sha, args)
     except ScriptError as error:
-        # The failure still lists what landed, and what the deploy reached
         reached = error.report.get("changes", [])
-        raise ScriptError(
-            *error.args, report={"changes": [*changes, *reached]}
-        ) from None
+        if changes or reached:
+            error.report["changes"] = [*changes, *reached]
+        raise
     return {"changes": [*changes, *deployed]}
 
 

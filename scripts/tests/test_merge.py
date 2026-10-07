@@ -113,12 +113,17 @@ def test_refuses_a_branch_without_main_tip_before_the_checks(
 
 
 def test_merges_nothing_when_the_pr_moves_after_the_signoff(github: Sandbox) -> None:
+    head = github.git("rev-parse", "HEAD")
     github.open_pr()
     github.hook("signoff", github.push_elsewhere("feature", "late"))
 
     result = github.run("merge.py")
 
     assert result.returncode == 1
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["signoff", head[:7]]
+    ]
+    assert github.statuses() == {head: "success"}
     assert "rerun just merge to check the new head" in result.stderr
     assert github.main_subject() == "seed"
     assert github.deploys() == []
@@ -139,14 +144,24 @@ def test_fails_when_main_moves_just_before_the_merge(github: Sandbox) -> None:
     assert github.deploys() == []
 
 
-def test_a_merge_call_lost_to_the_network_stays_retryable(github: Sandbox) -> None:
+@pytest.mark.parametrize("signed", [True, False])
+def test_a_merge_call_lost_to_the_network_stays_retryable(
+    github: Sandbox, signed: bool
+) -> None:
+    head = github.git("rev-parse", "HEAD")
     github.open_pr()
-    github.sign(github.git("rev-parse", "HEAD"))
+    if signed:
+        github.sign(head)
     github.hook("pr merge", "echo 'error connecting to api.github.com' >&2; exit 1")
 
     result = github.run("merge.py")
 
     assert result.returncode == 75
+    assert result.stdout == ""
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["retry"] == "just merge"
+    assert answer.get("changes", []) == ([] if signed else [["signoff", head[:7]]])
+    assert github.statuses() == {head: "success"}
     assert "error connecting to api.github.com" in result.stderr
     assert github.main_subject() == "seed"
 
