@@ -17,7 +17,7 @@ Write documents an agent reads so that it takes the same _process_ every run: a 
 
 ## Pick the branch
 
-- **Make an edit the request spells out in a target skill**, such as a one-line fix from an issue: apply the BPs to the lines you write or change, then run the skill validator and any test the request names. Done when the validator reports nothing about your lines and those tests pass; report what the validator prints about other lines as findings
+- **Make an edit the request spells out in a target skill**, such as a one-line fix from an issue: apply the BPs to the lines you write or change, then run the skill validator and any test the request names. Done when the validator lists no finding about your lines and those tests pass; report the findings it lists about other lines
 - **Create or improve a target skill, or make an edit the request leaves open**: follow [Create, edit, or improve a skill](#create-edit-or-improve-a-skill)
 - **Review a target skill or target document**: follow [Review](#review)
 - **Write or edit a target document**: apply the "Any agent document" BPs to the lines you write or change, and report other lines that break one as findings; the skill validator does not apply. Done when each line you write or change passes those BPs, such as a new rule merged into the line that already covers its subject (BP_02) and stated as what to do (BP_05)
@@ -33,7 +33,7 @@ Skill progress:
 - [ ] Step 3: Frontmatter
 - [ ] Step 4: Body
 - [ ] Step 5: Scripts and prerequisites
-- [ ] Step 6: Skill validator silent
+- [ ] Step 6: Skill validator passes
 - [ ] Step 7: Evaluations beat the baseline
 - [ ] Step 8: BP checklist complete
 ```
@@ -48,7 +48,7 @@ Skill progress:
 
 **Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). When the `coding-language` skill is installed, load it before writing a script, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand and each script has tests that pass.
 
-**Step 6: Skill validator silent.** Run the skill validator, fix each error, and rerun. Done when it prints nothing, or every warning left has a reason you tell the user.
+**Step 6: Skill validator passes.** Run the skill validator, fix each `error` finding, and rerun. Done when it answers `{"ok":true}`, or every finding left is a `warning` with a reason you tell the user.
 
 **Step 7: Evaluations beat the baseline.** Rerun the scenarios with the eval runner on the commit you will merge. Done when the target skill passes every expected behavior; otherwise return to Step 4.
 
@@ -79,7 +79,7 @@ Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/
 uv run <this-skill-folder>/scripts/validate_skill.py <target-skill-folder>
 ```
 
-It prints nothing for a clean target skill. Each finding is one line, `path:line: error|warning: BP_NN Title: message`, and any error exits 1. It checks the BPs marked _(validator)_; every other BP needs your judgment.
+It answers `{"ok":true}` for a clean target skill. Otherwise it exits 1, and the last line of stderr, `{"ok":false,"errors":[…]}`, lists each finding as `path:line: error|warning: BP_NN Title: message`; a warning fails too. It checks the BPs marked _(validator)_; every other BP needs your judgment.
 
 The link check covers inline links with at most one level of parentheses, angle-bracket destinations, and single-line reference definitions inside the target folder. Check other links and inline-code paths yourself. The validator checks inline-code paths for backslashes only.
 
@@ -91,7 +91,7 @@ Requires `uv`, `git`, and the CLI of each agent it runs: `claude --version` and 
 uv run <this-skill-folder>/scripts/run_evals.py <target-skill-folder> --ref <git-ref>
 ```
 
-It runs each scenario in `evals/evals.json` in a fresh repo per agent, with the skill copied from `<git-ref>` and the installed copies hidden, so a run never tests the wrong version. Runs carry no GitHub or git credentials, so GitHub refuses their writes; a scenario that reads GitHub needs a read-only token, passed as `--help` describes. It prints one line per run with its folder. Grade each folder's `answer.md`, `events.jsonl`, and `git-log.txt` against the scenario's expected behavior. `--help` lists the options.
+It runs each scenario in `evals/evals.json` in a fresh repo per agent, with the skill copied from `<git-ref>` and the installed copies hidden, so a run never tests the wrong version. Runs carry no GitHub or git credentials, so GitHub refuses their writes; a scenario that reads GitHub needs a read-only token, passed as `--help` describes. It answers `{"ok":true,"folders":[…]}`, one folder per run. Grade each folder's `answer.md`, `events.jsonl`, and `git-log.txt` against the scenario's expected behavior. `--help` lists the options.
 
 ## Best practices checklist
 

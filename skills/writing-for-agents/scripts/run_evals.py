@@ -383,8 +383,9 @@ refuses their writes, so a scenario that needs a remote uses a local bare
 repository. --github-token-file gives gh a token for scenarios that read
 GitHub; give it a read-only one. A gh shim logs every call to gh-calls.log. A
 runner started inside a run refuses to start. A run that ends or times out has
-its process group and every descendant stopped. stdout prints one line per run: name,
-status, folder."""
+its process group and every descendant stopped. A run answers
+{"ok":true,"folders":[...]}, one folder per run, and a dry run answers the same
+without running; a failure lists each run's status on stderr before its answer."""
 
 GH_SHIM = """\
 #!/usr/bin/env bash
@@ -863,7 +864,7 @@ def read_token(path: Path | None) -> str | None:
     return token
 
 
-def launch(args: argparse.Namespace) -> str:
+def launch(args: argparse.Namespace) -> dict[str, Any]:
     if env_flag(PARENT_ENV):
         raise ScriptError(
             "run_evals.py is running inside an eval run, which cannot start another; "
@@ -894,8 +895,9 @@ def launch(args: argparse.Namespace) -> str:
         for scenario in scenarios
         for agent in agents
     ]
+    folders = {"folders": [str(run.folder) for run in runs]}
     if args.dry_run:
-        return "\n".join(f"{run.name}\tplanned\t{run.folder}" for run in runs)
+        return folders
     plan.output.mkdir(parents=True, exist_ok=True)
     children = Children()
     pool = ThreadPoolExecutor(max_workers=args.jobs)
@@ -921,7 +923,7 @@ def launch(args: argparse.Namespace) -> str:
             "read setup.log or stderr.log in each run folder",
             detail=lines,
         )
-    return lines
+    return folders
 
 
 def positive(text: str) -> int:
@@ -991,68 +993,13 @@ def build_parser() -> Parser:
         "-n",
         "--dry-run",
         action="store_true",
-        help="print the runs without running them",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="print each run's start and status on stderr",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help=f"print tracebacks on stderr; also {DEBUG_ENV}=1",
+        help="answer the run folders without running them",
     )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    argv = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser()
-    if given(argv, "-h", "--help", parser=parser):
-        parser.print_help()
-        return 0
-    with signals_interrupt():
-        try:
-            args = parser.parse_args(argv)
-            debug = args.debug or env_flag(DEBUG_ENV)
-            logging.basicConfig(
-                format="%(message)s",
-                level=logging.DEBUG
-                if debug
-                else logging.INFO
-                if args.verbose
-                else logging.WARNING,
-                stream=sys.stderr,
-                force=True,
-            )
-            output = launch(args)
-        except SystemExit as exit_:
-            return exit_.code if isinstance(exit_.code, int) else 1
-        except Interrupted as stopped:
-            print(
-                "interrupted" if stopped.code == INTERRUPTED else "terminated",
-                file=sys.stderr,
-            )
-            return stopped.code
-        except ScriptError as error:
-            if error.detail:
-                print(error.detail, file=sys.stderr)
-            if isinstance(error, UsageError):
-                parser.print_usage(sys.stderr)
-            for message in error.args:
-                print(f"error: {message}", file=sys.stderr)
-            if isinstance(error, UsageError):
-                print(f"run '{parser.prog} --help'", file=sys.stderr)
-            return error.code
-        except Exception as error:
-            log.debug("unexpected failure", exc_info=True)
-            print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
-            return 1
-    if output:
-        print(output)
-    return 0
+    return run_script(build_parser(), launch, argv, debug=DEBUG_ENV)
 
 
 if __name__ == "__main__":

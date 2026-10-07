@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -39,9 +40,21 @@ def skill(
     return root
 
 
-def run(capsys: pytest.CaptureFixture[str], *folders: Path) -> tuple[int, list[str]]:
-    code = validator.main([str(folder) for folder in folders])
-    return code, capsys.readouterr().out.splitlines()
+def errors(code: int, out: str, err: str) -> list[str]:
+    """The errors of the one-line answer, after checking it agrees with `code`."""
+    if code == 0:
+        assert out == '{"ok":true}\n'
+        return []
+    assert out == ""
+    answer = json.loads(err.splitlines()[-1])
+    assert answer["ok"] is False
+    return answer["errors"]
+
+
+def run(capsys: pytest.CaptureFixture[str], *args: str | Path) -> tuple[int, list[str]]:
+    code = validator.main([str(arg) for arg in args])
+    captured = capsys.readouterr()
+    return code, errors(code, captured.out, captured.err)
 
 
 def test_this_skill_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
@@ -58,16 +71,17 @@ def test_exclude_skips_findings_in_copied_files(
     )
 
     code, lines = run(capsys, root)
-    excluded = validator.main(["--exclude", str(root / "vendor"), str(root)])
 
     assert (code, len(lines)) == (1, 2)
-    assert excluded == 1
-    assert capsys.readouterr().out.splitlines() == [
-        f"{root}/mine.md:1: error: BP_12 Links resolve: link to missing file 'gone.md'"
-    ]
+    assert run(capsys, "--exclude", root / "vendor", root) == (
+        1,
+        [
+            f"{root}/mine.md:1: error: BP_12 Links resolve: link to missing file 'gone.md'"
+        ],
+    )
 
 
-def test_clean_skill_prints_nothing(
+def test_clean_skill_answers_ok(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = skill(
@@ -206,9 +220,7 @@ def test_backslash_link(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     )
 
 
-def test_reference_warnings_keep_exit_zero(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_warnings_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     long_reference = "# Long\n" + "text\n" * 100
     root = skill(
         tmp_path,
@@ -220,12 +232,37 @@ def test_reference_warnings_keep_exit_zero(
         },
     )
     assert run(capsys, root) == (
-        0,
+        1,
         [
             f"{root}/references/a.md:3: warning: BP_01 Progressive disclosure: links to reference file 'b.md'; link it from SKILL.md instead",
             f"{root}/references/long.md:1: warning: BP_16 Contents list: 101 lines and no Contents list; ask the user before adding one",
         ],
     )
+
+
+def test_errors_only_leaves_warnings_to_verbose(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = skill(
+        tmp_path,
+        "See [a](references/a.md) and [gone](gone.md).\n",
+        files={"references/a.md": "See [b](b.md).\n", "references/b.md": "# B\n"},
+    )
+    warning = f"{root}/references/a.md:1: warning: BP_01 Progressive disclosure: links to reference file 'b.md'; link it from SKILL.md instead"
+    error = (
+        f"{root}/SKILL.md:6: error: BP_12 Links resolve: link to missing file 'gone.md'"
+    )
+
+    assert run(capsys, root) == (1, [error, warning])
+    assert run(capsys, "--errors-only", root) == (1, [error])
+    (root / "SKILL.md").write_text(
+        "---\nname: processing-pdfs\ndescription: Use when filling PDF forms.\n---\n\n"
+        "See [a](references/a.md).\n",
+        encoding="utf-8",
+    )
+    assert run(capsys, "--errors-only", root) == (0, [])
+    assert validator.main(["--errors-only", "-v", str(root)]) == 0
+    assert capsys.readouterr().err == f"{warning}\n"
 
 
 def test_contents_list_satisfies_bp_16(
@@ -242,7 +279,11 @@ def test_folder_without_skill_md_is_a_usage_error(
     assert validator.main([str(tmp_path)]) == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert f"error: {tmp_path} has no SKILL.md; pass a skill folder" in captured.err
+    assert json.loads(captured.err) == {
+        "ok": False,
+        "errors": [f"{tmp_path} has no SKILL.md; pass a skill folder"],
+        "help": "validate_skill.py --help",
+    }
 
 
 def test_validator_ids_match_the_skill_list() -> None:
@@ -305,13 +346,17 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
         text=True,
         check=False,
     )
-    assert (result.returncode, result.stderr, result.stdout.splitlines()) == (
-        1,
-        "",
-        [
+    answer = {
+        "ok": False,
+        "errors": [
             f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' does not match the folder name 'bad-name'",
             f"{root}/SKILL.md:2: error: BP_13 Name: name 'Bad_Name' may only use lowercase letters, digits, and hyphens",
         ],
+    }
+    assert (result.returncode, result.stdout, result.stderr) == (
+        1,
+        "",
+        json.dumps(answer, separators=(",", ":")) + "\n",
     )
 
 
@@ -363,7 +408,7 @@ def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         "start with 'Use only when explicitly invoked as `word`', the word in backticks"
     )
     assert run(capsys, good, bare, actor, mention, by_user, model, restricted) == (
-        0,
+        1,
         [
             f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
             f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: names an actor, 'the user'; a delegated prompt would be refused",

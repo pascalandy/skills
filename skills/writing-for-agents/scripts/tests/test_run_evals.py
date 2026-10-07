@@ -152,6 +152,15 @@ def run(lab: Lab, *args: str, **env: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def answer(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
+    """The one-line answer: on stdout for a success, else the last line of stderr."""
+    if result.returncode == 0:
+        assert result.stdout.count("\n") == 1, result.stdout
+        return json.loads(result.stdout)
+    assert result.stdout == ""
+    return json.loads(result.stderr.splitlines()[-1])
+
+
 def report(lab: Lab, name: str, file: str) -> str:
     return (lab.reports / name / file).read_text(encoding="utf-8")
 
@@ -161,12 +170,8 @@ def test_each_scenario_runs_in_each_agent_with_the_skill_from_the_ref(lab: Lab):
     result = run(lab, "--ref", str(lab.ref), "--output-dir", str(out))
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == [
-        f"s1-claude\tdone\t{out / 's1-claude'}",
-        f"s1-codex\tdone\t{out / 's1-codex'}",
-        f"s2-claude\tdone\t{out / 's2-claude'}",
-        f"s2-codex\tdone\t{out / 's2-codex'}",
-    ]
+    names = ("s1-claude", "s1-codex", "s2-claude", "s2-codex")
+    assert answer(result) == {"ok": True, "folders": [str(out / n) for n in names]}
     assert report(lab, "s1-claude", "demo") == "demo v2\n"
     assert report(lab, "s1-codex", "demo") == "demo v2\n"
     assert report(lab, "s1-claude", "skills").split() == ["demo", "helper"]
@@ -225,9 +230,13 @@ def test_a_missing_agent_cli_stops_before_any_run(lab: Lab):
     result = run(lab, "--ref", str(lab.ref), "--output-dir", str(out), PATH=str(tools))
 
     assert result.returncode == 1
-    assert result.stdout == ""
-    assert "claude is not installed" in result.stderr
-    assert "codex is not installed" in result.stderr
+    assert answer(result) == {
+        "ok": False,
+        "errors": [
+            f"{cli} is not installed; install it, or leave its agent out with --agent"
+            for cli in ("claude", "codex")
+        ],
+    }
     assert not out.exists()
 
 
@@ -237,18 +246,23 @@ def test_a_failed_setup_names_the_command_and_prints_every_run_on_stderr(lab: La
     result = run(lab, "--ref", str(lab.ref), "--output-dir", str(lab.out))
 
     assert result.returncode == 1
-    assert result.stdout == ""
     assert "s1-claude\tsetup failed: false" in result.stderr
-    assert "2 of 2 runs did not finish" in result.stderr
+    assert answer(result)["errors"] == [
+        (
+            "2 of 2 runs did not finish: s1-claude, s1-codex; "
+            "read setup.log or stderr.log in each run folder"
+        )
+    ]
 
 
-def test_dry_run_prints_the_plan_and_writes_nothing(lab: Lab):
+def test_dry_run_answers_the_folders_and_writes_nothing(lab: Lab):
     out = lab.out
     result = run(lab, "--ref", str(lab.ref), "--output-dir", str(out), "--dry-run")
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines()[0] == f"s1-claude\tplanned\t{out / 's1-claude'}"
-    assert len(result.stdout.splitlines()) == 4
+    folders = answer(result)["folders"]
+    assert isinstance(folders, list)
+    assert (folders[0], len(folders)) == (str(out / "s1-claude"), 4)
     assert not out.exists()
     assert not any(lab.reports.iterdir())
 
@@ -272,8 +286,9 @@ def test_bad_input_is_a_usage_error(lab: Lab, scenarios, args, message):
     result = run(lab, *ref, *args, "--output-dir", str(lab.out))
 
     assert result.returncode == 2
-    assert message in result.stderr
-    assert result.stdout == ""
+    failure = answer(result)
+    assert message in str(failure["errors"])
+    assert failure["help"] == "run_evals.py --help"
 
 
 @pytest.mark.parametrize("number", [signal.SIGINT, signal.SIGTERM])
@@ -315,7 +330,8 @@ def test_an_interrupt_during_setup_launches_no_agent(lab: Lab, number):
 
     assert runner.returncode == 128 + number
     assert stdout == b""
-    assert stderr == (b"interrupted\n" if number == signal.SIGINT else b"terminated\n")
+    word = b"interrupted" if number == signal.SIGINT else b"terminated"
+    assert stderr == b'{"ok":false,"errors":["' + word + b'"]}\n'
     assert not any(lab.reports.iterdir())
 
 
@@ -496,8 +512,7 @@ def test_a_runner_inside_an_eval_run_refuses_to_start(lab: Lab):
     )
 
     assert result.returncode == 1
-    assert result.stdout == ""
-    assert "running inside an eval run" in result.stderr
+    assert "running inside an eval run" in str(answer(result)["errors"])
     assert not lab.out.exists()
 
 

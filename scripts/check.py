@@ -165,11 +165,13 @@ CHECKS = [
     Check("remote-skills", uv_run("scripts/remote_skills.py", "--check")),
     Check("cli-block", uv_run("scripts/check_cli_block.py")),
     # The compiled validator names no package, so this runs on every change.
+    # Warnings the skills already carry were accepted, so only errors fail here.
     # corey-mode's playbooks are Corey Haines' text, pinned by its upstream lock
     Check(
         "skills",
         uv_run(
             "skills/writing-for-agents/scripts/validate_skill.py",
+            "--errors-only",
             "--exclude",
             "skills/corey-mode/playbooks",
             *SKILLS,

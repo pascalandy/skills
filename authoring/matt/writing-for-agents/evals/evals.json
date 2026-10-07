@@ -27,7 +27,7 @@
       "Ships a script that does the conversion and tells the agent to run it",
       "Names the tool the script needs, with its install command, before the first step that uses it",
       "Checks that each required tool is available before using it",
-      "Runs the skill validator on the new skill and ends with it printing nothing",
+      "Runs the skill validator on the new skill and ends with it answering {\"ok\":true}",
       "Writes tests for the script and runs them until they pass",
       "Keeps SKILL.md under 500 lines"
     ]
@@ -53,7 +53,7 @@
       "Shows the filled BP checklist before editing, with at least five BPs open and their finding counts",
       "Writes evaluation scenarios for pdf-helper and records a baseline for each before changing its behavior",
       "Edits pdf-helper/SKILL.md to fix the validator errors and at least three judgment findings, such as BP_06, BP_14, BP_19",
-      "Runs the skill validator on pdf-helper and ends with it printing nothing, or names the reason for each warning left",
+      "Runs the skill validator on pdf-helper and ends with it answering {\"ok\":true}, or names the reason for each warning left",
       "Ends with the BP checklist filled again, each BP ticked or open with a reason only the user can resolve, and a reason for each BP that does not apply",
       "Leaves the name change to the user, or renames the folder and the name together"
     ]
@@ -66,7 +66,7 @@
     "expected_behavior": [
       "Replaces only the element-names line in pdf-helper/SKILL.md and leaves every other line unchanged",
       "Writes the new line positively and calls them fields, such as 'Check the field names before you copy them.'",
-      "Runs the skill validator on pdf-helper and reports what it prints about other lines as findings, without fixing them",
+      "Runs the skill validator on pdf-helper and reports the findings it lists about other lines, without fixing them",
       "Writes no evaluation scenarios and shows no filled BP checklist"
     ]
   }
