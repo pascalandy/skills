@@ -134,7 +134,7 @@ def given(
     argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
 ) -> bool:
     """Whether one of `flags` comes before `--`, where options end; use it to let
-    -h and --help win over every other argument, or to spot --json early.
+    -h and --help win over every other argument.
 
     With `parser`, a bundle of its flag letters counts too, such as -vh for
     -v -h; a bundle holding an option that takes a value never does.
@@ -248,10 +248,6 @@ def named_command(
                 parser = action.choices[arg]
                 break
     return parser
-
-
-def usage_error(message: str) -> NoReturn:
-    raise UsageError(message)
 
 
 def usage_error_for(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
