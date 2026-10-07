@@ -21,16 +21,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import (
-    answer_in,
-    changes_in,
-    is_network_failure,
-    replay,
-    run,
-    run_git,
-    run_script,
-)
+from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_script
+from _common import answer_in, changes_in, is_network_failure, replay, run, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"

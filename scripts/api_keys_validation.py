@@ -14,8 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, TemporaryError, exit_codes
-from _common import frontmatter_value, main_checkout, run, run_script
+from _cli import Parser, ScriptError, TemporaryError, exit_codes, run_script
+from _common import frontmatter_value, main_checkout, run
 
 ROOT = Path(__file__).resolve().parent.parent
 TREES = (ROOT / "authoring", main_checkout(ROOT) / "_skills_private")

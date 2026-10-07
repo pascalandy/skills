@@ -73,7 +73,7 @@ $ uv run scripts/check_cli_block.py --fix
 
 ## How this repository does it
 
-- `answer()` prints the line and derives `ok` from the exit code. It lives in the cli block of `scripts/_cli.py`, so a skill script that pastes the block answers the same way. `run_script()` in `scripts/_common.py` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
+- `answer()` prints the line and derives `ok` from the exit code. `run_script()` sends every outcome through it. Both live in the cli block of `scripts/_cli.py`, so a skill script that pastes the block answers the same way: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
 - Each `justfile` recipe that runs such a script carries `[no-exit-message]`, for decision 10
 - The lock, decision 13: `scripts/tests/test_cli_contract.py` fails when a script in `scripts/` writes to stdout anywhere but in `answer()`, logs a warning, or answers a usage error in another form, and `scripts/tests/test_justfile.py` fails when a recipe that runs one lacks `[no-exit-message]`. pyright checks that `work` returns a dict
 - A pytest or pyright warning fails `just check`: `scripts/check.py` runs pytest with `-W error` and pyright with `--warnings` (#487). When a dependency starts to warn, filter that one warning in its check, with a comment that says why

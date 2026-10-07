@@ -30,15 +30,8 @@ from pathlib import Path
 from typing import Any
 
 import compile_skills
-from _cli import Parser, ScriptError, duration, exit_codes
-from _common import (
-    FRONTMATTER,
-    exclusive,
-    frontmatter_description,
-    run,
-    run_script,
-    swap,
-)
+from _cli import Parser, ScriptError, duration, exit_codes, run_script
+from _common import FRONTMATTER, exclusive, frontmatter_description, run, swap
 from sync_private import PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent

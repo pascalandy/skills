@@ -18,8 +18,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, exit_codes
-from _common import run, run_git, run_script
+from _cli import Parser, ScriptError, exit_codes, run_script
+from _common import run, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 

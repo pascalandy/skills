@@ -12,8 +12,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, exit_codes
-from _common import run_script
+from _cli import Parser, ScriptError, exit_codes, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"

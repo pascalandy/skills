@@ -23,8 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from _cli import Parser, ScriptError, UsageError, duration, exit_codes
-from _common import GRACE, run_git, run_script, send, stop
+from _cli import Parser, ScriptError, UsageError, duration, exit_codes, run_script
+from _common import GRACE, run_git, send, stop
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
