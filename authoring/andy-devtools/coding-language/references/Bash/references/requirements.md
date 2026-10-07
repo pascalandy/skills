@@ -32,6 +32,7 @@
   - Include timestamps
   - Colorized output to terminal (stderr) only when appropriate
   - Respect `NO_COLOR` (disable colors when set)
+  - `log_info`, `log_warn`, and `log_debug` print only with `-v`; `log_error` always prints
 - Cleanup pattern exists:
   - `cleanup()` function
   - `trap cleanup EXIT`
@@ -76,8 +77,9 @@
 
 ### Output contract
 
-- Logs go to stderr (human-readable, optionally colorized).
-- Stdout is reserved for command outputs or machine-readable results (template uses stdout for `--help/--version`).
+- The script answers in one compact JSON line through `answer()`, as [script-output](https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md) defines: `{"ok":true}` on stdout with exit 0, or an empty stdout and `{"ok":false,"errors":["…"]}` as the last line of stderr with the exit code. Each error names the command that fixes it.
+- Logs go to stderr (human-readable, optionally colorized), before the answer.
+- `--help` and `--version` print text to stdout.
 
 ### Exit codes
 
@@ -96,7 +98,8 @@
 - [ ] `log_info`, `log_warn`, `log_error`, `log_debug` exist and include timestamps.
 - [ ] Colors are disabled when `NO_COLOR` is set and never written to `--log-file`.
 - [ ] `cleanup()` runs on normal exit, error exit, and Ctrl+C.
-- [ ] Unknown options return exit code 2 with an error message.
+- [ ] Unknown options return exit code 2, an empty stdout, and `{"ok":false,…}` as the last line of stderr.
+- [ ] A success prints only `{"ok":true}`, on stdout.
 - [ ] Script does not auto-run and does not `exit` when sourced.
 - [ ] ShellCheck reports zero findings with `-x -o all`.
 
