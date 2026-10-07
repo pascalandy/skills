@@ -3152,8 +3152,10 @@ def _transcribe_and_save(
             if args.open:
                 open_folder(folder.path, budget)
             artifacts = _transcribe(asset, api_key, budget, reporter)
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as stop:
             folder.stop("interrupted")
+            # The queue answers what an interrupted run still saved
+            stop.__dict__["files"] = folder.files()
             raise
         except TRANSCRIPTION_ERRORS as error:
             failure = _transcription_failure(error, plan, args, argv)
@@ -3194,8 +3196,9 @@ def _transcribe_and_save(
         folder.usage = outcome.usage
         folder.summary_error = outcome.error
         folder.save_metadata()
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as stop:
         folder.stop("interrupted")
+        stop.__dict__["files"] = folder.files()
         raise
     except (OSError, RuntimeError) as error:
         folder.stop("failed", str(error))
@@ -3256,9 +3259,12 @@ def _run(
     reporter = ExecutionReporter(_live_console(args))
     reporter.run_configuration(plan, selected_prompt)
     api_key = _run_preflight(plan, args, argv, budget, reporter)
-    run = _transcribe_and_save(
-        plan, selected_prompt, args, argv, api_key, budget, reporter
-    )
+    try:
+        run = _transcribe_and_save(
+            plan, selected_prompt, args, argv, api_key, budget, reporter
+        )
+    except KeyboardInterrupt as stop:
+        raise _interruption(stop, []) from stop
 
     if run.summary.path and plan.preview:
         if sys.stderr.isatty():
@@ -3286,6 +3292,27 @@ def _run(
     elif run.summary.status == "skipped":
         reporter.skip("Summary preview", "no summary generated (--no-summary)")
     return {"files": run.files}
+
+
+def _interruption(
+    stop: KeyboardInterrupt,
+    files: Sequence[str],
+    rerun: str = "",
+    earlier: Sequence[str] = (),
+) -> Failure:
+    """The answer of an interrupted run: the files it and the run it stopped
+    saved, the failures before it, and the command that reruns the rest."""
+    code = getattr(stop, "code", INTERRUPTED)
+    word = "interrupted" if code == INTERRUPTED else "terminated"
+    return Failure(
+        word,
+        word,
+        rerun,
+        code=code,
+        label="rerun",
+        files=[*files, *stop.__dict__.get("files", [])],
+        earlier=earlier,
+    )
 
 
 def _queue_fix(
@@ -3373,13 +3400,10 @@ def _run_queue(
                 QUEUE_POSITION.reset(position)
             finished += 1
     except KeyboardInterrupt as stop:
-        code = getattr(stop, "code", INTERRUPTED)
-        word = "interrupted" if code == INTERRUPTED else "terminated"
         pending = urls[finished:]
         rerun = _rerun(argv, drop={"--url"}, add=("--url", *pending)) if pending else ""
-        raise Failure(
-            word, word, rerun, code=code, label="rerun", files=files
-        ) from stop
+        earlier = [f"{url}: {error.line}" for url, error in failed]
+        raise _interruption(stop, files, rerun, earlier) from stop
 
     if not failed:
         return {"files": files}

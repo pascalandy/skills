@@ -1188,14 +1188,36 @@ def test_an_interrupt_while_opening_a_folder_marks_it_and_keeps_earlier_results(
     failure = answer(err)
     assert (code, out) == (130, "")
     assert "[1/2] error: Summary generation failed: quota" in err
-    assert video_ids(failure["files"]) == ["aaa"]
-    assert failure["errors"] == [
-        "interrupted; rerun: "
-        + shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]])
-    ]
+    # The interrupted folder already held its metadata, so both runs answer
+    assert video_ids(failure["files"]) == ["aaa", "bbb"]
+    earlier, interrupted = failure["errors"]
+    assert earlier.startswith(f"{QUEUE[0]}: Summary generation failed: quota")
+    assert interrupted == "interrupted; rerun: " + shlex.join(
+        ["transcript", "run", "youtube", *options, "--url", QUEUE[1]]
+    )
     meta = (opened[1] / "meta.txt").read_text()
     assert "Transcript status: interrupted" in meta
     assert "Summary status: not started" in meta
+
+
+def test_an_interrupted_summary_answers_the_transcript_already_saved(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def interrupt(*_args):
+        raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "run_summary_prompt", interrupt)
+
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", QUEUE[0], "--output-dir", str(tmp_path)
+    )
+
+    failure = answer(err)
+    assert (code, out) == (130, "")
+    assert video_ids(failure["files"]) == ["aaa"]
+    assert any(path.endswith("raw_transcript.txt") for path in failure["files"])
 
 
 def test_a_preflight_failure_stops_the_queue_before_any_url(
