@@ -166,39 +166,47 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
                     f"could not commit private edits: {last_line(done)}; see why with "
                     f"git -C {PRIVATE} commit, then rerun uv run scripts/sync_private.py"
                 )
-    before = git("rev-parse", "HEAD").stdout.strip()
-    log.info("pull %s", LABEL)
-    pulled = git("pull", "--rebase", "--quiet", timeout=timeout)
-    if pulled.returncode:
-        rebasing = any(
-            (PRIVATE / git("rev-parse", "--git-path", part).stdout.strip()).exists()
-            for part in ("rebase-merge", "rebase-apply")
-        )
-        if rebasing:
-            git("rebase", "--abort")
-            raise ScriptError(
-                f"private edits on {host} conflict with GitHub; resolve them with "
-                f"git pull --rebase in {PRIVATE}, then rerun"
+    # A failure after the commit still answers it, so the saved edits stay known
+    try:
+        before = git("rev-parse", "HEAD").stdout.strip()
+        log.info("pull %s", LABEL)
+        pulled = git("pull", "--rebase", "--quiet", timeout=timeout)
+        if pulled.returncode:
+            rebasing = any(
+                (PRIVATE / git("rev-parse", "--git-path", part).stdout.strip()).exists()
+                for part in ("rebase-merge", "rebase-apply")
             )
-        raise failed(
-            "could not pull the private repository",
-            pulled,
-            f"fix the clone at {PRIVATE}, then rerun",
-        )
-    after = git("rev-parse", "HEAD").stdout.strip()
-    if after != before:
-        changes.append(["pull", LABEL, f"{before[:7]}..{after[:7]}"])
-    ahead = git("rev-list", "--count", "@{upstream}..HEAD").stdout.strip()
-    if ahead not in ("", "0"):
-        log.info("push %s", LABEL)
-        pushed = git("push", "--quiet", timeout=timeout)
-        if pushed.returncode:
+            if rebasing:
+                git("rebase", "--abort")
+                raise ScriptError(
+                    f"private edits on {host} conflict with GitHub; resolve them with "
+                    f"git pull --rebase in {PRIVATE}, then rerun"
+                )
             raise failed(
-                f"could not push private edits from {host}",
-                pushed,
+                "could not pull the private repository",
+                pulled,
                 f"fix the clone at {PRIVATE}, then rerun",
             )
-        changes.append(["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"])
+        after = git("rev-parse", "HEAD").stdout.strip()
+        if after != before:
+            changes.append(["pull", LABEL, f"{before[:7]}..{after[:7]}"])
+        ahead = git("rev-list", "--count", "@{upstream}..HEAD").stdout.strip()
+        if ahead not in ("", "0"):
+            log.info("push %s", LABEL)
+            pushed = git("push", "--quiet", timeout=timeout)
+            if pushed.returncode:
+                raise failed(
+                    f"could not push private edits from {host}",
+                    pushed,
+                    f"fix the clone at {PRIVATE}, then rerun",
+                )
+            changes.append(
+                ["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"]
+            )
+    except ScriptError as error:
+        if changes:
+            error.report["changes"] = changes
+        raise
     log.debug("private repository at %s", after)
     return changes
 

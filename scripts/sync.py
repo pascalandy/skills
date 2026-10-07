@@ -112,24 +112,30 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         f"{args.timeout:g}",
     ]
     changes: list[list[str]] = []
-    if args.dry_run or args.check:
-        flags = ["--dry-run" if args.dry_run else "--check"]
-    else:
-        changes += pull_main(args.timeout)
+    try:
+        if args.dry_run or args.check:
+            flags = ["--dry-run" if args.dry_run else "--check"]
+        else:
+            changes += pull_main(args.timeout)
+            changes += step(
+                "scripts/sync_private.py",
+                sys.executable,
+                str(SCRIPTS / "sync_private.py"),
+                *levels,
+            )
+            flags = []
         changes += step(
-            "scripts/sync_private.py",
+            "just install-skills",
             sys.executable,
-            str(SCRIPTS / "sync_private.py"),
+            str(SCRIPTS / "install_skills.py"),
+            *flags,
             *levels,
         )
-        flags = []
-    changes += step(
-        "just install-skills",
-        sys.executable,
-        str(SCRIPTS / "install_skills.py"),
-        *flags,
-        *levels,
-    )
+    except ScriptError as error:
+        # A failed step still answers what the steps before it changed
+        if changes:
+            error.report["changes"] = changes
+        raise
     return {"changes": changes} if changes else {}
 
 

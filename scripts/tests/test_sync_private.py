@@ -122,6 +122,9 @@ def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     assert result.returncode == 1
     assert "private edits on " in result.stderr
     assert "conflict with GitHub" in result.stderr
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["commit", "_skills_private", f"save edits from {HOST}"]
+    ]
     assert secret.read_text() == "from two\n"
     assert git(two / "_skills_private", "status", "--porcelain") == ""
     assert not (two / "_skills_private/.git/rebase-merge").exists()
