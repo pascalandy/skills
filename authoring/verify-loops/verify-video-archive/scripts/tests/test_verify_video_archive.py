@@ -233,12 +233,15 @@ class AnswerTests(RunFixture):
 
     def setUp(self) -> None:
         super().setUp()
-        # Only git on PATH: doctor finds no media tools, so drive starts no scenario
+        # Only git, and sysctl where the run reads the CPU name, on PATH: doctor
+        # finds no media tools, so drive starts no scenario
         self.bin = Path(self.temporary.name) / "bin"
         self.bin.mkdir()
         git = shutil.which("git")
         assert git is not None
         (self.bin / "git").symlink_to(git)
+        if sysctl := shutil.which("sysctl"):
+            (self.bin / "sysctl").symlink_to(sysctl)
 
     def answer(self, *args: str) -> tuple[int, str, dict[str, Any]]:
         """The exit code, stdout, and the JSON line that ends the output."""
