@@ -218,7 +218,7 @@ answer() {
 		errors+="${errors:+,}$(fct_json_string "${message}")"
 		# Why: --log-file keeps the failure too; stderr gets it once, in the answer.
 		if [[ -n "${LOG_FILE}" ]]; then
-			printf '%s\n' "${ts} [${SCRIPT_NAME}] ERROR: ${message}" >>"${LOG_FILE}"
+			printf '%s\n' "${ts} [${SCRIPT_NAME}] ERROR: ${message}" >>"${LOG_FILE}" || true
 		fi
 	done
 	printf '{"ok":false,"errors":[%s]}\n' "${errors}" >&2
