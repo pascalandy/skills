@@ -944,11 +944,18 @@ def api_run(plan: Plan, job: Job) -> tuple[list[bytes], dict[str, Any]]:
             {"type": "image_url", "image_url": {"url": data_url(p)}} for p in job.images
         ]
     response = api_post("images", body)
-    images = [
-        base64.b64decode(item["b64_json"])
-        for item in response.get("data", [])
-        if item.get("b64_json")
-    ]
+    try:
+        images = [
+            base64.b64decode(item["b64_json"], validate=True)
+            for item in response.get("data", [])
+            if item.get("b64_json")
+        ]
+    except ValueError as error:
+        # The request was billed; a blind rerun pays again for the same answer
+        raise RunError(
+            f"OpenRouter returned an image that is not valid base64: {error}; check "
+            "the OpenRouter activity log before you request new images"
+        ) from error
     if not images:
         raise RunError("OpenRouter API returned no image data; retry once")
     meta = {

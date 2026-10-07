@@ -806,3 +806,30 @@ def test_a_save_failure_keeps_the_images_already_written(
     answer = failure(stdout, err)
     assert answer["errors"][0].startswith("could not save out-2.png: ")
     assert [Path(item["path"]).name for item in answer["files"]] == ["out-1.png"]
+
+
+def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        image_creator, "api_post", lambda route, body: {"data": [{"b64_json": "%%"}]}
+    )
+
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "x",
+        "--out",
+        str(env / "x.png"),
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert answer["errors"][0].startswith("OpenRouter returned an image that is not")
+    assert "rerun" not in answer
