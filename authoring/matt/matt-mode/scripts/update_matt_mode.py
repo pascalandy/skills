@@ -379,7 +379,7 @@ class Registry:
     files: tuple[FileRecord, ...]
 
 
-# How to repair a generated file that drifted from the lock
+# How to restore a generated file that is missing
 REGENERATE = (
     "; regenerate with: update_matt_mode.py update --upstream DIR --revision SHA"
 )
@@ -940,14 +940,20 @@ def verify_imports(root: Path, upstream: Path | None = None) -> list[str]:
         if digest is None:
             errors.append(f"missing generated file: {destination}{REGENERATE}")
         elif digest != record.rendered_sha256:
-            errors.append(f"changed generated file: {destination}{REGENERATE}")
+            errors.append(
+                f"changed generated file: {destination}; restore it from git, or "
+                "move your edit out of it, then rerun check"
+            )
     try:
         actual = generated_inventory(root, registry)
     except ImportError as error:
         errors.append(str(error))
         actual = set()
     for destination in sorted(actual - set(expected)):
-        errors.append(f"untracked generated file: {destination}{REGENERATE}")
+        errors.append(
+            f"untracked generated file: {destination}; move or delete it, then "
+            "rerun check"
+        )
 
     if upstream is not None:
         try:

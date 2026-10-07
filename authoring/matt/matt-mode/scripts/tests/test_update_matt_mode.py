@@ -162,7 +162,10 @@ def test_a_changed_generated_file_fails_the_check_on_stderr(
         "",
         {
             "ok": False,
-            "errors": [f"changed generated file: {PLAYBOOK}{updater.REGENERATE}"],
+            "errors": [
+                f"changed generated file: {PLAYBOOK}; restore it from git, or move your "
+                + "edit out of it, then rerun check"
+            ],
         },
     )
 
