@@ -253,6 +253,10 @@ def test_a_failed_setup_names_the_command_and_prints_every_run_on_stderr(lab: La
             "read setup.log or stderr.log in each run folder"
         )
     ]
+    assert answer(result)["folders"] == [
+        str(lab.out / "s1-claude"),
+        str(lab.out / "s1-codex"),
+    ]
 
 
 def test_dry_run_answers_the_folders_and_writes_nothing(lab: Lab):

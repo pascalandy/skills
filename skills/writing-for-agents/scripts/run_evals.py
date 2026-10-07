@@ -922,6 +922,7 @@ def launch(args: argparse.Namespace) -> dict[str, Any]:
             f"{len(failed)} of {len(runs)} runs did not finish: {', '.join(failed)}; "
             "read setup.log or stderr.log in each run folder",
             detail=lines,
+            report=folders,
         )
     return folders
 
