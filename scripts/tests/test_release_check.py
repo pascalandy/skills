@@ -178,7 +178,8 @@ class ReleaseCheckTests(unittest.TestCase):
             result, stdout, stderr = self.run_check("v0.1.0", "--notes", str(notes))
             contents = notes.read_text(encoding="utf-8")
 
-        self.assertEqual((result, stdout, stderr), (0, OK, ""))
+        self.assertEqual((result, stderr), (0, ""))
+        self.assertEqual(json.loads(stdout), {"ok": True, "file": str(notes)})
         self.assertEqual(contents, "### Added\n\n- Initial snapshot\n")
 
     def test_notes_on_stdout_is_a_usage_error(self) -> None:

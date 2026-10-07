@@ -24,7 +24,7 @@ SECTION = re.compile(r"## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}")
 
 EPILOG = """\
 A valid candidate answers {"ok":true}; --notes FILE also writes its release
-notes to FILE.
+notes to FILE and answers with its path under file.
 
 examples:
   just release-check v0.1.0
@@ -207,6 +207,7 @@ def check_release(version: str, notes: str | None) -> dict[str, Any]:
         raise ScriptError(*errors)
     if notes is not None:
         Path(notes).write_text(body, encoding="utf-8")
+        return {"file": str(Path(notes).resolve())}
     return {}
 
 
