@@ -102,26 +102,19 @@ A model or reasoning level named in the request overrides the file through `--mo
 
 ## Read the result
 
-On success, stdout starts with six lines:
+On success, stdout holds one JSON line:
 
-```text
-model: gpt-6-luna
-effort: medium
-session: 01a0f7d4-cbcf-7162-869b-94b331ed56b0
-changed: nothing
-run: /tmp/headless-codex-review-only.8gcz_axu
-answer: /tmp/headless-codex-review-only.8gcz_axu/answer.md
+```json
+{"ok":true,"file":"/tmp/headless-codex-review-only.8gcz_axu/answer.md","model":"gpt-6-luna","effort":"medium","session":"01a0f7d4-cbcf-7162-869b-94b331ed56b0","changed":[]}
 ```
 
-`model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed. The run folder also keeps `prompt.md` and the child's logs.
-
-After `--review-only` or `--code-review`, stdout stops there. Read the `answer` file with your file-reading tool, since an output filter such as RTK cuts long stdout. After `--review-fix`, the answer follows the six lines, and the file keeps it whole.
+`file` holds the child's answer in every mode. Read it with your file-reading tool, since an output filter such as RTK cuts long output. `model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed; outside Git it is `null`, because the launcher cannot check them. The answer file's folder also keeps `prompt.md` and the child's logs.
 
 Read the whole answer before deciding the run succeeded. A one-line "no findings" without criteria is weak evidence: add the criteria and check results, then rerun.
 
-Exit 1 means the child failed, gave no answer, was denied a tool, or changed the checkout under `--review-only` or `--code-review`, or the config is invalid. stderr names the cause and the run folder. Change the cause before a retry. Exit 2 is a usage error, such as an effort the CLI does not accept.
+On failure, stdout stays empty and the last line of stderr is `{"ok":false,"errors":[…]}`, one message per cause. Exit 1 means the child failed, gave no answer, was denied a tool, or changed the checkout under `--review-only` or `--code-review`, or the config is invalid. Once the child has run, that line also carries `file` and the other fields above. Change the cause before a retry. Exit 2 is a usage error, such as an effort the CLI does not accept.
 
-For a follow-up round on the same thread, pass the printed session to `--resume`. A fresh run gives an independent opinion.
+For a follow-up round on the same thread, pass the `session` to `--resume`. A fresh run gives an independent opinion.
 
 ## Wait for a run
 
