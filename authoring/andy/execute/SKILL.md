@@ -2,7 +2,6 @@
 name: "execute"
 description: "Use only when explicitly invoked as `execute` or `implement`, or by a clear go-ahead to implement an agreed plan."
 kind: "dev"
-configuration-is-needed: true
 ---
 
 Execute all of this! Show real **agency**: use your expert judgment on every decision and follow your gut on what most improves the project.
