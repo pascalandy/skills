@@ -66,7 +66,7 @@ def answer(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
     """The one-line answer: stdout on success, else the last line of stderr.
     Its ok must agree with the exit code."""
     if result.returncode == 0:
-        assert result.stdout.count("\n") == 1, result.stdout
+        assert len(result.stdout.splitlines()) == 1, result.stdout
         found = json.loads(result.stdout)
     else:
         assert result.stdout == ""
@@ -110,7 +110,9 @@ The arguments are valid, and the test expects exit 1 with a specific error, so a
 def test_unknown_flag_is_usage_error() -> None:
     result = run("--no-such-flag")
     assert result.returncode == 2
-    assert answer(result)["help"] == "tool.py --help"
+    found = answer(result)
+    assert found["errors"] == ["unrecognized arguments: --no-such-flag"]
+    assert found["help"] == "tool.py --help"
 ```
 
 ### Environment Variables
