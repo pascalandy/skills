@@ -212,8 +212,14 @@ answer() {
 
 	local errors=""
 	local message
+	local ts
+	ts="$(fct_timestamp)"
 	for message in "$@"; do
 		errors+="${errors:+,}$(fct_json_string "${message}")"
+		# Why: --log-file keeps the failure too; stderr gets it once, in the answer.
+		if [[ -n "${LOG_FILE}" ]]; then
+			printf '%s\n' "${ts} [${SCRIPT_NAME}] ERROR: ${message}" >>"${LOG_FILE}"
+		fi
 	done
 	printf '{"ok":false,"errors":[%s]}\n' "${errors}" >&2
 }
