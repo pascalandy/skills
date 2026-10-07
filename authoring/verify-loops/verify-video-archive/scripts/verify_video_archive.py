@@ -3190,6 +3190,14 @@ def run_all(
     ) as error:
         # The manifest of a run that stopped midway stays readable
         raise ScriptError(str(error), report={"file": str(manifest_path)}) from error
+    except KeyboardInterrupt as stop:
+        code = getattr(stop, "code", INTERRUPTED)
+        error = ScriptError(
+            "interrupted" if code == INTERRUPTED else "terminated",
+            report={"file": str(manifest_path)},
+        )
+        error.code = code
+        raise error from stop
     return manifest_path, summary
 
 
