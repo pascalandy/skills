@@ -455,7 +455,8 @@ def test_plan_run_writes_the_image_at_the_exact_requested_size(
     assert receipt["calls"][0]["prompt_verbatim"] is True
     assert receipt["files"][0]["width"] == 1536
     assert receipt["files"][0]["height"] == 864
-    assert Image.open(out).format == "WEBP"
+    with Image.open(out) as image:
+        assert image.format == "WEBP"
     assert "upscaled 1254x1254 by 1.22x to reach 1536x864" in err
 
 
