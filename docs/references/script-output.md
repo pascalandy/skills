@@ -58,7 +58,7 @@ Every answer uses only these keys beside a command's own data, so a caller never
 
 Any other key is the data the command exists to return, such as `checks` for `just check --list` (decision 6). A new key that means the same as one above reuses that name
 
-In a failed apply, `changes` and `files` hold what already happened, whatever stopped the run: a failure, an interrupt, or a bug. In a preview, `--dry-run` or `--check`, `changes` holds what an apply would do
+In a failed apply, `changes` and `files` hold what already happened. Each command keeps them on the failures it expects. `just sync`, `just install-skills`, `just merge`, `just sync-fleet`, and `scripts/sync_private.py` keep them on an interrupt or a bug too, as do the skill scripts that write files or packages: mermaid's `render_examples.py`, image-creator, and the corey-mode and matt-mode updaters. A child step stopped midway loses the changes it had not answered yet. In a preview, `--dry-run` or `--check`, `changes` holds what an apply would do
 
 ## Examples
 

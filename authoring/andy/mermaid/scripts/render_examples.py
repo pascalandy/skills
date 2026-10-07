@@ -587,6 +587,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         raise ScriptError(
             str(error), report={"files": rendered_files(results)}
         ) from None
+    except BaseException as error:
+        error.report = {**carried(error), "files": rendered_files(results)}  # pyright: ignore[reportAttributeAccessIssue]
+        raise
     failed = [
         f"{example.path}:{example.line}: did not render: "
         f"{first_line(error).rstrip(':')}; fix the cause in mmdc's message "

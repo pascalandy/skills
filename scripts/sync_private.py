@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_script
-from _common import exclusive, is_network_failure, main_checkout, run_git
+from _common import exclusive, is_network_failure, main_checkout, receipt, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 # One clone per machine: a worktree uses the one in the main checkout
@@ -166,8 +166,9 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
                     f"could not commit private edits: {last_line(done)}; see why with "
                     f"git -C {PRIVATE} commit, then rerun uv run scripts/sync_private.py"
                 )
-    # A failure after the commit still answers it, so the saved edits stay known
-    try:
+    # A failure, an interrupt, or a bug after the commit still answers it, so
+    # the saved edits stay known
+    with receipt(changes):
         before = git("rev-parse", "HEAD").stdout.strip()
         log.info("pull %s", LABEL)
         pulled = git("pull", "--rebase", "--quiet", timeout=timeout)
@@ -203,10 +204,6 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             changes.append(
                 ["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"]
             )
-    except ScriptError as error:
-        if changes:
-            error.report["changes"] = changes
-        raise
     log.debug("private repository at %s", after)
     return changes
 

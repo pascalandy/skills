@@ -1077,9 +1077,11 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
                 path.unlink()
             except OSError as error:
                 fail(f"cannot remove stale generated file {destination}: {error}")
-            prune_empty_parents(path, root)
             done.append(change)
+            prune_empty_parents(path, root)
         atomic_write(lock_file, lock_content)
+        if lock_changed:
+            done.append(["update", str(LOCK_PATH)])
     except ScriptError as error:
         raise ImportError(*error.args, report={"changes": done}) from error
     except OSError as error:
@@ -1087,6 +1089,9 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
             f"cannot write Matt mode: {error}; fix that path, then rerun update",
             report={"changes": done},
         ) from error
+    except BaseException as error:
+        error.report = {**carried(error), "changes": done}  # pyright: ignore[reportAttributeAccessIssue]
+        raise
     log.info("updated Matt mode from %s to %s", registry.revision, args.revision)
     return {"changes": changes}
 

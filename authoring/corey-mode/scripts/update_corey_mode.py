@@ -610,6 +610,9 @@ def update(
             f"could not write the package: {error}; fix that path, then rerun the update",
             report={"changes": changes},
         ) from error
+    except BaseException as error:
+        error.report = {**carried(error), "changes": changes}  # pyright: ignore[reportAttributeAccessIssue]
+        raise
     return changes
 
 

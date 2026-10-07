@@ -8,6 +8,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -129,6 +130,47 @@ def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     assert git(two / "_skills_private", "status", "--porcelain") == ""
     assert not (two / "_skills_private/.git/rebase-merge").exists()
     assert git(remote, "show", "main:content/secret/SKILL.md") == "from one"
+
+
+@pytest.mark.parametrize(
+    "failure,code", [("Interrupted(130)", 130), ("RuntimeError('boom')", 1)]
+)
+def test_a_stop_after_saving_edits_keeps_the_commit_receipt(
+    machines: tuple[Path, Path, Path], failure: str, code: int
+) -> None:
+    one, _, _ = machines
+    assert run(one).returncode == 0
+    private = one / "_skills_private"
+    (private / "content/secret/SKILL.md").write_text("saved edits\n")
+    driver = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import sync_private
+from _cli import Interrupted
+original = sync_private.git
+def stopped(*args, **kwargs):
+    if args[0] == "pull":
+        raise FAILURE
+    return original(*args, **kwargs)
+sync_private.git = stopped
+raise SystemExit(sync_private.main([]))
+""".replace("FAILURE", failure)
+    result = subprocess.run(
+        [sys.executable, "-c", driver, str(one / "scripts")],
+        cwd=one,
+        env={**os.environ, **GIT_IDENTITY, "HOME": str(one.parent / "home")},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+
+    assert (result.returncode, result.stdout) == (code, "")
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["commit", "_skills_private", f"save edits from {HOST}"]
+    ]
+    assert git(private, "show", "HEAD:content/secret/SKILL.md") == "saved edits"
+    assert git(private, "status", "--porcelain") == ""
 
 
 def test_leaves_a_folder_that_is_not_a_clone_untouched(

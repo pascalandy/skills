@@ -770,10 +770,22 @@ def test_doctor_without_any_backend_fails(
     ]
 
 
+@pytest.mark.parametrize(
+    "raised,expected_code,message",
+    [
+        (None, 1, "could not save out-2.png:"),
+        (image_creator.Interrupted(130), 130, "interrupted"),
+        (image_creator.Interrupted(143), 143, "terminated"),
+        (RuntimeError("boom"), 1, "RuntimeError: boom"),
+    ],
+)
 def test_a_save_failure_keeps_the_images_already_written(
     env: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
+    raised: BaseException | None,
+    expected_code: int,
+    message: str,
 ) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     good = base64.b64encode(png_bytes(1024, 1024)).decode()
@@ -788,6 +800,16 @@ def test_a_save_failure_keeps_the_images_already_written(
         },
     )
     out = env / "out.png"
+    save = image_creator.save_image
+
+    def stopped(
+        data: bytes, path: Path, output_format: str, target_size: tuple[int, int] | None
+    ) -> list[str]:
+        if path.name == "out-2.png" and raised is not None:
+            raise raised
+        return save(data, path, output_format, target_size)
+
+    monkeypatch.setattr(image_creator, "save_image", stopped)
     code, stdout, err = run(
         capsys,
         "generate",
@@ -801,10 +823,11 @@ def test_a_save_failure_keeps_the_images_already_written(
         "2",
     )
 
-    assert code == 1
+    assert code == expected_code
     answer = failure(stdout, err)
-    assert answer["errors"][0].startswith("could not save out-2.png: ")
+    assert answer["errors"][0].startswith(message)
     assert [Path(item["path"]).name for item in answer["files"]] == ["out-1.png"]
+    assert image_creator.describe(env / "out-1.png")["width"] == 1024
 
 
 def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(

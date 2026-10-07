@@ -1078,14 +1078,17 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
             for note in save_image(data, path, plan.output_format, target):
                 log.info("%s: %s", path.name, note)
             info = describe(path)
-        except (OSError, ValueError) as error:
+        except BaseException as error:
             # The request was paid for, so the images already saved stay listed
             written = [{k: f[k] for k in ("path", "width", "height")} for f in files]
-            raise RunError(
-                f"could not save {path.name}: {error}; inspect the files already "
-                "written before you request new images",
-                report={"files": written},
-            ) from error
+            if isinstance(error, (OSError, ValueError)):
+                raise RunError(
+                    f"could not save {path.name}: {error}; inspect the files already "
+                    "written before you request new images",
+                    report={"files": written},
+                ) from error
+            error.report = {**carried(error), "files": written}  # pyright: ignore[reportAttributeAccessIssue]
+            raise
         if plan.target_size and (info["width"], info["height"]) != plan.target_size:
             plan.problems.append(
                 f"{path.name} is {info['width']}x{info['height']}, "

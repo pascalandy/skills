@@ -170,27 +170,40 @@ def test_a_changed_generated_file_fails_the_check_on_stderr(
     )
 
 
+@pytest.mark.parametrize(
+    "raised,code,message",
+    [
+        (OSError(28, "No space left on device"), 1, "cannot write Matt mode:"),
+        (updater.Interrupted(130), 130, "interrupted"),
+        (updater.Interrupted(143), 143, "terminated"),
+        (RuntimeError("boom"), 1, "RuntimeError: boom"),
+    ],
+)
 def test_a_failed_write_answers_the_changes_already_made(
     upstream: tuple[Path, str],
     bucket: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
+    raised: BaseException,
+    code: int,
+    message: str,
 ) -> None:
     checkout, revision = upstream
     write = updater.atomic_write
 
-    def full_disk(path: Path, content: bytes) -> None:
+    def stopped(path: Path, content: bytes) -> None:
         if path.name == "LICENSE":
-            raise OSError(28, "No space left on device")
+            raise raised
         write(path, content)
 
-    monkeypatch.setattr(updater, "atomic_write", full_disk)
+    monkeypatch.setattr(updater, "atomic_write", stopped)
     update = ["update", "--upstream", str(checkout), "--revision", revision]
 
-    assert updater.main([*update, "--root", str(bucket)]) == 1
+    assert updater.main([*update, "--root", str(bucket)]) == code
     answer = answered(capsys)[1]
     assert answer["changes"] == [["add", PLAYBOOK]]
-    assert str(answer["errors"]).startswith("['cannot write Matt mode: ")
+    assert answer["errors"][0].startswith(message)
+    assert (bucket / PLAYBOOK).read_bytes().endswith(b"# To Spec\n")
 
 
 def test_a_usage_error_in_a_command_answers_with_the_help_command(
