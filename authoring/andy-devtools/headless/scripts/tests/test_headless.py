@@ -64,6 +64,8 @@ if os.environ.get("STUB_RESTAGE"):
 if os.environ.get("STUB_CORRUPT_INDEX"):
     Path(".git/index").write_bytes(b"not an index")
 if os.environ.get("STUB_LINGER"):
+    print("partial stdout", flush=True)
+    print("partial stderr", file=sys.stderr, flush=True)
     subprocess.Popen([sys.executable, "-c", (
         "import os, signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
         "open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(60)"
@@ -474,6 +476,12 @@ def test_a_checkout_git_cannot_read_fails_the_run(env, repo, when):
     assert f"cannot read the Git state of {repo.resolve()} {when}" in errors(done)
     if when == "before the run":
         assert calls(env) == []
+        assert "files" not in answered(done)
+    else:
+        files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+        assert set(files) == {"prompt.md", "stdout.log", "stderr.log", "answer.md"}
+        assert all(path.is_file() for path in files.values())
+        assert files["answer.md"].read_text() == "No findings."
 
 
 def test_review_only_fails_when_only_the_staged_content_changed(env, repo):
@@ -496,6 +504,11 @@ def test_a_timeout_kills_descendants_that_ignore_sigterm(env, repo, tmp_path):
 
     assert done.returncode == 1
     assert "codex ran past --timeout" in errors(done)
+    files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+    assert set(files) == {"prompt.md", "stdout.log", "stderr.log"}
+    assert "Review README.md." in files["prompt.md"].read_text()
+    assert files["stdout.log"].read_text() == "partial stdout\n"
+    assert files["stderr.log"].read_text() == "partial stderr\n"
     assert not alive(wait_for(pid_file))
 
 
@@ -514,7 +527,14 @@ def test_an_interrupt_kills_descendants_that_ignore_sigterm(
 
     assert process.returncode == code
     assert stdout == ""
-    assert stderr.splitlines()[-1] == f'{{"ok":false,"errors":["{word}"]}}'
+    answer = json.loads(stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    assert answer["errors"] == [word]
+    files = {Path(path).name: Path(path) for path in answer["files"]}
+    assert set(files) == {"prompt.md", "stdout.log", "stderr.log"}
+    assert "Review README.md." in files["prompt.md"].read_text()
+    assert files["stdout.log"].read_text() == "partial stdout\n"
+    assert files["stderr.log"].read_text() == "partial stderr\n"
     assert not alive(descendant)
 
 

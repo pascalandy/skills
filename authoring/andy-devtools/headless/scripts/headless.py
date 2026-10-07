@@ -1181,56 +1181,75 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         extra=tuple(extra),
     )
     run = Path(tempfile.mkdtemp(prefix=f"headless-{target}-{args.mode}."))
-    rule = RULES.get(args.mode)
-    (run / "prompt.md").write_text(
-        f"{rule.format(cwd=cwd)}\n\n{prompt}" if rule else prompt, encoding="utf-8"
-    )
-    command = runner.command(request, run)
-    log.info("run folder: %s", run)
-    log.info(
-        "command: %s",
-        shlex.join(
-            [*(f"{key}={value}" for key, value in runner.env.items()), *command]
-        ),
-    )
     try:
-        status = run_child(
-            command, cwd=cwd, run=run, timeout=args.timeout, env=runner.env
+        rule = RULES.get(args.mode)
+        (run / "prompt.md").write_text(
+            f"{rule.format(cwd=cwd)}\n\n{prompt}" if rule else prompt, encoding="utf-8"
         )
-    except subprocess.TimeoutExpired:
-        raise ScriptError(
-            f"{target} ran past --timeout; its partial output is in {run}"
-        ) from None
-
-    reply = runner.reply(run)
-    if not (run / "answer.md").exists():
-        (run / "answer.md").write_text(reply.answer, encoding="utf-8")
-    result = Result(
-        target=target,
-        mode=args.mode,
-        model=reply.model,
-        effort=effort,
-        session=reply.session or request.session,
-        changed=changes(before, snapshot(root, cwd, "after the run") if root else None),
-        run_dir=str(run),
-        answer=reply.answer.strip(),
-    )
-    (run / "run.json").write_text(
-        json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8"
-    )
-
-    problems = list(reply.problems)
-    if status != 0:
-        problems.insert(0, f"{target} exited {status}; read stderr.log in {run}")
-    if not result.answer:
-        problems.append(f"{target} gave no answer")
-    if args.mode in READ_ONLY and result.changed:
-        problems.append(
-            f"the {args.mode} run changed the checkout: {', '.join(result.changed)}"
+        command = runner.command(request, run)
+        log.info("run folder: %s", run)
+        log.info(
+            "command: %s",
+            shlex.join(
+                [*(f"{key}={value}" for key, value in runner.env.items()), *command]
+            ),
         )
-    if problems:
-        raise ScriptError(*problems, report=fields(result))
-    return result
+        try:
+            status = run_child(
+                command, cwd=cwd, run=run, timeout=args.timeout, env=runner.env
+            )
+        except subprocess.TimeoutExpired:
+            raise ScriptError(
+                f"{target} ran past --timeout; its partial output is in {run}"
+            ) from None
+
+        reply = runner.reply(run)
+        if not (run / "answer.md").exists():
+            (run / "answer.md").write_text(reply.answer, encoding="utf-8")
+        result = Result(
+            target=target,
+            mode=args.mode,
+            model=reply.model,
+            effort=effort,
+            session=reply.session or request.session,
+            changed=changes(
+                before, snapshot(root, cwd, "after the run") if root else None
+            ),
+            run_dir=str(run),
+            answer=reply.answer.strip(),
+        )
+        (run / "run.json").write_text(
+            json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8"
+        )
+
+        problems = list(reply.problems)
+        if status != 0:
+            problems.insert(0, f"{target} exited {status}; read stderr.log in {run}")
+        if not result.answer:
+            problems.append(f"{target} gave no answer")
+        if args.mode in READ_ONLY and result.changed:
+            problems.append(
+                f"the {args.mode} run changed the checkout: {', '.join(result.changed)}"
+            )
+        if problems:
+            raise ScriptError(*problems, report=fields(result))
+        return result
+    except KeyboardInterrupt as stop:
+        code = getattr(stop, "code", INTERRUPTED)
+        error = ScriptError(
+            "interrupted" if code == INTERRUPTED else "terminated",
+            report={
+                "files": sorted(str(path) for path in run.rglob("*") if path.is_file())
+            },
+        )
+        error.code = code
+        raise error from stop
+    except ScriptError as error:
+        if "file" not in error.report:
+            error.report["files"] = sorted(
+                str(path) for path in run.rglob("*") if path.is_file()
+            )
+        raise
 
 
 def build_parser() -> Parser:
