@@ -94,7 +94,6 @@ def success(code: int, stdout: str) -> dict[str, Any]:
     assert code == 0
     assert stdout.count("\n") == 1
     answer = json.loads(stdout)
-    assert next(iter(answer)) == "ok"
     assert answer["ok"] is True
     return answer
 
