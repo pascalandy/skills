@@ -230,10 +230,7 @@ export async function main(
     const verdict = await watch(parseArgs(argv, runtime), runtime);
     const error = failure(verdict);
     if (error !== null) return answer(runtime, 1, { errors: [error] });
-    // The exit code says whether the watcher worked and the kind says what it
-    // found, so the verdict keeps no exit code of its own
-    const { exitCode: _exitCode, ...found } = verdict;
-    return answer(runtime, 0, { verdict: found });
+    return answer(runtime, 0, { verdict });
   } catch (error) {
     if (error instanceof CommanderError)
       return error.exitCode === 0
