@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import changes_in, main_checkout, run, run_git, run_script
+from _common import changes_in, main_checkout, replay, run, run_git, run_script
 from signoff import (
     ROOT,
     branch,
@@ -272,7 +272,7 @@ def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
         stderr=subprocess.PIPE,
         text=True,
     )
-    sys.stderr.write(deployed.stderr)
+    replay(deployed.stderr)
     # A failed deploy still lists the machines it reached, in its answer or,
     # from a sync-fleet older than #490, in its change lines
     changes = changes_in((deployed.stdout + deployed.stderr).splitlines())

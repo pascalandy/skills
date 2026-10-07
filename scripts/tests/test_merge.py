@@ -258,6 +258,21 @@ def test_a_partial_deploy_lists_the_machines_it_reached(github: Sandbox) -> None
     assert '"errors":["mini offline"]' in result.stderr
 
 
+def test_a_deploy_output_without_a_final_newline_leaves_the_answer_its_own_line(
+    github: Sandbox,
+) -> None:
+    head = github.git("rev-parse", "HEAD")
+    github.open_pr()
+    github.sign(head)
+
+    result = github.run(
+        "merge.py", FAKE_DEPLOY_EXIT="1", FAKE_DEPLOY_STDERR="fatal: broken"
+    )
+
+    assert result.stderr.splitlines()[-2] == "fatal: broken"
+    assert landed(result, head)
+
+
 @pytest.mark.parametrize("rerun", [False, True], ids=["after-merge", "rerun"])
 def test_a_failed_deploy_gate_fails_without_hiding_the_merge(
     github: Sandbox, rerun: bool
