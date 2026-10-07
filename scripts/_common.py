@@ -174,15 +174,19 @@ def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> No
 
 def stop(process: subprocess.Popen[Any], group: bool = False) -> None:
     """SIGTERM a child, then SIGKILL it after GRACE seconds. A descendant may
-    still hold the pipes, so stop reading them GRACE seconds later."""
+    still hold the pipes, so stop reading and close them GRACE seconds later."""
     send(process, signal.SIGTERM, group)
     try:
         process.communicate(timeout=GRACE)
         return
     except subprocess.TimeoutExpired:
         send(process, signal.SIGKILL, group)
-    with suppress(subprocess.TimeoutExpired):
+    try:
         process.communicate(timeout=GRACE)
+    except subprocess.TimeoutExpired:
+        for pipe in (process.stdin, process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
 
 
 def swap(fresh: Path, destination: Path, previous: Path) -> None:

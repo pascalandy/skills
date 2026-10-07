@@ -109,6 +109,7 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
         PYRIGHT,
+        "--warnings",
         "--pythonversion",
         python,
         path,
@@ -122,6 +123,8 @@ def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Co
         f"pytest@{PYTEST}",
         *with_deps(((XDIST,) if parallel else ()) + deps),
         "pytest",
+        "-W",
+        "error",
         *(("-n", "auto") if parallel else ()),
         *(path if isinstance(path, tuple) else (path,)),
     )
