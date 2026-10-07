@@ -545,23 +545,31 @@ def update(
     lock = read_lock(package)
     files = {dest: item.content for dest, item in plan.items()}
     files[LOCK] = lock_document(plan, revision)
+    # Each change is listed once done, so a failure answers what already changed
     changes: list[list[str]] = []
-    for dest in sorted(owned(package, lock) - set(plan)):
-        changes.append(["delete", str(dest)])
-        if not dry_run:
-            (package / dest).unlink(missing_ok=True)
-    for dest, content in sorted(files.items()):
-        path = package / dest
-        if path.is_file() and path.read_bytes() == content:
-            continue
-        changes.append(["update" if path.exists() else "add", str(dest)])
-        if not dry_run:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
-    if not dry_run and (package / PLAYBOOKS).is_dir():
-        for folder in sorted((package / PLAYBOOKS).rglob("*"), reverse=True):
-            if folder.is_dir() and not any(folder.iterdir()):
-                folder.rmdir()
+    try:
+        for dest in sorted(owned(package, lock) - set(plan)):
+            if not dry_run:
+                (package / dest).unlink(missing_ok=True)
+            changes.append(["delete", str(dest)])
+        for dest, content in sorted(files.items()):
+            path = package / dest
+            if path.is_file() and path.read_bytes() == content:
+                continue
+            change = ["update" if path.exists() else "add", str(dest)]
+            if not dry_run:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            changes.append(change)
+        if not dry_run and (package / PLAYBOOKS).is_dir():
+            for folder in sorted((package / PLAYBOOKS).rglob("*"), reverse=True):
+                if folder.is_dir() and not any(folder.iterdir()):
+                    folder.rmdir()
+    except OSError as error:
+        raise ScriptError(
+            f"could not write the package: {error}; fix that path, then rerun the update",
+            report={"changes": changes},
+        ) from error
     return changes
 
 

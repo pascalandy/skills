@@ -144,6 +144,21 @@ def test_update_imports_skills_as_playbooks(upstream: Path, package: Path) -> No
     assert (package / "playbooks/beta/beta.md").read_text() == "# Beta\n"
 
 
+def test_a_failed_update_answers_the_files_it_already_wrote(
+    upstream: Path, package: Path
+) -> None:
+    (package / "references/LICENSE").mkdir(parents=True)
+
+    answer = failure(update(upstream, package))
+
+    assert answer["changes"] == [
+        ["add", "playbooks/alpha/alpha.md"],
+        ["add", "playbooks/alpha/references/form.md"],
+        ["add", "playbooks/beta/beta.md"],
+    ]
+    assert answer["errors"][0].startswith("could not write the package: ")
+
+
 def test_update_rerun_changes_nothing(upstream: Path, package: Path) -> None:
     update(upstream, package)
 
