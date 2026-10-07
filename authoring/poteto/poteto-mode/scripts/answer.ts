@@ -15,6 +15,14 @@ export const processIo: Io = {
   },
 };
 
+// JSON.stringify leaves U+2028 and U+2029 raw, and a line reader such as
+// Python's splitlines() breaks the answer on them
+export function oneLine(value: unknown): string {
+  return JSON.stringify(value).replace(/[\u2028\u2029]/g, (char) =>
+    `\\u${char.charCodeAt(0).toString(16)}`
+  );
+}
+
 export function answer(
   io: Io,
   code: number,
@@ -22,7 +30,7 @@ export function answer(
 ): number {
   const body: Record<string, unknown> = { ok: code === 0, ...fields };
   body.ok = code === 0;
-  (code === 0 ? io.stdout : io.stderr)(`${JSON.stringify(body)}\n`);
+  (code === 0 ? io.stdout : io.stderr)(`${oneLine(body)}\n`);
   return code;
 }
 

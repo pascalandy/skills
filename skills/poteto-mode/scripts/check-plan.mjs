@@ -43,7 +43,12 @@ Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error`
 // One compact JSON line, `ok` first: a success on stdout, a failure as the last
 // line of stderr with stdout empty
 function answer(code, fields = {}) {
-	const line = Buffer.from(`${JSON.stringify({ ok: code === 0, ...fields })}\n`);
+	// U+2028 and U+2029 stay escaped, so a line reader keeps the answer whole
+	const json = JSON.stringify({ ok: code === 0, ...fields }).replace(
+		/[\u2028\u2029]/g,
+		(char) => `\\u${char.charCodeAt(0).toString(16)}`,
+	);
+	const line = Buffer.from(`${json}\n`);
 	// Written in full before exit, since process.exit drops a pipe's pending output
 	let offset = 0;
 	while (offset < line.length) {
