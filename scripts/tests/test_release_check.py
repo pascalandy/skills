@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from unittest.mock import patch
 
 import release_check
 
+OK = '{"ok":true}\n'
 CHANGELOG = """# Changelog
 
 ## [0.1.0] - 2026-09-26
@@ -71,17 +73,24 @@ class ReleaseCheckTests(unittest.TestCase):
             git(root, "tag", "v0.1.0")
             result, stdout, stderr = self.run_check("v0.1.0")
 
-        self.assertEqual((result, stdout, stderr), (0, "", ""))
+        self.assertEqual((result, stdout, stderr), (0, OK, ""))
 
     def test_invalid_version_is_a_usage_error_before_any_git_call(self) -> None:
         with self.repository():
             result, stdout, stderr = self.run_check("v01.0.0")
 
         self.assertEqual((result, stdout), (2, ""))
-        self.assertIn(
-            "error: argument version: 'v01.0.0' is not vMAJOR.MINOR.PATCH", stderr
+        self.assertEqual(
+            json.loads(stderr),
+            {
+                "ok": False,
+                "errors": [
+                    "argument version: 'v01.0.0' is not vMAJOR.MINOR.PATCH "
+                    + "without leading zeros, such as v0.1.0"
+                ],
+                "help": "just release-check --help",
+            },
         )
-        self.assertTrue(stderr.endswith("run 'just release-check --help'\n"))
 
     def test_version_must_exceed_other_tags(self) -> None:
         with self.repository() as root:
@@ -91,7 +100,7 @@ class ReleaseCheckTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
         self.assertIn(
-            "error: version must be greater than the latest release tag v0.2.0", stderr
+            "version must be greater than the latest release tag v0.2.0", stderr
         )
 
     def test_stray_v_tags_neither_block_nor_count_as_previous(self) -> None:
@@ -100,7 +109,7 @@ class ReleaseCheckTests(unittest.TestCase):
             git(root, "tag", "vendor-x")
             result, stdout, stderr = self.run_check("v0.1.0", "--verbose")
 
-        self.assertEqual((result, stdout), (0, ""))
+        self.assertEqual((result, stdout), (0, OK))
         self.assertIn("ignored non-release tags: v9.9.9-rc1, vendor-x\n", stderr)
 
     def test_missing_duplicated_and_empty_changelog_sections(self) -> None:
@@ -134,12 +143,12 @@ class ReleaseCheckTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
         self.assertIn("skills (1): alpha\n", stderr)
-        self.assertIn(
-            "error: HEAD is not an ancestor of origin/main; "
-            "run git fetch --tags origin main",
-            stderr,
+        self.assertEqual(
+            json.loads(stderr.splitlines()[-1])["errors"],
+            [
+                "HEAD is not an ancestor of origin/main; run git fetch --tags origin main"
+            ],
         )
-        self.assertEqual(stderr.count("error:"), 1)
 
     def test_tag_at_another_commit_fails(self) -> None:
         with self.repository() as root:
@@ -150,7 +159,7 @@ class ReleaseCheckTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
-        self.assertIn("error: tag v0.1.0 points to a different commit", stderr)
+        self.assertIn("tag v0.1.0 points to a different commit", stderr)
 
     def test_dirty_tree_fails_without_writing_notes(self) -> None:
         with self.repository() as root:
@@ -161,7 +170,7 @@ class ReleaseCheckTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
-        self.assertIn("error: working tree is dirty", stderr)
+        self.assertIn("working tree is dirty", stderr)
 
     def test_notes_are_exact_section_body(self) -> None:
         with self.repository() as root:
@@ -169,16 +178,15 @@ class ReleaseCheckTests(unittest.TestCase):
             result, stdout, stderr = self.run_check("v0.1.0", "--notes", str(notes))
             contents = notes.read_text(encoding="utf-8")
 
-        self.assertEqual((result, stdout, stderr), (0, "", ""))
+        self.assertEqual((result, stdout, stderr), (0, OK, ""))
         self.assertEqual(contents, "### Added\n\n- Initial snapshot\n")
 
-    def test_notes_dash_prints_the_section_body_on_stdout(self) -> None:
+    def test_notes_on_stdout_is_a_usage_error(self) -> None:
         with self.repository():
             result, stdout, stderr = self.run_check("v0.1.0", "--notes", "-")
 
-        self.assertEqual(
-            (result, stdout, stderr), (0, "### Added\n\n- Initial snapshot\n", "")
-        )
+        self.assertEqual((result, stdout), (2, ""))
+        self.assertIn("write the notes to a file", stderr)
 
     def test_changed_skill_summary_since_previous_tag(self) -> None:
         with self.repository(with_beta=True) as root:
@@ -196,7 +204,7 @@ class ReleaseCheckTests(unittest.TestCase):
             self.commit(root, "change skills")
             result, stdout, stderr = self.run_check("v0.1.1", "--verbose")
 
-        self.assertEqual((result, stdout), (0, ""))
+        self.assertEqual((result, stdout), (0, OK))
         self.assertIn("added (1): gamma\n", stderr)
         self.assertIn("changed (1): alpha\n", stderr)
         self.assertIn("removed (1): beta\n", stderr)

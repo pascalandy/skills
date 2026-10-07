@@ -13,6 +13,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import run_git, run_script
@@ -22,13 +23,13 @@ VERSION = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 SECTION = re.compile(r"## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}")
 
 EPILOG = """\
-A valid candidate prints nothing, or its release notes with --notes -.
+A valid candidate answers {"ok":true}; --notes FILE also writes its release
+notes to FILE.
 
 examples:
   just release-check v0.1.0
   just release-check v0.1.0 --verbose
-  just release-check v0.1.0 --notes /tmp/notes.md
-  just release-check v0.1.0 --notes -"""
+  just release-check v0.1.0 --notes /tmp/notes.md"""
 
 EXIT_CODES = exit_codes(
     {0: "HEAD is a valid release candidate", 1: "a release check failed"}
@@ -79,6 +80,15 @@ def release_version(value: str) -> str:
     if parse_version(value) is None:
         raise argparse.ArgumentTypeError(
             f"{value!r} is not vMAJOR.MINOR.PATCH without leading zeros, such as v0.1.0"
+        )
+    return value
+
+
+def notes_file(value: str) -> str:
+    """An argparse type: --notes names a file; stdout holds only the answer."""
+    if value == "-":
+        raise argparse.ArgumentTypeError(
+            "write the notes to a file, such as --notes $(mktemp)"
         )
     return value
 
@@ -143,8 +153,8 @@ def changelog_body(version: str) -> tuple[str | None, str | None]:
     return body + "\n", None
 
 
-def check_release(version: str, notes: str | None) -> str:
-    """Validate HEAD for `version`; return its notes when `notes` is "-"."""
+def check_release(version: str, notes: str | None) -> dict[str, Any]:
+    """Validate HEAD for `version`, and write its notes to `notes` when given."""
     errors: list[str] = []
     requested = parse_version(version)
 
@@ -195,11 +205,9 @@ def check_release(version: str, notes: str | None) -> str:
 
     if errors or body is None:
         raise ScriptError(*errors)
-    if notes == "-":
-        return body.rstrip("\n")
     if notes is not None:
         Path(notes).write_text(body, encoding="utf-8")
-    return ""
+    return {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -214,14 +222,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--notes",
+        type=notes_file,
         metavar="FILE",
-        help="write the release notes to FILE, or to stdout when FILE is -",
+        help="write the release notes to FILE",
     )
     return run_script(
         parser,
         lambda args: check_release(args.version, args.notes),
         argv,
         debug="RELEASE_CHECK_DEBUG",
+        json_answer=True,
     )
 
 

@@ -100,8 +100,7 @@ The rule rolls out script by script, after Pascal validates `just check` in prod
 
 | Script | Answers in one JSON line |
 |---|---|
-| `just check`, `just check-frontmatter`, `scripts/check_cli_block.py`, `just api-keys-validation` | now |
-| `just signoff`, `just release-check`, `just skills-discover`, `just replay-routing` | #489 |
+| `just check`, `just check-frontmatter`, `scripts/check_cli_block.py`, `just api-keys-validation`, `just signoff`, `just release-check`, `just skills-discover`, `just replay-routing` | now |
 | `just compile-skills`, `just remote-skills`, `just install-skills`, `just sync`, `scripts/sync_private.py`, `just sync-fleet`, `just merge` | #490 |
 | scripts inside skills | #494 |
 

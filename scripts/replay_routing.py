@@ -21,7 +21,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from _cli import Parser, ScriptError, UsageError, duration, exit_codes
 from _common import GRACE, run_git, run_script, send, stop
@@ -54,9 +54,11 @@ completes. `none` means the skill must not load, `no route` means it may read
 SKILL.md but no file it links to, and `manual` skips the row. Opens with, when
 set, is the start of the agent's final message, so that row runs to the end.
 
-A run prints one line per row: pass or skip, the row number, and the request.
-When a row fails, stderr names each failed row, what the agent opened, and the
-path of its saved events, then the command that reruns those rows.
+A run answers {{"ok":true}} when every row passes or is skipped; -v names each
+row as it passes or is skipped. When a row fails, the answer's errors name each
+failed row, what the agent opened, and the path of its saved events, then the
+command that reruns those rows. --dry-run answers the rows a run would replay,
+each as [number, expected reads, request].
 
 examples:
   just replay-routing corey-mode --project authoring/corey-mode/tests/routing-project
@@ -310,10 +312,14 @@ def terminate(process: subprocess.Popen[str]) -> None:
     killer.start()
 
 
-def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) -> str:
-    """One line for the row: pass, or fail with the reason and the saved events."""
+def replay(
+    case: Case, skill: Path, routes: set[str], args: argparse.Namespace
+) -> str | None:
+    """None when the row passes or is skipped, else why it failed and where its
+    events are saved."""
     if case.kind == "manual":
-        return f"skip\t{case.number}\t{case.request}\tmanual"
+        log.info("skip row %d: manual", case.number)
+        return None
     work = Path(tempfile.mkdtemp(prefix=f"replay-{skill.name}-{case.number}-"))
     events = work / "events.jsonl"
     scratch = prepare(work, skill, routes, args.project)
@@ -328,7 +334,7 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
         with LOCK:
             if CANCELLED.is_set():
                 shutil.rmtree(work, ignore_errors=True)
-                return f"skip\t{case.number}\t{case.request}\tinterrupted"
+                return None
             process = subprocess.Popen(
                 codex_command(scratch, skill.name, args),
                 stdin=subprocess.PIPE,
@@ -370,9 +376,13 @@ def replay(case: Case, skill: Path, routes: set[str], args: argparse.Namespace) 
         reason = verdict(case, run) or ""
     if not reason:
         shutil.rmtree(work, ignore_errors=True)
-        return f"pass\t{case.number}\t{case.request}"
+        log.info("pass row %d: %s", case.number, case.request)
+        return None
     opened = ", ".join(run.opened) or "nothing"
-    return f"fail\t{case.number}\t{case.request}\t{reason}; opened {opened}; events {events}"
+    return (
+        f"row {case.number} ({case.request}): {reason}; "
+        f"opened {opened}; events {events}"
+    )
 
 
 def read(line: str, name: str, routes: set[str], run: Run) -> None:
@@ -401,7 +411,7 @@ def read(line: str, name: str, routes: set[str], run: Run) -> None:
         run.finished = True
 
 
-def work(args: argparse.Namespace) -> str:
+def work(args: argparse.Namespace) -> dict[str, Any]:
     skill = SKILLS / args.skill
     if not (skill / "SKILL.md").is_file():
         raise UsageError(
@@ -420,31 +430,30 @@ def work(args: argparse.Namespace) -> str:
     if args.jobs < 1:
         raise UsageError(f"--jobs must be at least 1, not {args.jobs}")
     if args.dry_run:
-        return "\n".join(
-            f"case\t{c.number}\t{c.describe()}\t{c.request}" for c in cases
-        )
+        return {"cases": [[c.number, c.describe(), c.request] for c in cases]}
     if shutil.which("codex") is None:
         raise ScriptError("codex not found on PATH; install the Codex CLI, then rerun")
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         try:
-            lines = list(pool.map(lambda c: replay(c, skill, routes, args), cases))
+            problems = list(pool.map(lambda c: replay(c, skill, routes, args), cases))
         except BaseException:
             with LOCK:
                 CANCELLED.set()
                 for process in list(LIVE):
                     terminate(process)
             raise
-    if failed := [line for line in lines if line.startswith("fail\t")]:
+    failed = [(case, problem) for case, problem in zip(cases, problems) if problem]
+    if failed:
         rerun = ["just replay-routing", args.skill]
         rerun += [f"--cases {args.cases}"] if args.cases else []
         rerun += [f"--project {args.project}"] if args.project else []
-        rerun += [f"--case {line.split(chr(9))[1]}" for line in failed]
+        rerun += [f"--case {case.number}" for case, _ in failed]
         raise ScriptError(
-            *failed,
-            f"{len(failed)} of {len(lines)} rows failed; rerun them with: "
+            *(problem for _, problem in failed),
+            f"{len(failed)} of {len(cases)} rows failed; rerun them with: "
             + " ".join(rerun),
         )
-    return "\n".join(lines)
+    return {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -490,7 +499,9 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="list the rows a run would replay, without starting Codex",
     )
-    return run_script(parser, work, argv, debug="REPLAY_ROUTING_DEBUG")
+    return run_script(
+        parser, work, argv, debug="REPLAY_ROUTING_DEBUG", json_answer=True
+    )
 
 
 if __name__ == "__main__":

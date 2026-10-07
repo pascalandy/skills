@@ -1,13 +1,13 @@
 # Discovery
 
-`just skills-discover` asks the Codex, Pi, and OpenCode CLIs which skills they load, without a model call, and compares their answers with what the checkout installs. Claude Code has no listing interface, so it always reports `unverified`.
+`just skills-discover` asks the Codex, Pi, and OpenCode CLIs which skills they load, without a model call, and compares their answers with what the checkout installs. Claude Code has no listing interface, so the check leaves it out.
 
 ## Sub-features
 
 - `discover-codex`: Codex loads every skill from `~/.codex/skills` on om1, or `~/.agents/skills` on mac
 - `discover-pi`: Pi loads every skill from `~/.pi/agent/skills`
 - `discover-opencode`: OpenCode loads every skill from `~/.config/opencode/skills`
-- `discover-claude`: reported `unverified` by design
+- `discover-claude`: left out of the check by design
 
 ## How to get to it (user POV)
 
@@ -20,7 +20,7 @@ Preconditions:
 
 - Install passed in this run
 
-- **Discover.** Run the block. It prints `discover: exit 0`, and `discover.out` reads `codex verified`, `pi verified`, `claude unverified`, and `opencode verified`, one tab-separated line each.
+- **Discover.** Run the block. It prints `discover: exit 0`, and `discover.out` reads `{"ok":true}`. With `-v`, stderr names each agent and its status, such as `codex: verified`.
 
 ```bash
 ( . "${RUN:?}/env" && cd "$CHECKOUT" &&

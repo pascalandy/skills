@@ -23,14 +23,16 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
 from _common import is_network_failure, run, run_git, run_script
 
 ROOT = Path(__file__).resolve().parent.parent
 EPILOG = """\
-A run prints `signoff<TAB>SHA` when it signs off, and nothing when HEAD already
-carries a green signoff.
+A run that signs off answers {"ok":true,"changes":[["signoff","SHA"]]}, and
+{"ok":true} when HEAD already carries a green signoff. --dry-run answers what a
+run would answer.
 
 examples:
   just signoff             # check the pushed HEAD, then sign it off
@@ -202,15 +204,15 @@ def check_and_sign(sha: str, timeout: float) -> None:
     gh("signoff", "--commit", sha, timeout=timeout)
 
 
-def signoff(args: argparse.Namespace) -> str:
+def signoff(args: argparse.Namespace) -> dict[str, Any]:
     require_clean_tree()
     sha = pushed_head(args.timeout)
     if signed_off(sha, args.timeout):
         log.info("%s already carries a green signoff", sha[:7])
-        return ""
+        return {}
     if not args.dry_run:
         check_and_sign(sha, args.timeout)
-    return f"signoff\t{sha[:7]}"
+    return {"changes": [["signoff", sha[:7]]]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -232,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         default="1m",
         help="how long each call to GitHub may take (default: 1m)",
     )
-    return run_script(parser, signoff, argv, debug="SIGNOFF_DEBUG")
+    return run_script(parser, signoff, argv, debug="SIGNOFF_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":
