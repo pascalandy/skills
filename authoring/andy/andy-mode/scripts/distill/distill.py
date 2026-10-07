@@ -1318,7 +1318,16 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
     except ScriptError as error:
         error.report["files"] = sorted(map(str, run_folder_path.iterdir()))
         raise
+    except KeyboardInterrupt as stop:
+        code = getattr(stop, "code", INTERRUPTED)
+        stopped = ScriptError(
+            "interrupted" if code == INTERRUPTED else "terminated",
+            report={"files": sorted(map(str, run_folder_path.iterdir()))},
+        )
+        stopped.code = code
+        raise stopped from stop
     except Exception as error:
+        log.debug("unexpected failure", exc_info=True)
         raise ScriptError(
             f"{type(error).__name__}: {error}; see the traceback with --debug",
             report={"files": sorted(map(str, run_folder_path.iterdir()))},
