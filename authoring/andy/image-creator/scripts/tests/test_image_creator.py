@@ -769,3 +769,40 @@ def test_doctor_without_any_backend_fails(
             "keyring set --service=openrouter --user=api_key`, or set OPENROUTER_API_KEY"
         ),
     ]
+
+
+def test_a_save_failure_keeps_the_images_already_written(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {
+            "data": [
+                {"b64_json": good},
+                {"b64_json": base64.b64encode(b"junk").decode()},
+            ]
+        },
+    )
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "sticker",
+        "--out",
+        str(out),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert answer["errors"][0].startswith("could not save out-2.png: ")
+    assert [Path(item["path"]).name for item in answer["files"]] == ["out-1.png"]

@@ -1020,9 +1020,18 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
     files = []
     for data, path in zip(images, plan.paths, strict=False):
         target = plan.target_size if plan.backend == "plan" else None
-        for note in save_image(data, path, plan.output_format, target):
-            log.info("%s: %s", path.name, note)
-        info = describe(path)
+        try:
+            for note in save_image(data, path, plan.output_format, target):
+                log.info("%s: %s", path.name, note)
+            info = describe(path)
+        except (OSError, ValueError) as error:
+            # The request was paid for, so the images already saved stay listed
+            written = [{k: f[k] for k in ("path", "width", "height")} for f in files]
+            raise RunError(
+                f"could not save {path.name}: {error}; inspect the files already "
+                "written before you request new images",
+                report={"files": written},
+            ) from error
         if plan.target_size and (info["width"], info["height"]) != plan.target_size:
             plan.problems.append(
                 f"{path.name} is {info['width']}x{info['height']}, "
