@@ -75,9 +75,11 @@ Available prompt stems come from `distill-prompt`. Common values are:
 
 The slug is the input filename stem. The prompt name is the normalized prompt stem.
 
+The command answers `{"ok":true,"file":"<path>"}` with the path of `{slug}_{prompt}.md`; read the distilled result from there.
+
 ## Error Paths
 
-Run `--help` for the full exit-code map. Common failures:
+A failure leaves stdout empty and ends stderr with `{"ok":false,"errors":[…]}`, whose message names the problem. Run `--help` for the full exit-code map. Common failures:
 
 - **Exit 3** -- input file missing or unreadable. Check the path.
 - **Exit 4** -- unknown prompt stem. Run `--list-prompts` and choose one of the available values.

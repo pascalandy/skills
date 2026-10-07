@@ -67,6 +67,7 @@ Fundamental issue: applying distill prompt to local file should be one cmd, not 
     ├── article_raw.md                # a copy of the original input file
     └── article_meta.yml              # YAML run metadata (provider, model, effort, duration, tokens)
     ```
+    The command answers `{"ok":true,"file":"<path>"}`; read the distilled result from that path. A failure leaves stdout empty and ends stderr with `{"ok":false,"errors":[…]}`
 
 For dry-run, alternate providers, or custom output locations, read `references/distill/help.md` via `--help`.
 
@@ -84,7 +85,7 @@ For dry-run, alternate providers, or custom output locations, read `references/d
 **Summary:**
 - **Input sub-skills:** 1 (from-file)
 - **Scripts:** 1 (distill.py)
-- **Dependencies:** `distill-prompt` (prompt library), `claude` or `codex` CLI, `uv` runtime, `tiktoken` + `rich` (auto-installed by uv), optional `glow` for rich help rendering
+- **Dependencies:** `distill-prompt` (prompt library), `claude` or `codex` CLI, `uv` runtime, `tiktoken` (auto-installed by uv), optional `glow` for rich help rendering
 
 ---
 

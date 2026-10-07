@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import stat
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -157,6 +159,16 @@ def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str,
     return result.stdout, result.stderr, result.returncode
 
 
+def answer(stdout: str, stderr: str, code: int) -> dict[str, Any]:
+    """The one JSON line distill answers with: all of stdout on success, or the
+    last line of stderr, with stdout empty, on failure."""
+    if code == 0:
+        assert stdout.count("\n") == 1, stdout
+        return json.loads(stdout)
+    assert stdout == ""
+    return json.loads(stderr.splitlines()[-1])
+
+
 def env_with_fake_claude(tmp_path: Path) -> dict[str, str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -186,16 +198,26 @@ class TestPromptDiscovery:
         assert "--prompt STEM" in stdout
 
     def test_list_prompts_lists_library_names(self) -> None:
-        stdout, _stderr, code = run_script("--list-prompts")
+        result = run_script("--list-prompts")
 
-        assert code == 0
-        assert stdout.strip().splitlines() == [
-            "extract_wisdom",
-            "follow_along_note",
-            "short_summary",
-            "summary_with_quotes",
-            "synthese_rencontre",
-        ]
+        assert answer(*result) == {
+            "ok": True,
+            "prompts": [
+                "extract_wisdom",
+                "follow_along_note",
+                "short_summary",
+                "summary_with_quotes",
+                "synthese_rencontre",
+            ],
+        }
+
+    def test_list_models_puts_each_default_first(self) -> None:
+        result = run_script("--list-models", "--provider", "opencode")
+
+        assert answer(*result) == {
+            "ok": True,
+            "models": {"opencode": ["1-glm", "2-luna", "3-sol", "4-astra", "5-qwen"]},
+        }
 
 
 class TestPromptDrivenCli:
@@ -204,19 +226,22 @@ class TestPromptDrivenCli:
         input_file = tmp_path / "article.md"
         input_file.write_text("hello world\n", encoding="utf-8")
 
-        stdout, _stderr, code = run_script(str(input_file), "--dry-run", env=env)
+        result = run_script(str(input_file), "--dry-run", env=env)
 
-        assert code == 0
-        assert "prompt:         follow_along_note" in stdout
-        assert "prompt path:" in stdout
-        assert "follow-along-note/prompt.md" in "".join(stdout.split())
+        plan = answer(*result)
+        assert plan["ok"] is True
+        assert plan["prompt"] == "follow_along_note"
+        assert plan["prompt_file"].endswith("follow-along-note/prompt.md")
+        assert plan["file"].endswith("_follow_along_note/article_follow_along_note.md")
+        # A dry run writes nothing
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["article.md", "bin"]
 
     def test_prompt_flag_accepts_underscore_stem(self, tmp_path: Path) -> None:
         env = env_with_fake_claude(tmp_path)
         input_file = tmp_path / "notes.txt"
         input_file.write_text("hello world\n", encoding="utf-8")
 
-        stdout, _stderr, code = run_script(
+        result = run_script(
             "--prompt",
             "short_summary",
             str(input_file),
@@ -224,17 +249,16 @@ class TestPromptDrivenCli:
             env=env,
         )
 
-        assert code == 0
-        assert "prompt:         short_summary" in stdout
-        assert "prompt path:" in stdout
-        assert "short-summary/prompt.md" in "".join(stdout.split())
+        plan = answer(*result)
+        assert plan["prompt"] == "short_summary"
+        assert plan["prompt_file"].endswith("short-summary/prompt.md")
 
     def test_real_run_writes_planned_artifacts(self, tmp_path: Path) -> None:
         env = env_with_fake_claude(tmp_path)
         input_file = tmp_path / "article.md"
         input_file.write_text("hello world\n", encoding="utf-8")
 
-        _stdout, stderr, code = run_script(
+        stdout, stderr, code = run_script(
             "--prompt",
             "short_summary",
             str(input_file),
@@ -253,7 +277,9 @@ class TestPromptDrivenCli:
         run_dir = run_dirs[0]
         slug = input_file.stem
         raw_copy = run_dir / f"{slug}_raw{input_file.suffix}"
-        assert (run_dir / f"{slug}_short_summary.md").exists()
+        output_file = run_dir / f"{slug}_short_summary.md"
+        assert answer(stdout, stderr, code) == {"ok": True, "file": str(output_file)}
+        assert output_file.read_text(encoding="utf-8") == "## Distilled output\n"
         assert (run_dir / f"{slug}_meta.yml").exists()
         assert raw_copy.exists()
         assert raw_copy.read_text(encoding="utf-8") == input_file.read_text(
@@ -292,7 +318,7 @@ class TestOpenCodeProvider:
         input_file = tmp_path / "article.md"
         input_file.write_text("hello from opencode\n", encoding="utf-8")
 
-        _stdout, stderr, code = run_script(
+        result = run_script(
             "--provider",
             "opencode",
             "--effort",
@@ -302,8 +328,34 @@ class TestOpenCodeProvider:
             env=env,
         )
 
-        assert code == 2
-        assert "--effort is not supported with --provider opencode" in stderr
+        assert result[2] == 2
+        assert answer(*result) == {
+            "ok": False,
+            "errors": ["--effort is not supported with --provider opencode"],
+            "help": "distill.py --help",
+        }
+
+
+class TestFailures:
+    def test_missing_input_is_a_usage_error(self) -> None:
+        result = run_script()
+
+        assert result[2] == 2
+        assert answer(*result)["help"] == "distill.py --help"
+
+    def test_unknown_prompt_exits_four(self, tmp_path: Path) -> None:
+        input_file = tmp_path / "article.md"
+        input_file.write_text("hello world\n", encoding="utf-8")
+
+        result = run_script(str(input_file), "--prompt", "nope", "--dry-run")
+
+        assert result[2] == 4
+        assert answer(*result) == {
+            "ok": False,
+            "errors": [
+                "Unknown prompt stem: nope. Run with --list-prompts to see the list."
+            ],
+        }
 
 
 @pytest.mark.skipif(not E2E_INPUT_PATH.exists(), reason="E2E input file is unavailable")

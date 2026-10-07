@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -44,7 +45,16 @@ def test_valid_package_passes(tmp_path: Path) -> None:
     assert checker.validate(package(tmp_path)) == []
 
 
-def test_main_prints_each_problem_and_exits_one(
+def test_main_answers_ok_on_a_valid_package(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert checker.main([str(package(tmp_path))]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == '{"ok":true}\n'
+    assert captured.err == ""
+
+
+def test_main_answers_each_problem_and_exits_one(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = package(tmp_path)
@@ -54,9 +64,26 @@ def test_main_prints_each_problem_and_exits_one(
     assert checker.main([str(root)]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err == (
-        "playbooks/retro-skill.md: unresolved link: ../references/retro-skill/gone.md\n"
-    )
+    assert json.loads(captured.err.splitlines()[-1]) == {
+        "ok": False,
+        "errors": [
+            "playbooks/retro-skill.md: unresolved link: "
+            "../references/retro-skill/gone.md"
+        ],
+    }
+
+
+def test_main_answers_a_usage_error_with_exit_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert checker.main([str(tmp_path / "missing")]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err.splitlines()[-1]) == {
+        "ok": False,
+        "errors": [f"not a directory: {tmp_path / 'missing'}"],
+        "help": "check_andy_mode.py --help",
+    }
 
 
 def test_names_collide_after_normalization(tmp_path: Path) -> None:

@@ -1,15 +1,14 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "rich",
 #     "tiktoken",
 # ]
 # ///
 """Distill a local text file through a named prompt using Claude, Codex, or OpenCode.
 
 Reads an input file and a prompt file, runs the prompt against the selected
-LLM provider CLI, and writes the distilled output to a timestamped folder
-beside the input.
+LLM provider CLI, writes the distilled output to a timestamped folder beside
+the input, and answers in one JSON line with the path of the distilled file.
 
 See ``help.md`` for the full user-facing documentation. This script is
 intentionally thin: prompt content lives in the ``distill-prompt`` route of
@@ -18,22 +17,332 @@ andy-mode, and this tool resolves a named stem to its ``prompt.md`` file.
 
 from __future__ import annotations
 
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
 import json
+import logging
 import os
+import re
+import shlex
+import signal
+import sys
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the messages; `report` is the
+    object `--json` prints on stderr beside them.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print progress and step details on stderr",
+    )
+    if debug:
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+        )
+    if given(argv, "-h", "--help", parser=parser):
+        parser.print_help()
+        return 0
+
+    # Parser.error, in the pasted cli block, prints usage errors itself;
+    # raising sends this one through answer_failure()
+    parser.error = usage_error
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError):
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
 import platform
 import shutil
 import subprocess
-import sys
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING
 
 import tiktoken
-from rich.console import Console
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsWrite
 
 __version__ = "1.0.0"
 
@@ -108,20 +417,26 @@ LLM_CLI_TIMEOUT_SECONDS = 600  # 10 minutes
 LLM_MAX_RETRIES = 3
 
 # Exit codes
-EXIT_SUCCESS = 0
 EXIT_GENERIC_ERROR = 1
-EXIT_USAGE = 2
 EXIT_INPUT_NOT_FOUND = 3
 EXIT_PROMPT_NOT_FOUND = 4
 EXIT_PROVIDER_MISSING = 5
 EXIT_LLM_FAILED = 6
 EXIT_OUTPUT_NOT_WRITABLE = 7
+EXIT_CODES = exit_codes(
+    {
+        EXIT_INPUT_NOT_FOUND: "input file missing or unreadable",
+        EXIT_PROMPT_NOT_FOUND: "unknown prompt stem",
+        EXIT_PROVIDER_MISSING: "provider CLI not on PATH",
+        EXIT_LLM_FAILED: "LLM call failed, or the input is too large",
+        EXIT_OUTPUT_NOT_WRITABLE: "output folder not writable",
+    }
+)
 
 # Overhead tokens for the user-message framing ("Based on this content:\n\n")
 USER_MESSAGE_OVERHEAD = "Based on this content:\n\n"
 
-console = Console()
-error_console = Console(stderr=True)
+log = logging.getLogger("distill")
 
 
 # -------------------------------------------------------------------------
@@ -129,35 +444,30 @@ error_console = Console(stderr=True)
 # -------------------------------------------------------------------------
 
 
-class DistillError(Exception):
-    """Base class for distill-specific failures with an explicit exit code."""
+class DistillError(ScriptError):
+    """Base class for distill-specific failures; `code` is the exit code."""
 
-    exit_code: int = EXIT_GENERIC_ERROR
-
-    def __init__(self, message: str, exit_code: int | None = None) -> None:
-        super().__init__(message)
-        if exit_code is not None:
-            self.exit_code = exit_code
+    code = EXIT_GENERIC_ERROR
 
 
 class InputFileError(DistillError):
-    exit_code = EXIT_INPUT_NOT_FOUND
+    code = EXIT_INPUT_NOT_FOUND
 
 
 class PromptFileError(DistillError):
-    exit_code = EXIT_PROMPT_NOT_FOUND
+    code = EXIT_PROMPT_NOT_FOUND
 
 
 class ProviderMissingError(DistillError):
-    exit_code = EXIT_PROVIDER_MISSING
+    code = EXIT_PROVIDER_MISSING
 
 
 class LLMCallError(DistillError):
-    exit_code = EXIT_LLM_FAILED
+    code = EXIT_LLM_FAILED
 
 
 class OutputDirError(DistillError):
-    exit_code = EXIT_OUTPUT_NOT_WRITABLE
+    code = EXIT_OUTPUT_NOT_WRITABLE
 
 
 # -------------------------------------------------------------------------
@@ -184,7 +494,6 @@ class ResolvedPlan:
     slug: str
     run_folder_name: str
     run_folder_path: Path
-    quiet: bool
 
 
 # -------------------------------------------------------------------------
@@ -197,7 +506,6 @@ def retry_request[T](
     *,
     max_attempts: int = LLM_MAX_RETRIES,
     initial_delay: float = 1.0,
-    quiet: bool = False,
 ) -> T:
     """Execute ``func`` with exponential backoff retry logic.
 
@@ -205,7 +513,6 @@ def retry_request[T](
         func: Zero-argument callable to execute.
         max_attempts: Maximum number of tries (must be >= 1).
         initial_delay: Seconds to wait before the first retry.
-        quiet: Suppress retry progress output.
 
     Returns:
         The return value of ``func`` on the first successful call.
@@ -216,16 +523,14 @@ def retry_request[T](
     delay = initial_delay
     for attempt in range(1, max_attempts + 1):
         try:
-            if attempt > 1 and not quiet:
-                console.print(f"   [yellow]Retry {attempt}/{max_attempts}...[/yellow]")
+            if attempt > 1:
+                log.info("retry %d/%d", attempt, max_attempts)
             return func()
         except Exception:
             if attempt == max_attempts:
-                if not quiet:
-                    console.print(f"   [red]Failed after {max_attempts} attempts[/red]")
+                log.info("failed after %d attempts", max_attempts)
                 raise
-            if not quiet:
-                console.print(f"   [yellow]Failed, retrying in {delay}s...[/yellow]")
+            log.info("failed, retrying in %ss", delay)
             time.sleep(delay)
             delay *= 2
 
@@ -265,51 +570,21 @@ def open_folder_in_finder(path: Path) -> None:
 # -------------------------------------------------------------------------
 
 
-def render_help_and_exit() -> NoReturn:
-    """Render help.md via glow if available, otherwise print plain markdown.
+class DistillParser(Parser):
+    """The shared parser, whose --help renders help.md instead of argparse's help.
 
-    Exits with EXIT_SUCCESS regardless of glow presence.
+    It uses glow when installed, and plain Markdown otherwise.
     """
-    if not HELP_MD_PATH.exists():
-        error_console.print(f"[red]help.md not found at {HELP_MD_PATH}[/red]")
-        sys.exit(EXIT_GENERIC_ERROR)
 
-    if shutil.which("glow"):
-        result = subprocess.run(["glow", str(HELP_MD_PATH)], check=False)
-        if result.returncode == 0:
-            sys.exit(EXIT_SUCCESS)
-
-    # Plain fallback
-    sys.stdout.write(HELP_MD_PATH.read_text(encoding="utf-8"))
-    sys.exit(EXIT_SUCCESS)
-
-
-class _HelpAction(argparse.Action):
-    """Custom --help that defers to render_help_and_exit."""
-
-    def __init__(
-        self,
-        option_strings: list[str],
-        dest: str = argparse.SUPPRESS,
-        default: str = argparse.SUPPRESS,
-        help: str | None = None,
-    ) -> None:
-        super().__init__(
-            option_strings=option_strings,
-            dest=dest,
-            default=default,
-            nargs=0,
-            help=help,
-        )
-
-    def __call__(  # pragma: no cover - thin wrapper
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        render_help_and_exit()
+    def print_help(self, file: SupportsWrite[str] | None = None) -> None:
+        if not HELP_MD_PATH.is_file():
+            super().print_help(file)
+            return
+        if file is None and shutil.which("glow"):
+            sys.stdout.flush()
+            if subprocess.run(["glow", str(HELP_MD_PATH)], check=False).returncode == 0:
+                return
+        (file or sys.stdout).write(HELP_MD_PATH.read_text(encoding="utf-8"))
 
 
 # -------------------------------------------------------------------------
@@ -317,20 +592,13 @@ class _HelpAction(argparse.Action):
 # -------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def build_parser() -> DistillParser:
+    parser = DistillParser(
         prog="distill.py",
         description="Distill a local text file through a named prompt.",
-        add_help=False,
-        usage=argparse.SUPPRESS,
+        exit_codes=EXIT_CODES,
     )
 
-    parser.add_argument(
-        "-h",
-        "--help",
-        action=_HelpAction,
-        help="Show full help (rendered via glow) and exit.",
-    )
     parser.add_argument(
         "--version",
         action="version",
@@ -403,34 +671,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Resolve all inputs and print the plan without calling the LLM.",
-    )
-    parser.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        help="Suppress progress output.",
+        help="Resolve all inputs and answer the plan without calling the LLM.",
     )
 
     return parser
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def check_args(args: argparse.Namespace) -> None:
+    """Reject argument combinations the parser cannot catch."""
     provider = args.provider or DEFAULT_PROVIDER
 
     if provider == PROVIDER_OPENCODE and args.effort is not None:
-        parser.error("--effort is not supported with --provider opencode")
+        raise UsageError("--effort is not supported with --provider opencode")
 
     # Validate: if not using a discovery command, input is required
     if not args.list_models and not args.list_prompts and not args.input:
-        parser.error(
+        raise UsageError(
             "missing positional argument 'input' "
             "(or use --list-prompts / --list-models)"
         )
-
-    return args
 
 
 # -------------------------------------------------------------------------
@@ -486,38 +745,35 @@ def resolve_model(provider: str, raw_model: str | None) -> str:
     if provider == PROVIDER_CLAUDE:
         model = (raw_model or DEFAULT_CLAUDE_MODEL).strip()
         if model not in VALID_CLAUDE_MODELS:
-            raise DistillError(
+            raise UsageError(
                 (
                     f"Invalid claude model: {model}. "
                     f"Valid: {', '.join(VALID_CLAUDE_MODELS)}. "
                     f"Run with --list-models --provider claude to see the list."
                 ),
-                exit_code=EXIT_USAGE,
             )
         return model
 
     if provider == PROVIDER_CODEX:
         model = (raw_model or DEFAULT_CODEX_MODEL).strip()
         if model not in VALID_CODEX_MODELS:
-            raise DistillError(
+            raise UsageError(
                 (
                     f"Invalid codex model: {model}. "
                     f"Valid: {', '.join(VALID_CODEX_MODELS)}. "
                     f"Run with --list-models --provider codex to see the list."
                 ),
-                exit_code=EXIT_USAGE,
             )
         return model
 
     model = (raw_model or DEFAULT_OPENCODE_MODEL).strip()
     if model not in VALID_OPENCODE_MODELS:
-        raise DistillError(
+        raise UsageError(
             (
                 f"Invalid opencode model: {model}. "
                 f"Valid: {', '.join(VALID_OPENCODE_MODELS)}. "
                 f"Run with --list-models --provider opencode to see the list."
             ),
-            exit_code=EXIT_USAGE,
         )
     return model
 
@@ -670,7 +926,6 @@ def build_plan(args: argparse.Namespace) -> ResolvedPlan:
         slug=slug,
         run_folder_name=run_folder_name,
         run_folder_path=run_folder_path,
-        quiet=bool(args.quiet),
     )
 
 
@@ -679,61 +934,18 @@ def build_plan(args: argparse.Namespace) -> ResolvedPlan:
 # -------------------------------------------------------------------------
 
 
-def print_list_models(provider_filter: str | None) -> None:
-    show_claude = provider_filter in (None, PROVIDER_CLAUDE)
-    show_codex = provider_filter in (None, PROVIDER_CODEX)
-    show_opencode = provider_filter in (None, PROVIDER_OPENCODE)
-
-    if show_claude:
-        console.print("[bold]Claude models:[/bold]")
-        for model in VALID_CLAUDE_MODELS:
-            suffix = "  (default)" if model == DEFAULT_CLAUDE_MODEL else ""
-            console.print(f"  {model}{suffix}")
-        console.print()
-
-    if show_codex:
-        console.print("[bold]Codex models:[/bold]")
-        for model in VALID_CODEX_MODELS:
-            suffix = "  (default)" if model == DEFAULT_CODEX_MODEL else ""
-            console.print(f"  {model}{suffix}")
-        console.print()
-
-    if show_opencode:
-        console.print("[bold]OpenCode agents:[/bold]")
-        for model in VALID_OPENCODE_MODELS:
-            suffix = "  (default)" if model == DEFAULT_OPENCODE_MODEL else ""
-            console.print(f"  {model}{suffix}")
-        console.print()
-
-    console.print("[bold]Effort levels (canonical, all providers):[/bold]")
-    parts: list[str] = []
-    for level in CANONICAL_EFFORTS:
-        parts.append(f"{level} (default)" if level == DEFAULT_EFFORT else level)
-    console.print("  " + ", ".join(parts))
-    console.print()
-
-    console.print("[bold]Internal ETL:[/bold]")
-    if provider_filter == PROVIDER_CLAUDE:
-        console.print("  canonical  claude")
-        for level in CANONICAL_EFFORTS:
-            console.print(f"  {level:<9}  {EFFORT_ETL[PROVIDER_CLAUDE][level]}")
-        return
-
-    if provider_filter == PROVIDER_CODEX:
-        console.print("  canonical  codex")
-        for level in CANONICAL_EFFORTS:
-            console.print(f"  {level:<9}  {EFFORT_ETL[PROVIDER_CODEX][level]}")
-        return
-
-    if provider_filter == PROVIDER_OPENCODE:
-        console.print("  OpenCode uses agent-defined reasoning presets.")
-        return
-
-    console.print("  canonical  claude   codex")
-    for level in CANONICAL_EFFORTS:
-        claude_val = EFFORT_ETL[PROVIDER_CLAUDE][level]
-        codex_val = EFFORT_ETL[PROVIDER_CODEX][level]
-        console.print(f"  {level:<9}  {claude_val:<7}  {codex_val}")
+def list_models(provider_filter: str | None) -> dict[str, list[str]]:
+    """Each provider's models with its default first, or only `provider_filter`'s."""
+    catalog = (
+        (PROVIDER_CLAUDE, VALID_CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL),
+        (PROVIDER_CODEX, VALID_CODEX_MODELS, DEFAULT_CODEX_MODEL),
+        (PROVIDER_OPENCODE, VALID_OPENCODE_MODELS, DEFAULT_OPENCODE_MODEL),
+    )
+    return {
+        provider: [default, *(model for model in models if model != default)]
+        for provider, models, default in catalog
+        if provider_filter in (None, provider)
+    }
 
 
 def list_prompt_names() -> list[str]:
@@ -746,40 +958,22 @@ def list_prompt_names() -> list[str]:
     return prompt_names
 
 
-def print_list_prompts() -> None:
-    for prompt_name in list_prompt_names():
-        sys.stdout.write(prompt_name + "\n")
-
-
 # -------------------------------------------------------------------------
-# Dry-run printer
+# Dry-run answer
 # -------------------------------------------------------------------------
 
 
-def print_dry_run(plan: ResolvedPlan) -> None:
-    console.print("[bold yellow]DRY RUN[/bold yellow] -- no LLM call, no files written")
-    console.print()
-    input_size = plan.input_path.stat().st_size
-    console.print(
-        f"input:          {plan.input_path} "
-        f"({input_size:,} bytes, ~{plan.input_tokens:,} tokens)"
-    )
-    console.print(f"prompt:         {plan.prompt_name}")
-    console.print(f"prompt path:    {plan.prompt_path}")
-    console.print(
-        f"provider:       {plan.provider} (found at {plan.provider_cli_path})"
-    )
-    console.print(f"model:          {plan.model}")
-    console.print(
-        f"effort:         {plan.effort_canonical} "
-        f"→ {plan.effort_vendor} ({plan.provider})"
-    )
-    console.print(f"output folder:  {plan.run_folder_path}")
-    console.print()
-    console.print("Would write:")
-    console.print(f"  {plan.slug}_{plan.prompt_name}.md")
-    console.print(f"  {plan.slug}_raw{plan.input_path.suffix}")
-    console.print(f"  {plan.slug}_meta.yml")
+def dry_run_answer(plan: ResolvedPlan) -> dict[str, Any]:
+    """The resolved plan, and the file a real run would write."""
+    return {
+        "file": str(plan.run_folder_path / f"{plan.slug}_{plan.prompt_name}.md"),
+        "prompt": plan.prompt_name,
+        "prompt_file": str(plan.prompt_path),
+        "provider": plan.provider,
+        "model": plan.model,
+        "effort": plan.effort_canonical,
+        "input_tokens": plan.input_tokens,
+    }
 
 
 # -------------------------------------------------------------------------
@@ -822,14 +1016,14 @@ def run_claude(
         )
 
     try:
-        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES, quiet=plan.quiet)
+        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES)
     except subprocess.TimeoutExpired as exc:
         raise LLMCallError(
             f"claude CLI timed out after {LLM_CLI_TIMEOUT_SECONDS}s. "
             f"Input may be too large or the model overloaded."
         ) from exc
     except subprocess.CalledProcessError as exc:
-        details = exc.stderr or exc.stdout or str(exc)
+        details = (exc.stderr or exc.stdout or str(exc)).strip()
         raise LLMCallError(f"claude CLI failed: {details}") from exc
 
     try:
@@ -903,14 +1097,14 @@ def run_codex(
         )
 
     try:
-        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES, quiet=plan.quiet)
+        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES)
     except subprocess.TimeoutExpired as exc:
         raise LLMCallError(
             f"codex CLI timed out after {LLM_CLI_TIMEOUT_SECONDS}s. "
             f"Input may be too large or the model overloaded."
         ) from exc
     except subprocess.CalledProcessError as exc:
-        details = exc.stdout or str(exc)
+        details = (exc.stdout or str(exc)).strip()
         raise LLMCallError(f"codex CLI failed: {details}") from exc
 
     content = ""
@@ -960,14 +1154,14 @@ def run_opencode(
         )
 
     try:
-        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES, quiet=plan.quiet)
+        result = retry_request(_run, max_attempts=LLM_MAX_RETRIES)
     except subprocess.TimeoutExpired as exc:
         raise LLMCallError(
             f"opencode CLI timed out after {LLM_CLI_TIMEOUT_SECONDS}s. "
             f"Input may be too large or the agent overloaded."
         ) from exc
     except subprocess.CalledProcessError as exc:
-        details = exc.stderr or exc.stdout or str(exc)
+        details = (exc.stderr or exc.stdout or str(exc)).strip()
         raise LLMCallError(f"opencode CLI failed: {details}") from exc
 
     chunks: list[str] = []
@@ -1075,7 +1269,7 @@ def write_meta(
 def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
     """Run the LLM, write output + meta, optionally open Finder.
 
-    Returns the path to the run folder.
+    Returns the path to the distilled output.
     """
     run_folder_path = plan.run_folder_path
     while True:
@@ -1098,12 +1292,14 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
     copied_input_file = run_folder_path / f"{plan.slug}_raw{plan.input_path.suffix}"
     shutil.copy2(plan.input_path, copied_input_file)
 
-    if not plan.quiet:
-        console.print(
-            f"[cyan]Distilling {plan.input_path.name} "
-            f"with {plan.prompt_name} via {plan.provider} "
-            f"({plan.model}, effort={plan.effort_canonical})...[/cyan]"
-        )
+    log.info(
+        "distilling %s with %s via %s (%s, effort=%s)",
+        plan.input_path.name,
+        plan.prompt_name,
+        plan.provider,
+        plan.model,
+        plan.effort_canonical,
+    )
 
     started_at = datetime.now().astimezone()
     t0 = time.monotonic()
@@ -1119,60 +1315,35 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
         output_file,
     )
 
-    if not plan.quiet:
-        console.print(f"[green]Wrote {output_file}[/green]")
-        console.print(f"[dim]Duration: {duration:.1f}s[/dim]")
-    else:
-        # In quiet mode, just the output path to stdout
-        sys.stdout.write(str(output_file) + "\n")
+    log.info("wrote %s in %.1fs", output_file, duration)
 
     if open_finder:
         open_folder_in_finder(run_folder_path)
 
-    return run_folder_path
+    return output_file
 
 
-def main(argv: list[str] | None = None) -> int:
-    try:
-        args = parse_args(argv)
-    except SystemExit as exc:
-        # argparse already printed the error; propagate its code (default 2)
-        return int(exc.code) if isinstance(exc.code, int) else EXIT_USAGE
-
+def distill(args: argparse.Namespace) -> dict[str, Any]:
+    """Run the command `args` names and return the data beside `ok`."""
+    check_args(args)
     if args.list_models:
         # args.provider is None when the user did not pass --provider,
         # so None means "show all", and an explicit value filters.
-        print_list_models(args.provider)
-        return EXIT_SUCCESS
+        return {"models": list_models(args.provider)}
 
     if args.list_prompts:
-        print_list_prompts()
-        return EXIT_SUCCESS
+        return {"prompts": list_prompt_names()}
 
-    try:
-        plan = build_plan(args)
-    except DistillError as exc:
-        error_console.print(f"[red]{exc}[/red]")
-        return exc.exit_code
-
+    plan = build_plan(args)
     if args.dry_run:
-        print_dry_run(plan)
-        return EXIT_SUCCESS
+        return dry_run_answer(plan)
 
-    try:
-        execute_plan(plan, open_finder=not args.no_open)
-    except DistillError as exc:
-        error_console.print(f"[red]{exc}[/red]")
-        return exc.exit_code
-    except KeyboardInterrupt:
-        error_console.print("[yellow]Interrupted[/yellow]")
-        return 130
-    except Exception as exc:  # noqa: BLE001
-        error_console.print(f"[red]Unexpected error: {exc}[/red]")
-        return EXIT_GENERIC_ERROR
+    return {"file": str(execute_plan(plan, open_finder=not args.no_open))}
 
-    return EXIT_SUCCESS
+
+def main(argv: Sequence[str] | None = None) -> int:
+    return run_script(build_parser(), distill, argv, debug="DISTILL_DEBUG")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
