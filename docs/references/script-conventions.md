@@ -7,10 +7,10 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-04
+date_updated: 2026-10-07
 ---
 
-Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
+Every CLI in `scripts/` follows this contract. A skill-local script follows it too, and its skill's own tests cover it
 
 `<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
 
