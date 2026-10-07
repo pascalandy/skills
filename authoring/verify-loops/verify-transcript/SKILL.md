@@ -61,7 +61,7 @@ Paid work requires both the paid feature ID and `--allow-paid`. The flag alone d
 
 ## Evidence
 
-Every command answers in one JSON line. A verification answers `file`, the run's `result.json`, which records the `verdict` and `evidence_dir`; a failed feature is also one entry of `errors`, with the command that reruns it. `-v` prints each feature's verdict as it ends. The default evidence root remains `${XDG_STATE_HOME:-~/.local/state}/eval-transcript/runs`. Runs retained before the skill rename stay in the same history.
+Every command answers in one JSON line. A verification answers `file`, the run's `result.json`, which records the `verdict` and `evidence_dir`; a failed feature is also one entry of `errors`, with the command that reruns it. A run stopped by an interrupt or a failed write answers `files` instead, the evidence it saved so far. `-v` prints each feature's verdict as it ends. The default evidence root remains `${XDG_STATE_HOME:-~/.local/state}/eval-transcript/runs`. Runs retained before the skill rename stay in the same history.
 
 Each case retains:
 
