@@ -439,12 +439,24 @@ def test_failed_batch_names_an_executable_rerun_and_continues(
             "--only test-alpha --only test-beta --only test-gamma",
         ),
         (
+            "FAILED scripts/tests/test_alpha.py::test_one - assert False\n"
+            + "ERROR scripts/tests/test_beta.py - ImportError\n"
+            + "1 failed, 1 error during collection",
+            "--only test-alpha --only test-beta --only test-gamma",
+        ),
+        (
             "FAILED scripts/tests/test_beta.py::test_one - assert 1 == 2\n"
             + "FAILED scripts/tests/test_unknown.py::test_two - assert 1 == 2",
             "--only test-alpha --only test-beta --only test-gamma",
         ),
     ],
-    ids=["one", "error-and-failure", "collection-error", "unknown-module"],
+    ids=[
+        "one",
+        "error-and-failure",
+        "collection-error",
+        "failure-and-collection-error",
+        "unknown-module",
+    ],
 )
 def test_failed_batch_reruns_only_the_modules_pytest_names(
     routing_repo: Path,

@@ -441,8 +441,11 @@ FAILED_TEST = re.compile(
 
 
 def failed_tests(output: str, tests: list[Check]) -> list[Check]:
-    """The modules pytest's summary names, or every module when it names none
-    of them, as after a collection error or a verbose run."""
+    """The modules pytest's summary names, or every module when it cannot tell:
+    after a collection error, which its summary names without a test, or a
+    verbose run."""
+    if "during collection" in output:
+        return tests
     named = set(FAILED_TEST.findall(output))
     found = [test for test in tests if test.test_path in named]
     return found if found and len(found) == len(named) else tests
