@@ -378,6 +378,7 @@ TEST_PROFILE = "sonnet"
 EXIT_CODES = exit_codes({1: "a feature failed, or the verifier could not run"})
 EVIDENCE_NAMESPACE = "eval-transcript"
 RUN_MARKER = ".verify-transcript-run"
+DOCTOR_HINT = "run 'verify-transcript doctor -v' and fix what it reports"
 
 log = logging.getLogger("verify-transcript")
 FEATURE_AREAS = (
@@ -1952,52 +1953,70 @@ def run_verification(
     run_id = new_run_id()
     evidence_dir = evidence_root.expanduser().resolve() / run_id
     evidence_dir.mkdir(parents=True, exist_ok=False)
-    scratch = create_scratch(run_id)
-    context = RunContext(
-        run_id=run_id,
-        located=located,
-        scratch_dir=scratch,
-        evidence_dir=evidence_dir,
-        allow_paid=allow_paid,
-        youtube_url=youtube_url,
-    )
-    results: list[dict[str, object]] = []
-    cleanup_error: VerificationError | None = None
     try:
-        for feature in selected:
-            results.append(run_feature(feature, context))
-            log.info(f"{results[-1]['verdict']} {feature.id}")
-    finally:
+        scratch = create_scratch(run_id)
+        context = RunContext(
+            run_id=run_id,
+            located=located,
+            scratch_dir=scratch,
+            evidence_dir=evidence_dir,
+            allow_paid=allow_paid,
+            youtube_url=youtube_url,
+        )
+        results: list[dict[str, object]] = []
+        cleanup_error: VerificationError | None = None
         try:
-            safe_cleanup(scratch, run_id)
-        except VerificationError as error:
-            cleanup_error = error
-    passed = sum(result["verdict"] == "PASS" for result in results)
-    failed = len(results) - passed
-    if cleanup_error is not None:
-        failed += 1
-    ok = failed == 0
-    report: dict[str, object] = {
-        "schema_version": 1,
-        "ok": ok,
-        "verdict": "PASS" if ok else "FAIL",
-        "run_id": run_id,
-        "layout": located.layout,
-        "transcript_skill_dir": str(located.directory),
-        "paid_authorized": allow_paid,
-        "evidence_dir": str(evidence_dir),
-        "counts": {"passed": passed, "failed": failed},
-        "scratch_removed": not scratch.exists(),
-        "features": results,
-    }
-    if cleanup_error is not None:
-        report["cleanup_error"] = {
-            "code": cleanup_error.code,
-            "message": cleanup_error.message,
-            "hint": cleanup_error.hint,
+            for feature in selected:
+                results.append(run_feature(feature, context))
+                log.info(f"{results[-1]['verdict']} {feature.id}")
+        finally:
+            try:
+                safe_cleanup(scratch, run_id)
+            except VerificationError as error:
+                cleanup_error = error
+        passed = sum(result["verdict"] == "PASS" for result in results)
+        failed = len(results) - passed
+        if cleanup_error is not None:
+            failed += 1
+        ok = failed == 0
+        report: dict[str, object] = {
+            "schema_version": 1,
+            "ok": ok,
+            "verdict": "PASS" if ok else "FAIL",
+            "run_id": run_id,
+            "layout": located.layout,
+            "transcript_skill_dir": str(located.directory),
+            "paid_authorized": allow_paid,
+            "evidence_dir": str(evidence_dir),
+            "counts": {"passed": passed, "failed": failed},
+            "scratch_removed": not scratch.exists(),
+            "features": results,
         }
-    _write_json(evidence_dir / "result.json", report)
-    return report
+        if cleanup_error is not None:
+            report["cleanup_error"] = {
+                "code": cleanup_error.code,
+                "message": cleanup_error.message,
+                "hint": cleanup_error.hint,
+            }
+        _write_json(evidence_dir / "result.json", report)
+        return report
+    except (KeyboardInterrupt, OSError) as error:
+        if isinstance(error, KeyboardInterrupt):
+            code = getattr(error, "code", INTERRUPTED)
+            message = "interrupted" if code == INTERRUPTED else "terminated"
+        else:
+            code = 1
+            message = f"{error}; {DOCTOR_HINT}"
+        failure = ScriptError(
+            message,
+            report={
+                "files": sorted(
+                    str(path) for path in evidence_dir.rglob("*") if path.is_file()
+                )
+            },
+        )
+        failure.code = code
+        raise failure from error
 
 
 def feature_documents(skill_dir: Path, query: str | None) -> list[dict[str, str]]:
@@ -2277,9 +2296,7 @@ def work(args: argparse.Namespace) -> dict[str, object]:
         failure = UsageError if error.exit_code == USAGE else ScriptError
         raise failure(error.line) from error
     except OSError as error:
-        raise ScriptError(
-            f"{error}; run 'verify-transcript doctor -v' and fix what it reports"
-        ) from error
+        raise ScriptError(f"{error}; {DOCTOR_HINT}") from error
 
 
 def main(argv: list[str] | None = None) -> int:

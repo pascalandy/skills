@@ -71,6 +71,49 @@ def make_context(tmp_path: Path, *, allow_paid: bool = False):
     )
 
 
+@pytest.mark.parametrize("code", [1, 130, 143])
+def test_a_stopped_verification_answers_the_evidence_already_saved(
+    tmp_path, monkeypatch, capsys, code
+):
+    skill_dir = tmp_path / "verify-transcript"
+    skill_dir.mkdir()
+    make_transcript_skill(tmp_path / "transcript")
+    monkeypatch.setattr(verify_transcript, "verify_skill_dir", lambda: skill_dir)
+    first, second = verify_transcript.FEATURES[:2]
+    write_json = verify_transcript._write_json
+
+    def stop_second_case(path, payload):
+        if path.name == "result.json" and payload.get("id") == second.id:
+            if code == 1:
+                raise OSError("evidence write failed")
+            raise verify_transcript.Interrupted(code)
+        write_json(path, payload)
+
+    monkeypatch.setattr(verify_transcript, "_write_json", stop_second_case)
+    evidence_root = tmp_path / "evidence"
+
+    exit_code = verify_transcript.main(
+        [
+            "verify",
+            "--feature",
+            first.id,
+            "--feature",
+            second.id,
+            "--evidence-root",
+            str(evidence_root),
+        ]
+    )
+
+    output = capsys.readouterr()
+    assert (exit_code, output.out) == (code, "")
+    answer = json.loads(output.err.splitlines()[-1])
+    [saved] = evidence_root.glob("*/cases/*/result.json")
+    assert json.loads(saved.read_text())["id"] == first.id
+    assert str(saved) in answer["files"]
+    assert all(Path(path).is_file() for path in answer["files"])
+    assert not list(evidence_root.glob("*/result.json"))
+
+
 def test_locates_categorized_source_layout(tmp_path: Path):
     verify_dir = tmp_path / "skills" / "verify-loops" / "verify-transcript"
     transcript_dir = tmp_path / "skills" / "andy" / "transcript"
