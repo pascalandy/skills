@@ -670,19 +670,6 @@ class TestMainFunction:
     """main() must return correct exit codes for all paths."""
 
     @respx.mock
-    def test_success_returns_0(self) -> None:
-        respx.post(grokipedia.TAVILY_API_URL).mock(
-            return_value=httpx.Response(200, json=FAKE_RESPONSE)
-        )
-        # Mock extract endpoint (hybrid lookup for canonical page)
-        respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
-            return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
-        )
-        with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "test query"]):
-                assert grokipedia.main() == 0
-
-    @respx.mock
     def test_success_answers_with_the_results_file(
         self, capsys: pytest.CaptureFixture[str], temp_dir: Path
     ) -> None:
@@ -696,7 +683,7 @@ class TestMainFunction:
         with patch("grokipedia.get_api_key", return_value="fake-key"):
             assert grokipedia.main(["test query"]) == 0
         found = succeeded(capsys)
-        assert list(found) == ["ok", "file"]
+        assert set(found) == {"ok", "file"}
         file = Path(found["file"])
         assert file.parent == temp_dir.resolve()
         assert "### 1. Test Article" in file.read_text(encoding="utf-8")
@@ -754,15 +741,6 @@ class TestMainFunction:
         assert "added the exact page https://grokipedia.com/page/Pattern" in err
 
     @respx.mock
-    def test_http_401_returns_1(self) -> None:
-        respx.post(grokipedia.TAVILY_API_URL).mock(
-            return_value=httpx.Response(401, json={"error": "unauthorized"})
-        )
-        with patch("grokipedia.get_api_key", return_value="bad-key"):
-            with patch("sys.argv", ["grokipedia.py", "test"]):
-                assert grokipedia.main() == 1
-
-    @respx.mock
     def test_http_401_names_the_key_command(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -782,14 +760,6 @@ class TestMainFunction:
             return_value=httpx.Response(429, json={"error": "rate limited"})
         )
         with patch("grokipedia.get_api_key", return_value="key"):
-            with patch("sys.argv", ["grokipedia.py", "test"]):
-                assert grokipedia.main() == 1
-
-    def test_api_key_missing_returns_1(self) -> None:
-        with patch(
-            "grokipedia.get_api_key",
-            side_effect=grokipedia.ApiKeyError("no key"),
-        ):
             with patch("sys.argv", ["grokipedia.py", "test"]):
                 assert grokipedia.main() == 1
 

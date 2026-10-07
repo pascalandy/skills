@@ -277,7 +277,7 @@ CHECKS = [
     ),
     Check(
         "tavily",
-        pytest("authoring/andy/tavily/scripts/tests", "httpx", "rich", "respx"),
+        pytest("authoring/andy/tavily/scripts/tests", "httpx", "respx"),
     ),
     Check(
         "transcript",
