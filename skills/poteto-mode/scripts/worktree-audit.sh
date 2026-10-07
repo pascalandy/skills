@@ -52,6 +52,10 @@ args=()
 for arg in "$@"; do
 	case "$arg" in
 	-h | --help) usage && exit 0 ;;
+	esac
+done
+for arg in "$@"; do
+	case "$arg" in
 	-v | --verbose) verbose=1 ;;
 	-*) fail 2 "unknown option $arg" ',"help":"worktree-audit.sh --help"' ;;
 	*) args+=("$arg") ;;

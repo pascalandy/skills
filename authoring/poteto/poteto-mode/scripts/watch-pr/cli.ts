@@ -5,7 +5,7 @@ import {
   InvalidArgumentError,
   Option,
 } from "commander";
-import { answer, processIo } from "../answer.ts";
+import { answer, oneLine, processIo } from "../answer.ts";
 import {
   GhGitHubReader,
   WatcherQueryError,
@@ -189,7 +189,7 @@ async function watch(
   runtime: CliRuntime
 ): Promise<T.TerminalVerdict> {
   const emit = (verdict: T.ProgressVerdict): void =>
-    runtime.stderr(`${JSON.stringify(verdict)}\n`);
+    runtime.stderr(`${oneLine(verdict)}\n`);
   let contexts: T.NonEmpty<T.PrContext>;
   try {
     const seed = await resolveContext({

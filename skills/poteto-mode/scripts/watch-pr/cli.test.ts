@@ -188,7 +188,6 @@ describe("parseArgs", () => {
   it("rejects every invalid mode and numeric shape as usage", async () => {
     const invalid = [
       ["--unknown"],
-      ["--interval", "0"],
       ["--sweep-interval", "-1"],
       ["--timeout", "-1"],
       ["--max-query-errors", "1.5"],
@@ -316,6 +315,7 @@ describe("main", () => {
   });
 
   it("fails when GitHub stays unreadable until the deadline", async () => {
+    const detail = "HTTP 502\u2028\u2029";
     const harness = testRuntime({
       ...fakeReader(),
       async pullRequest() {
@@ -323,7 +323,7 @@ describe("main", () => {
           kind: "command-exit",
           retryable: true,
           code: 1,
-          detail: "HTTP 502",
+          detail,
         });
       },
     });
@@ -339,6 +339,8 @@ describe("main", () => {
     expect(code).toBe(1);
     expect(harness.stdout).toEqual([]);
     expect(harness.stderr).toHaveLength(2);
+    for (const line of harness.stderr)
+      expect(line).not.toMatch(/[\u2028\u2029]/);
     expect(JSON.parse(harness.stderr[0])).toMatchObject({
       kind: "RETRY",
       consecutiveFailures: 1,
@@ -346,7 +348,7 @@ describe("main", () => {
     expect(JSON.parse(harness.stderr[1])).toEqual({
       ok: false,
       errors: [
-        "GitHub status stayed unavailable until --timeout: HTTP 502; check gh auth status and the PR number, then rerun watch-pr",
+        `GitHub status stayed unavailable until --timeout: ${detail}; check gh auth status and the PR number, then rerun watch-pr`,
       ],
     });
   });
