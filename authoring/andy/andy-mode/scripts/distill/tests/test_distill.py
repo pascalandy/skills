@@ -443,6 +443,47 @@ class TestEndToEndWithRealTranscript:
         assert copied_input.exists()
 
 
+def test_a_failed_input_copy_answers_the_file_already_written(
+    tmp_path: Path,
+) -> None:
+    env = env_with_fake_claude(tmp_path)
+    input_file = tmp_path / "article.md"
+    input_file.write_text("hello world\n", encoding="utf-8")
+    probe = tmp_path / "copy_failure.py"
+    probe.write_text(
+        "import runpy, shutil, sys\n"
+        "def fail_metadata(*args, **kwargs):\n"
+        "    raise OSError('copy metadata denied')\n"
+        "shutil.copystat = fail_metadata\n"
+        f"sys.argv = [{str(SCRIPT_PATH)!r}, *sys.argv[1:]]\n"
+        f"runpy.run_path({str(SCRIPT_PATH)!r}, run_name='__main__')\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--with-requirements",
+            str(SCRIPT_PATH),
+            str(probe),
+            str(input_file),
+            "--no-open",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+        env=env,
+    )
+
+    assert (result.returncode, result.stdout) == (1, "")
+    payload = answer(result.stdout, result.stderr, result.returncode)
+    assert "copy metadata denied" in payload["errors"][0]
+    (saved,) = payload["files"]
+    assert Path(saved).name == "article_raw.md"
+    assert Path(saved).read_text(encoding="utf-8") == "hello world\n"
+
+
 def test_a_failed_model_call_answers_the_files_already_written(
     tmp_path: Path,
 ) -> None:

@@ -1290,20 +1290,20 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
 
     output_file = run_folder_path / f"{plan.slug}_{plan.prompt_name}.md"
     copied_input_file = run_folder_path / f"{plan.slug}_raw{plan.input_path.suffix}"
-    shutil.copy2(plan.input_path, copied_input_file)
-
-    log.info(
-        "distilling %s with %s via %s (%s, effort=%s)",
-        plan.input_path.name,
-        plan.prompt_name,
-        plan.provider,
-        plan.model,
-        plan.effort_canonical,
-    )
-
-    started_at = datetime.now().astimezone()
-    t0 = time.monotonic()
     try:
+        shutil.copy2(plan.input_path, copied_input_file)
+
+        log.info(
+            "distilling %s with %s via %s (%s, effort=%s)",
+            plan.input_path.name,
+            plan.prompt_name,
+            plan.provider,
+            plan.model,
+            plan.effort_canonical,
+        )
+
+        started_at = datetime.now().astimezone()
+        t0 = time.monotonic()
         usage = run_llm(plan, output_file)
         duration = time.monotonic() - t0
         write_meta(
@@ -1314,6 +1314,10 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
             duration,
             output_file,
         )
+        log.info("wrote %s in %.1fs", output_file, duration)
+
+        if open_finder:
+            open_folder_in_finder(run_folder_path)
     # A model call may have been paid for, so the files it left stay listed
     except ScriptError as error:
         error.report["files"] = sorted(map(str, run_folder_path.iterdir()))
@@ -1332,11 +1336,6 @@ def execute_plan(plan: ResolvedPlan, open_finder: bool) -> Path:
             f"{type(error).__name__}: {error}; see the traceback with --debug",
             report={"files": sorted(map(str, run_folder_path.iterdir()))},
         ) from error
-
-    log.info("wrote %s in %.1fs", output_file, duration)
-
-    if open_finder:
-        open_folder_in_finder(run_folder_path)
 
     return output_file
 
