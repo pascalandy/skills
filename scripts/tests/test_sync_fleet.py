@@ -178,7 +178,13 @@ def change(hub: Path, name: str = "change.txt", push: bool = True) -> str:
 
 
 def run(
-    hub: Path, homes: Path, bin_dir: Path, *args: str, stdin: str = "", **extra: str
+    hub: Path,
+    homes: Path,
+    bin_dir: Path,
+    *args: str,
+    stdin: str = "",
+    script: str = "sync_fleet.py",
+    **extra: str,
 ) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, **GIT_IDENTITY, **extra}
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
@@ -189,7 +195,7 @@ def run(
     env["SHELL"] = "/bin/sh"
     env.pop("XDG_STATE_HOME", None)
     result = subprocess.run(
-        ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],
+        ["uv", "run", str(hub / "scripts" / script), *args],
         check=False,
         cwd=hub,
         env=env,
@@ -649,6 +655,35 @@ def test_an_interrupt_keeps_the_machines_that_already_synced(
         "errors": ["interrupted"],
         "changes": [["sync", "synced", git(hub, "rev-parse", "HEAD")[:7]]],
     }
+    assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
+
+
+def test_a_bug_in_one_worker_keeps_the_machines_that_synced(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    synced = machine(homes, "synced", hub.parent / "skills.git")
+    change(hub)
+    register(hub, "synced", "broken")
+    # sync-fleet, with the worker for broken crashing
+    (hub / "scripts/crashing_fleet.py").write_text(
+        "import sys\n"
+        "import sync_fleet\n"
+        "real = sync_fleet.attempt\n"
+        "def attempt(machine, source, mode):\n"
+        "    if machine.name == 'broken':\n"
+        "        raise FileNotFoundError('no login shell')\n"
+        "    return real(machine, source, mode)\n"
+        "sync_fleet.attempt = attempt\n"
+        "sys.exit(sync_fleet.main())\n"
+    )
+
+    result = run(hub, homes, bin_dir, script="crashing_fleet.py")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["errors"] == ["FileNotFoundError: no login shell"]
+    assert answer["changes"] == [["sync", "synced", git(hub, "rev-parse", "HEAD")[:7]]]
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 

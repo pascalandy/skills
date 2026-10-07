@@ -783,6 +783,29 @@ def test_a_failure_midway_answers_the_entries_already_installed(
     assert not any(path.startswith("~/.claude/skills/") for path in done)
 
 
+def test_an_interrupt_during_the_prune_answers_the_entries_installed(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    # The installer, with its prune after the install interrupted
+    (repo / "scripts/interrupted_install.py").write_text(
+        "import sys\n"
+        "import install_skills\n"
+        "def interrupted():\n"
+        "    raise KeyboardInterrupt\n"
+        "install_skills.prune_leftovers = interrupted\n"
+        "sys.exit(install_skills.main())\n"
+    )
+
+    result = run(repo, home, script="interrupted_install.py")
+
+    assert (result.returncode, result.stdout) == (130, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["errors"] == ["interrupted"]
+    assert ["add", "~/.claude/skills/alpha"] in answer["changes"]
+    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+
+
 def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
     sandbox: tuple[Path, Path],
 ) -> None:

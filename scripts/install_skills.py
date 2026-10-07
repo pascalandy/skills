@@ -697,21 +697,22 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
         if preview:
             return output
         compile_skills.compile_tree()
-        # A failure midway still answers the entries already installed
+        # A failure midway, or during the prune after it, still answers the
+        # entries already installed
         done: list[list[str]] = []
         with receipt(done):
             execute(home, {**sources, **codex}, commands, actions, done)
-        try:
-            leftovers = prune_leftovers()
-        except (OSError, ScriptError) as error:
-            leftovers = [
-                f"could not prune leftover skill folders: {error}; "
-                + "see why with just install-skills --debug"
-            ]
-        if leftovers:
-            raise ScriptError(
-                *(f"installed, but {problem}" for problem in leftovers), report=output
-            )
+            try:
+                leftovers = prune_leftovers()
+            except (OSError, ScriptError) as error:
+                leftovers = [
+                    f"could not prune leftover skill folders: {error}; "
+                    + "see why with just install-skills --debug"
+                ]
+            if leftovers:
+                raise ScriptError(
+                    *(f"installed, but {problem}" for problem in leftovers)
+                )
         return output
 
 

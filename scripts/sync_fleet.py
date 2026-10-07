@@ -38,7 +38,7 @@ import sys
 import threading
 import time
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -749,29 +749,32 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
             len(public.split()),
             local or socket.gethostname().split(".")[0],
         )
-        with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
-            futures = [
-                pool.submit(attempt, machine, source, mode) for machine in machines
-            ]
-            try:
-                outcomes = [future.result() for future in futures]
-            except KeyboardInterrupt as stop:
-                stop_children()
-                # The answer keeps the machines that synced before the interrupt
-                finished = [
-                    future.result()
-                    for future in futures
-                    if future.done()
-                    and not future.cancelled()
-                    and future.exception() is None
+        futures: list[Future[Outcome]] = []
+        try:
+            with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
+                futures = [
+                    pool.submit(attempt, machine, source, mode) for machine in machines
                 ]
-                for outcome in finished:
-                    if outcome.changes:
-                        changed_machines[outcome.machine] = None
-                keep_changes(
-                    stop, [["sync", name, source.sha[:7]] for name in changed_machines]
-                )
-                raise
+                try:
+                    outcomes = [future.result() for future in futures]
+                except KeyboardInterrupt:
+                    stop_children()
+                    raise
+        except BaseException as error:
+            # The pool has waited for every worker, so the answer keeps each
+            # machine that synced before an interrupt or another worker's bug
+            synced = [
+                future.result()
+                for future in futures
+                if not future.cancelled() and future.exception() is None
+            ]
+            for outcome in synced:
+                if outcome.changes:
+                    changed_machines[outcome.machine] = None
+            keep_changes(
+                error, [["sync", name, source.sha[:7]] for name in changed_machines]
+            )
+            raise
     problems = [outcome for outcome in outcomes if outcome.status not in FINE]
     if args.notify:
         notify(
