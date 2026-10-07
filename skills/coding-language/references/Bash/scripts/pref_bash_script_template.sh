@@ -285,13 +285,19 @@ show_version() {
 
 fct_parse_arguments() {
 	POSITIONAL_ARGS=()
-
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
+	local arg
+	for arg in "$@"; do
+		case "${arg}" in
+		--) break ;;
 		-h | --help)
 			usage
 			fct_exit 0
 			;;
+		esac
+	done
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
 		-V | --version)
 			show_version
 			fct_exit 0

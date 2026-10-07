@@ -88,12 +88,14 @@ add_target() {
 	fail 2 "path not found: $path" "run_shellck.sh --help"
 }
 
-case ${1-} in
--h | --help)
-	usage
-	exit 0
-	;;
-esac
+for arg in "$@"; do
+	case $arg in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	esac
+done
 
 command -v shellcheck >/dev/null 2>&1 ||
 	fail 1 "shellcheck not found; install it with brew install shellcheck, then rerun"
