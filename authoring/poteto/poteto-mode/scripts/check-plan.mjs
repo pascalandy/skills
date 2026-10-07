@@ -43,8 +43,16 @@ Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error`
 // One compact JSON line, `ok` first: a success on stdout, a failure as the last
 // line of stderr with stdout empty
 function answer(code, fields = {}) {
-	const line = `${JSON.stringify({ ok: code === 0, ...fields })}\n`;
-	(code === 0 ? process.stdout : process.stderr).write(line);
+	const line = Buffer.from(`${JSON.stringify({ ok: code === 0, ...fields })}\n`);
+	// Written in full before exit, since process.exit drops a pipe's pending output
+	let offset = 0;
+	while (offset < line.length) {
+		try {
+			offset += fs.writeSync(code === 0 ? 1 : 2, line, offset);
+		} catch (error) {
+			if (error.code !== "EAGAIN") throw error;
+		}
+	}
 	process.exit(code);
 }
 

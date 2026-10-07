@@ -24,13 +24,27 @@ Exit codes: 0 success; 1 failure; 2 usage error; 130 interrupted
 HELP
 }
 
-# One compact JSON line on stderr, `ok` first, then exit with the given code
+# One compact JSON line on stderr, `ok` first, then exit with the given code.
+# Quotes, backslashes, and control characters are escaped for JSON
 fail() {
-	local text=${2//\\/\\\\}
-	text=${text//\"/\\\"}
-	printf '{"ok":false,"errors":["%s"]%s}\n' "$text" "${3:-}" >&2
+	local text=$2 out='' char i
+	for ((i = 0; i < ${#text}; i++)); do
+		char=${text:i:1}
+		case $char in
+		\" | \\) out+=\\$char ;;
+		[[:cntrl:]])
+			printf -v char '\\u%04x' "'$char"
+			out+=$char
+			;;
+		*) out+=$char ;;
+		esac
+	done
+	printf '{"ok":false,"errors":["%s"]%s}\n' "$out" "${3:-}" >&2
 	exit "$1"
 }
+
+prs=""
+trap 'rm -f "$prs"; fail 130 interrupted' INT
 
 verbose=0
 args=()
@@ -47,8 +61,9 @@ command -v jq >/dev/null || fail 1 "jq not found; install jq, then rerun worktre
 
 repo="${args[0]:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 [ -n "$repo" ] || fail 1 "not in a git repo; run worktree-audit.sh <repo-path>"
-cd "$repo" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 ||
+if ! { cd "$repo" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1; }; then
 	fail 1 "$repo is not a git repository; run worktree-audit.sh <repo-path>"
+fi
 
 # Main worktree is the first entry; everything else is a candidate.
 main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
@@ -59,7 +74,6 @@ git fetch origin main --quiet 2>/dev/null || [ "$verbose" = 0 ] ||
 
 # PR state by branch, fetched once. Empty if gh is unavailable.
 prs=$(mktemp)
-trap 'rm -f "$prs"; fail 130 interrupted' INT
 gh pr list --author "@me" --state all --limit 1000 \
 	--json number,state,baseRefName,headRefName,headRefOid 2>/dev/null >"$prs" || echo "[]" >"$prs"
 
