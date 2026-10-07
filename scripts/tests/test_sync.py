@@ -146,6 +146,22 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
     assert not (home / ".claude").exists()
 
 
+def test_a_step_that_ends_without_a_newline_leaves_the_answer_its_own_line(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    (repo / "scripts/install_skills.py").write_text(
+        'import sys\nsys.stderr.write("fatal: broken")\nsys.exit(1)\n'
+    )
+
+    result = run(repo, home, "--dry-run")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    *detail, last = result.stderr.splitlines()
+    assert detail[-1] == "fatal: broken"
+    assert json.loads(last)["ok"] is False
+
+
 def test_a_fetch_that_cannot_reach_origin_exits_75_before_installing(
     behind: tuple[Path, Path],
 ) -> None:

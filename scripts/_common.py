@@ -277,6 +277,12 @@ def changes_in(lines: Iterable[str]) -> list[list[str]]:
     return found
 
 
+def replay(output: str) -> None:
+    """Forward a child's output to stderr with its last line ended, so the
+    answer printed after it stays a line of its own."""
+    if output:
+        sys.stderr.write(output if output.endswith("\n") else f"{output}\n")
+
 
 def usage_error(message: str) -> NoReturn:
     raise UsageError(message)

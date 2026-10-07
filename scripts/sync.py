@@ -22,7 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import answer_in, changes_in, is_network_failure, run, run_git, run_script
+from _common import (
+    answer_in,
+    changes_in,
+    is_network_failure,
+    replay,
+    run,
+    run_git,
+    run_script,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -95,7 +103,7 @@ def step(name: str, *command: str) -> list[list[str]]:
     finished = run(
         command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
-    sys.stderr.write(finished.stderr)
+    replay(finished.stderr)
     # A failed step, such as a private pull that conflicts after the edits were
     # committed, still answers what it changed
     failed = answer_in(finished.stderr.splitlines()) or {}
