@@ -128,9 +128,8 @@ def answer(code: int, fields: Mapping[str, Any]) -> int:
     """
     body = {"ok": code == 0, **fields}
     body["ok"] = code == 0
-    print(
-        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
-    )
+    line = json.dumps(body, separators=(",", ":"))
+    print(line, file=sys.stderr if code else sys.stdout)
     return code
 
 
@@ -230,8 +229,42 @@ def duration(text: str) -> float:
     return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
 
 
+def command_parsers(parser: argparse.ArgumentParser) -> list[argparse.ArgumentParser]:
+    """The parser of every command below `parser`, at any depth."""
+    found: list[argparse.ArgumentParser] = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for command in dict.fromkeys(action.choices.values()):
+                found += [command, *command_parsers(command)]
+    return found
+
+
+def named_command(
+    parser: argparse.ArgumentParser, argv: Sequence[str]
+) -> argparse.ArgumentParser:
+    """The deepest command `argv` names, whose help -h asks for."""
+    for arg in argv:
+        if arg == "--":
+            break
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
+                parser = action.choices[arg]
+                break
+    return parser
+
+
 def usage_error(message: str) -> NoReturn:
     raise UsageError(message)
+
+
+def usage_error_for(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
+    """The error method of `parser`: a usage error whose help hint names it, so
+    a command's mistake points to that command's help."""
+
+    def error(message: str) -> NoReturn:
+        raise UsageError(message, report={"help": f"{parser.prog} --help"})
+
+    return error
 
 
 def run_script(
@@ -251,25 +284,34 @@ def run_script(
     prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
     """
     argv = list(sys.argv[1:] if argv is None else argv)
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="print progress and step details on stderr",
-    )
-    if debug:
-        parser.add_argument(
-            "--debug",
-            action="store_true",
-            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
-        )
+    # A command's parser takes -v and --debug too, after the command; SUPPRESS
+    # keeps a flag given before it
+    for each in (parser, *command_parsers(parser)):
+        default = False if each is parser else argparse.SUPPRESS
+        if "-v" not in each._option_string_actions:
+            each.add_argument(
+                "-v",
+                "--verbose",
+                action="store_true",
+                default=default,
+                help="print progress and step details on stderr",
+            )
+        if debug and "--debug" not in each._option_string_actions:
+            each.add_argument(
+                "--debug",
+                action="store_true",
+                default=default,
+                help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+            )
+        # Parser.error prints usage errors itself; raising sends each one
+        # through answer_failure(). The root reports unknown arguments, which
+        # belong to the command argv names
+        named = named_command(parser, argv) if each is parser else each
+        each.error = usage_error_for(named)  # pyright: ignore[reportAttributeAccessIssue]
     if given(argv, "-h", "--help", parser=parser):
-        parser.print_help()
+        named_command(parser, argv).print_help()
         return 0
 
-    # Parser.error, in the pasted cli block, prints usage errors itself;
-    # raising sends this one through answer_failure()
-    parser.error = usage_error
     command = shlex.join([*parser.prog.split(), *argv])
     tracing = False
     with signals_interrupt():
@@ -310,7 +352,7 @@ def answer_failure(
     temporary failure, and rerun with --debug for a bug."""
     messages = [str(message) for message in error.args]
     hints: dict[str, str] = {}
-    if isinstance(error, UsageError):
+    if isinstance(error, UsageError) and "help" not in error.report:
         hints["help"] = f"{parser.prog} --help"
     elif isinstance(error, TemporaryError) and messages:
         hints["retry"] = command
@@ -1197,26 +1239,8 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def add_shared_flags(parser: argparse.ArgumentParser) -> None:
-    """Accept run_script's -v and --debug after the command too. SUPPRESS keeps a
-    flag given before the command from being reset to False."""
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help="print the receipt, notes, and Codex logs on stderr",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help=f"print tracebacks on stderr; also {DEBUG_ENV}=1",
-    )
-
-
-def build_parser() -> tuple[Parser, dict[str, Parser]]:
-    """The parser and each command's own parser, whose usage errors answer in JSON."""
+def build_parser() -> Parser:
+    """The parser, with one command parser per command."""
     parser = Parser(
         prog="image_creator.py",
         description="Generate or edit images with GPT Image through a ChatGPT plan or the OpenRouter API.",
@@ -1244,17 +1268,11 @@ def build_parser() -> tuple[Parser, dict[str, Parser]]:
         help="input image; repeat, order matters",
     )
     add_job_options(edit)
-    doctor_parser = sub.add_parser(
+    sub.add_parser(
         "doctor", help="report which backends are ready", exit_codes=EXIT_CODES,
         epilog='answer: {"ok":true,"plan":{"ready":…,"detail":…},"openrouter":{…}}',
     )  # fmt: skip
-    commands = {"generate": generate, "edit": edit, "doctor": doctor_parser}
-    for command in commands.values():
-        add_shared_flags(command)
-        # run_script routes the main parser's usage errors; a command's own
-        # parser raises the same way, so its errors answer in JSON too
-        command.error = usage_error
-    return parser, commands
+    return parser
 
 
 def edit_shape(path: Path) -> tuple[tuple[int, int] | None, str | None]:
@@ -1320,14 +1338,7 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = list(sys.argv[1:] if argv is None else argv)
-    parser, commands = build_parser()
-    # run_script prints the main help for -h anywhere; a command's -h prints its own
-    named = next((arg for arg in argv if not arg.startswith("-")), None)
-    if named in commands and given(argv, "-h", "--help", parser=commands[named]):
-        commands[named].print_help()
-        return 0
-    return run_script(parser, work, argv, debug=DEBUG_ENV)
+    return run_script(build_parser(), work, argv, debug=DEBUG_ENV)
 
 
 if __name__ == "__main__":

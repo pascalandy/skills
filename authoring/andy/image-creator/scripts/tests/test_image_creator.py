@@ -691,7 +691,7 @@ def test_a_usage_error_answers_in_json_with_the_help_command(
     assert code == 2
     answer = failure(stdout, err)
     assert answer["errors"][0].startswith(error)
-    assert answer["help"] == "image_creator.py --help"
+    assert answer["help"] == "image_creator.py generate --help"
     assert not (plan_login / "x.png").exists()
 
 

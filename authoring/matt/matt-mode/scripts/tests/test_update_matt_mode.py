@@ -202,7 +202,7 @@ def test_a_usage_error_in_a_command_answers_with_the_help_command(
         {
             "ok": False,
             "errors": ["the following arguments are required: --upstream, --revision"],
-            "help": "update_matt_mode.py --help",
+            "help": "update_matt_mode.py update --help",
         },
     )
 
