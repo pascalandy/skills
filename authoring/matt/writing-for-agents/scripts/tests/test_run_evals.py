@@ -322,8 +322,10 @@ def test_an_interrupt_during_setup_launches_no_agent(lab: Lab, number):
 def test_a_setup_timeout_stops_before_launching_an_agent(lab: Lab):
     evals = lab.skill / "evals" / "evals.json"
     evals.write_text(
-        json.dumps([{"query": "Go.", "setup": ["echo preparing; sleep 2"]}])
+        json.dumps([{"query": "Go.", "setup": ["echo preparing; sleep 10"]}])
     )
+    # The deadline also covers the git init before the setup, which takes more
+    # than 0.1s on a loaded machine
     result = run(
         lab,
         "--ref",
@@ -333,7 +335,7 @@ def test_a_setup_timeout_stops_before_launching_an_agent(lab: Lab):
         "--agent",
         "codex",
         "--timeout",
-        "0.1s",
+        "1s",
     )
 
     assert result.returncode == 1
