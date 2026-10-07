@@ -198,6 +198,13 @@ answer() {
 	local code="${1}"
 	shift
 
+	# Why: Only the script's own shell answers. A failure inside $(...) or (...)
+	#      is a diagnostic, and the parent answers once it sees the status.
+	if [[ "${BASH_SUBSHELL}" -gt 0 ]]; then
+		[[ $# -eq 0 ]] || log_error "$@"
+		return 0
+	fi
+
 	if [[ "${code}" -eq 0 ]]; then
 		printf '{"ok":true}\n'
 		return 0
