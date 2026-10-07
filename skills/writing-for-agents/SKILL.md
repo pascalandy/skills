@@ -46,7 +46,7 @@ Skill progress:
 
 **Step 4: Body.** Steps first; move what only some branches need into files linked from `SKILL.md` (BP_01). Done when every branch has its steps and each linked file says when to read it.
 
-**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). When the `coding-language` skill is installed, load it before writing a script, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand and each script has tests that pass.
+**Step 5: Scripts and prerequisites.** Turn work that must give the same result every run into a script, and name each tool it needs (BP_17, BP_18). Before you write a script, read [script-output](https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md), which says what every script prints in any language. When the `coding-language` skill is installed, load it too, for the conventions of the script's language. Done when no step asks the agent to redo such work by hand and each script has tests that pass.
 
 **Step 6: Skill validator passes.** Run the skill validator, fix each `error` finding, and rerun. Done when it answers `{"ok":true}`, or every finding left is a `warning` with a reason you tell the user.
 
