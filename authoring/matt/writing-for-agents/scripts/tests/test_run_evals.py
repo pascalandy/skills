@@ -335,7 +335,9 @@ def test_an_interrupt_during_setup_launches_no_agent(lab: Lab, number):
     assert runner.returncode == 128 + number
     assert stdout == b""
     word = b"interrupted" if number == signal.SIGINT else b"terminated"
-    assert stderr == b'{"ok":false,"errors":["' + word + b'"]}\n'
+    answer = json.loads(stderr)
+    assert answer["errors"] == [word.decode()]
+    assert str(lab.out / "s1-codex") in answer["folders"]
     assert not any(lab.reports.iterdir())
 
 

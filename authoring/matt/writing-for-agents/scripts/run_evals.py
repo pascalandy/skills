@@ -910,6 +910,17 @@ def launch(args: argparse.Namespace) -> dict[str, Any]:
                 runs,
             )
         )
+    except KeyboardInterrupt as stop:
+        # Runs paid for so far left their folders, so the answer names them
+        code = getattr(stop, "code", INTERRUPTED)
+        error = ScriptError(
+            "interrupted" if code == INTERRUPTED else "terminated", report=folders
+        )
+        error.code = code
+        raise error from stop
+    except ScriptError as error:
+        error.report.update(folders)
+        raise
     finally:
         children.stop_all()
         pool.shutdown(wait=True, cancel_futures=True)
