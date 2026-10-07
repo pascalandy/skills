@@ -1250,6 +1250,14 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
                 str(path) for path in run.rglob("*") if path.is_file()
             )
         raise
+    except OSError as error:
+        log.debug("run file failure", exc_info=True)
+        raise ScriptError(
+            f"{error}; read the saved run files in {run}",
+            report={
+                "files": sorted(str(path) for path in run.rglob("*") if path.is_file())
+            },
+        ) from error
 
 
 def build_parser() -> Parser:

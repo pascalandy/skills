@@ -1,5 +1,6 @@
 import json
 import os
+import resource
 import signal
 import subprocess
 import sys
@@ -494,6 +495,34 @@ def test_review_only_fails_when_only_the_staged_content_changed(env, repo):
     assert readme.read_text() == "working\n"
     assert done.returncode == 1
     assert errors(done) == "the review-only run changed the checkout: README.md"
+
+
+def test_a_receipt_write_failure_reports_the_saved_answer(env, repo):
+    def quota():
+        resource.setrlimit(resource.RLIMIT_FSIZE, (1024, 1024))
+
+    done = subprocess.run(
+        command(repo, ("codex", "--review-only"), "Review README.md."),
+        env={**env, "STUB_ANSWER": "x" * 900},
+        preexec_fn=quota,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert (done.returncode, done.stdout) == (1, "")
+    assert "File too large" in errors(done)
+    files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+    assert set(files) == {
+        "prompt.md",
+        "stdout.log",
+        "stderr.log",
+        "answer.md",
+        "run.json",
+    }
+    assert all(path.is_file() for path in files.values())
+    assert files["answer.md"].read_text() == "x" * 900
+    assert len(calls(env)) == 1
 
 
 def test_a_timeout_kills_descendants_that_ignore_sigterm(env, repo, tmp_path):
