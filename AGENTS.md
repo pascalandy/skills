@@ -48,6 +48,8 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Read on demand
 
+[docs/INDEX.md](docs/INDEX.md) lists every reference page with one line on what it holds
+
 - Before writing or changing a script in `scripts/` or a skill's `scripts/`, read [script conventions](docs/references/script-conventions.md)
 - Before changing `docs/guide/` or `docs/guide-fr-ca/`, read [docs/AGENTS.md](docs/AGENTS.md)
 - Before adding or changing a check, hook, or CI step, or when `just signoff` or a merge is refused, read [checks](docs/references/checks.md)
