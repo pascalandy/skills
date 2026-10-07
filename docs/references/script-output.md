@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-10-04
-date_updated: 2026-10-05
+date_updated: 2026-10-07
 ---
 
 A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written. [State](#state) lists the scripts here that follow it today
@@ -34,6 +34,8 @@ A script tests the exit code, or pipes stdout to `jq -e .ok`:
 | text before the JSON | 5 |
 
 To read a failure's errors, merge the streams and keep the last line: `just check 2>&1 | tail -n1 | jq .errors`
+
+Read the answer as a JSON object: key order carries no meaning, so a reader never matches a prefix such as `{"ok":`. `answer_in()` and `changes_in()` in `scripts/_common.py` read it that way
 
 ## Examples
 

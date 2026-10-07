@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-03
+date_updated: 2026-10-07
 ---
 
 `just install-skills` installs public skills, every package in the private tree, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -48,7 +48,7 @@ GitHub's `main` is the source. Every machine in the fleet runs the same commands
 - An `offline` or `failed` machine waits for the next sync. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up. A run whose only failures are temporary, such as offline machines, exits 75 instead of 1
 - A run answers `{"ok":true,"changes":[...]}`, one `["sync",NAME,SHA]` for each machine it changed, this one included when it saved its private edits, and `{"ok":true}` when none needed a change; `--dry-run` runs every check without changing anything and answers the same for each machine a sync would change: one behind GitHub, or one whose private clone or installed skills would change. A failure names each machine that needs you or failed, and what to do, and keeps the rows of the machines it changed. `--verbose` adds GitHub's commit, its public skill count, and each machine's outcome and changes; `--debug` adds the remote output
 - `just merge` runs `just deploy` from this machine's main checkout after it merges a PR, when `main` holds the tree its checks ran on, so the fleet gets the new `main` without a pull
-- `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference in its errors, such as `~/.claude/skills waits for update 1`. It compares names and contents, so skills other tools installed do not count
+- `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference in its errors, such as `~/.claude/skills waits for update 1`. It compares names and contents, so skills other tools installed do not count. A machine whose installer predates #490 answers no JSON line and only warns about a conflict, so `--check` fails on it until `just sync-fleet` brings it to `main`
 - Editing a private skill fires no hook, so run `just sync` or `just sync-fleet` afterwards; each sync also saves the private edits of the machines it reaches
 - The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `fleet` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
 

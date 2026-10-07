@@ -247,14 +247,21 @@ def answer(code: int, fields: Mapping[str, Any]) -> int:
 CHANGE_LINE = re.compile(r"(clone|commit|pull|push|add|update|remove|synced|ready)\t")
 
 
+def parsed_answer(line: str) -> dict[str, Any] | None:
+    """The JSON answer a line holds, whatever its key order, or None."""
+    if line.startswith("{"):
+        with suppress(ValueError):
+            found = json.loads(line)
+            if isinstance(found, dict) and isinstance(found.get("ok"), bool):
+                return found
+    return None
+
+
 def answer_in(lines: Iterable[str]) -> dict[str, Any] | None:
     """The last JSON answer among a child's output lines, such as {"ok":true}."""
     for line in reversed(list(lines)):
-        if line.startswith('{"ok":'):
-            with suppress(ValueError):
-                found = json.loads(line)
-                if isinstance(found, dict):
-                    return found
+        if (found := parsed_answer(line)) is not None:
+            return found
     return None
 
 
@@ -263,12 +270,12 @@ def changes_in(lines: Iterable[str]) -> list[list[str]]:
     or each change line of a script older than #490."""
     found: list[list[str]] = []
     for line in lines:
-        if line.startswith('{"ok":'):
-            with suppress(ValueError):
-                found += json.loads(line).get("changes", [])
+        if (answer := parsed_answer(line)) is not None:
+            found += answer.get("changes", [])
         elif CHANGE_LINE.match(line):
             found.append(line.split("\t"))
     return found
+
 
 
 def usage_error(message: str) -> NoReturn:

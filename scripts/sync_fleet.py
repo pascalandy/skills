@@ -470,6 +470,12 @@ def installed(machine: Machine, source: Source) -> Outcome | list[str]:
     for line in lines:
         if line.startswith("private ") and len(fields := line.split()) == 3:
             problems.extend(private_problems(fields[1], fields[2], source.private))
+    if answer_in(lines) is None:
+        # An installer from before #490 only warns about a conflict, exit 0
+        problems.append(
+            "its installer predates #490 and answers no JSON line, "
+            "so a conflict would not show"
+        )
     return problems + waiting(changes_in(lines))
 
 

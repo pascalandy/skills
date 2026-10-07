@@ -59,8 +59,14 @@ HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"
 FAKE_JUST = """#!/bin/sh
 echo "$@" >> "$HOME/just.log"
 shift
-if [ -n "$FLEET_OLD_INSTALLER" ]; then
+# An installer from before #490 prints change lines and only warns about a
+# conflict, both with exit 0
+if [ "$FLEET_OLD_INSTALLER" = changes ]; then
     printf 'update\\t~/.claude/skills/alpha\\n'
+    exit 0
+fi
+if [ "$FLEET_OLD_INSTALLER" = conflict ]; then
+    echo "WARNING:install-skills:warning: ~/.claude/skills/alpha is a symlink or file; move it aside, then rerun: just install-skills" >&2
     exit 0
 fi
 exec "$FLEET_PYTHON" scripts/install_skills.py "$@"
@@ -357,19 +363,28 @@ def test_check_answers_ok_when_converged_and_names_each_difference(
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 
-def test_check_reads_the_changes_of_an_installer_from_before_490(
-    fleet: tuple[Path, Path, Path],
+# Its preview cannot show a conflict, so the check fails closed, and still
+# names the changes its lines report
+@pytest.mark.parametrize(
+    ("output", "waits"),
+    [("changes", "~/.claude/skills waits for update 1; "), ("conflict", "")],
+)
+def test_check_fails_on_an_installer_from_before_490(
+    fleet: tuple[Path, Path, Path], output: str, waits: str
 ) -> None:
     hub, homes, bin_dir = fleet
     machine(homes, "old", hub.parent / "skills.git")
     register(hub, "old")
     assert run(hub, homes, bin_dir).returncode == 0
 
-    result = run(hub, homes, bin_dir, "--check", FLEET_OLD_INSTALLER="1")
+    result = run(hub, homes, bin_dir, "--check", FLEET_OLD_INSTALLER=output)
 
     assert (result.returncode, result.stdout) == (1, "")
     assert json.loads(result.stderr)["errors"] == [
-        "old drift: ~/.claude/skills waits for update 1; rerun just sync-fleet old"
+        (
+            "old drift: its installer predates #490 and answers no JSON line, so a "
+            f"conflict would not show; {waits}rerun just sync-fleet old"
+        )
     ]
 
 

@@ -266,3 +266,14 @@ def test_answer_in_finds_the_last_json_answer_among_other_lines() -> None:
 
     assert _common.answer_in(lines) == {"ok": False, "errors": ["boom"]}
     assert _common.answer_in(["error: old text"]) is None
+
+
+def test_readers_take_an_answer_whatever_its_key_order() -> None:
+    lines = ['{"changes":[["update","~/.claude/skills/alpha"]],"ok":true}']
+
+    assert _common.answer_in(lines) == {
+        "changes": [["update", "~/.claude/skills/alpha"]],
+        "ok": True,
+    }
+    assert _common.changes_in(lines) == [["update", "~/.claude/skills/alpha"]]
+    assert _common.answer_in(['{"changes":[]}', "[1]"]) is None
