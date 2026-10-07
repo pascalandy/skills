@@ -175,13 +175,23 @@ fct_log_error() { log_error "$@"; }
 #      https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md
 
 fct_json_string() {
+	# Why: JSON allows no raw control character, so each becomes \uXXXX.
 	local text="${1}"
-	text="${text//\\/\\\\}"
-	text="${text//\"/\\\"}"
-	text="${text//$'\n'/\\n}"
-	text="${text//$'\r'/\\r}"
-	text="${text//$'\t'/\\t}"
-	printf '"%s"' "${text}"
+	local out=""
+	local char
+	local i
+	for ((i = 0; i < ${#text}; i++)); do
+		char="${text:i:1}"
+		case "${char}" in
+		\" | \\) out+="\\${char}" ;;
+		[[:cntrl:]])
+			printf -v char '\\u%04x' "'${char}"
+			out+="${char}"
+			;;
+		*) out+="${char}" ;;
+		esac
+	done
+	printf '"%s"' "${out}"
 }
 
 answer() {
@@ -391,6 +401,8 @@ fct_on_signal() {
 	*) exit_code=1 ;;
 	esac
 
+	# Why: The answer is the last line, so the ERR trap must not add another.
+	trap - ERR
 	answer "${exit_code}" "${word}"
 	exit "${exit_code}"
 }
