@@ -164,8 +164,9 @@ def main_checkout(root: Path) -> Path:
 
 def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> None:
     """Signal a child, or with `group` the process group of a child started in
-    its own session; the group outlives a leader that exits first."""
-    with suppress(ProcessLookupError):
+    its own session; the group outlives a leader that exits first. On macOS,
+    killpg fails with EPERM when the group holds only an unreaped leader."""
+    with suppress(ProcessLookupError, PermissionError):
         if group:
             os.killpg(process.pid, number)
         else:
