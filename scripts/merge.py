@@ -8,7 +8,7 @@
 Run it on the PR branch, pushed, with a clean working tree. It reuses a green
 signoff on the head, or runs the just signoff steps first. It merges only when
 the branch contains main's tip, so the tree that lands is the tree the checks
-ran on, and warns when another PR lands in the same seconds. Then, when main
+ran on, and fails when another PR lands in the same seconds. Then, when main
 holds the tree the checks ran on, it runs just deploy, which brings every fleet
 machine to the new main. A rerun after an interruption finds the merged PR and
 deploys again.
@@ -269,15 +269,20 @@ def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
         (sys.executable, str(checkout / "scripts/sync_fleet.py"), *levels),
         cwd=checkout,
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
     )
+    sys.stderr.write(deployed.stderr)
+    # A failed deploy still lists the machines it reached, in its answer or,
+    # from a sync-fleet older than #490, in its change lines
+    changes = changes_in((deployed.stdout + deployed.stderr).splitlines())
     if deployed.returncode:
         raise ScriptError(
             f"{landed} just deploy did not reach every machine; fix what its "
-            "answer above says, then run just deploy"
+            "answer above says, then run just deploy",
+            report={"changes": changes},
         )
-    # That checkout may still run the sync-fleet from before #490
-    return changes_in(deployed.stdout.splitlines())
+    return changes
 
 
 def merge(args: argparse.Namespace) -> dict[str, Any]:
@@ -324,8 +329,11 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
     try:
         deployed = deploy(sha, args)
     except ScriptError as error:
-        # The failure still lists what landed
-        raise ScriptError(*error.args, report={"changes": changes}) from None
+        # The failure still lists what landed, and what the deploy reached
+        reached = error.report.get("changes", [])
+        raise ScriptError(
+            *error.args, report={"changes": [*changes, *reached]}
+        ) from None
     return {"changes": [*changes, *deployed]}
 
 

@@ -230,6 +230,19 @@ def test_a_failed_deploy_fails_the_run_and_lists_what_landed(github: Sandbox) ->
     assert github.main_subject() == "✨ feat: add feature (#7)"
 
 
+def test_a_partial_deploy_lists_the_machines_it_reached(github: Sandbox) -> None:
+    head = github.git("rev-parse", "HEAD")
+    github.open_pr()
+    github.sign(head)
+
+    result = github.run("merge.py", FAKE_DEPLOY_PARTIAL="1")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["changes"] == [["merge", "#7", head[:7]], SYNCED]
+    assert '"errors":["mini offline"]' in result.stderr
+
+
 @pytest.mark.parametrize("rerun", [False, True], ids=["after-merge", "rerun"])
 def test_a_failed_deploy_gate_fails_without_hiding_the_merge(
     github: Sandbox, rerun: bool
