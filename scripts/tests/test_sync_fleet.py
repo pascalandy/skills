@@ -408,7 +408,10 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
 
     head = change(hub, push=False)
     committed = run(hub, homes, bin_dir, "--hook", "post-commit")
-    assert (committed.returncode, committed.stdout, committed.stderr) == (0, OK, "")
+    assert (committed.returncode, committed.stderr) == (0, "")
+    installed = json.loads(committed.stdout)
+    assert installed["ok"] is True
+    assert ["add", "~/.claude/skills/alpha"] in installed["changes"]
     assert (home / ".claude/skills/alpha/SKILL.md").is_file()
     assert not fleet_log.exists()
 

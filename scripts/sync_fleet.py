@@ -682,15 +682,15 @@ def hook(event: list[str]) -> dict[str, Any]:
     installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
+    lines = (installed.stderr + installed.stdout).splitlines()
+    changes = changes_in(lines)
+    report = {"changes": changes} if changes else {}
     if installed.returncode:
-        lines = (installed.stderr + installed.stdout).splitlines()
-        # An install that fails once done, on a leftover folder, still answers it
-        changes = changes_in(lines)
         raise ScriptError(
             f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose",
-            report={"changes": changes} if changes else None,
+            report=report,
         )
-    return {}
+    return report
 
 
 def work(args: argparse.Namespace) -> dict[str, Any]:
