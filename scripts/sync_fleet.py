@@ -684,8 +684,11 @@ def hook(event: list[str]) -> dict[str, Any]:
         background()
     if installed.returncode:
         lines = (installed.stderr + installed.stdout).splitlines()
+        # An install that fails once done, on a leftover folder, still answers it
+        changes = changes_in(lines)
         raise ScriptError(
-            f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose"
+            f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose",
+            report={"changes": changes} if changes else None,
         )
     return {}
 
