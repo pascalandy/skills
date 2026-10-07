@@ -44,6 +44,8 @@ fail() {
 	printf '{"ok":false,"errors":[%s]%s}\n' "$(json "$2")" "$help" >&2
 	exit "$1"
 }
+trap 'fail 130 interrupted' INT
+trap 'fail 143 terminated' TERM
 
 is_shell_file() {
 	local path="$1"
