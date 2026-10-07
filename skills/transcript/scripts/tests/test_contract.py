@@ -1220,6 +1220,36 @@ def test_an_interrupted_summary_answers_the_transcript_already_saved(
     assert any(path.endswith("raw_transcript.txt") for path in failure["files"])
 
 
+def test_an_interrupted_preview_answers_the_files_already_saved(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def summarize(_provider, _transcript_path, _prompt, summary_path, *_args):
+        summary_path.write_text("# Summary\n", encoding="utf-8")
+
+    def interrupt(*_args, **_kwargs):
+        raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "run_summary_prompt", summarize)
+    monkeypatch.setattr(transcript, "render_markdown_with_glow", interrupt)
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        QUEUE[0],
+        "--output-dir",
+        str(tmp_path),
+        "--preview",
+    )
+
+    failure = answer(err)
+    assert (code, out) == (130, "")
+    assert any(path.endswith(".md") for path in failure["files"])
+
+
 def test_a_preflight_failure_stops_the_queue_before_any_url(
     tmp_path, monkeypatch, capsys
 ) -> None:

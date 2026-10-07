@@ -3266,31 +3266,35 @@ def _run(
     except KeyboardInterrupt as stop:
         raise _interruption(stop, []) from stop
 
-    if run.summary.path and plan.preview:
-        if sys.stderr.isatty():
-            # A blank line separates the folder path from the preview
-            print(file=sys.stderr)
-        with reporter.step("Summary preview") as step:
-            try:
-                render_markdown_with_glow(
-                    run.summary.path,
-                    budget,
-                    color=color_enabled(sys.stderr, args.no_color),
-                )
-            except (
-                OSError,
-                RuntimeError,
-                subprocess.SubprocessError,
-                UnicodeError,
-            ) as error:
-                diagnostic = _clean_subprocess_diagnostic(str(error))
-                log.info(
-                    "Summary preview unavailable; the saved result is intact: "
-                    f"{diagnostic or type(error).__name__}"
-                )
-                step.detail = "saved without preview"
-    elif run.summary.status == "skipped":
-        reporter.skip("Summary preview", "no summary generated (--no-summary)")
+    try:
+        if run.summary.path and plan.preview:
+            if sys.stderr.isatty():
+                # A blank line separates the folder path from the preview
+                print(file=sys.stderr)
+            with reporter.step("Summary preview") as step:
+                try:
+                    render_markdown_with_glow(
+                        run.summary.path,
+                        budget,
+                        color=color_enabled(sys.stderr, args.no_color),
+                    )
+                except (
+                    OSError,
+                    RuntimeError,
+                    subprocess.SubprocessError,
+                    UnicodeError,
+                ) as error:
+                    diagnostic = _clean_subprocess_diagnostic(str(error))
+                    log.info(
+                        "Summary preview unavailable; the saved result is intact: "
+                        f"{diagnostic or type(error).__name__}"
+                    )
+                    step.detail = "saved without preview"
+        elif run.summary.status == "skipped":
+            reporter.skip("Summary preview", "no summary generated (--no-summary)")
+    except KeyboardInterrupt as stop:
+        # The run already saved its files; the preview only shows one
+        raise _interruption(stop, run.files) from stop
     return {"files": run.files}
 
 
