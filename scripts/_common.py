@@ -1,4 +1,4 @@
-"""Shared entry point for scripts/ CLIs, built on the contract in _cli.py."""
+"""Shared helpers for scripts/ CLIs."""
 
 from __future__ import annotations
 
