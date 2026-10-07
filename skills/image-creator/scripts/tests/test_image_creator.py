@@ -830,6 +830,47 @@ def test_a_save_failure_keeps_the_images_already_written(
     assert image_creator.describe(env / "out-1.png")["width"] == 1024
 
 
+def test_an_interrupt_while_reading_a_saved_image_still_lists_it(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {"data": [{"b64_json": good}, {"b64_json": good}]},
+    )
+    describe = image_creator.describe
+
+    def interrupted(path: Path) -> dict[str, Any]:
+        if path.name == "out-2.png":
+            raise image_creator.Interrupted(130)
+        return describe(path)
+
+    monkeypatch.setattr(image_creator, "describe", interrupted)
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "sticker",
+        "--out",
+        str(out),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 130
+    files = failure(stdout, err)["files"]
+    assert [Path(item["path"]).name for item in files] == ["out-1.png", "out-2.png"]
+    assert files[0]["width"] == 1024
+    assert (env / "out-2.png").is_file()
+
+
 def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
     env: Path,
     capsys: pytest.CaptureFixture[str],

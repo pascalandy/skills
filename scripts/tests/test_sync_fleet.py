@@ -658,6 +658,31 @@ def test_an_interrupt_keeps_the_machines_that_already_synced(
     assert git(synced, "rev-parse", "HEAD") == git(hub, "rev-parse", "HEAD")
 
 
+def test_an_interrupt_while_it_notifies_keeps_the_machines_that_synced(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    machine(homes, "synced", hub.parent / "skills.git")
+    change(hub)
+    register(hub, "synced")
+    # sync-fleet, interrupted once every worker has returned
+    (hub / "scripts/interrupted_fleet.py").write_text(
+        "import sys\n"
+        "import sync_fleet\n"
+        "def notify(problems):\n"
+        "    raise KeyboardInterrupt\n"
+        "sync_fleet.notify = notify\n"
+        "sys.exit(sync_fleet.main())\n"
+    )
+
+    result = run(hub, homes, bin_dir, "--notify", script="interrupted_fleet.py")
+
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["sync", "synced", git(hub, "rev-parse", "HEAD")[:7]]
+    ]
+
+
 def test_a_bug_in_one_worker_keeps_the_machines_that_synced(
     fleet: tuple[Path, Path, Path],
 ) -> None:

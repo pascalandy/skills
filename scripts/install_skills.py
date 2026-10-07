@@ -631,7 +631,11 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
     # An apply waits for any other one before it reads the working tree, so
     # the last to finish installs the newest version. Previews and checks
     # write nothing and do not wait.
+    # A failure, an interrupt, or a bug after the first install, through the
+    # prune and the staging folder's cleanup, still answers the entries installed
+    done: list[list[str]] = []
     with (
+        receipt(done),
         nullcontext() if preview else exclusive(install_lock(), args.timeout),
         tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
     ):
@@ -697,22 +701,16 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
         if preview:
             return output
         compile_skills.compile_tree()
-        # A failure midway, or during the prune after it, still answers the
-        # entries already installed
-        done: list[list[str]] = []
-        with receipt(done):
-            execute(home, {**sources, **codex}, commands, actions, done)
-            try:
-                leftovers = prune_leftovers()
-            except (OSError, ScriptError) as error:
-                leftovers = [
-                    f"could not prune leftover skill folders: {error}; "
-                    + "see why with just install-skills --debug"
-                ]
-            if leftovers:
-                raise ScriptError(
-                    *(f"installed, but {problem}" for problem in leftovers)
-                )
+        execute(home, {**sources, **codex}, commands, actions, done)
+        try:
+            leftovers = prune_leftovers()
+        except (OSError, ScriptError) as error:
+            leftovers = [
+                f"could not prune leftover skill folders: {error}; "
+                + "see why with just install-skills --debug"
+            ]
+        if leftovers:
+            raise ScriptError(*(f"installed, but {problem}" for problem in leftovers))
         return output
 
 

@@ -716,41 +716,45 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
     changed_machines: dict[str, None] = {}
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
-    # Queue behind any other sync from here, so each run sends the newest commit.
-    with exclusive(STATE / "fleet.lock", args.timeout):
-        source = github_main()
-        # This machine pushes its private edits before any machine pulls, even
-        # when it is not selected.
-        if mode == "apply":
-            try:
-                saved = sync_private.sync(timeout=args.timeout)
-            except ScriptError as error:
-                if error.report.get("changes"):
-                    error.report["changes"] = [["sync", coordinator, source.sha[:7]]]
-                raise
-            if saved:
-                changed_machines[coordinator] = None
-            for change in saved:
-                log.info("%s", "\t".join(change))
-        # A check needs the private clone; a preview compares with it when here,
-        # and counts the edits a sync would save from it before others pull
-        if mode == "check" or (mode == "preview" and sync_private.is_clone()):
-            source = Source(source.sha, sync_private.github_head(args.timeout))
-        if mode == "preview" and sync_private.is_clone():
-            saves = bool(sync_private.sync(dry_run=True))
-            if saves:
-                changed_machines[coordinator] = None
-            source = Source(source.sha, source.private, saves)
-        public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
-        log.info(
-            "%s: GitHub main at %s with %d public skills, from %s",
-            f"{datetime.now().astimezone():%F %T}",
-            source.sha[:7],
-            len(public.split()),
-            local or socket.gethostname().split(".")[0],
-        )
-        futures: list[Future[Outcome]] = []
-        try:
+    futures: list[Future[Outcome]] = []
+    sha = ""
+    # From the coordinator's save to the notification, a failure, an interrupt,
+    # or a bug still answers each machine that synced
+    try:
+        # Queue behind any other sync from here, so each run sends the newest commit.
+        with exclusive(STATE / "fleet.lock", args.timeout):
+            source = github_main()
+            sha = source.sha[:7]
+            # This machine pushes its private edits before any machine pulls, even
+            # when it is not selected.
+            if mode == "apply":
+                try:
+                    saved = sync_private.sync(timeout=args.timeout)
+                except BaseException as error:
+                    if getattr(error, "report", {}).get("changes"):
+                        error.report["changes"] = [["sync", coordinator, sha]]  # pyright: ignore[reportAttributeAccessIssue]
+                    raise
+                if saved:
+                    changed_machines[coordinator] = None
+                for change in saved:
+                    log.info("%s", "\t".join(change))
+            # A check needs the private clone; a preview compares with it when here,
+            # and counts the edits a sync would save from it before others pull
+            if mode == "check" or (mode == "preview" and sync_private.is_clone()):
+                source = Source(source.sha, sync_private.github_head(args.timeout))
+            if mode == "preview" and sync_private.is_clone():
+                saves = bool(sync_private.sync(dry_run=True))
+                if saves:
+                    changed_machines[coordinator] = None
+                source = Source(source.sha, source.private, saves)
+            public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
+            log.info(
+                "%s: GitHub main at %s with %d public skills, from %s",
+                f"{datetime.now().astimezone():%F %T}",
+                sha,
+                len(public.split()),
+                local or socket.gethostname().split(".")[0],
+            )
             with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
                 try:
                     for machine in machines:
@@ -759,34 +763,31 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
                 except KeyboardInterrupt:
                     stop_children()
                     raise
-        except BaseException as error:
-            # The pool has waited for every worker, so the answer keeps each
-            # machine that synced before an interrupt or another worker's bug
-            synced = [
-                future.result()
-                for future in futures
-                if not future.cancelled() and future.exception() is None
-            ]
-            for outcome in synced:
-                if outcome.changes:
-                    changed_machines[outcome.machine] = None
-            keep_changes(
-                error, [["sync", name, source.sha[:7]] for name in changed_machines]
+        problems = [outcome for outcome in outcomes if outcome.status not in FINE]
+        if args.notify:
+            notify(
+                [
+                    f"{outcome.machine}: {outcome.detail}"
+                    for outcome in problems
+                    if outcome.status in ("needs-you", "failed")
+                ]
             )
-            raise
-    problems = [outcome for outcome in outcomes if outcome.status not in FINE]
-    if args.notify:
-        notify(
-            [
-                f"{outcome.machine}: {outcome.detail}"
-                for outcome in problems
-                if outcome.status in ("needs-you", "failed")
-            ]
-        )
+    except BaseException as error:
+        # The pool has waited for every worker, so each finished outcome counts
+        finished = [
+            future.result()
+            for future in futures
+            if not future.cancelled() and future.exception() is None
+        ]
+        for outcome in finished:
+            if outcome.changes:
+                changed_machines[outcome.machine] = None
+        keep_changes(error, [["sync", name, sha] for name in changed_machines])
+        raise
     for outcome in outcomes:
         if outcome.changes:
             changed_machines[outcome.machine] = None
-    changes = [["sync", name, source.sha[:7]] for name in changed_machines]
+    changes = [["sync", name, sha] for name in changed_machines]
     answer = {"changes": changes} if changes else {}
     if problems:
         # The machines that did sync stay in the answer of a partial failure

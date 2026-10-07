@@ -1071,51 +1071,57 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
                 plan.problems.append(
                     f"requested {key}={expected}, API reported {actual}"
                 )
-    files = []
-    for data, path in zip(images, plan.paths, strict=False):
-        target = plan.target_size if plan.backend == "plan" else None
-        try:
-            for note in save_image(data, path, plan.output_format, target):
-                log.info("%s: %s", path.name, note)
-            info = describe(path)
-        except BaseException as error:
-            # The request was paid for, so the images already saved stay listed
-            written = [{k: f[k] for k in ("path", "width", "height")} for f in files]
-            if isinstance(error, (OSError, ValueError)):
+    files: list[dict[str, Any]] = []
+    saved: list[Path] = []
+
+    def written() -> list[dict[str, Any]]:
+        """The images on disk: their sizes once described, else their paths."""
+        described = [{k: f[k] for k in ("path", "width", "height")} for f in files]
+        return described + [{"path": str(path)} for path in saved[len(files) :]]
+
+    # The request was paid for, so every answer lists the images already saved,
+    # whatever stops the run
+    try:
+        for data, path in zip(images, plan.paths, strict=False):
+            target = plan.target_size if plan.backend == "plan" else None
+            try:
+                for note in save_image(data, path, plan.output_format, target):
+                    log.info("%s: %s", path.name, note)
+                saved.append(path)
+                info = describe(path)
+            except (OSError, ValueError) as error:
                 raise RunError(
                     f"could not save {path.name}: {error}; inspect the files already "
                     "written before you request new images",
-                    report={"files": written},
+                    report={"files": written()},
                 ) from error
-            error.report = {**carried(error), "files": written}  # pyright: ignore[reportAttributeAccessIssue]
-            raise
-        if plan.target_size and (info["width"], info["height"]) != plan.target_size:
-            plan.problems.append(
-                f"{path.name} is {info['width']}x{info['height']}, "
-                f"requested {plan.target_size[0]}x{plan.target_size[1]}"
-            )
-        if job.transparent and "alpha" not in info:
-            plan.problems.append(
-                f"{path.name} has no alpha channel; retry with a transparent background"
-            )
-        elif job.transparent and info["alpha"]["fully_opaque"]:
-            plan.problems.append(
-                f"{path.name} is fully opaque; retry with a transparent background"
-            )
-        files.append(info)
-    receipt["outputs"] = [f["path"] for f in files]
-    receipt["files"] = files
-    log.info("receipt %s", json.dumps(receipt))
-    fields: dict[str, Any] = {
-        "files": [{k: f[k] for k in ("path", "width", "height")} for f in files],
-        "backend": plan.backend,
-    }
-    cost = (meta.get("usage") or {}).get("cost")
-    if cost is not None:
-        fields["cost"] = cost
-    if plan.problems:
-        raise RunError(*plan.problems, report={"files": fields["files"]})
-    return fields
+            if plan.target_size and (info["width"], info["height"]) != plan.target_size:
+                plan.problems.append(
+                    f"{path.name} is {info['width']}x{info['height']}, "
+                    f"requested {plan.target_size[0]}x{plan.target_size[1]}"
+                )
+            if job.transparent and "alpha" not in info:
+                plan.problems.append(
+                    f"{path.name} has no alpha channel; retry with a transparent background"
+                )
+            elif job.transparent and info["alpha"]["fully_opaque"]:
+                plan.problems.append(
+                    f"{path.name} is fully opaque; retry with a transparent background"
+                )
+            files.append(info)
+        receipt["outputs"] = [f["path"] for f in files]
+        receipt["files"] = files
+        log.info("receipt %s", json.dumps(receipt))
+        fields: dict[str, Any] = {"files": written(), "backend": plan.backend}
+        cost = (meta.get("usage") or {}).get("cost")
+        if cost is not None:
+            fields["cost"] = cost
+        if plan.problems:
+            raise RunError(*plan.problems, report={"files": fields["files"]})
+        return fields
+    except BaseException as error:
+        error.report = {**carried(error), "files": written()}  # pyright: ignore[reportAttributeAccessIssue]
+        raise
 
 
 def doctor() -> dict[str, Any]:

@@ -783,18 +783,31 @@ def test_a_failure_midway_answers_the_entries_already_installed(
     assert not any(path.startswith("~/.claude/skills/") for path in done)
 
 
-def test_an_interrupt_during_the_prune_answers_the_entries_installed(
-    sandbox: tuple[Path, Path],
+# The installer, interrupted after the install, during its prune or the
+# cleanup of the folder it staged the sources in
+PRUNE = """
+def interrupted():
+    raise KeyboardInterrupt
+install_skills.prune_leftovers = interrupted
+"""
+STAGING = """
+import tempfile
+class Interrupted(tempfile.TemporaryDirectory):
+    def __exit__(self, *exc):
+        super().__exit__(*exc)
+        if self.name.rsplit("/", 1)[-1].startswith(".install-skills-source-"):
+            raise KeyboardInterrupt
+tempfile.TemporaryDirectory = Interrupted
+"""
+
+
+@pytest.mark.parametrize("fault", [PRUNE, STAGING], ids=["prune", "staging"])
+def test_an_interrupt_after_the_install_answers_the_entries_installed(
+    sandbox: tuple[Path, Path], fault: str
 ) -> None:
     repo, home = sandbox
-    # The installer, with its prune after the install interrupted
     (repo / "scripts/interrupted_install.py").write_text(
-        "import sys\n"
-        "import install_skills\n"
-        "def interrupted():\n"
-        "    raise KeyboardInterrupt\n"
-        "install_skills.prune_leftovers = interrupted\n"
-        "sys.exit(install_skills.main())\n"
+        f"import sys\nimport install_skills\n{fault}\nsys.exit(install_skills.main())\n"
     )
 
     result = run(repo, home, script="interrupted_install.py")
