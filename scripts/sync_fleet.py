@@ -704,7 +704,9 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
         return sync(args)
     except ScriptError as error:
         if args.notify:
-            notify([str(message) for message in error.args])
+            # A stop while it notifies still answers what the failed run changed
+            with receipt(error.report.get("changes", [])):
+                notify([str(message) for message in error.args])
         raise
 
 

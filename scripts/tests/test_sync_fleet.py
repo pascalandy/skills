@@ -758,6 +758,34 @@ def test_a_stopped_coordinator_keeps_its_private_save(
     assert answer["changes"] == [["sync", host, git(hub, "rev-parse", "HEAD")[:7]]]
 
 
+def test_an_interrupt_while_it_notifies_a_failure_keeps_the_failure_receipt(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "elsewhere")
+    # sync-fleet fails after a machine synced, then is interrupted as it
+    # notifies that failure
+    (hub / "scripts/notified_fleet.py").write_text(
+        "import sys\n"
+        "import sync_fleet\n"
+        "from _cli import ScriptError\n"
+        "def sync(args):\n"
+        "    raise ScriptError('mini offline', report={'changes': [['sync', 'mbp', 'abc1234']]})\n"
+        "def notify(problems):\n"
+        "    raise KeyboardInterrupt\n"
+        "sync_fleet.sync = sync\n"
+        "sync_fleet.notify = notify\n"
+        "sys.exit(sync_fleet.main())\n"
+    )
+
+    result = run(hub, homes, bin_dir, "--notify", script="notified_fleet.py")
+
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["sync", "mbp", "abc1234"]
+    ]
+
+
 def test_a_bug_in_one_worker_keeps_the_machines_that_synced(
     fleet: tuple[Path, Path, Path],
 ) -> None:
