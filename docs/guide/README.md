@@ -8,7 +8,7 @@ Here's what you'll do:
 
 1. [Paste one sentence and run your first skill](./01-get-started.md). Set up in one minute, and keep the skills on in every chat.
 2. [Name a mode, then the task](./02-modes.md). How a request reaches a playbook, and the five words you need.
-3. [Think before the agent acts](./03-think-first.md). `plan`, `grilling`, `research`, and two `andy-mode` routes to sharpen a decision.
+3. [Think before the agent acts](./03-think-first.md). `consensus`, `grilling`, `research`, and two `andy-mode` routes to sharpen a decision.
 4. [Write and edit with the agent](./04-write.md). `unslop`, `concise`, `2nd-pass`, and two `andy-mode` routes for clear prose and stories.
 5. [Do marketing with `corey-mode`](./05-marketing.md). Start with your product context, then write pages, emails, and plans.
 6. [Turn your work into something to show](./06-show.md). One-page summaries, slide decks, and diagrams with `html-mode`.

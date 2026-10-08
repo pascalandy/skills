@@ -1,6 +1,6 @@
 # Réfléchir avant de décider
 
-`plan` aligne l'agent sur une tâche à exécuter. Ces quatre outils servent l'autre cas : éprouver une idée ou une décision avant de t'engager.
+`consensus` aligne l'agent sur une tâche à exécuter. Ces quatre outils servent l'autre cas : éprouver une idée ou une décision avant de t'engager.
 
 ## Mets un plan à l'épreuve avec `grilling`
 
@@ -34,6 +34,6 @@ research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux
 
 L'agent remonte chaque affirmation jusqu'à sa source et la cite. Ouvre au moins une source.
 
-**Piège :** confondre `plan` et `grilling`. `plan` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
+**Piège :** confondre `consensus` et `grilling`. `consensus` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
 
 Suite : [Écrire et réviser](./05-ecrire.md).

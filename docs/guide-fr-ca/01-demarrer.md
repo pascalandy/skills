@@ -34,4 +34,4 @@ Il répond de mémoire, dit qu'il ne peut pas naviguer ou invente un skill. Essa
 
 **Piège :** une réponse qui ne nomme aucun skill est peut-être devinée. Demande : "Quel skill as-tu ouvert, et quelle est sa première étape?"
 
-Suite : [Planifier, puis dire go](./02-planifier-puis-go.md).
+Suite : [Viser le consensus, puis dire go](./02-consensus-puis-go.md).
