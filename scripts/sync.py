@@ -80,13 +80,14 @@ def pull_main(timeout: float) -> list[list[str]]:
             f"could not fetch main: {reason}; fix origin, then rerun just sync"
         )
     before = git("rev-parse", "HEAD").stdout.strip()
-    # A fast-forward lands on the upstream, so the receipt needs no git call
-    # after the merge, where an interrupt would lose it. A main ahead of its
-    # upstream pulls nothing
-    after = git("rev-parse", "@{upstream}").stdout.strip()
-    if git("merge-base", "--is-ancestor", after, "HEAD").returncode == 0:
-        after = before
-    merged = git("merge", "--quiet", "--ff-only", "@{upstream}")
+    # Merge the upstream commit read here, so the receipt names what landed
+    # even if a background fetch moves @{upstream}, and needs no git call after
+    # the merge, where an interrupt would lose it. A main ahead of its upstream
+    # pulls nothing
+    upstream = git("rev-parse", "@{upstream}").stdout.strip()
+    ahead = git("merge-base", "--is-ancestor", upstream, "HEAD").returncode == 0
+    after = before if ahead else upstream
+    merged = git("merge", "--quiet", "--ff-only", upstream)
     if merged.returncode:
         raise ScriptError(
             "main cannot fast-forward to its upstream; commit, stash, or push the "

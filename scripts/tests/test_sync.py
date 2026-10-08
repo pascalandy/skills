@@ -183,6 +183,40 @@ def test_a_stop_right_after_the_merge_still_answers_the_pull(
     ]
 
 
+def test_the_pull_answers_the_commit_it_merged_when_upstream_moves(
+    sandbox: tuple[Path, Path], behind: tuple[Path, Path], tmp_path: Path
+) -> None:
+    seed, _ = sandbox
+    repo, home = behind
+    # A newer commit the repository holds, which a background fetch could make
+    # the upstream between the read and the merge
+    (seed / "later.txt").write_text("later\n")
+    commit(seed)
+    origin = tmp_path / "skills.git"
+    subprocess.run(
+        ["git", "push", "-q", str(origin), "main:later"], cwd=seed, check=True
+    )
+    subprocess.run(["git", "fetch", "-q", "origin", "later"], cwd=repo, check=True)
+    later = git(repo, "rev-parse", "FETCH_HEAD")
+    (repo / "scripts/moving_sync.py").write_text(
+        "import subprocess, sys\n"
+        "import sync\n"
+        "real = sync.git\n"
+        "def git(*args, **kwargs):\n"
+        "    if args[0] == 'merge':\n"
+        f"        subprocess.run(['git', 'update-ref', 'refs/remotes/origin/main', {later!r}], check=True)\n"
+        "    return real(*args, **kwargs)\n"
+        "sync.git = git\n"
+        "sys.exit(sync.main())\n"
+    )
+
+    result = run(repo, home, script="moving_sync.py")
+
+    assert result.returncode == 0, result.stderr
+    pulled = next(c for c in json.loads(result.stdout)["changes"] if c[0] == "pull")
+    assert pulled[2].endswith(git(repo, "rev-parse", "--short=7", "HEAD"))
+
+
 def test_a_main_ahead_of_its_upstream_answers_no_pull(
     sandbox: tuple[Path, Path], tmp_path: Path
 ) -> None:
