@@ -86,12 +86,26 @@ Boundaries between:
 
 ## When You Need Me
 
-When you need me, ask at most 4 questions per round, ordered by impact. Mark your recommendation and say in one line why each question matters, so I can reply "1a, 2b":
+When you need me, ask at most 4 questions per round, ordered by impact. Put each question in context with its CMO and FMO, then give its choices. Mark one recommendation, or two when they are close, and say in one line why the question matters, so I can reply "1a, 2b":
+
+```md
+## 1) [Item to decide]
+
+### CMO (current Mode of operation)
+
+What we have now
+
+### FMO (future Mode of operation)
+
+The change you suggest, concrete enough that I can act on it
 
 1) 🙋 [Question (why it matters)]
    - a) … (🟢 recommended)
    - b) …
    - c) …
+```
+
+After my answers, apply them, rethink the whole deliverable, and ask the next round. When nothing is left to decide, say exactly: "👍 Je n'ai plus de question."
 
 ## Visual and Design Work
 
