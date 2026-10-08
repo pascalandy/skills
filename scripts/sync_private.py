@@ -150,25 +150,38 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
         raise ScriptError(
             f"{PRIVATE} is on {branch or 'a detached HEAD'}; switch it to main, then rerun"
         )
-    changes = (
-        [["commit", LABEL, f"save edits from {host}"]] if status == "dirty" else []
-    )
+    saving = [["commit", LABEL, f"save edits from {host}"]] if status == "dirty" else []
     if dry_run:
-        return changes
-    if status == "dirty":
-        for step in (
-            ("add", "--all"),
-            ("commit", "--quiet", "-m", f"🧰 skill: private: save edits from {host}"),
-        ):
-            done = git(*step)
-            if done.returncode:
-                raise ScriptError(
-                    f"could not commit private edits: {last_line(done)}; see why with "
-                    f"git -C {PRIVATE} commit, then rerun uv run scripts/sync_private.py"
-                )
-    # A failure, an interrupt, or a bug after the commit still answers it, so
-    # the saved edits stay known
+        return saving
+    # A failure, an interrupt, or a bug once the edits are committed still
+    # answers the commit, so the saved edits stay known
+    changes: list[list[str]] = []
     with receipt(changes):
+        if saving:
+            saved_from = git("rev-parse", "HEAD").stdout.strip()
+            try:
+                for step in (
+                    ("add", "--all"),
+                    (
+                        "commit",
+                        "--quiet",
+                        "-m",
+                        f"🧰 skill: private: save edits from {host}",
+                    ),
+                ):
+                    done = git(*step)
+                    if done.returncode:
+                        raise ScriptError(
+                            f"could not commit private edits: {last_line(done)}; see "
+                            f"why with git -C {PRIVATE} commit, then rerun uv run "
+                            "scripts/sync_private.py"
+                        )
+            except BaseException:
+                # A stop as git commits: the commit counts only once HEAD moved
+                if git("rev-parse", "HEAD").stdout.strip() != saved_from:
+                    changes += saving
+                raise
+            changes += saving
         before = git("rev-parse", "HEAD").stdout.strip()
         log.info("pull %s", LABEL)
         pulled = git("pull", "--rebase", "--quiet", timeout=timeout)

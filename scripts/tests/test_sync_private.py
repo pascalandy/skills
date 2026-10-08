@@ -132,29 +132,45 @@ def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     assert git(remote, "show", "main:content/secret/SKILL.md") == "from one"
 
 
+# Where the stop lands: before git add, right after git commit returns, or
+# before the pull; the receipt lists the commit only once it landed
+@pytest.mark.parametrize(
+    ("before", "after", "committed"),
+    [("add", None, False), (None, "commit", True), ("pull", None, True)],
+    ids=["add", "commit", "pull"],
+)
 @pytest.mark.parametrize(
     "failure,code", [("Interrupted(130)", 130), ("RuntimeError('boom')", 1)]
 )
 def test_a_stop_after_saving_edits_keeps_the_commit_receipt(
-    machines: tuple[Path, Path, Path], failure: str, code: int
+    machines: tuple[Path, Path, Path],
+    failure: str,
+    code: int,
+    before: str | None,
+    after: str | None,
+    committed: bool,
 ) -> None:
     one, _, _ = machines
     assert run(one).returncode == 0
     private = one / "_skills_private"
+    start = git(private, "rev-parse", "HEAD")
     (private / "content/secret/SKILL.md").write_text("saved edits\n")
-    driver = """
+    driver = f"""
 import sys
 sys.path.insert(0, sys.argv[1])
 import sync_private
 from _cli import Interrupted
 original = sync_private.git
 def stopped(*args, **kwargs):
-    if args[0] == "pull":
-        raise FAILURE
-    return original(*args, **kwargs)
+    if args[0] == {before!r}:
+        raise {failure}
+    result = original(*args, **kwargs)
+    if args[0] == {after!r}:
+        raise {failure}
+    return result
 sync_private.git = stopped
 raise SystemExit(sync_private.main([]))
-""".replace("FAILURE", failure)
+"""
     result = subprocess.run(
         [sys.executable, "-c", driver, str(one / "scripts")],
         cwd=one,
@@ -166,11 +182,15 @@ raise SystemExit(sync_private.main([]))
     )
 
     assert (result.returncode, result.stdout) == (code, "")
-    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
-        ["commit", "_skills_private", f"save edits from {HOST}"]
-    ]
-    assert git(private, "show", "HEAD:content/secret/SKILL.md") == "saved edits"
-    assert git(private, "status", "--porcelain") == ""
+    answer = json.loads(result.stderr.splitlines()[-1])
+    if committed:
+        assert answer["changes"] == [
+            ["commit", "_skills_private", f"save edits from {HOST}"]
+        ]
+        assert git(private, "show", "HEAD:content/secret/SKILL.md") == "saved edits"
+    else:
+        assert "changes" not in answer
+        assert git(private, "rev-parse", "HEAD") == start
 
 
 def test_leaves_a_folder_that_is_not_a_clone_untouched(
