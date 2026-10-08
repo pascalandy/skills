@@ -38,7 +38,7 @@ uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream "$M
 just check
 ```
 
-Review the preview before updating. Inspect every changed procedure and supporting file, then check whether local adaptations still apply. Newly introduced skill dependencies and entry links that cross installed package boundaries need an explicit routing decision. Update relevant behavioral cases when upstream changes the procedure, even if the text and structural checks pass.
+Review the `changes` the dry run answers before updating. Inspect every changed procedure and supporting file, then check whether local adaptations still apply. Newly introduced skill dependencies and entry links that cross installed package boundaries need an explicit routing decision. Update relevant behavioral cases when upstream changes the procedure, even if the text and structural checks pass.
 
 Offline `check` detects missing or changed imported files against the lock. Supplying `--upstream` also reconstructs every imported file from the pinned source and verifies fidelity. Hashes alone do not independently prove provenance. A successful text check does not prove that an agent follows the intended process.
 
