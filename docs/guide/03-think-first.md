@@ -1,6 +1,6 @@
 # Think before the agent acts
 
-A vague request gets a vague answer, and a rushed decision costs more than the minutes it saved. In this page you use three skills and two `andy-mode` routes. They make the agent understand the goal first, or make your own thinking sharper before you decide.
+A vague request gets a vague answer, and a rushed decision costs more than the minutes it saved. In this page you use four skills and two `andy-mode` routes. They make the agent understand the goal first, or make your own thinking sharper before you decide.
 
 ## Agree before doing with `consensus`
 
@@ -15,6 +15,14 @@ The agent changes nothing yet. It restates your goal and the problem in its own 
 For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
 
 It applies your answers, rethinks its proposals, and asks again until nothing is left to decide. Then it says "👍 Je n'ai plus de question.", French for "I have no questions left". Read its proposals, and say `go` only when they're right.
+
+## Drop your ideas with `brainstorm`
+
+```text
+brainstorm
+```
+
+Then send your ideas as they come, one message at a time. The agent listens and answers "ok", without analyzing or suggesting anything. Once you have sent everything, ask for the next step, such as a `consensus` on what you just wrote.
 
 ## Get grilled with `grilling`
 
