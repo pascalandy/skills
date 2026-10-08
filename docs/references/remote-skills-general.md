@@ -95,6 +95,7 @@ A mode's routes run through that mode's SKILL.md.
 ## Skills
 
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
+- `brainstorm`: Use only when explicitly invoked as `brainstorm`
 - `concise`: Use when the user requests to be more concise.
 - `consensus`: Use only when explicitly invoked as `consensus`.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
