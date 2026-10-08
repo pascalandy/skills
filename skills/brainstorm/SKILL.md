@@ -1,6 +1,6 @@
 ---
 name: "brainstorm"
-description: "Use only when explicitly invoked as `brainstorm`"
+description: "Use only when explicitly invoked as `brainstorm`."
 kind: "general"
 ---
 
