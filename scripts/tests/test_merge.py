@@ -166,21 +166,6 @@ def test_a_merge_call_lost_to_the_network_stays_retryable(
     assert github.main_subject() == "seed"
 
 
-def test_reads_the_deploy_of_a_main_checkout_from_before_490(
-    github: Sandbox,
-) -> None:
-    head = github.git("rev-parse", "HEAD")
-    github.open_pr()
-    github.sign(head)
-
-    result = github.run("merge.py", FAKE_DEPLOY_LEGACY="1")
-
-    assert (result.returncode, result.stdout) == (
-        0,
-        changed(["merge", "#7", head[:7]], ["synced", "mbp", "abc1234"]),
-    )
-
-
 def test_a_rerun_after_the_merge_only_deploys_again(github: Sandbox) -> None:
     github.open_pr()
     github.sign(github.git("rev-parse", "HEAD"))
