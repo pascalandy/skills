@@ -19,6 +19,7 @@
 - Borrow proven methods without studying them first
 **Use cases:**
 - Agree before acting: `consensus`
+- Drop ideas while the agent listens: `brainstorm`
 - Write and tighten prose: `unslop`, `concise`, `andy-mode ; write-with-clarity`
 - Do marketing work such as positioning, page copy, and emails: `corey-mode`
 - Stress-test a plan or an idea: `grilling`, `andy-mode ; sparring`, `andy-mode ; think`

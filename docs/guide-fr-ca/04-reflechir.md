@@ -1,6 +1,6 @@
 # Réfléchir avant de décider
 
-`consensus` aligne l'agent sur une tâche à exécuter. Ces cinq outils servent l'autre cas : vider ta tête, puis éprouver une idée ou une décision avant de t'engager.
+`consensus` aligne l'agent sur une tâche à exécuter. Les outils suivants t'aident à déposer tes idées ou à examiner une décision avant de t'engager.
 
 ## Dépose tes idées avec `brainstorm`
 
