@@ -1,5 +1,6 @@
 import json
 import os
+import resource
 import signal
 import subprocess
 import sys
@@ -64,6 +65,8 @@ if os.environ.get("STUB_RESTAGE"):
 if os.environ.get("STUB_CORRUPT_INDEX"):
     Path(".git/index").write_bytes(b"not an index")
 if os.environ.get("STUB_LINGER"):
+    print("partial stdout", flush=True)
+    print("partial stderr", file=sys.stderr, flush=True)
     subprocess.Popen([sys.executable, "-c", (
         "import os, signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
         "open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(60)"
@@ -206,15 +209,33 @@ def calls(env: dict[str, str]) -> list[dict]:
     )
 
 
-def test_codex_review_runs_unsandboxed_and_prints_the_model_that_ran(env, repo):
+def answered(done: subprocess.CompletedProcess[str]) -> dict:
+    """The one JSON line the launcher answers with: all of stdout on success, or
+    the last line of stderr, with stdout empty, on failure."""
+    if done.returncode == 0:
+        [line] = done.stdout.splitlines()
+    else:
+        assert done.stdout == ""
+        line = done.stderr.splitlines()[-1]
+    body = json.loads(line)
+    assert body["ok"] is (done.returncode == 0)
+    return body
+
+
+def errors(done: subprocess.CompletedProcess[str]) -> str:
+    return "\n".join(answered(done)["errors"])
+
+
+def test_codex_review_runs_unsandboxed_and_answers_with_the_model_that_ran(env, repo):
     done = launch(env, repo, "codex", "--review-only")
 
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:4] == [
-        "model: gpt-6.1-sol",
-        "effort: xhigh",
-        "session: stub-codex-session",
-        "changed: nothing",
+    run = answered(done)
+    assert [run["model"], run["effort"], run["session"], run["changed"]] == [
+        "gpt-6.1-sol",
+        "xhigh",
+        "stub-codex-session",
+        [],
     ]
     [call] = calls(env)
     assert call["argv"][:4] == [
@@ -241,8 +262,9 @@ def test_claude_fix_may_edit_and_lists_the_changed_file(env, repo):
     )
 
     assert done.returncode == 0, done.stderr
-    assert "changed: README.md" in done.stdout.splitlines()
-    assert "model: claude-opus-5-5" in done.stdout.splitlines()
+    run = answered(done)
+    assert run["changed"] == ["README.md"]
+    assert run["model"] == "claude-opus-5-5"
     [call] = calls(env)
     assert call["argv"][:2] == ["-p", "--model"]
     assert "--dangerously-skip-permissions" in call["argv"]
@@ -257,9 +279,8 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
 
     assert review.returncode == 0, review.stderr
     assert fix.returncode == 0, fix.stderr
-    lines = review.stdout.splitlines()
-    assert lines[:2] == ["model: grok-4.7", "effort: xhigh"]
-    assert lines[3] == "changed: nothing"
+    run = answered(review)
+    assert [run["model"], run["effort"], run["changed"]] == ["grok-4.7", "xhigh", []]
     review_call, fix_call = calls(env)
     argv = review_call["argv"]
     assert argv[:2] == ["--cwd", str(repo)]
@@ -268,8 +289,7 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
     assert argv[argv.index("--reasoning-effort") + 1] == "xhigh"
     assert {"--always-approve", "--no-leader", "--no-auto-update"} <= set(argv)
     assert argv[argv.index("--output-format") + 1] == "streaming-messages-json"
-    session = argv[argv.index("--session-id") + 1]
-    assert f"session: {session}" in lines
+    assert run["session"] == argv[argv.index("--session-id") + 1]
     tools = argv[argv.index("--disallowed-tools") + 1].split(",")
     assert {"search_replace", "write"} <= set(tools)
     assert "--disallowed-tools" not in fix_call["argv"]
@@ -280,7 +300,7 @@ def test_grok_review_reads_the_prompt_file_without_its_edit_tools(env, repo):
 
 @pytest.mark.parametrize("target", ["codex", "claude", "grok"])
 @pytest.mark.parametrize("mode", ["--review-only", "--code-review", "--review-fix"])
-def test_stdout_delivers_the_answer_for_each_mode(env, repo, target, mode):
+def test_each_mode_answers_with_the_file_that_holds_the_answer(env, repo, target, mode):
     prompt = "Review README.md."
     args = ()
     if mode == "--code-review":
@@ -290,27 +310,20 @@ def test_stdout_delivers_the_answer_for_each_mode(env, repo, target, mode):
     done = launch(env, repo, target, mode, *args, prompt=prompt, STUB_ANSWER=answer)
 
     assert done.returncode == 0, done.stderr
-    lines = done.stdout.splitlines()[:6]
-    assert [line.split(": ", 1)[0] for line in lines] == [
-        "model",
-        "effort",
-        "session",
-        "changed",
-        "run",
-        "answer",
-    ]
-    run = Path(lines[4].removeprefix("run: "))
-    assert lines[5] == f"answer: {run / 'answer.md'}"
-    assert (run / "answer.md").read_text(encoding="utf-8") == answer
-    suffix = f"\n\n{answer}\n" if mode == "--review-fix" else "\n"
-    assert done.stdout == "\n".join(lines) + suffix
+    run = answered(done)
+    assert set(run) == {"ok", "file", "model", "effort", "session", "changed"}
+    file = Path(run["file"])
+    assert file.is_absolute() and file.name == "answer.md"
+    assert file.read_text(encoding="utf-8") == answer
+    assert (file.parent / "run.json").is_file()
+    assert done.stderr == ""
 
 
-def test_grok_prints_the_model_that_answered_not_the_one_requested(env, repo):
+def test_grok_answers_with_the_model_that_answered_not_the_one_requested(env, repo):
     done = launch(env, repo, "grok", "--review-only", STUB_SERVED="grok-4.7-build-fast")
 
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[0] == "model: grok-4.7-build-fast"
+    assert answered(done)["model"] == "grok-4.7-build-fast"
 
 
 def test_a_review_that_edits_the_checkout_fails(env, repo):
@@ -319,22 +332,23 @@ def test_a_review_that_edits_the_checkout_fails(env, repo):
     )
 
     assert done.returncode == 1
-    assert done.stdout == ""
-    assert "error: the review-only run changed the checkout: README.md" in done.stderr
+    run = answered(done)
+    assert run["errors"] == ["the review-only run changed the checkout: README.md"]
+    assert run["changed"] == ["README.md"]
 
 
 @pytest.mark.parametrize(
     ("target", "stub", "message"),
     [
-        ("codex", {"STUB_ANSWER": ""}, "error: codex gave no answer"),
+        ("codex", {"STUB_ANSWER": ""}, "codex gave no answer"),
         (
             "codex",
             {"STUB_ANSWER": "Review was interrupted. Please re-run /review"},
             "interrupted",
         ),
-        ("claude", {"STUB_DENY": "1"}, "error: Claude was denied Edit"),
-        ("claude", {"STUB_EXIT": "1"}, "error: claude exited 1"),
-        ("grok", {"STUB_ANSWER": ""}, "error: grok gave no answer"),
+        ("claude", {"STUB_DENY": "1"}, "Claude was denied Edit"),
+        ("claude", {"STUB_EXIT": "1"}, "claude exited 1"),
+        ("grok", {"STUB_ANSWER": ""}, "grok gave no answer"),
         (
             "grok",
             {"STUB_ERROR": "error_during_execution", "STUB_EXIT": "1"},
@@ -343,26 +357,30 @@ def test_a_review_that_edits_the_checkout_fails(env, repo):
                 "error_during_execution details"
             ),
         ),
-        ("grok", {"STUB_STOP": "refusal"}, "error: Grok stopped with refusal"),
+        ("grok", {"STUB_STOP": "refusal"}, "Grok stopped with refusal"),
     ],
 )
 def test_an_unusable_answer_fails(env, repo, target, stub, message):
     done = launch(env, repo, target, "--review-only", **stub)
 
     assert done.returncode == 1
-    assert done.stdout == ""
-    assert message in done.stderr
-    assert "run: " in done.stderr
+    run = answered(done)
+    assert message in "\n".join(run["errors"])
+    assert Path(run["file"]).is_file()
+    assert run["session"]
 
 
 def test_an_unknown_effort_is_refused_before_launch(env, repo):
     done = launch(env, repo, "claude", "--review-only", "--effort", "minimal")
 
     assert done.returncode == 2
-    assert (
-        "--effort minimal is not one of low, medium, high, xhigh, max for claude"
-        in done.stderr
-    )
+    assert answered(done) == {
+        "ok": False,
+        "errors": [
+            "--effort minimal is not one of low, medium, high, xhigh, max for claude"
+        ],
+        "help": "headless.py --help",
+    }
     assert calls(env) == []
 
 
@@ -373,7 +391,7 @@ def test_a_missing_login_names_the_command_that_fixes_it(env, repo, target, logi
     done = launch(env, repo, target, "--review-only", STUB_AUTH_FAIL="1")
 
     assert done.returncode == 1
-    assert f"error: {target} is not logged in; run '{login}', then rerun" in done.stderr
+    assert errors(done) == f"{target} is not logged in; run '{login}', then rerun"
     assert calls(env) == []
 
 
@@ -396,29 +414,33 @@ def test_resume_continues_the_named_session(env, repo):
     for call, session in zip(others, ("def", "ghi")):
         assert call["argv"][call["argv"].index("--resume") + 1] == session
         assert "--session-id" not in call["argv"]
-    assert "session: ghi" in grok.stdout.splitlines()
+    assert answered(grok)["session"] == "ghi"
 
 
-def test_json_prints_the_run_as_one_object(env, repo):
+def test_a_usage_error_answers_in_one_json_line_with_the_help_hint(env, repo):
     done = launch(env, repo, "claude", "--review-only", "--json")
 
-    assert done.returncode == 0, done.stderr
-    run = json.loads(done.stdout)
-    assert run["model"] == "claude-opus-5-5"
-    assert run["answer"] == "No findings."
-    assert run["changed"] == []
-    assert (Path(run["run_dir"]) / "run.json").is_file()
-    assert (Path(run["run_dir"]) / "answer.md").read_text() == "No findings."
+    assert done.returncode == 2
+    assert done.stderr.splitlines() == [
+        (
+            '{"ok":false,"errors":["unrecognized arguments: --json"],'
+            '"help":"headless.py --help"}'
+        )
+    ]
+    assert calls(env) == []
 
 
-def test_a_folder_outside_git_warns_and_skips_the_repository_check(env, tmp_path):
+def test_a_folder_outside_git_leaves_changes_unchecked(env, tmp_path):
     folder = tmp_path / "notes"
     folder.mkdir()
-    done = launch(env, folder, "codex", "--review-only")
+    quiet = launch(env, folder, "codex", "--review-only")
+    verbose = launch(env, folder, "codex", "--review-only", "-v")
 
-    assert done.returncode == 0, done.stderr
-    assert "is not a Git checkout, so file changes go unchecked" in done.stderr
-    [call] = calls(env)
+    assert quiet.returncode == 0, quiet.stderr
+    assert answered(quiet)["changed"] is None
+    assert quiet.stderr == ""
+    assert "is not a Git checkout, so file changes go unchecked" in verbose.stderr
+    call, _ = calls(env)
     assert "--skip-git-repo-check" in call["argv"]
 
 
@@ -438,6 +460,7 @@ def test_exactly_one_access_flag_is_required(env, repo, access):
     done = launch(env, repo, "codex", *access)
 
     assert done.returncode == 2
+    assert answered(done)["help"] == "headless.py --help"
     assert calls(env) == []
 
 
@@ -451,10 +474,15 @@ def test_a_checkout_git_cannot_read_fails_the_run(env, repo, when):
     done = launch(env, repo, "codex", "--review-only", **stub)
 
     assert done.returncode == 1
-    assert done.stdout == ""
-    assert f"cannot read the Git state of {repo.resolve()} {when}" in done.stderr
+    assert f"cannot read the Git state of {repo.resolve()} {when}" in errors(done)
     if when == "before the run":
         assert calls(env) == []
+        assert "files" not in answered(done)
+    else:
+        files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+        assert set(files) == {"prompt.md", "stdout.log", "stderr.log", "answer.md"}
+        assert all(path.is_file() for path in files.values())
+        assert files["answer.md"].read_text() == "No findings."
 
 
 def test_review_only_fails_when_only_the_staged_content_changed(env, repo):
@@ -466,8 +494,35 @@ def test_review_only_fails_when_only_the_staged_content_changed(env, repo):
 
     assert readme.read_text() == "working\n"
     assert done.returncode == 1
-    assert done.stdout == ""
-    assert "error: the review-only run changed the checkout: README.md" in done.stderr
+    assert errors(done) == "the review-only run changed the checkout: README.md"
+
+
+def test_a_receipt_write_failure_reports_the_saved_answer(env, repo):
+    def quota():
+        resource.setrlimit(resource.RLIMIT_FSIZE, (1024, 1024))
+
+    done = subprocess.run(
+        command(repo, ("codex", "--review-only"), "Review README.md."),
+        env={**env, "STUB_ANSWER": "x" * 900},
+        preexec_fn=quota,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert (done.returncode, done.stdout) == (1, "")
+    assert "File too large" in errors(done)
+    files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+    assert set(files) == {
+        "prompt.md",
+        "stdout.log",
+        "stderr.log",
+        "answer.md",
+        "run.json",
+    }
+    assert all(path.is_file() for path in files.values())
+    assert files["answer.md"].read_text() == "x" * 900
+    assert len(calls(env)) == 1
 
 
 def test_a_timeout_kills_descendants_that_ignore_sigterm(env, repo, tmp_path):
@@ -477,23 +532,38 @@ def test_a_timeout_kills_descendants_that_ignore_sigterm(env, repo, tmp_path):
     )
 
     assert done.returncode == 1
-    assert "codex ran past --timeout" in done.stderr
+    assert "codex ran past --timeout" in errors(done)
+    files = {Path(path).name: Path(path) for path in answered(done)["files"]}
+    assert set(files) == {"prompt.md", "stdout.log", "stderr.log"}
+    assert "Review README.md." in files["prompt.md"].read_text()
+    assert files["stdout.log"].read_text() == "partial stdout\n"
+    assert files["stderr.log"].read_text() == "partial stderr\n"
     assert not alive(wait_for(pid_file))
 
 
 @pytest.mark.parametrize(
-    ("number", "code"), [(signal.SIGINT, 130), (signal.SIGTERM, 143)]
+    ("number", "code", "word"),
+    [(signal.SIGINT, 130, "interrupted"), (signal.SIGTERM, 143, "terminated")],
 )
 def test_an_interrupt_kills_descendants_that_ignore_sigterm(
-    env, repo, tmp_path, number, code
+    env, repo, tmp_path, number, code, word
 ):
     pid_file = tmp_path / "linger.pid"
     process = start(env, repo, "codex", "--review-fix", STUB_LINGER=str(pid_file))
     descendant = wait_for(pid_file)
     process.send_signal(number)
-    process.communicate(timeout=60)
+    stdout, stderr = process.communicate(timeout=60)
 
     assert process.returncode == code
+    assert stdout == ""
+    answer = json.loads(stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    assert answer["errors"] == [word]
+    files = {Path(path).name: Path(path) for path in answer["files"]}
+    assert set(files) == {"prompt.md", "stdout.log", "stderr.log"}
+    assert "Review README.md." in files["prompt.md"].read_text()
+    assert files["stdout.log"].read_text() == "partial stdout\n"
+    assert files["stderr.log"].read_text() == "partial stderr\n"
     assert not alive(descendant)
 
 
@@ -509,6 +579,7 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
     )
 
     assert done.returncode == 0, done.stderr
+    assert done.stderr == ""
     assert not alive(wait_for(pid_file))
 
 
@@ -533,7 +604,7 @@ def test_the_shipped_config_reaches_each_cli(env, repo, name):
         assert call["argv"][call["argv"].index(flag) + 1] == table["reasoning-level"]
     else:
         assert f'model_reasoning_effort="{table["reasoning-level"]}"' in call["argv"]
-    assert f"effort: {table['reasoning-level']}" in done.stdout.splitlines()
+    assert answered(done)["effort"] == table["reasoning-level"]
 
 
 def test_without_a_cli_name_the_config_harness_runs(env, repo, tmp_path):
@@ -569,10 +640,10 @@ def test_a_harness_the_launcher_cannot_run_points_to_its_reference(env, repo, tm
     done = launch(env, repo, "--review-only")
 
     assert done.returncode == 2
-    assert (
-        'sets harness = "pi", which the launcher does not run yet (#281)' in done.stderr
+    assert 'sets harness = "pi", which the launcher does not run yet (#281)' in errors(
+        done
     )
-    assert "references/pi/MetaSkill.md" in done.stderr
+    assert "references/pi/MetaSkill.md" in errors(done)
     assert calls(env) == []
 
 
@@ -612,9 +683,8 @@ def test_an_invalid_config_names_the_file_and_the_key(
     done = launch(env, repo, "codex", "--review-only")
 
     assert done.returncode == 1
-    assert done.stdout == ""
-    assert f"error: {config}" in done.stderr
-    assert message in done.stderr
+    found = answered(done)["errors"]
+    assert any(error.startswith(str(config)) and message in error for error in found)
     assert calls(env) == []
 
 
@@ -623,8 +693,8 @@ def test_a_missing_config_says_how_to_point_at_another(env, repo, tmp_path):
     done = launch(env, repo, "codex", "--review-only")
 
     assert done.returncode == 1
-    assert "cannot read the config" in done.stderr
-    assert "pass --config FILE" in done.stderr
+    assert "cannot read the config" in errors(done)
+    assert "pass --config FILE" in errors(done)
 
 
 def test_the_docs_repeat_no_model_from_the_config():
@@ -645,7 +715,8 @@ def test_code_review_runs_codex_review_read_only_on_the_review_model(env, repo):
     done = launch(env, repo, "--code-review", "--base", "main", prompt=None)
 
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == ["model: gpt-6.1-sol", "effort: xhigh"]
+    run = answered(done)
+    assert [run["model"], run["effort"]] == ["gpt-6.1-sol", "xhigh"]
     [call] = calls(env)
     assert call["argv"][:2] == ["exec", "review"]
     assert call["argv"][2:6] == [
@@ -686,9 +757,8 @@ def test_code_review_rejects_sandbox_bypass_before_launch(env, repo, flag):
     done = launch(env, repo, "--code-review", "--uncommitted", "--", flag, prompt=None)
 
     assert done.returncode == 2
-    assert done.stdout == ""
-    assert (
-        f"{flag} defeats the read-only sandbox required by --code-review" in done.stderr
+    assert f"{flag} defeats the read-only sandbox required by --code-review" in errors(
+        done
     )
     assert calls(env) == []
 
@@ -697,7 +767,7 @@ def test_a_codex_flag_before_double_dash_is_a_usage_error(env, repo):
     done = launch(env, repo, "codex", "--review-only", "-c", 'web_search="live"')
 
     assert done.returncode == 2
-    assert "unrecognized arguments: -c" in done.stderr
+    assert "unrecognized arguments: -c" in errors(done)
     assert calls(env) == []
 
 
@@ -725,8 +795,8 @@ def test_a_diff_target_git_cannot_find_stops_before_launch(env, repo, flag):
     done = launch(env, repo, "--code-review", flag, "origin/gone", prompt=None)
 
     assert done.returncode == 2
-    assert f"{flag} origin/gone names no commit" in done.stderr
-    assert "run 'git fetch'" in done.stderr
+    assert f"{flag} origin/gone names no commit" in errors(done)
+    assert "run 'git fetch'" in errors(done)
     assert calls(env) == []
 
 
@@ -758,7 +828,8 @@ def test_claude_code_review_types_review_with_the_effort_and_a_range(env, repo):
     done = launch(env, repo, "claude", "--code-review", "--base", "main", prompt=None)
 
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == ["model: claude-opus-5-5", "effort: xhigh"]
+    run = answered(done)
+    assert [run["model"], run["effort"]] == ["claude-opus-5-5", "xhigh"]
     [call] = calls(env)
     argv = call["argv"]
     assert argv[:2] == ["-p", "/review xhigh main...HEAD"]
@@ -804,7 +875,7 @@ def test_claude_code_review_of_a_base_refuses_uncommitted_tracked_changes(
     done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
 
     assert done.returncode == 2
-    assert "tracked files have uncommitted changes: README.md" in done.stderr
+    assert "tracked files have uncommitted changes: README.md" in errors(done)
     assert calls(env) == []
 
 
@@ -836,7 +907,7 @@ def test_claude_code_review_of_a_base_needs_shared_history(env, repo):
     done = launch(env, repo, "claude", "--code-review", "--base", "other", prompt=None)
 
     assert done.returncode == 2
-    assert "--base other shares no history with HEAD" in done.stderr
+    assert "--base other shares no history with HEAD" in errors(done)
     assert calls(env) == []
 
 
@@ -845,7 +916,7 @@ def test_claude_code_review_of_a_base_ignores_untracked_files(env, repo):
     done = launch(env, repo, "claude", "--code-review", "--base", "HEAD", prompt=None)
 
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[3] == "changed: nothing"
+    assert answered(done)["changed"] == []
 
 
 def test_grok_code_review_types_review_with_the_local_or_main_target(env, repo):
@@ -882,7 +953,7 @@ def test_a_code_review_that_edits_the_checkout_fails(env, repo):
     )
 
     assert done.returncode == 1
-    assert "error: the code-review run changed the checkout: README.md" in done.stderr
+    assert "the code-review run changed the checkout: README.md" in errors(done)
 
 
 @pytest.mark.parametrize(
@@ -942,7 +1013,7 @@ def test_code_review_usage_errors_stop_before_launch(env, repo, args, prompt, me
     done = launch(env, repo, *args, prompt=prompt)
 
     assert done.returncode == 2
-    assert message in done.stderr
+    assert message in errors(done)
     assert calls(env) == []
 
 
@@ -957,9 +1028,9 @@ def test_grok_code_review_of_main_needs_a_clean_checkout(env, repo):
     )
 
     assert named.returncode == 2 and dirty.returncode == 2
-    assert "compares with origin/main only" in named.stderr
-    assert "needs a clean checkout" in dirty.stderr
-    assert "these files have changes: draft.md" in dirty.stderr
+    assert "compares with origin/main only" in errors(named)
+    assert "needs a clean checkout" in errors(dirty)
+    assert "these files have changes: draft.md" in errors(dirty)
     assert calls(env) == []
 
 
@@ -969,5 +1040,5 @@ def test_code_review_outside_git_is_a_usage_error(env, tmp_path):
     done = launch(env, folder, "--code-review", "--uncommitted", prompt=None)
 
     assert done.returncode == 2
-    assert "is not a Git checkout" in done.stderr
+    assert "is not a Git checkout" in errors(done)
     assert calls(env) == []

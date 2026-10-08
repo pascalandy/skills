@@ -4,10 +4,10 @@
 # dependencies = []
 # ///
 """Run Codex, Claude Code, or Grok Build as a child agent that reviews
-read-only, reviews and fixes, or runs the CLI's own code review, then print the
-model that ran, its session, the files it changed, and the file that holds its
-answer; a fix also prints the answer. One command shape per run keeps headless
-use deterministic."""
+read-only, reviews and fixes, or runs the CLI's own code review, then answer in
+one JSON line with the file that holds the child's answer, the model that ran,
+its effort and session, and the files it changed. One command shape per run
+keeps headless use deterministic."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -328,7 +328,6 @@ import subprocess
 import tempfile
 import time
 import uuid
-from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import cast
@@ -383,9 +382,9 @@ examples:
 
 Without a CLI name, the launcher runs the config's harness, and --code-review
 runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
-flags under --code-review. On success, stdout holds the model, effort, session,
-changed, run, and answer lines; --review-fix adds a blank line, then the answer.
-The run folder keeps the prompt, the answer, and the child's logs."""
+flags under --code-review. On success, stdout holds one JSON line: ok, file,
+the path of the answer, then model, effort, session, and changed. The answer
+file's folder also keeps the prompt and the child's logs."""
 
 
 @dataclass(frozen=True)
@@ -416,14 +415,15 @@ class Reply:
 
 @dataclass(frozen=True)
 class Result:
-    """The run as reported to the caller and saved as run.json."""
+    """The run as saved in run.json; `changed` is None outside Git, where file
+    changes go unchecked."""
 
     target: str
     mode: str
     model: str | None
     effort: str
     session: str | None
-    changed: list[str]
+    changed: list[str] | None
     run_dir: str
     answer: str
 
@@ -1013,9 +1013,11 @@ def digest(file: Path) -> str:
         return hashlib.file_digest(content, "sha256").hexdigest()
 
 
-def changes(before: dict[str, str] | None, after: dict[str, str] | None) -> list[str]:
+def changes(
+    before: dict[str, str] | None, after: dict[str, str] | None
+) -> list[str] | None:
     if before is None or after is None:
-        return []
+        return None
     return [
         "HEAD (a new commit)" if key == "HEAD" else key
         for key in sorted(before.keys() | after.keys())
@@ -1068,7 +1070,7 @@ def run_child(
             stop(process)
             raise
         if group_alive(process):
-            log.warning("warning: %s left processes running; stopping them", command[0])
+            log.info("%s left processes running; stopping them", command[0])
             stop(process)
         return status
 
@@ -1112,17 +1114,16 @@ def read_prompt(name: str) -> str:
         ) from None
 
 
-def summary(result: Result) -> str:
-    return "\n".join(
-        [
-            f"model: {result.model or 'unknown'}",
-            f"effort: {result.effort}",
-            f"session: {result.session or 'unknown'}",
-            f"changed: {', '.join(result.changed) or 'nothing'}",
-            f"run: {result.run_dir}",
-            f"answer: {Path(result.run_dir) / 'answer.md'}",
-        ]
-    )
+def fields(result: Result) -> dict[str, Any]:
+    """What the caller acts on beside `ok`: the answer file, the model and effort
+    to cite, the session to resume, and the files to review."""
+    return {
+        "file": str(Path(result.run_dir) / "answer.md"),
+        "model": result.model,
+        "effort": result.effort,
+        "session": result.session,
+        "changed": result.changed,
+    }
 
 
 def launch(args: argparse.Namespace, extra: list[str]) -> Result:
@@ -1165,9 +1166,7 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
 
     before = snapshot(root, cwd, "before the run") if root else None
     if before is None:
-        log.warning(
-            "warning: %s is not a Git checkout, so file changes go unchecked", cwd
-        )
+        log.info("%s is not a Git checkout, so file changes go unchecked", cwd)
     fresh_session = str(uuid.uuid4()) if runner.names_session else None
     request = Request(
         target=target,
@@ -1182,56 +1181,83 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         extra=tuple(extra),
     )
     run = Path(tempfile.mkdtemp(prefix=f"headless-{target}-{args.mode}."))
-    rule = RULES.get(args.mode)
-    (run / "prompt.md").write_text(
-        f"{rule.format(cwd=cwd)}\n\n{prompt}" if rule else prompt, encoding="utf-8"
-    )
-    command = runner.command(request, run)
-    log.info("run folder: %s", run)
-    log.info(
-        "command: %s",
-        shlex.join(
-            [*(f"{key}={value}" for key, value in runner.env.items()), *command]
-        ),
-    )
     try:
-        status = run_child(
-            command, cwd=cwd, run=run, timeout=args.timeout, env=runner.env
+        rule = RULES.get(args.mode)
+        (run / "prompt.md").write_text(
+            f"{rule.format(cwd=cwd)}\n\n{prompt}" if rule else prompt, encoding="utf-8"
         )
-    except subprocess.TimeoutExpired:
+        command = runner.command(request, run)
+        log.info("run folder: %s", run)
+        log.info(
+            "command: %s",
+            shlex.join(
+                [*(f"{key}={value}" for key, value in runner.env.items()), *command]
+            ),
+        )
+        try:
+            status = run_child(
+                command, cwd=cwd, run=run, timeout=args.timeout, env=runner.env
+            )
+        except subprocess.TimeoutExpired:
+            raise ScriptError(
+                f"{target} ran past --timeout; its partial output is in {run}"
+            ) from None
+
+        reply = runner.reply(run)
+        if not (run / "answer.md").exists():
+            (run / "answer.md").write_text(reply.answer, encoding="utf-8")
+        result = Result(
+            target=target,
+            mode=args.mode,
+            model=reply.model,
+            effort=effort,
+            session=reply.session or request.session,
+            changed=changes(
+                before, snapshot(root, cwd, "after the run") if root else None
+            ),
+            run_dir=str(run),
+            answer=reply.answer.strip(),
+        )
+        (run / "run.json").write_text(
+            json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8"
+        )
+
+        problems = list(reply.problems)
+        if status != 0:
+            problems.insert(0, f"{target} exited {status}; read stderr.log in {run}")
+        if not result.answer:
+            problems.append(f"{target} gave no answer")
+        if args.mode in READ_ONLY and result.changed:
+            problems.append(
+                f"the {args.mode} run changed the checkout: {', '.join(result.changed)}"
+            )
+        if problems:
+            raise ScriptError(*problems, report=fields(result))
+        return result
+    except KeyboardInterrupt as stop:
+        code = getattr(stop, "code", INTERRUPTED)
+        error = ScriptError(
+            "interrupted" if code == INTERRUPTED else "terminated",
+            report={
+                "files": sorted(str(path) for path in run.rglob("*") if path.is_file())
+            },
+        )
+        error.code = code
+        raise error from stop
+    except ScriptError as error:
+        if "file" not in error.report:
+            error.report["files"] = sorted(
+                str(path) for path in run.rglob("*") if path.is_file()
+            )
+        raise
+    except OSError as error:
+        log.debug("run file failure", exc_info=True)
         raise ScriptError(
-            f"{target} ran past --timeout; its partial output is in {run}"
-        ) from None
-
-    reply = runner.reply(run)
-    if not (run / "answer.md").exists():
-        (run / "answer.md").write_text(reply.answer, encoding="utf-8")
-    result = Result(
-        target=target,
-        mode=args.mode,
-        model=reply.model,
-        effort=effort,
-        session=reply.session or request.session,
-        changed=changes(before, snapshot(root, cwd, "after the run") if root else None),
-        run_dir=str(run),
-        answer=reply.answer.strip(),
-    )
-    (run / "run.json").write_text(
-        json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8"
-    )
-
-    problems = list(reply.problems)
-    if status != 0:
-        problems.insert(0, f"{target} exited {status}; read stderr.log in {run}")
-    if not result.answer:
-        problems.append(f"{target} gave no answer")
-    if args.mode in READ_ONLY and result.changed:
-        problems.append(
-            f"the {args.mode} run changed the checkout: {', '.join(result.changed)}"
-        )
-    if problems:
-        raise ScriptError(*problems, detail=summary(result), report=asdict(result))
-    return result
+            f"{error}; read the saved run files in {run}",
+            report={
+                "files": sorted(str(path) for path in run.rglob("*") if path.is_file())
+            },
+        ) from error
 
 
 def build_parser() -> Parser:
@@ -1332,90 +1358,21 @@ def build_parser() -> Parser:
         default=duration("2h"),
         help="stop the child after this long (default: 2h)",
     )
-    parser.add_argument(
-        "--json", action="store_true", help="print the run as one JSON object"
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="print the run folder and command on stderr",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help=f"print tracebacks on stderr; also {DEBUG_ENV}=1",
-    )
     return parser
-
-
-def report(error: ScriptError, parser: Parser, as_json: bool) -> int:
-    messages = [str(message) for message in error.args]
-    usage = isinstance(error, UsageError)
-    if as_json:
-        failure = {**error.report, "errors": messages}
-        if usage:
-            failure["help"] = f"{parser.prog} --help"
-        print(json.dumps(failure, indent=2), file=sys.stderr)
-        return error.code
-    if error.detail:
-        print(error.detail, file=sys.stderr)
-    if usage:
-        parser.print_usage(sys.stderr)
-    for message in messages:
-        print(f"error: {message}", file=sys.stderr)
-    if usage:
-        print(f"run '{parser.prog} --help'", file=sys.stderr)
-    return error.code
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     split = argv.index("--") if "--" in argv else len(argv)
     own, extra = argv[:split], argv[split + 1 :]
-    parser = build_parser()
-    if given(own, "-h", "--help", parser=parser):
-        parser.print_help()
-        return 0
-    as_json = given(own, "--json")
-    parser.json_errors = as_json
-    with signals_interrupt():
-        try:
-            args = parser.parse_args(own)
-            debug = args.debug or env_flag(DEBUG_ENV)
-            logging.basicConfig(
-                format="%(message)s",
-                level=logging.DEBUG
-                if debug
-                else logging.INFO
-                if args.verbose
-                else logging.WARNING,
-                stream=sys.stderr,
-                force=True,
-            )
-            result = launch(args, extra)
-        except SystemExit as stop:
-            return stop.code if isinstance(stop.code, int) else 1
-        except Interrupted as stop:
-            word = "interrupted" if stop.code == INTERRUPTED else "terminated"
-            print(json.dumps({"errors": [word]}) if as_json else word, file=sys.stderr)
-            return stop.code
-        except ScriptError as error:
-            return report(error, parser, as_json)
-        except Exception as error:
-            log.debug("unexpected failure", exc_info=True)
-            return report(
-                ScriptError(f"{type(error).__name__}: {error}"), parser, as_json
-            )
-    if as_json:
-        print(json.dumps(asdict(result), indent=2))
-    elif result.mode in READ_ONLY:
-        # A review is the deliverable, and output filters such as RTK cut long
+
+    def work(args: argparse.Namespace) -> dict[str, Any]:
+        # The answer can run long, and output filters such as RTK cut long
         # stdout, so the caller reads it whole from the answer file
-        print(summary(result))
-    else:
-        print(f"{summary(result)}\n\n{result.answer}")
-    return 0
+        return fields(launch(args, extra))
+
+    # Flags after -- go to the child, so the parser reads only the launcher's own
+    return run_script(build_parser(), work, own, debug=DEBUG_ENV)
 
 
 if __name__ == "__main__":
