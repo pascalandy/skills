@@ -63,6 +63,14 @@ exec "$FLEET_PYTHON" scripts/install_skills.py "$@"
 """
 
 
+def login_path(home: Path, bin_dir: Path) -> None:
+    """Put the fake ssh and just first in a login shell's PATH. A login shell
+    reads ~/.profile after /etc/profile, where macOS's path_helper moves the
+    inherited entries behind /opt/homebrew/bin and the real just."""
+    home.mkdir(parents=True, exist_ok=True)
+    (home / ".profile").write_text(f'PATH="{bin_dir}:$PATH"\n')
+
+
 def git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", *args], cwd=repo, check=True, capture_output=True, text=True
@@ -109,12 +117,14 @@ def fleet(tmp_path: Path) -> tuple[Path, Path, Path]:
     for name, body in (("ssh", FAKE_SSH), ("just", FAKE_JUST)):
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
+    login_path(tmp_path / "hub-home", bin_dir)
     return hub, tmp_path / "homes", bin_dir
 
 
 def machine(homes: Path, name: str, origin: Path) -> Path:
     checkout = homes / name / "projects/skills"
     checkout.parent.mkdir(parents=True)
+    login_path(homes / name, homes.parent / "bin")
     subprocess.run(["git", "clone", "-q", str(origin), str(checkout)], check=True)
     return checkout
 
@@ -146,6 +156,8 @@ def run(
     env["FLEET_HOMES"] = str(homes)
     env["FLEET_PYTHON"] = sys.executable
     env["HOME"] = str(hub.parent / "hub-home")
+    # This machine's step runs in $SHELL; sh reads the ~/.profile above
+    env["SHELL"] = "/bin/sh"
     env.pop("XDG_STATE_HOME", None)
     result = subprocess.run(
         ["uv", "run", str(hub / "scripts/sync_fleet.py"), *args],

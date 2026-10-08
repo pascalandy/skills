@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -181,16 +182,25 @@ def test_each_scenario_runs_in_each_agent_with_the_skill_from_the_ref(lab: Lab):
     assert (first / "skills.txt").read_text() == "installed\tdemo\ninstalled\thelper\n"
 
 
-def test_codex_hides_installed_copies_of_listed_and_deleted_skills(lab: Lab):
-    result = run(lab, "--ref", str(lab.ref), "--output-dir", str(lab.out))
+# The installed skill named private is neither listed nor deleted, so it stays
+# visible; a home under a folder named private, like macOS's /private/var,
+# hides the same skills
+@pytest.mark.parametrize("home", ["home", "private/home"])
+def test_codex_hides_installed_copies_of_listed_and_deleted_skills(lab: Lab, home: str):
+    moved = lab.tmp / home
+    if moved != lab.home:
+        shutil.copytree(lab.home, moved)
+    result = run(
+        lab, "--ref", str(lab.ref), "--output-dir", str(lab.out), HOME=str(moved)
+    )
 
     assert result.returncode == 0, result.stderr
     argv = report(lab, "s2-codex", "argv").splitlines()
-    installed = lab.home / ".codex" / "skills"
+    installed = moved / ".codex" / "skills"
     hidden = next(arg for arg in argv if arg.startswith("skills.config="))
-    assert str(installed / "demo" / "SKILL.md") in hidden
-    assert str(installed / "gone" / "SKILL.md") in hidden
-    assert "private" not in hidden
+    assert sorted(re.findall(r'path="([^"]+)"', hidden)) == [
+        str(installed / name / "SKILL.md") for name in ("demo", "gone")
+    ]
 
 
 def test_a_ref_without_the_skill_gives_a_no_skill_baseline(lab: Lab):
@@ -312,8 +322,10 @@ def test_an_interrupt_during_setup_launches_no_agent(lab: Lab, number):
 def test_a_setup_timeout_stops_before_launching_an_agent(lab: Lab):
     evals = lab.skill / "evals" / "evals.json"
     evals.write_text(
-        json.dumps([{"query": "Go.", "setup": ["echo preparing; sleep 2"]}])
+        json.dumps([{"query": "Go.", "setup": ["echo preparing; sleep 10"]}])
     )
+    # The deadline also covers the git init before the setup, which takes more
+    # than 0.1s on a loaded machine
     result = run(
         lab,
         "--ref",
@@ -323,7 +335,7 @@ def test_a_setup_timeout_stops_before_launching_an_agent(lab: Lab):
         "--agent",
         "codex",
         "--timeout",
-        "0.1s",
+        "1s",
     )
 
     assert result.returncode == 1

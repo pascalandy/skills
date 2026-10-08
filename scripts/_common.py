@@ -164,8 +164,9 @@ def main_checkout(root: Path) -> Path:
 
 def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> None:
     """Signal a child, or with `group` the process group of a child started in
-    its own session; the group outlives a leader that exits first."""
-    with suppress(ProcessLookupError):
+    its own session; the group outlives a leader that exits first. On macOS,
+    killpg fails with EPERM when the group holds only an unreaped leader."""
+    with suppress(ProcessLookupError, PermissionError):
         if group:
             os.killpg(process.pid, number)
         else:
@@ -174,15 +175,19 @@ def send(process: subprocess.Popen[Any], number: int, group: bool = False) -> No
 
 def stop(process: subprocess.Popen[Any], group: bool = False) -> None:
     """SIGTERM a child, then SIGKILL it after GRACE seconds. A descendant may
-    still hold the pipes, so stop reading them GRACE seconds later."""
+    still hold the pipes, so stop reading and close them GRACE seconds later."""
     send(process, signal.SIGTERM, group)
     try:
         process.communicate(timeout=GRACE)
         return
     except subprocess.TimeoutExpired:
         send(process, signal.SIGKILL, group)
-    with suppress(subprocess.TimeoutExpired):
+    try:
         process.communicate(timeout=GRACE)
+    except subprocess.TimeoutExpired:
+        for pipe in (process.stdin, process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
 
 
 def swap(fresh: Path, destination: Path, previous: Path) -> None:

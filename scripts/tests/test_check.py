@@ -208,6 +208,8 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
             "--with",
             "pytest-xdist==3.8.0",
             "pytest",
+            "-W",
+            "error",
             "-n",
             "auto",
             "scripts/tests/test_alpha.py",
@@ -230,6 +232,8 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             "--from",
             "pytest@9.1.1",
             "pytest",
+            "-W",
+            "error",
             "scripts/tests/test_commands.py",
             "scripts/tests/test_skill_invocation.py",
         ]
@@ -393,7 +397,7 @@ def test_verbose_list_shows_the_actual_cheap_test_command(
     ) == (
         0,
         '{"ok":true,"checks":["test-commands"]}\n',
-        "repository-tests: uvx --from pytest@9.1.1 pytest scripts/tests/test_commands.py\n",
+        "repository-tests: uvx --from pytest@9.1.1 pytest -W error scripts/tests/test_commands.py\n",
     )
     assert not (routing_repo / "pytest-calls").exists()
 
@@ -429,3 +433,23 @@ def test_ambiguous_test_alias_is_rejected(
     assert (code, stdout) == (2, "")
     assert "invalid choice: 'test'" in stderr
     assert not (routing_repo / "pytest-calls").exists()
+
+
+def test_a_test_that_warns_fails_its_check(tmp_path: Path) -> None:
+    (tmp_path / "test_warns.py").write_text(
+        "import warnings\n\ndef test_warns():\n    warnings.warn('stale call')\n",
+        encoding="utf-8",
+    )
+    command = check.pytest("test_warns.py", parallel=False)
+    flags = command[command.index("pytest") + 1 :]
+
+    ran = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", *flags],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert ran.returncode == 1
+    assert "UserWarning: stale call" in ran.stdout

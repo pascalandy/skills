@@ -73,7 +73,7 @@ $ uv run scripts/check_cli_block.py --fix
 
 - `answer()` in `scripts/_common.py` prints the line and derives `ok` from the exit code. `run_script(..., json_answer=True)` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
 - Each `justfile` recipe that runs such a script carries `[no-exit-message]`, for decision 10
-- #487 makes a pytest or pyright warning fail `just check`, through `-W error` and `--warnings`
+- A pytest or pyright warning fails `just check`: `scripts/check.py` runs pytest with `-W error` and pyright with `--warnings` (#487). When a dependency starts to warn, filter that one warning in its check, with a comment that says why
 
 ## Why
 

@@ -214,3 +214,23 @@ def test_stop_stops_reading_pipes_a_descendant_keeps_open(
         assert time.monotonic() - began < 2
     finally:
         os.kill(int(holder.read_text()), signal.SIGKILL)
+
+
+def test_a_group_signal_to_a_child_that_already_exited_is_a_no_op() -> None:
+    process = subprocess.Popen(["/bin/sh", "-c", "exit 0"], start_new_session=True)
+    # Nothing reaps it yet, so the exited leader stays a zombie
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        state = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(process.pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout
+        if state.startswith("Z"):
+            break
+        time.sleep(0.05)
+
+    _common.send(process, signal.SIGTERM, group=True)
+
+    assert process.wait(timeout=5) == 0
