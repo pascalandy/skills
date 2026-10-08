@@ -349,7 +349,7 @@ class AnswerTests(RunFixture):
                 {
                     "ok": False,
                     "errors": ["the following arguments are required: --manifest"],
-                    "help": "verify-video-archive --help",
+                    "help": "verify-video-archive drive --help",
                 },
             ),
         )

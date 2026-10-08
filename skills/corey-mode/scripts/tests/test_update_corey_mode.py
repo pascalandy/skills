@@ -291,7 +291,7 @@ def test_a_short_revision_is_a_usage_error(upstream: Path, package: Path) -> Non
         "errors": [
             "argument --revision: must be a full 40-character SHA, got '5b2c000'"
         ],
-        "help": "update_corey_mode.py --help",
+        "help": "update_corey_mode.py update --help",
     }
     assert files(package) == {"SKILL.md"}
 
@@ -302,7 +302,7 @@ def test_update_without_revision_is_a_usage_error(upstream: Path) -> None:
     assert failure(result, code=2) == {
         "ok": False,
         "errors": ["the following arguments are required: --revision"],
-        "help": "update_corey_mode.py --help",
+        "help": "update_corey_mode.py update --help",
     }
 
 
@@ -312,7 +312,7 @@ def test_an_unknown_flag_is_a_usage_error() -> None:
     assert failure(result, code=2) == {
         "ok": False,
         "errors": ["unrecognized arguments: --typo"],
-        "help": "update_corey_mode.py --help",
+        "help": "update_corey_mode.py check --help",
     }
 
 

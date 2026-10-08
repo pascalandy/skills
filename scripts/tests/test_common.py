@@ -208,3 +208,32 @@ def test_readers_take_an_answer_whatever_its_key_order() -> None:
     }
     assert _common.changes_in(lines) == [["update", "~/.claude/skills/alpha"]]
     assert _common.answer_in(['{"changes":[]}', "[1]"]) is None
+
+
+def with_command(*argv: str) -> tuple[int, str, str]:
+    parser = Parser(prog="just tool", exit_codes=exit_codes({}))
+    sub = parser.add_subparsers(
+        dest="name", required=True, parser_class=argparse.ArgumentParser
+    )
+    sub.add_parser("build", help="build it").add_argument("--fast", action="store_true")
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = run_script(
+            parser, lambda args: {"verbose": args.verbose}, list(argv), debug="T"
+        )
+    return code, stdout.getvalue(), stderr.getvalue()
+
+
+def test_a_command_takes_its_own_help_usage_errors_and_v_after_it() -> None:
+    code, stdout, _ = with_command("build", "-h")
+
+    assert code == 0
+    assert stdout.startswith("usage: just tool build [-h] [--fast] [-v] [--debug]")
+    assert with_command("build", "--slow") == (
+        2,
+        "",
+        '{"ok":false,"errors":["unrecognized arguments: --slow"],"help":"just tool build --help"}\n',
+    )
+    assert with_command("build", "-v")[:2] == (0, '{"ok":true,"verbose":true}\n')
+    assert with_command("-v", "build")[:2] == (0, '{"ok":true,"verbose":true}\n')
+    assert with_command("build")[:2] == (0, '{"ok":true,"verbose":false}\n')
