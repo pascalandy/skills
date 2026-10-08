@@ -1,6 +1,14 @@
 # Réfléchir avant de décider
 
-`plan` aligne l'agent sur une tâche à exécuter. Ces quatre outils servent l'autre cas : éprouver une idée ou une décision avant de t'engager.
+`consensus` aligne l'agent sur une tâche à exécuter. Les outils suivants t'aident à déposer tes idées ou à examiner une décision avant de t'engager.
+
+## Dépose tes idées avec `brainstorm`
+
+```text
+brainstorm
+```
+
+Envoie ensuite tes idées en vrac, un message à la fois. L'agent écoute et répond "ok", sans analyser ni proposer. Quand tout est déposé, demande la suite, comme un `consensus` sur ce que tu viens d'écrire.
 
 ## Mets un plan à l'épreuve avec `grilling`
 
@@ -34,6 +42,6 @@ research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux
 
 L'agent remonte chaque affirmation jusqu'à sa source et la cite. Ouvre au moins une source.
 
-**Piège :** confondre `plan` et `grilling`. `plan` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
+**Piège :** confondre `consensus` et `grilling`. `consensus` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
 
 Suite : [Écrire et réviser](./05-ecrire.md).

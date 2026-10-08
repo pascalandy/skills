@@ -46,7 +46,8 @@ A mode is a skill that opens a family of tasks, each with its own playbook. Name
 
 | Skill | Use it when |
 |---|---|
-| `plan` | you want the agent to restate your goal and ask the right questions before it does anything |
+| `consensus` | you want the agent to restate your goal and ask the right questions before it starts the work |
+| `brainstorm` | you want to drop ideas one by one while the agent only listens and answers "ok" |
 | `grilling` | you want a plan or an idea stress-tested through an interview. Say "grill me" |
 | `research` | you want a topic researched, with its sources |
 | `unslop` | a text sounds like a robot wrote it |
@@ -59,7 +60,7 @@ A mode is a skill that opens a family of tasks, each with its own playbook. Name
 <summary>More prompts to copy</summary>
 
 ```text
-plan:       plan I want to move my team's weekly report to a shared dashboard
+consensus:  I want to move my team's weekly report to a shared dashboard. consensus
 grilling:   grill me on my plan to open a second location
 think:      andy-mode ; think. Should I hire a junior or a senior first?
 clarity:    andy-mode ; write-with-clarity. [paste your text]
