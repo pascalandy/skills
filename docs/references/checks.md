@@ -56,6 +56,16 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 | The merge landed, but `main` holds a tree the checks did not run on | `just check` on an up-to-date `main`, then `just deploy` |
 | The merge landed, but the main checkout holds code `main` never had | Put it back on a commit of `main`, with no changes under `scripts/` or the justfile, then `just deploy` there |
 
+## Land a stack
+
+A stack lands bottom-up, one layer at a time, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch:
+
+1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
+2. Sign off on macOS. The fleet also runs Linux, and a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path, so run `gh workflow run ci.yml --ref <top layer>` too. It proves the stack's end state on Linux, not the layers below: run it on a lower layer as well when that layer may land without the ones above it
+3. A suite `just check` does not run, such as poteto-mode's TypeScript tests, runs by hand on each layer that changes it, and its PR names the command and the result
+4. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line, and the code in [[script-conventions]]'s Transitions keeps older machines syncing
+5. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main` before any Transitions row is removed (#492)
+
 ## The signoff rule
 
 `gh signoff install` created the `signoff` ruleset on `main`. It requires the `signoff` status to merge a PR and blocks force pushes and deletion of `main`. Repository admins bypass it, so direct pushes to `main` keep working. `gh signoff check` reports whether the rule is on; `gh signoff uninstall` removes it, and `gh signoff install` restores it

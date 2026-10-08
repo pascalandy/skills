@@ -1,16 +1,16 @@
 ---
 name: Script conventions
-description: The CLI contract for scripts/ and skill-local scripts, and the shared code and tests that enforce it
+description: How to build a script that follows the output rule: flags, exit codes, how each kind of script adopts the contract, the shared code and tests, and the code kept for older machines
 tags:
   - area/ea
   - kind/doc
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-04
+date_updated: 2026-10-07
 ---
 
-Every CLI in `scripts/` follows this contract. A skill-local script may follow it too, and its skill's own tests cover it
+Every CLI in `scripts/` follows this contract. A skill-local script follows it too, and its skill's own tests cover it
 
 `<name>` is the command a user types: `just <recipe>` for a `scripts/` tool, its path such as `scripts/sync_private.py` when no recipe runs it, and a skill script's current program name, otherwise its file name. `<NAME>_DEBUG` comes from the file stem, such as `SYNC_FLEET_DEBUG`
 
@@ -18,11 +18,11 @@ Every CLI in `scripts/` follows this contract. A skill-local script may follow i
 
 Every script meets all of these. No exception waives an exit code, the output rule, or help behavior.
 
-Output follows [[script-output]]: one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`. Every script in `scripts/` and every new script answers that way. A skill script the State section of [[script-output]] has not reached yet still follows the Rule of Silence: when nothing needs saying, print nothing
+Output follows [[script-output]]: every script, in `scripts/` or in a skill, answers in one JSON line, `{"ok":true}` or `{"ok":false,"errors":[…]}`
 
-- stdout holds the primary result only: data, IDs, paths, or change lines. No banners or status lines
-- A failure leaves stdout empty. Under `--json`, the error is one JSON object on stderr
-- stderr holds every diagnostic. By default, only errors and warnings that need action
+- stdout holds the answer of a success and nothing else. No banners or status lines
+- A failure leaves stdout empty, and its answer is the last line of stderr
+- stderr holds every diagnostic. By default, only what explains a failure
 - Without a terminal, or with `NO_COLOR` set or `TERM=dumb`: no color, spinners, or progress bars
 
 Exit codes, all listed in `--help`:
@@ -57,19 +57,16 @@ Add a row's flags only when the script has the matching behavior.
 
 | When the script... | Add |
 |---|---|
-| is installed as a command or has a release version | `--version`: one line on stdout, `<name> <version>` |
+| is installed as a command or has a release version | `--version`: one line of text on stdout, `<name> <version>`, exit 0; like `--help`, it is documentation, not an answer |
 | has steps worth reporting | `-v`, `--verbose`: progress and step details on stderr |
 | has failures worth diagnosing: network, locks, or subprocesses | `--debug`, also `<NAME>_DEBUG=1`: internals, timings, and stack traces on stderr |
-| has output read by programs or agents, and does not answer in JSON yet | `--json`: stdout is one JSON object and nothing else |
 | emits color | `--no-color` |
 | changes state | `-n`, `--dry-run`: preview in the same format as a real run |
 | asks for confirmation | `-y`, `--yes`; `--no-input`: never prompt, and a missing value exits 2 naming the flag |
 | has a safety check worth overriding | `-f`, `--force`, separate from `--yes` |
 | calls networks or APIs, or takes locks | exit `75` for a temporary, safe-to-retry failure; `--timeout <duration>` with a default |
-| reads or writes files | `-` as a filename for stdin or stdout; `-o`, `--output <file>` |
+| reads or writes files | `-` as a filename for stdin; `-o`, `--output <file>`. Content goes to a file the answer names, never to stdout, which holds only the answer |
 | has subcommands | `<name> help <cmd>`, `<name> <cmd> --help`, and `<name> <cmd> -h` print the same text; global flags work before and after the subcommand; an unknown subcommand exits 2 and suggests the closest match; subcommands need their full name |
-| has line-oriented output | `--plain`: tab-separated, no color |
-| has several output formats | `--format <fmt>` in place of `--json` |
 | reads config files | `-c`, `--config <path>`; precedence: flag, env, project, `~/.config/<name>/`, system |
 | has named environments | `--profile <name>` |
 | shows progress bars | `--no-progress` |
@@ -80,7 +77,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`, which until #492 also reads the change lines, `<action>\t<object>`, of a machine that still runs code from before #490
+A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 
@@ -91,27 +88,40 @@ A duration is `30s`, `5m`, `2h`, or bare seconds
 Opt-in flags that would give no real choice are left out, and a script outside the shared block's language drops only a Parsing item its language cannot express. Each exception gets one line:
 
 - `scripts/` tools have no `--version`: they ship with the checkout, not as versioned commands
-- Change lines are already tab-separated and colorless, so no `scripts/` tool has `--plain`
 - `just check-frontmatter`, `just compile-skills`, `just remote-skills`: no `-r`; each walks one fixed tree
 - `just compile-skills`, `just install-skills`, `just remote-skills`: no `-o` or `-`; they write fixed paths: `skills/` and the skill count, the agent directories, and the skill lists
 - `just install-skills`: no `--force`; it would delete entries the installer does not own
-- `just install-skills`: accepts a hidden `-q/--quiet` and ignores it, because a `just sync` or `just sync-fleet` started before this contract passes it; remove it once every machine has synced
 - `just release-check`: `--notes FILE` names what `-o` would write
 - `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
-- `watch-pr` in `poteto-mode` streams JSON Lines by default, with `--pretty` for people; the one-object rule applies to `--status-only`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
-- `transcript`: no `--plain`; `list` already prints one item per line, tab-separated and colorless
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
-- `transcript`: a JSON error keeps `{"ok": false, "error": {"code", "message", "hint"}}`, which its agents and `verify-transcript` read, instead of the shared `errors` list; `hint` is the command that fixes it
+
+## Transitions
+
+Code kept only so a machine that still runs older scripts keeps syncing. Each row ends when `just sync-fleet --check` answers `{"ok":true}` with every machine on a `main` commit that holds the change in its first column; then delete the code, its test, and its row in one PR (#492)
+
+| Change | Kept until then | Why |
+|---|---|---|
+| #490, state commands answer in JSON | `changes_in()` also reads change lines, `<action>\t<object>` | a machine still on older code reports its changes that way |
+| this contract | `just install-skills` accepts a hidden `-q/--quiet` and ignores it | a `just sync` or `just sync-fleet` started from older code passes it |
+
+## Adopt the contract
+
+Each kind of script reaches the contract through one path. Then `just check` confirms it
+
+- A script in `scripts/`: import from `_cli`, build a `Parser`, and return `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. Add it to `ENTRIES` in `scripts/tests/test_cli_contract.py`, and give it a one-line `justfile` recipe with `[no-exit-message]`
+- A Python script in a skill: paste the block below the `cli-block` marker of `scripts/_cli.py` whole, then use it the same way. `uv run scripts/check_cli_block.py` confirms the copy
+- A Bash script: start from the Bash template of `coding-language`, `references/Bash/scripts/pref_bash_script_template.sh`
+- Another language: no shared code. Its tests assert the same boundary through the command: the exit code, an empty stdout on failure, the answer as the last line of stderr, and a usage error that exits 2 with `help`
 
 ## Shared code
 
 `scripts/_cli.py` holds the contract pieces: the parser, the help pre-scan, signal handling, `<NAME>_DEBUG`, color detection, the duration parser, the exit-code table, `ScriptError` (1), `UsageError` (2), and `TemporaryError` (75), and `run_script()` with the `answer()` it prints through. Everything below its `cli-block` marker is the block a skill script pastes whole; `just check --only cli-block` fails when a copy differs, and `uv run scripts/check_cli_block.py --fix` rewrites the copies. Keep the block on the standard library and Python 3.10
 
-Every entry point, in `scripts/` or pasted in a skill, builds a `Parser` with the script's `exit_codes(...)` table, then returns `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. `work` returns the data beside `ok`, usually `{}`, and raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, and answers each outcome in one JSON line with its exit code. Run each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. Functions other scripts import print nothing and install no signal handlers
+Every entry point, in `scripts/` or pasted in a skill, builds a `Parser` with the script's `exit_codes(...)` table, then returns `run_script(parser, work, argv, debug="<NAME>_DEBUG")` from `main()`. `work` returns the data beside `ok`, usually `{}`, and raises one of the error classes with one message per problem. `run_script` adds `-v` and `--debug`, and answers each outcome in one JSON line with its exit code. A script in `scripts/` runs each child through `_common.run()`: on a timeout or an interrupt it sends SIGTERM, so the child can clean up, and SIGKILL 10 seconds later. A skill script cannot import `_common`, since an installed skill ships without `scripts/`. Functions other scripts import print nothing and install no signal handlers
 
 Use only the standard library unless a dependency earns its place. Each `justfile` recipe is one line that forwards its arguments (`recipe *args`, passed as `"$@"`) to one script or tool through `uv run --quiet`; branching and chaining belong in the script. Bare `just` lists recipes in file order: the `commands` group, most-run first, then the `checks` group; hook-only recipes are `[private]`. `scripts/tests/test_justfile.py` enforces it
 

@@ -1,6 +1,6 @@
 ---
 name: Script output
-description: How a script answers in one JSON line, how agents and scripts read the answer, and why each choice was made
+description: The output rule: what a script answers in one JSON line, its keys, how agents and scripts read it, and why each choice was made
 tags:
   - area/ea
   - kind/doc
@@ -10,14 +10,17 @@ date_created: 2026-10-04
 date_updated: 2026-10-07
 ---
 
-A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written. [State](#state) lists the scripts here that follow it today
+A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written.
 
 ## The rule
+
+This section is the normative definition. Other pages and skills link here instead of restating it
 
 - Everything passed: `{"ok":true}` on stdout, exit code 0
 - Anything else: stdout stays empty, the last line of stderr is `{"ok":false,"errors":["…"]}`, and the exit code is not 0. Each error says what failed and the command that fixes it
 - `ok` always agrees with the exit code
 - A success with a warning is not a success: what needs action fails the command, and the rest moves to `-v`
+- `--help` and `--version` are documentation and stay text on stdout, exit 0 (decision 9)
 
 ## Read the answer
 
@@ -36,6 +39,24 @@ A script tests the exit code, or pipes stdout to `jq -e .ok`:
 To read a failure's errors, merge the streams and keep the last line: `just check 2>&1 | tail -n1 | jq .errors`
 
 Read the answer as a JSON object: key order carries no meaning, so a reader never matches a prefix such as `{"ok":`. `answer_in()` and `changes_in()` in `scripts/_common.py` read it that way
+
+Behind rtk, a long answer is cut and ends with `[full output: rtk recall ID]`. Run that recall, or rerun the command as `rtk proxy <command>`, to read the whole line (decision 12)
+
+## Keys
+
+Every answer uses only these keys beside a command's own data, so a caller never guesses what a key means:
+
+| Key | When | Holds |
+|---|---|---|
+| `ok` | always | `true` exactly when the exit code is 0 |
+| `errors` | a failure | one message per problem, each ending with the command that fixes it |
+| `help` | a usage error, exit 2 | `<name> --help` |
+| `retry` | a temporary failure, exit 75 | the same command, safe to run again as is |
+| `rerun` | an unexpected error | the same command with `--debug` |
+| `changes` | a command that changes state, on success, dry run, `--check`, or a failure after a change landed | one array per change, `[action, object]` with an optional detail |
+| `file`, `files` | a command whose job is content, on success or failure | the path it wrote, or a list of what it wrote: paths, or objects with a `path` and the command's details, as `image-creator` answers |
+
+Any other key is the data the command exists to return, such as `checks` for `just check --list` (decision 6). A new key that means the same as one above reuses that name
 
 ## Examples
 
@@ -88,19 +109,15 @@ Decided on 2026-10-04, while planning #430
 4. **A success goes to stdout; a failure leaves stdout empty and ends stderr, after the diagnostics.** Failures already worked this way, and the code that reported them is reused
 5. **One line rather than indented JSON.** The verdict is always the last line, so `tail -n1 | jq` works. Indented JSON grows with its lists, to about 48 lines for `just check --sweep`. Pascal compared one line, indented, and one key per line, and chose the line
 6. **Data only when it is the command's job**: `--list`, `--dry-run`, or `changes` for a command that changes state. The checks that ran stay visible with `-v`. A change is an array such as `["install","andy-mode"]`, which costs fewer tokens than an object
-7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something
+7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something. A failure also keeps the data a caller needs to recover: the `changes` that already happened, such as a merge that landed before its deploy failed, or the `files` a run wrote before it failed
 8. **A warning is never a success.** What needs action fails the command, and the rest moves to `-v`. This covers pytest and pyright warnings too (#487). `just merge` exits 1 when the merge landed but the deploy missed a machine, since a rerun only deploys (#491)
-9. **No `--json` flag, since JSON is the default. `--help` stays text**, because it is documentation
+9. **No `--json` flag, since JSON is the default. `--help` and `--version` stay text**, because they are documentation. `--version` prints one line, `<name> <version>`, the form tools read by convention. Pascal confirmed `--version` on 2026-10-07
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line
 11. **An agent reads the line; a script reads the exit code or `jq -e .ok`**, as [Read the answer](#read-the-answer) shows. A script never parses text, and an agent that hides the line is back to silence
-12. **rtk passes the line through unchanged.** Checked on 2026-10-04 with a one-line and an indented object from a `just` recipe, on success and on failure; `rtk proxy` prints the same lines, so agents need no workaround
+12. **rtk passes a short line through unchanged, and cuts a long one.** Checked on 2026-10-04 with short answers, on success and on failure. On 2026-10-07, rtk 0.49.0 cut the 714-byte answer of `rtk just check --list` to about 150 characters and added `[full output: rtk recall ID]`; [Read the answer](#read-the-answer) says how to recover the line. A script reads the exit code or `jq`, never rtk's output
 13. **The lock lives in `test_cli_contract.py`, not in a new check** (#492), because that test already lists every script
 14. **Rejected: a sentence in `AGENTS.md` that explains the silence** (the first proposal in #430), because it fixes one script in one repository. **Rejected: text in a terminal and JSON elsewhere**, because the agent and the human would see two different outputs
 15. **A script whose job is content writes the content to a file and answers with its path**, such as `{"ok":true,"file":"…"}`, so the line stays one line an agent reads whole. A script that streams events, such as a watcher, writes them to stderr and ends with its answer on stdout. Pascal decided on 2026-10-06 that skill scripts follow the rule too, these included (#494)
-
-## State
-
-Every entry point in `scripts/` follows the rule, and the lock keeps it that way. Scripts inside skills follow it skill by skill (#494); until a skill's script does, it keeps the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`
 
 ## Related
 

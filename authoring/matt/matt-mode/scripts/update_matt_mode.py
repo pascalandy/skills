@@ -25,8 +25,8 @@ TERMINATED = 128 + signal.SIGTERM
 class ScriptError(Exception):
     """An expected failure; each argument is one message that says what to fix.
 
-    `detail` is text printed on stderr before the messages; `report` is the
-    object `--json` prints on stderr beside them.
+    `detail` is text printed on stderr before the answer; `report` holds the
+    fields the answer carries beside `errors`, such as `changes`.
     """
 
     code = 1
@@ -82,12 +82,8 @@ def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
 
 class Parser(argparse.ArgumentParser):
     """argparse without abbreviated options, whose help ends with the exit codes
-    and whose usage errors print short usage and the help hint, then exit 2.
-
-    With `json_errors` set, a usage error is one JSON object on stderr instead.
-    """
-
-    json_errors = False
+    and whose usage errors print short usage and the help hint, then exit 2;
+    run_script() makes them answer in JSON instead."""
 
     def __init__(
         self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
@@ -104,9 +100,6 @@ class Parser(argparse.ArgumentParser):
         self.exit_codes = dict(exit_codes)
 
     def error(self, message: str) -> NoReturn:
-        if self.json_errors:
-            failure = {"errors": [message], "help": f"{self.prog} --help"}
-            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
         self.print_usage(sys.stderr)
         self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
 
@@ -129,7 +122,7 @@ def given(
     argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
 ) -> bool:
     """Whether one of `flags` comes before `--`, where options end; use it to let
-    -h and --help win over every other argument, or to spot --json early.
+    -h and --help win over every other argument.
 
     With `parser`, a bundle of its flag letters counts too, such as -vh for
     -v -h; a bundle holding an option that takes a value never does.
@@ -243,10 +236,6 @@ def named_command(
                 parser = action.choices[arg]
                 break
     return parser
-
-
-def usage_error(message: str) -> NoReturn:
-    raise UsageError(message)
 
 
 def usage_error_for(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
