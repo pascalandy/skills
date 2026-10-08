@@ -116,7 +116,9 @@ def step(name: str, *command: str) -> list[list[str]]:
     if finished.returncode == 75:
         raise TemporaryError(f"{name} could not finish", report=report)
     if finished.returncode < 0:
-        raise ScriptError(f"{name} was killed by signal {-finished.returncode}")
+        raise ScriptError(
+            f"{name} was killed by signal {-finished.returncode}", report=report
+        )
     if finished.returncode:
         raise ScriptError(
             f"{name} failed; fix what its answer above says, then rerun just sync",

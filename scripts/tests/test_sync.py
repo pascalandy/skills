@@ -118,6 +118,36 @@ def test_an_interrupt_after_the_pull_still_answers_the_pull(
     }
 
 
+def test_a_step_killed_by_a_signal_keeps_the_changes_it_answered(
+    sandbox: tuple[Path, Path], behind: tuple[Path, Path], tmp_path: Path
+) -> None:
+    seed, _ = sandbox
+    repo, home = behind
+    # The pulled private sync answers a saved commit, then is killed
+    saved = ["commit", "_skills_private", "save edits from here"]
+    (seed / "scripts/sync_private.py").write_text(
+        "import json, os, signal, sys\n"
+        f"answer = {{'ok': False, 'errors': ['stopping'], 'changes': [{saved!r}]}}\n"
+        "print(json.dumps(answer, separators=(',', ':')), file=sys.stderr, flush=True)\n"
+        "os.kill(os.getpid(), signal.SIGKILL)\n"
+    )
+    commit(seed)
+    subprocess.run(
+        ["git", "push", "-q", str(tmp_path / "skills.git"), "main"],
+        cwd=seed,
+        check=True,
+    )
+    before = git(repo, "rev-parse", "--short=7", "HEAD")
+
+    result = run(repo, home)
+
+    after = git(repo, "rev-parse", "--short=7", "HEAD")
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["errors"] == ["scripts/sync_private.py was killed by signal 9"]
+    assert answer["changes"] == [["pull", "main", f"{before}..{after}"], saved]
+
+
 def test_a_stop_right_after_the_merge_still_answers_the_pull(
     behind: tuple[Path, Path],
 ) -> None:
