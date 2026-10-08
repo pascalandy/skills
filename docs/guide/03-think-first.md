@@ -22,7 +22,7 @@ It applies your answers, rethinks its proposals, and asks again until nothing is
 brainstorm
 ```
 
-Then send your ideas as they come, one message at a time. The agent listens and answers "ok", without analyzing or suggesting anything. Once everything is down, ask for the next step, such as a `consensus` on what you just wrote.
+Then send your ideas as they come, one message at a time. The agent listens and answers "ok", without analyzing or suggesting anything. Once you have sent everything, ask for the next step, such as a `consensus` on what you just wrote.
 
 ## Get grilled with `grilling`
 
