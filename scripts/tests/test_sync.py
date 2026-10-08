@@ -23,7 +23,9 @@ if __name__ == "__main__":
 """
 
 
-def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(
+    repo: Path, home: Path, *args: str, script: str = "sync.py"
+) -> subprocess.CompletedProcess[str]:
     env = {
         **os.environ,
         "HOME": str(home),
@@ -33,7 +35,7 @@ def run(repo: Path, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
     # Keep the caller's git settings, such as pull.rebase, out of the pull
     env.pop("XDG_CONFIG_HOME", None)
     result = subprocess.run(
-        ["uv", "run", str(repo / "scripts/sync.py"), *args],
+        ["uv", "run", str(repo / "scripts" / script), *args],
         check=False,
         cwd=repo,
         env=env,
@@ -114,6 +116,65 @@ def test_an_interrupt_after_the_pull_still_answers_the_pull(
         "errors": ["interrupted"],
         "changes": [["pull", "main", f"{before}..{after}"]],
     }
+
+
+def test_a_stop_right_after_the_merge_still_answers_the_pull(
+    behind: tuple[Path, Path],
+) -> None:
+    repo, home = behind
+    # just sync, stopped by whatever comes after the fast-forward
+    (repo / "scripts/stopped_sync.py").write_text(
+        "import sys\n"
+        "import sync\n"
+        "real = sync.git\n"
+        "merged = []\n"
+        "def git(*args, **kwargs):\n"
+        "    if merged:\n"
+        "        raise KeyboardInterrupt\n"
+        "    result = real(*args, **kwargs)\n"
+        "    if args[0] == 'merge':\n"
+        "        merged.append(True)\n"
+        "    return result\n"
+        "def step(*args, **kwargs):\n"
+        "    raise KeyboardInterrupt\n"
+        "sync.git = git\n"
+        "sync.step = step\n"
+        "sys.exit(sync.main())\n"
+    )
+    before = git(repo, "rev-parse", "--short=7", "HEAD")
+
+    result = run(repo, home, script="stopped_sync.py")
+
+    after = git(repo, "rev-parse", "--short=7", "HEAD")
+    assert after != before
+    assert (result.returncode, result.stdout) == (130, "")
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["pull", "main", f"{before}..{after}"]
+    ]
+
+
+def test_a_main_ahead_of_its_upstream_answers_no_pull(
+    sandbox: tuple[Path, Path], tmp_path: Path
+) -> None:
+    seed, home = sandbox
+    subprocess.run(["git", "branch", "-q", "-M", "main"], cwd=seed, check=True)
+    (seed / "scripts/sync_private.py").write_text(PULLED_PRIVATE_SYNC)
+    commit(seed)
+    origin = tmp_path / "skills.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(seed), str(origin)], check=True)
+    repo = tmp_path / "machine"
+    subprocess.run(["git", "clone", "-q", str(origin), str(repo)], check=True)
+    (repo / "local.txt").write_text("not pushed yet\n")
+    commit(repo)
+    head = git(repo, "rev-parse", "HEAD")
+
+    result = run(repo, home)
+
+    assert result.returncode == 0, result.stderr
+    assert not any(
+        change[0] == "pull" for change in json.loads(result.stdout)["changes"]
+    )
+    assert git(repo, "rev-parse", "HEAD") == head
 
 
 def test_a_blocked_pull_shows_gits_reason_and_installs_nothing(

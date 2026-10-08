@@ -80,6 +80,12 @@ def pull_main(timeout: float) -> list[list[str]]:
             f"could not fetch main: {reason}; fix origin, then rerun just sync"
         )
     before = git("rev-parse", "HEAD").stdout.strip()
+    # A fast-forward lands on the upstream, so the receipt needs no git call
+    # after the merge, where an interrupt would lose it. A main ahead of its
+    # upstream pulls nothing
+    after = git("rev-parse", "@{upstream}").stdout.strip()
+    if git("merge-base", "--is-ancestor", after, "HEAD").returncode == 0:
+        after = before
     merged = git("merge", "--quiet", "--ff-only", "@{upstream}")
     if merged.returncode:
         raise ScriptError(
@@ -87,7 +93,6 @@ def pull_main(timeout: float) -> list[list[str]]:
             "local changes git names above, then rerun just sync",
             detail=(merged.stderr + merged.stdout).strip(),
         )
-    after = git("rev-parse", "HEAD").stdout.strip()
     return [["pull", "main", f"{before[:7]}..{after[:7]}"]] if after != before else []
 
 
