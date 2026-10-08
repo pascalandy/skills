@@ -88,7 +88,7 @@ Decided on 2026-10-04, while planning #430
 5. **One line rather than indented JSON.** The verdict is always the last line, so `tail -n1 | jq` works. Indented JSON grows with its lists, to about 48 lines for `just check --sweep`. Pascal compared one line, indented, and one key per line, and chose the line
 6. **Data only when it is the command's job**: `--list`, `--dry-run`, or `changes` for a command that changes state. The checks that ran stay visible with `-v`. A change is an array such as `["install","andy-mode"]`, which costs fewer tokens than an object
 7. **A failure gives `errors`, one message per problem, each with the command that fixes it.** `help`, `retry`, or `rerun` follow only when they add something
-8. **A warning is never a success.** What needs action fails the command, and the rest moves to `-v`. This covers pytest and pyright warnings too (#487). #491 makes `just merge` exit 1 when the merge landed but the deploy missed a machine, since a rerun only deploys
+8. **A warning is never a success.** What needs action fails the command, and the rest moves to `-v`. This covers pytest and pyright warnings too (#487). `just merge` exits 1 when the merge landed but the deploy missed a machine, since a rerun only deploys (#491)
 9. **No `--json` flag, since JSON is the default. `--help` stays text**, because it is documentation
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line
 11. **An agent reads the line; a script reads the exit code or `jq -e .ok`**, as [Read the answer](#read-the-answer) shows. A script never parses text, and an agent that hides the line is back to silence

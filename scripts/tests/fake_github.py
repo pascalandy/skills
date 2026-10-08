@@ -48,6 +48,10 @@ import os, sys
 with open(os.environ["FAKE_DEPLOYS"], "a") as log:
     log.write(os.getcwd() + "\\n")
 code = int(os.environ.get("FAKE_DEPLOY_EXIT", "0"))
+sys.stderr.write(os.environ.get("FAKE_DEPLOY_STDERR", ""))
+if os.environ.get("FAKE_DEPLOY_PARTIAL"):
+    print('{"ok":false,"errors":["mini offline"],"changes":[["sync","mbp","abc1234"]]}', file=sys.stderr)
+    sys.exit(1)
 if code == 0 and os.environ.get("FAKE_DEPLOY_LEGACY"):
     # A main checkout that still runs the sync-fleet from before #490
     print("synced\\tmbp\\tabc1234")

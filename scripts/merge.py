@@ -8,7 +8,7 @@
 Run it on the PR branch, pushed, with a clean working tree. It reuses a green
 signoff on the head, or runs the just signoff steps first. It merges only when
 the branch contains main's tip, so the tree that lands is the tree the checks
-ran on, and warns when another PR lands in the same seconds. Then, when main
+ran on, and fails when another PR lands in the same seconds. Then, when main
 holds the tree the checks ran on, it runs just deploy, which brings every fleet
 machine to the new main. A rerun after an interruption finds the merged PR and
 deploys again.
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import changes_in, main_checkout, run, run_git, run_script
+from _common import changes_in, main_checkout, replay, run, run_git, run_script
 from signoff import (
     ROOT,
     branch,
@@ -43,16 +43,18 @@ from signoff import (
 EPILOG = """\
 A run answers {"ok":true,"changes":[...]}: ["signoff", SHA] when it signs off
 the head, ["merge", "#N", SHA] for the commit it merges, then the changes of
-just deploy. A dry run answers what a run would do. A deploy that fails or is
-withheld warns without failing the run: the merge landed.
+just deploy. A dry run answers what a run would do. When the merge lands but the
+deploy fails or is withheld, the run fails and says so; a rerun of just merge
+then only deploys.
 
 examples:
   just merge             # sign off this branch's PR head, then merge it
   just merge --dry-run   # check that the PR can merge, without changing anything"""
 EXIT_CODES = exit_codes(
     {
-        0: "the PR is merged, even when the deploy failed",
-        1: "the PR cannot merge as it is, or a check failed; the error says why",
+        0: "the PR is merged and deployed",
+        1: "the PR cannot merge as it is, a check failed, or the merge landed but "
+        "the deploy failed; the error says why",
         75: "GitHub did not make the PR mergeable in time, or the network failed; retry",
     }
 )
@@ -222,26 +224,17 @@ def land(pr: PullRequest, sha: str, timeout: float) -> None:
         )
 
 
-def main_holds_tested_tree(sha: str, timeout: float) -> bool:
-    """Whether main's tip holds the tree the checks ran on `sha`; warn when
-    another PR landed in the seconds around the merge."""
-    main = remote_tip("main", timeout)
-    if git("rev-parse", f"{main}^{{tree}}") == git("rev-parse", f"{sha}^{{tree}}"):
-        return True
-    log.warning(
-        "warning: main at %s holds a tree the checks did not run on, so just merge "
-        "did not deploy it; run just check on an up-to-date main, then just deploy",
-        main[:7],
-    )
-    return False
-
-
 def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
     """Run just deploy from the main checkout once main holds the tree the checks
-    ran on `sha`. The merge already landed, so expected failures only warn."""
+    ran on `sha`, and return its changes. The merge already landed, so a deploy
+    that cannot run or misses a machine fails with what to do, and a rerun of
+    just merge only deploys."""
+    landed = "the merge landed, but"
     try:
-        if not main_holds_tested_tree(sha, args.timeout):
-            return []
+        main = remote_tip("main", args.timeout)
+        tested = git("rev-parse", f"{main}^{{tree}}") == git(
+            "rev-parse", f"{sha}^{{tree}}"
+        )
         checkout = main_checkout(ROOT)
         # The deploy runs this checkout's code, which must be code main has held
         held = run_git(
@@ -250,39 +243,46 @@ def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
         changed = run_git(
             "status", "--porcelain", "--", "scripts", "justfile", cwd=checkout
         )
-        if held.returncode or changed.returncode or changed.stdout.strip():
-            log.warning(
-                "warning: just merge did not deploy: %s must hold a commit of main, "
-                "with no changes under scripts/ or the justfile; fix it, then run "
-                "just deploy there",
-                checkout,
-            )
-            return []
-        levels = [
-            *(["--verbose"] if args.verbose else []),
-            *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
-        ]
-        log.info("run just deploy from %s", checkout)
-        deployed = run(
-            (sys.executable, str(checkout / "scripts/sync_fleet.py"), *levels),
-            cwd=checkout,
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-        if deployed.returncode:
-            log.warning(
-                "warning: the merge landed, but just deploy did not reach every "
-                "machine; fix what it names above, then run just deploy"
-            )
-        # That checkout may still run the sync-fleet from before #490
-        return changes_in(deployed.stdout.splitlines())
     except ScriptError as error:
-        log.warning(
-            "warning: the merge landed, but just deploy could not run: %s; "
-            "fix it, then run just deploy",
-            error,
+        raise ScriptError(
+            f"{landed} just deploy could not run: {error}; fix it, then run just deploy"
+        ) from None
+    if not tested:
+        # Another PR landed in the seconds around the merge
+        raise ScriptError(
+            f"{landed} main at {main[:7]} holds a tree the checks did not run on, "
+            "so it was not deployed; run just check on an up-to-date main, then "
+            "just deploy"
         )
-        return []
+    if held.returncode or changed.returncode or changed.stdout.strip():
+        raise ScriptError(
+            f"{landed} it was not deployed: {checkout} must hold a commit of main, "
+            "with no changes under scripts/ or the justfile; fix it, then run "
+            "just deploy there"
+        )
+    levels = [
+        *(["--verbose"] if args.verbose else []),
+        *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
+    ]
+    log.info("run just deploy from %s", checkout)
+    deployed = run(
+        (sys.executable, str(checkout / "scripts/sync_fleet.py"), *levels),
+        cwd=checkout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    replay(deployed.stderr)
+    # A failed deploy still lists the machines it reached, in its answer or,
+    # from a sync-fleet older than #490, in its change lines
+    changes = changes_in((deployed.stdout + deployed.stderr).splitlines())
+    if deployed.returncode:
+        raise ScriptError(
+            f"{landed} just deploy did not reach every machine; fix what its "
+            "answer above says, then run just deploy",
+            report={"changes": changes},
+        )
+    return changes
 
 
 def merge(args: argparse.Namespace) -> dict[str, Any]:
@@ -315,18 +315,25 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
         )
     require_contains_main(sha, args.timeout)
     changes = []
-    if not signed_off(sha, args.timeout):
-        changes.append(["signoff", sha[:7]])
-        if not args.dry_run:
-            check_and_sign(sha, args.timeout)
-    changes.append(["merge", f"#{pr.number}", sha[:7]])
-    if args.dry_run:
-        return {"changes": changes}
-    wait_until_mergeable(pr.number, sha, args.timeout)
-    # main can move while the checks run
-    require_contains_main(sha, args.timeout)
-    land(pr, sha, args.timeout)
-    return {"changes": [*changes, *deploy(sha, args)]}
+    try:
+        if not signed_off(sha, args.timeout):
+            if not args.dry_run:
+                check_and_sign(sha, args.timeout)
+            changes.append(["signoff", sha[:7]])
+        if args.dry_run:
+            return {"changes": [*changes, ["merge", f"#{pr.number}", sha[:7]]]}
+        wait_until_mergeable(pr.number, sha, args.timeout)
+        # main can move while the checks run
+        require_contains_main(sha, args.timeout)
+        land(pr, sha, args.timeout)
+        changes.append(["merge", f"#{pr.number}", sha[:7]])
+        deployed = deploy(sha, args)
+    except ScriptError as error:
+        reached = error.report.get("changes", [])
+        if changes or reached:
+            error.report["changes"] = [*changes, *reached]
+        raise
+    return {"changes": [*changes, *deployed]}
 
 
 def main(argv: list[str] | None = None) -> int:
