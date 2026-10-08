@@ -7,7 +7,7 @@ Prérequis : une application d'IA qui ouvre des pages web, comme ChatGPT ou Clau
 1. [Activer les skills](./01-demarrer.md). Une phrase dans tes instructions personnalisées.
 2. [Viser le consensus, puis dire go](./02-consensus-puis-go.md). Ma façon de travailler.
 3. [Nommer un mode, puis la tâche](./03-modes.md). Comment une demande trouve son playbook.
-4. [Réfléchir avant de décider](./04-reflechir.md). `grilling`, `research`, `sparring` et `think`.
+4. [Réfléchir avant de décider](./04-reflechir.md). `brainstorm`, `grilling`, `research`, `sparring` et `think`.
 5. [Écrire et réviser](./05-ecrire.md). `unslop`, `write-with-clarity`, `storytelling`, `concise` et `2nd-pass`.
 6. [Faire du marketing avec `corey-mode`](./06-marketing.md). 50 playbooks, à commencer par ton contexte produit.
 7. [Produire un document à montrer](./07-montrer.md). Résumés, présentations et schémas avec `html-mode`.

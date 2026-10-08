@@ -1,6 +1,14 @@
 # Réfléchir avant de décider
 
-`consensus` aligne l'agent sur une tâche à exécuter. Ces quatre outils servent l'autre cas : éprouver une idée ou une décision avant de t'engager.
+`consensus` aligne l'agent sur une tâche à exécuter. Ces cinq outils servent l'autre cas : vider ta tête, puis éprouver une idée ou une décision avant de t'engager.
+
+## Dépose tes idées avec `brainstorm`
+
+```text
+brainstorm
+```
+
+Envoie ensuite tes idées en vrac, un message à la fois. L'agent écoute et répond "ok", sans analyser ni proposer. Quand tout est déposé, demande la suite, comme un `consensus` sur ce que tu viens d'écrire.
 
 ## Mets un plan à l'épreuve avec `grilling`
 

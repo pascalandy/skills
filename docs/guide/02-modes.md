@@ -64,7 +64,7 @@ The agent reads the list and names the route, here `emails`. Then you ask for th
 
 ## Call a skill without a mode
 
-Some skills stand alone: `consensus`, `grilling`, `research`, `unslop`, `concise`, and `2nd-pass`. Name the skill in your request:
+Some skills stand alone: `consensus`, `brainstorm`, `grilling`, `research`, `unslop`, `concise`, and `2nd-pass`. Name the skill in your request:
 
 ```text
 grill me on my plan to open a second location next spring
