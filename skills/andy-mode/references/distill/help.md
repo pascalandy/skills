@@ -14,7 +14,7 @@ distill.py --version
 
 ## Description
 
-`distill` reads a local text file, resolves a prompt name from the `distill-prompt` route, runs it against your chosen LLM provider, and writes the result to a timestamped output folder.
+`distill` reads a local text file, resolves a prompt name from the `distill-prompt` route, runs it against your chosen LLM provider, writes the result to a timestamped output folder, and answers in one JSON line with the path of the distilled file.
 
 This v1 scope is file-only. `distill` remains a meta-skill so URL and media flows can be added later without changing its name.
 
@@ -72,18 +72,21 @@ Do not open the output folder in Finder when done (macOS only).
 ### Discovery
 
 **`--list-prompts`**
-List every prompt available in the distill-prompt library and exit.
+Answer every prompt in the distill-prompt library under `prompts`, such as `{"ok":true,"prompts":["extract_wisdom",…]}`.
 
 **`--list-models`**
-List supported models and exit. Combine with `--provider` to filter.
+Answer the supported models under `models`, by provider, each provider's default first, such as `{"ok":true,"models":{"codex":["gpt-5.4"]}}`. Combine with `--provider` to filter.
 
 ### Behavior
 
 **`--dry-run`**
-Resolve all inputs, check dependencies, and print the plan without calling the LLM or writing files.
+Resolve all inputs and check dependencies without calling the LLM or writing files. Answers the plan: the `file` a run would write, `prompt`, `prompt_file`, `provider`, `model`, `effort`, and `input_tokens`.
 
-**`-q, --quiet`**
-Suppress progress output. Only errors and the final output path are printed.
+**`-v, --verbose`**
+Print progress, retries, and the run's duration on stderr.
+
+**`--debug`**
+Print internals and tracebacks on stderr; also `DISTILL_DEBUG=1`.
 
 **`-h, --help`**
 Show this help message and exit.
@@ -105,6 +108,31 @@ Show program version and exit.
 | Run folder name | `{slug}_{timestamp}_{prompt}/` |
 | Timestamp format | `YYYY-MM-DD_HH-MM-SS` |
 | Open in Finder when done | yes (macOS only) |
+
+## Answer
+
+Every run answers in one JSON line. A success prints it on stdout, with the path of the distilled file:
+
+```json
+{"ok":true,"file":"/Users/me/Documents/article_2026-04-06_14-32-08_follow_along_note/article_follow_along_note.md"}
+```
+
+A failure leaves stdout empty and ends stderr with `{"ok":false,"errors":["…"]}`; a usage error adds `"help":"distill.py --help"`.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | success |
+| `1` | failure |
+| `2` | bad usage, such as an unknown model or `--effort` with OpenCode |
+| `3` | input file missing or unreadable |
+| `4` | unknown prompt stem |
+| `5` | provider CLI not on PATH |
+| `6` | LLM call failed, or the input is too large |
+| `7` | output folder not writable |
+| `130` | interrupted (SIGINT) |
+| `143` | terminated (SIGTERM) |
 
 ## Output
 

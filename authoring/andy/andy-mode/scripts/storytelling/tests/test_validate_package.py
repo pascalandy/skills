@@ -1,9 +1,11 @@
 """Exercise package links and agent invocation through the validator CLI."""
 
+import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 VALIDATOR = Path(__file__).resolve().parent.parent / "validate-package.py"
 
@@ -15,6 +17,12 @@ def run_validator(package: Path, *options: str) -> subprocess.CompletedProcess[s
         text=True,
         check=False,
     )
+
+
+def answer(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    """The one JSON line the validator answers with: stdout, or stderr's last line."""
+    stream = result.stderr if result.returncode else result.stdout
+    return json.loads(stream.splitlines()[-1])
 
 
 def make_package(
@@ -49,11 +57,11 @@ class PackageLinksTest(unittest.TestCase):
             cases = (
                 ("[Profile](profile.md#rules)", 0),
                 ("[Source](https://example.com/source)", 0),
-                ("[Profile](missing.md)", 2),
-                ("[Profile](profile.md#missing)", 2),
-                ("[Profile](../outside.md)", 2),
-                ("[Profile](file:///outside/profile.md)", 2),
-                ("[Profile](skill://outside/profile)", 2),
+                ("[Profile](missing.md)", 1),
+                ("[Profile](profile.md#missing)", 1),
+                ("[Profile](../outside.md)", 1),
+                ("[Profile](file:///outside/profile.md)", 1),
+                ("[Profile](skill://outside/profile)", 1),
             )
             for link, expected_status in cases:
                 with self.subTest(link=link):
@@ -70,17 +78,38 @@ class PackageLinksTest(unittest.TestCase):
                         result.stdout + result.stderr,
                     )
                     if expected_status:
-                        self.assertIn("FAIL", result.stderr)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn(
+                            link[link.index("(") + 1 : -1], answer(result)["errors"][0]
+                        )
                     else:
-                        self.assertIn("PASS sample-style", result.stdout)
+                        self.assertEqual(result.stdout, '{"ok":true}\n')
+
+    def test_usage_error_answers_with_help(self) -> None:
+        result = subprocess.run(
+            ["uv", "run", str(VALIDATOR)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(
+            answer(result),
+            {
+                "ok": False,
+                "errors": ["the following arguments are required: package"],
+                "help": "validate-package.py --help",
+            },
+        )
 
 
 class AgentInvocationTest(unittest.TestCase):
     def test_rejects_disabled_invocation(self) -> None:
         cases = (
             ("", None, 0),
-            ("disable-model-invocation: true\n", None, 2),
-            ("", "policy:\n  allow_implicit_invocation: false\n", 2),
+            ("disable-model-invocation: true\n", None, 1),
+            ("", "policy:\n  allow_implicit_invocation: false\n", 1),
         )
         for frontmatter, policy, expected_status in cases:
             with (
@@ -95,7 +124,11 @@ class AgentInvocationTest(unittest.TestCase):
                 result = run_validator(package)
                 self.assertEqual(result.returncode, expected_status, result.stderr)
                 if expected_status:
-                    self.assertIn("agent invocation must stay enabled", result.stderr)
+                    self.assertEqual(answer(result)["ok"], False)
+                    self.assertIn(
+                        "agent invocation must stay enabled",
+                        answer(result)["errors"][0],
+                    )
 
 
 if __name__ == "__main__":
