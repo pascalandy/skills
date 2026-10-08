@@ -1,5 +1,6 @@
 """Exercise chat activity detection against a real temporary Git worktree."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -59,26 +60,56 @@ class WorktreeAuditTests(unittest.TestCase):
                     env={**os.environ, "GH_HOST": "invalid.example", "GH_TOKEN": ""},
                     timeout=15,
                 )
-                return dict(
-                    zip(
-                        result.stdout.splitlines()[0].split("\t"),
-                        result.stdout.splitlines()[1].split("\t"),
-                    )
-                )
+                self.assertEqual(result.stderr, "")
+                answer = json.loads(result.stdout)
+                self.assertIs(answer["ok"], True)
+                [row] = answer["worktrees"]
+                self.assertEqual(row["worktree"], str(worktree))
+                return row
 
             before = audit()
             self.assertEqual(
-                before["LAST_CHAT"], time.strftime("%Y-%m-%d", time.localtime(old_time))
+                before["lastChat"], time.strftime("%Y-%m-%d", time.localtime(old_time))
             )
-            self.assertEqual(before["BUCKET"], "safe")
+            self.assertIs(before["merged"], True)
+            self.assertEqual(before["bucket"], "safe")
             recent = chats / "new chat with spaces.jsonl"
             recent.write_text(f'{{"file":"{worktree}/file.txt"}}\n')
             after = audit()
             self.assertEqual(
-                after["LAST_CHAT"],
+                after["lastChat"],
                 time.strftime("%Y-%m-%d", time.localtime(recent.stat().st_mtime)),
             )
-            self.assertEqual(after["BUCKET"], "verify-recent-chat")
+            self.assertEqual(after["bucket"], "verify-recent-chat")
+            (worktree / "draft.txt").write_text("draft\n")
+            subprocess.run(["git", "-C", str(worktree), "add", "draft.txt"], check=True)
+            self.assertEqual(audit()["bucket"], "hold-wip")
+
+    def test_failures_answer_on_stderr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cases = [
+                (["--typo"], 2, "worktree-audit.sh --help"),
+                ([directory], 1, None),
+            ]
+            for args, code, hint in cases:
+                result = subprocess.run(
+                    ["bash", str(SCRIPT), *args],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "GIT_CEILING_DIRECTORIES": str(Path(directory).parent),
+                    },
+                    cwd=directory,
+                    timeout=15,
+                )
+                self.assertEqual(result.returncode, code)
+                self.assertEqual(result.stdout, "")
+                answer = json.loads(result.stderr.splitlines()[-1])
+                self.assertIs(answer["ok"], False)
+                self.assertEqual(len(answer["errors"]), 1)
+                self.assertEqual(answer.get("help"), hint)
 
 
 if __name__ == "__main__":

@@ -59,7 +59,6 @@ const ready = {
   mode: "single",
   kind: "READY",
   terminal: true,
-  exitCode: 0,
   scope: { kind: "single", pr: readyPr },
 } satisfies ReadyVerdict;
 
@@ -80,9 +79,6 @@ const refusalIsNotAllowed: GitHubMergeAllowed = refused;
 // @ts-expect-error CI cannot be clean while GitHub refuses the merge.
 const refusalIsNotClean: CiClean = { ...cleanCi, github: refused };
 
-// @ts-expect-error READY cannot carry the failing-checks exit code.
-const readyWithBlockerExit: ReadyVerdict = { ...ready, exitCode: 4 };
-
 const unprovenPr = { kind: "ready-pr", context } as const;
 
 // @ts-expect-error An open READY row must carry positive readiness proof.
@@ -90,5 +86,4 @@ const readyWithoutProof: ReadyPr = unprovenPr;
 
 void refusalIsNotAllowed;
 void refusalIsNotClean;
-void readyWithBlockerExit;
 void readyWithoutProof;

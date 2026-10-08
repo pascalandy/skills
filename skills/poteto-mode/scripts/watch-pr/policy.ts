@@ -303,20 +303,7 @@ function blockerVerdict(
   stamp: VerdictStamp,
   blocker: T.MergeBlocker
 ): T.BlockerVerdict {
-  switch (blocker.kind) {
-    case "merge-conflicts":
-      return stamp({ kind: "BLOCKER", terminal: true, exitCode: 2, blocker });
-    case "review-threads":
-      return stamp({ kind: "BLOCKER", terminal: true, exitCode: 3, blocker });
-    case "failing-checks":
-      return stamp({ kind: "BLOCKER", terminal: true, exitCode: 4, blocker });
-    case "merge-gate":
-      return stamp({ kind: "BLOCKER", terminal: true, exitCode: 6, blocker });
-    default: {
-      const exhaustive: never = blocker;
-      return exhaustive;
-    }
-  }
+  return stamp({ kind: "BLOCKER", terminal: true, blocker });
 }
 export function statusQueryVerdict(
   stamp: VerdictStamp,
@@ -326,7 +313,6 @@ export function statusQueryVerdict(
   return stamp({
     kind: "BLOCKER",
     terminal: true,
-    exitCode: 7,
     blocker: { kind: "status-query", failures, failure },
   });
 }
@@ -388,7 +374,6 @@ async function pollUntilTerminal<V>(args: {
         return args.stamp({
           kind: "TIMEOUT",
           terminal: true,
-          exitCode: 5,
           reason: { kind: "status-unavailable", failure: error.failure },
         });
       await args.dependencies.clock.sleep(retryInSeconds);
@@ -432,7 +417,6 @@ export async function runSimple(args: {
         verdict: stamp({
           kind: "STATUS",
           terminal: true,
-          exitCode: 0,
           reason: "status-only",
           rows: complete,
         }),
@@ -462,7 +446,6 @@ export async function runSimple(args: {
           {
             kind: "READY",
             terminal: true,
-            exitCode: 0,
             scope: { kind: "single", pr: decision.pr },
           },
           args.mode
@@ -475,7 +458,6 @@ export async function runSimple(args: {
           {
             kind: "READY",
             terminal: true,
-            exitCode: 0,
             scope: { kind: "stack", prs: decision.prs },
           },
           args.mode
@@ -496,7 +478,6 @@ export async function runSimple(args: {
         stamp({
           kind: "TIMEOUT",
           terminal: true,
-          exitCode: 5,
           reason: { kind: "pending-checks", pending: decision.pending },
         }),
     };
@@ -731,7 +712,6 @@ export async function runQueued(args: {
         verdict: stamp({
           kind: "COMPLETE",
           terminal: true,
-          exitCode: 0,
           queue: state.queue,
           merged: complete.merged,
         }),
@@ -777,7 +757,6 @@ export async function runQueued(args: {
           verdict: stamp({
             kind: "COMPLETE",
             terminal: true,
-            exitCode: 0,
             queue: state.queue,
             merged: evaluation.merged,
           }),
@@ -804,7 +783,6 @@ export async function runQueued(args: {
           verdict: stamp({
             kind: "TIMEOUT",
             terminal: true,
-            exitCode: 5,
             reason: {
               kind: "queued-stack",
               frontier: evaluation.frontier,

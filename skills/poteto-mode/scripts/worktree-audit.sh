@@ -1,40 +1,92 @@
 #!/usr/bin/env bash
 # Read-only worktree prune audit. Classifies every git worktree by size, merge
 # state, uncommitted work, remote/PR state, and the most recent chat that
-# operated in it. Emits a table sorted by size with a suggested bucket. Never
-# deletes anything; deletion stays a human-gated step in the playbook.
-#
-# Usage: worktree-audit.sh [repo-path] [transcripts-dir]
-# Repo defaults to the current repo. The optional transcript directory must
-# contain only this workspace's history; PSTACK_TRANSCRIPTS_DIR is the fallback.
-# Missing history leaves activity unknown and requires review.
+# operated in it, with a suggested bucket. Never deletes anything; deletion
+# stays a human-gated step in the playbook.
 set -u
 
-repo="${1:-$(git rev-parse --show-toplevel 2>/dev/null)}"
-[ -z "$repo" ] && {
-	echo "not in a git repo; pass a repo path" >&2
-	exit 1
+usage() {
+	cat <<'HELP'
+Usage: worktree-audit.sh [-v] [repo-path] [transcripts-dir]
+
+Answers {"ok":true,"worktrees":[...]} on stdout, largest first, or
+{"ok":false,"errors":[...]} as the last line of stderr. Repo defaults to the
+current repo. The optional transcript directory must contain only this
+workspace's history; PSTACK_TRANSCRIPTS_DIR is the fallback. Missing history
+leaves activity unknown and requires review. Needs git and jq; gh and rg add
+PR state and chat activity when present.
+
+Options:
+  -v, --verbose  report a failed fetch of origin/main on stderr
+  -h, --help     show this help
+
+Exit codes: 0 success; 1 failure; 2 usage error; 130 interrupted; 143 terminated
+HELP
 }
-cd "$repo" || exit 1
+
+# One compact JSON line on stderr, then exit with the given code.
+# Quotes, backslashes, and control characters are escaped for JSON
+fail() {
+	local text=$2 out='' char i
+	for ((i = 0; i < ${#text}; i++)); do
+		char=${text:i:1}
+		case $char in
+		\" | \\) out+=\\$char ;;
+		[[:cntrl:]])
+			printf -v char '\\u%04x' "'$char"
+			out+=$char
+			;;
+		*) out+=$char ;;
+		esac
+	done
+	printf '{"ok":false,"errors":["%s"]%s}\n' "$out" "${3:-}" >&2
+	exit "$1"
+}
+
+prs=""
+trap 'rm -f "$prs"; fail 130 interrupted' INT
+trap 'rm -f "$prs"; fail 143 terminated' TERM
+
+verbose=0
+args=()
+for arg in "$@"; do
+	case "$arg" in
+	-h | --help) usage && exit 0 ;;
+	esac
+done
+for arg in "$@"; do
+	case "$arg" in
+	-v | --verbose) verbose=1 ;;
+	-*) fail 2 "unknown option $arg" ',"help":"worktree-audit.sh --help"' ;;
+	*) args+=("$arg") ;;
+	esac
+done
+[ "${#args[@]}" -le 2 ] || fail 2 "expected at most a repo path and a transcripts dir" ',"help":"worktree-audit.sh --help"'
+command -v jq >/dev/null || fail 1 "jq not found; install jq, then rerun worktree-audit.sh"
+
+repo="${args[0]:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+[ -n "$repo" ] || fail 1 "not in a git repo; run worktree-audit.sh <repo-path>"
+if ! { cd "$repo" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1; }; then
+	fail 1 "$repo is not a git repository; run worktree-audit.sh <repo-path>"
+fi
 
 # Main worktree is the first entry; everything else is a candidate.
 main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 
 # origin/main drives the merge check. Best-effort; stale is fine for a first pass.
-git fetch origin main --quiet 2>/dev/null || echo "warn: could not fetch origin/main; merged column may be stale" >&2
+git fetch origin main --quiet 2>/dev/null || [ "$verbose" = 0 ] ||
+	echo "could not fetch origin/main; merged may be stale" >&2
 
 # PR state by branch, fetched once. Empty if gh is unavailable.
 prs=$(mktemp)
 gh pr list --author "@me" --state all --limit 1000 \
 	--json number,state,baseRefName,headRefName,headRefOid 2>/dev/null >"$prs" || echo "[]" >"$prs"
 
-transcripts="${2:-${PSTACK_TRANSCRIPTS_DIR:-}}"
+transcripts="${args[1]:-${PSTACK_TRANSCRIPTS_DIR:-}}"
 now=$(date +%s)
 platform=$(uname -s)
 
-printf "SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
-
-git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
+rows=$(git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
 	[ "$wt" = "$main_wt" ] && continue
 
 	size=$(du -sh "$wt" 2>/dev/null | awk '{print $1}')
@@ -94,22 +146,26 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 		recent=$([ $(((now - last_ts) / 86400)) -le 4 ] && echo yes || echo no)
 	fi
 
-	case "$dirty" in wip:*) bucket=hold-wip ;; *)
-		case "$pr" in *OPEN*) bucket=hold-open-pr ;; *)
-			if [ "$recent" = yes ]; then
-				bucket=verify-recent-chat
-			elif [ "$recent" = unknown ]; then
-				bucket=review
-			elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then
-				bucket=safe
-			else bucket=review; fi
-			;;
-		esac
-		;;
-	esac
+	# No case here: inside $(...), macOS's Bash 3.2 parses a case pattern only
+	# with its opening parenthesis, which shfmt removes
+	if [ "${dirty#wip:}" != "$dirty" ]; then
+		bucket=hold-wip
+	elif [ "${pr#*OPEN}" != "$pr" ]; then
+		bucket=hold-open-pr
+	elif [ "$recent" = yes ]; then
+		bucket=verify-recent-chat
+	elif [ "$recent" = unknown ]; then
+		bucket=review
+	elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then
+		bucket=safe
+	else
+		bucket=review
+	fi
 
 	printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
 		"$size" "$age" "$merged" "$dirty" "$remote" "$pr" "$last" "$bucket" "$wt"
-done | sort -t$'\t' -k1,1 -rh
+done | sort -t$'\t' -k1,1 -rh)
 
 rm -f "$prs"
+printf '%s' "$rows" | jq -R -s -c '{ok: true, worktrees: [split("\n")[] | select(. != "") | split("\t") |
+	{size: .[0], age: .[1], merged: (.[2] == "YES"), dirty: .[3], remote: .[4], pr: .[5], lastChat: .[6], bucket: .[7], worktree: .[8]}]}'

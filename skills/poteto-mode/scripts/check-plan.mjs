@@ -28,13 +28,68 @@ const HOW_TO_READ_MARKERS = [
 const PERF_ITEMS = ["Metric.", "Probe.", "Baseline.", "Rule."];
 const BOX = /^\s*- \[[ x]\] (.*)$/;
 
-const file = process.argv[2];
-if (!file) {
-	console.error("Usage: node check-plan.mjs <plan.md>");
-	process.exit(2);
+const HELP = `Usage: node check-plan.mjs [-v] <plan.md>
+
+Check a plan against the skeleton in poteto-mode's playbooks/multi-phase-plan.md.
+Answers {"ok":true} on stdout, or {"ok":false,"errors":[...]} as the last line
+of stderr, one error per plan line to fix.
+
+Options:
+  -v, --verbose  print each PR section's box counts on stderr
+  -h, --help     show this help
+
+Exit codes: 0 clean plan; 1 a line to fix, or an unreadable plan; 2 usage error;
+130 interrupted; 143 terminated`;
+
+// One compact JSON line: a success on stdout, a failure as the last
+// line of stderr with stdout empty
+function answer(code, fields = {}) {
+	// U+2028 and U+2029 stay escaped, so a line reader keeps the answer whole
+	const json = JSON.stringify({ ok: code === 0, ...fields }).replace(
+		/[\u2028\u2029]/g,
+		(char) => `\\u${char.charCodeAt(0).toString(16)}`,
+	);
+	const line = Buffer.from(`${json}\n`);
+	// Written in full before exit, since process.exit drops a pipe's pending output
+	let offset = 0;
+	while (offset < line.length) {
+		try {
+			offset += fs.writeSync(code === 0 ? 1 : 2, line, offset);
+		} catch (error) {
+			if (error.code !== "EAGAIN") throw error;
+			// The reader is behind; wait a millisecond rather than spin
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
+		}
+	}
+	process.exit(code);
 }
 
-const raw = fs.readFileSync(file, "utf8").split(/\r?\n/);
+for (const [signal, code, word] of [
+	["SIGINT", 130, "interrupted"],
+	["SIGTERM", 143, "terminated"],
+]) {
+	process.on(signal, () => answer(code, { errors: [word] }));
+}
+
+const args = process.argv.slice(2);
+if (args.includes("-h") || args.includes("--help")) {
+	console.log(HELP);
+	process.exit(0);
+}
+const verbose = args.some((arg) => arg === "-v" || arg === "--verbose");
+const paths = args.filter((arg) => arg !== "-v" && arg !== "--verbose");
+const usage = (message) => answer(2, { errors: [message], help: "check-plan.mjs --help" });
+const unknown = paths.find((arg) => arg.startsWith("-"));
+if (unknown) usage(`unknown option ${unknown}`);
+if (paths.length !== 1) usage(paths.length ? `expected one plan path, got ${paths.length}` : "missing the plan path");
+const file = paths[0];
+
+let raw;
+try {
+	raw = fs.readFileSync(file, "utf8").split(/\r?\n/);
+} catch (error) {
+	answer(1, { errors: [`cannot read ${file}: ${error.message}`] });
+}
 const problems = [];
 const fail = (line, message) => problems.push(`${file}:${line}: ${message}`);
 
@@ -180,7 +235,8 @@ if (closeIndex !== -1) {
 	if (!tail.some((s) => s.title.includes("Prototype evidence"))) fail(close.n, 'no "## Appendix ... Prototype evidence" section');
 }
 
-for (const line of report) console.log(line);
-console.log(`${prSections.length} PR sections, ${problems.length} problems`);
-for (const p of problems) console.error(p);
-process.exit(problems.length ? 1 : 0);
+if (verbose) {
+	for (const line of report) console.error(line);
+	console.error(`${prSections.length} PR sections, ${problems.length} problems`);
+}
+answer(problems.length ? 1 : 0, problems.length ? { errors: problems } : {});

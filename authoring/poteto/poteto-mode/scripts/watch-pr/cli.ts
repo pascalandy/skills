@@ -5,6 +5,7 @@ import {
   InvalidArgumentError,
   Option,
 } from "commander";
+import { answer, oneLine, processIo } from "../answer.ts";
 import {
   GhGitHubReader,
   WatcherQueryError,
@@ -18,7 +19,6 @@ import {
   verdictFactory,
   type WatchClock,
 } from "./policy.ts";
-import { renderJson, renderPretty } from "./render.ts";
 import type * as T from "./types.ts";
 import { nonEmpty, parsePrNumber } from "./types.ts";
 export interface CliOptions {
@@ -28,7 +28,6 @@ export interface CliOptions {
   readonly mode: T.WatchMode;
   readonly stackPrs: readonly T.PrNumber[];
   readonly statusOnly: boolean;
-  readonly pretty: boolean;
   readonly polling: T.PollingOptions;
 }
 function positiveNumber(value: string): number {
@@ -77,7 +76,6 @@ interface RawOptions {
   readonly maxQueryErrors: number;
   readonly statusOnly: boolean;
   readonly allowDraft: boolean;
-  readonly pretty: boolean;
 }
 export function parseArgs(
   argv: readonly string[],
@@ -85,9 +83,17 @@ export function parseArgs(
 ): CliOptions {
   const program = new Command("watch-pr")
     .description(
-      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text."
+      'Watch one pull request, a connected stack, or an immutable queued stack.\nProgress verdicts go to stderr as one JSON line; the run ends with\n{"ok":true,"verdict":{...}} on stdout.'
     )
-    .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
+    .addHelpText(
+      "after",
+      "\nExit codes:\n  0    answered a verdict, a blocker or a timeout included\n  1    GitHub could not be read, or the watcher failed\n  2    usage error\n  130  interrupted\n  143  terminated"
+    )
+    .configureOutput({
+      writeOut: io.stdout,
+      writeErr: io.stderr,
+      outputError: () => {},
+    })
     .exitOverride()
     .option("--owner <owner>", "GitHub repository owner")
     .option("--repo <repo>", "GitHub repository name")
@@ -126,13 +132,12 @@ export function parseArgs(
       positiveInteger,
       5
     )
-    .option("--status-only", "print one status table and exit 0", false)
-    .option("--allow-draft", "do not treat a draft as a merge gate", false)
-    .option("--pretty", "render human text instead of JSON", false);
+    .option("--status-only", "read the status once and answer it", false)
+    .option("--allow-draft", "do not treat a draft as a merge gate", false);
   program.parse(argv, { from: "user" });
   const raw = program.opts<RawOptions>();
   if (raw.stackPrs !== undefined && !raw.queuedStack)
-    program.error("error: --stack-prs requires --queued-stack");
+    program.error("--stack-prs requires --queued-stack");
   return {
     owner: raw.owner ?? null,
     repo: raw.repo ?? null,
@@ -140,7 +145,6 @@ export function parseArgs(
     mode: raw.queuedStack ? "queued-stack" : raw.stack ? "stack" : "single",
     stackPrs: raw.stackPrs ?? [],
     statusOnly: raw.statusOnly,
-    pretty: raw.pretty,
     polling: {
       interval: raw.interval,
       sweepInterval: raw.sweepInterval,
@@ -166,24 +170,26 @@ function realRuntime(): CliRuntime {
         await delay(seconds * 1_000);
       },
     },
-    stdout: (value) => process.stdout.write(value),
-    stderr: (value) => process.stderr.write(value),
+    ...processIo,
   };
 }
-export async function main(
-  argv: readonly string[],
-  runtime: CliRuntime = realRuntime()
-): Promise<number> {
-  let options: CliOptions;
-  try {
-    options = parseArgs(argv, runtime);
-  } catch (error) {
-    if (!(error instanceof CommanderError)) throw error;
-    return error.exitCode === 0 ? 0 : 64;
-  }
-  const render = options.pretty ? renderPretty : renderJson;
+function failure(verdict: T.TerminalVerdict): string | null {
+  const retry = "check gh auth status and the PR number, then rerun watch-pr";
+  if (verdict.kind === "BLOCKER" && verdict.blocker.kind === "status-query")
+    return `GitHub status query failed (${verdict.blocker.failures} in a row): ${verdict.blocker.failure.detail}; ${retry}`;
+  if (
+    verdict.kind === "TIMEOUT" &&
+    verdict.reason.kind === "status-unavailable"
+  )
+    return `GitHub status stayed unavailable until --timeout: ${verdict.reason.failure.detail}; ${retry}`;
+  return null;
+}
+async function watch(
+  options: CliOptions,
+  runtime: CliRuntime
+): Promise<T.TerminalVerdict> {
   const emit = (verdict: T.ProgressVerdict): void =>
-    runtime.stdout(render(verdict));
+    runtime.stderr(`${oneLine(verdict)}\n`);
   let contexts: T.NonEmpty<T.PrContext>;
   try {
     const seed = await resolveContext({
@@ -199,25 +205,42 @@ export async function main(
         : await discoverStack(runtime.reader, seed));
   } catch (error) {
     if (!(error instanceof WatcherQueryError)) throw error;
-    const verdict = statusQueryVerdict(
+    return statusQueryVerdict(
       verdictFactory(runtime.clock, options.mode),
       1,
       error.failure
     );
-    runtime.stdout(render(verdict));
-    return verdict.exitCode;
   }
   const dependencies = { reader: runtime.reader, clock: runtime.clock, emit };
-  const verdict =
-    options.mode === "queued-stack" && !options.statusOnly
-      ? await runQueued({ dependencies, contexts, options: options.polling })
-      : await runSimple({
-          dependencies,
-          contexts,
-          mode: options.mode,
-          statusOnly: options.statusOnly,
-          options: options.polling,
-        });
-  runtime.stdout(render(verdict));
-  return verdict.exitCode;
+  return options.mode === "queued-stack" && !options.statusOnly
+    ? runQueued({ dependencies, contexts, options: options.polling })
+    : runSimple({
+        dependencies,
+        contexts,
+        mode: options.mode,
+        statusOnly: options.statusOnly,
+        options: options.polling,
+      });
+}
+export async function main(
+  argv: readonly string[],
+  runtime: CliRuntime = realRuntime()
+): Promise<number> {
+  try {
+    const verdict = await watch(parseArgs(argv, runtime), runtime);
+    const error = failure(verdict);
+    if (error !== null) return answer(runtime, 1, { errors: [error] });
+    return answer(runtime, 0, { verdict });
+  } catch (error) {
+    if (error instanceof CommanderError)
+      return error.exitCode === 0
+        ? 0
+        : answer(runtime, 2, {
+            errors: [error.message.replace(/^error: /, "")],
+            help: "watch-pr --help",
+          });
+    return answer(runtime, 1, {
+      errors: [error instanceof Error ? error.message : String(error)],
+    });
+  }
 }
