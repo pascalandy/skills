@@ -25,8 +25,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import changes_in, main_checkout, replay, run, run_git, run_script
+from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_script
+from _common import changes_in, main_checkout, replay, run, run_git
 from signoff import (
     ROOT,
     branch,

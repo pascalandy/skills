@@ -22,8 +22,9 @@ from _cli import (
     ScriptError,
     TemporaryError,
     exit_codes,
+    run_script,
 )
-from _common import run_script, stop
+from _common import stop
 
 
 def broken(_: argparse.Namespace) -> dict[str, Any]:

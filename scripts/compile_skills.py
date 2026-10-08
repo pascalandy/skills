@@ -19,17 +19,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from _cli import Parser, ScriptError, exit_codes
-from _common import (
-    FRONTMATTER,
-    KINDS,
-    UNKNOWN,
-    frontmatter_value,
-    kind_of,
-    run,
-    run_script,
-    swap,
-)
+from _cli import Parser, ScriptError, exit_codes, run_script
+from _common import FRONTMATTER, KINDS, UNKNOWN, frontmatter_value, kind_of, run, swap
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORING = ROOT / "authoring"

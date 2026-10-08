@@ -53,6 +53,7 @@ from _cli import (
     UsageError,
     duration,
     exit_codes,
+    run_script,
 )
 from _common import (
     GRACE,
@@ -63,7 +64,6 @@ from _common import (
     main_checkout,
     run,
     run_git,
-    run_script,
     send,
     stop,
 )

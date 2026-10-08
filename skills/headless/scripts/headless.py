@@ -12,12 +12,14 @@ use deterministic."""
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
 import json
+import logging
 import os
 import re
+import shlex
 import signal
 import sys
 import threading
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any, NoReturn, TextIO
 
@@ -116,6 +118,21 @@ class Parser(argparse.ArgumentParser):
         self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
 
 
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
 def given(
     argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
 ) -> bool:
@@ -212,11 +229,100 @@ def duration(text: str) -> float:
     return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
 
 
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print progress and step details on stderr",
+    )
+    if debug:
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+        )
+    if given(argv, "-h", "--help", parser=parser):
+        parser.print_help()
+        return 0
+
+    # Parser.error, in the pasted cli block, prints usage errors itself;
+    # raising sends this one through answer_failure()
+    parser.error = usage_error
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError):
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
 # <<< cli-block
 
 import hashlib
-import logging
-import shlex
 import shutil
 import subprocess
 import tempfile
