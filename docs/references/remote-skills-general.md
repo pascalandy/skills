@@ -96,13 +96,13 @@ A mode's routes run through that mode's SKILL.md.
 
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
 - `concise`: Use when the user requests to be more concise.
+- `consensus`: Use only when explicitly invoked as `consensus`
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.
 - `image-creator`: Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter.
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
 - `oem`: Load at the start of every session, before the first reply. Shared definitions and conventions for every task.
-- `plan`: Use only when explicitly invoked as `plan`.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `tavily`: Use only when explicitly invoked as `tavily`.
 - `transcript`: Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording.
