@@ -19,7 +19,7 @@ Preconditions:
 
 - Compile passed in this run
 
-- **Install and check.** Run the block. It prints `install: exit 0` and `install-check: exit 0`. `install.out` holds one `add` line per entry, and `install-check.out` is empty.
+- **Install and check.** Run the block. It prints `install: exit 0` and `install-check: exit 0`. `install.out` holds one answer whose `changes` list one `add` per entry, and `install-check.out` reads `{"ok":true}`.
 - **Compare with the checkout.** The same block prints `install-diff: exit 0`, and `install-diff.out` is empty. The installed Claude Code skills match `skills/` file for file, each command folder matches `commands/`, and Codex has one skill per command.
 
 ```bash

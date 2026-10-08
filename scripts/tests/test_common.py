@@ -119,7 +119,7 @@ def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
     assert answered(busy) == (
         75,
         "",
-        '{"ok":false,"mode":"apply","errors":["the lock is held"],"retry":"just tool"}\n',
+        '{"ok":false,"errors":["the lock is held"],"mode":"apply","retry":"just tool"}\n',
     )
     assert answered(broken) == (
         1,
@@ -234,3 +234,46 @@ def test_a_group_signal_to_a_child_that_already_exited_is_a_no_op() -> None:
     _common.send(process, signal.SIGTERM, group=True)
 
     assert process.wait(timeout=5) == 0
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        [
+            "a login profile line",
+            '{"ok":true,"changes":[["pull","_skills_private","a..b"]]}',
+            '{"ok":true,"changes":[["add","~/.claude/skills/alpha"]]}',
+        ],
+        [
+            "a login profile line",
+            "pull\t_skills_private\ta..b",
+            "add\t~/.claude/skills/alpha",
+        ],
+    ],
+    ids=["json-answers", "change-lines-from-before-490"],
+)
+def test_changes_in_reads_json_answers_and_older_change_lines(
+    lines: list[str],
+) -> None:
+    assert _common.changes_in(lines) == [
+        ["pull", "_skills_private", "a..b"],
+        ["add", "~/.claude/skills/alpha"],
+    ]
+
+
+def test_answer_in_finds_the_last_json_answer_among_other_lines() -> None:
+    lines = ['{"ok":true}', "warning: noise", '{"ok":false,"errors":["boom"]}', "x"]
+
+    assert _common.answer_in(lines) == {"ok": False, "errors": ["boom"]}
+    assert _common.answer_in(["error: old text"]) is None
+
+
+def test_readers_take_an_answer_whatever_its_key_order() -> None:
+    lines = ['{"changes":[["update","~/.claude/skills/alpha"]],"ok":true}']
+
+    assert _common.answer_in(lines) == {
+        "changes": [["update", "~/.claude/skills/alpha"]],
+        "ok": True,
+    }
+    assert _common.changes_in(lines) == [["update", "~/.claude/skills/alpha"]]
+    assert _common.answer_in(['{"changes":[]}', "[1]"]) is None

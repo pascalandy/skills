@@ -11,6 +11,7 @@ import argparse
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from _cli import Parser, ScriptError, exit_codes
 from _common import (
@@ -45,9 +46,11 @@ a description in its frontmatter; the list keeps its first sentence.
 A skill whose frontmatter sets role: "helper" lists under helpers. Modes
 cannot set a role.
 
-A run prints one line per page it changes: add or update, then a tab and the
-page's path. A dry run prints the same lines and changes nothing; a run with
-nothing to change prints nothing.
+A run answers {"ok":true,"changes":[...]}, one [action, path] per page it
+changes, such as ["update","docs/references/remote-skills.md"], and
+{"ok":true} when nothing changes. A dry run answers the same and changes
+nothing; --check fails when a page is stale, with the changes beside the
+error.
 
 pages:
   docs/references/remote-skills.md          every skill, one section per kind
@@ -195,23 +198,23 @@ def render() -> dict[Path, str]:
     return pages
 
 
-def work(args: argparse.Namespace) -> str:
-    lines: list[str] = []
+def work(args: argparse.Namespace) -> dict[str, Any]:
+    lines: list[list[str]] = []
     for path, text in render().items():
         current = path.read_text(encoding="utf-8") if path.is_file() else None
         if current == text:
             continue
         lines.append(
-            f"{'add' if current is None else 'update'}\t{path.relative_to(ROOT)}"
+            ["add" if current is None else "update", path.relative_to(ROOT).as_posix()]
         )
         if not (args.check or args.dry_run):
             path.write_text(text, encoding="utf-8")
     if args.check and lines:
         raise ScriptError(
             "the skill lists differ from skills/; run: just remote-skills",
-            detail="\n".join(lines),
+            report={"changes": lines},
         )
-    return "\n".join(lines)
+    return {"changes": lines} if lines else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -233,9 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check",
         action="store_true",
-        help="dry run that exits 1 when a list differs, printing the changes on stderr",
+        help="dry run that exits 1 when a list differs, listing the changes beside the error",
     )
-    return run_script(parser, work, argv)
+    return run_script(parser, work, argv, json_answer=True)
 
 
 if __name__ == "__main__":

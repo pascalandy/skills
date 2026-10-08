@@ -14,7 +14,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Literal, NoReturn
@@ -242,6 +242,48 @@ def answer(code: int, fields: Mapping[str, Any]) -> int:
     return code
 
 
+# What a script older than #490 printed for each change: an action, a tab, and
+# its object. A machine mid-deploy may still run one; #492 stops reading it
+CHANGE_LINE = re.compile(r"(clone|commit|pull|push|add|update|remove|synced|ready)\t")
+
+
+def parsed_answer(line: str) -> dict[str, Any] | None:
+    """The JSON answer a line holds, whatever its key order, or None."""
+    if line.startswith("{"):
+        with suppress(ValueError):
+            found = json.loads(line)
+            if isinstance(found, dict) and isinstance(found.get("ok"), bool):
+                return found
+    return None
+
+
+def answer_in(lines: Iterable[str]) -> dict[str, Any] | None:
+    """The last JSON answer among a child's output lines, such as {"ok":true}."""
+    for line in reversed(list(lines)):
+        if (found := parsed_answer(line)) is not None:
+            return found
+    return None
+
+
+def changes_in(lines: Iterable[str]) -> list[list[str]]:
+    """The changes a child reports: the `changes` of each JSON answer it prints,
+    or each change line of a script older than #490."""
+    found: list[list[str]] = []
+    for line in lines:
+        if (answer := parsed_answer(line)) is not None:
+            found += answer.get("changes", [])
+        elif CHANGE_LINE.match(line):
+            found.append(line.split("\t"))
+    return found
+
+
+def replay(output: str) -> None:
+    """Forward a child's output to stderr with its last line ended, so the
+    answer printed after it stays a line of its own."""
+    if output:
+        sys.stderr.write(output if output.endswith("\n") else f"{output}\n")
+
+
 def usage_error(message: str) -> NoReturn:
     raise UsageError(message)
 
@@ -361,7 +403,7 @@ def report(
         hints["retry"] = command
     elif rerun:
         hints["rerun"] = f"{command} --debug"
-    failure = {**error.report, "errors": messages, **hints}
+    failure = {"errors": messages, **error.report, **hints}
     if form == "json":
         print(json.dumps(failure, indent=2), file=sys.stderr)
         return error.code

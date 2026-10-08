@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import io
+import json
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import pytest
 import remote_skills
 
+OK = '{"ok":true}\n'
 MAIN = "docs/references/remote-skills.md"
 GENERAL = "docs/references/remote-skills-general.md"
 DEV = "docs/references/remote-skills-dev.md"
@@ -59,6 +61,17 @@ def run(*argv: str) -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
+def changed(*changes: list[str]) -> str:
+    return (
+        json.dumps({"ok": True, "changes": list(changes)}, separators=(",", ":")) + "\n"
+    )
+
+
+def failed(error: str, **fields: object) -> str:
+    answer = {"ok": False, "errors": [error], **fields}
+    return json.dumps(answer, separators=(",", ":")) + "\n"
+
+
 def listing(root: Path, path: str) -> str:
     """A page from its URL line on, below the generated header."""
     page = (root / path).read_text(encoding="utf-8")
@@ -71,7 +84,7 @@ def test_run_writes_each_kind_to_its_section_and_its_own_page(root: Path) -> Non
     skill(root, "code", tagged("code", "Use for code.", "dev"))
     skill(root, "fresh", '---\nname: "fresh"\ndescription: "Use for new."\n---\n')
     skill(root, "typo", tagged("typo", "Use for typos.", "Dev"))
-    written = f"add\t{MAIN}\nadd\t{GENERAL}\nadd\t{DEV}\n"
+    written = changed(["add", MAIN], ["add", GENERAL], ["add", DEV])
 
     assert run("--dry-run") == (0, written, "")
     assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))
@@ -98,7 +111,7 @@ def test_run_writes_each_kind_to_its_section_and_its_own_page(root: Path) -> Non
         f"{URL}## Skills\n\n- `alpha`: Use for a | b.\n- `zeta`: Use for z.\n"
     )
     assert listing(root, DEV) == f"{URL}## Skills\n\n- `code`: Use for code.\n"
-    assert run() == (0, "", "")
+    assert run() == (0, OK, "")
 
 
 def test_each_kind_lists_modes_with_their_routes_then_skills_then_helpers(
@@ -178,9 +191,9 @@ def test_a_route_that_breaks_a_listing_rule_fails_before_writing(
     assert run() == (
         1,
         "",
-        (
-            f"error: skills/draw-mode/playbooks/{entry} {problem}; "
-            "fix its source in authoring/, then run: just compile-skills\n"
+        failed(
+            f"skills/draw-mode/playbooks/{entry} {problem}; "
+            "fix its source in authoring/, then run: just compile-skills"
         ),
     )
     assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))
@@ -196,7 +209,7 @@ def test_classifying_the_last_unknown_skill_drops_the_unknown_section(
 
     skill(root, "fresh", tagged("fresh", "Use for new.", "general"))
 
-    assert run() == (0, f"update\t{MAIN}\nupdate\t{GENERAL}\n", "")
+    assert run() == (0, changed(["update", MAIN], ["update", GENERAL]), "")
     assert listing(root, MAIN) == (
         f"{URL}## General\n\n### Skills\n\n- `fresh`: Use for new.\n"
         "\n## Dev\n\n### Skills\n\n- `code`: Use for code.\n"
@@ -210,9 +223,9 @@ def test_check_reports_each_stale_list_and_leaves_them_alone(root: Path) -> None
     assert run("--check") == (
         1,
         "",
-        (
-            f"update\t{MAIN}\nadd\t{GENERAL}\nadd\t{DEV}\n"
-            "error: the skill lists differ from skills/; run: just remote-skills\n"
+        failed(
+            "the skill lists differ from skills/; run: just remote-skills",
+            changes=[["update", MAIN], ["add", GENERAL], ["add", DEV]],
         ),
     )
     assert (root / MAIN).read_text(encoding="utf-8") == "stale\n"
@@ -264,9 +277,9 @@ def test_a_skill_that_breaks_a_listing_rule_fails_before_writing(
     assert run() == (
         1,
         "",
-        (
-            f"error: skills/{name}/SKILL.md {problem}; "
-            "fix its source in authoring/, then run: just compile-skills\n"
+        failed(
+            f"skills/{name}/SKILL.md {problem}; "
+            "fix its source in authoring/, then run: just compile-skills"
         ),
     )
     assert not any((root / path).exists() for path in (MAIN, GENERAL, DEV))

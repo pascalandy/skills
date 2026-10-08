@@ -44,7 +44,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 5. It reads the PR back, then warns when the tip of `main` holds a tree the checks did not run on, as when another PR lands in the same seconds
 6. When the tip of `main` holds that tree, it runs `just deploy`, an alias of `just sync-fleet`, from the main checkout. The deploy runs the main checkout's code, so that checkout must hold a commit of `main`, with no changes under `scripts/` or the justfile. The deploy brings the fleet to `main` as it is when the deploy runs. A machine the deploy cannot reach waits for the next sync; the run warns and still exits 0, since the merge landed
 
-`just merge --dry-run` runs step 1 and prints what a run would do, without deploying. A rerun on a merged PR runs only the deploy. It never deletes the branch
+`just merge --dry-run` runs step 1 and answers what a run would do, without deploying. A rerun on a merged PR runs only the deploy. It never deletes the branch
 
 | Situation | Do |
 |---|---|

@@ -63,22 +63,38 @@ def run(
     return result
 
 
+OK = '{"ok":true}\n'
+
+
 def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
-    return json.loads(result.stdout)["actions"]
+    """The installer's changes, each as its kind, target, and name."""
+    return [
+        {
+            "kind": kind,
+            "target": path[2:].rsplit("/", 1)[0],
+            "name": path.rsplit("/", 1)[1],
+        }
+        for kind, path in json.loads(result.stdout).get("changes", [])
+    ]
+
+
+def failed(*errors: str, **fields: object) -> str:
+    answer = {"ok": False, "errors": list(errors), **fields}
+    return json.dumps(answer, separators=(",", ":")) + "\n"
 
 
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "alpha", "new")
-    preview = run(repo, home, "--dry-run", "--json")
+    preview = run(repo, home, "--dry-run")
     assert preview.returncode == 0
     assert {a["kind"] for a in report(preview)} == {"add"}
     assert not home.exists()
     assert (repo / "skills/alpha/SKILL.md").read_text(
         encoding="utf-8"
     ) == "# alpha\n\nold\n"
-    assert run(repo, home, "--check", "--json").returncode == 1
-    applied = run(repo, home, "--json")
+    assert run(repo, home, "--check").returncode == 1
+    applied = run(repo, home)
     assert applied.returncode == 0
     assert [(a["target"], a["name"], a["kind"]) for a in report(applied)] == [
         (a["target"], a["name"], a["kind"]) for a in report(preview)
@@ -89,7 +105,7 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
         for target in MAC
     )
     converged = run(repo, home, "--check")
-    assert (converged.returncode, converged.stdout, converged.stderr) == (0, "", "")
+    assert (converged.returncode, converged.stdout, converged.stderr) == (0, OK, "")
 
 
 # Applies like the CLI, but pauses after staging its sources until `resume`
@@ -168,7 +184,7 @@ def test_every_private_package_installs_and_replaces_a_public_namesake(
     root = repo / "_skills_private"
     private = skill(root / "knowledge", "secret", "private")
     skill(private / "references", "example")
-    applied = run(repo, home, "--json")
+    applied = run(repo, home)
     assert applied.returncode == 0, applied.stderr
     assert {a["name"] for a in report(applied)} == {"alpha", "secret"}
     assert all((home / target / "secret/SKILL.md").exists() for target in MAC)
@@ -208,7 +224,7 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
         ["git", "worktree", "add", "-q", str(worktree)], cwd=repo, check=True
     )
 
-    applied = run(worktree, home, "--json")
+    applied = run(worktree, home)
 
     assert applied.returncode == 0, applied.stderr
     assert {a["name"] for a in report(applied)} == {"alpha", "secret"}
@@ -277,15 +293,11 @@ def test_removes_only_published_names_and_overwrites_edits(
     edited = home / ".claude/skills/alpha/SKILL.md"
     edited.write_text("edited\n", encoding="utf-8")
     subprocess.run(["git", "rm", "-qr", "authoring/content/beta"], cwd=repo, check=True)
-    preview = report(run(repo, home, "--dry-run", "--json"))
+    preview = report(run(repo, home, "--dry-run"))
     assert [(a["target"], a["kind"]) for a in preview if a["name"] == "beta"] == [
         (target, "remove") for target in MAC
     ]
-    assert Counter(a["kind"] for a in preview) == {
-        "current": len(MAC) - 1,
-        "update": 1,
-        "remove": len(MAC),
-    }
+    assert Counter(a["kind"] for a in preview) == {"update": 1, "remove": len(MAC)}
     assert run(repo, home).returncode == 0
     assert not any((home / target / "beta").exists() for target in MAC)
     assert edited.read_text(encoding="utf-8") == "# alpha\n\nold\n"
@@ -500,17 +512,19 @@ def test_symlink_at_a_target_blocks_apply_and_a_preview_warns(
     preview = run(repo, home, "--dry-run")
 
     assert (blocked.returncode, blocked.stdout) == (1, "")
-    assert blocked.stderr == f"error: {conflict}\n"
+    assert blocked.stderr == failed(conflict)
     assert not (home / ".agents").exists()
     assert preview.returncode == 0
-    assert "add\t~/.agents/skills/alpha\n" in preview.stdout
+    assert {"kind": "add", "target": ".agents/skills", "name": "alpha"} in report(
+        preview
+    )
     assert preview.stderr == f"warning: {conflict}\n"
 
 
 def test_om1_exclusion_and_inactive_mac_target(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "apple-mail")
-    preview = run(repo, home, "--profile", "om1", "--dry-run", "--json")
+    preview = run(repo, home, "--profile", "om1", "--dry-run")
     assert preview.returncode == 0
     assert {a["name"] for a in report(preview)} == {"alpha"}
     assert run(repo, home, "--profile", "om1").returncode == 0
@@ -557,7 +571,7 @@ def test_commands_install_and_only_published_ones_are_removed(
     foreign = home / ".claude/commands/foreign.md"
     foreign.parent.mkdir(parents=True)
     foreign.write_text("keep\n", encoding="utf-8")
-    preview = report(run(repo, home, "--dry-run", "--json"))
+    preview = report(run(repo, home, "--dry-run"))
     assert [
         (a["target"], a["name"], a["kind"]) for a in preview if a["name"] != "alpha"
     ] == [(".codex/skills", "review", "add")] + [
@@ -608,11 +622,9 @@ def test_om1_codex_directory_holds_skills_beside_commands(
         "alpha",
         "review",
     ]
-    checked = run(repo, home, "--profile", "om1", "--check", "--json")
-    assert checked.returncode == 0
-    targets = {t["target"]: t for t in json.loads(checked.stdout)["targets"]}
-    assert targets[".codex/skills"]["expected"] == 2
-    assert targets[".codex/skills"]["current"] == 2
+    checked = run(repo, home, "--profile", "om1", "--check", "-v")
+    assert (checked.returncode, checked.stdout) == (0, OK)
+    assert "~/.codex/skills: 2 of 2 current\n" in checked.stderr
 
 
 def test_retired_command_targets_lose_only_published_commands(
@@ -627,9 +639,9 @@ def test_retired_command_targets_lose_only_published_commands(
         (home / target / "mine.md").write_text("keep\n", encoding="utf-8")
     applied = run(repo, home, "--profile", "om1")
     assert applied.returncode == 0
-    assert {f"remove\t~/{target}/review.md" for target in RETIRED} <= set(
-        applied.stdout.splitlines()
-    )
+    assert {("remove", target, "review.md") for target in RETIRED} <= {
+        (a["kind"], a["target"], a["name"]) for a in report(applied)
+    }
     for target in RETIRED:
         assert not (home / target / "review.md").exists()
         assert (home / target / "mine.md").read_text(encoding="utf-8") == "keep\n"
@@ -651,7 +663,7 @@ def test_retired_targets_reached_through_a_symlink_are_left_alone(
     (home / ".config/agents").mkdir(parents=True)
     (home / ".config/agents/commands").symlink_to(checkout)
     assert run(repo, home).returncode == 0
-    assert run(repo, home).stdout == ""
+    assert run(repo, home).stdout == OK
     assert (home / ".claude/commands/review.md").read_text(encoding="utf-8") == (
         "shared\n"
     )
@@ -690,9 +702,9 @@ def test_a_command_named_like_a_skill_stops_before_writing(
     command(repo, "alpha")
     result = run(repo, home)
     assert (result.returncode, result.stdout) == (1, "")
-    assert result.stderr == (
-        "error: command 'alpha' has the same name as a skill; rename "
-        "commands/alpha.md, then rerun: just install-skills\n"
+    assert result.stderr == failed(
+        "command 'alpha' has the same name as a skill; rename "
+        "commands/alpha.md, then rerun: just install-skills"
     )
     assert not home.exists()
 
@@ -710,17 +722,17 @@ def test_a_codex_directory_linked_to_a_skill_target_stops_before_writing(
     assert list((home / ".agents/skills").iterdir()) == []
 
 
-def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_target(
+def test_apply_and_preview_answer_each_change_and_check_counts_each_target(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "beta")
     command(repo, "hello")
     commit(repo)
-    lines = sorted(
-        [f"add\t~/{target}/{name}" for target in MAC for name in ("alpha", "beta")]
-        + [f"add\t~/{target}/hello.md" for target in COMMANDS]
-        + ["add\t~/.codex/skills/hello"]
+    changes = sorted(
+        [["add", f"~/{target}/{name}"] for target in MAC for name in ("alpha", "beta")]
+        + [["add", f"~/{target}/hello.md"] for target in COMMANDS]
+        + [["add", "~/.codex/skills/hello"]]
     )
 
     preview = run(repo, home, "-n")
@@ -728,35 +740,26 @@ def test_apply_and_preview_print_one_line_per_change_and_check_counts_each_targe
 
     assert (preview.returncode, preview.stderr) == (0, "")
     assert (applied.returncode, applied.stderr) == (0, "")
-    assert sorted(preview.stdout.splitlines()) == lines
+    assert sorted(json.loads(preview.stdout)["changes"]) == changes
     assert applied.stdout == preview.stdout
-    assert run(repo, home).stdout == ""
+    assert run(repo, home).stdout == OK
     # A caller from before this version still passes -q
     for flag in ("-q", "--quiet"):
         bridged = run(repo, home, flag)
-        assert (bridged.returncode, bridged.stdout, bridged.stderr) == (0, "", "")
+        assert (bridged.returncode, bridged.stdout, bridged.stderr) == (0, OK, "")
     shutil.rmtree(home / ".claude/skills/beta")
 
-    checked = run(repo, home, "--check", "--json")
+    checked = run(repo, home, "--check", "-v")
 
     assert (checked.returncode, checked.stdout) == (1, "")
-    failure = json.loads(checked.stderr)
-    assert failure["errors"] == [
-        "1 installed entries differ from the checkout; run: just install-skills"
-    ]
-    targets = {t["target"]: t for t in failure["targets"]}
-    assert targets[".claude/skills"] == {
-        "target": ".claude/skills",
-        "expected": 2,
-        "current": 1,
-        "counts": {"add": 1, "current": 1},
-    }
-    assert targets[".claude/commands"] == {
-        "target": ".claude/commands",
-        "expected": 1,
-        "current": 1,
-        "counts": {"current": 1},
-    }
+    assert checked.stderr.endswith(
+        failed(
+            "1 installed entries differ from the checkout; run: just install-skills",
+            changes=[["add", "~/.claude/skills/beta"]],
+        )
+    )
+    assert "~/.claude/skills: 1 of 2 current\n" in checked.stderr
+    assert "~/.claude/commands: 1 of 1 current\n" in checked.stderr
 
 
 def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
@@ -770,9 +773,9 @@ def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
         preview = run(repo, home, "--dry-run", "--timeout", "1s")
 
     assert (waited.returncode, waited.stdout) == (75, "")
-    assert waited.stderr == (
-        f"error: another run still holds {lock} after 1s\n"
-        "retry: just install-skills --profile mac --timeout 1s\n"
+    assert waited.stderr == failed(
+        f"another run still holds {lock} after 1s",
+        retry="just install-skills --profile mac --timeout 1s",
     )
     assert not home.exists()
     assert (preview.returncode, preview.stderr) == (0, ""), "a preview never waits"

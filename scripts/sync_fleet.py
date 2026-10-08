@@ -27,10 +27,8 @@ notes for agents:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
-import re
 import shlex
 import shutil
 import signal
@@ -39,10 +37,12 @@ import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 import sync_private
 import tomllib
@@ -56,6 +56,8 @@ from _cli import (
 )
 from _common import (
     GRACE,
+    answer_in,
+    changes_in,
     exclusive,
     is_network_failure,
     main_checkout,
@@ -97,13 +99,12 @@ TEMPORARY = 75
 TIMEOUT = 600
 POLL_DELAY = 3
 FINE = ("synced", "ready", "converged")
-# What a remote step prints for each change it makes
-CHANGE = re.compile(r"(clone|commit|pull|push|add|update|remove)\t")
 EPILOG = """\
-A run prints one line per machine it changed, `synced<TAB>NAME<TAB>SHA`, and a
-dry run one per machine it would change, `ready<TAB>NAME<TAB>SHA`; a run with
-nothing to change prints nothing. A failure prints every machine's status and
-what to do on stderr.
+A run answers {"ok":true,"changes":[...]}, one ["sync", NAME, SHA] per machine
+it changed, and a dry run one per machine it would change; it answers
+{"ok":true} when nothing changes, and --check does when every machine
+matches. A failure names each machine that needs you or failed, and what to
+do. -v logs each machine's status and changes.
 
 examples:
   just sync-fleet              # every machine
@@ -182,13 +183,14 @@ step() {
             echo "main did not fast-forward to GitHub's commit"
             return 12
         }
+        printf '{"ok":true,"changes":[["move","%.7s","%.7s"]]}\\n' "$now" "$3"
     fi
     uv run --quiet scripts/sync_private.py 2>&1 || return
     just install-skills 2>&1
 }
 """
-# Prints the private clone's state as sync_private.state() reports it, then the
-# installer's preview, from which installed() finds the drift.
+# Prints the private clone's state as sync_private.state() reports it, then
+# the installer's preview, from which installed() finds the drift.
 CHECK = """
 step() {
     enter "$1" || return
@@ -204,7 +206,7 @@ step() {
             echo "private $head clean"
         fi
     fi
-    just install-skills --dry-run --json 2>&1
+    just install-skills --dry-run 2>&1
 }
 """
 
@@ -239,7 +241,7 @@ class Source:
 
     sha: str
     private: str = ""
-    saves: tuple[str, ...] = ()
+    saves: bool = False
 
     def contains(self, commit: str) -> bool:
         return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
@@ -250,7 +252,6 @@ class Outcome:
     machine: str
     status: str
     detail: str
-    targets: list[dict] = field(default_factory=list)
     changes: list[str] = field(default_factory=list)
     temporary: bool = False
 
@@ -391,7 +392,11 @@ def git(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def reason(lines: list[str], code: int) -> str:
-    """The last line that explains a failure; the installer's hint is not one."""
+    """What explains a failure: the errors of a JSON answer, or else the last
+    line of text, from a script older than #490; the installer's hint is not one."""
+    answer = answer_in(lines)
+    if answer and answer.get("errors"):
+        return "; ".join(answer["errors"])
     useful = [line for line in lines if line and not line.startswith("rerun with")]
     return useful[-1].removeprefix("error: ") if useful else f"exited {code}"
 
@@ -443,51 +448,35 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
     return problems
 
 
-def report_in(lines: list[str]) -> dict | None:
-    """The installer's indented JSON object; uv or a login profile may print
-    around it."""
-    braces = [i for i, line in enumerate(lines) if line in ("{", "}")]
-    try:
-        return json.loads("\n".join(lines[braces[0] : braces[-1] + 1]))
-    except (IndexError, json.JSONDecodeError):
-        return None
+def waiting(changes: list[list[str]]) -> list[str]:
+    """One problem per install target: the changes it waits for, by action."""
+    targets: dict[str, Counter[str]] = {}
+    for action, path, *_ in changes:
+        targets.setdefault(path.rpartition("/")[0], Counter())[action] += 1
+    return [
+        f"{target} waits for "
+        + ", ".join(f"{action} {count}" for action, count in counts.items())
+        for target, counts in targets.items()
+    ]
 
 
-def installed(
-    machine: Machine, source: Source
-) -> Outcome | tuple[list[str], list[dict]]:
+def installed(machine: Machine, source: Source) -> Outcome | list[str]:
     """Run the CHECK step: what differs on the machine, from its private clone
-    to each install target, with the targets' counts; an Outcome when it fails."""
+    to each install target; an Outcome when it fails."""
     code, lines = remote(machine, CHECK, machine.path)
-    report = report_in(lines)
     if code:
-        outcome = failure(machine.name, code, lines)
-        if report and report.get("errors"):
-            outcome.detail = "; ".join(report["errors"])
-        return outcome
-    if report is None:
-        return Outcome(machine.name, "failed", reason(lines, 1))
+        return failure(machine.name, code, lines)
     problems: list[str] = []
     for line in lines:
         if line.startswith("private ") and len(fields := line.split()) == 3:
             problems.extend(private_problems(fields[1], fields[2], source.private))
-    for target in report["targets"]:
-        log.info(
-            "%s ~/%s: %d of %d current",
-            machine.name,
-            target["target"],
-            target["current"],
-            target["expected"],
+    if answer_in(lines) is None:
+        # An installer from before #490 only warns about a conflict, exit 0
+        problems.append(
+            "its installer predates #490 and answers no JSON line, "
+            "so a conflict would not show"
         )
-        other = {k: n for k, n in target["counts"].items() if k != "current"}
-        if other:
-            problems.append(
-                f"~/{target['target']} has {target['current']} of "
-                f"{target['expected']} current ("
-                + ", ".join(f"{kind} {count}" for kind, count in other.items())
-                + ")"
-            )
-    return problems, report["targets"]
+    return problems + waiting(changes_in(lines))
 
 
 def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
@@ -510,9 +499,9 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         found = installed(machine, source)
         if isinstance(found, Outcome):
             return found
-        problems += found[0]
+        problems += found
         status = "drift" if problems else "converged"
-        return Outcome(machine.name, status, "; ".join(problems) or status, found[1])
+        return Outcome(machine.name, status, "; ".join(problems) or status)
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
@@ -525,14 +514,13 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
             )
         # At GitHub's main already, a sync would still save and pull the
         # private clone and install what differs
-        found = installed(machine, source)
-        if isinstance(found, Outcome):
-            return found
-        pending, targets = found
+        pending = installed(machine, source)
+        if isinstance(pending, Outcome):
+            return pending
         if source.saves:
             pending.append("pull the private edits this sync saves first")
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
-        return Outcome(machine.name, "ready", detail, targets, changes=pending)
+        return Outcome(machine.name, "ready", detail, changes=pending)
     if head != source.sha:
         pushed = call(
             [
@@ -555,11 +543,11 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 temporary=is_network_failure(pushed.stderr),
             )
     code, lines = remote(machine, APPLY, machine.path, head, source.sha)
+    changes = ["\t".join(change) for change in changes_in(lines)]
     if code:
-        return failure(machine.name, code, lines)
-    changes = [line for line in lines if CHANGE.match(line)]
-    if head != source.sha:
-        changes.insert(0, f"move {head[:7]} to {source.sha[:7]}")
+        outcome = failure(machine.name, code, lines)
+        outcome.changes = changes
+        return outcome
     return Outcome(
         machine.name, "synced", f"synced at {source.sha[:7]}", changes=changes
     )
@@ -669,7 +657,7 @@ def background(*flags: str) -> None:
         )
 
 
-def hook(event: list[str]) -> str:
+def hook(event: list[str]) -> dict[str, Any]:
     """Install after a commit or a pull, and sync the fleet once GitHub has it.
 
     Lefthook runs this in every checkout; it acts only in a main checkout that
@@ -680,14 +668,14 @@ def hook(event: list[str]) -> str:
     """
     name, *rest = event
     if ROOT != main_checkout(ROOT) or not sync_private.is_clone():
-        return ""
+        return {}
     if name == "pre-push":
         if (sha := pushed_main(sys.stdin.read().splitlines())) and has_registry():
             background("--after-push", sha)
-        return ""
+        return {}
     branch = git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
     if branch != "main":
-        return ""
+        return {}
     in_rebase = any(
         (ROOT / git("rev-parse", "--git-path", part).stdout.strip()).exists()
         for part in ("rebase-merge", "rebase-apply")
@@ -697,9 +685,9 @@ def hook(event: list[str]) -> str:
     if (name == "post-commit" and in_rebase) or (
         name == "post-rewrite" and rest[:1] != ["rebase"]
     ):
-        return ""
+        return {}
     if not has_registry():
-        return ""
+        return {}
     installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
         background()
@@ -708,10 +696,10 @@ def hook(event: list[str]) -> str:
         raise ScriptError(
             f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose"
         )
-    return ""
+    return {}
 
 
-def work(args: argparse.Namespace) -> str:
+def work(args: argparse.Namespace) -> dict[str, Any]:
     if args.hook:
         return hook(args.hook)
     try:
@@ -722,13 +710,15 @@ def work(args: argparse.Namespace) -> str:
         raise
 
 
-def sync(args: argparse.Namespace) -> str:
+def sync(args: argparse.Namespace) -> dict[str, Any]:
     fleet = load_registry(args.fleet or registry())
     machines = select(fleet, args.machines)
     if args.others:
         machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
     local = next((machine.name for machine in fleet if machine.is_local()), None)
+    coordinator = local or socket.gethostname().split(".")[0]
+    changed_machines: dict[str, None] = {}
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
     # Queue behind any other sync from here, so each run sends the newest commit.
@@ -737,14 +727,24 @@ def sync(args: argparse.Namespace) -> str:
         # This machine pushes its private edits before any machine pulls, even
         # when it is not selected.
         if mode == "apply":
-            for change in sync_private.sync(timeout=args.timeout):
-                log.info("%s", change)
+            try:
+                saved = sync_private.sync(timeout=args.timeout)
+            except ScriptError as error:
+                if error.report.get("changes"):
+                    error.report["changes"] = [["sync", coordinator, source.sha[:7]]]
+                raise
+            if saved:
+                changed_machines[coordinator] = None
+            for change in saved:
+                log.info("%s", "\t".join(change))
         # A check needs the private clone; a preview compares with it when here,
         # and counts the edits a sync would save from it before others pull
         if mode == "check" or (mode == "preview" and sync_private.is_clone()):
             source = Source(source.sha, sync_private.github_head(args.timeout))
         if mode == "preview" and sync_private.is_clone():
-            saves = tuple(sync_private.sync(dry_run=True))
+            saves = bool(sync_private.sync(dry_run=True))
+            if saves:
+                changed_machines[coordinator] = None
             source = Source(source.sha, source.private, saves)
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
@@ -771,23 +771,18 @@ def sync(args: argparse.Namespace) -> str:
                 if outcome.status in ("needs-you", "failed")
             ]
         )
-    report = {
-        "from": local,
-        "sha": source.sha,
-        "mode": mode,
-        "machines": [asdict(outcome) for outcome in outcomes],
-    }
-    lines = "\n".join(
-        f"{outcome.status}\t{outcome.machine}\t{source.sha[:7]}"
-        for outcome in outcomes
-        if problems or outcome.changes
-    )
+    for outcome in outcomes:
+        if outcome.changes:
+            changed_machines[outcome.machine] = None
+    changes = [["sync", name, source.sha[:7]] for name in changed_machines]
+    answer = {"changes": changes} if changes else {}
     if problems:
+        # The machines that did sync stay in the answer of a partial failure
         temporary = all(outcome.temporary for outcome in problems)
         raise (TemporaryError if temporary else ScriptError)(
-            *(advice(outcome) for outcome in problems), detail=lines, report=report
+            *(advice(outcome) for outcome in problems), report=answer
         )
-    return json.dumps(report, indent=2) if args.json else lines
+    return answer
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -845,10 +840,7 @@ def main(argv: list[str] | None = None) -> int:
         help="how long to wait for another sync from this machine, and for the "
         "private clone's network steps (default: 30m)",
     )
-    parser.add_argument(
-        "--json", action="store_true", help="print the per-machine report as JSON"
-    )
-    return run_script(parser, work, argv, debug="SYNC_FLEET_DEBUG")
+    return run_script(parser, work, argv, debug="SYNC_FLEET_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":

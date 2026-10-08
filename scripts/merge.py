@@ -23,9 +23,10 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
-from _common import main_checkout, run, run_git, run_script
+from _common import changes_in, main_checkout, run, run_git, run_script
 from signoff import (
     ROOT,
     branch,
@@ -40,10 +41,10 @@ from signoff import (
 )
 
 EPILOG = """\
-A run prints `signoff<TAB>SHA` when it signs off the head,
-`merge<TAB>#N<TAB>SHA` for the commit it merges, then the change lines of just
-deploy. A deploy that fails or is withheld warns without failing the run: the
-merge landed.
+A run answers {"ok":true,"changes":[...]}: ["signoff", SHA] when it signs off
+the head, ["merge", "#N", SHA] for the commit it merges, then the changes of
+just deploy. A dry run answers what a run would do. A deploy that fails or is
+withheld warns without failing the run: the merge landed.
 
 examples:
   just merge             # sign off this branch's PR head, then merge it
@@ -235,12 +236,12 @@ def main_holds_tested_tree(sha: str, timeout: float) -> bool:
     return False
 
 
-def deploy(sha: str, args: argparse.Namespace) -> str:
+def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
     """Run just deploy from the main checkout once main holds the tree the checks
     ran on `sha`. The merge already landed, so expected failures only warn."""
     try:
         if not main_holds_tested_tree(sha, args.timeout):
-            return ""
+            return []
         checkout = main_checkout(ROOT)
         # The deploy runs this checkout's code, which must be code main has held
         held = run_git(
@@ -256,7 +257,7 @@ def deploy(sha: str, args: argparse.Namespace) -> str:
                 "just deploy there",
                 checkout,
             )
-            return ""
+            return []
         levels = [
             *(["--verbose"] if args.verbose else []),
             *(["--debug"] if log.isEnabledFor(logging.DEBUG) else []),
@@ -273,17 +274,18 @@ def deploy(sha: str, args: argparse.Namespace) -> str:
                 "warning: the merge landed, but just deploy did not reach every "
                 "machine; fix what it names above, then run just deploy"
             )
-        return deployed.stdout.rstrip()
+        # That checkout may still run the sync-fleet from before #490
+        return changes_in(deployed.stdout.splitlines())
     except ScriptError as error:
         log.warning(
             "warning: the merge landed, but just deploy could not run: %s; "
             "fix it, then run just deploy",
             error,
         )
-        return ""
+        return []
 
 
-def merge(args: argparse.Namespace) -> str:
+def merge(args: argparse.Namespace) -> dict[str, Any]:
     name = branch()
     pr = branch_pr(name, args.timeout)
     if pr.state == "MERGED":
@@ -301,7 +303,8 @@ def merge(args: argparse.Namespace) -> str:
                 f"{head[:7]}; open a new PR for the new commits"
             )
         log.info("PR #%d is already merged: %s", pr.number, pr.url)
-        return "" if args.dry_run else deploy(pr.head, args)
+        deployed = [] if args.dry_run else deploy(pr.head, args)
+        return {"changes": deployed} if deployed else {}
     require_mergeable_as_is(pr)
     require_clean_tree()
     sha = pushed_head(args.timeout)
@@ -311,19 +314,19 @@ def merge(args: argparse.Namespace) -> str:
             f"{sha[:7]}; rerun just merge once GitHub catches up"
         )
     require_contains_main(sha, args.timeout)
-    lines = []
+    changes = []
     if not signed_off(sha, args.timeout):
-        lines.append(f"signoff\t{sha[:7]}")
+        changes.append(["signoff", sha[:7]])
         if not args.dry_run:
             check_and_sign(sha, args.timeout)
-    lines.append(f"merge\t#{pr.number}\t{sha[:7]}")
+    changes.append(["merge", f"#{pr.number}", sha[:7]])
     if args.dry_run:
-        return "\n".join(lines)
+        return {"changes": changes}
     wait_until_mergeable(pr.number, sha, args.timeout)
     # main can move while the checks run
     require_contains_main(sha, args.timeout)
     land(pr, sha, args.timeout)
-    return "\n".join(line for line in (*lines, deploy(sha, args)) if line)
+    return {"changes": [*changes, *deploy(sha, args)]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -347,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         help="how long each call to GitHub, and the wait for GitHub to accept "
         "the merge, may take (default: 1m)",
     )
-    return run_script(parser, merge, argv, debug="MERGE_DEBUG")
+    return run_script(parser, merge, argv, debug="MERGE_DEBUG", json_answer=True)
 
 
 if __name__ == "__main__":
