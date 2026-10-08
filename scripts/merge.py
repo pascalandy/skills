@@ -273,8 +273,7 @@ def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
         text=True,
     )
     replay(deployed.stderr)
-    # A failed deploy still lists the machines it reached, in its answer or,
-    # from a sync-fleet older than #490, in its change lines
+    # A failed deploy still lists the machines it reached in its answer
     changes = changes_in((deployed.stdout + deployed.stderr).splitlines())
     if deployed.returncode:
         raise ScriptError(

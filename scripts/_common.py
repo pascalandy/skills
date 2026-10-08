@@ -212,11 +212,6 @@ def exclusive(path: Path, timeout: float) -> Iterator[None]:
         yield
 
 
-# What a script older than #490 printed for each change: an action, a tab, and
-# its object. A machine mid-deploy may still run one; #492 stops reading it
-CHANGE_LINE = re.compile(r"(clone|commit|pull|push|add|update|remove|synced|ready)\t")
-
-
 def parsed_answer(line: str) -> dict[str, Any] | None:
     """The JSON answer a line holds, whatever its key order, or None."""
     if line.startswith("{"):
@@ -236,14 +231,11 @@ def answer_in(lines: Iterable[str]) -> dict[str, Any] | None:
 
 
 def changes_in(lines: Iterable[str]) -> list[list[str]]:
-    """The changes a child reports: the `changes` of each JSON answer it prints,
-    or each change line of a script older than #490."""
+    """The changes a child reports: the `changes` of each JSON answer it prints."""
     found: list[list[str]] = []
     for line in lines:
         if (answer := parsed_answer(line)) is not None:
             found += answer.get("changes", [])
-        elif CHANGE_LINE.match(line):
-            found.append(line.split("\t"))
     return found
 
 

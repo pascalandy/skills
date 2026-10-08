@@ -167,25 +167,14 @@ def test_a_group_signal_to_a_child_that_already_exited_is_a_no_op() -> None:
     assert process.wait(timeout=5) == 0
 
 
-@pytest.mark.parametrize(
-    "lines",
-    [
-        [
-            "a login profile line",
-            '{"ok":true,"changes":[["pull","_skills_private","a..b"]]}',
-            '{"ok":true,"changes":[["add","~/.claude/skills/alpha"]]}',
-        ],
-        [
-            "a login profile line",
-            "pull\t_skills_private\ta..b",
-            "add\t~/.claude/skills/alpha",
-        ],
-    ],
-    ids=["json-answers", "change-lines-from-before-490"],
-)
-def test_changes_in_reads_json_answers_and_older_change_lines(
-    lines: list[str],
-) -> None:
+def test_changes_in_reads_only_the_changes_of_json_answers() -> None:
+    lines = [
+        "a login profile line",
+        '{"ok":true,"changes":[["pull","_skills_private","a..b"]]}',
+        "update\t~/.claude/skills/beta",
+        '{"ok":true,"changes":[["add","~/.claude/skills/alpha"]]}',
+    ]
+
     assert _common.changes_in(lines) == [
         ["pull", "_skills_private", "a..b"],
         ["add", "~/.claude/skills/alpha"],

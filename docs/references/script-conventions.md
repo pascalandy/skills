@@ -77,7 +77,7 @@ Add a row's flags only when the script has the matching behavior.
 
 A dry run changes nothing a user owns, such as a checkout or installed skills. It may write a preview file in the tool's own state folder and refresh caches
 
-A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`; [Transitions](#transitions) says why it still reads change lines too
+A command that changes state lists its changes under `changes`, one array per change, `[action, object]` with an optional detail, as [[script-output]] shows. A real run and its dry run answer the same; a no-op answers `{"ok":true}`. `--check` is a dry run that fails when a change is pending, with `changes` beside the errors. A hook answers like any run. A script that reads another's changes uses `changes_in()` in `scripts/_common.py`
 
 Decide at the failing boundary whether a failure is temporary. A network error from git, a timeout, or a held lock exits 75; bad credentials or configuration exit 1. A paid request that may have completed is never reported as safe to retry. A script that runs several steps exits 75 only when every failure was temporary
 
@@ -98,15 +98,6 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
-
-## Transitions
-
-Code kept only so a machine that still runs older scripts keeps syncing. Each row ends when `just sync-fleet --check` answers `{"ok":true}` with every machine on a `main` commit that holds the change in its first column; then delete the code, its test, and its row in one PR (#492)
-
-| Change | Kept until then | Why |
-|---|---|---|
-| #490, state commands answer in JSON | `changes_in()` also reads change lines, `<action>\t<object>` | a machine still on older code reports its changes that way |
-| this contract | `just install-skills` accepts a hidden `-q/--quiet` and ignores it | a `just sync` or `just sync-fleet` started from older code passes it |
 
 ## Adopt the contract
 
