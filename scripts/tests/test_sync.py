@@ -118,17 +118,20 @@ def test_an_interrupt_after_the_pull_still_answers_the_pull(
     }
 
 
+# The pulled private sync answers a saved commit, as a success on stdout or a
+# failure on stderr, then is killed before it exits
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
 def test_a_step_killed_by_a_signal_keeps_the_changes_it_answered(
-    sandbox: tuple[Path, Path], behind: tuple[Path, Path], tmp_path: Path
+    sandbox: tuple[Path, Path], behind: tuple[Path, Path], tmp_path: Path, stream: str
 ) -> None:
     seed, _ = sandbox
     repo, home = behind
-    # The pulled private sync answers a saved commit, then is killed
     saved = ["commit", "_skills_private", "save edits from here"]
+    ok = stream == "stdout"
     (seed / "scripts/sync_private.py").write_text(
         "import json, os, signal, sys\n"
-        f"answer = {{'ok': False, 'errors': ['stopping'], 'changes': [{saved!r}]}}\n"
-        "print(json.dumps(answer, separators=(',', ':')), file=sys.stderr, flush=True)\n"
+        f"answer = {{'ok': {ok}, 'changes': [{saved!r}]}}\n"
+        f"print(json.dumps(answer, separators=(',', ':')), file=sys.{stream}, flush=True)\n"
         "os.kill(os.getpid(), signal.SIGKILL)\n"
     )
     commit(seed)

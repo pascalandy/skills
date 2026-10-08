@@ -117,8 +117,13 @@ def step(name: str, *command: str) -> list[list[str]]:
     if finished.returncode == 75:
         raise TemporaryError(f"{name} could not finish", report=report)
     if finished.returncode < 0:
+        # It may have answered, a success on stdout included, before the signal
+        answered = answer_in((finished.stdout + finished.stderr).splitlines()) or {}
         raise ScriptError(
-            f"{name} was killed by signal {-finished.returncode}", report=report
+            f"{name} was killed by signal {-finished.returncode}",
+            report={"changes": answered["changes"]}
+            if answered.get("changes")
+            else None,
         )
     if finished.returncode:
         raise ScriptError(
