@@ -25,7 +25,7 @@ Si l'idée tient :
 ```text
 marketing ; launch. Lancement de la tenue de livres par texto.
 
-plan
+consensus
 ```
 
 ```text
@@ -61,7 +61,7 @@ Pour un nouveau sujet, ouvre une nouvelle conversation. Une longue conversation 
 - **Traduire les noms.** `corey-mode ; rédaction` ne trouve rien. Les noms de la liste restent en anglais.
 - **Les skills qui exigent un ordinateur.** `image-creator`, `transcript`, `html-publish`, `tavily` et les routes `cass`, `qmd` et `trello` d'`andy-mode`, entre autres, lisent des fichiers locaux ou appellent des services externes. Dans une application de conversation, ils échouent ou l'agent improvise. Tout ce que ce guide nomme fonctionne dans ChatGPT ou Claude.
 - **Un skill sauté.** Une réponse qui ne nomme aucun skill et ne pose aucune question du playbook est probablement devinée. Demande quel skill a été ouvert. Sinon, recolle la phrase de la [page 1](./01-demarrer.md).
-- **Un `go` trop rapide.** Lis le plan avant.
+- **Un `go` trop rapide.** Lis les propositions de l'agent avant.
 - **Un chiffre sans source.** Exige la source et ouvre-la.
 
 Les réflexes viennent de l'usage, pas de la lecture. Retourne à la [page 1](./01-demarrer.md) et lance une vraie tâche.

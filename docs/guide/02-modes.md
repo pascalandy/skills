@@ -7,7 +7,7 @@ Most of the work goes through three modes. In this page you learn the five words
 These five words come back on every page:
 
 - **Agent**: the AI in your chat app
-- **Skill**: written instructions the agent follows for one kind of task, such as `plan`
+- **Skill**: written instructions the agent follows for one kind of task, such as `consensus`
 - **Mode**: a skill that opens a family of routes, such as `corey-mode`
 - **Route**: one task inside a mode, such as `copywriting`
 - **Playbook**: the written steps of one route
@@ -20,7 +20,7 @@ flowchart TD
     B -->|marketing or corey-mode| C[corey-mode]
     B -->|andy-mode| D[andy-mode]
     B -->|an HTML page or presentation| E[html-mode]
-    B -->|no mode| F[A skill on its own, such as plan or grilling]
+    B -->|no mode| F[A skill on its own, such as consensus or grilling]
     C --> G[The route named after the semicolon, or the one that fits]
     D --> G
     E --> G
@@ -28,7 +28,7 @@ flowchart TD
     F --> H
 ```
 
-The agent reads your request, finds the mode, then opens the route. If you name no mode, the agent looks for a single skill that matches, such as `plan` or `grilling`.
+The agent reads your request, finds the mode, then opens the route. If you name no mode, the agent looks for a single skill that matches, such as `consensus` or `grilling`.
 
 ## Write the request: mode, semicolon, task
 
@@ -64,7 +64,7 @@ The agent reads the list and names the route, here `emails`. Then you ask for th
 
 ## Call a skill without a mode
 
-Some skills stand alone: `plan`, `grilling`, `research`, `unslop`, `concise`, and `2nd-pass`. Name the skill in your request:
+Some skills stand alone: `consensus`, `grilling`, `research`, `unslop`, `concise`, and `2nd-pass`. Name the skill in your request:
 
 ```text
 grill me on my plan to open a second location next spring

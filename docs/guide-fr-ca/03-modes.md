@@ -8,7 +8,7 @@ flowchart TD
     B -->|marketing ou corey-mode| C[corey-mode]
     B -->|andy-mode| D[andy-mode]
     B -->|une page ou une présentation HTML| E[html-mode]
-    B -->|aucun mode| F[Un skill seul, comme plan ou grilling]
+    B -->|aucun mode| F[Un skill seul, comme consensus ou grilling]
     C --> G[La route nommée après le point-virgule, ou celle qui convient]
     D --> G
     E --> G
@@ -48,7 +48,7 @@ L'agent répond `emails`.
 
 ## Appelle un skill seul
 
-`plan`, `grilling`, `research`, `unslop`, `concise` et `2nd-pass` fonctionnent sans mode. Nomme-les dans la demande.
+`consensus`, `grilling`, `research`, `unslop`, `concise` et `2nd-pass` fonctionnent sans mode. Nomme-les dans la demande.
 
 **Piège :** énumérer les skills, comme "utilise sparring, puis storytelling, puis copywriting". Donne le but. Nomme une route seulement pour imposer un choix.
 

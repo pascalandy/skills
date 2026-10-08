@@ -2,15 +2,19 @@
 
 A vague request gets a vague answer, and a rushed decision costs more than the minutes it saved. In this page you use three skills and two `andy-mode` routes. They make the agent understand the goal first, or make your own thinking sharper before you decide.
 
-## Plan before doing with `plan`
+## Agree before doing with `consensus`
 
 ```text
-plan I want to move my team's weekly status report from email to a shared dashboard
+I want to move my team's weekly status report from email to a shared dashboard.
+
+consensus
 ```
 
-The agent restates your goal in its own words, lists the cases to cover, and says what's out of scope. If it needs a decision from you, it stops and asks. Then it describes how things work today, how they'll work after the change, how you'll know it worked, and what could go wrong.
+The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the CMO, how things work today, and the FMO, the change it suggests.
 
-It does nothing until you say `go`. Read the plan, answer the questions, and say `go` only when the plan is right.
+For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
+
+It applies your answers, rethinks its proposals, and asks again until nothing is left to decide. Then it says "👍 Je n'ai plus de question.", French for "I have no questions left". Read its proposals, and say `go` only when they're right.
 
 ## Get grilled with `grilling`
 
@@ -46,6 +50,6 @@ research how bakeries in Montreal price custom cakes. Cite your sources.
 
 The agent follows each claim back to the source that owns it, such as a business's own website or an official page, and cites it. Open at least one source to check the answer instead of trusting it.
 
-**Pitfall:** don't write "plan it and do it" in one request. `plan` stops before doing on purpose, so you can catch a wrong idea while it's still cheap. Say `go` once the plan is right.
+**Pitfall:** don't write "agree on it and do it" in one request. `consensus` stops before doing on purpose, so you can catch a wrong idea while it's still cheap. Say `go` once its proposals are right.
 
 Next: [Write and edit with the agent](./04-write.md).
