@@ -137,7 +137,7 @@ def routing_repo(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "with Path('pytest-calls').open('a', encoding='utf-8') as log:\n"
         "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
         "if os.environ.get('FAKE_PYTEST_EXIT'):\n"
-        "    print('batch boom')\n"
+        "    print(os.environ.get('FAKE_PYTEST_OUTPUT', 'batch boom'))\n"
         "    raise SystemExit(1)\n",
         encoding="utf-8",
     )
@@ -210,6 +210,8 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
             "pytest",
             "-W",
             "error",
+            "-r",
+            "fE",
             "-n",
             "auto",
             "scripts/tests/test_alpha.py",
@@ -234,6 +236,8 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             "pytest",
             "-W",
             "error",
+            "-r",
+            "fE",
             "scripts/tests/test_commands.py",
             "scripts/tests/test_skill_invocation.py",
         ]
@@ -397,7 +401,7 @@ def test_verbose_list_shows_the_actual_cheap_test_command(
     ) == (
         0,
         '{"ok":true,"checks":["test-commands"]}\n',
-        "repository-tests: uvx --from pytest@9.1.1 pytest -W error scripts/tests/test_commands.py\n",
+        "repository-tests: uvx --from pytest@9.1.1 pytest -W error -r fE scripts/tests/test_commands.py\n",
     )
     assert not (routing_repo / "pytest-calls").exists()
 
@@ -419,6 +423,62 @@ def test_failed_batch_names_an_executable_rerun_and_continues(
         '{"ok":false,"errors":["repository-tests failed; rerun: just check --only test-alpha --only test-beta"]}\n'
     )
     assert (routing_repo / "ran").exists()
+
+
+@pytest.mark.parametrize(
+    ("summary", "rerun"),
+    [
+        (
+            "FAILED scripts/tests/test_beta.py::test_one - assert 1 == 2",
+            "--only test-beta",
+        ),
+        (
+            "ERROR scripts/tests/test_alpha.py::test_one - OSError\n"
+            + "FAILED scripts/tests/test_gamma.py::test_two - assert 1 == 2",
+            "--only test-alpha --only test-gamma",
+        ),
+        (
+            "ERROR scripts/tests/test_beta.py - ImportError\n"
+            + "Interrupted: 1 error during collection",
+            "--only test-alpha --only test-beta --only test-gamma",
+        ),
+        (
+            "FAILED scripts/tests/test_alpha.py::test_one - assert False\n"
+            + "ERROR scripts/tests/test_beta.py - ImportError\n"
+            + "1 failed, 1 passed, 1 error",
+            "--only test-alpha --only test-beta --only test-gamma",
+        ),
+        (
+            "FAILED scripts/tests/test_beta.py::test_one - assert 1 == 2\n"
+            + "FAILED scripts/tests/test_unknown.py::test_two - assert 1 == 2",
+            "--only test-alpha --only test-beta --only test-gamma",
+        ),
+    ],
+    ids=[
+        "one",
+        "error-and-failure",
+        "collection-error",
+        "failure-and-collection-error",
+        "unknown-module",
+    ],
+)
+def test_failed_batch_reruns_only_the_modules_pytest_names(
+    routing_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    summary: str,
+    rerun: str,
+) -> None:
+    checks = repository_checks(routing_repo, "alpha", "beta", "gamma")
+    monkeypatch.setenv("FAKE_PYTEST_EXIT", "1")
+    monkeypatch.setenv("FAKE_PYTEST_OUTPUT", summary)
+
+    code, stdout, stderr = verdict(monkeypatch, capfd, checks, "--sweep")
+
+    assert (code, stdout) == (1, "")
+    assert stderr.endswith(
+        f'{{"ok":false,"errors":["repository-tests failed; rerun: just check {rerun}"]}}\n'
+    )
 
 
 def test_ambiguous_test_alias_is_rejected(

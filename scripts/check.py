@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import shlex
 import subprocess
 import sys
@@ -125,6 +126,9 @@ def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Co
         "pytest",
         "-W",
         "error",
+        # The rerun reads the FAILED and ERROR summary lines, whatever PYTEST_ADDOPTS says
+        "-r",
+        "fE",
         *(("-n", "auto") if parallel else ()),
         *(path if isinstance(path, tuple) else (path,)),
     )
@@ -345,9 +349,12 @@ def validate_repo_tests(checks: list[Check]) -> None:
         raise ScriptError(f"test check registry is incomplete; {details}")
 
 
-def passes(check: Check, verbose: bool) -> bool:
-    """Run one check; verbose runs stream each command's output to stderr, and
-    quiet runs replay a failing command's output there."""
+def failure(check: Check, verbose: bool) -> str | None:
+    """Run one check: None when it passes, else the failing command's output.
+
+    Verbose runs stream each command's output to stderr and return "" on a
+    failure; quiet runs replay the failing command's output there.
+    """
     for command in check.commands:
         log.info("==> %s: %s", check.name, shlex.join(command))
         started = time.monotonic()
@@ -365,11 +372,12 @@ def passes(check: Check, verbose: bool) -> bool:
             time.monotonic() - started,
         )
         if result.returncode != 0:
-            if not verbose:
-                print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
-                sys.stderr.write(result.stdout)
-            return False
-    return True
+            if verbose:
+                return ""
+            print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
+            sys.stderr.write(result.stdout)
+            return result.stdout
+    return None
 
 
 def changed() -> list[str] | None:
@@ -429,6 +437,27 @@ def repo_batch(checks: list[Check]) -> Command:
     return pytest(paths, parallel=any(not check.cheap for check in checks))
 
 
+# pytest's summary line for a failed test, or for a test whose setup failed
+FAILED_TEST = re.compile(
+    r"^(?:FAILED|ERROR) (scripts/tests/test_\w+\.py)::", re.MULTILINE
+)
+
+
+# pytest's summary line for a module it could not collect, which names no test
+COLLECTION_ERROR = re.compile(r"^ERROR scripts/tests/test_\w+\.py(?!::)", re.MULTILINE)
+
+
+def failed_tests(output: str, tests: list[Check]) -> list[Check]:
+    """The modules pytest's summary names, or every module when it cannot tell:
+    after a collection error, which its summary names without a test, or a
+    verbose run."""
+    if COLLECTION_ERROR.search(output):
+        return tests
+    named = set(FAILED_TEST.findall(output))
+    found = [test for test in tests if test.test_path in named]
+    return found if found and len(found) == len(named) else tests
+
+
 def verdict(args: argparse.Namespace) -> dict[str, Any]:
     validate_repo_tests(CHECKS)
     selected = [check for check in CHECKS if not args.only or check.name in args.only]
@@ -453,25 +482,19 @@ def verdict(args: argparse.Namespace) -> dict[str, Any]:
             if ran_repo_tests:
                 continue
             ran_repo_tests = True
-            names = [test.name for test in repo_tests]
-            if not passes(
-                Check("repository-tests", repo_batch(repo_tests)), args.verbose
-            ):
-                rerun = " ".join(f"--only {name}" for name in names)
+            batch = Check("repository-tests", repo_batch(repo_tests))
+            output = failure(batch, args.verbose)
+            if output is not None:
+                rerun = " ".join(
+                    f"--only {test.name}" for test in failed_tests(output, repo_tests)
+                )
                 failed.append(f"repository-tests failed; rerun: just check {rerun}")
             continue
-        if not passes(check, args.verbose):
-            failed.append(check.name)
+        if failure(check, args.verbose) is not None:
+            failed.append(f"{check.name} failed; rerun: just check --only {check.name}")
 
     if failed:
-        raise ScriptError(
-            *(
-                name
-                if name.startswith("repository-tests failed;")
-                else f"{name} failed; rerun: just check --only {name}"
-                for name in failed
-            )
-        )
+        raise ScriptError(*failed)
     return {}
 
 
