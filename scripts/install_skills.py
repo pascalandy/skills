@@ -23,9 +23,10 @@ import stat
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -204,7 +205,11 @@ def digest_command(path: Path) -> str:
     return digest_files(((Path(path.name), path),))
 
 
-def replace(source: Path, destination: Path) -> None:
+def replace(
+    source: Path, destination: Path, landed: Callable[[], None] = lambda: None
+) -> None:
+    """Swap a fresh copy of `source` into `destination`, then delete the old
+    copy. `landed` runs once the swap is done, before that cleanup can fail."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=".install-skills-", dir=destination.parent
@@ -216,6 +221,7 @@ def replace(source: Path, destination: Path) -> None:
             ignore=lambda _, names: {name for name in names if is_runtime(name)},
         )
         swap(fresh, destination, Path(temporary) / "previous")
+        landed()
 
 
 def replace_command(source: Path, destination: Path) -> None:
@@ -520,20 +526,24 @@ def execute(
 ) -> None:
     """Apply each action and append its change to `done` once it lands."""
     for action in actions:
+        if action.kind not in CHANGES:
+            continue
         destination = home / action.target / action.name
-        if action.kind in ("add", "update"):
-            if action.source == "command":
-                replace_command(commands[action.name].path, destination)
-            else:
-                replace(sources[action.name].path, destination)
-        elif action.kind == "remove":
+        change = [action.kind, f"~/{action.target}/{action.name}"]
+        if action.kind == "remove":
             if action.source == "command":
                 destination.unlink()
             else:
                 shutil.rmtree(destination)
+            done.append(change)
+        elif action.source == "command":
+            replace_command(commands[action.name].path, destination)
+            done.append(change)
         else:
-            continue
-        done.append([action.kind, f"~/{action.target}/{action.name}"])
+            # The old copy's cleanup can still fail once the new one is in place
+            replace(
+                sources[action.name].path, destination, partial(done.append, change)
+            )
 
 
 def install_lock() -> Path:

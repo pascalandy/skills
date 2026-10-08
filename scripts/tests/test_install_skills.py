@@ -783,40 +783,57 @@ def test_a_failure_midway_answers_the_entries_already_installed(
     assert not any(path.startswith("~/.claude/skills/") for path in done)
 
 
-# The installer, interrupted after the install, during its prune or the
-# cleanup of the folder it staged the sources in
+# The installer, stopped after an install landed: in its prune, in the cleanup
+# of the folder it staged the sources in, or in the cleanup of the backup a
+# replaced skill leaves, by an interrupt or an error
 PRUNE = """
 def interrupted():
     raise KeyboardInterrupt
 install_skills.prune_leftovers = interrupted
 """
-STAGING = """
+CLEANUP = """
 import tempfile
-class Interrupted(tempfile.TemporaryDirectory):
+class Stopped(tempfile.TemporaryDirectory):
     def __exit__(self, *exc):
         super().__exit__(*exc)
-        if self.name.rsplit("/", 1)[-1].startswith(".install-skills-source-"):
-            raise KeyboardInterrupt
-tempfile.TemporaryDirectory = Interrupted
+        name = self.name.rsplit("/", 1)[-1]
+        if name.startswith(".install-skills-") and STAGED("-source-" in name):
+            raise FAULT
+tempfile.TemporaryDirectory = Stopped
 """
+STAGING = CLEANUP.replace("STAGED", "bool").replace("FAULT", "KeyboardInterrupt")
+BACKUP = CLEANUP.replace("STAGED", "not")
 
 
-@pytest.mark.parametrize("fault", [PRUNE, STAGING], ids=["prune", "staging"])
-def test_an_interrupt_after_the_install_answers_the_entries_installed(
-    sandbox: tuple[Path, Path], fault: str
+@pytest.mark.parametrize(
+    ("fault", "code", "error"),
+    [
+        (PRUNE, 130, "interrupted"),
+        (STAGING, 130, "interrupted"),
+        (BACKUP.replace("FAULT", "KeyboardInterrupt"), 130, "interrupted"),
+        (
+            BACKUP.replace("FAULT", "OSError('cleanup failed')"),
+            1,
+            "OSError: cleanup failed",
+        ),
+    ],
+    ids=["prune", "staging", "backup-interrupt", "backup-error"],
+)
+def test_a_stop_after_an_install_answers_the_entries_installed(
+    sandbox: tuple[Path, Path], fault: str, code: int, error: str
 ) -> None:
     repo, home = sandbox
-    (repo / "scripts/interrupted_install.py").write_text(
+    (repo / "scripts/stopped_install.py").write_text(
         f"import sys\nimport install_skills\n{fault}\nsys.exit(install_skills.main())\n"
     )
 
-    result = run(repo, home, script="interrupted_install.py")
+    result = run(repo, home, script="stopped_install.py")
 
-    assert (result.returncode, result.stdout) == (130, "")
+    assert (result.returncode, result.stdout) == (code, "")
     answer = json.loads(result.stderr.splitlines()[-1])
-    assert answer["errors"] == ["interrupted"]
-    assert ["add", "~/.claude/skills/alpha"] in answer["changes"]
-    assert (home / ".claude/skills/alpha/SKILL.md").is_file()
+    assert answer["errors"] == [error]
+    assert answer["changes"], "an install landed before the stop"
+    assert all((home / path[2:]).exists() for _, path in answer["changes"])
 
 
 def test_an_apply_gives_up_with_75_when_another_holds_the_lock(
