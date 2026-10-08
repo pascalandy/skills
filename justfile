@@ -85,16 +85,19 @@ gitleaks-staged:
 
 # Check that agents discover the installed skills
 [group('checks')]
+[no-exit-message]
 skills-discover *args:
     @uv run --quiet scripts/discover_skills.py "$@"
 
 # Replay a skill's routing cases through headless Codex
 [group('checks')]
+[no-exit-message]
 replay-routing *args:
     @uv run --quiet scripts/replay_routing.py "$@"
 
 # Validate HEAD as a release candidate
 [group('checks')]
+[no-exit-message]
 release-check version *args:
     @uv run --quiet scripts/release_check.py "$@"
 

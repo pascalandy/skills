@@ -97,6 +97,15 @@ def repo(tmp_path: Path) -> Path:
     return root
 
 
+OK = '{"ok":true}\n'
+
+
+def errors(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """A failed run's errors, from the answer on the last line of stderr."""
+    assert (result.returncode, result.stdout) == (1, "")
+    return json.loads(result.stderr.splitlines()[-1])["errors"]
+
+
 def replay(
     repo: Path, events: dict[str, list[dict]], *args: str, path: str | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -178,16 +187,18 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
     }
 
     started = time.monotonic()
-    result = replay(repo, events)
+    result = replay(repo, events, "-v")
 
-    assert (result.returncode, result.stderr) == (0, "")
-    assert result.stdout.splitlines() == [
-        "pass\t1\tmake it convert",
-        "pass\t2\tfix my build",
-        "pass\t3\timprove it",
-        "skip\t4\task the other mode\tmanual",
-        "pass\t5\tconvert and say so",
-        "pass\t6\tuse the other skill",
+    assert (result.returncode, result.stdout) == (0, OK)
+    assert sorted(
+        line for line in result.stderr.splitlines() if line.startswith(("pass", "skip"))
+    ) == [
+        "pass row 1: make it convert",
+        "pass row 2: fix my build",
+        "pass row 3: improve it",
+        "pass row 5: convert and say so",
+        "pass row 6: use the other skill",
+        "skip row 4: manual",
     ]
     assert time.monotonic() - started < 30
     first = calls(repo)[0]
@@ -247,12 +258,12 @@ def test_a_row_that_misroutes_fails_with_what_the_agent_opened(
 ) -> None:
     result = replay(repo, {"make it convert": events}, "--case", "1")
 
-    assert (result.returncode, result.stdout) == (1, "")
-    line, rerun = result.stderr.splitlines()[-2:]
-    assert line.startswith(f"error: fail\t1\tmake it convert\t{reason}; events ")
+    line, rerun = errors(result)
+    assert line.startswith(f"row 1 (make it convert): {reason}; events ")
     assert Path(line.rsplit("events ", 1)[1]).is_file()
-    assert rerun.endswith(
-        "1 of 1 rows failed; rerun them with: just replay-routing demo --case 1"
+    assert (
+        rerun
+        == "1 of 1 rows failed; rerun them with: just replay-routing demo --case 1"
     )
 
 
@@ -271,7 +282,7 @@ def test_a_sibling_route_counts_however_its_path_is_spelled(
 
     result = replay(repo, events, "--case", "6")
 
-    assert (result.returncode, result.stdout) == (0, "pass\t6\tuse the other skill\n")
+    assert (result.returncode, result.stdout) == (0, OK)
 
 
 def test_a_route_line_is_read_from_the_final_message(repo: Path) -> None:
@@ -287,9 +298,8 @@ def test_a_route_line_is_read_from_the_final_message(repo: Path) -> None:
 
     result = replay(repo, events, "--case", "5")
 
-    assert result.returncode == 1
-    assert result.stderr.startswith(
-        "error: fail\t5\tconvert and say so\tfinal message opens with "
+    assert errors(result)[0].startswith(
+        "row 5 (convert and say so): final message opens with "
         "'Here is my advice.'; opened SKILL.md, playbooks/cro.md; events "
     )
 
@@ -302,10 +312,9 @@ def test_a_row_that_must_not_route_fails_on_the_first_playbook(repo: Path) -> No
 
     result = replay(repo, events, "--case", "2", "--case", "3")
 
-    assert result.returncode == 1
-    assert [line.split("; events")[0] for line in result.stderr.splitlines()[:2]] == [
-        "error: fail\t2\tfix my build\tloaded the skill: opened SKILL.md; opened SKILL.md",
-        "error: fail\t3\timprove it\topened playbooks/seo.md; opened SKILL.md, playbooks/seo.md",
+    assert [line.split("; events")[0] for line in errors(result)[:2]] == [
+        "row 2 (fix my build): loaded the skill: opened SKILL.md; opened SKILL.md",
+        "row 3 (improve it): opened playbooks/seo.md; opened SKILL.md, playbooks/seo.md",
     ]
 
 
@@ -361,8 +370,7 @@ def test_a_session_that_ignores_sigterm_still_ends_at_the_timeout(repo: Path) ->
     started = time.monotonic()
     result = replay(repo, events, "--case", "1", "--timeout", "1")
 
-    assert result.returncode == 1
-    assert "no verdict within 1s" in result.stderr
+    assert "no verdict within 1s" in errors(result)[0]
     assert time.monotonic() - started < 40
 
 
@@ -403,7 +411,7 @@ def test_a_project_in_a_linked_worktree_leaves_its_repository_alone(
 
     result = replay(repo, events, "--case", "2", "--project", str(linked))
 
-    assert (result.returncode, result.stderr) == (0, "")
+    assert (result.returncode, result.stdout, result.stderr) == (0, OK, "")
     after = subprocess.run(
         ["git", "-C", str(linked), "rev-parse", "HEAD"],
         capture_output=True,
@@ -438,7 +446,7 @@ def test_a_project_holding_an_old_copy_of_the_skill_gets_the_compiled_one(
         str(project),
     )
 
-    assert (result.returncode, result.stderr) == (0, "")
+    assert (result.returncode, result.stdout, result.stderr) == (0, OK, "")
     assert calls(repo)[0]["skills"] == ["demo", "other"]
     assert calls(repo)[0]["status"] == ""
 
@@ -489,4 +497,15 @@ def test_the_routing_tables_in_this_repository_parse(skill: str, rows: int) -> N
     )
 
     assert (result.returncode, result.stderr) == (0, "")
-    assert len(result.stdout.splitlines()) == rows
+    assert len(json.loads(result.stdout)["cases"]) == rows
+
+
+def test_a_dry_run_answers_each_row_without_starting_codex(repo: Path) -> None:
+    result = replay(repo, {}, "--dry-run", "--case", "1", "--case", "4")
+
+    assert (result.returncode, result.stderr) == (0, "")
+    assert result.stdout == (
+        '{"ok":true,"cases":[[1,"playbooks/cro.md","make it convert"],'
+        '[4,"manual","ask the other mode"]]}\n'
+    )
+    assert calls(repo) == []

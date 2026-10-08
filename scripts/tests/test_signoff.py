@@ -9,6 +9,10 @@ import pytest
 from fake_github import Sandbox
 
 
+def signed(head: str) -> str:
+    return f'{{"ok":true,"changes":[["signoff","{head[:7]}"]]}}\n'
+
+
 @pytest.fixture
 def github(tmp_path: Path) -> Sandbox:
     return Sandbox(tmp_path, "signoff.py")
@@ -19,7 +23,7 @@ def test_signs_off_the_pushed_head_after_the_checks(github: Sandbox) -> None:
 
     result = github.run("signoff.py")
 
-    assert (result.returncode, result.stdout) == (0, f"signoff\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, signed(head))
     assert github.statuses() == {head: "success"}
     assert github.checked() == [github.git("rev-parse", "HEAD^{tree}")]
 
@@ -29,7 +33,7 @@ def test_a_signed_off_head_needs_no_new_run(github: Sandbox) -> None:
 
     result = github.run("signoff.py")
 
-    assert (result.returncode, result.stdout) == (0, "")
+    assert (result.returncode, result.stdout) == (0, '{"ok":true}\n')
     assert github.checks_run() == 0
 
 
@@ -95,7 +99,7 @@ def test_checks_the_pushed_commit_whatever_happens_in_the_checkout(
         "signoff.py", FAKE_CHECK_HOOK=f"cd {shlex.quote(str(github.work))} && {change}"
     )
 
-    assert (result.returncode, result.stdout) == (0, f"signoff\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, signed(head))
     assert github.checked() == [tree]
     assert github.statuses() == {head: "success"}
 
@@ -108,7 +112,7 @@ def test_checks_the_pushed_commit_despite_a_replace_ref(github: Sandbox) -> None
 
     result = github.run("signoff.py")
 
-    assert (result.returncode, result.stdout) == (0, f"signoff\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, signed(head))
     assert github.checked() == [tree]
 
 
@@ -139,7 +143,7 @@ def test_compares_head_with_origin_branch_whatever_the_upstream(
 
     result = github.run("signoff.py")
 
-    assert (result.returncode, result.stdout) == (0, f"signoff\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, signed(head))
     assert github.statuses() == {head: "success"}
 
 
@@ -148,6 +152,6 @@ def test_a_dry_run_prints_the_signoff_without_checking(github: Sandbox) -> None:
 
     result = github.run("signoff.py", "--dry-run")
 
-    assert (result.returncode, result.stdout) == (0, f"signoff\t{head[:7]}\n")
+    assert (result.returncode, result.stdout) == (0, signed(head))
     assert github.statuses() == {}
     assert github.checks_run() == 0

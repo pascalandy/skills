@@ -32,10 +32,18 @@ def run(home: Path, executable: Path, *args: str) -> subprocess.CompletedProcess
     return result
 
 
-def failure(result: subprocess.CompletedProcess[str]) -> dict:
-    """A failing run's JSON report, which it prints on stderr."""
+OK = '{"ok":true}\n'
+MISSED = (
+    "opencode did not load alpha; run just install-skills --profile mac, then rerun"
+)
+
+
+def errors(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """A failed run's errors, from the answer on the last line of stderr."""
     assert (result.returncode, result.stdout) == (1, "")
-    return json.loads(result.stderr)
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    return answer["errors"]
 
 
 def fake_opencode(binary: Path, location: Path) -> None:
@@ -48,7 +56,7 @@ def fake_opencode(binary: Path, location: Path) -> None:
     binary.chmod(0o755)
 
 
-def test_native_opencode_discovery_and_unverified_claude(
+def test_native_opencode_discovery_matches_the_installed_copy(
     sandbox: tuple[Path, Path], tmp_path: Path
 ) -> None:
     _, home = sandbox
@@ -58,69 +66,52 @@ def test_native_opencode_discovery_and_unverified_claude(
     binary = tmp_path / "bin/opencode"
     binary.parent.mkdir()
     fake_opencode(binary, entry)
-    verified = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
-    assert verified.returncode == 0, verified.stderr
-    assert json.loads(verified.stdout)["agents"]["opencode"]["status"] == "verified"
+    verified = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert (verified.returncode, verified.stdout, verified.stderr) == (0, OK, "")
     shared = home / ".agents/skills/alpha/SKILL.md"
     shared.parent.mkdir(parents=True)
     shared.write_text("# stale alpha\n", encoding="utf-8")
     fake_opencode(binary, shared)
-    stale = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
-    assert failure(stale)["agents"]["opencode"]["missing"] == ["alpha"]
+    stale = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert errors(stale) == [MISSED]
     shared.write_text("# alpha\n", encoding="utf-8")
     (entry.parent / "guide.md").write_text("current\n", encoding="utf-8")
     shared_guide = shared.parent / "guide.md"
     shared_guide.write_text("stale\n", encoding="utf-8")
-    stale_package = run(
-        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
-    )
-    assert failure(stale_package)["agents"]["opencode"]["missing"] == ["alpha"]
+    stale_package = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert errors(stale_package) == [MISSED]
     shared.unlink()
     shared.symlink_to(entry)
-    stale_link = run(home, binary, "--profile", "mac", "--agent", "opencode", "--json")
-    assert failure(stale_link)["agents"]["opencode"]["missing"] == ["alpha"]
+    stale_link = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert errors(stale_link) == [MISSED]
     shared.unlink()
     shared.write_text("# alpha\n", encoding="utf-8")
     shared_guide.write_text("current\n", encoding="utf-8")
-    deduplicated = run(
-        home, binary, "--profile", "mac", "--agent", "opencode", "--json"
-    )
-    assert deduplicated.returncode == 0, deduplicated.stderr
+    deduplicated = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert (deduplicated.returncode, deduplicated.stdout) == (0, OK)
     real = home / "actual/alpha"
     real.parent.mkdir()
     entry.parent.rename(real)
     entry.parent.symlink_to(real, target_is_directory=True)
     fake_opencode(binary, real / "SKILL.md")
-    linked = run(
-        home,
-        binary,
-        "--profile",
-        "mac",
-        "--agent",
-        "opencode",
-        "--agent",
-        "claude",
-        "--json",
-    )
-    assert linked.returncode == 0
-    assert json.loads(linked.stdout)["verdict"] == "partial"
-    assert json.loads(linked.stdout)["agents"]["opencode"]["status"] == "verified"
-    summary = run(home, binary, "--profile", "mac", "--agent", "opencode")
-    assert (summary.returncode, summary.stdout, summary.stderr) == (
-        0,
-        "opencode\tverified\n",
-        "",
-    )
+    linked = run(home, binary, "--profile", "mac", "--agent", "opencode")
+    assert (linked.returncode, linked.stdout, linked.stderr) == (0, OK, "")
     entry.unlink()
     missing = run(home, binary, "--profile", "mac", "--agent", "opencode")
-    assert (missing.returncode, missing.stdout) == (1, "")
-    assert missing.stderr == (
-        "opencode\tmissing\n"
-        "error: opencode did not load alpha; "
-        "run just install-skills --profile mac, then rerun\n"
-    )
-    unverified = run(home, binary, "--profile", "mac", "--agent", "claude", "--json")
-    assert failure(unverified)["agents"]["claude"]["status"] == "unverified"
+    assert missing.stderr == f'{{"ok":false,"errors":["{MISSED}"]}}\n'
+    assert errors(missing) == [MISSED]
+
+
+def test_claude_code_is_not_an_agent_it_checks(
+    sandbox: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, home = sandbox
+    home.mkdir()
+
+    claude = run(home, tmp_path / "bin/claude", "--profile", "mac", "--agent", "claude")
+
+    assert (claude.returncode, claude.stdout) == (2, "")
+    assert "invalid choice: 'claude'" in json.loads(claude.stderr)["errors"][0]
 
 
 def test_an_agent_that_times_out_exits_75(
@@ -136,8 +127,8 @@ def test_an_agent_that_times_out_exits_75(
     slow = run(home, binary, "--profile", "mac", "--agent", "opencode", "--timeout=1s")
 
     assert (slow.returncode, slow.stdout) == (75, "")
-    assert slow.stderr.splitlines() == [
-        "opencode\tunverified",
-        "error: opencode: timed out after 1s; retry, or pass a longer --timeout",
-        "retry: just skills-discover --profile mac --agent opencode --timeout=1s",
-    ]
+    assert json.loads(slow.stderr) == {
+        "ok": False,
+        "errors": ["opencode: timed out after 1s; retry, or pass a longer --timeout"],
+        "retry": "just skills-discover --profile mac --agent opencode --timeout=1s",
+    }

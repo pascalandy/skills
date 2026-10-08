@@ -16,24 +16,24 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes
 from _common import run_script
 
 EPILOG = """\
-Codex, Pi, and OpenCode have native adapters; Claude is reported as
-unverified. Success prints one line per agent, its name, a tab, and its
-status.
+Codex, Pi, and OpenCode each list the skills they load, so each one is
+checked. Claude Code has no command that lists its skills, so it stays out of
+the check. Success answers {"ok":true}; a failure names each agent that missed
+a skill or could not list them.
 
 examples:
   just skills-discover --profile mac
-  just skills-discover --profile mac --json
   just skills-discover --profile om1 --agent codex --timeout 2m"""
 
 EXIT_CODES = exit_codes(
     {
-        0: "every agent with a native adapter loaded the expected skills",
+        0: "every checked agent loaded the expected skills",
         1: "an agent missed a skill, or its adapter failed",
         75: "every failing agent timed out; retry",
     }
@@ -44,8 +44,6 @@ log = logging.getLogger("skills-discover")
 
 class Evidence(TypedDict):
     status: str
-    expected: list[str]
-    discovered: list[str]
     missing: list[str]
     reason: str | None
 
@@ -210,8 +208,8 @@ def problem(agent: str, evidence: Evidence, profile: str) -> str:
     return f"{agent}: {evidence['reason']}"
 
 
-def run(args: argparse.Namespace) -> str:
-    """Check native adapters; report unsupported Claude without masking supported results."""
+def run(args: argparse.Namespace) -> dict[str, Any]:
+    """Check that each agent's native listing holds every selected skill."""
     from install_skills import PROFILES, digest, skill_sources
 
     home = Path.home()
@@ -222,7 +220,6 @@ def run(args: argparse.Namespace) -> str:
     roots = {
         "codex": ".codex/skills" if args.profile == "om1" else ".agents/skills",
         "pi": ".pi/agent/skills",
-        "claude": ".claude/skills",
         "opencode": ".config/opencode/skills",
     }
     agents = args.agent or list(roots)
@@ -230,22 +227,11 @@ def run(args: argparse.Namespace) -> str:
     timed_out: set[str] = set()
     for agent in agents:
         root = roots[agent]
-        evidence: Evidence = {
-            "status": "unverified",
-            "expected": selected,
-            "discovered": [],
-            "missing": [],
-            "reason": None,
-        }
+        evidence: Evidence = {"status": "unverified", "missing": [], "reason": None}
         results[agent] = evidence
         if root not in PROFILES[args.profile]:
             evidence["reason"] = (
                 f"~/{root} is not a {args.profile} target; drop --agent {agent}"
-            )
-            continue
-        if agent == "claude":
-            evidence["reason"] = (
-                "Claude native command names do not provide a stable skill path adapter"
             )
             continue
         if shutil.which(agent) is None:
@@ -272,7 +258,6 @@ def run(args: argparse.Namespace) -> str:
                 found = {
                     Path(key[agent](item)).expanduser().resolve() for item in items
                 }
-            discovered: list[str] = []
             missing: list[str] = []
             for name in selected:
                 entry = home / root / name / "SKILL.md"
@@ -292,11 +277,8 @@ def run(args: argparse.Namespace) -> str:
                     )
                 else:
                     matched = entry.is_file() and entry.resolve() in found
-                if matched:
-                    discovered.append(name)
-                else:
+                if not matched:
                     missing.append(name)
-            evidence["discovered"] = discovered
             evidence["missing"] = missing
             evidence["status"] = "missing" if missing else "verified"
         except (TimeoutError, subprocess.TimeoutExpired):
@@ -318,27 +300,15 @@ def run(args: argparse.Namespace) -> str:
                 f"see where with just skills-discover --profile {args.profile} "
                 f"--agent {agent} --debug"
             )
-    supported = [agent for agent in agents if agent != "claude"]
-    failing = [agent for agent in supported if results[agent]["status"] != "verified"]
-    failed = not supported or bool(failing)
-    verdict = (
-        "unverified" if failed else "partial" if "claude" in agents else "verified"
-    )
-    for agent, evidence in results.items():
-        if evidence["reason"]:
-            log.info("%s: %s", agent, evidence["reason"])
-    summary = {"profile": args.profile, "verdict": verdict, "agents": results}
-    lines = "\n".join(f"{agent}\t{results[agent]['status']}" for agent in agents)
-    if failed:
-        problems = [
-            problem(agent, results[agent], args.profile) for agent in failing
-        ] or [
-            "no selected agent has a native adapter; add --agent codex, pi, or opencode"
-        ]
-        temporary = bool(failing) and set(failing) <= timed_out
-        error = TemporaryError if temporary else ScriptError
-        raise error(*problems, detail=lines, report=summary)
-    return json.dumps(summary, indent=2, sort_keys=True) if args.json else lines
+    for agent in agents:
+        log.info("%s: %s", agent, results[agent]["status"])
+    failing = [agent for agent in agents if results[agent]["status"] != "verified"]
+    if failing:
+        error = TemporaryError if set(failing) <= timed_out else ScriptError
+        raise error(
+            *(problem(agent, results[agent], args.profile) for agent in failing)
+        )
+    return {}
 
 
 # Native discovery is a separate post-install proof. File hashes alone cannot
@@ -359,8 +329,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--agent",
         action="append",
-        choices=("codex", "pi", "claude", "opencode"),
-        help="check only this agent; repeat for more (default: all four)",
+        choices=("codex", "pi", "opencode"),
+        help="check only this agent; repeat for more (default: all three)",
     )
     parser.add_argument(
         "--private-root",
@@ -373,10 +343,9 @@ def main(argv: list[str] | None = None) -> int:
         default="40s",
         help="how long each agent may take to list its skills (default: 40s)",
     )
-    parser.add_argument(
-        "--json", action="store_true", help="print the per-agent report as JSON"
+    return run_script(
+        parser, run, argv, debug="DISCOVER_SKILLS_DEBUG", json_answer=True
     )
-    return run_script(parser, run, argv, debug="DISCOVER_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":
