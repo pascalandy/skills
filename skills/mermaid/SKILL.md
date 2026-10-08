@@ -99,7 +99,7 @@ On Linux, use `pnpm dlx --allow-build=puppeteer @mermaid-js/mermaid-cli` when no
 
 An existing Chrome can be selected with `PUPPETEER_EXECUTABLE_PATH`; `PUPPETEER_SKIP_DOWNLOAD=true` skips downloading another browser. Do not change project dependencies merely to render a diagram.
 
-For a reference containing multiple examples, use [scripts/render_examples.py](scripts/render_examples.py). Run its `--help` for extraction, output, and gallery options. It uses the bundled theme by default and keeps individual sources and render failures, so one broken example cannot hide behind the others.
+For a reference containing multiple examples, use [scripts/render_examples.py](scripts/render_examples.py). Run its `--help` for extraction, output, and gallery options. It uses the bundled theme by default and keeps individual sources. It answers in one JSON line: `files` lists each SVG to inspect, and an example that fails to render fails the run, named by file and line under `errors`, so one broken example cannot hide behind the others.
 
 ```bash
 # Run from this skill directory, with mmdc available on PATH
