@@ -9,6 +9,7 @@ import re
 import stat
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 import image_creator
 import pytest
@@ -88,6 +89,23 @@ def run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
     return code, captured.out, captured.err
 
 
+def success(code: int, stdout: str) -> dict[str, Any]:
+    """The one JSON line a success answers with, on stdout."""
+    assert code == 0
+    assert stdout.count("\n") == 1
+    answer = json.loads(stdout)
+    assert answer["ok"] is True
+    return answer
+
+
+def failure(stdout: str, stderr: str) -> dict[str, Any]:
+    """The answer that ends stderr after a failure, which leaves stdout empty."""
+    assert stdout == ""
+    answer = json.loads(stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    return answer
+
+
 def test_fit_size_returns_canonical_sizes() -> None:
     assert image_creator.fit_size(1.0, 1024 * 1024) == (1024, 1024)
     assert image_creator.fit_size(1.5, 1536 * 1024) == (1536, 1024)
@@ -134,11 +152,17 @@ def test_tiers_match_the_guide_tier_table() -> None:
 def test_no_backend_is_a_usage_error(
     env: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code, _, err = run(
+    code, out, err = run(
         capsys, "generate", "--prompt", "a cat", "--out", str(env / "cat.png")
     )
     assert code == 2
-    assert "plan backend unavailable" in err
+    assert failure(out, err) == {
+        "ok": False,
+        "errors": [
+            "plan backend unavailable: codex is not on PATH; no paid fallback was selected"
+        ],
+        "help": "image_creator.py --help",
+    }
 
 
 def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
@@ -157,10 +181,8 @@ def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
         "--out",
         str(out),
         "--dry-run",
-        "--json",
     )
-    receipt = json.loads(stdout)
-    assert code == 0
+    receipt = success(code, stdout)
     assert receipt["backend"] == "plan"
     assert receipt["outputs"] == [str(plan_login / f"hero-{i}.png") for i in (1, 2, 3)]
     assert receipt["prompt"] == "A hero\nAspect ratio: 16:9, landscape."
@@ -183,10 +205,8 @@ def test_openrouter_key_never_changes_the_default_mode(
         "--out",
         str(plan_login / "out.png"),
         "--dry-run",
-        "--json",
     )
-    assert code == 0
-    receipt = json.loads(stdout)
+    receipt = success(code, stdout)
     assert receipt["backend"] == "plan"
     assert not (plan_login / "chezmoi.log").exists()
     if intent is None:
@@ -277,16 +297,17 @@ def test_explicit_model_uses_openrouter_image_protocol(
         "poster",
         "--out",
         str(out),
-        "--json",
     ]
     if command == "edit":
         args += ["--image", str(source)]
     code, stdout, err = run(capsys, *args)
-    assert code == 0
     assert err == ""
-    receipt = json.loads(stdout)
-    assert receipt["backend"] == "openrouter"
-    assert receipt["usage"]["cost"] == 0.013
+    assert success(code, stdout) == {
+        "ok": True,
+        "files": [{"path": str(out), "width": 1024, "height": 1024}],
+        "backend": "openrouter",
+        "cost": 0.013,
+    }
     assert out.read_bytes() == original
 
 
@@ -310,15 +331,16 @@ def test_the_keyring_key_wins_over_the_variable(
     code, stdout, err = run(
         capsys, "generate", "--model", "flare", "--prompt", "poster", "--out", str(out)
     )
-    assert (code, err) == (0, "")
+    assert err == ""
     assert "sk-keyring" not in stdout
+    assert success(code, stdout)["files"][0]["path"] == str(out)
     assert sent == ["Bearer sk-keyring"]
     assert (env / "chezmoi.log").read_text().splitlines() == [
         "secret keyring get --service=openrouter --user=api_key"
     ]
-    assert run(capsys, "doctor", "--json")[1] == (
-        '{"plan": {"ready": false, "detail": "codex is not on PATH"}, '
-        '"openrouter": {"ready": true, "detail": "the keyring holds the OpenRouter key"}}\n'
+    assert run(capsys, "doctor")[1] == (
+        '{"ok":true,"plan":{"ready":false,"detail":"codex is not on PATH"},'
+        '"openrouter":{"ready":true,"detail":"the keyring holds the OpenRouter key"}}\n'
     )
 
 
@@ -361,10 +383,8 @@ def test_explicit_openrouter_defaults_to_high_intent(
         "--out",
         str(plan_login / "p.png"),
         "--dry-run",
-        "--json",
     )
-    receipt = json.loads(stdout)
-    assert code == 0
+    receipt = success(code, stdout)
     assert receipt["backend"] == "openrouter"
     assert receipt["request"] == {
         "model": "openai/gpt-image-2.5-sunburst",
@@ -448,19 +468,21 @@ def test_plan_run_writes_the_image_at_the_exact_requested_size(
         "A banner",
         "--out",
         str(out),
-        "--json",
+        "-v",
     )
-    receipt = json.loads(stdout)
-    assert code == 0
-    assert receipt["calls"][0]["prompt_verbatim"] is True
-    assert receipt["files"][0]["width"] == 1536
-    assert receipt["files"][0]["height"] == 864
+    assert success(code, stdout) == {
+        "ok": True,
+        "files": [{"path": str(out), "width": 1536, "height": 864}],
+        "backend": "plan",
+    }
     with Image.open(out) as image:
         assert image.format == "WEBP"
-    assert "upscaled 1254x1254 by 1.22x to reach 1536x864" in err
+    # -v adds the notes and the full receipt on stderr; stdout stays the answer
+    assert "banner.webp: upscaled 1254x1254 by 1.22x to reach 1536x864" in err
+    assert '"prompt_verbatim": true' in err
 
 
-def test_plan_run_warns_when_codex_changed_the_prompt(
+def test_plan_run_fails_when_codex_changed_the_prompt(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -476,18 +498,21 @@ def test_plan_run_warns_when_codex_changed_the_prompt(
         "--out",
         str(plan_login / "cat.png"),
     )
-    assert code == 0
-    assert stdout.startswith("wrote cat.png 1254x1254 via plan in ")
-    assert "warning: Codex changed the prompt before sending it" in err
+    assert code == 1
+    assert failure(stdout, err) == {
+        "ok": False,
+        "errors": ["Codex changed the prompt before sending it; inspect the result"],
+        "files": [{"path": str(plan_login / "cat.png"), "width": 1254, "height": 1254}],
+    }
 
 
-def test_transparent_request_without_alpha_warns(
+def test_transparent_request_without_alpha_fails(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("FAKE_TRACE_BODY", "{}")
-    code, _, err = run(
+    code, stdout, err = run(
         capsys,
         "generate",
         "--candidates",
@@ -498,8 +523,11 @@ def test_transparent_request_without_alpha_warns(
         "--out",
         str(plan_login / "fox.png"),
     )
-    assert code == 0
-    assert "fox.png has no alpha channel" in err
+    assert code == 1
+    assert failure(stdout, err)["errors"] == [
+        "fox.png has no alpha channel; retry with a transparent background"
+    ]
+    assert (plan_login / "fox.png").exists()
 
 
 def test_alpha_report_reads_a_real_cutout() -> None:
@@ -548,10 +576,8 @@ def test_edit_keeps_the_first_input_shape(
         "--out",
         str(plan_login / "edited.png"),
         "--dry-run",
-        "--json",
     )
-    receipt = json.loads(stdout)
-    assert code == 0
+    receipt = success(code, stdout)
     assert receipt.get("target_size") == expected_target
     assert receipt["prompt"] == f"Change only the color.\n{expected_line}"
 
@@ -576,7 +602,7 @@ def test_api_output_preserves_original_bytes(
         },
     )
     out = env / f"out.{format}"
-    code, _, err = run(
+    code, stdout, err = run(
         capsys,
         "generate",
         "--backend",
@@ -586,12 +612,14 @@ def test_api_output_preserves_original_bytes(
         "--out",
         str(out),
     )
-    assert code == 0
     assert err == ""
+    assert success(code, stdout)["files"] == [
+        {"path": str(out), "width": 128, "height": 128}
+    ]
     assert out.read_bytes() == original
 
 
-def test_api_mismatches_warn_and_list_only_delivered_files(
+def test_api_mismatches_fail_and_list_only_delivered_files(
     env: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -627,15 +655,214 @@ def test_api_mismatches_warn_and_list_only_delivered_files(
         "--transparent",
         "--candidates",
         "2",
-        "--json",
     )
-    assert code == 0
-    assert "requested 2 images but received 1" in err
-    assert "requested quality=high, API reported low" in err
-    assert "requested size=1536x864, API reported 1024x1024" in err
-    assert "requested background=transparent, API reported opaque" in err
-    assert "requested output_format=png, API reported webp" in err
-    assert "out-1.png is 1024x1024, requested 1536x864" in err
-    assert "out-1.png is fully opaque" in err
-    assert json.loads(stdout)["outputs"] == [str(env / "out-1.png")]
+    assert code == 1
+    assert failure(stdout, err) == {
+        "ok": False,
+        "errors": [
+            "requested 2 images but received 1; inspect the outputs",
+            "requested quality=high, API reported low",
+            "requested size=1536x864, API reported 1024x1024",
+            "requested background=transparent, API reported opaque",
+            "requested output_format=png, API reported webp",
+            "out-1.png is 1024x1024, requested 1536x864",
+            "out-1.png is fully opaque; retry with a transparent background",
+        ],
+        "files": [{"path": str(env / "out-1.png"), "width": 1024, "height": 1024}],
+    }
     assert not (env / "out-2.png").exists()
+
+
+@pytest.mark.parametrize(
+    ("argv", "error"),
+    [
+        (["--json"], "unrecognized arguments: --json"),
+        (["--intent", "best"], "argument --intent: invalid choice: 'best'"),
+    ],
+)
+def test_a_usage_error_answers_in_json_with_the_help_command(
+    plan_login: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    error: str,
+) -> None:
+    out = str(plan_login / "x.png")
+    code, stdout, err = run(capsys, "generate", "--prompt", "x", "--out", out, *argv)
+    assert code == 2
+    answer = failure(stdout, err)
+    assert answer["errors"][0].startswith(error)
+    assert answer["help"] == "image_creator.py --help"
+    assert not (plan_login / "x.png").exists()
+
+
+@pytest.mark.parametrize("where", ["before", "after"])
+def test_verbose_works_before_and_after_the_command(
+    plan_login: Path, capsys: pytest.CaptureFixture[str], where: str
+) -> None:
+    argv = [
+        "generate",
+        "--prompt",
+        "x",
+        "--out",
+        str(plan_login / "x.png"),
+        "--dry-run",
+    ]
+    argv = ["-v", *argv] if where == "before" else [*argv, "-v"]
+    code, stdout, err = run(capsys, *argv)
+    assert success(code, stdout)["backend"] == "plan"
+    assert "backend plan: Codex plan is the default for every intent" in err
+
+
+def test_each_command_help_prints_its_own_flags_and_answer(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, stdout, err = run(capsys, "generate", "--help")
+    assert (code, err) == (0, "")
+    assert "--prompt-file" in stdout
+    assert "answer: one JSON line on stdout" in stdout
+    code, stdout, _ = run(capsys, "--help")
+    assert code == 0
+    assert "{generate,edit,doctor}" in stdout
+
+
+@pytest.mark.parametrize(
+    ("raised", "code", "answer"),
+    [
+        (KeyboardInterrupt(), 130, {"ok": False, "errors": ["interrupted"]}),
+        (
+            RuntimeError("boom"),
+            1,
+            {
+                "ok": False,
+                "errors": ["RuntimeError: boom"],
+                "rerun": "image_creator.py generate --prompt x --out x.png --debug",
+            },
+        ),
+    ],
+)
+def test_an_interrupt_or_a_bug_still_answers(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    raised: BaseException,
+    code: int,
+    answer: dict[str, Any],
+) -> None:
+    def fail(*_: object) -> None:
+        raise raised
+
+    monkeypatch.setattr(image_creator, "job_from_args", fail)
+    got, stdout, err = run(capsys, "generate", "--prompt", "x", "--out", "x.png")
+    assert got == code
+    assert failure(stdout, err) == answer
+
+
+def test_doctor_without_any_backend_fails(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, stdout, err = run(capsys, "doctor")
+    assert code == 1
+    assert failure(stdout, err)["errors"] == [
+        "plan backend unavailable: codex is not on PATH",
+        (
+            "OpenRouter backend unavailable: no OpenRouter key; run `chezmoi secret "
+            "keyring set --service=openrouter --user=api_key`, or set OPENROUTER_API_KEY"
+        ),
+    ]
+
+
+def test_a_save_failure_keeps_the_images_already_written(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {
+            "data": [
+                {"b64_json": good},
+                {"b64_json": base64.b64encode(b"junk").decode()},
+            ]
+        },
+    )
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "sticker",
+        "--out",
+        str(out),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert answer["errors"][0].startswith("could not save out-2.png: ")
+    assert [Path(item["path"]).name for item in answer["files"]] == ["out-1.png"]
+
+
+def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        image_creator, "api_post", lambda route, body: {"data": [{"b64_json": "%%"}]}
+    )
+
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "x",
+        "--out",
+        str(env / "x.png"),
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert answer["errors"][0].startswith("OpenRouter returned 1 image(s) that are not")
+    assert "rerun" not in answer
+
+
+def test_a_malformed_candidate_still_saves_its_valid_sibling(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {"data": [{"b64_json": good}, {"b64_json": "%%"}]},
+    )
+
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "x",
+        "--out",
+        str(env / "x.png"),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 1
+    answer = failure(stdout, err)
+    assert [Path(item["path"]).name for item in answer["files"]] == ["x-1.png"]
+    assert any(
+        error.startswith("OpenRouter returned 1 image(s)") for error in answer["errors"]
+    )
