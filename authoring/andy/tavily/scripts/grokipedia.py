@@ -2,44 +2,366 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "httpx>=0.27",
-#     "rich>=13.0",
 # ]
 # ///
 """
-Search Grokipedia.com using Tavily API.
+Search Grokipedia.com using Tavily API and write the results to a Markdown file.
 
 Usage:
     uv run grokipedia.py "quantum computing"
     uv run grokipedia.py "Italian cuisine" --max-results 10
     uv run grokipedia.py "AI history" --raw
-    uv run grokipedia.py "neural networks" --json | jq '.results[].url'
+    uv run grokipedia.py "neural networks" --output notes/neural-networks.md
 """
 
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
 import json
-import subprocess
+import logging
+import os
+import re
+import shlex
+import signal
 import sys
-from typing import Any
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the messages; `report` is the
+    object `--json` prints on stderr beside them.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print progress and step details on stderr",
+    )
+    if debug:
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+        )
+    if given(argv, "-h", "--help", parser=parser):
+        parser.print_help()
+        return 0
+
+    # Parser.error, in the pasted cli block, prints usage errors itself;
+    # raising sends this one through answer_failure()
+    parser.error = usage_error
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError):
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
+import subprocess
+import tempfile
+from pathlib import Path
 
 import httpx
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.text import Text
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 TAVILY_API_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 GROKIPEDIA_BASE = "https://grokipedia.com/page"
 SEARCH_DOMAINS = ["grokipedia.com", "grokxpedia.us"]
+KEYRING_GET = "chezmoi secret keyring get --service=tavily --user=api_key"
+KEYRING_SET = "chezmoi secret keyring set --service=tavily --user=api_key"
 
-# Separate consoles: stdout for data, stderr for diagnostics
-out = Console()
-err = Console(stderr=True)
+EPILOG = """\
+The results go to a Markdown file: the --output path, or a new
+grokipedia-<query>-*.md file in the system temp directory ($TMPDIR, else /tmp).
+The answer is one JSON line on stdout, {"ok":true,"file":"/abs/path.md"}; a
+failure leaves stdout empty and ends stderr with {"ok":false,"errors":[...]}.
+
+examples:
+  uv run grokipedia.py "quantum physics"
+  uv run grokipedia.py "Italian cuisine" -n 10
+  uv run grokipedia.py "AI history" --raw
+  uv run grokipedia.py "neural networks" --output notes/neural-networks.md"""
+
+EXIT_CODES = exit_codes(
+    {0: "the results file was written", 1: "the key lookup, search, or write failed"}
+)
+
+log = logging.getLogger("grokipedia")
 
 
-class ApiKeyError(Exception):
+class ApiKeyError(ScriptError):
     """Raised when the Tavily API key cannot be retrieved."""
 
 
@@ -70,23 +392,20 @@ def get_api_key() -> str:
         key = result.stdout.strip()
         if not key:
             raise ApiKeyError(
-                "Tavily API key from keyring is empty.\n"
-                "  Set it with: chezmoi secret keyring set --service=tavily --user=api_key"
+                f"Tavily API key from keyring is empty; set it with: {KEYRING_SET}"
             )
         return key
     except FileNotFoundError as exc:
         raise ApiKeyError(
-            "chezmoi not found in PATH.\n"
-            "  Install chezmoi: https://www.chezmoi.io/install/"
+            "chezmoi not found in PATH; install chezmoi: https://www.chezmoi.io/install/"
         ) from exc
     except subprocess.CalledProcessError as exc:
         raise ApiKeyError(
-            "Could not retrieve Tavily API key from keyring.\n"
-            "  Set it with: chezmoi secret keyring set --service=tavily --user=api_key"
+            f"Could not retrieve Tavily API key from keyring; set it with: {KEYRING_SET}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise ApiKeyError(
-            "Tavily API key lookup timed out.\n  Check the keyring and retry."
+            f"Tavily API key lookup timed out; check the keyring with: {KEYRING_GET}"
         ) from exc
 
 
@@ -215,211 +534,174 @@ def extract_exact_page(
             "raw_content": raw_content,
         }
 
-    except (httpx.HTTPStatusError, httpx.RequestError):
+    except (httpx.HTTPStatusError, httpx.RequestError) as error:
+        log.info("exact page lookup failed for %s: %s", canonical_url, error)
         return None
 
 
-def display_results(data: dict[str, Any], raw: bool = False) -> None:
-    """Display search results with rich formatting.
+def render_markdown(data: dict[str, Any], raw: bool = False) -> str:
+    """Render search results as a Markdown document.
 
     Args:
         data: Tavily API response dictionary.
-        raw: Whether to show raw page content.
+        raw: Whether to include raw page content.
+
+    Returns:
+        The Markdown text, ending with a newline.
     """
-    query = data.get("query", "Unknown")
-    answer = data.get("answer")
-    results = data.get("results", [])
+    query = data.get("query") or "Unknown"
+    summary = data.get("answer")
+    results = data.get("results") or []
 
-    # Header
-    out.print(
-        Panel(
-            f"[bold cyan]Query:[/bold cyan] {query}\n"
-            f"[dim]Domains: {', '.join(SEARCH_DOMAINS)}[/dim]",
-            title="[bold green]Grokipedia Search via Tavily[/bold green]",
-            border_style="green",
-        )
-    )
+    lines = [
+        f"# Grokipedia search: {query}",
+        "",
+        f"Domains: {', '.join(SEARCH_DOMAINS)}",
+        "",
+    ]
+    if summary:
+        lines += ["## AI summary", "", summary, ""]
 
-    # AI Answer
-    if answer:
-        out.print(
-            Panel(
-                Markdown(answer),
-                title="[bold yellow]AI Summary[/bold yellow]",
-                border_style="yellow",
-            )
-        )
-
-    # Results
     if not results:
-        out.print("[yellow]No results found on grokipedia.com[/yellow]")
-        return
+        lines += ["No results found on grokipedia.com.", ""]
+        return "\n".join(lines)
 
-    out.print(f"\n[bold]Found {len(results)} result(s):[/bold]\n")
-
+    lines += [f"## Results ({len(results)})", ""]
     for i, result in enumerate(results, 1):
         title = result.get("title") or "No title"
         url = result.get("url") or ""
         content = result.get("content") or ""
         score = result.get("score")
 
-        title_text = Text()
-        title_text.append(f"{i}. ", style="bold cyan")
-        title_text.append(title, style="bold white underline")
-        out.print(title_text)
-        out.print(f"   [dim]{url}[/dim]")
-        if score is not None:
-            out.print(f"   [dim]Relevance: {score:.2f}[/dim]")
-        else:
-            out.print("   [dim]Relevance: N/A[/dim]")
-
+        lines += [f"### {i}. {title}", ""]
+        if url:
+            lines.append(f"- URL: {url}")
+        lines += [f"- Relevance: {'N/A' if score is None else f'{score:.2f}'}", ""]
         if content:
-            snippet = content[:300] + "..." if len(content) > 300 else content
-            out.print(Panel(snippet, border_style="dim", padding=(0, 2)))
+            lines += [content, ""]
 
         raw_content = result.get("raw_content") or ""
         if raw and raw_content:
-            out.print("[dim]--- Raw Content ---[/dim]")
-            out.print(
-                raw_content[:500] + "..." if len(raw_content) > 500 else raw_content
-            )
+            lines += ["#### Raw content", "", raw_content, ""]
 
-        out.print()
-
-    # Footer
-    response_time = data.get("response_time")
-    if response_time is not None:
-        out.print(f"[dim]Response time: {response_time:.2f}s[/dim]")
-    else:
-        out.print("[dim]Response time: N/A[/dim]")
+    return "\n".join(lines)
 
 
-def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Search Grokipedia.com using Tavily API",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""\
-Examples:
-  uv run grokipedia.py "quantum physics"
-  uv run grokipedia.py "Italian cuisine" -n 10
-  uv run grokipedia.py "AI history" --raw
-  uv run grokipedia.py "neural networks" --json | jq '.results[].url'
-""",
-    )
-
-    parser.add_argument(
-        "query",
-        help="Search query (e.g., 'quantum computing')",
-    )
-
-    parser.add_argument(
-        "-n",
-        "--max-results",
-        type=int,
-        default=5,
-        help="Maximum number of results (default: 5, max: 20)",
-    )
-
-    parser.add_argument(
-        "--raw",
-        action="store_true",
-        help="Include raw content from pages",
-    )
-
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="json_output",
-        help="Output raw JSON instead of formatted results",
-    )
-
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-
-    return parser.parse_args()
-
-
-def main() -> int:
-    """Main entry point.
+def write_results(markdown: str, query: str, output: str | None = None) -> Path:
+    """Write the results to `output`, or to a new file in the system temp directory.
 
     Returns:
-        Exit code: 0 success, 1 runtime error, 2 validation error.
+        The absolute path of the file written.
     """
-    args = parse_arguments()
+    if output is not None:
+        path = Path(output).expanduser().resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(markdown, encoding="utf-8")
+        return path
+    slug = re.sub(r"[^a-z0-9]+", "-", query.lower()).strip("-")[:60] or "search"
+    handle, name = tempfile.mkstemp(prefix=f"grokipedia-{slug}-", suffix=".md")
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        file.write(markdown)
+    return Path(name).resolve()
 
-    # Validate inputs before doing any work
+
+def http_failure(response: httpx.Response) -> str:
+    """The error message for a non-2xx answer from Tavily, with what to do next."""
+    status = response.status_code
+    if status in (401, 403):
+        return f"Tavily API returned HTTP {status}; verify the API key: {KEYRING_GET}"
+    if status == 429:
+        return "Tavily API returned HTTP 429, rate limited; wait a moment, then rerun the search"
+    body = " ".join(response.text[:200].split())
+    return f"Tavily API returned HTTP {status}: {body}; rerun the search later"
+
+
+def search(args: argparse.Namespace) -> dict[str, Any]:
+    """Run the search, write the results file, and return the data beside `ok`."""
     query = args.query.strip()
     if not query:
-        err.print("[red]Error: query must not be empty[/red]")
-        err.print('  uv run grokipedia.py "your search terms"')
-        return 2
-
+        raise UsageError("query must not be empty; pass search terms in quotes")
     if args.max_results < 1 or args.max_results > 20:
-        err.print(
-            f"[red]Error: --max-results must be 1-20, got {args.max_results}[/red]"
-        )
-        err.print('  uv run grokipedia.py "your query" -n 5')
-        return 2
+        raise UsageError(f"--max-results must be 1-20, got {args.max_results}")
 
+    api_key = get_api_key()
     try:
-        api_key = get_api_key()
-
         data = search_grokipedia(
             query=query,
             max_results=args.max_results,
             include_raw=args.raw,
             api_key=api_key,
         )
+    except httpx.HTTPStatusError as error:
+        raise ScriptError(http_failure(error.response)) from error
+    except httpx.RequestError as error:
+        raise ScriptError(
+            f"Could not reach Tavily API: {error}; check the internet connection, "
+            "then rerun the search"
+        ) from error
+    log.info("Tavily answered in %ss", data.get("response_time"))
 
-        # Hybrid lookup: if the canonical page isn't in search results,
-        # try extracting it directly and prepend it.
-        title = normalize_page_title(query)
-        canonical_url = f"{GROKIPEDIA_BASE}/{title}"
-        results = data["results"] = data.get("results") or []
-        existing_urls = {(r.get("url") or "").lower() for r in results}
+    # Hybrid lookup: if the canonical page isn't in search results,
+    # try extracting it directly and prepend it.
+    title = normalize_page_title(query)
+    canonical_url = f"{GROKIPEDIA_BASE}/{title}"
+    results = data["results"] = data.get("results") or []
+    existing_urls = {(r.get("url") or "").lower() for r in results}
 
-        if canonical_url.lower() not in existing_urls:
-            exact = extract_exact_page(query, api_key=api_key)
-            if exact is not None:
-                results.insert(0, exact)
+    if canonical_url.lower() not in existing_urls:
+        exact = extract_exact_page(query, api_key=api_key)
+        if exact is not None:
+            log.info("added the exact page %s", canonical_url)
+            results.insert(0, exact)
 
-        if args.json_output:
-            print(json.dumps(data, indent=2))
-        else:
-            display_results(data, raw=args.raw)
+    try:
+        path = write_results(render_markdown(data, raw=args.raw), query, args.output)
+    except OSError as error:
+        raise ScriptError(
+            f"Could not write the results: {error}; pass --output with a writable file path"
+        ) from error
+    return {"file": str(path)}
 
-        return 0
 
-    except ApiKeyError as e:
-        err.print(f"[red]Error: {e}[/red]")
-        return 1
+def build_parser() -> Parser:
+    """The command line parser; its help is the flag reference."""
+    parser = Parser(
+        prog="grokipedia.py",
+        description="Search Grokipedia.com using the Tavily API and write the results "
+        "to a Markdown file.",
+        epilog=EPILOG,
+        exit_codes=EXIT_CODES,
+    )
+    parser.add_argument("query", help="search query, such as 'quantum computing'")
+    parser.add_argument(
+        "-n",
+        "--max-results",
+        type=int,
+        default=5,
+        help="maximum number of results, 1-20 (default: 5)",
+    )
+    parser.add_argument(
+        "--raw", action="store_true", help="include each page's raw content"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        metavar="FILE",
+        help="write the results to FILE (default: a new file in the system temp directory)",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    return parser
 
-    except httpx.HTTPStatusError as e:
-        status = e.response.status_code
-        err.print(f"[red]Error: Tavily API returned HTTP {status}[/red]")
-        if status in (401, 403):
-            err.print(
-                "  Verify API key: chezmoi secret keyring get --service=tavily --user=api_key"
-            )
-        elif status == 429:
-            err.print("  Rate limited. Wait a moment and retry.")
-        else:
-            err.print(f"  Response: {e.response.text[:200]}")
-        return 1
 
-    except httpx.RequestError as e:
-        err.print("[red]Error: Could not reach Tavily API[/red]")
-        err.print(f"  {e}")
-        err.print("  Check your internet connection and try again.")
-        return 1
+def main(argv: Sequence[str] | None = None) -> int:
+    """Main entry point: answer every outcome in one JSON line.
 
-    except KeyboardInterrupt:
-        err.print("\n[dim]Interrupted[/dim]")
-        return 130
+    Returns:
+        Exit code: 0 success, 1 runtime error, 2 usage error, 130 or 143 interrupted.
+    """
+    return run_script(build_parser(), search, argv, debug="GROKIPEDIA_DEBUG")
 
 
 if __name__ == "__main__":

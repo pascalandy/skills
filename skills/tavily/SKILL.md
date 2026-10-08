@@ -226,6 +226,8 @@ Use conservative defaults unless deeper recall needed:
 
 Domain-scoped search restricted to `grokipedia.com` and `grokxpedia.us` using Tavily's `include_domains` parameter. Equivalent to Google's `site:grokipedia.com` operator.
 
+It writes the AI summary and the results to a Markdown file, then answers in one JSON line that names the file: `{"ok":true,"file":"/abs/path.md"}`. Read that file for the results. Without `--output`, the file is a new `grokipedia-<query>-*.md` in the system temp directory. A failure leaves stdout empty and ends stderr with `{"ok":false,"errors":[…]}`; each error names the command that fixes it.
+
 ```bash
 # Basic search
 uv run <skill_dir>/scripts/grokipedia.py "quantum computing"
@@ -236,14 +238,8 @@ uv run <skill_dir>/scripts/grokipedia.py "Italian cuisine" -n 10
 # Include raw page content
 uv run <skill_dir>/scripts/grokipedia.py "AI history" --raw
 
-# JSON output for piping
-uv run <skill_dir>/scripts/grokipedia.py "neural networks" --json | jq '.results[].url'
+# Write the results to a chosen file
+uv run <skill_dir>/scripts/grokipedia.py "neural networks" --output notes/neural-networks.md
 ```
 
-| Flag | Description |
-|------|-------------|
-| `query` | Search query (positional, required) |
-| `-n, --max-results` | Number of results, 1-20 (default: 5) |
-| `--raw` | Include raw page content |
-| `--json` | Machine-readable JSON output |
-| `--version` | Print version and exit |
+Run it with `--help` for every flag and exit code.

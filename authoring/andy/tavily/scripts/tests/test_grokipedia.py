@@ -3,7 +3,6 @@
 # dependencies = [
 #     "pytest>=8.0",
 #     "httpx>=0.27",
-#     "rich>=13.0",
 #     "respx>=0.22",
 # ]
 # ///
@@ -54,6 +53,48 @@ def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str,
         timeout=60,
     )
     return result.stdout, result.stderr, result.returncode
+
+
+@pytest.fixture(autouse=True)
+def temp_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Send the default results file to a per-test folder, never the real temp dir."""
+    monkeypatch.setattr(grokipedia.tempfile, "tempdir", str(tmp_path))
+    return tmp_path
+
+
+def succeeded(capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
+    """The one-line answer a successful run printed, with an empty stderr."""
+    out, err = capsys.readouterr()
+    assert err == ""
+    assert out.endswith("\n") and out.count("\n") == 1
+    found = json.loads(out)
+    assert found["ok"] is True
+    return found
+
+
+def failed(capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
+    """The answer a failed run left as the last stderr line, with an empty stdout."""
+    out, err = capsys.readouterr()
+    assert out == ""
+    found = json.loads(err.splitlines()[-1])
+    assert found["ok"] is False
+    return found
+
+
+def results_text(capsys: pytest.CaptureFixture[str]) -> str:
+    """The Markdown file a successful run answered with."""
+    file = Path(succeeded(capsys)["file"])
+    assert file.is_absolute()
+    return file.read_text(encoding="utf-8")
+
+
+def urls_in(markdown: str) -> list[str]:
+    """The result URLs in a results file, in order."""
+    return [
+        line.removeprefix("- URL: ")
+        for line in markdown.splitlines()
+        if line.startswith("- URL: ")
+    ]
 
 
 def _capture_payload(
@@ -128,14 +169,21 @@ class TestCLIHelp:
 
     def test_help_shows_examples(self) -> None:
         stdout, _, _ = run_script("--help")
-        assert "Examples:" in stdout
+        assert "examples:" in stdout
 
     def test_help_shows_all_flags(self) -> None:
         stdout, _, _ = run_script("--help")
         assert "--max-results" in stdout
         assert "--raw" in stdout
-        assert "--json" in stdout
+        assert "--output" in stdout
+        assert "--verbose" in stdout
         assert "--version" in stdout
+        assert "--json" not in stdout
+
+    def test_help_wins_over_a_bad_argument(self) -> None:
+        stdout, _, code = run_script("--typo", "--help")
+        assert code == 0
+        assert stdout.startswith("usage: grokipedia.py")
 
 
 class TestCLIVersion:
@@ -147,7 +195,7 @@ class TestCLIVersion:
 
     def test_version_shows_semver(self) -> None:
         stdout, _, _ = run_script("--version")
-        assert "0.1.0" in stdout
+        assert stdout == "grokipedia.py 0.2.0\n"
 
 
 class TestCLIValidation:
@@ -169,10 +217,6 @@ class TestCLIValidation:
         _, stderr, code = run_script("   ")
         assert code == 2
 
-    def test_max_results_zero_exits_2(self) -> None:
-        _, _, code = run_script("test", "-n", "0")
-        assert code == 2
-
     def test_max_results_21_exits_2(self) -> None:
         _, _, code = run_script("test", "-n", "21")
         assert code == 2
@@ -186,11 +230,20 @@ class TestCLIValidation:
         _, _, code = run_script("test", "-n", "abc")
         assert code == 2
 
-    def test_validation_errors_on_stderr(self) -> None:
-        """Error text must be on stderr, not stdout."""
-        stdout, stderr, _ = run_script("test", "-n", "0")
-        assert stdout == ""  # stdout must be clean
-        assert "Error" in stderr or "error" in stderr
+    def test_json_flag_is_gone(self) -> None:
+        """JSON is the default answer, so --json is an unknown flag."""
+        _, _, code = run_script("test", "--json")
+        assert code == 2
+
+    def test_validation_errors_answer_on_stderr(self) -> None:
+        """A usage error leaves stdout empty and ends stderr with its answer."""
+        stdout, stderr, code = run_script("test", "-n", "0")
+        assert (code, stdout) == (2, "")
+        assert json.loads(stderr.splitlines()[-1]) == {
+            "ok": False,
+            "errors": ["--max-results must be 1-20, got 0"],
+            "help": "grokipedia.py --help",
+        }
 
 
 # ===================================================================
@@ -455,44 +508,54 @@ class TestSearchGrokipedia:
 
 
 # ===================================================================
-# Unit Tests -- display_results
+# Unit Tests -- render_markdown
 # ===================================================================
 
 
-class TestDisplayResults:
-    """display_results must handle all edge cases without crashing."""
+class TestRenderMarkdown:
+    """render_markdown must handle all edge cases and keep every result."""
 
     def test_empty_results(self) -> None:
-        """Empty results list should not crash."""
-        grokipedia.display_results(EMPTY_RESPONSE)
+        """Empty results list says so instead of listing nothing."""
+        text = grokipedia.render_markdown(EMPTY_RESPONSE)
+        assert "No results found on grokipedia.com." in text
 
     def test_no_answer_key(self) -> None:
-        """Missing answer should be handled gracefully."""
+        """Missing answer leaves out the summary section."""
         data = {"query": "test", "results": [], "response_time": 0.1}
-        grokipedia.display_results(data)
+        assert "## AI summary" not in grokipedia.render_markdown(data)
 
-    def test_none_score_does_not_crash(self) -> None:
-        """score: null from API must not cause format error."""
-        grokipedia.display_results(NULL_FIELDS_RESPONSE)
+    def test_answer_becomes_summary(self) -> None:
+        text = grokipedia.render_markdown(FAKE_RESPONSE)
+        assert "## AI summary\n\nA test answer from Tavily.\n" in text
 
-    def test_none_content_does_not_crash(self) -> None:
-        """content: null must not cause TypeError on slicing."""
-        grokipedia.display_results(NULL_FIELDS_RESPONSE)
+    def test_result_fields(self) -> None:
+        text = grokipedia.render_markdown(FAKE_RESPONSE)
+        assert "### 1. Test Article\n" in text
+        assert urls_in(text) == ["https://grokipedia.com/page/Test"]
+        assert "- Relevance: 0.95\n" in text
+        assert "This is test content from Grokipedia.\n" in text
 
-    def test_none_response_time_does_not_crash(self) -> None:
-        """response_time: null must not cause format error."""
-        grokipedia.display_results(NULL_FIELDS_RESPONSE)
-
-    def test_none_title_does_not_crash(self) -> None:
-        """title: null must render fallback text."""
-        grokipedia.display_results(NULL_FIELDS_RESPONSE)
+    def test_null_fields_render_fallbacks(self) -> None:
+        """null title, url, score, and content must not crash."""
+        text = grokipedia.render_markdown(NULL_FIELDS_RESPONSE)
+        assert "### 1. No title\n" in text
+        assert "- Relevance: N/A\n" in text
+        assert urls_in(text) == []
 
     def test_none_raw_content_with_raw_flag(self) -> None:
         """raw_content: null with raw=True must not crash."""
-        grokipedia.display_results(NULL_FIELDS_RESPONSE, raw=True)
+        text = grokipedia.render_markdown(NULL_FIELDS_RESPONSE, raw=True)
+        assert "Raw content" not in text
 
-    def test_long_content_truncated(self) -> None:
-        """Content over 300 chars should be truncated with '...'."""
+    def test_raw_content_only_with_raw_flag(self) -> None:
+        raw = "Full raw content of the test article."
+        assert raw not in grokipedia.render_markdown(FAKE_RESPONSE)
+        text = grokipedia.render_markdown(FAKE_RESPONSE, raw=True)
+        assert f"#### Raw content\n\n{raw}\n" in text
+
+    def test_long_content_kept_whole(self) -> None:
+        """A file has no screen width, so content and raw content stay whole."""
         data = {
             "query": "long",
             "results": [
@@ -501,42 +564,50 @@ class TestDisplayResults:
                     "url": "https://grokipedia.com/page/Long",
                     "content": "x" * 500,
                     "score": 0.5,
+                    "raw_content": "y" * 1000,
                 }
             ],
-            "response_time": 0.1,
         }
-        # Should not crash; truncation is visual only
-        grokipedia.display_results(data)
-
-    # --- NEW: additional edge cases ---
+        text = grokipedia.render_markdown(data, raw=True)
+        assert "x" * 500 in text
+        assert "y" * 1000 in text
 
     def test_unit_empty_dict_does_not_crash(self) -> None:
         """Completely empty dict must not raise."""
-        grokipedia.display_results({})
+        text = grokipedia.render_markdown({})
+        assert text.startswith("# Grokipedia search: Unknown\n")
 
-    def test_unit_valid_data_with_raw_true(self) -> None:
-        """Full valid data with raw=True must render without error."""
-        grokipedia.display_results(FAKE_RESPONSE, raw=True)
 
-    # --- Gap: raw content truncation boundary ---
+# ===================================================================
+# Unit Tests -- write_results
+# ===================================================================
 
-    def test_unit_raw_long_content_truncated_at_500(self) -> None:
-        """Raw content >500 chars with raw=True must not crash (truncation is visual)."""
-        data = {
-            "query": "long",
-            "results": [
-                {
-                    "title": "Long Article",
-                    "url": "https://grokipedia.com/page/Long",
-                    "content": "Short snippet.",
-                    "score": 0.8,
-                    "raw_content": "x" * 1000,
-                }
-            ],
-            "response_time": 0.5,
-        }
-        # Must not raise; truncation happens inside display logic
-        grokipedia.display_results(data, raw=True)
+
+class TestWriteResults:
+    """write_results must put the file where the caller can find it."""
+
+    def test_default_goes_to_temp_dir(self, temp_dir: Path) -> None:
+        path = grokipedia.write_results("# hi\n", "Quantum computing!")
+        assert path.parent == temp_dir.resolve()
+        assert path.name.startswith("grokipedia-quantum-computing-")
+        assert path.suffix == ".md"
+        assert path.read_text(encoding="utf-8") == "# hi\n"
+
+    def test_same_query_twice_keeps_both_files(self) -> None:
+        first = grokipedia.write_results("a", "same")
+        second = grokipedia.write_results("b", "same")
+        assert first != second
+        assert first.read_text(encoding="utf-8") == "a"
+
+    def test_query_without_letters_gets_a_name(self) -> None:
+        path = grokipedia.write_results("x", "???")
+        assert path.name.startswith("grokipedia-search-")
+
+    def test_output_creates_parent_folders(self, tmp_path: Path) -> None:
+        wanted = tmp_path / "notes" / "q.md"
+        path = grokipedia.write_results("# hi\n", "q", str(wanted))
+        assert path == wanted.resolve()
+        assert path.read_text(encoding="utf-8") == "# hi\n"
 
 
 # ===================================================================
@@ -545,57 +616,49 @@ class TestDisplayResults:
 
 
 class TestParseArguments:
-    """parse_arguments must expose correct defaults and flag mappings."""
+    """build_parser must expose correct defaults and flag mappings."""
 
     def test_unit_default_max_results_is_5(self) -> None:
         """Default --max-results must be 5 when omitted."""
-        with patch("sys.argv", ["grokipedia.py", "test"]):
-            args = grokipedia.parse_arguments()
-            assert args.max_results == 5
-
-    def test_unit_json_flag_sets_json_output(self) -> None:
-        """--json must set json_output=True."""
-        with patch("sys.argv", ["grokipedia.py", "test", "--json"]):
-            args = grokipedia.parse_arguments()
-            assert args.json_output is True
+        args = grokipedia.build_parser().parse_args(["test"])
+        assert args.max_results == 5
 
     def test_unit_raw_flag_sets_attribute(self) -> None:
         """--raw must set raw=True."""
-        with patch("sys.argv", ["grokipedia.py", "test", "--raw"]):
-            args = grokipedia.parse_arguments()
-            assert args.raw is True
+        args = grokipedia.build_parser().parse_args(["test", "--raw"])
+        assert args.raw is True
 
-    def test_unit_json_output_false_by_default(self) -> None:
-        """json_output must default to False."""
-        with patch("sys.argv", ["grokipedia.py", "test"]):
-            args = grokipedia.parse_arguments()
-            assert args.json_output is False
+    def test_unit_output_none_by_default(self) -> None:
+        """output must default to None, the system temp directory."""
+        args = grokipedia.build_parser().parse_args(["test"])
+        assert args.output is None
+
+    def test_unit_short_o_flag_sets_output(self) -> None:
+        """-o must set output."""
+        args = grokipedia.build_parser().parse_args(["test", "-o", "out.md"])
+        assert args.output == "out.md"
 
     def test_unit_raw_false_by_default(self) -> None:
         """raw must default to False."""
-        with patch("sys.argv", ["grokipedia.py", "test"]):
-            args = grokipedia.parse_arguments()
-            assert args.raw is False
+        args = grokipedia.build_parser().parse_args(["test"])
+        assert args.raw is False
 
     def test_unit_query_positional_captured(self) -> None:
         """Positional query argument must be captured."""
-        with patch("sys.argv", ["grokipedia.py", "quantum computing"]):
-            args = grokipedia.parse_arguments()
-            assert args.query == "quantum computing"
+        args = grokipedia.build_parser().parse_args(["quantum computing"])
+        assert args.query == "quantum computing"
 
     # --- Gap: short and long flag variants ---
 
     def test_unit_short_n_flag_sets_max_results(self) -> None:
         """-n must set max_results."""
-        with patch("sys.argv", ["grokipedia.py", "test", "-n", "10"]):
-            args = grokipedia.parse_arguments()
-            assert args.max_results == 10
+        args = grokipedia.build_parser().parse_args(["test", "-n", "10"])
+        assert args.max_results == 10
 
     def test_unit_long_max_results_flag_sets_value(self) -> None:
         """--max-results must set max_results."""
-        with patch("sys.argv", ["grokipedia.py", "test", "--max-results", "15"]):
-            args = grokipedia.parse_arguments()
-            assert args.max_results == 15
+        args = grokipedia.build_parser().parse_args(["test", "--max-results", "15"])
+        assert args.max_results == 15
 
 
 # ===================================================================
@@ -607,7 +670,9 @@ class TestMainFunction:
     """main() must return correct exit codes for all paths."""
 
     @respx.mock
-    def test_success_returns_0(self) -> None:
+    def test_success_answers_with_the_results_file(
+        self, capsys: pytest.CaptureFixture[str], temp_dir: Path
+    ) -> None:
         respx.post(grokipedia.TAVILY_API_URL).mock(
             return_value=httpx.Response(200, json=FAKE_RESPONSE)
         )
@@ -616,39 +681,78 @@ class TestMainFunction:
             return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
         )
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "test query"]):
-                assert grokipedia.main() == 0
+            assert grokipedia.main(["test query"]) == 0
+        found = succeeded(capsys)
+        assert set(found) == {"ok", "file"}
+        file = Path(found["file"])
+        assert file.parent == temp_dir.resolve()
+        assert "### 1. Test Article" in file.read_text(encoding="utf-8")
 
     @respx.mock
-    def test_json_output_is_valid_json(self) -> None:
+    def test_output_flag_names_the_file(
+        self, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
         respx.post(grokipedia.TAVILY_API_URL).mock(
             return_value=httpx.Response(200, json=FAKE_RESPONSE)
         )
-        # Mock extract endpoint (hybrid lookup for canonical page)
         respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
             return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
         )
+        wanted = tmp_path / "out" / "results.md"
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "test query", "--json"]):
-                # Capture stdout
-                import io
-
-                captured = io.StringIO()
-                with patch("sys.stdout", captured):
-                    code = grokipedia.main()
-                assert code == 0
-                output = captured.getvalue()
-                parsed = json.loads(output)  # Must be valid JSON
-                assert "results" in parsed
+            assert grokipedia.main(["test query", "--output", str(wanted)]) == 0
+        assert succeeded(capsys) == {"ok": True, "file": str(wanted.resolve())}
+        assert wanted.is_file()
 
     @respx.mock
-    def test_http_401_returns_1(self) -> None:
+    def test_unwritable_output_returns_1(
+        self, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
+        respx.post(grokipedia.TAVILY_API_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_RESPONSE)
+        )
+        respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_EXTRACT_FAIL_RESPONSE)
+        )
+        blocker = tmp_path / "a-file"
+        blocker.write_text("", encoding="utf-8")
+        with patch("grokipedia.get_api_key", return_value="fake-key"):
+            code = grokipedia.main(["test", "--output", str(blocker / "out.md")])
+        assert code == 1
+        [error] = failed(capsys)["errors"]
+        assert error.startswith("Could not write the results:")
+        assert error.endswith("pass --output with a writable file path")
+
+    @respx.mock
+    def test_verbose_logs_on_stderr_only(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        respx.post(grokipedia.TAVILY_API_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_RESPONSE)
+        )
+        respx.post(grokipedia.TAVILY_EXTRACT_URL).mock(
+            return_value=httpx.Response(200, json=FAKE_EXTRACT_RESPONSE)
+        )
+        with patch("grokipedia.get_api_key", return_value="fake-key"):
+            assert grokipedia.main(["pattern", "-v"]) == 0
+        out, err = capsys.readouterr()
+        assert json.loads(out)["ok"] is True
+        assert "Tavily answered in 1.23s" in err
+        assert "added the exact page https://grokipedia.com/page/Pattern" in err
+
+    @respx.mock
+    def test_http_401_names_the_key_command(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         respx.post(grokipedia.TAVILY_API_URL).mock(
             return_value=httpx.Response(401, json={"error": "unauthorized"})
         )
         with patch("grokipedia.get_api_key", return_value="bad-key"):
-            with patch("sys.argv", ["grokipedia.py", "test"]):
-                assert grokipedia.main() == 1
+            assert grokipedia.main(["test"]) == 1
+        assert failed(capsys)["errors"] == [
+            "Tavily API returned HTTP 401; verify the API key: "
+            "chezmoi secret keyring get --service=tavily --user=api_key"
+        ]
 
     @respx.mock
     def test_http_429_returns_1(self) -> None:
@@ -659,13 +763,15 @@ class TestMainFunction:
             with patch("sys.argv", ["grokipedia.py", "test"]):
                 assert grokipedia.main() == 1
 
-    def test_api_key_missing_returns_1(self) -> None:
+    def test_api_key_error_is_the_answer(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         with patch(
             "grokipedia.get_api_key",
             side_effect=grokipedia.ApiKeyError("no key"),
         ):
-            with patch("sys.argv", ["grokipedia.py", "test"]):
-                assert grokipedia.main() == 1
+            assert grokipedia.main(["test"]) == 1
+        assert failed(capsys) == {"ok": False, "errors": ["no key"]}
 
     @respx.mock
     def test_connection_error_returns_1(self) -> None:
@@ -676,9 +782,10 @@ class TestMainFunction:
             with patch("sys.argv", ["grokipedia.py", "test"]):
                 assert grokipedia.main() == 1
 
-    def test_empty_query_returns_2(self) -> None:
+    def test_empty_query_returns_2(self, capsys: pytest.CaptureFixture[str]) -> None:
         with patch("sys.argv", ["grokipedia.py", ""]):
             assert grokipedia.main() == 2
+        assert failed(capsys)["help"] == "grokipedia.py --help"
 
     def test_whitespace_query_returns_2(self) -> None:
         with patch("sys.argv", ["grokipedia.py", "   "]):
@@ -710,11 +817,14 @@ class TestMainFunction:
             with patch("sys.argv", ["grokipedia.py", "test"]):
                 assert grokipedia.main() == 1
 
-    def test_unit_keyboard_interrupt_returns_130(self) -> None:
+    def test_unit_keyboard_interrupt_returns_130(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """KeyboardInterrupt during execution must return 130."""
         with patch("grokipedia.get_api_key", side_effect=KeyboardInterrupt):
             with patch("sys.argv", ["grokipedia.py", "test"]):
                 assert grokipedia.main() == 130
+        assert failed(capsys)["errors"] == ["interrupted"]
 
     @respx.mock
     def test_unit_max_results_1_valid_boundary(self) -> None:
@@ -1101,12 +1211,14 @@ class TestHybridSearch:
         )
         with (
             patch("grokipedia.get_api_key", return_value="fake-key"),
-            patch("sys.argv", ["grokipedia.py", "nulls", "--json"]),
+            patch("sys.argv", ["grokipedia.py", "nulls"]),
         ):
             code = grokipedia.main()
 
         assert code == 0
-        assert json.loads(capsys.readouterr().out)["results"][0]["url"] is None
+        text = results_text(capsys)
+        assert "### 1. No title" in text
+        assert urls_in(text) == []
 
     @respx.mock
     def test_null_results_does_not_abort_search(
@@ -1120,15 +1232,17 @@ class TestHybridSearch:
         )
         with (
             patch("grokipedia.get_api_key", return_value="fake-key"),
-            patch("sys.argv", ["grokipedia.py", "x", "--json"]),
+            patch("sys.argv", ["grokipedia.py", "x"]),
         ):
             code = grokipedia.main()
 
         assert code == 0
-        assert json.loads(capsys.readouterr().out)["results"] == []
+        assert "No results found on grokipedia.com." in results_text(capsys)
 
     @respx.mock
-    def test_exact_page_injected_when_missing_from_search(self) -> None:
+    def test_exact_page_injected_when_missing_from_search(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """If search doesn't return /page/Pattern, extract should inject it."""
         # Search returns results that DON'T include /page/Pattern
         search_response = {
@@ -1151,23 +1265,22 @@ class TestHybridSearch:
             return_value=httpx.Response(200, json=FAKE_EXTRACT_RESPONSE)
         )
 
-        import io
-
-        captured = io.StringIO()
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "pattern", "--json"]):
-                with patch("sys.stdout", captured):
-                    code = grokipedia.main()
+            with patch("sys.argv", ["grokipedia.py", "pattern"]):
+                code = grokipedia.main()
 
         assert code == 0
-        data = json.loads(captured.getvalue())
-        urls = [r["url"] for r in data["results"]]
-        assert "https://grokipedia.com/page/Pattern" in urls
+        urls = urls_in(results_text(capsys))
         # Exact match should be first
-        assert data["results"][0]["url"] == "https://grokipedia.com/page/Pattern"
+        assert urls == [
+            "https://grokipedia.com/page/Pattern",
+            "https://grokipedia.com/page/pattern_grammar",
+        ]
 
     @respx.mock
-    def test_no_duplicate_when_search_already_has_page(self) -> None:
+    def test_no_duplicate_when_search_already_has_page(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """If search already includes the exact page, don't add it twice."""
         search_response = {
             "query": "pattern",
@@ -1188,25 +1301,18 @@ class TestHybridSearch:
         # Extract should NOT be called if search already has it,
         # but even if it is, no duplicate should appear.
 
-        import io
-
-        captured = io.StringIO()
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "pattern", "--json"]):
-                with patch("sys.stdout", captured):
-                    code = grokipedia.main()
+            with patch("sys.argv", ["grokipedia.py", "pattern"]):
+                code = grokipedia.main()
 
         assert code == 0
-        data = json.loads(captured.getvalue())
-        pattern_urls = [
-            r["url"]
-            for r in data["results"]
-            if r["url"] == "https://grokipedia.com/page/Pattern"
-        ]
-        assert len(pattern_urls) == 1  # no duplicate
+        urls = urls_in(results_text(capsys))
+        assert urls == ["https://grokipedia.com/page/Pattern"]  # no duplicate
 
     @respx.mock
-    def test_extract_failure_does_not_break_search(self) -> None:
+    def test_extract_failure_does_not_break_search(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """If extract fails, search results should still display normally."""
         search_response = {
             "query": "pattern",
@@ -1228,22 +1334,20 @@ class TestHybridSearch:
             side_effect=httpx.ConnectError("timeout")
         )
 
-        import io
-
-        captured = io.StringIO()
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "pattern", "--json"]):
-                with patch("sys.stdout", captured):
-                    code = grokipedia.main()
+            with patch("sys.argv", ["grokipedia.py", "pattern"]):
+                code = grokipedia.main()
 
         assert code == 0
-        data = json.loads(captured.getvalue())
-        assert len(data["results"]) == 1  # just the search result, no crash
+        urls = urls_in(results_text(capsys))
+        assert len(urls) == 1  # just the search result, no crash
 
     # --- NEW: case-insensitive URL dedup ---
 
     @respx.mock
-    def test_unit_case_insensitive_url_dedup(self) -> None:
+    def test_unit_case_insensitive_url_dedup(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """URL comparison for dedup must be case-insensitive."""
         search_response = {
             "query": "pattern",
@@ -1263,15 +1367,11 @@ class TestHybridSearch:
             return_value=httpx.Response(200, json=search_response)
         )
 
-        import io
-
-        captured = io.StringIO()
         with patch("grokipedia.get_api_key", return_value="fake-key"):
-            with patch("sys.argv", ["grokipedia.py", "pattern", "--json"]):
-                with patch("sys.stdout", captured):
-                    code = grokipedia.main()
+            with patch("sys.argv", ["grokipedia.py", "pattern"]):
+                code = grokipedia.main()
 
         assert code == 0
-        data = json.loads(captured.getvalue())
+        urls = urls_in(results_text(capsys))
         # Must not inject a duplicate even though casing differs
-        assert len(data["results"]) == 1
+        assert len(urls) == 1
