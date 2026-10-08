@@ -443,6 +443,29 @@ def test_hooks_install_on_commit_and_sync_the_fleet_once_a_push_lands(
     assert git(behind, "rev-parse", "HEAD") == head != before
 
 
+def test_a_post_merge_hook_stopped_after_its_install_keeps_the_receipt(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "elsewhere")
+    # The hook, interrupted as it starts the background fleet sync
+    (hub / "scripts/stopped_hook.py").write_text(
+        "import sys\n"
+        "import sync_fleet\n"
+        "def background(*args):\n"
+        "    raise KeyboardInterrupt\n"
+        "sync_fleet.background = background\n"
+        "sys.exit(sync_fleet.main())\n"
+    )
+
+    result = run(hub, homes, bin_dir, "--hook", "post-merge", script="stopped_hook.py")
+
+    assert (result.returncode, result.stdout) == (130, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert ["add", "~/.claude/skills/alpha"] in answer["changes"]
+    assert (hub.parent / "hub-home/.claude/skills/alpha/SKILL.md").is_file()
+
+
 def test_a_hook_fails_in_a_main_checkout_without_the_registry(
     fleet: tuple[Path, Path, Path],
 ) -> None:

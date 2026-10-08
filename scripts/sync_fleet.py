@@ -63,6 +63,7 @@ from _common import (
     is_network_failure,
     keep_changes,
     main_checkout,
+    receipt,
     run,
     run_git,
     send,
@@ -681,11 +682,13 @@ def hook(event: list[str]) -> dict[str, Any]:
         return {}
     registry()
     installed = call([sys.executable, str(INSTALLER)])
-    if name != "post-commit":
-        background()
     lines = (installed.stderr + installed.stdout).splitlines()
     changes = changes_in(lines)
     report = {"changes": changes} if changes else {}
+    if name != "post-commit":
+        # The installer already answered, so its changes stay in the answer
+        with receipt(changes):
+            background()
     if installed.returncode:
         raise ScriptError(
             f"{reason(lines, installed.returncode)}; rerun just install-skills --verbose",
