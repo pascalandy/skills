@@ -40,7 +40,7 @@ Run shellcheck on scripts using the provided wrapper. Resolve `scripts/run_shell
 The linting script:
 
 - Automatically detects shell scripts by extension (`.sh`, `.bash`, `.zsh`) or shebang
-- Exits non-zero on shellcheck failures
+- Answers in one JSON line: `{"ok":true}`, or shellcheck's diagnostics on stderr followed by `{"ok":false,"errors":[…]}` and a non-zero exit
 - Defaults to scanning `scripts/` when no arguments provided
 
 See `references/pref_bash.md` section 14 for shellcheck integration details.

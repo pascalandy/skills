@@ -93,7 +93,8 @@ fct_enable_strict_mode() {
 # Logging
 # ==============================================================================
 # Why: Consistent logs make scripts debuggable in CI and on laptops. Logs go to
-#      stderr so stdout can be reserved for machine-readable output.
+#      stderr, and only errors show without -v, so a success prints nothing but
+#      its one-line answer.
 
 fct_timestamp() {
 	date '+%Y-%m-%d %H:%M:%S%z'
@@ -146,8 +147,17 @@ log_debug() {
 		fct_log "DEBUG" "$@"
 	fi
 }
-log_info() { fct_log "INFO" "$@"; }
-log_warn() { fct_log "WARN" "$@"; }
+log_info() {
+	if [[ "${VERBOSE}" -eq 1 ]]; then
+		fct_log "INFO" "$@"
+	fi
+}
+# Why: A warning that needs action is an error; what remains is detail for -v.
+log_warn() {
+	if [[ "${VERBOSE}" -eq 1 ]]; then
+		fct_log "WARN" "$@"
+	fi
+}
 log_error() { fct_log "ERROR" "$@"; }
 
 # Repo convention wrappers (optional, keep project naming consistent).
@@ -157,15 +167,81 @@ fct_log_warn() { log_warn "$@"; }
 fct_log_error() { log_error "$@"; }
 
 # ==============================================================================
+# Answer
+# ==============================================================================
+# Why: An agent or a script reads the outcome from one compact JSON line:
+#      {"ok":true} on stdout, or {"ok":false,"errors":[...]} as the last line of
+#      stderr with stdout empty. `ok` always agrees with the exit code. The rule:
+#      https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md
+
+fct_json_string() {
+	# Why: JSON allows no raw control character, so each becomes \uXXXX.
+	local text="${1}"
+	local out=""
+	local char
+	local i
+	for ((i = 0; i < ${#text}; i++)); do
+		char="${text:i:1}"
+		case "${char}" in
+		\" | \\) out+="\\${char}" ;;
+		[[:cntrl:]])
+			printf -v char '\\u%04x' "'${char}"
+			out+="${char}"
+			;;
+		*) out+="${char}" ;;
+		esac
+	done
+	printf '"%s"' "${out}"
+}
+
+answer() {
+	local code="${1}"
+	shift
+
+	# Why: Only the script's own shell answers. A failure inside $(...) or (...)
+	#      is a diagnostic, and the parent answers once it sees the status.
+	if [[ "${BASH_SUBSHELL}" -gt 0 ]]; then
+		[[ $# -eq 0 ]] || log_error "$@"
+		return 0
+	fi
+
+	if [[ "${code}" -eq 0 ]]; then
+		printf '{"ok":true}\n'
+		return 0
+	fi
+
+	local errors=""
+	local message
+	local ts
+	ts="$(fct_timestamp)"
+	for message in "$@"; do
+		errors+="${errors:+,}$(fct_json_string "${message}")"
+		# Why: --log-file keeps the failure too; stderr gets it once, in the answer.
+		if [[ -n "${LOG_FILE}" ]]; then
+			printf '%s\n' "${ts} [${SCRIPT_NAME}] ERROR: ${message}" >>"${LOG_FILE}" || true
+		fi
+	done
+	# Why: A usage error names the help command beside its errors.
+	local help=""
+	if [[ "${code}" -eq 2 ]]; then
+		help=",\"help\":$(fct_json_string "${SCRIPT_NAME} --help")"
+	fi
+	printf '{"ok":false,"errors":[%s]%s}\n' "${errors}" "${help}" >&2
+}
+
+# ==============================================================================
 # Error handling
 # ==============================================================================
-# Why: Centralize fatal exits for consistent messages and exit codes.
+# Why: Centralize fatal exits for consistent messages and exit codes. Each
+#      message says what failed and the command that fixes it.
 
 die() {
 	local message="${1:-Unknown error}"
 	local exit_code="${2:-1}"
 
-	log_error "${message}"
+	answer "${exit_code}" "${message}"
+	# Why: The answer is the last line, so the ERR trap must not add another.
+	trap - ERR
 	fct_exit "${exit_code}"
 }
 fct_die() { die "${1:-Unknown error}" "${2:-1}"; }
@@ -183,6 +259,9 @@ Author: ${SCRIPT_AUTHOR}
 
 Usage:
   ${SCRIPT_NAME} [options] [--] [args...]
+
+Answers {"ok":true} on stdout, or {"ok":false,"errors":[...]} as the last line
+of stderr, in one JSON line.
 
 Options:
   -h, --help         Show this help and exit
@@ -208,13 +287,19 @@ show_version() {
 
 fct_parse_arguments() {
 	POSITIONAL_ARGS=()
-
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
+	local arg
+	for arg in "$@"; do
+		case "${arg}" in
+		--) break ;;
 		-h | --help)
 			usage
 			fct_exit 0
 			;;
+		esac
+	done
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
 		-V | --version)
 			show_version
 			fct_exit 0
@@ -229,10 +314,10 @@ fct_parse_arguments() {
 			;;
 		--log-file)
 			if [[ $# -lt 2 ]]; then
-				die "Option --log-file requires a path." 2
+				die "Option --log-file requires a path" 2
 			fi
 			if [[ "${2}" == -* ]]; then
-				die "Option --log-file requires a path (got: ${2})." 2
+				die "Option --log-file requires a path (got: ${2})" 2
 			fi
 			LOG_FILE="${2}"
 			if ! : >>"${LOG_FILE}"; then
@@ -276,9 +361,9 @@ fct_require_command() {
 
 	if ! command -v "${cmd}" >/dev/null 2>&1; then
 		if [[ -n "${hint}" ]]; then
-			die "Missing required command: ${cmd}. ${hint}" 4
+			die "Missing required command: ${cmd}; ${hint}" 4
 		fi
-		die "Missing required command: ${cmd}." 4
+		die "Missing required command: ${cmd}" 4
 	fi
 }
 
@@ -319,21 +404,27 @@ fct_on_error() {
 	# Prevent recursive ERR trapping while handling an error.
 	trap - ERR
 
-	log_error "Command failed (exit ${exit_status}) at line ${line_no}: ${command}"
+	answer "${exit_status}" "Command failed (exit ${exit_status}) at line ${line_no}: ${command}; rerun with -v"
 	exit "${exit_status}"
 }
 
 fct_on_signal() {
 	local signal="${1:-INT}"
 	local exit_code=130
+	local word="interrupted"
 
 	case "${signal}" in
 	INT) exit_code=130 ;;
-	TERM) exit_code=143 ;;
+	TERM)
+		exit_code=143
+		word="terminated"
+		;;
 	*) exit_code=1 ;;
 	esac
 
-	log_warn "Received ${signal}, exiting."
+	# Why: The answer is the last line, so the ERR trap must not add another.
+	trap - ERR
+	answer "${exit_code}" "${word}"
 	exit "${exit_code}"
 }
 
@@ -368,7 +459,7 @@ main() {
 
 	# Why: A temp workspace prevents clobbering user directories and is easy to
 	#      tear down via cleanup() on all exit paths.
-	TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXXXXXXX")" || die "Failed to create temp dir." 1
+	TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXXXXXXX")" || die "Failed to create temp dir" 1
 
 	log_debug "Script dir: ${SCRIPT_DIR}"
 	log_debug "Temp dir: ${TMP_DIR}"
@@ -377,7 +468,7 @@ main() {
 	fi
 
 	fct_execute_this
-	log_info "Done."
+	answer 0
 }
 
 # Repo convention wrapper.
