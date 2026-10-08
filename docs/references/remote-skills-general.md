@@ -96,7 +96,7 @@ A mode's routes run through that mode's SKILL.md.
 
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
 - `concise`: Use when the user requests to be more concise.
-- `consensus`: Use only when explicitly invoked as `consensus`
+- `consensus`: Use only when explicitly invoked as `consensus`.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.

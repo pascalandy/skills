@@ -1,6 +1,6 @@
 ---
 name: "consensus"
-description: "Use only when explicitly invoked as `consensus`"
+description: "Use only when explicitly invoked as `consensus`."
 kind: "general"
 ---
 
