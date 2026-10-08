@@ -331,22 +331,25 @@ def replay(
         events.open("w", encoding="utf-8") as saved,
         (work / "stderr.txt").open("w", encoding="utf-8") as stderr,
     ):
+        # The request reaches codex from a file, not a pipe: on Python 3.12,
+        # stop() calls communicate(), which fails on a pipe already closed
+        request = work / "request.txt"
+        request.write_text(case.request, encoding="utf-8")
         with LOCK:
             if CANCELLED.is_set():
                 shutil.rmtree(work, ignore_errors=True)
                 return None
-            process = subprocess.Popen(
-                codex_command(scratch, skill.name, args),
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=stderr,
-                text=True,
-                start_new_session=True,
-            )
+            with request.open(encoding="utf-8") as stdin:
+                process = subprocess.Popen(
+                    codex_command(scratch, skill.name, args),
+                    stdin=stdin,
+                    stdout=subprocess.PIPE,
+                    stderr=stderr,
+                    text=True,
+                    start_new_session=True,
+                )
             LIVE.add(process)
-        assert process.stdin and process.stdout
-        process.stdin.write(case.request)
-        process.stdin.close()
+        assert process.stdout
 
         def expire() -> None:
             timed_out.set()
