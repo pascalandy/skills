@@ -7,7 +7,7 @@ clipboard integration, and personal media.
 ## Baseline preconditions
 
 - Resolve `verify_video_archive.py` relative to this skill directory
-- Launch one unique run and keep its printed manifest path
+- Launch one unique run and keep the manifest path its answer names in `file`
 - Run Doctor before Drive
 - Require macOS or Linux, Python 3.11 or newer, Just, FFmpeg, FFprobe, `libx265`, and a resolved `lsof`
 - Use only the generated scenario paths recorded in the manifest
