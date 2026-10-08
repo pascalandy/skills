@@ -78,7 +78,7 @@ For a truly new topic, a new chat works better than "new task". Long chats carry
 - **A vague goal.** "Make it better" gives the agent nothing to aim at. Say who reads the result and what they should do next.
 - **Skills that need a computer.** Some skills work on files on a computer or call outside services: `image-creator`, `transcript`, `html-publish`, `tavily`, and the `andy-mode` routes `cass`, `qmd`, and `trello`, among others. In a chat app they fail, or the agent improvises. Every skill this guide names works in a chat app.
 - **An agent that skipped the skill.** If the answer names no skill and never asks the playbook's questions, the agent may have guessed. Ask which skill it opened. If it can't say, paste the sentence from [page 1](./01-get-started.md) again.
-- **Saying `go` too early.** `consensus` changes nothing until no question is left, so you can catch a wrong idea while it's cheap. Read its proposals first.
+- **Saying `go` too early.** Read the agent's proposals first.
 - **Trusting a number without a source.** Ask for sources, and open at least one.
 
 That's the guide. If you skipped ahead, go back to [page 1](./01-get-started.md) and run one real task. The habit sticks from use, not from reading.

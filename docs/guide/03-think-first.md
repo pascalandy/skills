@@ -10,7 +10,9 @@ I want to move my team's weekly status report from email to a shared dashboard.
 consensus
 ```
 
-The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the CMO, how things work today, and the FMO, the change it suggests. Then it asks its questions, at most four per round, each with lettered choices and its recommendation marked 🟢, so you can reply "1a, 2b".
+The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the CMO, how things work today, and the FMO, the change it suggests.
+
+For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
 
 It applies your answers, rethinks its proposals, and asks again until nothing is left to decide. Then it says "👍 Je n'ai plus de question.", French for "I have no questions left". Read its proposals, and say `go` only when they're right.
 

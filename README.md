@@ -46,7 +46,7 @@ A mode is a skill that opens a family of tasks, each with its own playbook. Name
 
 | Skill | Use it when |
 |---|---|
-| `consensus` | you want the agent to restate your goal and ask the right questions before it does anything |
+| `consensus` | you want the agent to restate your goal and ask the right questions before it starts the work |
 | `grilling` | you want a plan or an idea stress-tested through an interview. Say "grill me" |
 | `research` | you want a topic researched, with its sources |
 | `unslop` | a text sounds like a robot wrote it |

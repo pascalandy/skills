@@ -18,10 +18,10 @@
 - Stop re-explaining the same instructions in every chat
 - Borrow proven methods without studying them first
 **Use cases:**
-- Agree before acting: `consensus`, `grilling`
+- Agree before acting: `consensus`
 - Write and tighten prose: `unslop`, `concise`, `andy-mode ; write-with-clarity`
 - Do marketing work such as positioning, page copy, and emails: `corey-mode`
-- Stress-test an idea: `andy-mode ; sparring`, `andy-mode ; think`
+- Stress-test a plan or an idea: `grilling`, `andy-mode ; sparring`, `andy-mode ; think`
 - Make a visual one-pager or a slide deck: `html-mode`
 
 ## Problems & Pain Points
