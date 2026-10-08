@@ -871,6 +871,48 @@ def test_an_interrupt_while_reading_a_saved_image_still_lists_it(
     assert (env / "out-2.png").is_file()
 
 
+def test_a_stop_while_logging_a_saved_image_still_lists_it(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    good = base64.b64encode(png_bytes(1024, 1024)).decode()
+    monkeypatch.setattr(
+        image_creator,
+        "api_post",
+        lambda route, body: {"data": [{"b64_json": good}, {"b64_json": good}]},
+    )
+    save = image_creator.save_image
+    monkeypatch.setattr(
+        image_creator, "save_image", lambda *args: [*save(*args), "resized"]
+    )
+
+    def stopped(message: str, *args: object) -> None:
+        if "resized" in args:
+            raise image_creator.Interrupted(143)
+
+    monkeypatch.setattr(image_creator.log, "info", stopped)
+    out = env / "out.png"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--backend",
+        "openrouter",
+        "--prompt",
+        "sticker",
+        "--out",
+        str(out),
+        "--candidates",
+        "2",
+    )
+
+    assert code == 143
+    files = failure(stdout, err)["files"]
+    assert [Path(item["path"]).name for item in files] == ["out-1.png"]
+    assert (env / "out-1.png").is_file()
+
+
 def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
     env: Path,
     capsys: pytest.CaptureFixture[str],

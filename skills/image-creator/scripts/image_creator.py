@@ -1085,9 +1085,10 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
         for data, path in zip(images, plan.paths, strict=False):
             target = plan.target_size if plan.backend == "plan" else None
             try:
-                for note in save_image(data, path, plan.output_format, target):
-                    log.info("%s: %s", path.name, note)
+                notes = save_image(data, path, plan.output_format, target)
                 saved.append(path)
+                for note in notes:
+                    log.info("%s: %s", path.name, note)
                 info = describe(path)
             except (OSError, ValueError) as error:
                 raise RunError(
