@@ -15,7 +15,9 @@ Run from this skill's folder: `uv run scripts/extract_fields.py <input.pdf> <fie
 A good script:
 
 - Solves the problem instead of handing it back to the agent
+- Answers in one JSON line, as [script-output](https://github.com/pascalandy/skills/blob/main/docs/references/script-output.md) defines: `{"ok":true}` on stdout, or an empty stdout and `{"ok":false,"errors":["…"]}` as the last line of stderr, so the agent reads the outcome once
 - Explains each error: what failed, then the command that fixes it
+- Writes content, such as extracted fields, to a file it names in the answer
 - Justifies every constant
 - Documents its usage in `--help`
 - Writes every path with forward slashes
