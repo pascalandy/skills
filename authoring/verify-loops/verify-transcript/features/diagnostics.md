@@ -4,14 +4,14 @@ Diagnostics reports Deepgram credential availability, commands, browser state, a
 
 ## Sub-features
 
-- `diagnostics.youtube` validates YouTube doctor JSON, counts, readiness, and exit code
-- `diagnostics.zoom` validates Zoom doctor JSON, counts, readiness, and exit code
+- `diagnostics.youtube` validates the YouTube doctor's answer, readiness, and exit code
+- `diagnostics.zoom` validates the Zoom doctor's answer, readiness, and exit code
 
 ## How to get to it (user POV)
 
-- Run `transcript doctor --source youtube --json`
-- Run `transcript doctor --source zoom --json`
-- Run `verify-transcript doctor --json` to diagnose the verifier layout itself
+- Run `transcript doctor --source youtube`
+- Run `transcript doctor --source zoom`
+- Run `verify-transcript doctor` to diagnose the verifier layout itself
 
 ## Driving it with verify-transcript
 
@@ -20,9 +20,9 @@ Preconditions:
 - Diagnostics are read-only and require no paid authorization
 - A machine can be unready while still returning a valid diagnostic report
 
-- **YouTube report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.youtube --json`. Require counts that match checks and an exit code that matches `readiness_ok`
-- **Zoom report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.zoom --json`. Require the same consistency and inspect failed requirement messages when unready
-- **Verifier report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" doctor --json`. Require the expected layout, `uv`, and all Feature Map pages
+- **YouTube report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.youtube`. Require `{"ok":true}` on exit `0`, or on exit `1` one error per failed YouTube check, each with its fix; `readiness_ok` is whether it exited `0`
+- **Zoom report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature diagnostics.zoom`. Require the same for Zoom checks and inspect `failed_checks` when unready
+- **Verifier report.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" doctor`. Require the expected layout, `uv`, and all Feature Map pages
 
 ## Gotchas
 
@@ -31,5 +31,5 @@ Preconditions:
 - Diagnostics can read default browser and Zoom paths but do not mutate them
 - Inspect `readiness_ok` before attempting the paid feature
 - Doctor does not measure upload bandwidth or prove that an audio file reached Deepgram
-- Upload and workflow timeouts return `transcription_timeout`; a stalled write reports a lower bound on bytes sent because the last block may have been partially transmitted
+- An upload or workflow timeout fails with an error whose fix reruns with twice the `--timeout`; a stalled write reports a lower bound on bytes sent because the last block may have been partially transmitted
 - Use the upload verification loop in [SKILL.md](../SKILL.md) to check timeout behavior without paid calls

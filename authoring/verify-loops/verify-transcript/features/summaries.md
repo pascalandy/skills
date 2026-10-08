@@ -14,8 +14,8 @@ Summary mode discovers profiles and prompts, resolves one explicit summary plan,
 
 ## How to get to it (user POV)
 
-- Run `transcript list prompts --json`
-- Run `transcript list profiles --json`
+- Run `transcript list prompts`
+- Run `transcript list profiles`
 - Pass `--profile` and `--prompt` to a run command
 - Pass `--no-summary` to skip the summary while retaining paid transcription
 
@@ -26,11 +26,11 @@ Preconditions:
 - Free discovery and dry-run checks need no paid authorization
 - The real summary check needs a signed-in `claude`. Follow the transcript README's `Test videos` rule for paid calls
 
-- **Discovery.** Run the default `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --json`. Require all three providers and all bundled prompts
-- **Plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require the `glm` profile, OpenRouter, `z-ai/glm-5.3-flash`, `medium`, and `summary_with_quotes`
-- **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require `summary.enabled: false` and null provider, model, effort, and prompt values for both sources
-- **Zoom plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run --json`. Require the `opus` profile, Claude, `claude-opus-5-5`, `high`, and `synthese-rencontre`
-- **Real summary.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.real-summary --allow-paid --json`. Require `summary.status: succeeded`, `summary.profile: sonnet`, non-empty Markdown, and `Summary status: succeeded` in metadata
+- **Discovery.** Run the default `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify`. Require all three providers and all bundled prompts
+- **Plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary`. Require the `glm` profile, OpenRouter, `z-ai/glm-5.3-flash`, `medium`, and `summary_with_quotes`
+- **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only`. Require `summary.enabled: false` and null provider, model, effort, and prompt values for both sources
+- **Zoom plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run`. Require the `opus` profile, Claude, `claude-opus-5-5`, `high`, and `synthese-rencontre`
+- **Real summary.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.real-summary --allow-paid`. Require a `sonnet` model on the metadata's summary line, non-empty Markdown, and `Summary status: succeeded` in metadata
 
 ## Gotchas
 

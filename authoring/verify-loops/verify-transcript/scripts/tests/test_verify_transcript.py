@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -69,6 +70,49 @@ def make_context(tmp_path: Path, *, allow_paid: bool = False):
         allow_paid=allow_paid,
         youtube_url=verify_transcript.CANONICAL_YOUTUBE_URL,
     )
+
+
+@pytest.mark.parametrize("code", [1, 130, 143])
+def test_a_stopped_verification_answers_the_evidence_already_saved(
+    tmp_path, monkeypatch, capsys, code
+):
+    skill_dir = tmp_path / "verify-transcript"
+    skill_dir.mkdir()
+    make_transcript_skill(tmp_path / "transcript")
+    monkeypatch.setattr(verify_transcript, "verify_skill_dir", lambda: skill_dir)
+    first, second = verify_transcript.FEATURES[:2]
+    write_json = verify_transcript._write_json
+
+    def stop_second_case(path, payload):
+        if path.name == "result.json" and payload.get("id") == second.id:
+            if code == 1:
+                raise OSError("evidence write failed")
+            raise verify_transcript.Interrupted(code)
+        write_json(path, payload)
+
+    monkeypatch.setattr(verify_transcript, "_write_json", stop_second_case)
+    evidence_root = tmp_path / "evidence"
+
+    exit_code = verify_transcript.main(
+        [
+            "verify",
+            "--feature",
+            first.id,
+            "--feature",
+            second.id,
+            "--evidence-root",
+            str(evidence_root),
+        ]
+    )
+
+    output = capsys.readouterr()
+    assert (exit_code, output.out) == (code, "")
+    answer = json.loads(output.err.splitlines()[-1])
+    [saved] = evidence_root.glob("*/cases/*/result.json")
+    assert json.loads(saved.read_text())["id"] == first.id
+    assert str(saved) in answer["files"]
+    assert all(Path(path).is_file() for path in answer["files"])
+    assert not list(evidence_root.glob("*/result.json"))
 
 
 def test_locates_categorized_source_layout(tmp_path: Path):
@@ -174,7 +218,10 @@ def test_feature_entries_return_exact_selectable_ids():
         == entry["id"]
         for entry in entries
     )
-    assert all(entry["verify_command"].endswith(" --json") for entry in entries)
+    assert all(
+        entry["verify_command"].startswith("verify-transcript verify --feature ")
+        for entry in entries
+    )
 
     interface = verify_transcript.feature_entries(SCRIPT.parents[1], "interface")
     assert {entry["id"] for entry in interface} == {
@@ -192,18 +239,13 @@ def test_feature_entries_return_exact_selectable_ids():
     )
 
 
-def test_features_command_exposes_selectable_ids(monkeypatch):
-    reports = []
-    monkeypatch.setattr(
-        verify_transcript,
-        "_print_json",
-        lambda payload, **_kwargs: reports.append(payload),
-    )
+def test_features_command_exposes_selectable_ids(capsys):
+    code = verify_transcript.main(["features"])
 
-    code = verify_transcript.main(["features", "--json"])
-
-    payload = reports[0]
-    assert code == 0
+    out, err = capsys.readouterr()
+    payload = json.loads(out)
+    assert (code, err, out.count("\n")) == (0, "", 1)
+    assert payload["ok"] is True
     assert {entry["id"] for entry in payload["features"]} == {
         feature.id for feature in verify_transcript.FEATURES
     }
@@ -254,54 +296,81 @@ def test_public_surface_inventory_matches_help_contracts():
     } == expected_options
 
 
-def test_response_contract_enforces_json_streams():
-    success = verify_transcript.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
-    failure = verify_transcript.CapturedProcess((), 2, "", '{"ok":false}\n', 0.1, False)
+ANSWER = verify_transcript.OutputExpectation("answer", (0,))
+
+
+def captured(code: int, stdout: str = "", stderr: str = ""):
+    return verify_transcript.CapturedProcess((), code, stdout, stderr, 0.1, False)
+
+
+def test_an_answer_is_one_json_line_on_the_stream_its_exit_code_names():
+    by_exit = verify_transcript.OutputExpectation("answer", (0, 1))
+    failure = '{"ok":false,"errors":["boom; fix: run this"]}\n'
 
     assert verify_transcript.parse_expected_output(
-        success, verify_transcript.OutputExpectation("stdout-json", (0,))
+        captured(0, '{"ok":true}\n'), by_exit
     ) == {"ok": True}
     assert verify_transcript.parse_expected_output(
-        failure, verify_transcript.OutputExpectation("stderr-json", (2,))
-    ) == {"ok": False}
-    with pytest.raises(AssertionError, match="stderr"):
-        verify_transcript.parse_expected_output(
-            failure, verify_transcript.OutputExpectation("stdout-json", (2,))
-        )
+        captured(1, stderr=f"/tmp/result\n{failure}"), by_exit
+    ) == {"ok": False, "errors": ["boom; fix: run this"]}
+
+
+@pytest.mark.parametrize(
+    ("process", "expectation", "verdict"),
+    [
+        (captured(0, '{"ok":true}\n', "note\n"), ANSWER, "wrote to stderr"),
+        (
+            captured(0, '{"ok":true}\n{"ok":true}\n'),
+            ANSWER,
+            "stdout is not one JSON line",
+        ),
+        (captured(0, '{"ok":false}\n'), ANSWER, "ok disagrees with the exit code"),
+        (
+            captured(1, '{"ok":true}\n', '{"ok":false}\n'),
+            verify_transcript.OutputExpectation("answer", (1,)),
+            "a failed command wrote to stdout",
+        ),
+        (captured(0, "help text\n"), ANSWER, "invalid JSON on stdout"),
+    ],
+    ids=["stderr-on-success", "two-lines", "ok-disagrees", "stdout-on-failure", "text"],
+)
+def test_an_answer_that_breaks_the_rule_fails(process, expectation, verdict):
+    with pytest.raises(AssertionError, match=verdict):
+        verify_transcript.parse_expected_output(process, expectation)
+
+
+def test_a_real_run_may_stream_its_folder_on_stderr_before_it_answers():
+    events = verify_transcript.OutputExpectation("answer", (0,), events=True)
+
+    assert verify_transcript.parse_expected_output(
+        captured(0, '{"ok":true,"files":[]}\n', "/tmp/result\n"), events
+    ) == {"ok": True, "files": []}
 
 
 @pytest.mark.parametrize(
     ("stderr", "verdict"),
     [
         (
-            '{"ok": false, "error": {"code": "transcription_failed", '
-            '"message": "yt-dlp failed: HTTP Error 403: Forbidden"}}\n',
-            "transcript exited 1; expected (0,): transcription_failed: "
-            "yt-dlp failed: HTTP Error 403: Forbidden",
+            (
+                "/tmp/result\n"
+                '{"ok":false,"errors":["yt-dlp failed: HTTP Error 403: Forbidden; '
+                'fix: transcript doctor --source youtube"]}\n'
+            ),
+            (
+                "transcript exited 1; expected (0,): yt-dlp failed: HTTP Error 403: "
+                "Forbidden; fix: transcript doctor --source youtube"
+            ),
         ),
         ("Traceback (most recent call last):\n", "transcript exited 1; expected (0,)"),
         ("", "transcript exited 1; expected (0,)"),
-        ('{"ok": false, "error": {"code": 3}}\n', "transcript exited 1; expected (0,)"),
+        ('{"ok":false,"errors":[3]}\n', "transcript exited 1; expected (0,)"),
     ],
 )
 def test_a_wrong_exit_code_names_the_error_transcript_reported(stderr, verdict):
-    failed = verify_transcript.CapturedProcess((), 1, "", stderr, 0.1, False)
-
     with pytest.raises(AssertionError) as raised:
-        verify_transcript.parse_expected_output(
-            failed, verify_transcript.OutputExpectation("stdout-json", (0,))
-        )
+        verify_transcript.parse_expected_output(captured(1, stderr=stderr), ANSWER)
 
     assert str(raised.value) == verdict
-
-
-def test_a_doctor_report_is_read_from_the_stream_its_exit_code_names():
-    by_exit = verify_transcript.OutputExpectation("json-by-exit", (0, 1))
-    ready = verify_transcript.CapturedProcess((), 0, '{"ok":true}\n', "", 0.1, False)
-    unready = verify_transcript.CapturedProcess((), 1, "", '{"ok":false}\n', 0.1, False)
-
-    assert verify_transcript.parse_expected_output(ready, by_exit) == {"ok": True}
-    assert verify_transcript.parse_expected_output(unready, by_exit) == {"ok": False}
 
 
 def test_new_free_commands_remain_safe_and_confined(tmp_path: Path):
@@ -410,21 +479,42 @@ def test_doctor_validator_rejects_crossed_source():
         for feature in verify_transcript.FEATURES
         if feature.id == "diagnostics.youtube"
     )
-    process = verify_transcript.CapturedProcess((), 0, "", "", 0.1, False)
+    unready = captured(1)
     payload = {
-        "ok": True,
-        "command": "doctor",
-        "source": "zoom",
-        "summary": False,
-        "checks": [
-            {"name": "deepgram_credential", "status": "pass"},
-            {"name": "zoom_recordings", "status": "pass"},
+        "ok": False,
+        "errors": [
+            "deepgram_credential: Missing Deepgram API key; fix: chezmoi secret",
+            "zoom_recordings: no Zoom folder; fix: record a meeting",
         ],
-        "counts": {"pass": 2, "warn": 0, "fail": 0},
     }
 
     with pytest.raises(AssertionError, match="doctor source is invalid"):
-        verify_transcript._validate_doctor(feature, process, payload)
+        verify_transcript._validate_doctor(feature, unready, payload)
+
+
+def test_doctor_validator_reads_readiness_from_the_answer():
+    feature = next(
+        feature
+        for feature in verify_transcript.FEATURES
+        if feature.id == "diagnostics.zoom"
+    )
+    failure = {
+        "ok": False,
+        "errors": ["zoom_recordings: no Zoom folder; fix: record a meeting"],
+    }
+
+    assert verify_transcript._validate_doctor(feature, captured(0), {"ok": True}) == {
+        "readiness_ok": True,
+        "failed_checks": [],
+    }
+    assert verify_transcript._validate_doctor(feature, captured(1), failure) == {
+        "readiness_ok": False,
+        "failed_checks": ["zoom_recordings"],
+    }
+    with pytest.raises(AssertionError, match="names no fix"):
+        verify_transcript._validate_doctor(
+            feature, captured(1), {"ok": False, "errors": ["zoom_recordings: x"]}
+        )
 
 
 def test_safe_cleanup_requires_current_marker(tmp_path: Path):
@@ -443,6 +533,43 @@ def test_safe_cleanup_requires_current_marker(tmp_path: Path):
     assert not removable.exists()
 
 
+def published_run(
+    plan, metadata: str
+) -> tuple[dict, verify_transcript.CapturedProcess]:
+    """A real run's saved files under `plan`'s output, its answer, and the
+    process that streamed its folder."""
+    published = plan.output_dir / "2026_09_01_fixture"
+    published.mkdir(parents=True)
+    files = {
+        "meta.txt": metadata,
+        "raw_transcript.txt": "Hello world\n",
+        "raw_sentences.txt": "[00:00] Hello world\n",
+        "raw_transcript.json": json.dumps([{"text": "Hello world"}]),
+        "short_summary.md": "# Summary\n\nHello world\n",
+    }
+    for name, content in files.items():
+        (published / name).write_text(content)
+    payload = {"ok": True, "files": [str(published / name) for name in files]}
+    return payload, captured(0, stderr=f"{published}\n")
+
+
+def real_summary(context):
+    feature = next(
+        feature
+        for feature in verify_transcript.FEATURES
+        if feature.id == "youtube.real-summary"
+    )
+    return feature, verify_transcript.build_commands(feature, context)[0]
+
+
+def metadata(*, upload: str, model: str = "claude-sonnet-5-5") -> str:
+    url = verify_transcript.CANONICAL_YOUTUBE_URL
+    return (
+        f"Source: {url}\nSummary status: succeeded\n"
+        f"Claude: {model} (reasoning: medium)\n{upload}\n"
+    )
+
+
 @pytest.mark.parametrize(
     "upload_line",
     [
@@ -456,35 +583,8 @@ def test_e2e_validator_records_verified_upload_without_transcript_content(
     tmp_path: Path, upload_line: str
 ):
     context = make_context(tmp_path, allow_paid=True)
-    feature = next(
-        feature
-        for feature in verify_transcript.FEATURES
-        if feature.id == "youtube.real-summary"
-    )
-    plan = verify_transcript.build_commands(feature, context)[0]
-    assert plan.output_dir is not None
-    published = plan.output_dir / "2026_09_01_fixture"
-    published.mkdir(parents=True)
-    artifact_paths = {
-        "transcript": published / "raw_transcript.txt",
-        "sentences": published / "raw_sentences.txt",
-        "json": published / "raw_transcript.json",
-        "metadata": published / "meta.txt",
-        "summary": published / "short_summary.md",
-    }
-    artifact_paths["transcript"].write_text("Hello world\n")
-    artifact_paths["sentences"].write_text("[00:00] Hello world\n")
-    artifact_paths["json"].write_text(json.dumps([{"text": "Hello world"}]))
-    artifact_paths["metadata"].write_text(f"Summary status: succeeded\n{upload_line}\n")
-    artifact_paths["summary"].write_text("# Summary\n\nHello world\n")
-    payload = {
-        "ok": True,
-        "source": "youtube",
-        "output_dir": str(published),
-        "summary": {"status": "succeeded", "profile": "sonnet"},
-        "artifacts": {key: str(path) for key, path in artifact_paths.items()},
-    }
-    process = verify_transcript.CapturedProcess((), 0, "", "", 1.0, False)
+    feature, plan = real_summary(context)
+    payload, process = published_run(plan, metadata(upload=upload_line))
     try:
         if upload_line != "Audio upload: complete (1024 bytes)":
             with pytest.raises(AssertionError, match="upload"):
@@ -509,23 +609,41 @@ def test_e2e_validator_records_verified_upload_without_transcript_content(
 
 def test_the_paid_run_summarizes_with_the_sonnet_profile(tmp_path: Path):
     context = make_context(tmp_path, allow_paid=True)
-    feature = next(
-        feature
-        for feature in verify_transcript.FEATURES
-        if feature.id == "youtube.real-summary"
+    feature, plan = real_summary(context)
+    upload = "Audio upload: complete (1024 bytes)"
+    payload, process = published_run(
+        plan, metadata(upload=upload, model="claude-opus-5-5")
     )
-    plan = verify_transcript.build_commands(feature, context)[0]
-    payload = {
-        "ok": True,
-        "source": "youtube",
-        "summary": {"status": "succeeded", "profile": "opus"},
-        "artifacts": {},
-    }
-    process = verify_transcript.CapturedProcess((), 0, "", "", 1.0, False)
 
     try:
         assert plan.args[plan.args.index("--profile") + 1] == "sonnet"
         with pytest.raises(AssertionError, match="sonnet test profile"):
+            verify_transcript._validate_e2e(feature, plan, process, payload, context)
+    finally:
+        verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
+
+
+@pytest.mark.parametrize(
+    ("change", "verdict"),
+    [
+        ("drop-summary", "file set is incomplete"),
+        ("no-stream", "did not stream its result folder"),
+    ],
+)
+def test_the_paid_run_answers_every_file_and_streams_its_folder(
+    tmp_path: Path, change: str, verdict: str
+):
+    context = make_context(tmp_path, allow_paid=True)
+    feature, plan = real_summary(context)
+    upload = "Audio upload: complete (1024 bytes)"
+    payload, process = published_run(plan, metadata(upload=upload))
+    if change == "drop-summary":
+        payload["files"].pop()
+    else:
+        process = captured(0)
+
+    try:
+        with pytest.raises(AssertionError, match=verdict):
             verify_transcript._validate_e2e(feature, plan, process, payload, context)
     finally:
         verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
@@ -543,8 +661,6 @@ def test_dry_run_validator_requires_no_output(tmp_path: Path):
     meeting = Path(plan.args[plan.args.index("--path") + 1])
     payload = {
         "ok": True,
-        "command": "run",
-        "dry_run": True,
         "source": {
             "kind": "zoom",
             "path": str(meeting),
@@ -560,14 +676,109 @@ def test_dry_run_validator_requires_no_output(tmp_path: Path):
         },
         "output_dir": str(plan.output_dir),
         "timeout_seconds": 570.0,
-        "side_effects": [],
     }
     process = verify_transcript.CapturedProcess((), 0, "", "", 0.1, False)
     try:
         observations = verify_transcript._validate_dry_run(
             feature, plan, process, payload
         )
-        assert observations["side_effects"] == []
+        assert observations == {
+            "source": payload["source"],
+            "summary": payload["summary"],
+        }
         assert not plan.output_dir.exists()
     finally:
         verify_transcript.safe_cleanup(context.scratch_dir, context.run_id)
+
+
+@pytest.mark.parametrize(
+    ("argv", "code", "answer"),
+    [
+        (["doctor"], 0, {"ok": True}),
+        (
+            ["features", "no page says this"],
+            1,
+            {
+                "ok": False,
+                "errors": [
+                    (
+                        "no feature or Feature Map page matches 'no page says this'; "
+                        "run 'verify-transcript features' to list them all"
+                    )
+                ],
+            },
+        ),
+        (
+            ["verify", "--feature", "bogus"],
+            2,
+            {
+                "ok": False,
+                "errors": [
+                    (
+                        "Unknown feature ID: bogus; run 'verify-transcript features' "
+                        "and use one of features[].id"
+                    )
+                ],
+                "help": "verify-transcript --help",
+            },
+        ),
+        (
+            ["verify", "--json"],
+            2,
+            {
+                "ok": False,
+                "errors": ["unrecognized arguments: --json"],
+                "help": "verify-transcript verify --help",
+            },
+        ),
+    ],
+    ids=["doctor", "no-match", "unknown-feature", "json-is-the-default"],
+)
+def test_each_command_answers_in_one_json_line(argv, code, answer, capsys):
+    assert verify_transcript.main(argv) == code
+
+    out, err = capsys.readouterr()
+    assert json.loads(out if code == 0 else err) == answer
+    assert (out if code else err) == ""
+
+
+def test_a_command_prints_its_own_help(capsys):
+    assert verify_transcript.main(["verify", "--help"]) == 0
+
+    assert capsys.readouterr().out.startswith("usage: verify-transcript verify ")
+
+
+def test_a_paid_feature_rerun_preserves_the_requested_video(
+    tmp_path, monkeypatch, capsys
+):
+    url = "https://www.youtube.com/watch?v=custom&t=12"
+
+    def unavailable(feature, plan, context):
+        raise OSError("video unavailable")
+
+    monkeypatch.setattr(verify_transcript, "capture_command", unavailable)
+    code = verify_transcript.main(
+        [
+            "verify",
+            "--feature",
+            "youtube.real-summary",
+            "--allow-paid",
+            "--youtube-url",
+            url,
+            "--evidence-root",
+            str(tmp_path),
+        ]
+    )
+
+    out, err = capsys.readouterr()
+    assert (code, out) == (1, "")
+    payload = json.loads(err.splitlines()[-1])
+    assert Path(payload["file"]).is_file()
+    [error] = payload["errors"]
+    command = shlex.split(error.split("; rerun: ")[1])
+    rerun = verify_transcript.build_parser().parse_args(command[1:])
+    assert (rerun.feature, rerun.allow_paid, rerun.youtube_url) == (
+        ["youtube.real-summary"],
+        True,
+        url,
+    )

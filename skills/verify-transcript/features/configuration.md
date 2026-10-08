@@ -15,9 +15,9 @@ Configuration resolves source selectors, summary settings, timeouts, and output 
 ## How to get to it (user POV)
 
 - Run a leaf command with `--help` to see its accepted flags and defaults
-- Run `transcript list profiles --json` before changing inference
-- Run `transcript list prompts --json` or `transcript list models --provider <provider> --json` for low-level discovery
-- Run a source with `--dry-run --json` to inspect the resolved plan
+- Run `transcript list profiles` before changing inference
+- Run `transcript list prompts` or `transcript list models --provider <provider>` for low-level discovery
+- Run a source with `--dry-run` to inspect the resolved plan
 
 ## Driving it with verify-transcript
 
@@ -26,13 +26,13 @@ Preconditions:
 - Use the Feature Map IDs exactly
 - Keep custom output under the eval-created scratch root
 
-- **Prompt values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.prompts --json`. Require all three bundled prompt names and input kinds
-- **Profile values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.profiles --json`. Require complete profiles with unique names, including the default and the test profile
-- **Model values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.models --json`. Require Claude, Codex, and OpenRouter defaults inside non-empty model lists
-- **Recovery.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery --json`. Require the current `transcript list models --provider codex` guidance on `stderr`
-- **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only --json`. Require disabled summary fields and the configured timeout for both sources
-- **Resolved settings.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary --json`. Require the configured provider, model, effort, prompt, timeout, and isolated output path
-- **Zoom defaults.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run --json`. Require the Zoom folder, audio file, Claude model, effort, `synthese-rencontre` prompt, timeout, and isolated output path
+- **Prompt values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.prompts`. Require all three bundled prompt names and input kinds
+- **Profile values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.profiles`. Require complete profiles with unique names, including the default and the test profile
+- **Model values.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature configuration.models`. Require Claude, Codex, and OpenRouter defaults inside non-empty model lists
+- **Recovery.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature interface.structured-recovery`. Require the current `transcript list models --provider codex` guidance on `stderr`
+- **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only`. Require disabled summary fields and the configured timeout for both sources
+- **Resolved settings.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary`. Require the configured provider, model, effort, prompt, timeout, and isolated output path
+- **Zoom defaults.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run`. Require the Zoom folder, audio file, Claude model, effort, `synthese-rencontre` prompt, timeout, and isolated output path
 
 ## Gotchas
 

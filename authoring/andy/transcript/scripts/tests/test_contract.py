@@ -4,9 +4,10 @@ transcript.py and youtube_smoke.py.
 scripts/tests/test_cli_contract.py probes the flat scripts in scripts/; these two
 have subcommands and PEP 723 dependencies, so this suite runs the same probes
 here, where the transcript check provides those dependencies. In-process
-probes call main() the way the command line does. Signal and terminal probes run
-the real script with this test's Python, in an isolated home with stub commands
-first on PATH. Nothing here reaches the network.
+probes call main() the way the command line does, and read the one JSON line
+it answers with (docs/references/script-output.md). Signal and terminal probes
+run the real script with this test's Python, in an isolated home with stub
+commands first on PATH. Nothing here reaches the network.
 """
 
 from __future__ import annotations
@@ -72,18 +73,27 @@ def smoke(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str
     return code, captured.out, captured.err
 
 
+def answer(stream: str) -> dict:
+    """The one JSON line a run answers with: the last line of its stream."""
+    return json.loads(stream.splitlines()[-1])
+
+
+def json_line(fields: dict) -> str:
+    """`fields` as the one compact JSON line a script prints."""
+    return json.dumps(fields, separators=(",", ":")) + "\n"
+
+
 FALLBACK = "Arc YouTube access failed; retrying anonymously"
 
 
-def fall_back_twice(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Warn on two download attempts, as a retry without a browser session does."""
+def fall_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fall back to anonymous access, as a run without a browser session does."""
 
-    def warn_then_download(_url, output_dir, *_args, **_kwargs):
-        transcript.log.warning(FALLBACK)
-        transcript.log.warning(FALLBACK)
+    def fall_back_then_download(_url, output_dir, *_args, **_kwargs):
+        transcript.log.info(FALLBACK)
         return downloaded(output_dir)
 
-    fake_youtube(monkeypatch, download=warn_then_download)
+    fake_youtube(monkeypatch, download=fall_back_then_download)
 
 
 def fake_youtube(
@@ -188,7 +198,15 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
     code, out, err = smoke(capsys, "--", URL)
 
     assert (code, out) == (75, "")
-    assert err.splitlines()[-1] == f"retry: youtube_smoke.py --timeout 20m -- {URL}"
+    assert json.loads(err) == {
+        "ok": False,
+        "errors": [
+            (
+                "YouTube smoke timed out: budget exhausted before the download; "
+                f"retry: youtube_smoke.py --timeout 20m -- {URL}"
+            )
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +240,11 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
             "unrecognized arguments: --jso",
         ),
         (
+            ["list", "prompts", "--json"],
+            "transcript list prompts",
+            "unrecognized arguments: --json",
+        ),
+        (
             ["ru"],
             "transcript",
             "argument COMMAND: unknown command 'ru'; did you mean 'run'?",
@@ -247,14 +270,17 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
         (
             ["run", "youtube", "--url", "https://example.com/video", "-n"],
             "transcript run youtube",
-            "Invalid YouTube URL: https://example.com/video",
+            (
+                "Invalid YouTube URL: https://example.com/video; fix: transcript run "
+                "youtube -n --url 'https://www.youtube.com/watch?v=VIDEO_ID'"
+            ),
         ),
         (
             ["run", "youtube", "--url", URL, "--prompt", "nope", "-n"],
             "transcript run youtube",
             (
                 "Unknown prompt 'nope'. Available prompts: follow_along_note, "
-                "short_summary, summary_with_quotes"
+                "short_summary, summary_with_quotes; fix: transcript list prompts"
             ),
         ),
     ],
@@ -264,6 +290,7 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
         "empty-url",
         "unknown-flag",
         "abbreviated-flag",
+        "json-is-the-default",
         "unknown-command",
         "unknown-resource",
         "unknown-help-topic",
@@ -272,16 +299,15 @@ def test_a_smoke_retry_hint_keeps_the_url_after_double_dash(
         "unknown-prompt",
     ],
 )
-def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
+def test_a_usage_error_exits_2_with_its_error_and_the_help_command(
     argv: list[str], command: str, error: str, capsys
 ) -> None:
     code, out, err = cli(capsys, *argv)
-    lines = err.splitlines()
 
     assert (code, out) == (2, "")
-    assert lines[0].startswith(f"usage: {command} ")
-    assert f"error: {error}" in lines
-    assert lines[-1] == f"run '{command} --help'"
+    assert err == json_line(
+        {"ok": False, "errors": [error], "help": f"{command} --help"}
+    )
 
 
 @exits("youtube_smoke", 2)
@@ -296,28 +322,15 @@ def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
     ],
     ids=["unknown-flag", "invalid-url"],
 )
-def test_a_smoke_usage_error_exits_2_with_the_help_hint(
+def test_a_smoke_usage_error_exits_2_with_the_help_command(
     argv: list[str], error: str, capsys
 ) -> None:
     code, out, err = smoke(capsys, *argv)
 
     assert (code, out) == (2, "")
-    assert f"error: {error}" in err.splitlines()
-    assert err.splitlines()[-1] == "run 'youtube_smoke.py --help'"
-
-
-def test_a_json_usage_error_is_one_object_on_stderr(capsys) -> None:
-    code, out, err = cli(capsys, "list", "prompts", "--json", "--bogus-flag")
-
-    assert (code, out) == (2, "")
-    assert json.loads(err) == {
-        "ok": False,
-        "error": {
-            "code": "invalid_usage",
-            "message": "unrecognized arguments: --bogus-flag",
-            "hint": "transcript list prompts --help",
-        },
-    }
+    assert err == json_line(
+        {"ok": False, "errors": [error], "help": "youtube_smoke.py --help"}
+    )
 
 
 def test_a_pasted_url_names_the_command_it_was_meant_for(capsys) -> None:
@@ -340,13 +353,13 @@ def test_double_dash_ends_options_so_help_after_it_is_an_argument(capsys) -> Non
             ["run", "youtube", "--url", URL, "--timeout", "5m", "-v", "-n"],
             ["run", "youtube", f"--url={URL}", "--timeout=5m", "-vn"],
         ),
-        (["list", "prompts", "--json"], ["--json", "list", "prompts"]),
+        (["list", "prompts", "--no-color"], ["--no-color", "list", "prompts"]),
         (
             ["run", "youtube", "--url", URL, "-n", "-v"],
             ["-v", "run", "youtube", "--url", URL, "-n"],
         ),
     ],
-    ids=["equals-and-bundled-shorts", "global-json-first", "global-verbose-first"],
+    ids=["equals-and-bundled-shorts", "global-flag-first", "global-verbose-first"],
 )
 def test_equivalent_spellings_give_identical_results(
     spaced: list[str], joined: list[str], capsys
@@ -356,7 +369,7 @@ def test_equivalent_spellings_give_identical_results(
 
 def test_a_duration_reaches_the_plan_in_seconds(capsys) -> None:
     code, out, _err = cli(
-        capsys, "run", "youtube", "--url", URL, "--timeout", "5m", "-n", "--json"
+        capsys, "run", "youtube", "--url", URL, "--timeout", "5m", "-n"
     )
 
     assert code == 0
@@ -364,12 +377,19 @@ def test_a_duration_reaches_the_plan_in_seconds(capsys) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Output: silence, verbosity, and JSON
+# Output: one JSON line, the stream on stderr, and verbosity
 # ---------------------------------------------------------------------------
+
+RAW_FILES = ("raw_transcript.txt", "raw_sentences.txt", "raw_transcript.json")
+
+
+def saved(folder: Path, *names: str) -> list[str]:
+    """The paths a run answers for `folder`: meta.txt, then `names`."""
+    return [str(folder / name) for name in ("meta.txt", *names)]
 
 
 @exits("transcript", 0)
-def test_a_successful_run_prints_only_its_result_folder(
+def test_a_successful_run_answers_its_files_and_streams_its_folder(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_youtube(monkeypatch)
@@ -386,7 +406,8 @@ def test_a_successful_run_prints_only_its_result_folder(
     )
 
     result = next(tmp_path.iterdir())
-    assert (code, out, err) == (0, f"{result}\n", "")
+    assert (code, err) == (0, f"{result}\n")
+    assert out == json_line({"ok": True, "files": saved(result, *RAW_FILES)})
     assert (result / "raw_transcript.txt").read_text() == "Hello world"
 
 
@@ -416,7 +437,11 @@ def test_verbosity_changes_only_stderr(
         capsys, *(a.replace("{out}", str(tmp_path / "env")) for a in argv)
     )
 
-    assert runs["default"][2] == ""
+    # By default, stderr holds only the stream of result folders
+    assert all(
+        line.startswith(str(tmp_path / "default"))
+        for line in runs["default"][2].splitlines()
+    )
     assert {(c, o) for c, o, _ in runs.values()} == {runs["default"][:2]}
     assert (code, out.replace(str(tmp_path / "env"), "<out>")) == runs["default"][:2]
     assert not any(
@@ -432,78 +457,47 @@ def test_verbosity_changes_only_stderr(
 @pytest.mark.parametrize(
     "argv",
     [
-        ["list", "prompts", "--json"],
-        ["list", "profiles", "--json"],
-        ["list", "models", "--json"],
-        ["run", "youtube", "--url", URL, "--dry-run", "--json"],
-        [
-            "run",
-            "youtube",
-            "--url",
-            URL,
-            "--no-summary",
-            "--output-dir",
-            "{out}",
-            "--json",
-        ],
+        ["list", "prompts"],
+        ["list", "profiles"],
+        ["list", "models"],
+        ["doctor", "--source", "youtube"],
+        ["run", "youtube", "--url", URL, "--dry-run"],
+        ["run", "youtube", "--url", URL, "--no-summary", "--output-dir", "{out}"],
     ],
-    ids=["prompts", "profiles", "models", "dry-run", "run"],
+    ids=["prompts", "profiles", "models", "doctor", "dry-run", "run"],
 )
-def test_json_stdout_is_exactly_one_object(
+def test_stdout_is_exactly_one_json_line(
     argv: list[str], tmp_path, monkeypatch, capsys
 ) -> None:
     fake_youtube(monkeypatch)
+    monkeypatch.setattr(transcript, "_doctor_checks", lambda **_kwargs: [])
 
-    code, out, err = cli(capsys, *(a.replace("{out}", str(tmp_path)) for a in argv))
-
-    assert (code, err) == (0, "")
-    assert isinstance(json.loads(out), dict)
-    assert out.count("\n") == 1
-
-
-def test_json_warnings_join_the_object_once_and_leave_stderr_empty(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fall_back_twice(monkeypatch)
-
-    code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        URL,
-        "--no-summary",
-        "--output-dir",
-        str(tmp_path),
-        "--json",
-    )
-
-    assert (code, err) == (0, "")
-    assert json.loads(out)["warnings"] == [FALLBACK]
-
-
-def test_a_human_warning_goes_to_stderr_once_and_keeps_success(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fall_back_twice(monkeypatch)
-
-    code, out, err = cli(
-        capsys,
-        "run",
-        "youtube",
-        "--url",
-        URL,
-        "--no-summary",
-        "--output-dir",
-        str(tmp_path),
-    )
+    code, out, _err = cli(capsys, *(a.replace("{out}", str(tmp_path)) for a in argv))
 
     assert code == 0
-    assert out == f"{next(tmp_path.iterdir())}\n"
-    assert err == f"warning: {FALLBACK}\n"
+    assert out.count("\n") == 1
+    assert json.loads(out)["ok"] is True
 
 
-def test_a_failed_finder_launch_warns_and_keeps_success(
+def test_a_browser_fallback_is_verbose_detail_and_keeps_success(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fall_back(monkeypatch)
+    argv = ["run", "youtube", "--url", URL, "--no-summary", "--output-dir"]
+
+    code, out, err = cli(capsys, *argv, str(tmp_path / "quiet"))
+
+    assert code == 0
+    assert answer(out)["ok"] is True
+    assert FALLBACK not in err
+
+    code, out, err = cli(capsys, *argv, str(tmp_path / "verbose"), "-v")
+
+    assert code == 0
+    assert FALLBACK in err.splitlines()
+
+
+def test_a_failed_finder_launch_is_verbose_detail_and_keeps_success(
     tmp_path, monkeypatch, capsys
 ) -> None:
     def no_open(command, **_kwargs):
@@ -523,23 +517,27 @@ def test_a_failed_finder_launch_warns_and_keeps_success(
         "--output-dir",
         str(tmp_path),
         "--open",
+        "-v",
     )
 
+    result = next(tmp_path.iterdir())
     assert code == 0
-    assert out == f"{next(tmp_path.iterdir())}\n"
-    assert err.startswith("warning: Could not open the output folder in Finder: ")
+    assert out == json_line({"ok": True, "files": saved(result, *RAW_FILES)})
+    assert any(
+        line.startswith("Could not open the output folder in Finder: ")
+        for line in err.splitlines()
+    )
 
 
-def test_a_dry_run_prints_where_the_result_would_go_and_writes_nothing(
-    tmp_path, capsys
-) -> None:
+def test_a_dry_run_answers_its_plan_and_writes_nothing(tmp_path, capsys) -> None:
     out_dir = tmp_path / "parent"
 
     code, out, err = cli(
         capsys, "run", "youtube", "--url", URL, "--output-dir", str(out_dir), "-n"
     )
 
-    assert (code, out, err) == (0, f"{out_dir}\n", "")
+    assert (code, err) == (0, "")
+    assert json.loads(out)["output_dir"] == str(out_dir)
     assert not out_dir.exists()
 
 
@@ -549,7 +547,7 @@ def test_a_dry_run_prints_where_the_result_would_go_and_writes_nothing(
 
 
 @exits("transcript", 1)
-def test_a_failed_summary_leaves_stdout_empty_and_names_the_saved_transcript(
+def test_a_failed_summary_leaves_stdout_empty_and_answers_the_saved_transcript(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_youtube(monkeypatch)
@@ -558,25 +556,27 @@ def test_a_failed_summary_leaves_stdout_empty_and_names_the_saved_transcript(
         "run_summary_prompt",
         lambda *_args: (_ for _ in ()).throw(transcript.SummaryCLIError("quota")),
     )
-    argv = ["run", "youtube", "--url", URL, "--output-dir", str(tmp_path), "--json"]
+    argv = ["run", "youtube", "--url", URL, "--output-dir", str(tmp_path)]
 
     code, out, err = cli(capsys, *argv)
 
     result = next(tmp_path.iterdir())
-    failure = json.loads(err)
     assert (code, out) == (1, "")
-    assert failure["output_dir"] == str(result)
-    assert failure["summary"]["status"] == "failed"
-    assert failure["artifacts"]["transcript"] == str(result / "raw_transcript.txt")
-    assert failure["error"] == {
-        "code": "summary_failed",
-        "message": f"Summary generation failed: quota. The transcript is saved in {result}",
-        "hint": shlex.join(["transcript", *argv, "--profile", "astra"]),
-    }
+    assert err == f"{result}\n" + json_line(
+        {
+            "ok": False,
+            "errors": [
+                f"Summary generation failed: quota. The transcript is saved in "
+                f"{result}; fix: "
+                + shlex.join(["transcript", *argv, "--profile", "astra"])
+            ],
+            "files": saved(result, *RAW_FILES),
+        }
+    )
 
 
 @exits("transcript", 1)
-def test_a_failed_doctor_check_exits_1_with_the_report_on_stderr(
+def test_a_failed_doctor_check_exits_1_with_its_error_and_fix(
     tmp_path, monkeypatch, capsys
 ) -> None:
     monkeypatch.setattr(transcript, "ZOOM_ROOT", tmp_path / "missing")
@@ -586,13 +586,18 @@ def test_a_failed_doctor_check_exits_1_with_the_report_on_stderr(
     code, out, err = cli(capsys, "doctor", "--source", "zoom")
 
     assert (code, out) == (1, "")
-    assert err.splitlines()[-2:] == [
-        "error: 1 required check failed: zoom_recordings",
-        (
-            "fix: Record a Zoom meeting locally, or check YouTube only: "
-            "transcript doctor --source youtube"
-        ),
-    ]
+    assert err == json_line(
+        {
+            "ok": False,
+            "errors": [
+                (
+                    "zoom_recordings: Zoom recordings directory does not exist: "
+                    f"{tmp_path / 'missing'}; fix: Record a Zoom meeting locally, or "
+                    "check YouTube only: transcript doctor --source youtube"
+                )
+            ],
+        }
+    )
 
 
 @exits("transcript", 75)
@@ -625,13 +630,21 @@ def test_deepgram_refusing_the_audio_is_safe_to_retry(
     code, out, err = cli(capsys, *argv)
 
     (folder,) = tmp_path.iterdir()
-    assert (code, out) == (75, f"{folder}\n")
-    assert err.splitlines()[-1] == f"retry: {shlex.join(['transcript', *argv])}"
+    failure = answer(err)
+    assert (code, out) == (75, "")
+    assert err.splitlines()[0] == str(folder)
+    assert failure["errors"] == [
+        (
+            f"Deepgram did not take the audio: {error}; "
+            f"retry: {shlex.join(['transcript', *argv])}"
+        )
+    ]
+    assert failure["files"] == saved(folder)
     assert [path.name for path in folder.iterdir()] == ["meta.txt"]
     assert "Transcript status: failed" in (folder / "meta.txt").read_text()
 
 
-def test_a_failed_transcription_under_json_names_its_folder(
+def test_a_failed_transcription_answers_the_metadata_it_saved(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_youtube(
@@ -640,14 +653,16 @@ def test_a_failed_transcription_under_json_names_its_folder(
     )
 
     code, out, err = cli(
-        capsys, "run", "youtube", "--url", URL, "--output-dir", str(tmp_path), "--json"
+        capsys, "run", "youtube", "--url", URL, "--output-dir", str(tmp_path)
     )
 
-    report = json.loads(err)
-    meta = (Path(report["output_dir"]) / "meta.txt").read_text()
-    assert (code, out, report["error"]["code"]) == (75, "", "temporary_failure")
-    assert "Transcript status: failed" in meta
-    assert "Summary status: not started" in meta
+    (meta,) = answer(err)["files"]
+    assert (code, out) == (75, "")
+    assert "Transcript status: failed" in Path(meta).read_text()
+    assert "Transcript error: Deepgram did not take the audio: down" in (
+        Path(meta).read_text()
+    )
+    assert "Summary status: not started" in Path(meta).read_text()
 
 
 @pytest.mark.parametrize(
@@ -667,7 +682,7 @@ def test_a_deepgram_failure_that_may_have_been_paid_is_never_75(
 ) -> None:
     fake_youtube(monkeypatch, transcribe=lambda *_args: (_ for _ in ()).throw(error))
 
-    code, out, _err = cli(
+    code, out, err = cli(
         capsys,
         "run",
         "youtube",
@@ -678,7 +693,8 @@ def test_a_deepgram_failure_that_may_have_been_paid_is_never_75(
         str(tmp_path),
     )
 
-    assert (code, out) == (1, f"{next(tmp_path.iterdir())}\n")
+    assert (code, out) == (1, "")
+    assert answer(err)["files"] == saved(next(tmp_path.iterdir()))
 
 
 @exits("transcript", 75)
@@ -709,8 +725,9 @@ def test_a_deadline_passing_before_deepgram_is_safe_to_retry(
         str(tmp_path),
     )
 
-    assert (code, out) == (75, f"{next(tmp_path.iterdir())}\n")
-    assert err.splitlines()[-1].startswith("retry: transcript run youtube ")
+    (error,) = answer(err)["errors"]
+    assert (code, out) == (75, "")
+    assert "; retry: transcript run youtube " in error
 
 
 def test_a_network_failure_reaching_youtube_is_safe_to_retry(
@@ -730,7 +747,7 @@ def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     code, out, err = cli(capsys, "run", "youtube", "--url", URL, "--no-summary")
 
     assert (code, out) == (75, "")
-    assert "retry: transcript run youtube" in err
+    assert "; retry: transcript run youtube" in answer(err)["errors"][0]
 
 
 @exits("transcript", 75)
@@ -753,11 +770,9 @@ def test_a_retry_hint_drops_the_empty_url_that_just_ttr_adds(
         capsys, "run", "youtube", "--url", "--no-summary", "--url", URL
     )
 
+    (error,) = answer(err)["errors"]
     assert (code, out) == (75, "")
-    assert (
-        err.splitlines()[-1]
-        == f"retry: transcript run youtube --no-summary --url {URL}"
-    )
+    assert error.endswith(f"; retry: transcript run youtube --no-summary --url {URL}")
 
 
 @exits("youtube_smoke", 0, 1, 75)
@@ -773,9 +788,9 @@ def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> N
         "run_child",
         lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "audio\n", ""),
     )
-    assert smoke(capsys) == (0, "", "")
+    assert smoke(capsys) == (0, json_line({"ok": True}), "")
     verbose = smoke(capsys, "-v")
-    assert verbose[:2] == (0, "")
+    assert verbose[:2] == (0, json_line({"ok": True}))
     assert "Arc adapter exercised; audio stream verified" in verbose[2]
 
     monkeypatch.setattr(
@@ -785,14 +800,30 @@ def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> N
             transcript.YtDlpError("HTTP Error 503", temporary=True)
         ),
     )
-    code, out, err = smoke(capsys)
-    assert (code, out) == (75, "")
-    assert err.splitlines()[-1] == "retry: youtube_smoke.py"
+    assert smoke(capsys) == (
+        75,
+        "",
+        json_line(
+            {
+                "ok": False,
+                "errors": [
+                    "YouTube smoke failed: HTTP Error 503; retry: youtube_smoke.py"
+                ],
+            }
+        ),
+    )
 
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: None)
-    code, out, err = smoke(capsys)
-    assert (code, out) == (1, "")
-    assert err.splitlines()[-1] == "fix: brew install ffmpeg"
+    assert smoke(capsys) == (
+        1,
+        "",
+        json_line(
+            {
+                "ok": False,
+                "errors": ["ffprobe was not found on PATH; fix: brew install ffmpeg"],
+            }
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -834,9 +865,18 @@ def deepgram_status(status: int) -> httpx.HTTPStatusError:
     )
 
 
-def video_ids(out: str) -> list[str]:
-    """The video ID that ends each result folder printed on stdout."""
-    return [Path(line).name.rsplit("_", 1)[1] for line in out.splitlines()]
+def video_ids(files: list[str]) -> list[str]:
+    """The video ID that ends each result folder in an answer's files, in order."""
+    return [
+        Path(path).parent.name.rsplit("_", 1)[1]
+        for path in files
+        if Path(path).name == "meta.txt"
+    ]
+
+
+def folders(err: str) -> list[str]:
+    """The result folders a run streamed on stderr."""
+    return [line for line in err.splitlines() if line.startswith("/")]
 
 
 @exits("transcript", 0)
@@ -850,7 +890,7 @@ def video_ids(out: str) -> list[str]:
     ],
     ids=["one-flag", "repeated-flag", "empty-flag"],
 )
-def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
+def test_a_queue_saves_each_url_in_order_and_reads_the_key_once(
     urls: list[str], tmp_path, monkeypatch, capsys
 ) -> None:
     reads = fake_queue(monkeypatch)
@@ -859,10 +899,12 @@ def test_a_queue_publishes_each_url_in_order_and_reads_the_key_once(
         capsys, "run", "youtube", *urls, "--no-summary", "--output-dir", str(tmp_path)
     )
 
-    assert (code, err) == (0, "")
-    assert video_ids(out) == ["aaa", "bbb"]
+    files = json.loads(out)["files"]
+    assert code == 0
+    assert err.splitlines() == [str(Path(path).parent) for path in files[::4]]
+    assert video_ids(files) == ["aaa", "bbb"]
     assert [
-        (Path(line) / "raw_transcript.txt").read_text() for line in out.splitlines()
+        Path(path).read_text() for path in files if path.endswith("raw_transcript.txt")
     ] == ["Words of aaa", "Words of bbb"]
     assert reads == ["key"]
 
@@ -885,15 +927,19 @@ def test_a_failed_url_reports_its_fix_and_the_queue_moves_on(
 
     code, out, err = cli(capsys, "run", "youtube", *argv)
 
-    lines = err.splitlines()
-    assert code == 1
-    assert video_ids(out) == ["aaa", "bbb", "ccc"]
-    assert lines[0].startswith("[2/3] error: ")
-    assert lines[1:] == [
-        "[2/3] fix: transcript doctor --source youtube",
-        "error: 1 of 3 URLs failed; 2 saved a transcript",
-        "rerun: "
-        + shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]]),
+    failure = answer(err)
+    events = [line for line in err.splitlines() if not line.startswith("/")]
+    fix = "; fix: transcript doctor --source youtube"
+    assert (code, out) == (1, "")
+    assert len(folders(err)) == 3
+    assert events[0].startswith("[2/3] error: ")
+    assert events[0].endswith(fix)
+    assert video_ids(failure["files"]) == ["aaa", "bbb", "ccc"]
+    assert failure["errors"][0].startswith(f"{QUEUE[1]}: ")
+    assert failure["errors"][0].endswith(fix)
+    assert failure["errors"][1:] == [
+        "1 of 3 URLs failed; 2 saved a transcript; rerun: "
+        + shlex.join(["transcript", "run", "youtube", *options, "--url", QUEUE[1]])
     ]
 
 
@@ -905,17 +951,16 @@ def test_a_queue_exits_75_only_when_nothing_was_transcribed(
     busy = {"aaa": deepgram_status(503), "bbb": deepgram_status(503)}
 
     fake_queue(monkeypatch, failing=busy)
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+    code, _out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
 
     retry_both = ["transcript", "run", "youtube", *options, "--url", *QUEUE[:2]]
-    assert (code, video_ids(out)) == (75, ["aaa", "bbb"])
-    assert err.splitlines()[-2:] == [
-        "error: 2 of 2 URLs failed; 0 saved a transcript",
-        f"retry: {shlex.join(retry_both)}",
-    ]
+    assert (code, video_ids(answer(err)["files"])) == (75, ["aaa", "bbb"])
+    assert answer(err)["errors"][-1] == (
+        f"2 of 2 URLs failed; 0 saved a transcript; retry: {shlex.join(retry_both)}"
+    )
 
     fake_queue(monkeypatch, failing={"bbb": deepgram_status(503)})
-    code, out, err = cli(
+    code, _out, err = cli(
         capsys,
         "run",
         "youtube",
@@ -937,11 +982,10 @@ def test_a_queue_exits_75_only_when_nothing_was_transcribed(
         ]
     )
     assert code == 1
-    assert video_ids(out) == ["aaa", "bbb"]
-    assert err.splitlines()[1:] == [
-        f"[2/2] retry: {retry}",
-        "error: 1 of 2 URLs failed; 1 saved a transcript",
-        f"retry: {retry}",
+    assert video_ids(answer(err)["files"]) == ["aaa", "bbb"]
+    assert answer(err)["errors"] == [
+        f"{QUEUE[1]}: Deepgram did not take the audio: 503; retry: {retry}",
+        f"1 of 2 URLs failed; 1 saved a transcript; retry: {retry}",
     ]
 
 
@@ -958,17 +1002,21 @@ def test_a_failed_summary_still_lists_its_saved_transcript(
 
     monkeypatch.setattr(transcript, "run_summary_prompt", summarize)
 
-    code, out, err = cli(
+    code, _out, err = cli(
         capsys, "run", "youtube", "--url", *QUEUE[:2], "--output-dir", str(tmp_path)
     )
 
+    failure = answer(err)
     assert code == 1
-    assert video_ids(out) == ["aaa", "bbb"]
+    assert video_ids(failure["files"]) == ["aaa", "bbb"]
+    assert sum(path.endswith("raw_transcript.txt") for path in failure["files"]) == 2
     assert [path.name.rsplit("_", 1)[1] for path in sorted(tmp_path.iterdir())] == [
         "aaa",
         "bbb",
     ]
-    assert "error: 1 of 2 URLs failed; 2 saved a transcript" in err
+    assert failure["errors"][-1].startswith(
+        "1 of 2 URLs failed; 2 saved a transcript; "
+    )
 
 
 def test_the_final_hint_keeps_the_repair_each_url_needs(
@@ -986,44 +1034,36 @@ def test_the_final_hint_keeps_the_repair_each_url_needs(
     monkeypatch.setattr(transcript, "download_audio", slow_for_bbb)
     options = ["--no-summary", "--output-dir", str(tmp_path), "--timeout", "1m"]
 
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
+    code, _out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
 
     repaired = ["--no-summary", "--output-dir", str(tmp_path), "--timeout", "2m"]
     assert code == 1
-    assert video_ids(out) == ["aaa", "bbb"]
-    assert err.splitlines()[-1] == "retry: " + shlex.join(
-        ["transcript", "run", "youtube", *repaired, "--url", QUEUE[1]]
+    assert video_ids(answer(err)["files"]) == ["aaa", "bbb"]
+    assert answer(err)["errors"][-1].endswith(
+        "; retry: "
+        + shlex.join(["transcript", "run", "youtube", *repaired, "--url", QUEUE[1]])
     )
 
 
-def test_a_queue_under_json_prints_one_object_with_a_result_per_url(
-    tmp_path, monkeypatch, capsys
-) -> None:
+def test_a_queue_answers_the_files_of_every_url(tmp_path, monkeypatch, capsys) -> None:
     fake_queue(monkeypatch)
-    argv = ["run", "youtube", "--url", *QUEUE[:2], "--no-summary", "--json"]
+    argv = ["run", "youtube", "--url", *QUEUE[:2], "--no-summary"]
 
     code, out, err = cli(capsys, *argv, "--output-dir", str(tmp_path / "ok"))
 
-    report = json.loads(out)
-    assert (code, err, report["ok"]) == (0, "", True)
-    assert [result["url"] for result in report["results"]] == QUEUE[:2]
-    assert [Path(r["output_dir"]).parent for r in report["results"]] == [
-        tmp_path / "ok",
-        tmp_path / "ok",
-    ]
+    files = json.loads(out)["files"]
+    assert (code, len(folders(err))) == (0, 2)
+    assert video_ids(files) == ["aaa", "bbb"]
+    assert {Path(path).parent.parent for path in files} == {tmp_path / "ok"}
 
     fake_queue(monkeypatch, failing={"bbb": deepgram_status(500)})
     code, out, err = cli(capsys, *argv, "--output-dir", str(tmp_path / "failed"))
 
-    report = json.loads(err)
+    failure = answer(err)
     assert (code, out) == (1, "")
-    assert report["error"]["code"] == "queue_failed"
-    assert [(r["url"], r["ok"]) for r in report["results"]] == [
-        (QUEUE[0], True),
-        (QUEUE[1], False),
-    ]
-    assert report["results"][1]["error"]["code"] == "transcription_failed"
-    assert Path(report["results"][0]["output_dir"]).is_dir()
+    assert video_ids(failure["files"]) == ["aaa", "bbb"]
+    assert len(failure["files"]) == 5
+    assert failure["errors"][0].startswith(f"{QUEUE[1]}: ")
 
 
 @exits("transcript", 2)
@@ -1049,9 +1089,17 @@ def test_an_invalid_url_stops_the_queue_before_any_work(
     )
 
     assert (code, out, reads) == (2, "", [])
-    assert f"error: Invalid YouTube URL: {invalid}" in err
-    assert (
-        f"fix: transcript run youtube --output-dir {tmp_path} --url {QUEUE[0]}" in err
+    assert err == json_line(
+        {
+            "ok": False,
+            "errors": [
+                (
+                    f"Invalid YouTube URL: {invalid}; fix: transcript run youtube "
+                    f"--output-dir {tmp_path} --url {QUEUE[0]}"
+                )
+            ],
+            "help": "transcript run youtube --help",
+        }
     )
     assert list(tmp_path.iterdir()) == []
 
@@ -1065,15 +1113,13 @@ def test_one_video_under_two_url_forms_runs_once_as_a_queue(
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *forms, *options)
 
-    assert (code, err) == (0, "warning: Skipped 1 repeated URL(s)\n")
-    assert video_ids(out) == ["aaa"]
+    assert (code, len(folders(err))) == (0, 1)
+    assert video_ids(json.loads(out)["files"]) == ["aaa"]
 
-    code, out, err = cli(capsys, "run", "youtube", "--url", *forms, *options, "--json")
+    code, out, err = cli(capsys, "run", "youtube", "--url", *forms, *options, "-v")
 
-    report = json.loads(out)
-    assert (code, err) == (0, "")
-    assert [result["url"] for result in report["results"]] == forms[:1]
-    assert report["warnings"] == ["Skipped 1 repeated URL(s)"]
+    assert code == 0
+    assert "Skipped 1 repeated URL(s)" in err.splitlines()
 
 
 @exits("transcript", 1)
@@ -1099,18 +1145,25 @@ def test_a_folder_that_cannot_be_saved_stops_the_queue_before_any_paid_work(
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
 
     fix = ["--no-summary", "--output-dir", "WRITABLE_DIR", "--url", *QUEUE]
+    error = (
+        "Could not create the result folder: disk full; fix: transcript run youtube "
+        f"--no-summary --url {QUEUE[0]} --output-dir WRITABLE_DIR"
+    )
     assert (code, out, uploads) == (1, "", [])
-    assert "[1/3] error: Could not create the result folder: disk full" in err
-    assert err.splitlines()[-2:] == [
-        (
-            "error: 1 of 3 URLs failed; 0 saved a transcript. The queue "
-            "stopped before the last 2, which would fail to save the same way"
-        ),
-        "rerun: " + shlex.join(["transcript", "run", "youtube", *fix]),
-    ]
+    assert err.splitlines()[0] == f"[1/3] error: {error}"
+    assert answer(err) == {
+        "ok": False,
+        "errors": [
+            f"{QUEUE[0]}: {error}",
+            "1 of 3 URLs failed; 0 saved a transcript. The queue stopped before "
+            "the last 2, which would fail to save the same way; rerun: "
+            + shlex.join(["transcript", "run", "youtube", *fix]),
+        ],
+    }
     assert list(tmp_path.iterdir()) == []
 
 
+@exits("transcript", 130)
 def test_an_interrupt_while_opening_a_folder_marks_it_and_keeps_earlier_results(
     tmp_path, monkeypatch, capsys
 ) -> None:
@@ -1128,21 +1181,73 @@ def test_an_interrupt_while_opening_a_folder_marks_it_and_keeps_earlier_results(
             raise transcript.Interrupted(130)
 
     monkeypatch.setattr(transcript, "open_folder", interrupt_on_second)
-    options = ["--output-dir", str(tmp_path), "--open", "--json"]
+    options = ["--output-dir", str(tmp_path), "--open"]
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], *options)
 
-    report = json.loads(err)
+    failure = answer(err)
     assert (code, out) == (130, "")
-    assert [(r["url"], r["error"]["code"]) for r in report["results"]] == [
-        (QUEUE[0], "summary_failed")
-    ]
-    assert report["error"]["hint"] == shlex.join(
+    assert "[1/2] error: Summary generation failed: quota" in err
+    # The interrupted folder already held its metadata, so both runs answer
+    assert video_ids(failure["files"]) == ["aaa", "bbb"]
+    earlier, interrupted = failure["errors"]
+    assert earlier.startswith(f"{QUEUE[0]}: Summary generation failed: quota")
+    assert interrupted == "interrupted; rerun: " + shlex.join(
         ["transcript", "run", "youtube", *options, "--url", QUEUE[1]]
     )
     meta = (opened[1] / "meta.txt").read_text()
     assert "Transcript status: interrupted" in meta
     assert "Summary status: not started" in meta
+
+
+def test_an_interrupted_summary_answers_the_transcript_already_saved(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def interrupt(*_args):
+        raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "run_summary_prompt", interrupt)
+
+    code, out, err = cli(
+        capsys, "run", "youtube", "--url", QUEUE[0], "--output-dir", str(tmp_path)
+    )
+
+    failure = answer(err)
+    assert (code, out) == (130, "")
+    assert video_ids(failure["files"]) == ["aaa"]
+    assert any(path.endswith("raw_transcript.txt") for path in failure["files"])
+
+
+def test_an_interrupted_preview_answers_the_files_already_saved(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    fake_queue(monkeypatch)
+
+    def summarize(_provider, _transcript_path, _prompt, summary_path, *_args):
+        summary_path.write_text("# Summary\n", encoding="utf-8")
+
+    def interrupt(*_args, **_kwargs):
+        raise transcript.Interrupted(130)
+
+    monkeypatch.setattr(transcript, "run_summary_prompt", summarize)
+    monkeypatch.setattr(transcript, "render_markdown_with_glow", interrupt)
+
+    code, out, err = cli(
+        capsys,
+        "run",
+        "youtube",
+        "--url",
+        QUEUE[0],
+        "--output-dir",
+        str(tmp_path),
+        "--preview",
+    )
+
+    failure = answer(err)
+    assert (code, out) == (130, "")
+    assert any(path.endswith(".md") for path in failure["files"])
 
 
 def test_a_preflight_failure_stops_the_queue_before_any_url(
@@ -1160,10 +1265,12 @@ def test_a_preflight_failure_stops_the_queue_before_any_url(
     )
 
     assert (code, out) == (1, "")
-    assert err.splitlines() == [
-        "error: Missing Deepgram API key",
-        f"fix: {transcript.KEYRING_COMMAND}",
-    ]
+    assert err == json_line(
+        {
+            "ok": False,
+            "errors": [f"Missing Deepgram API key; fix: {transcript.KEYRING_COMMAND}"],
+        }
+    )
     assert list(tmp_path.iterdir()) == []
 
 
@@ -1171,35 +1278,10 @@ def test_preview_takes_one_url(capsys) -> None:
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE[:2], "--preview")
 
     assert (code, out) == (2, "")
-    assert "error: --preview takes one URL" in err
+    assert answer(err)["errors"][0].startswith("--preview takes one URL")
 
 
-@exits("transcript", 130)
-def test_an_interrupted_queue_reports_what_it_published_and_what_remains(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fake_queue(monkeypatch)
-
-    def interrupt_on_second(url, output_dir, *_args, **_kwargs):
-        if url == QUEUE[1]:
-            raise transcript.Interrupted(130)
-        return downloaded(output_dir, url[-3:])
-
-    monkeypatch.setattr(transcript, "download_audio", interrupt_on_second)
-    options = ["--no-summary", "--output-dir", str(tmp_path), "--json"]
-
-    code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
-
-    report = json.loads(err)
-    assert (code, out) == (130, "")
-    assert [r["url"] for r in report["results"]] == [QUEUE[0]]
-    assert Path(report["results"][0]["output_dir"]).is_dir()
-    assert report["error"]["hint"] == shlex.join(
-        ["transcript", "run", "youtube", *options, "--url", *QUEUE[1:]]
-    )
-
-
-def test_an_interrupted_queue_names_the_urls_left_on_a_terminal_too(
+def test_an_interrupted_queue_answers_what_it_saved_and_what_remains(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake_queue(monkeypatch)
@@ -1214,11 +1296,12 @@ def test_an_interrupted_queue_names_the_urls_left_on_a_terminal_too(
 
     code, out, err = cli(capsys, "run", "youtube", "--url", *QUEUE, *options)
 
-    assert (code, video_ids(out)) == (130, ["aaa"])
-    assert err.splitlines()[-2:] == [
-        "interrupted",
-        "rerun: "
-        + shlex.join(["transcript", "run", "youtube", *options, "--url", *QUEUE[1:]]),
+    failure = answer(err)
+    assert (code, out) == (130, "")
+    assert video_ids(failure["files"]) == ["aaa"]
+    assert failure["errors"] == [
+        "interrupted; rerun: "
+        + shlex.join(["transcript", "run", "youtube", *options, "--url", *QUEUE[1:]])
     ]
 
 
@@ -1240,7 +1323,7 @@ def test_verbose_queue_steps_include_their_position(
     )
 
     assert code == 0
-    assert "[" not in out
+    assert json.loads(out)["ok"] is True
     assert [
         line.split(" ", 1)[0]
         for line in err.splitlines()
@@ -1369,7 +1452,11 @@ def test_a_signal_exits_without_a_traceback_and_stops_children_gently(
         observe("transcript", process.returncode)
 
         assert process.returncode == code, stderr
-        assert (stdout, stderr.splitlines()[-1]) == ("", last)
+        assert stdout == ""
+        assert (
+            stderr.splitlines()[-1]
+            == json_line({"ok": False, "errors": [last]}).strip()
+        )
         assert "Traceback" not in stderr
         for pid in children:
             wait_for(lambda pid=pid: not alive(pid), f"process {pid} to end", 10)
@@ -1452,7 +1539,7 @@ def test_a_signal_stops_the_smoke_check_and_removes_its_download(
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _name: "/bin/ffprobe")
     monkeypatch.setattr(youtube_smoke, "download_audio", signalled_download)
 
-    assert smoke(capsys) == (code, "", f"{word}\n")
+    assert smoke(capsys) == (code, "", json_line({"ok": False, "errors": [word]}))
     assert not downloads[0].exists()
 
 

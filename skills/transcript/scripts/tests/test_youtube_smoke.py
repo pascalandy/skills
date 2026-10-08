@@ -122,8 +122,8 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
     code = youtube_smoke.main([CANONICAL_TRANSPORT_URL])
 
     assert code == 0
-    # A pass says nothing; -v reports the steps on stderr
-    assert capsys.readouterr() == ("", "")
+    # A pass answers in one line; -v reports the steps on stderr
+    assert capsys.readouterr() == ('{"ok":true}\n', "")
     assert len(observed_audio_paths) == 1
     assert not observed_audio_paths[0].parent.exists()
 

@@ -1,6 +1,6 @@
 """Agent-facing CLI contract for transcript.py.
 
-These tests cover the public command tree and structured output. They avoid
+These tests cover the public command tree and the one-line JSON answer. They avoid
 network calls and paid services.
 """
 
@@ -19,9 +19,11 @@ class TestCommandTree:
 
         assert code == 2
         assert stdout == ""
-        assert stderr.startswith("usage: transcript ")
-        assert "the following arguments are required: COMMAND" in stderr
-        assert stderr.splitlines()[-1] == "run 'transcript --help'"
+        assert json.loads(stderr) == {
+            "ok": False,
+            "errors": ["the following arguments are required: COMMAND"],
+            "help": "transcript --help",
+        }
 
     @pytest.mark.parametrize(
         "argv,expected",
@@ -30,7 +32,7 @@ class TestCommandTree:
             (("run", "youtube", "--help"), "--url URL"),
             (("run", "zoom", "--help"), "--latest"),
             (("list", "--help"), "prompts"),
-            (("list", "prompts", "--help"), "--json"),
+            (("list", "prompts", "--help"), "--no-color"),
             (("list", "models", "--help"), "--provider"),
             (("doctor", "--help"), "--source"),
         ],
@@ -66,7 +68,6 @@ class TestParsing:
                 "/tmp/transcripts",
                 "--no-summary",
                 "--dry-run",
-                "--json",
             ]
         )
 
@@ -78,7 +79,6 @@ class TestParsing:
         assert args.zoom_custom_path is None
         assert args.no_prompt is True
         assert args.dry_run is True
-        assert args.json is True
 
     @pytest.mark.parametrize(
         "selector,zoom,custom_path",
@@ -103,42 +103,28 @@ class TestParsing:
         assert args.zoom_custom_path == custom_path
         assert args.no_prompt is True
 
-    def test_json_and_preview_are_rejected_before_execution(self) -> None:
-        _stdout, stderr, code = run_script(
-            "run",
-            "youtube",
-            "--url",
-            "https://youtu.be/abc",
-            "--json",
-            "--preview",
-        )
-
-        assert code == 2
-        payload = json.loads(stderr)
-        assert payload["ok"] is False
-        assert payload["error"]["code"] == "invalid_usage"
-        assert "--preview" in payload["error"]["message"]
-        assert "--help" in payload["error"]["hint"]
-
-    def test_json_source_error_is_one_document(self) -> None:
+    def test_a_source_error_is_one_json_line_with_its_fix_and_help(self) -> None:
         stdout, stderr, code = run_script(
             "run",
             "youtube",
             "--url",
             "https://example.com/video",
             "--no-summary",
-            "--json",
         )
 
         assert code == 2
         assert stdout == ""
-        payload = json.loads(stderr)
-        assert payload["ok"] is False
-        assert payload["error"]["code"] == "invalid_source"
-        assert payload["error"]["hint"] == (
-            "transcript run youtube --no-summary --json "
-            "--url 'https://www.youtube.com/watch?v=VIDEO_ID'"
-        )
+        assert json.loads(stderr) == {
+            "ok": False,
+            "errors": [
+                (
+                    "Invalid YouTube URL: https://example.com/video; fix: "
+                    "transcript run youtube --no-summary "
+                    "--url 'https://www.youtube.com/watch?v=VIDEO_ID'"
+                )
+            ],
+            "help": "transcript run youtube --help",
+        }
 
     def test_invalid_model_names_the_current_discovery_command(self) -> None:
         stdout, stderr, code = run_script(
@@ -153,39 +139,33 @@ class TestParsing:
             "--effort",
             "low",
             "--dry-run",
-            "--json",
         )
 
         assert code == 2
         assert stdout == ""
-        payload = json.loads(stderr)
-        assert payload["error"]["code"] == "invalid_configuration"
-        assert "transcript list models --provider codex" in payload["error"]["message"]
-        assert "--list-models" not in payload["error"]["message"]
+        (error,) = json.loads(stderr)["errors"]
+        assert "transcript list models --provider codex" in error
+        assert "--list-models" not in error
 
 
 class TestDiscovery:
-    def test_list_prompts_json_is_one_document(self) -> None:
-        stdout, stderr, code = run_script("list", "prompts", "--json")
+    def test_list_prompts_is_one_json_line(self) -> None:
+        stdout, stderr, code = run_script("list", "prompts")
 
         assert code == 0
         assert stderr == ""
         payload = json.loads(stdout)
         assert payload["ok"] is True
-        assert payload["command"] == "list prompts"
         assert "follow_along_note" in [item["name"] for item in payload["prompts"]]
 
-    def test_list_models_json_names_provider_and_default(self) -> None:
-        stdout, stderr, code = run_script(
-            "list", "models", "--provider", "openrouter", "--json"
-        )
+    def test_list_models_names_provider_and_default(self) -> None:
+        stdout, stderr, code = run_script("list", "models", "--provider", "openrouter")
 
         assert code == 0
         assert stderr == ""
         payload = json.loads(stdout)
         assert payload == {
             "ok": True,
-            "command": "list models",
             "provider": "openrouter",
             "default": "z-ai/glm-5.3-flash",
             "models": ["z-ai/glm-5.3-flash"],
@@ -193,7 +173,7 @@ class TestDiscovery:
 
 
 class TestDryRun:
-    def test_json_dry_run_resolves_plan_without_preflight(
+    def test_a_dry_run_answers_its_plan_without_preflight(
         self, monkeypatch, capsys
     ) -> None:
         import transcript
@@ -217,25 +197,28 @@ class TestDryRun:
                 "https://youtu.be/abc",
                 "--no-summary",
                 "--dry-run",
-                "--json",
             ]
         )
 
         assert code == 0
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["ok"] is True
-        assert payload["command"] == "run"
-        assert payload["dry_run"] is True
-        assert payload["source"] == {
-            "kind": "youtube",
-            "url": "https://youtu.be/abc",
+        assert json.loads(capsys.readouterr().out) == {
+            "ok": True,
+            "source": {"kind": "youtube", "url": "https://youtu.be/abc"},
+            "summary": {
+                "enabled": False,
+                "profile": None,
+                "provider": None,
+                "model": None,
+                "effort": None,
+                "prompt": None,
+            },
+            "output_dir": str(transcript.OUTPUT_DIR),
+            "timeout_seconds": 570.0,
         }
-        assert payload["summary"]["enabled"] is False
-        assert payload["side_effects"] == []
 
 
 class TestDoctor:
-    def test_doctor_report_never_exposes_deepgram_key(
+    def test_doctor_checks_never_expose_deepgram_key(
         self, monkeypatch, tmp_path
     ) -> None:
         import transcript
@@ -258,12 +241,11 @@ class TestDoctor:
             lambda: "2026.7.4",
         )
 
-        report = transcript._doctor_report(source="all", summarize=True)
+        checks = transcript._doctor_checks(source="all", summarize=True)
 
-        serialized = json.dumps(report)
-        assert report["ok"] is True
-        assert "deepgram-secret-value" not in serialized
-        assert {check["name"] for check in report["checks"]} >= {
+        assert all(check["status"] == "pass" for check in checks)
+        assert "deepgram-secret-value" not in json.dumps(checks)
+        assert {check["name"] for check in checks} >= {
             "deepgram_credential",
             "claude",
             "pi",
@@ -312,167 +294,116 @@ class TestDoctor:
             lambda name: None if name == missing else f"/bin/{name}",
         )
 
-        report = transcript._doctor_report(source="zoom", summarize=True)
+        checks = transcript._doctor_checks(source="zoom", summarize=True)
 
-        runner_check = next(
-            check for check in report["checks"] if check["name"] == missing
-        )
+        runner_check = next(check for check in checks if check["name"] == missing)
         assert runner_check == expected
-        assert report["ok"] is (expected["status"] != "fail")
 
-    def test_doctor_failure_is_actionable_json(self, monkeypatch, capsys) -> None:
+    def test_a_warning_is_verbose_detail_and_keeps_doctor_passing(
+        self, monkeypatch, capsys
+    ) -> None:
+        import transcript
+
+        warning = {
+            "name": "pi",
+            "status": "warn",
+            "message": "pi was not found on PATH",
+            "hint": "Install pi to use --profile astra",
+        }
+        monkeypatch.setattr(transcript, "_doctor_checks", lambda **_kwargs: [warning])
+
+        assert transcript.main(["doctor"]) == 0
+        assert capsys.readouterr() == ('{"ok":true}\n', "")
+        assert transcript.main(["doctor", "-v"]) == 0
+        assert capsys.readouterr() == (
+            '{"ok":true}\n',
+            (
+                "[WARN] pi: pi was not found on PATH\n"
+                "  fix: Install pi to use --profile astra\n"
+            ),
+        )
+
+    def test_each_failed_check_is_one_error_with_its_fix(
+        self, monkeypatch, capsys
+    ) -> None:
         import transcript
 
         monkeypatch.setattr(
             transcript,
-            "_doctor_report",
-            lambda **_kwargs: {
-                "ok": False,
-                "command": "doctor",
-                "source": "youtube",
-                "summary": True,
-                "checks": [
-                    {
-                        "name": "pi",
-                        "status": "fail",
-                        "message": "pi was not found on PATH",
-                        "hint": "Install pi or rerun with --no-summary",
-                    }
-                ],
-                "counts": {"pass": 0, "warn": 0, "fail": 1},
-            },
+            "_doctor_checks",
+            lambda **_kwargs: [
+                {
+                    "name": "pi",
+                    "status": "fail",
+                    "message": "pi was not found on PATH",
+                    "hint": "Install pi or rerun with --no-summary",
+                },
+                {"name": "ffmpeg", "status": "pass", "message": "ffmpeg is here"},
+                {
+                    "name": "ffprobe",
+                    "status": "fail",
+                    "message": "ffprobe was not found on PATH",
+                    "hint": "brew install ffmpeg",
+                },
+            ],
         )
 
-        code = transcript.main(["doctor", "--source", "youtube", "--json"])
+        code = transcript.main(["doctor", "--source", "youtube"])
 
         captured = capsys.readouterr()
         assert code == 1
-        # A failed report is the error: stdout stays empty
+        # A failed check is the error: stdout stays empty
         assert captured.out == ""
-        payload = json.loads(captured.err)
-        assert payload["ok"] is False
-        assert payload["checks"][0]["hint"] == "Install pi or rerun with --no-summary"
-        assert payload["error"] == {
-            "code": "doctor_failed",
-            "message": "1 required check failed: pi",
-            "hint": "Install pi or rerun with --no-summary",
+        assert json.loads(captured.err) == {
+            "ok": False,
+            "errors": [
+                (
+                    "pi: pi was not found on PATH; "
+                    "fix: Install pi or rerun with --no-summary"
+                ),
+                "ffprobe: ffprobe was not found on PATH; fix: brew install ffmpeg",
+            ],
         }
 
 
 class TestStructuredRunResult:
-    def test_payload_names_every_saved_artifact(self, tmp_path) -> None:
+    def test_the_answer_lists_every_saved_file_in_the_order_it_appears(
+        self, tmp_path
+    ) -> None:
         from datetime import UTC, datetime
 
         import transcript
 
         result_dir = tmp_path / "result"
         result_dir.mkdir()
+        meta = result_dir / "meta.txt"
         raw = result_dir / "raw_transcript.txt"
         sentences = result_dir / "raw_sentences.txt"
         raw_json = result_dir / "raw_transcript.json"
         summary = result_dir / "short_summary.md"
-        meta = result_dir / "meta.txt"
-        for path in (raw, sentences, raw_json, summary, meta):
+        folder = transcript.ResultFolder(
+            path=result_dir,
+            asset=transcript.SourceAsset(
+                "youtube", "A video", "https://youtu.be/abc", raw, "abc"
+            ),
+            prompt=transcript.PromptSpec("short_summary", summary.name, summary),
+            started=datetime.now(UTC),
+        )
+        for path in (meta, raw):
             path.write_text("content", encoding="utf-8")
 
-        payload = transcript._run_result_payload(
-            plan=transcript.RunPlan(
-                source_kind="youtube",
-                provider="codex",
-                model="gpt-5.6-sol",
-                effort="medium",
-                summarize=True,
-            ),
-            folder=transcript.ResultFolder(
-                path=result_dir,
-                asset=transcript.SourceAsset(
-                    "youtube", "A video", "https://youtu.be/abc", raw, "abc"
-                ),
-                prompt=None,
-                started=datetime.now(UTC),
-            ),
-            saved_files={
-                "transcript": raw,
-                "sentences": sentences,
-                "json": raw_json,
-            },
-            outcome=transcript.SummaryOutcome(status="succeeded", path=summary),
-        )
+        assert folder.files() == [str(meta), str(raw)]
 
-        assert payload["ok"] is True
-        assert payload["output_dir"] == str(result_dir)
-        assert payload["summary"]["status"] == "succeeded"
-        assert payload["artifacts"] == {
-            "transcript": str(raw),
-            "sentences": str(sentences),
-            "json": str(raw_json),
-            "metadata": str(meta),
-            "summary": str(summary),
-        }
+        for path in (sentences, raw_json, summary):
+            path.write_text("content", encoding="utf-8")
 
-    def test_json_run_suppresses_human_progress(
-        self, tmp_path, monkeypatch, capsys
-    ) -> None:
-        import transcript
-
-        monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")
-
-        def fake_download(_url, output_dir, *_args, **_kwargs):
-            audio = output_dir / "audio.webm"
-            audio.write_bytes(b"audio")
-            return transcript.DownloadedAudio(audio, "anonymous", "A video", "abc")
-
-        monkeypatch.setattr(transcript, "download_audio", fake_download)
-        monkeypatch.setattr(
-            transcript,
-            "transcribe_audio",
-            lambda *_args: {
-                "results": {
-                    "channels": [
-                        {
-                            "alternatives": [
-                                {
-                                    "transcript": "Hello world",
-                                    "paragraphs": {
-                                        "paragraphs": [
-                                            {
-                                                "sentences": [
-                                                    {
-                                                        "start": 1.0,
-                                                        "end": 2.0,
-                                                        "text": "Hello world",
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-        )
-
-        code = transcript.main(
-            [
-                "run",
-                "youtube",
-                "--url",
-                "https://youtu.be/abc",
-                "--no-summary",
-                "--output-dir",
-                str(tmp_path),
-                "--json",
-            ]
-        )
-
-        captured = capsys.readouterr()
-        assert code == 0
-        assert captured.err == ""
-        payload = json.loads(captured.out)
-        assert payload["ok"] is True
-        assert payload["summary"]["status"] == "skipped"
+        assert folder.files() == [
+            str(meta),
+            str(raw),
+            str(sentences),
+            str(raw_json),
+            str(summary),
+        ]
 
 
 class TestProcessBoundary:
@@ -486,7 +417,7 @@ class TestProcessBoundary:
         )
 
         assert transcript.main(["run", "youtube", "--url", "https://youtu.be/a"]) == 130
-        assert capsys.readouterr() == ("", "interrupted\n")
+        assert capsys.readouterr() == ("", '{"ok":false,"errors":["interrupted"]}\n')
 
     def test_unexpected_error_names_the_debug_rerun(self, monkeypatch, capsys) -> None:
         import transcript
@@ -499,14 +430,13 @@ class TestProcessBoundary:
 
         code = transcript.main(["run", "youtube", "--url", "https://youtu.be/a"])
 
-        assert code == 1
-        assert capsys.readouterr() == (
-            "",
-            (
-                "error: RuntimeError: boom\n"
-                "rerun: transcript run youtube --url https://youtu.be/a --debug\n"
-            ),
-        )
+        out, err = capsys.readouterr()
+        assert (code, out) == (1, "")
+        assert json.loads(err) == {
+            "ok": False,
+            "errors": ["RuntimeError: boom"],
+            "rerun": "transcript run youtube --url https://youtu.be/a --debug",
+        }
 
     def test_debug_prints_the_traceback_and_keeps_the_exit_code(
         self, monkeypatch, capsys
@@ -526,7 +456,7 @@ class TestProcessBoundary:
         err = capsys.readouterr().err
         assert code == 1
         assert "Traceback (most recent call last)" in err
-        assert err.splitlines()[-2:] == [
-            "error: RuntimeError: boom",
-            "report: report the traceback above as a bug",
-        ]
+        assert json.loads(err.splitlines()[-1]) == {
+            "ok": False,
+            "errors": ["RuntimeError: boom"],
+        }

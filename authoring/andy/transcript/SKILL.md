@@ -16,19 +16,19 @@ Resolve `scripts/transcript.py` relative to this skill directory and run that ab
 
 ```bash
 # YouTube
-uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --json
+uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>"
 
 # YouTube queue
-uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url-a>" "<youtube-url-b>" --json
+uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url-a>" "<youtube-url-b>"
 
 # Latest Zoom meeting
-uv run <skill_dir>/scripts/transcript.py run zoom --latest --json
+uv run <skill_dir>/scripts/transcript.py run zoom --latest
 
 # Specific Zoom meeting folder
-uv run <skill_dir>/scripts/transcript.py run zoom --path "<folder-name-or-full-path>" --json
+uv run <skill_dir>/scripts/transcript.py run zoom --path "<folder-name-or-full-path>"
 ```
 
-Pass `--profile` only when the user selects a profile; `list profiles --json` marks the default.
+Pass `--profile` only when the user selects a profile; `list profiles` marks the default.
 
 ## Manage inference through profiles
 
@@ -37,7 +37,7 @@ Treat every request to use, change, or add a model as a profile-management reque
 First run:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py list profiles --json
+uv run <skill_dir>/scripts/transcript.py list profiles
 ```
 
 Show the current profile names, providers, models, and efforts. Then ask whether the user wants to select an existing profile, update one, or create one. If the user already named a profile, show its configuration and use `--profile <name>`.
@@ -58,13 +58,13 @@ Only `summary_with_quotes` receives the timestamped transcript; every other prom
 
 ## Agent operation
 
-Use `--json` for discovery, dry runs, and real runs unless the user asks for a terminal preview. JSON success is one object on `stdout` and leaves `stderr` empty; warnings join it as a `warnings` list. A failure leaves `stdout` empty and writes one JSON object on `stderr`.
+Every command answers in one JSON line. Success is `{"ok":true,…}` on `stdout`: a run lists the `files` it saved, `list` its values, and a dry run its plan. A failure leaves `stdout` empty and ends `stderr` with `{"ok":false,"errors":[…]}`. While a run works, `stderr` shows each result folder as soon as it appears.
 
 For an unfamiliar machine or after a preflight failure, run:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py doctor --source youtube --json
-uv run <skill_dir>/scripts/transcript.py doctor --source zoom --json
+uv run <skill_dir>/scripts/transcript.py doctor --source youtube
+uv run <skill_dir>/scripts/transcript.py doctor --source zoom
 ```
 
 `doctor` checks local dependencies and credentials without calling Deepgram, a summary model, or another paid API.
@@ -72,23 +72,23 @@ uv run <skill_dir>/scripts/transcript.py doctor --source zoom --json
 Before a run with a non-default profile, prompt, output, or source setting, resolve the plan without secrets, network calls, or writes:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --prompt short_summary --dry-run --json
+uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --prompt short_summary --dry-run
 ```
 
 Discover valid values through the command tree:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py list prompts --json
-uv run <skill_dir>/scripts/transcript.py list profiles --json
-uv run <skill_dir>/scripts/transcript.py list models --provider claude --json
-uv run <skill_dir>/scripts/transcript.py list models --provider codex --json
-uv run <skill_dir>/scripts/transcript.py list models --provider openrouter --json
+uv run <skill_dir>/scripts/transcript.py list prompts
+uv run <skill_dir>/scripts/transcript.py list profiles
+uv run <skill_dir>/scripts/transcript.py list models --provider claude
+uv run <skill_dir>/scripts/transcript.py list models --provider codex
+uv run <skill_dir>/scripts/transcript.py list models --provider openrouter
 uv run <skill_dir>/scripts/transcript.py --help
 ```
 
-Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Exit `75` means a temporary failure before any paid request; rerunning the same command is safe. Exits `130` and `143` mean the run was interrupted. Read the error `code`, `message`, and `hint`; the hint is the command that fixes it. Never rerun an exit `1` run automatically, because Deepgram may already have billed the audio.
+Exit `2` means the invocation or source is invalid. Exit `1` means runtime work failed. Exit `75` means a temporary failure before any paid request; rerunning the same command is safe. Exits `130` and `143` mean the run was interrupted. Each error ends with the command that fixes it, after `fix:`, `retry:`, or `rerun:`; a usage error without one adds a `help` command instead. Never rerun an exit `1` run automatically, because Deepgram may already have billed the audio.
 
-Report the result folder and summary status. A failure after the folder appears keeps it, with its metadata naming the failed stage: read `output_dir` from the `stderr` JSON. A run with several URLs reports each one in `results`, with its own `url`, `output_dir`, or `error`. Do not paste the generated summary into chat unless the user asks.
+Report the result folder, the one holding the `files`, and whether a summary `.md` is among them. A failure after the folder appears keeps it, and its answer still lists the `files` saved, including the metadata that names the failed stage. A run with several URLs lists the files of each URL, and its `errors` name each failed URL before a command that reruns only those. Do not paste the generated summary into chat unless the user asks.
 
 ## YouTube transport check
 

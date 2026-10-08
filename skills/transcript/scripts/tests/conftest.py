@@ -31,14 +31,17 @@ def no_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def restore_transcript_logger() -> Iterator[None]:
-    """main() sets the shared transcript logger's level and handlers; restore them
-    so a --debug run cannot leak DEBUG records into a later test (#313)."""
+    """main() sets the shared transcript logger's level, handlers, and
+    propagation; restore them so a --debug run cannot leak DEBUG records into a
+    later test (#313), and caplog still sees the logger."""
     import transcript
 
-    level, handlers = transcript.log.level, list(transcript.log.handlers)
+    log = transcript.log
+    level, handlers, propagate = log.level, list(log.handlers), log.propagate
     yield
-    transcript.log.setLevel(level)
-    transcript.log.handlers[:] = handlers
+    log.setLevel(level)
+    log.handlers[:] = handlers
+    log.propagate = propagate
 
 
 Test = TypeVar("Test", bound=Callable[..., Any])

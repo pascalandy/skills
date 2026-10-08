@@ -373,7 +373,7 @@ import subprocess
 import tempfile
 import time
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -388,7 +388,7 @@ from rich.markdown import Markdown
 from rich.progress import Progress, ProgressColumn, SpinnerColumn, Task, TextColumn
 from rich.text import Text
 
-__version__ = "4.1.0"
+__version__ = "5.0.0"
 
 PROG = "transcript"
 DEBUG_ENV = "TRANSCRIPT_DEBUG"
@@ -484,11 +484,15 @@ class DeepgramError(RuntimeError):
 
 
 class Failure(ScriptError):
-    """An expected failure: its error code, message, and the command that fixes it.
+    """An expected failure: what failed and the command that fixes it.
 
-    `label` names that command: `fix`, `retry` for a temporary failure, or `rerun`.
-    `result` holds what a failed run still produced, for the JSON error object.
-    `usage` is the command whose usage frames a usage error, as argparse's do.
+    Its one error, or with `earlier` its last, is the message, then `label`
+    and `fix`: `fix`, `retry` for a temporary failure, or `rerun`. `earlier`
+    holds errors this one sums up, each already naming its fix. `files` holds
+    what the failed run still saved, and `usage` the command whose help a usage
+    error points to; both join the answer. `kind` tells failures apart inside
+    the script; the answer leaves it out, since a caller branches on the exit
+    code.
     """
 
     def __init__(
@@ -499,45 +503,27 @@ class Failure(ScriptError):
         *,
         code: int = 1,
         label: str = "fix",
-        result: Mapping[str, Any] | None = None,
-        detail: str = "",
+        files: Sequence[str] = (),
         usage: argparse.ArgumentParser | None = None,
+        earlier: Sequence[str] = (),
     ) -> None:
-        super().__init__(message, detail=detail, report=result)
+        report: dict[str, Any] = {"files": list(files)} if files else {}
+        if usage is not None:
+            report["help"] = f"{usage.prog} --help"
+        self.line = f"{message.rstrip('.')}; {label}: {fix}" if fix else message
+        super().__init__(*earlier, self.line, report=report)
         self.kind = kind
+        self.message = message
         self.fix = fix
         self.code = code
-        self.label = label
-        self.usage = usage
-
-
-class QueueInterrupted(Interrupted):
-    """A signal stopped a queue: `results` holds the URLs it finished, and
-    `rerun` the command that reruns only the URLs it did not, or None when
-    every URL has a result."""
-
-    def __init__(self, code: int, results: list[dict], rerun: str | None) -> None:
-        super().__init__(code)
-        self.results = results
-        self.rerun = rerun
 
 
 class TranscriptParser(Parser):
-    """The shared Parser, with transcript's JSON usage errors and a closest-match
-    suggestion for an unknown command."""
+    """The shared Parser, whose usage errors raise a Failure so they answer in
+    JSON, with a closest-match suggestion for an unknown command."""
 
     def error(self, message: str) -> NoReturn:
-        if self.json_errors:
-            failure = {
-                "ok": False,
-                "error": {
-                    "code": "invalid_usage",
-                    "message": message,
-                    "hint": f"{self.prog} --help",
-                },
-            }
-            self.exit(USAGE, json.dumps(failure, ensure_ascii=False) + "\n")
-        super().error(message)
+        raise Failure("invalid_usage", message, "", code=USAGE, usage=self)
 
     def _check_value(self, action: argparse.Action, value: Any) -> None:
         if isinstance(action, argparse._SubParsersAction) and value not in (
@@ -801,6 +787,18 @@ class ResultFolder:
             f"{self.base_stem}.meta.txt" if self.base_stem else "meta.txt"
         )
 
+    def files(self) -> list[str]:
+        """The files the run saved so far, in the order they appear."""
+        names = [
+            self.metadata_path.name,
+            *(output_name(kind, self.base_stem) for kind in SAVE_OUTPUT_NAMES),
+        ]
+        if self.prompt is not None:
+            names.append(
+                f"{self.base_stem}.md" if self.base_stem else self.prompt.filename
+            )
+        return [str(self.path / name) for name in names if (self.path / name).is_file()]
+
     def save_metadata(self) -> None:
         lines = [
             f"Title: {self.asset.title}",
@@ -839,9 +837,9 @@ class ResultFolder:
 
 @dataclass(frozen=True)
 class SavedRun:
-    """A saved run's JSON payload and summary outcome."""
+    """The files a saved run wrote, and its summary outcome."""
 
-    payload: dict
+    files: list[str]
     summary: SummaryOutcome
 
 
@@ -863,24 +861,13 @@ class ElapsedSecondsColumn(ProgressColumn):
 
 class StderrHandler(logging.Handler):
     """Print each record on the current sys.stderr, so a live spinner can
-    redirect it above itself. Under --json, warnings join the JSON object in
-    `collected` instead of stderr. A repeated warning, such as the browser
-    fallback that every yt-dlp step hits, appears once."""
+    redirect it above itself, after the queue position of its URL."""
 
-    def __init__(self, collected: list[str] | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.collected = collected
-        self.warned: set[str] = set()
         self.setFormatter(logging.Formatter("%(message)s"))
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.levelno >= logging.WARNING:
-            if record.getMessage() in self.warned:
-                return
-            self.warned.add(record.getMessage())
-            if self.collected is not None:
-                self.collected.append(record.getMessage())
-                return
         text = self.format(record)
         if record.levelno >= logging.WARNING:
             text = f"warning: {text}"
@@ -889,27 +876,26 @@ class StderrHandler(logging.Handler):
         print(f"{QUEUE_POSITION.get()}{text}", file=sys.stderr)
 
 
-def configure_logging(*, verbose: bool, debug: bool, as_json: bool) -> list[str]:
-    """Route the transcript logger to stderr at the requested level.
+def configure_logging(*, verbose: bool, debug: bool) -> None:
+    """Route the transcript logger to stderr at the requested level, and keep
+    its records from the root logger that run_script() sets up.
 
-    Default shows warnings, -v adds progress, and --debug adds internals. Returns
-    the list that collects warnings under --json.
+    -v adds progress, and --debug adds internals.
     """
-    warnings: list[str] = []
     for handler in list(log.handlers):
         log.removeHandler(handler)
-    log.addHandler(StderrHandler(warnings if as_json else None))
+    log.addHandler(StderrHandler())
+    log.propagate = False
     log.setLevel(
         logging.DEBUG if debug else logging.INFO if verbose else logging.WARNING
     )
-    return warnings
 
 
 class ExecutionReporter:
     """Report each step: a transient spinner on a terminal, and lines with -v.
 
     `live` is the stderr console for the spinner, or None when output must not
-    animate: no terminal, --json, --no-progress, --no-color, NO_COLOR, or TERM=dumb.
+    animate: no terminal, --no-progress, --no-color, NO_COLOR, or TERM=dumb.
     """
 
     def __init__(
@@ -1006,8 +992,9 @@ def run_child(
     A captured child leads its own process group, so what it starts, such as
     the ffmpeg that yt-dlp runs, stops with it. A child on the terminal, such as
     glow, stays in ours: in another group, reading the terminal would stop it.
-    On a timeout or an interrupt, the child gets SIGTERM, so it can clean up,
-    and SIGKILL only GRACE seconds later.
+    It writes to stderr, so stdout keeps only the answer. On a timeout or an
+    interrupt, the child gets SIGTERM, so it can clean up, and SIGKILL only
+    GRACE seconds later.
     """
     log.debug("run %s", _describe(command))
     started = time.monotonic()
@@ -1015,7 +1002,7 @@ def run_child(
     with subprocess.Popen(
         list(command),
         stdin=subprocess.PIPE if input is not None else None,
-        stdout=pipe,
+        stdout=pipe if capture else 2,  # file descriptor 2 is stderr
         stderr=pipe,
         text=True,
         cwd=cwd,
@@ -1207,7 +1194,9 @@ def run_ytdlp(
     authenticated_diagnostic = _clean_subprocess_diagnostic(
         authenticated.stderr or authenticated.stdout
     )
-    log.warning(
+    # The run goes on, and meta.txt records the method that worked, so this is
+    # -v detail
+    log.info(
         f"{authenticated_label} YouTube access failed; retrying anonymously. "
         f"Sign in to YouTube in {authenticated_label} to use your session"
     )
@@ -1495,8 +1484,8 @@ def open_folder(path: Path, budget: RunBudget) -> None:
                 timeout=budget.remaining("Finder", POST_RUN_TIMEOUT),
             )
         except (subprocess.TimeoutExpired, OSError) as error:
-            # A GUI nicety cannot fail the run
-            log.warning(
+            # A GUI nicety cannot fail the run, so it is -v detail
+            log.info(
                 "Could not open the output folder in Finder: "
                 f"{error or type(error).__name__}"
             )
@@ -1505,7 +1494,8 @@ def open_folder(path: Path, budget: RunBudget) -> None:
 def render_markdown_with_glow(
     markdown_path: Path, budget: RunBudget, *, color: bool = True
 ) -> None:
-    """Render a markdown file on stdout with glow, or with Rich without glow.
+    """Render a markdown file on stderr with glow, or with Rich without glow,
+    so stdout keeps only the answer.
 
     Without color, Rich renders plain text, because glow always styles it.
     """
@@ -1513,7 +1503,9 @@ def render_markdown_with_glow(
         return
 
     markdown_text = markdown_path.read_text(encoding="utf-8")
-    markdown = Console(color_system="auto" if color else None, highlight=False)
+    markdown = Console(
+        stderr=True, color_system="auto" if color else None, highlight=False
+    )
 
     if not color or not shutil.which("glow"):
         if color:
@@ -1529,7 +1521,7 @@ def render_markdown_with_glow(
             timeout=budget.remaining("glow", POST_RUN_TIMEOUT),
         )
     except (subprocess.TimeoutExpired, WorkflowTimeoutError):
-        log.warning("glow timed out; summary saved without preview")
+        log.info("glow timed out; summary saved without preview")
         return
     if result.returncode != 0:
         log.info("glow failed; rendering markdown with rich")
@@ -1947,32 +1939,31 @@ def _help_formatter(prog: str) -> argparse.HelpFormatter:
 def _add_global_options(parser: argparse.ArgumentParser, *, nested: bool) -> None:
     """Add the options every command accepts, before or after its name.
 
-    A nested command suppresses their defaults, so a flag given before the
-    command name is not reset by the command's own parser.
+    run_script() adds -v and --debug to the root. A nested command suppresses
+    their defaults, so a flag given before the command name is not reset by the
+    command's own parser.
     """
     default: Any = argparse.SUPPRESS if nested else False
     group = parser.add_argument_group(
         "global options", "These work before or after the command name."
     )
-    group.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=default,
-        help="Print progress and step details on stderr",
-    )
-    group.add_argument(
-        "--debug",
-        action="store_true",
-        default=default,
-        help=f"Print internals, timings, and tracebacks on stderr; also {DEBUG_ENV}=1",
-    )
-    group.add_argument(
-        "--json",
-        action="store_true",
-        default=default,
-        help="Print one JSON object on stdout; a failure is one JSON object on stderr",
-    )
+    if nested:
+        group.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            default=default,
+            help="Print progress and step details on stderr",
+        )
+        group.add_argument(
+            "--debug",
+            action="store_true",
+            default=default,
+            help=(
+                "Print internals, timings, and tracebacks on stderr; "
+                f"also {DEBUG_ENV}=1"
+            ),
+        )
     group.add_argument(
         "--no-color",
         action="store_true",
@@ -2054,7 +2045,7 @@ def _add_run_options(
     summary.add_argument(
         "--preview",
         action="store_true",
-        help="Render the saved Markdown summary after publication",
+        help="Render the saved Markdown summary on stderr",
     )
 
     output = parser.add_argument_group("Output and execution")
@@ -2073,7 +2064,7 @@ def _add_run_options(
         "-n",
         "--dry-run",
         action="store_true",
-        help="Print where the result would go, without secrets, network calls, or writes",
+        help="Answer the plan, without secrets, network calls, or writes",
     )
     output.add_argument(
         "--timeout",
@@ -2101,13 +2092,9 @@ def _all_parsers(parser: argparse.ArgumentParser) -> Iterator[argparse.ArgumentP
         yield from _all_parsers(child)
 
 
-def configure_parsers(
-    parser: argparse.ArgumentParser, *, json_errors: bool, color: bool
-) -> None:
-    """Apply JSON usage errors and help color to the root and every command."""
+def configure_parsers(parser: argparse.ArgumentParser, *, color: bool) -> None:
+    """Apply help color to the root and every command."""
     for each in _all_parsers(parser):
-        if isinstance(each, Parser):
-            each.json_errors = json_errors
         # Python 3.14 colors help on a terminal; --no-color turns that off
         each.color = color  # type: ignore[attr-defined]
 
@@ -2127,19 +2114,29 @@ def help_target(
     return target
 
 
-def build_parser(*, json_errors: bool = False) -> TranscriptParser:
+class CommandTree(TranscriptParser):
+    """The root parser, whose parse_args() is transcript's own, so run_script()
+    gets arguments checked as a whole and usage errors from the command they
+    belong to."""
+
+    def parse_args(self, args: Any = None, namespace: Any = None) -> Any:
+        return parse_args(args, self)
+
+
+def build_parser() -> TranscriptParser:
     """Build the side-effect-free command tree."""
-    parser = TranscriptParser(
+    parser = CommandTree(
         prog=PROG,
         exit_codes=EXIT_CODES,
         description=(
             "Transcribe YouTube or Zoom audio with Deepgram and optionally "
-            "summarize it. The README next to this script covers setup and output."
+            "summarize it. Each command answers in one JSON line. The README next "
+            "to this script covers setup and output."
         ),
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
   transcript run zoom --latest
-  transcript list profiles --json
+  transcript list profiles
   transcript help run youtube""",
         formatter_class=_help_formatter,
     )
@@ -2149,7 +2146,9 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         version=f"{PROG} {__version__}",
     )
     _add_global_options(parser, nested=False)
-    commands = parser.add_subparsers(dest="command", metavar="COMMAND", required=True)
+    commands = parser.add_subparsers(
+        dest="command", metavar="COMMAND", required=True, parser_class=TranscriptParser
+    )
 
     run_parser = _command_parser(
         commands,
@@ -2170,13 +2169,13 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help_text="Transcribe one or more YouTube videos",
         description=(
             "Download and transcribe each YouTube video's audio, one URL at a "
-            "time. Each result folder prints as soon as it appears, and a "
+            "time. Each result folder prints on stderr as soon as it appears, and a "
             "failed URL lets the others run unless its result could not be saved."
         ),
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
   transcript run youtube --url URL_A URL_B URL_C
-  transcript run youtube --url URL --no-summary --dry-run --json
+  transcript run youtube --url URL --no-summary --dry-run
   transcript run youtube --url URL --profile sol --prompt short_summary""",
         codes=EXIT_CODES,
     )
@@ -2233,7 +2232,7 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         epilog="""examples:
   transcript list prompts
   transcript list profiles
-  transcript list models --provider codex --json""",
+  transcript list models --provider codex""",
         codes=LIST_EXIT_CODES,
     )
     resources = list_parser.add_subparsers(
@@ -2246,7 +2245,7 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         description="List bundled prompt names and their transcript input type.",
         epilog="""examples:
   transcript list prompts
-  transcript list prompts --json""",
+  transcript list prompts | jq -r '.prompts[].name'""",
         codes=LIST_EXIT_CODES,
     )
     prompts.set_defaults(
@@ -2258,12 +2257,12 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         "profiles",
         help_text="List configured inference profiles",
         description=(
-            "List the ordered profiles used to select summary inference, one per "
-            "line: name, provider, model, effort, and 'default' on the default."
+            "List the ordered profiles used to select summary inference, each with "
+            "its provider, model, and effort, and name the default."
         ),
         epilog="""examples:
   transcript list profiles
-  transcript list profiles --json""",
+  transcript list profiles | jq -r .default""",
         codes=LIST_EXIT_CODES,
     )
     profiles.set_defaults(
@@ -2277,7 +2276,7 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         description="List stable model suggestions for a summary provider.",
         epilog="""examples:
   transcript list models --provider codex
-  transcript list models --provider openrouter --json""",
+  transcript list models --provider openrouter""",
         codes=LIST_EXIT_CODES,
     )
     models.add_argument(
@@ -2294,11 +2293,11 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help_text="Check local requirements without paid API calls",
         description=(
             "Check commands, credentials, browser state, and local source paths. "
-            "A healthy report goes to stdout; a failed one goes to stderr."
+            "Each failed check is one error with its fix; -v lists every check."
         ),
         epilog="""examples:
   transcript doctor
-  transcript doctor --source youtube --json
+  transcript doctor --source youtube
   transcript doctor --source zoom --no-summary""",
         codes=DOCTOR_EXIT_CODES,
     )
@@ -2332,7 +2331,7 @@ def build_parser(*, json_errors: bool = False) -> TranscriptParser:
         help="The command to explain, such as 'run youtube'",
     )
 
-    configure_parsers(parser, json_errors=json_errors, color=True)
+    configure_parsers(parser, color=True)
     return parser
 
 
@@ -2342,7 +2341,7 @@ def parse_args(
     """Parse and validate arguments without execution-time I/O."""
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     if parser is None:
-        parser = build_parser(json_errors=given(raw_argv, "--json"))
+        parser = build_parser()
     args, extras = parser.parse_known_args(raw_argv)
     # Report errors from the command they belong to, so the hint names its help
     command_parser: argparse.ArgumentParser = parser
@@ -2412,10 +2411,6 @@ def parse_args(
             "--profile cannot be combined with --provider, --model, or --effort"
         )
 
-    if args.json and args.preview:
-        source_parser.error(
-            "--preview cannot be combined with --json because both use stdout"
-        )
     if args.preview and getattr(args, "queued", False):
         source_parser.error(
             "--preview takes one URL, because each summary would print "
@@ -2497,8 +2492,8 @@ def _transcribe_source(
     return TranscriptArtifacts(plain, timestamped, json_data, audio_bytes)
 
 
-def _print_discovery(args: argparse.Namespace, prompts: list[PromptSpec]) -> bool:
-    """Print requested discovery data and report whether execution should stop."""
+def _discovery(args: argparse.Namespace, prompts: list[PromptSpec]) -> dict:
+    """The values a `list` command asks for, as the fields beside `ok`."""
     if args.list_profiles:
         profiles = [
             {
@@ -2509,70 +2504,27 @@ def _print_discovery(args: argparse.Namespace, prompts: list[PromptSpec]) -> boo
             }
             for name, profile in INFERENCE_PROFILES.items()
         ]
-        if args.json:
-            _print_json(
-                {
-                    "ok": True,
-                    "command": "list profiles",
-                    "default": DEFAULT_PROFILE,
-                    "profiles": profiles,
-                }
-            )
-        else:
-            for profile in profiles:
-                marker = "\tdefault" if profile["name"] == DEFAULT_PROFILE else ""
-                print(
-                    f"{profile['name']}\t{profile['provider']}\t"
-                    f"{profile['model']}\t{profile['effort']}{marker}"
-                )
+        return {"default": DEFAULT_PROFILE, "profiles": profiles}
     if args.list_models:
         provider = args.provider or DEFAULT_PROVIDER
-        models = get_models_for_provider(provider)
-        if args.json:
-            default = next(
-                profile.model
-                for profile in INFERENCE_PROFILES.values()
-                if profile.provider == provider
-            )
-            _print_json(
-                {
-                    "ok": True,
-                    "command": "list models",
-                    "provider": provider,
-                    "default": default,
-                    "models": list(models),
-                }
-            )
-        else:
-            for model in models:
-                print(model)
-    if args.list_prompts:
-        if args.json:
-            _print_json(
-                {
-                    "ok": True,
-                    "command": "list prompts",
-                    "prompts": [
-                        {"name": prompt.name, "input_kind": prompt.input_kind}
-                        for prompt in prompts
-                    ],
-                }
-            )
-        else:
-            for prompt in prompts:
-                print(prompt.name)
-    return bool(args.list_models or args.list_profiles or args.list_prompts)
+        default = next(
+            profile.model
+            for profile in INFERENCE_PROFILES.values()
+            if profile.provider == provider
+        )
+        return {
+            "provider": provider,
+            "default": default,
+            "models": list(get_models_for_provider(provider)),
+        }
+    return {
+        "prompts": [
+            {"name": prompt.name, "input_kind": prompt.input_kind} for prompt in prompts
+        ]
+    }
 
 
-def _print_json(payload: dict, warnings: Sequence[str] = ()) -> None:
-    """Write exactly one compact JSON document to stdout, with any warnings."""
-    if warnings:
-        payload = {**payload, "warnings": list(warnings)}
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
-    sys.stdout.write("\n")
-
-
-def _dry_run_payload(
+def _dry_run_plan(
     args: argparse.Namespace,
     plan: RunPlan,
     prompt: PromptSpec | None,
@@ -2602,40 +2554,11 @@ def _dry_run_payload(
         "prompt": prompt.name if prompt is not None else None,
     }
     return {
-        "ok": True,
-        "command": "run",
-        "dry_run": True,
         "source": source,
         "summary": summary,
         "output_dir": str(output_dir),
         "timeout_seconds": args.timeout,
-        "side_effects": [],
     }
-
-
-def _print_dry_run(
-    args: argparse.Namespace,
-    plan: RunPlan,
-    prompt: PromptSpec | None,
-    warnings: Sequence[str],
-) -> None:
-    """Print one dry-run plan in the selected output format."""
-    payload = _dry_run_payload(args, plan, prompt)
-    if args.json:
-        _print_json(payload, warnings)
-        return
-    # Like a real run, stdout is where the result goes; the plan is -v detail
-    log.info("Dry run: no secrets, network calls, or writes")
-    log.info(f"Source: {plan.source_kind}")
-    if plan.summarize:
-        log.info(
-            "Summary: "
-            f"{plan.provider}/{plan.model}/{plan.effort} "
-            f"with {payload['summary']['prompt']}"
-        )
-    else:
-        log.info("Summary: disabled")
-    print(payload["output_dir"])
 
 
 def _installed_ytdlp_version() -> str | None:
@@ -2659,7 +2582,7 @@ def _doctor_check(
     return check
 
 
-def _doctor_report(*, source: str, summarize: bool) -> dict:
+def _doctor_checks(*, source: str, summarize: bool) -> list[dict[str, str]]:
     """Inspect local prerequisites without making network or paid API calls."""
     checks: list[dict[str, str]] = []
 
@@ -2787,72 +2710,25 @@ def _doctor_report(*, source: str, summarize: bool) -> dict:
             )
         )
 
-    counts = {
-        status: sum(check["status"] == status for check in checks)
-        for status in ("pass", "warn", "fail")
-    }
-    return {
-        "ok": counts["fail"] == 0,
-        "command": "doctor",
-        "source": source,
-        "summary": summarize,
-        "checks": checks,
-        "counts": counts,
-    }
+    return checks
 
 
-def _run_doctor(args: argparse.Namespace) -> int:
-    """Print a healthy report on stdout, or fail with the report on stderr."""
-    report = _doctor_report(source=args.source, summarize=not args.no_prompt)
-    lines = []
-    for check in report["checks"]:
-        lines.append(f"[{check['status'].upper()}] {check['name']}: {check['message']}")
+def _run_doctor(args: argparse.Namespace) -> dict:
+    """List every check with -v, and fail with one error per failed check."""
+    checks = _doctor_checks(source=args.source, summarize=not args.no_prompt)
+    for check in checks:
+        log.info(f"[{check['status'].upper()}] {check['name']}: {check['message']}")
         if hint := check.get("hint"):
-            lines.append(f"  fix: {hint}")
-    if not report["ok"]:
-        failed = [check for check in report["checks"] if check["status"] == "fail"]
-        raise Failure(
-            "doctor_failed",
-            f"{len(failed)} required check{'s' if len(failed) > 1 else ''} failed: "
-            + ", ".join(check["name"] for check in failed),
-            failed[0].get("hint") or f"{PROG} doctor --help",
-            result=report,
-            detail="\n".join(lines),
-        )
-    if args.json:
-        _print_json(report)
-    else:
-        print("\n".join(lines))
-    return 0
-
-
-def _run_result_payload(
-    *,
-    plan: RunPlan,
-    folder: ResultFolder,
-    saved_files: dict[str, Path],
-    outcome: SummaryOutcome,
-) -> dict:
-    """Describe a run whose transcript is saved, with each artifact's path."""
-    artifacts = {kind: str(path) for kind, path in saved_files.items()}
-    artifacts["metadata"] = str(folder.metadata_path)
-    if outcome.path is not None:
-        artifacts["summary"] = str(outcome.path)
-    return {
-        "ok": outcome.status != "failed",
-        "command": "run",
-        "source": plan.source_kind,
-        "output_dir": str(folder.path),
-        "summary": {
-            "status": outcome.status,
-            "profile": plan.profile if plan.summarize else None,
-            "provider": plan.provider if plan.summarize else None,
-            "model": plan.model if plan.summarize else None,
-            "effort": plan.effort if plan.summarize else None,
-            "error": outcome.error,
-        },
-        "artifacts": artifacts,
-    }
+            log.info(f"  fix: {hint}")
+    failed = [check for check in checks if check["status"] == "fail"]
+    if failed:
+        *earlier, last = [
+            f"{check['name']}: {check['message']}; "
+            f"fix: {check.get('hint') or f'{PROG} doctor -v'}"
+            for check in failed
+        ]
+        raise Failure("doctor_failed", last, "", earlier=earlier)
+    return {}
 
 
 def _preflight(plan: RunPlan, budget: RunBudget) -> str:
@@ -3174,46 +3050,14 @@ def _other_profile(argv: Sequence[str], plan: RunPlan) -> str:
 
 def _live_console(args: argparse.Namespace) -> Console | None:
     """A stderr console for the spinner, or None when output must not animate."""
-    if args.json or args.no_progress or not color_enabled(sys.stderr, args.no_color):
+    if args.no_progress or not color_enabled(sys.stderr, args.no_color):
         return None
     return Console(stderr=True)
 
 
-def _failure_object(error: Failure) -> dict:
-    """The JSON object that reports `error`, with what the failed run produced."""
-    return {
-        **error.report,
-        "ok": False,
-        "error": {"code": error.kind, "message": str(error), "hint": error.fix},
-    }
-
-
-def report_failure(error: Failure, *, as_json: bool, warnings: list[str]) -> int:
-    """Print one failure on stderr, one JSON object under --json, and return its
-    exit code. The last line names the command that fixes it."""
-    if as_json:
-        failure = _failure_object(error)
-        if warnings:
-            failure["warnings"] = warnings
-        print(
-            json.dumps(failure, ensure_ascii=False, separators=(",", ":")),
-            file=sys.stderr,
-        )
-        return error.code
-    if error.detail:
-        print(error.detail, file=sys.stderr)
-    if error.usage is not None:
-        error.usage.print_usage(sys.stderr)
-    position = QUEUE_POSITION.get()
-    print(f"{position}error: {error}", file=sys.stderr)
-    print(f"{position}{error.label}: {error.fix}", file=sys.stderr)
-    if error.usage is not None:
-        print(f"run '{error.usage.prog} --help'", file=sys.stderr)
-    return error.code
-
-
-def _show_help(parser: TranscriptParser, topic: Sequence[str]) -> int:
-    """Print the help of the command `topic` names, as '<command> --help' does."""
+def _show_help(parser: TranscriptParser, topic: Sequence[str]) -> NoReturn:
+    """Print the help of the command `topic` names and exit, as
+    '<command> --help' does."""
     target: argparse.ArgumentParser = parser
     for name in topic:
         commands = _subcommands(target)
@@ -3226,7 +3070,7 @@ def _show_help(parser: TranscriptParser, topic: Sequence[str]) -> int:
             _subcommands(parser)["help"].error(message)
         target = commands[name]
     target.print_help()
-    return 0
+    target.exit()
 
 
 def _resolve_run(
@@ -3292,9 +3136,9 @@ def _transcribe_and_save(
 ) -> SavedRun:
     """Transcribe one source into a new result folder.
 
-    The folder and its metadata appear, and its path prints, as soon as the
-    source is known; the transcript files, then the summary, join it as each
-    stage ends. Each Failure's hint reruns `argv`, so a queue passes the
+    The folder and its metadata appear, and its path prints on stderr, as soon
+    as the source is known; the transcript files, then the summary, join it as
+    each stage ends. Each Failure's hint reruns `argv`, so a queue passes the
     arguments of one URL.
     """
     with tempfile.TemporaryDirectory(prefix="transcript-audio-") as audio_dir:
@@ -3303,21 +3147,21 @@ def _transcribe_and_save(
         except TRANSCRIPTION_ERRORS as error:
             raise _transcription_failure(error, plan, args, argv) from error
         folder = _create_result_folder(plan, args, argv, asset, selected_prompt)
-        if not args.json:
-            print(folder.path, flush=True)
+        print(folder.path, file=sys.stderr, flush=True)
         try:
             if args.open:
                 open_folder(folder.path, budget)
             artifacts = _transcribe(asset, api_key, budget, reporter)
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as stop:
             folder.stop("interrupted")
+            # The queue answers what an interrupted run still saved
+            stop.__dict__["files"] = folder.files()
             raise
         except TRANSCRIPTION_ERRORS as error:
             failure = _transcription_failure(error, plan, args, argv)
-            folder.stop("failed", str(failure))
-            failure.report.update(
-                command="run", source=plan.source_kind, output_dir=str(folder.path)
-            )
+            folder.stop("failed", failure.message)
+            if files := folder.files():
+                failure.report["files"] = files
             raise failure from error
 
     try:
@@ -3352,8 +3196,9 @@ def _transcribe_and_save(
         folder.usage = outcome.usage
         folder.summary_error = outcome.error
         folder.save_metadata()
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as stop:
         folder.stop("interrupted")
+        stop.__dict__["files"] = folder.files()
         raise
     except (OSError, RuntimeError) as error:
         folder.stop("failed", str(error))
@@ -3361,16 +3206,9 @@ def _transcribe_and_save(
             "publication_failed",
             f"Could not save the result: {error}",
             _other_output_dir(argv),
-            result={
-                "command": "run",
-                "source": plan.source_kind,
-                "output_dir": str(folder.path),
-            },
+            files=folder.files(),
         ) from error
 
-    payload = _run_result_payload(
-        plan=plan, folder=folder, saved_files=saved_files, outcome=outcome
-    )
     if outcome.status == "failed":
         reporter.skip("Summary preview", "summary generation failed")
         raise Failure(
@@ -3378,19 +3216,19 @@ def _transcribe_and_save(
             f"Summary generation failed: {outcome.error}. "
             f"The transcript is saved in {folder.path}",
             _other_profile(argv, plan),
-            result=payload,
+            files=folder.files(),
         )
-    return SavedRun(payload, outcome)
+    return SavedRun(folder.files(), outcome)
 
 
 def _run(
     args: argparse.Namespace,
     argv: Sequence[str],
     prompts: list[PromptSpec],
-    warnings: list[str],
     source_parser: argparse.ArgumentParser,
-) -> int:
-    """Transcribe one source into its result folder, printing the folder first."""
+) -> dict:
+    """Transcribe one source into its result folder, and answer the files it
+    saved; the folder prints on stderr as soon as it appears."""
     plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
 
     try:
@@ -3414,46 +3252,71 @@ def _run(
         ) from error
 
     if args.dry_run:
-        _print_dry_run(args, plan, selected_prompt, warnings)
-        return 0
+        return _dry_run_plan(args, plan, selected_prompt)
 
     budget = RunBudget.start(args.timeout)
     log.debug(f"workflow deadline: {args.timeout:g}s")
     reporter = ExecutionReporter(_live_console(args))
     reporter.run_configuration(plan, selected_prompt)
     api_key = _run_preflight(plan, args, argv, budget, reporter)
-    run = _transcribe_and_save(
-        plan, selected_prompt, args, argv, api_key, budget, reporter
-    )
+    try:
+        run = _transcribe_and_save(
+            plan, selected_prompt, args, argv, api_key, budget, reporter
+        )
+    except KeyboardInterrupt as stop:
+        raise _interruption(stop, []) from stop
 
-    if args.json:
-        _print_json(run.payload, warnings)
-    if run.summary.path and plan.preview:
-        if sys.stdout.isatty():
-            # A blank line separates the folder path from the preview
-            print()
-        with reporter.step("Summary preview") as step:
-            try:
-                render_markdown_with_glow(
-                    run.summary.path,
-                    budget,
-                    color=color_enabled(sys.stdout, args.no_color),
-                )
-            except (
-                OSError,
-                RuntimeError,
-                subprocess.SubprocessError,
-                UnicodeError,
-            ) as error:
-                diagnostic = _clean_subprocess_diagnostic(str(error))
-                log.warning(
-                    "Summary preview unavailable; the saved result is intact: "
-                    f"{diagnostic or type(error).__name__}"
-                )
-                step.detail = "saved without preview"
-    elif run.summary.status == "skipped":
-        reporter.skip("Summary preview", "no summary generated (--no-summary)")
-    return 0
+    try:
+        if run.summary.path and plan.preview:
+            if sys.stderr.isatty():
+                # A blank line separates the folder path from the preview
+                print(file=sys.stderr)
+            with reporter.step("Summary preview") as step:
+                try:
+                    render_markdown_with_glow(
+                        run.summary.path,
+                        budget,
+                        color=color_enabled(sys.stderr, args.no_color),
+                    )
+                except (
+                    OSError,
+                    RuntimeError,
+                    subprocess.SubprocessError,
+                    UnicodeError,
+                ) as error:
+                    diagnostic = _clean_subprocess_diagnostic(str(error))
+                    log.info(
+                        "Summary preview unavailable; the saved result is intact: "
+                        f"{diagnostic or type(error).__name__}"
+                    )
+                    step.detail = "saved without preview"
+        elif run.summary.status == "skipped":
+            reporter.skip("Summary preview", "no summary generated (--no-summary)")
+    except KeyboardInterrupt as stop:
+        # The run already saved its files; the preview only shows one
+        raise _interruption(stop, run.files) from stop
+    return {"files": run.files}
+
+
+def _interruption(
+    stop: KeyboardInterrupt,
+    files: Sequence[str],
+    rerun: str = "",
+    earlier: Sequence[str] = (),
+) -> Failure:
+    """The answer of an interrupted run: the files it and the run it stopped
+    saved, the failures before it, and the command that reruns the rest."""
+    code = getattr(stop, "code", INTERRUPTED)
+    word = "interrupted" if code == INTERRUPTED else "terminated"
+    return Failure(
+        word,
+        word,
+        rerun,
+        code=code,
+        label="rerun",
+        files=[*files, *stop.__dict__.get("files", [])],
+        earlier=earlier,
+    )
 
 
 def _queue_fix(
@@ -3477,11 +3340,11 @@ def _run_queue(
     args: argparse.Namespace,
     argv: Sequence[str],
     prompts: list[PromptSpec],
-    warnings: list[str],
     source_parser: argparse.ArgumentParser,
-) -> int:
-    """Transcribe each URL in order. A failed URL reports its own fix and the
-    queue moves on, unless its result could not be saved."""
+) -> dict:
+    """Transcribe each URL in order, and answer the files they saved. A failed
+    URL prints its error and fix on stderr, and the queue moves on, unless its
+    result could not be saved."""
     plan, selected_prompt = _resolve_run(args, argv, prompts, source_parser)
     urls: list[str] = args.urls
     invalid = [url for url in urls if not validate_youtube_url(url)]
@@ -3500,15 +3363,15 @@ def _run_queue(
         )
 
     if args.dry_run:
-        _print_dry_run(args, plan, selected_prompt, warnings)
-        return 0
+        return _dry_run_plan(args, plan, selected_prompt)
 
     log.debug(f"workflow deadline for each URL: {args.timeout:g}s")
     reporter = ExecutionReporter(_live_console(args))
     reporter.run_configuration(plan, selected_prompt)
     api_key = _run_preflight(plan, args, argv, RunBudget.start(args.timeout), reporter)
-    results: list[dict] = []
+    files: list[str] = []
     failed: list[tuple[str, Failure]] = []
+    finished = transcribed = 0
     try:
         for number, url in enumerate(urls, start=1):
             position = QUEUE_POSITION.set(f"[{number}/{len(urls)}] ")
@@ -3524,33 +3387,31 @@ def _run_queue(
                     reporter,
                 )
             except Failure as error:
-                results.append({"url": url, **_failure_object(error)})
+                files.extend(error.report.get("files", []))
                 failed.append((url, error))
-                if not args.json:
-                    report_failure(error, as_json=False, warnings=warnings)
+                if error.kind == "summary_failed":
+                    # A failed summary still saved the transcript
+                    transcribed += 1
+                print(f"{QUEUE_POSITION.get()}error: {error.line}", file=sys.stderr)
                 if error.kind == "publication_failed":
+                    finished += 1
                     # Every later URL would fail to save the same way
                     break
             else:
-                results.append({"url": url, **run.payload})
+                files.extend(run.files)
+                transcribed += 1
             finally:
                 QUEUE_POSITION.reset(position)
+            finished += 1
     except KeyboardInterrupt as stop:
-        pending = urls[len(results) :]
-        rerun = (
-            _rerun(argv, drop={"--url"}, add=("--url", *pending)) if pending else None
-        )
-        code = getattr(stop, "code", INTERRUPTED)
-        raise QueueInterrupted(code, results, rerun) from stop
+        pending = urls[finished:]
+        rerun = _rerun(argv, drop={"--url"}, add=("--url", *pending)) if pending else ""
+        earlier = [f"{url}: {error.line}" for url, error in failed]
+        raise _interruption(stop, files, rerun, earlier) from stop
 
-    report = {"command": "run", "source": "youtube", "results": results}
     if not failed:
-        if args.json:
-            _print_json({"ok": True, **report}, warnings)
-        return 0
-    # Only a URL whose transcript was saved lists its artifacts
-    transcribed = sum("artifacts" in result for result in results)
-    pending = urls[len(results) :]
+        return {"files": files}
+    pending = urls[finished:]
     temporary = all(error.code == TEMPORARY for _, error in failed)
     message = (
         f"{len(failed)} of {len(urls)} URLs failed; {transcribed} saved a transcript"
@@ -3571,121 +3432,51 @@ def _run_queue(
         # 75 promises that rerunning the same command bills nothing again
         code=TEMPORARY if temporary and not transcribed else 1,
         label="retry" if temporary else "rerun",
-        result=report,
+        files=files,
+        earlier=[f"{url}: {error.line}" for url, error in failed],
     )
 
 
 def _dispatch(
-    parser: TranscriptParser,
-    args: argparse.Namespace,
-    argv: Sequence[str],
-    warnings: list[str],
-) -> int:
-    """Run the command `args` names and return its exit code."""
+    parser: TranscriptParser, args: argparse.Namespace, argv: Sequence[str]
+) -> dict:
+    """Run the command `args` names and return the fields beside `ok`."""
     if args.command == "help":
-        return _show_help(parser, args.topic)
+        _show_help(parser, args.topic)
     prompts = scan_prompts(PROMPTS_DIR)
     if args.command == "list":
-        _print_discovery(args, prompts)
-        return 0
+        return _discovery(args, prompts)
     if args.command == "doctor":
         return _run_doctor(args)
     source_parser = _subcommands(_subcommands(parser)["run"])[args.source]
     if args.source == "youtube" and args.repeated_urls:
-        log.warning(f"Skipped {args.repeated_urls} repeated URL(s)")
+        log.info(f"Skipped {args.repeated_urls} repeated URL(s)")
     if args.source == "youtube" and args.queued:
-        return _run_queue(args, argv, prompts, warnings, source_parser)
-    return _run(args, argv, prompts, warnings, source_parser)
-
-
-def run_guarded(
-    argv: Sequence[str],
-    parse: Callable[[], argparse.Namespace],
-    work: Callable[[argparse.Namespace, list[str]], int],
-    *,
-    prog: str,
-    debug_env: str,
-    as_json: bool,
-) -> int:
-    """Parse, run `work`, and turn every outcome into its exit code.
-
-    A usage error exits 2, a Failure its own code, SIGINT 130, SIGTERM 143, and
-    a bug 1. Tracebacks appear only with --debug or `debug_env`. `work` gets the
-    arguments and the list that collects warnings under --json.
-    """
-    warnings: list[str] = []
-    tracing = False
-    with signals_interrupt():
-        try:
-            try:
-                args = parse()
-                tracing = args.debug or env_flag(debug_env)
-                warnings = configure_logging(
-                    verbose=args.verbose,
-                    debug=tracing,
-                    as_json=getattr(args, "json", False),
-                )
-                return work(args, warnings)
-            except SystemExit as stop:
-                return stop.code if isinstance(stop.code, int) else 1
-        except KeyboardInterrupt as stop:
-            code = getattr(stop, "code", INTERRUPTED)
-            word = "interrupted" if code == INTERRUPTED else "terminated"
-            if not as_json:
-                print(word, file=sys.stderr)
-                if isinstance(stop, QueueInterrupted) and stop.rerun:
-                    print(f"rerun: {stop.rerun}", file=sys.stderr)
-                return code
-            rerun, result = (
-                (
-                    stop.rerun or "nothing to rerun: every URL has a result",
-                    {"results": stop.results},
-                )
-                if isinstance(stop, QueueInterrupted)
-                else (_rerun(argv, prog=prog), None)
-            )
-            stopped = Failure(
-                word, word, rerun, code=code, label="rerun", result=result
-            )
-            return report_failure(stopped, as_json=True, warnings=warnings)
-        except Failure as error:
-            # The traceback comes first, so the error and its fix end stderr
-            log.debug("traceback", exc_info=error)
-            return report_failure(error, as_json=as_json, warnings=warnings)
-        except Exception as error:
-            log.debug("unexpected failure", exc_info=error)
-            message = _clean_subprocess_diagnostic(str(error)) or "no message"
-            unexpected = Failure(
-                "internal_error",
-                f"{type(error).__name__}: {message}",
-                (
-                    "report the traceback above as a bug"
-                    if tracing
-                    else _rerun(argv, drop={"--debug"}, add=("--debug",), prog=prog)
-                ),
-                label="report" if tracing else "rerun",
-            )
-            return report_failure(unexpected, as_json=as_json, warnings=warnings)
+        return _run_queue(args, argv, prompts, source_parser)
+    return _run(args, argv, prompts, source_parser)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one command and return its exit code, as listed in --help."""
+    """Run one command and answer it in one JSON line; return its exit code,
+    as listed in --help."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    # Known before parsing, so even a usage error or an interrupt is JSON
-    as_json = given(argv, "--json")
-    parser = build_parser(json_errors=as_json)
-    configure_parsers(parser, json_errors=as_json, color=not given(argv, "--no-color"))
-    if (target := help_target(parser, argv)) is not None:
+    parser = build_parser()
+    configure_parsers(parser, color=not given(argv, "--no-color"))
+    target = help_target(parser, argv)
+    if target is not None and target is not parser:
+        # run_script() prints the root's help, with the -v and --debug it adds
         target.print_help()
         return 0
-    return run_guarded(
-        argv,
-        lambda: parse_args(argv, parser),
-        lambda args, warnings: _dispatch(parser, args, argv, warnings),
-        prog=PROG,
-        debug_env=DEBUG_ENV,
-        as_json=as_json,
-    )
+
+    def work(args: argparse.Namespace) -> dict:
+        configure_logging(verbose=args.verbose, debug=args.debug or env_flag(DEBUG_ENV))
+        return _dispatch(parser, args, argv)
+
+    try:
+        return run_script(parser, work, argv, debug=DEBUG_ENV)
+    except SystemExit as stop:
+        # --version and the help command print text and exit, as --help does
+        return stop.code if isinstance(stop.code, int) else 1
 
 
 if __name__ == "__main__":
