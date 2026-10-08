@@ -6,16 +6,325 @@
 
 from __future__ import annotations
 
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
-import hashlib
 import json
-import posixpath
+import logging
+import os
 import re
+import shlex
+import signal
 import sys
-from collections.abc import Sequence
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the messages; `report` is the
+    object `--json` prints on stderr beside them.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2.
+
+    With `json_errors` set, a usage error is one JSON object on stderr instead.
+    """
+
+    json_errors = False
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        if self.json_errors:
+            failure = {"errors": [message], "help": f"{self.prog} --help"}
+            self.exit(USAGE, json.dumps(failure, indent=2) + "\n")
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    print(
+        json.dumps(body, separators=(",", ":")), file=sys.stderr if code else sys.stdout
+    )
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument, or to spot --json early.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def usage_error(message: str) -> NoReturn:
+    raise UsageError(message)
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print progress and step details on stderr",
+    )
+    if debug:
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+        )
+    if given(argv, "-h", "--help", parser=parser):
+        parser.print_help()
+        return 0
+
+    # Parser.error, in the pasted cli block, prints usage errors itself;
+    # raising sends this one through answer_failure()
+    parser.error = usage_error
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError):
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
+import hashlib
+import posixpath
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import NoReturn
+
+log = logging.getLogger("update_corey_mode")
 
 PACKAGE = Path(__file__).resolve().parent.parent
 REPOSITORY = "https://github.com/coreyhaines31/marketingskills"
@@ -28,23 +337,28 @@ ROUTE = re.compile(r"^\|\s*\[`(?P<name>[^`]+)`\]\((?P<target>[^)]+)\)\s*\|")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
+REGENERATE = (
+    "regenerate with: update_corey_mode.py update --upstream DIR --revision SHA"
+)
+ONE_ROW = "give each folder in playbooks/ exactly one row in SKILL.md"
+
 EPILOG = """\
+Each run answers in one JSON line: {"ok":true} on stdout, with "changes" when
+update writes files or, with --dry-run, would write them; or
+{"ok":false,"errors":[...]} as the last line of stderr.
+
 examples:
   update_corey_mode.py check
   update_corey_mode.py check --upstream DIR
   update_corey_mode.py update --upstream DIR --revision SHA --dry-run
-  update_corey_mode.py update --upstream DIR --revision SHA
+  update_corey_mode.py update --upstream DIR --revision SHA"""
 
-exit codes:
-  0  success, including a no-op
-  1  the package drifted from the lock or the upstream, or the update failed
-  2  bad usage
-  130  interrupted
-"""
-
-
-class Failure(Exception):
-    """An expected failure; each argument is one message."""
+EXIT_CODES = exit_codes(
+    {
+        0: "success, including a no-op",
+        1: "the package drifted from the lock or the upstream, or the update failed",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -77,10 +391,10 @@ def destination(source: PurePosixPath) -> PurePosixPath | None:
 
 def upstream_files(upstream: Path) -> set[PurePosixPath]:
     if not (upstream / "skills").is_dir() or not (upstream / "LICENSE").is_file():
-        raise Failure(
-            f"{upstream} is not a marketingskills checkout: it needs skills/ and LICENSE",
-            "pass --upstream the snapshot folder, such as "
-            "$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main",
+        raise ScriptError(
+            f"{upstream} is not a marketingskills checkout: it needs skills/ and "
+            "LICENSE; pass --upstream the snapshot folder, such as "
+            "$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main"
         )
     return {
         PurePosixPath(path.relative_to(upstream).as_posix())
@@ -134,7 +448,7 @@ def render(upstream: Path, revision: str) -> Plan:
     }
     clashes = len(target_of) - len(set(target_of.values()))
     if clashes:
-        raise Failure(f"{clashes} upstream files map to the same package path")
+        raise ScriptError(f"{clashes} upstream files map to the same package path")
     plan: Plan = {}
     for source, dest in target_of.items():
         content = (upstream / source).read_bytes()
@@ -169,10 +483,9 @@ def read_lock(package: Path) -> Locked | None:
     path = package / LOCK
 
     def invalid(reason: str) -> NoReturn:
-        raise Failure(
-            f"{path}: invalid lock: {reason}",
-            f"restore a valid {LOCK}, then run "
-            f"'update_corey_mode.py check --package {package}'",
+        raise ScriptError(
+            f"{path}: invalid lock: {reason}; restore a valid {LOCK}, then run: "
+            f"update_corey_mode.py check --package {package}"
         )
 
     try:
@@ -224,29 +537,40 @@ def owned(package: Path, lock: Locked | None) -> set[PurePosixPath]:
     return paths
 
 
-def update(package: Path, upstream: Path, revision: str, dry_run: bool) -> str:
+def update(
+    package: Path, upstream: Path, revision: str, dry_run: bool
+) -> list[list[str]]:
     plan = render(upstream, revision)
+    log.info("rendered %d files from %s at %s", len(plan), upstream, revision)
     lock = read_lock(package)
     files = {dest: item.content for dest, item in plan.items()}
     files[LOCK] = lock_document(plan, revision)
-    changes: list[str] = []
-    for dest in sorted(owned(package, lock) - set(plan)):
-        changes.append(f"delete\t{dest}")
-        if not dry_run:
-            (package / dest).unlink(missing_ok=True)
-    for dest, content in sorted(files.items()):
-        path = package / dest
-        if path.is_file() and path.read_bytes() == content:
-            continue
-        changes.append(f"{'update' if path.exists() else 'add'}\t{dest}")
-        if not dry_run:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
-    if not dry_run and (package / PLAYBOOKS).is_dir():
-        for folder in sorted((package / PLAYBOOKS).rglob("*"), reverse=True):
-            if folder.is_dir() and not any(folder.iterdir()):
-                folder.rmdir()
-    return "\n".join(changes)
+    # Each change is listed once done, so a failure answers what already changed
+    changes: list[list[str]] = []
+    try:
+        for dest in sorted(owned(package, lock) - set(plan)):
+            if not dry_run:
+                (package / dest).unlink(missing_ok=True)
+            changes.append(["delete", str(dest)])
+        for dest, content in sorted(files.items()):
+            path = package / dest
+            if path.is_file() and path.read_bytes() == content:
+                continue
+            change = ["update" if path.exists() else "add", str(dest)]
+            if not dry_run:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            changes.append(change)
+        if not dry_run and (package / PLAYBOOKS).is_dir():
+            for folder in sorted((package / PLAYBOOKS).rglob("*"), reverse=True):
+                if folder.is_dir() and not any(folder.iterdir()):
+                    folder.rmdir()
+    except OSError as error:
+        raise ScriptError(
+            f"could not write the package: {error}; fix that path, then rerun the update",
+            report={"changes": changes},
+        ) from error
+    return changes
 
 
 def markdown_links(text: str) -> list[str]:
@@ -291,26 +615,25 @@ def check_routes(package: Path) -> list[str]:
 def check(package: Path, upstream: Path | None) -> None:
     lock = read_lock(package)
     if lock is None:
-        raise Failure(
-            f"{package / LOCK} is missing",
-            "import upstream with: update_corey_mode.py update --upstream DIR --revision SHA",
+        raise ScriptError(
+            f"{package / LOCK} is missing; import upstream with: "
+            "update_corey_mode.py update --upstream DIR --revision SHA"
         )
-    problems: list[str] = []
+    stale: list[str] = []
     entries = lock.hashes
     for dest, digest in sorted(entries.items()):
         path = package / dest
         if not path.is_file():
-            problems.append(f"missing: {dest}")
+            stale.append(f"missing: {dest}")
         elif sha256(path.read_bytes()) != digest:
-            problems.append(f"changed: {dest}")
+            stale.append(f"changed: {dest}")
+    log.info("checked %d generated files against the lock", len(entries))
     for dest in sorted(owned(package, lock) - entries.keys()):
-        problems.append(f"not in the lock: {dest}")
+        stale.append(f"not in the lock: {dest}")
     for path in sorted(package.rglob("SKILL.md")):
         if path != package / "SKILL.md":
-            problems.append(f"nested SKILL.md: {path.relative_to(package)}")
-    stale = bool(problems)
-    routes = check_routes(package)
-    problems += routes
+            stale.append(f"nested SKILL.md: {path.relative_to(package)}")
+    links: list[str] = []
     for path in sorted(package.rglob("*.md")):
         relative = PurePosixPath(path.relative_to(package).as_posix())
         if relative in entries:
@@ -318,26 +641,22 @@ def check(package: Path, upstream: Path | None) -> None:
         for target in markdown_links(path.read_text(encoding="utf-8")):
             link = target.partition("#")[0]
             if link and not SCHEME.match(link) and not (path.parent / link).exists():
-                problems.append(f"broken link in {relative}: {target}")
+                links.append(f"broken link in {relative}: {target}")
     if upstream is not None:
         revision = lock.revision
         plan = render(upstream, revision)
+        log.info("rebuilt %d files from %s at %s", len(plan), upstream, revision)
         if lock_document(plan, revision) != (package / LOCK).read_bytes():
-            problems.append(f"{LOCK} differs from a fresh render of {upstream}")
-            stale = True
+            stale.append(f"{LOCK} differs from a fresh render of {upstream}")
         for dest, item in sorted(plan.items()):
             path = package / dest
             if not path.is_file() or path.read_bytes() != item.content:
-                problems.append(f"differs from upstream: {dest}")
-                stale = True
-    if stale:
-        problems.append(
-            "regenerate with: update_corey_mode.py update --upstream DIR --revision SHA"
-        )
-    if routes:
-        problems.append("give each folder in playbooks/ exactly one row in SKILL.md")
+                stale.append(f"differs from upstream: {dest}")
+    problems = [f"{problem}; {REGENERATE}" for problem in stale]
+    problems += [f"{problem}; {ONE_ROW}" for problem in check_routes(package)]
+    problems += links
     if problems:
-        raise Failure(*problems)
+        raise ScriptError(*problems)
 
 
 def full_sha(value: str) -> str:
@@ -348,23 +667,23 @@ def full_sha(value: str) -> str:
     return value
 
 
-class Parser(argparse.ArgumentParser):
+class CommandParser(Parser):
+    """The shared parser, whose commands raise a usage error for run_script to
+    answer, as run_script makes the root parser do."""
+
     def error(self, message: str) -> NoReturn:
-        self.print_usage(sys.stderr)
-        print(f"{self.prog}: error: {message}", file=sys.stderr)
-        print(f"run '{self.prog} --help'", file=sys.stderr)
-        raise SystemExit(2)
+        usage_error(message)
 
 
-def parser() -> Parser:
-    result = Parser(
+def parsers() -> tuple[CommandParser, dict[str, argparse.ArgumentParser]]:
+    """The root parser, and the parser of each command by name."""
+    result = CommandParser(
         prog="update_corey_mode.py",
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=EPILOG,
-        allow_abbrev=False,
+        exit_codes=EXIT_CODES,
     )
-    commands = result.add_subparsers(dest="command", required=True, parser_class=Parser)
+    commands = result.add_subparsers(dest="command", required=True)
 
     def subcommand(
         name: str, summary: str, description: str
@@ -373,9 +692,8 @@ def parser() -> Parser:
             name,
             help=summary,
             description=description,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=EPILOG,
-            allow_abbrev=False,
+            exit_codes=EXIT_CODES,
         )
 
     check_command = subcommand(
@@ -401,34 +719,36 @@ def parser() -> Parser:
         help="full commit SHA of that folder",
     )
     update_command.add_argument(
-        "-n", "--dry-run", action="store_true", help="print the changes, write nothing"
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="answer the changes a run would make, and write nothing",
     )
     for command in (check_command, update_command):
         command.add_argument(
             "--package", type=Path, default=PACKAGE, help="corey-mode package folder"
         )
-    return result
+    return result, {"check": check_command, "update": update_command}
+
+
+def work(args: argparse.Namespace) -> dict[str, Any]:
+    if args.command == "update":
+        changes = update(args.package, args.upstream, args.revision, args.dry_run)
+        return {"changes": changes} if changes else {}
+    check(args.package, args.upstream)
+    return {}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parser().parse_args(argv)
-    try:
-        if args.command == "update":
-            output = update(args.package, args.upstream, args.revision, args.dry_run)
-            if output:
-                print(output)
-        else:
-            check(args.package, args.upstream)
-    except Failure as failure:
-        for message in failure.args:
-            print(message, file=sys.stderr)
-        return 1
-    except (OSError, UnicodeError) as error:
-        print(error, file=sys.stderr)
-        return 1
-    except KeyboardInterrupt:
-        return 130
-    return 0
+    root, commands = parsers()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # run_script prints the root help for a -h anywhere, so the help of a
+    # command, which lists its options, prints here
+    command = commands.get(argv[0]) if argv else None
+    if command is not None and given(argv[1:], "-h", "--help", parser=command):
+        command.print_help()
+        return 0
+    return run_script(root, work, argv)
 
 
 if __name__ == "__main__":
