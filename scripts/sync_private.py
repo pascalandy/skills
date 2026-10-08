@@ -217,7 +217,7 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             changes.append(
                 ["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"]
             )
-    log.debug("private repository at %s", after)
+        log.debug("private repository at %s", after)
     return changes
 
 

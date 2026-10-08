@@ -206,6 +206,29 @@ def test_a_failed_write_answers_the_changes_already_made(
     assert (bucket / PLAYBOOK).read_bytes().endswith(b"# To Spec\n")
 
 
+def test_a_stop_once_the_update_is_written_answers_every_change(
+    upstream: tuple[Path, str],
+    bucket: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, revision = upstream
+    info = updater.log.info
+
+    def stopped(message: str, *args: object) -> None:
+        if message.startswith("updated Matt mode"):
+            raise updater.Interrupted(143)
+        info(message, *args)
+
+    monkeypatch.setattr(updater.log, "info", stopped)
+    update = ["update", "--upstream", str(checkout), "--revision", revision]
+
+    assert updater.main([*update, "--root", str(bucket)]) == 143
+    paths = [path for _, path in answered(capsys)[1]["changes"]]
+    assert PLAYBOOK in paths
+    assert str(updater.LOCK_PATH) in paths
+
+
 def test_a_usage_error_in_a_command_answers_with_the_help_command(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

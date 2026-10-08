@@ -193,6 +193,43 @@ raise SystemExit(sync_private.main([]))
         assert git(private, "rev-parse", "HEAD") == start
 
 
+def test_a_stop_after_the_push_keeps_the_commit_and_push_receipt(
+    machines: tuple[Path, Path, Path],
+) -> None:
+    one, _, remote = machines
+    assert run(one).returncode == 0
+    private = one / "_skills_private"
+    (private / "content/secret/SKILL.md").write_text("saved edits\n")
+    # The private sync, stopped by its last log line once it pushed
+    driver = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import sync_private
+from _cli import Interrupted
+def stopped(message, *args):
+    if message.startswith("private repository at"):
+        raise Interrupted(143)
+sync_private.log.debug = stopped
+raise SystemExit(sync_private.main([]))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", driver, str(one / "scripts")],
+        cwd=one,
+        env={**os.environ, **GIT_IDENTITY, "HOME": str(one.parent / "home")},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+
+    assert (result.returncode, result.stdout) == (143, "")
+    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
+        ["commit", "_skills_private", f"save edits from {HOST}"],
+        ["push", "_skills_private", "1 commit"],
+    ]
+    assert git(remote, "show", "main:content/secret/SKILL.md") == "saved edits"
+
+
 def test_leaves_a_folder_that_is_not_a_clone_untouched(
     machines: tuple[Path, Path, Path],
 ) -> None:
