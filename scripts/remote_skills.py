@@ -238,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="dry run that exits 1 when a list differs, listing the changes beside the error",
     )
-    return run_script(parser, work, argv, json_answer=True)
+    return run_script(parser, work, argv)
 
 
 if __name__ == "__main__":

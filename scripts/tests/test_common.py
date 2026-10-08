@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import io
-import json
 import os
 import signal
 import subprocess
@@ -27,87 +26,30 @@ from _cli import (
 from _common import run_script, stop
 
 
-def broken(_: argparse.Namespace) -> str:
+def broken(_: argparse.Namespace) -> dict[str, Any]:
     raise RuntimeError("boom")
 
 
-def busy(_: argparse.Namespace) -> str:
+def busy(_: argparse.Namespace) -> dict[str, Any]:
     raise TemporaryError("the lock is held", report={"mode": "apply"})
 
 
-def call(work: Callable[[argparse.Namespace], str], *argv: str) -> tuple[int, str, str]:
-    parser = Parser(prog="just tool", exit_codes=exit_codes({75: "retry"}))
-    parser.add_argument("--json", action="store_true")
-    stdout, stderr = io.StringIO(), io.StringIO()
-    with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = run_script(parser, work, list(argv), debug="TOOL_DEBUG")
-    return code, stdout.getvalue(), stderr.getvalue()
+def interrupted(_: argparse.Namespace) -> dict[str, Any]:
+    raise Interrupted(INTERRUPTED)
 
 
-def test_a_bug_names_the_rerun_and_only_debug_shows_the_traceback() -> None:
-    code, stdout, stderr = call(broken)
-    traced = call(broken, "--debug")
-
-    assert (code, stdout, stderr) == (
-        1,
-        "",
-        "error: RuntimeError: boom\nrerun: just tool --debug\n",
-    )
-    assert traced[2].startswith("unexpected failure\nTraceback")
-    assert traced[2].endswith("\nerror: RuntimeError: boom\n")
-
-
-def test_under_json_a_bug_and_a_temporary_failure_are_one_object_each() -> None:
-    bug = call(broken, "--json")
-    retry = call(busy, "--json")
-
-    assert bug[:2] == (1, "")
-    assert json.loads(bug[2]) == {
-        "errors": ["RuntimeError: boom"],
-        "rerun": "just tool --json --debug",
-    }
-    assert retry[:2] == (75, "")
-    assert json.loads(retry[2]) == {
-        "mode": "apply",
-        "errors": ["the lock is held"],
-        "retry": "just tool --json",
-    }
-
-
-def test_under_json_a_usage_error_is_one_object_and_exits_2() -> None:
-    code, stdout, stderr = call(broken, "--json", "--bogus")
-
-    assert (code, stdout) == (2, "")
-    assert json.loads(stderr) == {
-        "errors": ["unrecognized arguments: --bogus"],
-        "help": "just tool --help",
-    }
-
-
-def test_under_json_and_debug_the_error_object_still_ends_stderr() -> None:
-    code, stdout, stderr = call(broken, "--json", "--debug")
-    lines = stderr.splitlines()
-    start = len(lines) - 1 - lines[::-1].index("{")
-
-    assert (code, stdout) == (1, "")
-    assert "Traceback" in stderr
-    assert json.loads("\n".join(lines[start:])) == {"errors": ["RuntimeError: boom"]}
+def lying(_: argparse.Namespace) -> dict[str, Any]:
+    raise ScriptError("the deploy missed mbp", report={"ok": True})
 
 
 def answered(
-    work: Callable[[argparse.Namespace], str | Mapping[str, Any]], *argv: str
+    work: Callable[[argparse.Namespace], Mapping[str, Any]], *argv: str
 ) -> tuple[int, str, str]:
     parser = Parser(prog="just tool", exit_codes=exit_codes({75: "retry"}))
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = run_script(
-            parser, work, list(argv), debug="TOOL_DEBUG", json_answer=True
-        )
+        code = run_script(parser, work, list(argv), debug="TOOL_DEBUG")
     return code, stdout.getvalue(), stderr.getvalue()
-
-
-def interrupted(_: argparse.Namespace) -> str:
-    raise Interrupted(INTERRUPTED)
 
 
 def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
@@ -129,24 +71,12 @@ def test_a_json_answer_is_one_line_whose_ok_matches_the_exit_code() -> None:
     assert answered(interrupted) == (130, "", '{"ok":false,"errors":["interrupted"]}\n')
 
 
-def lying(_: argparse.Namespace) -> str:
-    raise ScriptError("the deploy missed mbp", report={"ok": True})
-
-
 def test_ok_follows_the_exit_code_whatever_work_returns() -> None:
     assert answered(lambda _: {"ok": False}) == (0, '{"ok":true}\n', "")
     assert answered(lying) == (
         1,
         "",
         '{"ok":false,"errors":["the deploy missed mbp"]}\n',
-    )
-    assert answered(lambda _: "") == (
-        1,
-        "",
-        (
-            '{"ok":false,"errors":["TypeError: work must return a mapping under json_answer"],'
-            '"rerun":"just tool --debug"}\n'
-        ),
     )
 
 
@@ -159,7 +89,7 @@ def test_a_json_answer_covers_usage_errors_and_ends_stderr_after_a_traceback() -
         '{"ok":false,"errors":["unrecognized arguments: --bogus"],"help":"just tool --help"}\n',
     )
     assert (code, stdout) == (1, "")
-    assert "Traceback" in stderr
+    assert stderr.startswith("unexpected failure\nTraceback")
     assert stderr.endswith('\n{"ok":false,"errors":["RuntimeError: boom"]}\n')
 
 

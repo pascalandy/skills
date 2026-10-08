@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog=EPILOG,
         exit_codes=EXIT_CODES,
     )
-    return run_script(parser, lambda args: validate(), argv, json_answer=True)
+    return run_script(parser, lambda args: validate(), argv)
 
 
 if __name__ == "__main__":

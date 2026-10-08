@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         default="5m",
         help="how long to wait for another sync, and for each clone, pull, or push (default: 5m)",
     )
-    return run_script(parser, work, argv, debug="SYNC_PRIVATE_DEBUG", json_answer=True)
+    return run_script(parser, work, argv, debug="SYNC_PRIVATE_DEBUG")
 
 
 if __name__ == "__main__":

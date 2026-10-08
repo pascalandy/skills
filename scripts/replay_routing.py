@@ -499,9 +499,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="list the rows a run would replay, without starting Codex",
     )
-    return run_script(
-        parser, work, argv, debug="REPLAY_ROUTING_DEBUG", json_answer=True
-    )
+    return run_script(parser, work, argv, debug="REPLAY_ROUTING_DEBUG")
 
 
 if __name__ == "__main__":

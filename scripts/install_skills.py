@@ -746,9 +746,7 @@ def main(argv: list[str] | None = None) -> int:
     # Syncs started before this version pass -q to the installer they pulled;
     # accept it silently until every machine runs this one
     parser.add_argument("-q", "--quiet", action="store_true", help=argparse.SUPPRESS)
-    return run_script(
-        parser, install, argv, debug="INSTALL_SKILLS_DEBUG", json_answer=True
-    )
+    return run_script(parser, install, argv, debug="INSTALL_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

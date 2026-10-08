@@ -343,9 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         default="40s",
         help="how long each agent may take to list its skills (default: 40s)",
     )
-    return run_script(
-        parser, run, argv, debug="DISCOVER_SKILLS_DEBUG", json_answer=True
-    )
+    return run_script(parser, run, argv, debug="DISCOVER_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

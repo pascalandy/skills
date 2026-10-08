@@ -232,7 +232,6 @@ def main(argv: list[str] | None = None) -> int:
         lambda args: check_release(args.version, args.notes),
         argv,
         debug="RELEASE_CHECK_DEBUG",
-        json_answer=True,
     )
 
 

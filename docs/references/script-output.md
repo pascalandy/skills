@@ -73,8 +73,9 @@ $ uv run scripts/check_cli_block.py --fix
 
 ## How this repository does it
 
-- `answer()` in `scripts/_common.py` prints the line and derives `ok` from the exit code. `run_script(..., json_answer=True)` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
+- `answer()` in `scripts/_common.py` prints the line and derives `ok` from the exit code. `run_script()` sends every outcome through it: a success, an expected failure, a usage error, a bug, and an interrupt, which answers `{"ok":false,"errors":["interrupted"]}` with exit code 130. The script's `work` function returns the data beside `ok`, usually `{}`
 - Each `justfile` recipe that runs such a script carries `[no-exit-message]`, for decision 10
+- The lock, decision 13: `scripts/tests/test_cli_contract.py` fails when a script in `scripts/` writes to stdout anywhere but in `answer()`, logs a warning, or answers a usage error in another form, and `scripts/tests/test_justfile.py` fails when a recipe that runs one lacks `[no-exit-message]`. pyright checks that `work` returns a dict
 - A pytest or pyright warning fails `just check`: `scripts/check.py` runs pytest with `-W error` and pyright with `--warnings` (#487). When a dependency starts to warn, filter that one warning in its check, with a comment that says why
 
 ## Why
@@ -93,19 +94,12 @@ Decided on 2026-10-04, while planning #430
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line
 11. **An agent reads the line; a script reads the exit code or `jq -e .ok`**, as [Read the answer](#read-the-answer) shows. A script never parses text, and an agent that hides the line is back to silence
 12. **rtk passes the line through unchanged.** Checked on 2026-10-04 with a one-line and an indented object from a `just` recipe, on success and on failure; `rtk proxy` prints the same lines, so agents need no workaround
-13. **#492 puts the lock in `test_cli_contract.py`, not in a new check**, because that test already lists every script
+13. **The lock lives in `test_cli_contract.py`, not in a new check** (#492), because that test already lists every script
 14. **Rejected: a sentence in `AGENTS.md` that explains the silence** (the first proposal in #430), because it fixes one script in one repository. **Rejected: text in a terminal and JSON elsewhere**, because the agent and the human would see two different outputs
 
 ## State
 
-The rule rolls out script by script, after Pascal validates `just check` in production (#496). A script not marked "now" still follows the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`
-
-| Script | Answers in one JSON line |
-|---|---|
-| every entry point in `scripts/` | now |
-| scripts inside skills | #494 |
-
-#492 removes this section once every script follows the rule
+Every entry point in `scripts/` follows the rule, and the lock keeps it that way. Scripts inside skills follow it skill by skill (#494); until a skill's script does, it keeps the older output rules in [[script-conventions]]: a silent success, one change line per change, and under `--json` an indented error object without `ok`
 
 ## Related
 

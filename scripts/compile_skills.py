@@ -340,9 +340,7 @@ def main(argv: list[str] | None = None) -> int:
         help="dry run that exits 1 when skills/ or the skill count differs, "
         "listing the changes beside the error",
     )
-    return run_script(
-        parser, work, argv, debug="COMPILE_SKILLS_DEBUG", json_answer=True
-    )
+    return run_script(parser, work, argv, debug="COMPILE_SKILLS_DEBUG")
 
 
 if __name__ == "__main__":

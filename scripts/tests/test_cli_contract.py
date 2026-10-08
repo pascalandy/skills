@@ -1,13 +1,17 @@
-"""Every scripts/ entry point is registered, and its --help shows that it uses the shared parser.
+"""Every scripts/ entry point is registered, uses the shared parser, and answers
+in one JSON line.
 
 test_cli.py tests the parser and the contract behavior once; this suite checks
-each script is wired to it, and that doc lines running a script use only flags
-its help lists. The contract is in docs/references/script-conventions.md.
+each script is wired to it, that doc lines running a script use only flags its
+help lists, and that nothing but run_script writes the answer. The contract is
+in docs/references/script-conventions.md, the output in script-output.md.
 """
 
 from __future__ import annotations
 
+import ast
 import importlib
+import json
 import os
 import re
 import subprocess
@@ -148,3 +152,86 @@ def test_help_comes_from_the_shared_parser_and_docs_use_only_its_flags(
     assert section(shown.stdout, "examples")
     assert codes == list(importlib.import_module(Path(path).stem).EXIT_CODES)
     assert unknown == []
+
+
+@pytest.mark.parametrize("path", sorted(ENTRIES))
+def test_a_usage_error_answers_in_one_json_line_and_exits_2(path: str) -> None:
+    refused = subprocess.run(
+        [sys.executable, str(ROOT / path), "--no-such-flag"],
+        cwd=ROOT,
+        env={**os.environ, "PATH": ""},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert (refused.returncode, refused.stdout) == (2, "")
+    answer = json.loads(refused.stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    assert answer["errors"]
+
+
+def stdout_writes(source: str, allowed: str = "") -> list[int]:
+    """The lines of `source` that write to stdout, a print() without file= or any
+    sys.stdout, outside the function named `allowed`."""
+    tree = ast.parse(source)
+    skipped = {
+        id(node)
+        for function in ast.walk(tree)
+        if isinstance(function, ast.FunctionDef) and function.name == allowed
+        for node in ast.walk(function)
+    }
+    found: set[int] = set()
+    for node in ast.walk(tree):
+        if id(node) in skipped:
+            continue
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "print":
+            if not any(keyword.arg == "file" for keyword in node.keywords):
+                found.add(node.lineno)
+        elif isinstance(node, ast.Attribute) and ast.unparse(node) == "sys.stdout":
+            found.add(node.lineno)
+    return sorted(found)
+
+
+def warnings_in(source: str) -> list[int]:
+    """The lines of `source` that log a warning, which a success would hide."""
+    return [
+        node.lineno
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in ("warning", "warn")
+        and ast.unparse(node.func.value) in ("log", "logging")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("source", "writes", "warns"),
+    [
+        ('print("done")', [1], []),
+        ('import sys\nsys.stdout.write("done")', [2], []),
+        ('import sys\nprint("note", file=sys.stderr)', [], []),
+        ('log.warning("stale cache")', [], [1]),
+        ('logging.warning("stale cache")', [], [1]),
+        ('log.info("stale cache")', [], []),
+    ],
+    ids=["print", "sys-stdout", "stderr", "log-warning", "logging-warning", "info"],
+)
+def test_the_lock_flags_a_write_beside_the_answer_and_a_warning(
+    source: str, writes: list[int], warns: list[int]
+) -> None:
+    assert (stdout_writes(source), warnings_in(source)) == (writes, warns)
+
+
+def test_only_the_answer_writes_to_stdout_and_no_script_warns() -> None:
+    found = []
+    for path in sorted(SCRIPTS.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        allowed = "answer" if path.name == "_common.py" else ""
+        found += [
+            f"{path.name}:{line} writes to stdout"
+            for line in stdout_writes(source, allowed)
+        ]
+        found += [f"{path.name}:{line} logs a warning" for line in warnings_in(source)]
+
+    assert found == []

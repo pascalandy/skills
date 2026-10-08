@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="rewrite each stale copy and list each under changes",
     )
-    return run_script(parser, lambda args: check(args.fix), argv, json_answer=True)
+    return run_script(parser, lambda args: check(args.fix), argv)
 
 
 if __name__ == "__main__":
