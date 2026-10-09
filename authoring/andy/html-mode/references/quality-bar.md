@@ -13,7 +13,7 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 
 ## Type
 
-- Text on a phone is 12px or larger _(checked)_, form fields 16px so iOS does not zoom
+- Text on a phone is 12px or larger _(checked for CSS font sizes and SVG scaling; QA checks HTML transforms)_. Form fields use 16px so iOS does not zoom
 - Sizes in `rem`, so the browser's text size setting applies; container query thresholds in `rem` too
 - One scale: at most 8 sizes and 4 weights, line height 1.6 for text and 1.15 for titles
 - Headings `text-wrap: balance`, paragraphs `text-wrap: pretty`

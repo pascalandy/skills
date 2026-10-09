@@ -60,6 +60,15 @@ GOOD = """<!doctype html>
     <text x="70" y="8" transform="scale(1 2)" font-size="8" fill="currentColor">Stretched</text>
   </svg>
   <p id="more">More text.</p>
+  <details>
+    <summary style="min-height: 44px">Optional details</summary>
+    <p style="font-size: 10px; color: #bbb">Hidden detail text.</p>
+    <span style="display: contents; font-size: 10px; color: #bbb">Hidden boxless detail text.</span>
+    <button type="button">Hidden detail button</button>
+  </details>
+  <details inert style="opacity: 0">
+    <summary style="font-size: 10px; color: #bbb">Hidden summary text.</summary>
+  </details>
   <div style="display: contents; background: #111"><p>Visible through a boxless parent.</p></div>
   <div style="display: contents">Direct text in a boxless parent.</div>
   <div hidden><span style="display: contents; font-size: 10px">Hidden boxless text</span></div>
@@ -132,6 +141,7 @@ LATE_EVENTS = GOOD.replace(
     "<script>document.querySelector('button').addEventListener('focus', () => {"
     "console.error('focus broke');"
     "const image = new Image(); image.src = 'http://example.invalid/focus.png';"
+    "new WebSocket('ws://example.invalid/focus');"
     "});</script></body>",
 )
 
@@ -317,7 +327,11 @@ def test_baseline_counts_a_region_present_in_one_version_only(
         ),
         (
             "late-events",
-            ("console: focus broke", "network: http://example.invalid/focus.png"),
+            (
+                "console: focus broke",
+                "network: http://example.invalid/focus.png",
+                "network: ws://example.invalid/focus",
+            ),
         ),
     ),
 )

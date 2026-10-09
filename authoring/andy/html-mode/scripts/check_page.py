@@ -427,10 +427,13 @@ AUDIT_JS = (
   const isShown = (el) => {
     if (shown.has(el)) return shown.get(el);
     const s = getComputedStyle(el);
-    let result = s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
+    let result = s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0 && (s.display === 'contents' || el.checkVisibility());
     for (let parent = el.parentElement; result && parent; parent = parent.parentElement) {
       const s = getComputedStyle(parent);
       result = s.display !== 'none' && Number(s.opacity) > 0;
+      if (parent instanceof HTMLDetailsElement && !parent.open) {
+        result = result && !!parent.querySelector(':scope > summary')?.contains(el);
+      }
     }
     shown.set(el, result);
     return result;
@@ -519,7 +522,7 @@ TARGETS_JS = (
   // Allow one pixel of tolerance for fractional layout edges
   const half = min / 2 - 1;
   for (const el of document.querySelectorAll(selector)) {
-    if (!el.getClientRects().length || el.closest('[hidden], [inert]')) continue;
+    if (!el.checkVisibility() || !el.getClientRects().length || el.closest('[hidden], [inert]')) continue;
     const s = getComputedStyle(el);
     if (s.visibility === 'hidden' || s.display === 'none') continue;
     let r = el.getBoundingClientRect();
@@ -669,6 +672,12 @@ class Run:
                 "request",
                 lambda request: (
                     external.append(request.url) if self.external(request.url) else None
+                ),
+            )
+            page.on(
+                "websocket",
+                lambda socket: (
+                    external.append(socket.url) if self.external(socket.url) else None
                 ),
             )
             if count_frames:
