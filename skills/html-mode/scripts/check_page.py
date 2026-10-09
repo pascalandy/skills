@@ -426,8 +426,8 @@ AUDIT_JS = (
   const shown = new Map();
   const isShown = (el) => {
     if (shown.has(el)) return shown.get(el);
-    let result = el.getClientRects().length > 0;
-    if (result) { const s = getComputedStyle(el); result = s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0; }
+    const s = getComputedStyle(el);
+    let result = s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
     for (let parent = el.parentElement; result && parent; parent = parent.parentElement) {
       const s = getComputedStyle(parent);
       result = s.display !== 'none' && Number(s.opacity) > 0;
@@ -460,11 +460,16 @@ AUDIT_JS = (
     const text = node.textContent.replace(/\\s+/g, ' ').trim();
     const el = node.parentElement;
     if (!text || !el || el.closest('script, style, noscript, template') || !isShown(el)) continue;
-    const box = el.getBoundingClientRect();
+    const parentBox = el.getBoundingClientRect();
+    if (el.getClientRects().length && (parentBox.width <= 1 || parentBox.height <= 1)) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const box = range.getBoundingClientRect();
     if (box.width <= 1 || box.height <= 1) continue;
     const style = getComputedStyle(el);
     const svg = el instanceof SVGElement;
-    const size = parseFloat(style.fontSize) * (svg ? (el.getScreenCTM()?.a ?? 1) : 1);
+    const matrix = svg ? el.getScreenCTM() : null;
+    const size = parseFloat(style.fontSize) * (matrix ? Math.hypot(matrix.c, matrix.d) : 1);
     const label = text.slice(0, 40);
     if (phone && size < 11.95) small.add(`"${label}" at ${size.toFixed(1)}px`);
     // SVG text sits on shapes and text over an image has no single background: both stay a visual check

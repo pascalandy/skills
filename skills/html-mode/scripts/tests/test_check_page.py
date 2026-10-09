@@ -52,9 +52,15 @@ GOOD = """<!doctype html>
       <circle cx="30" cy="40" r="8" fill="currentColor"/>
       <text x="150" y="46" fill="currentColor">A label far to the right</text>
     </g>
+    <text x="300" y="10" transform="rotate(90 300 10)" fill="currentColor">Rotated</text>
+    <text x="70" y="8" transform="scale(1 2)" font-size="8" fill="currentColor">Stretched</text>
   </svg>
   <p id="more">More text.</p>
   <div style="display: contents; background: #111"><p>Visible through a boxless parent.</p></div>
+  <div style="display: contents">Direct text in a boxless parent.</div>
+  <div hidden><span style="display: contents; font-size: 10px">Hidden boxless text</span></div>
+  <div style="opacity: 0"><span style="display: contents; font-size: 10px">Transparent boxless text</span></div>
+  <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); font-size: 10px; color: #bbb">Visually hidden text</span>
 </main>
 </body>
 </html>
@@ -82,12 +88,15 @@ BAD = """<!doctype html>
   <div class="wide">wide content</div>
   <p class="tiny">tiny text</p>
   <div style="display: contents"><p class="tiny">tiny boxless text</p></div>
+  <div style="display: contents; font-size: 10px">tiny direct boxless text</div>
+  <div class="pale" style="display: contents">pale direct boxless text</div>
   <div style="visibility: hidden; background: #000"><p class="pale" style="visibility: visible">visible child text</p></div>
   <p>repeated label</p>
   <p class="pale">repeated label</p>
   <p style="opacity: .1">faded text</p>
   <div style="background: #000; opacity: .5"><p style="color: #fff">grouped text</p></div>
   <div class="cut"><span>a label far too long for its box</span></div>
+  <svg width="100" height="40"><text x="10" y="30" transform="scale(1 .5)">compressed text</text></svg>
   <button class="small" type="button">x</button>
   <div class="spin"></div>
   <img src="http://example.invalid/pixel.png" alt="">
@@ -210,6 +219,9 @@ def test_each_defect_is_reported_with_its_check(
     assert "infinite CSS animations running at rest" in errors
     assert "animation frames in 2 s at rest" in errors
     assert '"tiny boxless text" at 10.0px' in errors
+    assert '"tiny direct boxless text" at 10.0px' in errors
+    assert '"pale direct boxless text" at' in errors
+    assert '"compressed text" at 8.0px' in errors
     assert '"visible child text" at' in errors
     assert "targets: button.small" in errors
     assert answer["evidence"] == str(evidence.resolve())
