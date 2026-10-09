@@ -12,11 +12,11 @@ Resolve bundled paths relative to this skill directory. Playbooks and references
 
 ## Workflow
 
-1. Read the brief, source material, and project instructions. Record the audience, review question, content to preserve, fidelity, and useful interaction. Follow explicit user decisions, then project conventions, then the subject and audience. This step is complete when the artifact's purpose and boundaries are concrete.
+1. Read the brief, source material, and project instructions. Record the audience, review question, content to preserve, fidelity, and useful interaction, and set the [level](#levels). Follow explicit user decisions, then project conventions, then the subject and audience. Decide technical choices, such as a script's language and tooling, from `coding-language` without asking the user; Python runs through `uv`. This step is complete when the artifact's purpose, boundaries, and level are concrete.
 2. Select and read one primary playbook from the table below. For mixed artifacts, add only the references or playbook sections needed for embedded content. This step is complete when the primary review question has one owner.
 3. Set the visual direction. When palette, type, composition, or register remain open, read [design](references/design.md). Follow the active theme and motion policy. Before implementation, resolve whether the result is local-only or authorized for publication. An explicit local-only request wins. For any authorized publication, read `html-publish` from the active skill catalog; it is the sole owner of hosted delivery and durable receipts. `html-mode` owns artifact design and browser verification for this run. This step is complete when the design, interactions, and delivery choice are concrete.
 4. Build under the shared contract and selected playbook. Preserve any project-required variant review before changing real product components. This step is complete when the file exists and every intended section, control, and state is accounted for.
-5. Verify the file using the shared checks and playbook-specific criteria. Fix observed failures. This step is complete when the checks pass or unavailable checks are explicitly identified in the handoff.
+5. Verify the file using the shared checks and playbook-specific criteria. For a page readers use, run `uv run scripts/check_page.py <page>` first; `--help` lists its screens and options. Fix observed failures. This step is complete when the checks pass or unavailable checks are explicitly identified in the handoff.
 6. Return the absolute file path and playbook-specific handoff. Report browser rendering, external network dependencies, host and client delivery, private URL, and receipt persistence as separate facts. Private hosting does not make an artifact offline or hide its external dependencies. For local-only work, do not invoke a host or change a receipt. For authorized publication, use `html-publish` and report a private URL only when a verified result carries one. If publication cannot complete, keep the local artifact and retained receipt attempt, then report the exact retry from `html-publish` without creating another publication identity.
 
 ## Playbooks
@@ -28,9 +28,30 @@ Resolve bundled paths relative to this skill directory. Playbooks and references
 | What work happens in what order, with which commitments? | [Plan](playbooks/plan.md) |
 | How do components, events, states, or concepts relate? | [Diagram](playbooks/diagram.md) |
 | How should an HTML presentation tell its story one screen at a time? | [Slides](playbooks/slides.md) |
+| How do readers move through a page built for them, such as a document turned into a guided reading page? | [Interactive page](playbooks/interactive-page.md) |
 | A report, explainer, landing page, tool, data story, or mixed artifact without a narrower owner | [Artifact](playbooks/artifact.md) |
 
 For quantitative content in any playbook, read [charts and data](references/charts-and-data.md).
+
+For a page readers use, read these as the interactive page playbook asks:
+
+- [Quality bar](references/quality-bar.md): what the page meets, and which items `check_page.py` fails
+- [Pitfalls](references/pitfalls.md): symptom, cause, and fix for each defect a QA round found, by feature
+- [QA loop](references/qa-loop.md): QA threads, how to split them, the brief, and the journal
+- [Learnings](learnings/README.md): why the rules exist, and how a project adds its lessons
+
+## Levels
+
+| Level | When | QA rounds |
+| --- | --- | --- |
+| Esquisse | By default, to see an idea on the web | 2 to 3 |
+| Livrable | Only when the user asks for a client deliverable | The number the user gives; ask for it when missing |
+
+Every QA agent runs in a new top-level thread, never as a subagent, as the QA loop describes.
+
+## Grow this skill
+
+At the end of a Livrable, add a learning and move each lesson into a reference, a check, or a playbook step. This repository is public: describe the use case, never the client, its product, a private URL, or its text.
 
 ## Shared build contract
 

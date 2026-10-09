@@ -463,6 +463,7 @@ def validate_package(root: Path, errors: list[str]) -> tuple[int, int, str | Non
         "Plan": "playbooks/plan.md",
         "Diagram": "playbooks/diagram.md",
         "Slides": "playbooks/slides.md",
+        "Interactive page": "playbooks/interactive-page.md",
         "Artifact": "playbooks/artifact.md",
     }
     for label, target in expected_routes.items():
