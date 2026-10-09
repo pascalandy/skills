@@ -38,6 +38,8 @@ GOOD = """<!doctype html>
   button { min-width: 44px; min-height: 44px; font: inherit; color: var(--ink); background: none; border: 1px solid var(--brand); border-radius: 12px; }
   :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   a { color: var(--brand); }
+  .pin:focus-visible { outline: none; }
+  .pin:focus-visible .ring { stroke: var(--brand); stroke-width: 3; }
 </style>
 </head>
 <body>
@@ -45,6 +47,13 @@ GOOD = """<!doctype html>
   <h1>Readable</h1>
   <p>Body text with a <a href="#more">link inside the sentence</a>, which needs no 44 pixel box.</p>
   <button type="button">Next</button>
+  <svg width="320" height="80" viewBox="0 0 320 80">
+    <g class="pin" role="button" tabindex="0" aria-label="First stop">
+      <circle class="ring" cx="30" cy="40" r="24" fill="transparent"/>
+      <circle cx="30" cy="40" r="8" fill="currentColor"/>
+      <text x="150" y="46" fill="currentColor">A label far to the right</text>
+    </g>
+  </svg>
   <p id="more">More text.</p>
 </main>
 </body>

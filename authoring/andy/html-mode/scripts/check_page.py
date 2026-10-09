@@ -499,7 +499,8 @@ TARGETS_JS = (
     + """
   const selector = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="switch"], [tabindex]:not([tabindex="-1"])';
   const out = [];
-  const half = min / 2 - 0.5;
+  // Within a pixel of the size: the browser hit-tests whole pixels and edges fall on half pixels
+  const half = min / 2 - 1;
   for (const el of document.querySelectorAll(selector)) {
     if (!el.getClientRects().length || el.closest('[hidden], [inert]')) continue;
     const s = getComputedStyle(el);
@@ -513,8 +514,10 @@ TARGETS_JS = (
     }
     el.scrollIntoView({ block: 'center', inline: 'center' });
     r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
+    const centre = (b) => [b.left + b.width / 2, b.top + b.height / 2];
+    // A composite target, such as a map pin and its label, counts around the centre of any of its parts
+    const centres = [centre(r), ...[...el.children].slice(0, 8).map((child) => centre(child.getBoundingClientRect()))];
+    const [cx, cy] = centres[0];
     // A skip link waits off-screen until it has focus
     if (cx < 0 || cy < 0 || cx >= innerWidth || cy >= innerHeight) continue;
     // Hit testing counts padding and pseudo-elements that enlarge the hit area, and finds what covers a control
@@ -523,10 +526,10 @@ TARGETS_JS = (
       const h = document.elementFromPoint(x, y);
       return !!h && (h === el || el.contains(h));
     };
-    if (!hit(cx, cy)) { out.push(`${describe(el)} is covered at its centre`); continue; }
-    if (![[cx - half, cy], [cx + half, cy], [cx, cy - half], [cx, cy + half]].every(([x, y]) => hit(x, y))) {
-      out.push(`${describe(el)} hit area under ${min}px (box ${Math.round(r.width)}×${Math.round(r.height)})`);
-    }
+    const roomy = ([x, y]) => [[x, y], [x - half, y], [x + half, y], [x, y - half], [x, y + half]].every(([px, py]) => hit(px, py));
+    if (centres.some(roomy)) continue;
+    if (!centres.some(([x, y]) => hit(x, y))) out.push(`${describe(el)} is covered at its centre`);
+    else out.push(`${describe(el)} hit area under ${min}px (box ${Math.round(r.width)}×${Math.round(r.height)})`);
   }
   return out;
 }"""
