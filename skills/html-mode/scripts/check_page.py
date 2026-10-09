@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["playwright>=1.48", "pillow>=10"]
+# dependencies = ["playwright==1.63.0", "pillow==12.3.0"]
 # ///
 """Check a standalone HTML page in a real browser against html-mode's quality bar."""
 
