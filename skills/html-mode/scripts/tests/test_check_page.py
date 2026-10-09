@@ -113,6 +113,9 @@ BAD = """<!doctype html>
   <div class="cut-y">First line<br>Second line clipped below the box</div>
   <svg width="100" height="40"><text x="10" y="30" transform="scale(1 .5)">compressed text</text></svg>
   <button class="small" type="button">x</button>
+  <input id="offscreen-choice" type="checkbox" aria-label="Offscreen choice" style="position: absolute; left: -9999px">
+  <label for="offscreen-choice" style="position: absolute; top: 0; visibility: hidden">Hidden choice</label>
+  <label for="offscreen-choice" style="display: block; width: 12px; height: 12px">x</label>
   <div class="spin"></div>
   <img src="http://example.invalid/pixel.png" alt="">
   <script>
@@ -241,6 +244,7 @@ def test_each_defect_is_reported_with_its_check(
     assert '"compressed text" at 8.0px' in errors
     assert '"visible child text" at' in errors
     assert "targets: button.small" in errors
+    assert 'targets: input "Offscreen choice" hit area under 44px' in errors
     assert answer["evidence"] == str(evidence.resolve())
 
 

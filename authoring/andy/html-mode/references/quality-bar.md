@@ -2,6 +2,8 @@
 
 Read when building or reviewing a page for readers. Items marked _(checked)_ are sampled by `scripts/check_page.py`. Inspect screenshots and use QA for remaining states and limits below. Apply feature-specific items only when that feature exists.
 
+The font-size and contrast checks omit form-field values and placeholders, which QA checks.
+
 Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tablets in both orientations, a laptop and a desktop.
 
 ## Layout and reading

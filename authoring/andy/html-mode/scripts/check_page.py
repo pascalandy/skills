@@ -532,15 +532,14 @@ TARGETS_JS = (
       const block = el.parentElement?.closest('p, li, dd, dt, td, th, blockquote, figcaption, label, h1, h2, h3, h4, h5, h6');
       if (block && block.textContent.trim().length > el.textContent.trim().length + 3) continue;
     }
-    el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+    const labels = [...(el.labels || [])].filter((label) => label.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && label.getClientRects().length);
+    (labels[0] || el).scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
     r = el.getBoundingClientRect();
     const centre = (b) => [b.left + b.width / 2, b.top + b.height / 2];
     // A composite target, such as a map pin and its label, counts around the centre of any of its parts
-    const labels = [...(el.labels || [])];
     const centres = [centre(r), ...[...el.children].slice(0, 8).map((child) => centre(child.getBoundingClientRect())), ...labels.map((label) => centre(label.getBoundingClientRect()))];
-    const [cx, cy] = centres[0];
     // A skip link waits off-screen until it has focus
-    if (cx < 0 || cy < 0 || cx >= innerWidth || cy >= innerHeight) continue;
+    if (!centres.some(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight)) continue;
     // Hit testing counts padding and pseudo-elements that enlarge the hit area, and finds what covers a control
     const hit = (x, y) => {
       if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
