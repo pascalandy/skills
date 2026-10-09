@@ -18,14 +18,14 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 - One scale: at most 8 sizes and 4 weights, line height 1.6 for text and 1.15 for titles
 - Headings `text-wrap: balance`, paragraphs `text-wrap: pretty`
 - French typography: a non-breaking space before `:` `;` `!` `?`, inside `« »`, between a number and its unit, and inside a brand name
-- A long word in a narrow box keeps its size bound to the box (`cqi`), since browsers without a hyphenation dictionary break it mid-word
+- A long word fits its box at every width, without breaking mid-word
 
 ## Colour and themes
 
 - Text contrast 4.5:1, or 3:1 from 24px or 18.66px bold _(checked, except SVG text and text over an image)_; graphics and focus rings 3:1
-- Colours written once as `light-dark()` tokens in `:root`, with a `@supports not (color: light-dark(#000, #fff))` fallback for Safari before 17.5
+- Colours written once as `light-dark()` tokens in `:root`, and still present in browsers without `light-dark()`
 - Dark mode is a designed palette: warm near-black surfaces, off-white text, accents lifted for contrast. A saturated block that reads well in light can glare in dark; give it a deeper shade
-- The theme switch turns transitions off for one frame, so no element lags in the old theme
+- The theme switch changes every colour at once
 - Two `theme-color` metas, one per `prefers-color-scheme`, both set to the chosen theme by the switch
 - Printing is light, whatever the theme
 - Under `forced-colors: active`, state colours map to `Highlight`, `CanvasText` and `GrayText`
@@ -36,7 +36,7 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 - Nothing covers a control _(checked)_
 - Hover styles inside `@media (hover: hover)`; what hover reveals also shows on focus and on tap
 - `touch-action: manipulation` on buttons tapped in quick succession
-- An inline control inside text is a `<span role="button" tabindex="0">` with Enter and Space, or a link: a `<button>` is an inline block and breaks out of its line
+- An inline control wraps with its sentence and stays inside its box
 
 ## Keyboard and screen readers
 
@@ -44,7 +44,7 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 - `aria-current="step"` on the current step of a journey, `aria-expanded` on what opens and closes
 - One announcement per change: focus moves to the new heading, or `aria-live` speaks, not both
 - Every section has a heading, every icon button a name, foreign text its `lang`
-- Visually hidden text ends with a non-breaking space, so copied text keeps its word spacing
+- Copied text keeps its word spacing, and decorative glyphs stay out of it
 
 ## Motion
 

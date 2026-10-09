@@ -47,8 +47,6 @@ For a page readers use, read these as the interactive page playbook asks:
 | Esquisse | By default, to see an idea on the web | 2 to 3 |
 | Livrable | Only when the user asks for a client deliverable | The number the user gives; ask for it when missing |
 
-Every QA agent runs in a new top-level thread, never as a subagent, as the QA loop describes.
-
 ## Grow this skill
 
 At the end of a Livrable, add a learning and move each lesson into a reference, a check, or a playbook step. This repository is public: describe the use case, never the client, its product, a private URL, or its text.
