@@ -490,8 +490,9 @@ AUDIT_JS = (
   for (const el of document.body.querySelectorAll('*')) {
     if (!isShown(el)) continue;
     const s = getComputedStyle(el);
-    if (!['hidden', 'clip'].includes(s.overflowX) || s.textOverflow === 'ellipsis') continue;
-    if (el.scrollWidth <= el.clientWidth + 1) continue;
+    const cutX = ['hidden', 'clip'].includes(s.overflowX) && s.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 1;
+    const cutY = ['hidden', 'clip'].includes(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
+    if (!cutX && !cutY) continue;
     const r = el.getBoundingClientRect();
     if (r.width <= 1 || r.height <= 1) continue;
     const inner = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -501,7 +502,7 @@ AUDIT_JS = (
       const range = document.createRange();
       range.selectNodeContents(n);
       const t = range.getBoundingClientRect();
-      cut = t.width > 0 && (t.right > r.right + 1 || t.left < r.left - 1);
+      cut = t.width > 0 && ((cutX && (t.right > r.right + 1 || t.left < r.left - 1)) || (cutY && (t.bottom > r.bottom + 1 || t.top < r.top - 1)));
     }
     if (cut) out.clipped.push(describe(el));
   }
@@ -513,7 +514,7 @@ TARGETS_JS = (
     "({ min }) => {"
     + DESCRIBE_JS
     + """
-  const selector = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="switch"], [tabindex]:not([tabindex="-1"])';
+  const selector = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="switch"]';
   const out = [];
   // Allow one pixel of tolerance for fractional layout edges
   const half = min / 2 - 1;
@@ -532,7 +533,8 @@ TARGETS_JS = (
     r = el.getBoundingClientRect();
     const centre = (b) => [b.left + b.width / 2, b.top + b.height / 2];
     // A composite target, such as a map pin and its label, counts around the centre of any of its parts
-    const centres = [centre(r), ...[...el.children].slice(0, 8).map((child) => centre(child.getBoundingClientRect()))];
+    const labels = [...(el.labels || [])];
+    const centres = [centre(r), ...[...el.children].slice(0, 8).map((child) => centre(child.getBoundingClientRect())), ...labels.map((label) => centre(label.getBoundingClientRect()))];
     const [cx, cy] = centres[0];
     // A skip link waits off-screen until it has focus
     if (cx < 0 || cy < 0 || cx >= innerWidth || cy >= innerHeight) continue;
@@ -540,7 +542,7 @@ TARGETS_JS = (
     const hit = (x, y) => {
       if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
       const h = document.elementFromPoint(x, y);
-      return !!h && (h === el || el.contains(h));
+      return !!h && (h === el || el.contains(h) || labels.some((label) => label === h || label.contains(h)));
     };
     const roomy = ([x, y]) => [[x, y], [x - half, y], [x + half, y], [x, y - half], [x, y + half]].every(([px, py]) => hit(px, py));
     if (centres.some(roomy)) continue;
@@ -804,7 +806,7 @@ class Run:
 
     def frames(self, screen: Screen, scheme: str) -> None:
         where = f"{screen.name}/{scheme}"
-        with self.open(screen, scheme, touch=False) as page:
+        with self.open(screen, scheme) as page:
             page.evaluate(SAMPLE_START_JS)
             page.mouse.move(screen.width / 2, screen.height / 2)
             deadline = time.monotonic() + 8

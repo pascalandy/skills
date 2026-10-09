@@ -39,6 +39,7 @@ GOOD = """<!doctype html>
   a { color: var(--brand); }
   .pin:focus-visible { outline: none; }
   .pin:focus-visible .ring { stroke: var(--brand); stroke-width: 3; }
+  label { display: flex; align-items: center; min-height: 44px; padding: 0 24px; }
 </style>
 </head>
 <body>
@@ -46,6 +47,9 @@ GOOD = """<!doctype html>
   <h1>Readable</h1>
   <p>Body text with a <a href="#more">link inside the sentence</a>, which needs no 44 pixel box.</p>
   <button type="button">Next</button>
+  <label><input type="checkbox"> Wrapped checkbox</label>
+  <input id="choice" type="radio" name="choice"><label for="choice">Linked radio</label>
+  <p tabindex="0" style="font-size: 12px; line-height: 1.5">Focusable reading text.</p>
   <svg width="320" height="80" viewBox="0 0 320 80">
     <g class="pin" role="button" tabindex="0" aria-label="First stop">
       <circle class="ring" cx="30" cy="40" r="24" fill="transparent"/>
@@ -79,6 +83,7 @@ BAD = """<!doctype html>
   .tiny { font-size: 10px; }
   .pale { color: #bbb; }
   .cut { width: 60px; overflow: hidden; white-space: nowrap; }
+  .cut-y { height: 24px; overflow: hidden; }
   .small { width: 24px; height: 24px; margin-top: 4000px; outline: none; border: 0; background: #ddd; }
   .spin { width: 10px; height: 10px; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(1turn); } }
@@ -96,6 +101,7 @@ BAD = """<!doctype html>
   <p style="opacity: .1">faded text</p>
   <div style="background: #000; opacity: .5"><p style="color: #fff">grouped text</p></div>
   <div class="cut"><span>a label far too long for its box</span></div>
+  <div class="cut-y">First line<br>Second line clipped below the box</div>
   <svg width="100" height="40"><text x="10" y="30" transform="scale(1 .5)">compressed text</text></svg>
   <button class="small" type="button">x</button>
   <div class="spin"></div>
@@ -216,6 +222,7 @@ def test_each_defect_is_reported_with_its_check(
     assert '"faded text" at' in errors, "text faded by opacity"
     assert '"grouped text" at' in errors, "text in a half-transparent panel"
     assert "clipped: div.cut" in errors, "text clipped inside a nested span"
+    assert "clipped: div.cut-y" in errors, "text clipped below its box"
     assert "infinite CSS animations running at rest" in errors
     assert "animation frames in 2 s at rest" in errors
     assert '"tiny boxless text" at 10.0px' in errors
