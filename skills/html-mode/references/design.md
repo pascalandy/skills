@@ -10,6 +10,18 @@ These defaults constrain the choices below for artifacts created through `html-m
 - Use true black (`#000`) for the background, white primary text, and dark gray only for secondary surfaces or accents
 - Avoid marketing voice, em dashes, and light-gray subtitle lines above sections
 
+## Pages for readers
+
+A page for readers outside the team, such as a client page built from a source document, replaces the communication defaults above with these:
+
+- Take the brand from the source: trace a raster logo with `potrace` and sample its colours; type never stands in for a logo
+- Open calm: one headline and one line, then the content. A second mark, such as a partner badge, goes in the footer
+- In a split layout, text on the left and the map or picture on the right
+- Explain step by step: the part being read lights up elsewhere on the page
+- Let a metaphor organize real information, such as a map of stages or a ticket that serves as a title. Cut a flourish that carries no information, such as a punch hole or a stamp
+- No purple accent. Light surfaces may read as paper; the dark palette follows the quality bar
+- Set tokens before components: two section spacings, one radius scale, two durations (`--t-quick` for hover, `--t-state` for a change of state) and one easing
+
 ## Choose a register
 
 Anchor the direction in the subject, audience, and purpose. Derive composition from the subject's materials, tools, notation, or working context.
