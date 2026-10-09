@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -14,13 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import check_page
 
-BROWSER = (
-    os.environ.get("CHECK_PAGE_BROWSER")
-    or shutil.which("chromium")
-    or shutil.which("google-chrome")
-)
 needs_browser = pytest.mark.skipif(
-    BROWSER is None, reason="no Chromium on PATH; set CHECK_PAGE_BROWSER"
+    check_page.browser_path() is None,
+    reason="no Chromium on PATH; set CHECK_PAGE_BROWSER",
 )
 
 # The package bundles one HTML file, the slides template, so the test pages live here
@@ -80,8 +74,10 @@ BAD = """<!doctype html>
 <body>
   <div class="wide">wide content</div>
   <p class="tiny">tiny text</p>
-  <p class="pale">pale text</p>
-  <div class="cut">a label far too long for its box</div>
+  <p>repeated label</p>
+  <p class="pale">repeated label</p>
+  <p style="opacity: .1">faded text</p>
+  <div class="cut"><span>a label far too long for its box</span></div>
   <button class="small" type="button">x</button>
   <div class="spin"></div>
   <img src="http://example.invalid/pixel.png" alt="">
@@ -94,13 +90,26 @@ BAD = """<!doctype html>
 </html>
 """
 
+# Focus shows in light only: a dark-mode run must catch it
+LIGHT_FOCUS = GOOD.replace(
+    ":focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }",
+    "@media (prefers-color-scheme: light) { :focus-visible { outline: 3px solid var(--brand); } }"
+    " :focus-visible { outline: none; }",
+)
+LONGER = GOOD.replace("</main>", '<div style="height: 900px"></div></main>')
+
 
 @pytest.fixture
 def pages(tmp_path: Path) -> Path:
     folder = tmp_path / "pages"
     folder.mkdir()
-    (folder / "good.html").write_text(GOOD, encoding="utf-8")
-    (folder / "bad.html").write_text(BAD, encoding="utf-8")
+    for name, html in (
+        ("good", GOOD),
+        ("bad", BAD),
+        ("light-focus", LIGHT_FOCUS),
+        ("longer", LONGER),
+    ):
+        (folder / f"{name}.html").write_text(html, encoding="utf-8")
     return folder
 
 
@@ -111,6 +120,10 @@ def run(
     out, err = capsys.readouterr()
     line = out.strip() if code == 0 else err.strip().splitlines()[-1]
     return code, json.loads(line)
+
+
+def errors_of(answer: dict[str, object]) -> str:
+    return "\n".join(str(error) for error in answer["errors"])  # type: ignore[union-attr]
 
 
 @needs_browser
@@ -152,7 +165,7 @@ def test_each_defect_is_reported_with_its_check(
         str(evidence),
     )
     assert code == 1
-    errors = "\n".join(str(error) for error in answer["errors"])  # type: ignore[union-attr]
+    errors = errors_of(answer)
     checks = (
         "overflow",
         "small-text",
@@ -166,11 +179,52 @@ def test_each_defect_is_reported_with_its_check(
     )
     for check in checks:
         assert f": {check}: " in errors, check
+    assert '"repeated label" at' in errors, "a pale copy of a repeated label"
+    assert '"faded text" at' in errors, "text faded by opacity"
+    assert "clipped: div.cut" in errors, "text clipped inside a nested span"
+    assert "infinite CSS animations running at rest" in errors
     assert answer["evidence"] == str(evidence.resolve())
 
 
 @needs_browser
-def test_baseline_counts_changed_pixels(
+def test_a_phone_only_run_still_checks_focus_and_motion(
+    capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
+) -> None:
+    code, answer = run(
+        capsys,
+        str(pages / "bad.html"),
+        "-s",
+        "phone",
+        "--scheme",
+        "light",
+        "--output-dir",
+        str(tmp_path / "evidence"),
+    )
+    assert code == 1
+    assert "phone/light: focus: " in errors_of(answer)
+    assert "phone/light: motion: " in errors_of(answer)
+
+
+@needs_browser
+def test_focus_is_checked_in_dark_mode(
+    capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
+) -> None:
+    code, answer = run(
+        capsys,
+        str(pages / "light-focus.html"),
+        "-s",
+        "desktop",
+        "--scheme",
+        "dark",
+        "--output-dir",
+        str(tmp_path / "evidence"),
+    )
+    assert code == 1
+    assert "desktop/dark: focus: " in errors_of(answer)
+
+
+@needs_browser
+def test_baseline_counts_a_region_present_in_one_version_only(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
     evidence = tmp_path / "evidence"
@@ -182,13 +236,14 @@ def test_baseline_counts_changed_pixels(
         "--scheme",
         "light",
         "--baseline",
-        str(pages / "bad.html"),
+        str(pages / "longer.html"),
         "--output-dir",
         str(evidence),
     )
     assert code == 0, answer
-    changed = answer["metrics"]["baseline"]["desktop"]["changed_pixels"]  # type: ignore[index]
-    assert changed > 0
+    measured = answer["metrics"]["baseline"]["desktop"]  # type: ignore[index]
+    assert measured["heights"][0] > measured["heights"][1]
+    assert measured["changed_pixels"] > 0
     assert (evidence / "baseline-desktop.png").is_file()
 
 

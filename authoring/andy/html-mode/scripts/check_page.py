@@ -450,7 +450,8 @@ AUDIT_JS = (
     }
     return layers.reverse().reduce((acc, layer) => over(layer, acc), base);
   };
-  const seen = new Set();
+  const small = new Set();
+  const pale = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent.replace(/\\s+/g, ' ').trim();
@@ -461,24 +462,24 @@ AUDIT_JS = (
     const style = getComputedStyle(el);
     const svg = el instanceof SVGElement;
     const size = parseFloat(style.fontSize) * (svg ? (el.getScreenCTM()?.a ?? 1) : 1);
-    const key = `${text.slice(0, 40)}|${Math.round(size)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
     const label = text.slice(0, 40);
-    if (phone && size < 11.95) out.smallText.push(`"${label}" at ${size.toFixed(1)}px`);
+    if (phone && size < 11.95) small.add(`"${label}" at ${size.toFixed(1)}px`);
     // SVG text sits on shapes and text over an image has no single background: both stay a visual check
     if (svg || el.closest('[aria-disabled="true"], :disabled')) continue;
+    // Opacity on the text or an ancestor fades the text toward its background
     let alpha = 1;
     for (let e = el; e; e = e.parentElement) alpha *= Number(getComputedStyle(e).opacity);
-    if (alpha < 0.99) continue;
     const bg = backgroundOf(el);
     const fg = rgba(style.color);
     if (!bg || fg[3] === 0) continue;
+    fg[3] *= alpha;
     const bold = Number(style.fontWeight) >= 700;
     const need = size >= 24 || (bold && size >= 18.66) ? 3 : 4.5;
     const r = ratio(over(fg, bg), bg);
-    if (r < need - 0.005) out.contrast.push(`"${label}" at ${r.toFixed(2)}:1, needs ${need}:1`);
+    if (r < need - 0.005) pale.add(`"${label}" at ${r.toFixed(2)}:1, needs ${need}:1`);
   }
+  out.smallText = [...small];
+  out.contrast = [...pale];
   for (const el of document.body.querySelectorAll('*')) {
     if (!isShown(el)) continue;
     const s = getComputedStyle(el);
@@ -486,8 +487,16 @@ AUDIT_JS = (
     if (el.scrollWidth <= el.clientWidth + 1) continue;
     const r = el.getBoundingClientRect();
     if (r.width <= 1 || r.height <= 1) continue;
-    if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
-    out.clipped.push(describe(el));
+    const inner = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let cut = false;
+    for (let n = inner.nextNode(), seen = 0; n && !cut && seen < 50; n = inner.nextNode(), seen += 1) {
+      if (!n.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      const t = range.getBoundingClientRect();
+      cut = t.width > 0 && (t.right > r.right + 1 || t.left < r.left - 1);
+    }
+    if (cut) out.clipped.push(describe(el));
   }
   return out;
 }"""
@@ -709,9 +718,9 @@ class Run:
         finally:
             context.close()
 
-    def focus(self, screen: Screen) -> None:
-        where = f"{screen.name}/light"
-        context = self.context(screen, "light", reduced=True)
+    def focus(self, screen: Screen, scheme: str) -> None:
+        where = f"{screen.name}/{scheme}"
+        context = self.context(screen, scheme, reduced=True)
         try:
             page = self.open(context, where)
             invisible: list[str] = []
@@ -767,12 +776,12 @@ class Run:
                 page.evaluate("window.__checkPageFrames = 0")
                 page.wait_for_timeout(2000)
                 frames = int(page.evaluate("window.__checkPageFrames"))
-                looping = int(page.evaluate(INFINITE_JS)) if reduced else 0
+                looping = int(page.evaluate(INFINITE_JS))
                 still: list[str] = []
                 if frames > REST_FRAMES:
                     still.append(f"{frames} animation frames in 2 s at rest")
                 if looping:
-                    still.append(f"{looping} infinite animations running")
+                    still.append(f"{looping} infinite CSS animations running at rest")
                 fix = (
                     "stop motion under prefers-reduced-motion"
                     if reduced
@@ -836,10 +845,17 @@ class Run:
             before.crop((0, 0, width, height)), after.crop((0, 0, width, height))
         )
         mask = difference.convert("L").point(above(8))
-        changed = mask.histogram()[255]
+        unmatched = (
+            max(before.width * before.height, after.width * after.height)
+            - width * height
+        )
+        changed = mask.histogram()[255] + unmatched
         if changed:
-            overlay = after.crop((0, 0, width, height))
+            overlay = after.copy()
             overlay.paste((230, 30, 30), mask=mask)
+            if after.height > height or after.width > width:
+                overlay.paste((230, 30, 30), (0, height, after.width, after.height))
+                overlay.paste((230, 30, 30), (width, 0, after.width, height))
             overlay.save(self.evidence / f"baseline-{screen.name}.png")
         self.metrics.setdefault("baseline", {})[screen.name] = {
             "changed_pixels": changed,
@@ -870,20 +886,19 @@ def page_url(target: str) -> str:
     return path.resolve().as_uri()
 
 
+def browser_path(name: str = "chromium") -> str | None:
+    """The browser to run: CHECK_PAGE_BROWSER, a Chromium on PATH, or None for Playwright's own."""
+    if found := os.environ.get("CHECK_PAGE_BROWSER"):
+        return found
+    if name != "chromium":
+        return None
+    names = ("chromium", "chromium-browser", "google-chrome")
+    return next((path for path in map(shutil.which, names) if path), None)
+
+
 def launch(playwright: Playwright, name: str) -> Browser:
     kind = getattr(playwright, name)
-    executable = os.environ.get("CHECK_PAGE_BROWSER")
-    if not executable and name == "chromium":
-        executable = next(
-            (
-                found
-                for found in map(
-                    shutil.which, ("chromium", "chromium-browser", "google-chrome")
-                )
-                if found
-            ),
-            None,
-        )
+    executable = browser_path(name)
     try:
         return kind.launch(executable_path=executable) if executable else kind.launch()
     except PlaywrightError as error:
@@ -923,14 +938,14 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
                 for scheme in schemes:
                     log.info("audit %s/%s", screen.name, scheme)
                     run.audit(screen, scheme)
-            desktop = next((screen for screen in screens if not screen.touch), None)
-            if desktop:
-                log.info("focus, rest and frames on %s", desktop.name)
-                run.focus(desktop)
-                run.rest(desktop)
-                run.frames(desktop)
+            main = next((screen for screen in screens if not screen.touch), screens[0])
+            log.info("focus, rest and frames on %s", main.name)
+            for scheme in schemes:
+                run.focus(main, scheme)
+            run.rest(main)
+            run.frames(main)
             phone = next((screen for screen in screens if screen.phone), None)
-            if phone:
+            if phone and phone is not main:
                 run.frames(phone)
             if baseline:
                 for screen in screens:
