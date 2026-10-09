@@ -100,6 +100,7 @@ A mode's routes run through that mode's SKILL.md.
 - `brainstorm`: Use only when explicitly invoked as `brainstorm`.
 - `concise`: Use when the user requests to be more concise.
 - `consensus`: Use only when explicitly invoked as `consensus`.
+- `frontend-design`: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.
