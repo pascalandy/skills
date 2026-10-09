@@ -40,7 +40,7 @@ A mode is a skill that opens a family of tasks, each with its own playbook. Name
 |---|---|---|
 | `corey-mode` | Marketing work such as positioning, web pages, emails, and launches, in 50 playbooks by Corey Haines. Any request with the word "marketing" starts it | `marketing ; write the homepage for my accounting firm` |
 | `andy-mode` | My thinking and writing tools: challenge an idea, think a decision through, write clearly, tell a story | `andy-mode ; sparring. Remote work hurts junior staff.` |
-| `html-mode` | Visual documents: a one-page summary, a diagram, a slide deck | `html-mode ; slides. Turn these notes into a 5-slide pitch.` |
+| `html-mode` | Visual documents: a one-page summary, a diagram, a slide deck, an interactive page | `html-mode ; slides. Turn these notes into a 5-slide pitch.` |
 
 ## Skills you call by name
 
