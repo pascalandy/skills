@@ -424,7 +424,6 @@ AUDIT_JS = (
   const channel = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   const luminance = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
   const ratio = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
-  const over = (top, bottom) => top.slice(0, 3).map((v, i) => v * top[3] + bottom[i] * (1 - top[3]));
   const shown = new Map();
   const isShown = (el) => {
     if (shown.has(el)) return shown.get(el);
@@ -435,21 +434,21 @@ AUDIT_JS = (
     return result;
   };
   const dark = matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark');
-  let base = dark ? [18, 18, 18] : [255, 255, 255];
-  for (const el of [document.body, document.documentElement]) {
-    const c = rgba(getComputedStyle(el).backgroundColor);
-    if (c[3] > 0) { base = over(c, base); break; }
-  }
-  const backgroundOf = (el) => {
-    const layers = [];
-    for (let e = el; e; e = e.parentElement) {
+  const canvasColour = dark ? [18, 18, 18, 1] : [255, 255, 255, 1];
+  // Paint the ancestors as the browser does: each element paints its background, then its content, and its
+  // opacity fades that whole group against what lies outside it. Colours are premultiplied by alpha.
+  const premultiply = ([r, g, b, a]) => [r * a, g * a, b * a, a];
+  const sourceOver = (top, bottom) => top.map((v, i) => v + bottom[i] * (1 - top[3]));
+  const paint = (chain, ink) => {
+    let content = ink ? premultiply(ink) : [0, 0, 0, 0];
+    for (const e of chain) {
       const s = getComputedStyle(e);
       if (s.backgroundImage !== 'none') return null;
-      const c = rgba(s.backgroundColor);
-      if (c[3] > 0) { layers.push(c); if (c[3] >= 1) break; }
+      content = sourceOver(content, premultiply(rgba(s.backgroundColor))).map((v) => v * Number(s.opacity));
     }
-    return layers.reverse().reduce((acc, layer) => over(layer, acc), base);
+    return sourceOver(content, premultiply(canvasColour)).slice(0, 3);
   };
+  const chainOf = (el) => { const chain = []; for (let e = el; e; e = e.parentElement) chain.push(e); return chain; };
   const small = new Set();
   const pale = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -466,16 +465,15 @@ AUDIT_JS = (
     if (phone && size < 11.95) small.add(`"${label}" at ${size.toFixed(1)}px`);
     // SVG text sits on shapes and text over an image has no single background: both stay a visual check
     if (svg || el.closest('[aria-disabled="true"], :disabled')) continue;
-    // Opacity on the text or an ancestor fades the text toward its background
-    let alpha = 1;
-    for (let e = el; e; e = e.parentElement) alpha *= Number(getComputedStyle(e).opacity);
-    const bg = backgroundOf(el);
     const fg = rgba(style.color);
-    if (!bg || fg[3] === 0) continue;
-    fg[3] *= alpha;
+    if (fg[3] === 0) continue;
+    const chain = chainOf(el);
+    const bg = paint(chain, null);
+    const ink = paint(chain, fg);
+    if (!bg || !ink) continue;
     const bold = Number(style.fontWeight) >= 700;
     const need = size >= 24 || (bold && size >= 18.66) ? 3 : 4.5;
-    const r = ratio(over(fg, bg), bg);
+    const r = ratio(ink, bg);
     if (r < need - 0.005) pale.add(`"${label}" at ${r.toFixed(2)}:1, needs ${need}:1`);
   }
   out.smallText = [...small];
@@ -489,8 +487,8 @@ AUDIT_JS = (
     if (r.width <= 1 || r.height <= 1) continue;
     const inner = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let cut = false;
-    for (let n = inner.nextNode(), seen = 0; n && !cut && seen < 50; n = inner.nextNode(), seen += 1) {
-      if (!n.textContent.trim()) continue;
+    for (let n = inner.nextNode(); n && !cut; n = inner.nextNode()) {
+      if (!n.textContent.trim() || !n.parentElement || !isShown(n.parentElement)) continue;
       const range = document.createRange();
       range.selectNodeContents(n);
       const t = range.getBoundingClientRect();
@@ -846,16 +844,17 @@ class Run:
         )
         mask = difference.convert("L").point(above(8))
         unmatched = (
-            max(before.width * before.height, after.width * after.height)
-            - width * height
+            before.width * before.height
+            + after.width * after.height
+            - 2 * width * height
         )
         changed = mask.histogram()[255] + unmatched
         if changed:
-            overlay = after.copy()
+            # The evidence spans both versions: a region either one lacks shows in red
+            size = (max(before.width, after.width), max(before.height, after.height))
+            overlay = Image.new("RGB", size, (230, 30, 30))
+            overlay.paste(after.crop((0, 0, width, height)), (0, 0))
             overlay.paste((230, 30, 30), mask=mask)
-            if after.height > height or after.width > width:
-                overlay.paste((230, 30, 30), (0, height, after.width, after.height))
-                overlay.paste((230, 30, 30), (width, 0, after.width, height))
             overlay.save(self.evidence / f"baseline-{screen.name}.png")
         self.metrics.setdefault("baseline", {})[screen.name] = {
             "changed_pixels": changed,

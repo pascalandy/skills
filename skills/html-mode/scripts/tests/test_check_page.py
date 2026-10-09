@@ -12,9 +12,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import check_page
 
+
+def browser_starts() -> bool:
+    """The check the script itself runs: a Chromium on PATH, CHECK_PAGE_BROWSER, or Playwright's own."""
+    try:
+        with check_page.sync_playwright() as playwright:
+            check_page.launch(playwright, "chromium").close()
+    except check_page.ScriptError:
+        return False
+    return True
+
+
 needs_browser = pytest.mark.skipif(
-    check_page.browser_path() is None,
-    reason="no Chromium on PATH; set CHECK_PAGE_BROWSER",
+    not browser_starts(),
+    reason="Chromium cannot start; run: uv run --with playwright playwright install chromium",
 )
 
 # The package bundles one HTML file, the slides template, so the test pages live here
@@ -77,6 +88,7 @@ BAD = """<!doctype html>
   <p>repeated label</p>
   <p class="pale">repeated label</p>
   <p style="opacity: .1">faded text</p>
+  <div style="background: #000; opacity: .5"><p style="color: #fff">grouped text</p></div>
   <div class="cut"><span>a label far too long for its box</span></div>
   <button class="small" type="button">x</button>
   <div class="spin"></div>
@@ -93,8 +105,8 @@ BAD = """<!doctype html>
 # Focus shows in light only: a dark-mode run must catch it
 LIGHT_FOCUS = GOOD.replace(
     ":focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }",
-    "@media (prefers-color-scheme: light) { :focus-visible { outline: 3px solid var(--brand); } }"
-    " :focus-visible { outline: none; }",
+    ":focus-visible { outline: none; }"
+    " @media (prefers-color-scheme: light) { :focus-visible { outline: 3px solid var(--brand); } }",
 )
 LONGER = GOOD.replace("</main>", '<div style="height: 900px"></div></main>')
 
@@ -181,6 +193,7 @@ def test_each_defect_is_reported_with_its_check(
         assert f": {check}: " in errors, check
     assert '"repeated label" at' in errors, "a pale copy of a repeated label"
     assert '"faded text" at' in errors, "text faded by opacity"
+    assert '"grouped text" at' in errors, "text in a half-transparent panel"
     assert "clipped: div.cut" in errors, "text clipped inside a nested span"
     assert "infinite CSS animations running at rest" in errors
     assert answer["evidence"] == str(evidence.resolve())
@@ -221,6 +234,17 @@ def test_focus_is_checked_in_dark_mode(
     )
     assert code == 1
     assert "desktop/dark: focus: " in errors_of(answer)
+    code, answer = run(
+        capsys,
+        str(pages / "light-focus.html"),
+        "-s",
+        "desktop",
+        "--scheme",
+        "light",
+        "--output-dir",
+        str(tmp_path / "evidence-light"),
+    )
+    assert code == 0, answer
 
 
 @needs_browser
