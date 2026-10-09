@@ -13,20 +13,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import check_page
 
 
-def browser_starts() -> bool:
-    """The check the script itself runs: a Chromium on PATH, CHECK_PAGE_BROWSER, or Playwright's own."""
+@pytest.fixture(scope="session")
+def browser_ready() -> None:
     try:
         with check_page.sync_playwright() as playwright:
             check_page.launch(playwright, "chromium").close()
-    except check_page.ScriptError:
-        return False
-    return True
+    except check_page.ScriptError as error:
+        pytest.fail(str(error))
 
-
-needs_browser = pytest.mark.skipif(
-    not browser_starts(),
-    reason="Chromium cannot start; run: uv run --with playwright playwright install chromium",
-)
 
 # The package bundles one HTML file, the slides template, so the test pages live here
 GOOD = """<!doctype html>
@@ -60,6 +54,7 @@ GOOD = """<!doctype html>
     </g>
   </svg>
   <p id="more">More text.</p>
+  <div style="display: contents; background: #111"><p>Visible through a boxless parent.</p></div>
 </main>
 </body>
 </html>
@@ -72,12 +67,13 @@ BAD = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>A page with one defect per check</title>
 <style>
+  html { scroll-behavior: smooth; }
   body { margin: 0; background: #fff; color: #111; font: 16px/1.5 system-ui, sans-serif; }
   .wide { width: 1200px; }
   .tiny { font-size: 10px; }
   .pale { color: #bbb; }
   .cut { width: 60px; overflow: hidden; white-space: nowrap; }
-  .small { width: 24px; height: 24px; outline: none; border: 0; background: #ddd; }
+  .small { width: 24px; height: 24px; margin-top: 4000px; outline: none; border: 0; background: #ddd; }
   .spin { width: 10px; height: 10px; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(1turn); } }
 </style>
@@ -85,6 +81,8 @@ BAD = """<!doctype html>
 <body>
   <div class="wide">wide content</div>
   <p class="tiny">tiny text</p>
+  <div style="display: contents"><p class="tiny">tiny boxless text</p></div>
+  <div style="visibility: hidden; background: #000"><p class="pale" style="visibility: visible">visible child text</p></div>
   <p>repeated label</p>
   <p class="pale">repeated label</p>
   <p style="opacity: .1">faded text</p>
@@ -109,6 +107,18 @@ LIGHT_FOCUS = GOOD.replace(
     " @media (prefers-color-scheme: light) { :focus-visible { outline: 3px solid var(--brand); } }",
 )
 LONGER = GOOD.replace("</main>", '<div style="height: 900px"></div></main>')
+DARK_MOTION = GOOD.replace(
+    "</style>",
+    "@media (prefers-color-scheme: dark) { h1 { animation: fade 60s linear; } }"
+    " @keyframes fade { to { transform: translateX(5px); } }</style>",
+)
+LATE_EVENTS = GOOD.replace(
+    "</body>",
+    "<script>document.querySelector('button').addEventListener('focus', () => {"
+    "console.error('focus broke');"
+    "const image = new Image(); image.src = 'http://example.invalid/focus.png';"
+    "});</script></body>",
+)
 
 
 @pytest.fixture
@@ -120,6 +130,8 @@ def pages(tmp_path: Path) -> Path:
         ("bad", BAD),
         ("light-focus", LIGHT_FOCUS),
         ("longer", LONGER),
+        ("dark-motion", DARK_MOTION),
+        ("late-events", LATE_EVENTS),
     ):
         (folder / f"{name}.html").write_text(html, encoding="utf-8")
     return folder
@@ -138,7 +150,7 @@ def errors_of(answer: dict[str, object]) -> str:
     return "\n".join(str(error) for error in answer["errors"])  # type: ignore[union-attr]
 
 
-@needs_browser
+@pytest.mark.usefixtures("browser_ready")
 def test_a_compliant_page_passes_on_phone_and_desktop(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
@@ -159,7 +171,7 @@ def test_a_compliant_page_passes_on_phone_and_desktop(
     assert (evidence / "desktop-dark.png").is_file()
 
 
-@needs_browser
+@pytest.mark.usefixtures("browser_ready")
 def test_each_defect_is_reported_with_its_check(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
@@ -196,10 +208,14 @@ def test_each_defect_is_reported_with_its_check(
     assert '"grouped text" at' in errors, "text in a half-transparent panel"
     assert "clipped: div.cut" in errors, "text clipped inside a nested span"
     assert "infinite CSS animations running at rest" in errors
+    assert "animation frames in 2 s at rest" in errors
+    assert '"tiny boxless text" at 10.0px' in errors
+    assert '"visible child text" at' in errors
+    assert "targets: button.small" in errors
     assert answer["evidence"] == str(evidence.resolve())
 
 
-@needs_browser
+@pytest.mark.usefixtures("browser_ready")
 def test_a_phone_only_run_still_checks_focus_and_motion(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
@@ -218,7 +234,7 @@ def test_a_phone_only_run_still_checks_focus_and_motion(
     assert "phone/light: motion: " in errors_of(answer)
 
 
-@needs_browser
+@pytest.mark.usefixtures("browser_ready")
 def test_focus_is_checked_in_dark_mode(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
@@ -247,7 +263,7 @@ def test_focus_is_checked_in_dark_mode(
     assert code == 0, answer
 
 
-@needs_browser
+@pytest.mark.usefixtures("browser_ready")
 def test_baseline_counts_a_region_present_in_one_version_only(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
 ) -> None:
@@ -258,17 +274,55 @@ def test_baseline_counts_a_region_present_in_one_version_only(
         "-s",
         "desktop",
         "--scheme",
-        "light",
+        "both",
         "--baseline",
         str(pages / "longer.html"),
         "--output-dir",
         str(evidence),
     )
     assert code == 0, answer
-    measured = answer["metrics"]["baseline"]["desktop"]  # type: ignore[index]
-    assert measured["heights"][0] > measured["heights"][1]
-    assert measured["changed_pixels"] > 0
-    assert (evidence / "baseline-desktop.png").is_file()
+    for scheme in ("light", "dark"):
+        measured = answer["metrics"]["baseline"][f"desktop/{scheme}"]  # type: ignore[index]
+        assert measured["heights"][0] > measured["heights"][1]
+        assert measured["changed_pixels"] > 0
+        assert (evidence / f"baseline-desktop-{scheme}.png").is_file()
+
+
+@pytest.mark.usefixtures("browser_ready")
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    (
+        (
+            "dark-motion",
+            ("desktop/dark/reduced-motion: motion: ", "CSS animations running at rest"),
+        ),
+        (
+            "late-events",
+            ("console: focus broke", "network: http://example.invalid/focus.png"),
+        ),
+    ),
+)
+def test_dark_motion_and_late_interaction_events_are_reported(
+    capsys: pytest.CaptureFixture[str],
+    pages: Path,
+    tmp_path: Path,
+    name: str,
+    expected: tuple[str, ...],
+) -> None:
+    code, answer = run(
+        capsys,
+        str(pages / f"{name}.html"),
+        "-s",
+        "desktop",
+        "--scheme",
+        "dark",
+        "--output-dir",
+        str(tmp_path / name),
+    )
+    assert code == 1, answer
+    errors = errors_of(answer)
+    for finding in expected:
+        assert finding in errors
 
 
 def test_a_missing_page_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:

@@ -379,7 +379,6 @@ class Screen:
     phone: bool = False
 
 
-# The screens of references/quality-bar.md
 SCREENS: tuple[Screen, ...] = (
     Screen("phone", 390, 844, touch=True, phone=True),
     Screen("iphone-pro", 402, 874, touch=True, phone=True),
@@ -429,7 +428,10 @@ AUDIT_JS = (
     if (shown.has(el)) return shown.get(el);
     let result = el.getClientRects().length > 0;
     if (result) { const s = getComputedStyle(el); result = s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0; }
-    if (result && el.parentElement) result = isShown(el.parentElement);
+    for (let parent = el.parentElement; result && parent; parent = parent.parentElement) {
+      const s = getComputedStyle(parent);
+      result = s.display !== 'none' && Number(s.opacity) > 0;
+    }
     shown.set(el, result);
     return result;
   };
@@ -443,8 +445,10 @@ AUDIT_JS = (
     let content = ink ? premultiply(ink) : [0, 0, 0, 0];
     for (const e of chain) {
       const s = getComputedStyle(e);
-      if (s.backgroundImage !== 'none') return null;
-      content = sourceOver(content, premultiply(rgba(s.backgroundColor))).map((v) => v * Number(s.opacity));
+      const paints = e.getClientRects().length > 0 && s.visibility !== 'hidden';
+      if (paints && s.backgroundImage !== 'none') return null;
+      const background = paints ? premultiply(rgba(s.backgroundColor)) : [0, 0, 0, 0];
+      content = sourceOver(content, background).map((v) => v * Number(s.opacity));
     }
     return sourceOver(content, premultiply(canvasColour)).slice(0, 3);
   };
@@ -506,7 +510,7 @@ TARGETS_JS = (
     + """
   const selector = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="switch"], [tabindex]:not([tabindex="-1"])';
   const out = [];
-  // Within a pixel of the size: the browser hit-tests whole pixels and edges fall on half pixels
+  // Allow one pixel of tolerance for fractional layout edges
   const half = min / 2 - 1;
   for (const el of document.querySelectorAll(selector)) {
     if (!el.getClientRects().length || el.closest('[hidden], [inert]')) continue;
@@ -519,7 +523,7 @@ TARGETS_JS = (
       const block = el.parentElement?.closest('p, li, dd, dt, td, th, blockquote, figcaption, label, h1, h2, h3, h4, h5, h6');
       if (block && block.textContent.trim().length > el.textContent.trim().length + 3) continue;
     }
-    el.scrollIntoView({ block: 'center', inline: 'center' });
+    el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
     r = el.getBoundingClientRect();
     const centre = (b) => [b.left + b.width / 2, b.top + b.height / 2];
     // A composite target, such as a map pin and its label, counts around the centre of any of its parts
@@ -586,8 +590,8 @@ SAMPLE_STOP_JS = """
 }
 """.replace("SLOW_MS", str(SLOW_FRAME_MS))
 
-INFINITE_JS = """
-() => document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations === Infinity).length
+ANIMATIONS_JS = """
+(reduced) => document.getAnimations().filter((a) => a.playState === 'running' && (reduced || a.effect?.getTiming().iterations === Infinity)).length
 """
 
 
@@ -631,43 +635,57 @@ class Run:
             options["is_mobile"] = touch
         return self.browser.new_context(**options)
 
+    @contextmanager
     def open(
-        self, context: BrowserContext, where: str, *, count_frames: bool = False
-    ) -> Page:
-        page = context.new_page()
+        self,
+        screen: Screen,
+        scheme: str,
+        *,
+        reduced: bool = False,
+        touch: bool | None = None,
+        count_frames: bool = False,
+    ) -> Iterator[Page]:
+        where = f"{screen.name}/{scheme}{'/reduced-motion' if reduced else ''}"
+        context = self.context(screen, scheme, reduced=reduced, touch=touch)
         problems: list[str] = []
         external: list[str] = []
-        page.on("pageerror", lambda error: problems.append(f"uncaught {error}"))
-        page.on(
-            "console",
-            lambda message: (
-                problems.append(message.text) if message.type == "error" else None
-            ),
-        )
-        page.on(
-            "request",
-            lambda request: (
-                external.append(request.url) if self.external(request.url) else None
-            ),
-        )
-        if count_frames:
-            page.add_init_script(f"({COUNT_FRAMES_JS})()")
-        page.goto(self.url, wait_until="load")
-        page.evaluate("document.fonts.ready.then(() => true)")
-        page.wait_for_timeout(500)
-        self.report(
-            where,
-            "console",
-            problems,
-            "fix the script error shown in the browser console",
-        )
-        self.report(
-            where,
-            "network",
-            sorted(set(external)),
-            "inline the asset or remove the request",
-        )
-        return page
+        try:
+            page = context.new_page()
+            page.on("pageerror", lambda error: problems.append(f"uncaught {error}"))
+            page.on(
+                "console",
+                lambda message: (
+                    problems.append(message.text) if message.type == "error" else None
+                ),
+            )
+            page.on(
+                "request",
+                lambda request: (
+                    external.append(request.url) if self.external(request.url) else None
+                ),
+            )
+            if count_frames:
+                page.add_init_script(f"({COUNT_FRAMES_JS})()")
+            page.goto(self.url, wait_until="load")
+            page.evaluate("document.fonts.ready.then(() => true)")
+            page.wait_for_timeout(500)
+            yield page
+        finally:
+            try:
+                self.report(
+                    where,
+                    "console",
+                    list(dict.fromkeys(problems)),
+                    "fix the script error shown in the browser console",
+                )
+                self.report(
+                    where,
+                    "network",
+                    sorted(set(external)),
+                    "inline the asset or remove the request",
+                )
+            finally:
+                context.close()
 
     def external(self, url: str) -> bool:
         parsed = urlparse(url)
@@ -677,9 +695,7 @@ class Run:
 
     def audit(self, screen: Screen, scheme: str) -> None:
         where = f"{screen.name}/{scheme}"
-        context = self.context(screen, scheme)
-        try:
-            page = self.open(context, where)
+        with self.open(screen, scheme) as page:
             page.screenshot(path=self.evidence / f"{screen.name}-{scheme}.png")
             found = page.evaluate(
                 AUDIT_JS, {"phone": screen.phone, "width": screen.width}
@@ -698,7 +714,7 @@ class Run:
                 where,
                 "contrast",
                 found["contrast"],
-                "darken the text or lighten its background",
+                "adjust text and background colours to meet the required contrast",
             )
             self.report(
                 where,
@@ -713,14 +729,10 @@ class Run:
                     page.evaluate(TARGETS_JS, {"min": 44}),
                     "enlarge the hit area to 44px with padding or a pseudo-element",
                 )
-        finally:
-            context.close()
 
     def focus(self, screen: Screen, scheme: str) -> None:
         where = f"{screen.name}/{scheme}"
-        context = self.context(screen, scheme, reduced=True)
-        try:
-            page = self.open(context, where)
+        with self.open(screen, scheme, reduced=True) as page:
             invisible: list[str] = []
             stops = 0
             for index in range(FOCUS_STOPS):
@@ -732,6 +744,7 @@ class Run:
                 stops += 1
                 clip = self.clip(stop, screen)
                 if clip is None:
+                    invisible.append(stop["label"])
                     continue
                 focused = page.screenshot(clip=clip)
                 page.evaluate("document.activeElement.blur()")
@@ -744,15 +757,13 @@ class Run:
                     12, 0.004 * clip["width"] * clip["height"]
                 ):
                     invisible.append(stop["label"])
-            self.metrics["focus_stops"] = stops
+            self.metrics.setdefault("focus_stops", {})[where] = stops
             self.report(
                 where,
                 "focus",
                 invisible,
                 "give :focus-visible an outline or ring that contrasts",
             )
-        finally:
-            context.close()
 
     @staticmethod
     def clip(stop: Mapping[str, Any], screen: Screen) -> FloatRect | None:
@@ -764,36 +775,31 @@ class Run:
             return None
         return FloatRect(x=x, y=y, width=right - x, height=bottom - y)
 
-    def rest(self, screen: Screen) -> None:
+    def rest(self, screen: Screen, scheme: str) -> None:
         for reduced in (False, True):
-            where = f"{screen.name}/light{'/reduced-motion' if reduced else ''}"
-            context = self.context(screen, "light", reduced=reduced)
-            try:
-                page = self.open(context, where, count_frames=True)
+            where = f"{screen.name}/{scheme}{'/reduced-motion' if reduced else ''}"
+            with self.open(screen, scheme, reduced=reduced, count_frames=True) as page:
                 page.wait_for_timeout(2500)
                 page.evaluate("window.__checkPageFrames = 0")
                 page.wait_for_timeout(2000)
                 frames = int(page.evaluate("window.__checkPageFrames"))
-                looping = int(page.evaluate(INFINITE_JS))
+                looping = int(page.evaluate(ANIMATIONS_JS, reduced))
                 still: list[str] = []
                 if frames > REST_FRAMES:
                     still.append(f"{frames} animation frames in 2 s at rest")
                 if looping:
-                    still.append(f"{looping} infinite CSS animations running at rest")
+                    kind = "" if reduced else "infinite "
+                    still.append(f"{looping} {kind}CSS animations running at rest")
                 fix = (
                     "stop motion under prefers-reduced-motion"
                     if reduced
                     else "draw only while something moves"
                 )
                 self.report(where, "motion", still, fix)
-            finally:
-                context.close()
 
-    def frames(self, screen: Screen) -> None:
-        where = f"{screen.name}/light"
-        context = self.context(screen, "light", touch=False)
-        try:
-            page = self.open(context, where)
+    def frames(self, screen: Screen, scheme: str) -> None:
+        where = f"{screen.name}/{scheme}"
+        with self.open(screen, scheme, touch=False) as page:
             page.evaluate(SAMPLE_START_JS)
             page.mouse.move(screen.width / 2, screen.height / 2)
             deadline = time.monotonic() + 8
@@ -806,9 +812,7 @@ class Run:
                     break
             page.wait_for_timeout(600)
             sample = page.evaluate(SAMPLE_STOP_JS)
-            self.metrics.setdefault("max_frame_ms", {})[screen.name] = round(
-                sample["max"], 1
-            )
+            self.metrics.setdefault("max_frame_ms", {})[where] = round(sample["max"], 1)
             slow: list[str] = []
             if sample["slow"]:
                 slow.append(
@@ -822,13 +826,11 @@ class Run:
                 slow,
                 "move work out of scroll handlers or animate with transform",
             )
-        finally:
-            context.close()
 
-    def baseline(self, screen: Screen, baseline_url: str) -> None:
+    def baseline(self, screen: Screen, scheme: str, baseline_url: str) -> None:
         shots: list[bytes] = []
         for url in (baseline_url, self.url):
-            context = self.context(screen, "light")
+            context = self.context(screen, scheme)
             try:
                 page = context.new_page()
                 page.goto(url, wait_until="load")
@@ -855,8 +857,8 @@ class Run:
             overlay = Image.new("RGB", size, (230, 30, 30))
             overlay.paste(after.crop((0, 0, width, height)), (0, 0))
             overlay.paste((230, 30, 30), mask=mask)
-            overlay.save(self.evidence / f"baseline-{screen.name}.png")
-        self.metrics.setdefault("baseline", {})[screen.name] = {
+            overlay.save(self.evidence / f"baseline-{screen.name}-{scheme}.png")
+        self.metrics.setdefault("baseline", {})[f"{screen.name}/{scheme}"] = {
             "changed_pixels": changed,
             "heights": [before.height, after.height],
         }
@@ -903,7 +905,7 @@ def launch(playwright: Playwright, name: str) -> Browser:
     except PlaywrightError as error:
         first = str(error).strip().splitlines()[0]
         raise ScriptError(
-            f"cannot start {name}: {first}; run: uv run --with playwright playwright install {name}"
+            f"cannot start {name}: {first}; run: uv run --with playwright==1.63.0 playwright install {name}"
         ) from error
 
 
@@ -941,15 +943,17 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
             log.info("focus, rest and frames on %s", main.name)
             for scheme in schemes:
                 run.focus(main, scheme)
-            run.rest(main)
-            run.frames(main)
             phone = next((screen for screen in screens if screen.phone), None)
-            if phone and phone is not main:
-                run.frames(phone)
+            for scheme in schemes:
+                run.rest(main, scheme)
+                run.frames(main, scheme)
+                if phone and phone is not main:
+                    run.frames(phone, scheme)
             if baseline:
                 for screen in screens:
                     log.info("baseline %s", screen.name)
-                    run.baseline(screen, baseline)
+                    for scheme in schemes:
+                        run.baseline(screen, scheme, baseline)
         finally:
             browser.close()
     report = {"evidence": str(evidence), "metrics": run.metrics}
@@ -993,7 +997,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--baseline",
         metavar="TARGET",
-        help="the previous version of the page; reports changed pixels per screen",
+        help="the previous version; reports changed pixels per screen and scheme",
     )
     parser.add_argument(
         "--output-dir",
@@ -1007,6 +1011,10 @@ EPILOG = """\
 Answers {{"ok":true}} with the evidence folder and metrics when the page passes.
 Otherwise stdout stays empty and the last line of stderr lists each finding
 under "errors". Findings name the screen, the check, the element, and the fix.
+Install a missing engine with:
+  uv run --with playwright==1.63.0 playwright install chromium
+Use the same command with firefox or webkit for another engine.
+CHECK_PAGE_BROWSER can select an existing compatible executable.
 
 screens: {screens}
 
