@@ -146,6 +146,7 @@ def repo_test(stem: str, *reads: str, cheap: bool = False) -> Check:
 VIDEO_ARCHIVE = "authoring/verify-loops/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/andy/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify-loops/verify-transcript"
+HTML_MODE = "authoring/andy/html-mode/scripts"
 IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
 HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
@@ -249,7 +250,14 @@ CHECKS = [
         "workflows",
         ("uvx", "--from", ACTIONLINT, "actionlint", "-shellcheck=", "-pyflakes="),
     ),
-    Check("html-mode", uv_run("authoring/andy/html-mode/scripts/check_html_mode.py")),
+    Check(
+        "html-mode",
+        uv_run(f"{HTML_MODE}/check_html_mode.py"),
+        *ruff(f"{HTML_MODE}/check_page.py"),
+        *ruff(f"{HTML_MODE}/tests"),
+        pyright(f"{HTML_MODE}/check_page.py", "playwright", "pillow"),
+        pytest(f"{HTML_MODE}/tests", "playwright", "pillow"),
+    ),
     Check(
         "matt-mode",
         uv_run("authoring/matt/matt-mode/scripts/check_matt_mode.py"),
