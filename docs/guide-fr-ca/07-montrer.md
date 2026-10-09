@@ -30,6 +30,14 @@ html-mode ; plan. Étapes, responsables et échéances de ce projet : [colle le 
 
 L'agent montre l'ordre, les responsables, les dépendances et les risques.
 
+## Transforme un document en page interactive avec `html-mode ; interactive-page`
+
+```text
+html-mode ; interactive-page. Fais de ce PDF une page web où une carte suit la lecture : [joins le PDF]
+```
+
+Par défaut, l'agent prépare une esquisse, vérifie le rendu, puis vise 2 ou 3 rondes de QA. Ces rondes nécessitent T3 et un commit poussé autorisé. Pour un livrable client, précise le nombre de rondes. L'agent te demande seulement le contexte manquant et signale les vérifications impossibles.
+
 ## Vérifie le rendu toi-même
 
 Certaines applications affichent un aperçu. Sinon, télécharge le fichier et ouvre-le. Dans une application de conversation, l'agent ne voit pas la page, alors il te dit quelles vérifications il n'a pas faites. Regarde-la sur téléphone et sur ordinateur, puis demande les corrections : "Le tableau déborde sur mobile."

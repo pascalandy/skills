@@ -89,6 +89,7 @@ A mode's routes run through that mode's SKILL.md.
 - `html-mode`: Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes.
   - `artifact`: Build a standalone HTML report, explainer, landing page, tool, or data story that no narrower playbook owns.
   - `diagram`: Draw an HTML diagram that shows how components, events, states, or concepts relate.
+  - `interactive-page`: Build a page readers move through, such as a document turned into a guided reading page, or a journey with a map that follows the reading.
   - `plan`: Turn a work plan into an HTML document that shows its commitments, order, owners, dependencies, and risks.
   - `prototype`: Build a polished HTML mockup or a working prototype of a bounded product flow.
   - `slides`: Build an HTML slide deck with reveal.js that tells one story a screen at a time.
