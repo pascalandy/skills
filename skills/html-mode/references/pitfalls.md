@@ -1,6 +1,6 @@
 # Pitfalls
 
-Read before building an interactive page, and when a symptom below shows up. Each row is a defect that took a QA round to find. Look up the feature, match the symptom, apply the fix.
+Read rows matching a planned feature or observed defect. Confirm the cause before applying a fix. These fixes came from one page; they are not requirements for every page.
 
 ## The reviewer and the environment
 
@@ -28,7 +28,7 @@ Read before building an interactive page, and when a symptom below shows up. Eac
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | Back lands in the wrong place | The `popstate` handler scrolls where the browser already restores | Mark your own `pushState` entries; on `popstate`, act only on entries without the mark, such as a typed hash |
-| A deep link lands, then jumps | A resize or the font load reruns the scroll during startup | Read the hash once, keep the page hidden until the font is ready, update nothing before a `ready` flag |
+| A deep link lands, then jumps | A resize or the font load reruns the scroll during startup | Read the hash once, keep the page hidden until the font is ready (400ms at most), update nothing before a `ready` flag |
 | The address flickers through every section during a jump | `replaceState` on each scroll | Freeze the address while a jump runs |
 
 ## Resize, zoom and rotation
@@ -54,7 +54,7 @@ Read before building an interactive page, and when a symptom below shows up. Eac
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| A term breaks out of its box on a phone | A `<button>` inside a `nowrap` group: the button is an inline block | Use an inline `<span role="button" tabindex="0">`; glue its punctuation with non-breaking spaces |
+| A term breaks out of its box on a phone | A `<button>` inside a `nowrap` group: the button is an inline block | Use an inline `<span role="button" tabindex="0">` that Enter and Space activate; glue its punctuation with non-breaking spaces |
 | The popover opens beside a term split over two lines | It is placed from the bounding box | Place it under the last rect of `getClientRects()`, or above the first |
 | A popover stays open after Tab | Nothing closes it when focus leaves | Close on `focusout`, unless focus moves into the popover |
 
@@ -65,7 +65,7 @@ Read before building an interactive page, and when a symptom below shows up. Eac
 | A long title word spills out of a narrow card | The size floor of `clamp()` ignores the card's width | Cap the size with `cqi` of the column |
 | `overflow-wrap` breaks a word mid-syllable | Chromium on Linux has no French hyphenation dictionary | Size the text to fit instead of relying on hyphenation |
 | `cqi` sizes come out too small | `cqi` measures the content box, without padding | Compute the factor from the content width |
-| A `cqi` size follows the wrong box | Units resolve against the nearest container of any name | Name containers (`container: text / inline-size`) and check which one a rule reaches |
+| A `cqi` size follows the wrong box | Units resolve against the nearest eligible size container, regardless of its name | Check the nearest container's axis and width; names such as `container: text / inline-size` do not select which box units use |
 | A number and its unit split across lines | A plain space | Insert a non-breaking space in the text escaping function |
 | Copied text reads `Step 2 :Name` | The space ending a visually hidden span is dropped | End the hidden text with a non-breaking space |
 | A decorative arrow is copied | It stays selectable | `-webkit-user-select: none; user-select: none` |

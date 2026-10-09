@@ -36,7 +36,7 @@ L'agent montre l'ordre, les responsables, les dépendances et les risques.
 html-mode ; interactive-page. Fais de ce PDF une page web où une carte suit la lecture : [joins le PDF]
 ```
 
-Par défaut, l'agent livre une esquisse : il vérifie la page sur téléphone, tablette et ordinateur, puis la fait relire en 2 ou 3 rondes de QA. Pour un livrable client, dis-le : il te pose d'abord quelques questions, dont le nombre de rondes de QA.
+Par défaut, l'agent prépare une esquisse, vérifie le rendu, puis vise 2 ou 3 rondes de QA. Ces rondes nécessitent T3 et un commit poussé autorisé. Pour un livrable client, précise le nombre de rondes. L'agent te demande seulement le contexte manquant et signale les vérifications impossibles.
 
 ## Vérifie le rendu toi-même
 

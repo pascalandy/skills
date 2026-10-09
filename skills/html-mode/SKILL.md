@@ -16,7 +16,7 @@ Resolve bundled paths relative to this skill directory. Playbooks and references
 2. Select and read one primary playbook from the table below. For mixed artifacts, add only the references or playbook sections needed for embedded content. This step is complete when the primary review question has one owner.
 3. Set the visual direction. When palette, type, composition, or register remain open, read [design](references/design.md). Follow the active theme and motion policy. Before implementation, resolve whether the result is local-only or authorized for publication. An explicit local-only request wins. For any authorized publication, read `html-publish` from the active skill catalog; it is the sole owner of hosted delivery and durable receipts. `html-mode` owns artifact design and browser verification for this run. This step is complete when the design, interactions, and delivery choice are concrete.
 4. Build under the shared contract and selected playbook. Preserve any project-required variant review before changing real product components. This step is complete when the file exists and every intended section, control, and state is accounted for.
-5. Verify the file using the shared checks and playbook-specific criteria. For a page readers use, run `uv run scripts/check_page.py <page>` first; `--help` lists its screens and options. Fix observed failures. This step is complete when the checks pass or unavailable checks are explicitly identified in the handoff.
+5. Verify the file using the shared checks and playbook-specific criteria. For a page readers use, run `uv run scripts/check_page.py <page>` from this skill's directory first; `--help` lists screens and browser setup. Fix observed failures. This step is complete when checks pass or unavailable checks are named in the handoff.
 6. Return the absolute file path and playbook-specific handoff. Report browser rendering, external network dependencies, host and client delivery, private URL, and receipt persistence as separate facts. Private hosting does not make an artifact offline or hide its external dependencies. For local-only work, do not invoke a host or change a receipt. For authorized publication, use `html-publish` and report a private URL only when a verified result carries one. If publication cannot complete, keep the local artifact and retained receipt attempt, then report the exact retry from `html-publish` without creating another publication identity.
 
 ## Playbooks
@@ -33,12 +33,12 @@ Resolve bundled paths relative to this skill directory. Playbooks and references
 
 For quantitative content in any playbook, read [charts and data](references/charts-and-data.md).
 
-For a page readers use, read these as the interactive page playbook asks:
+For a page readers use, consult these when their conditions apply:
 
 - [Quality bar](references/quality-bar.md): what the page meets, and which items `check_page.py` fails
-- [Pitfalls](references/pitfalls.md): symptom, cause, and fix for each defect a QA round found, by feature
+- [Pitfalls](references/pitfalls.md): look up a matching feature or observed defect
 - [QA loop](references/qa-loop.md): QA threads, how to split them, the brief, and the journal
-- [Learnings](learnings/README.md): why the rules exist, and how a project adds its lessons
+- [Learnings](learnings/README.md): read when recording a new lesson or tracing a rule's origin
 
 ## Levels
 

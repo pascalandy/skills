@@ -1,13 +1,13 @@
 # Quality bar
 
-Read when building or reviewing a page a reader will use. Items marked _(checked)_ fail `scripts/check_page.py`; the others are checked by eye on its screenshots and by the QA loop.
+Read when building or reviewing a page for readers. Items marked _(checked)_ are sampled by `scripts/check_page.py`. Inspect screenshots and use QA for remaining states and limits below. Apply feature-specific items only when that feature exists.
 
 Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tablets in both orientations, a laptop and a desktop.
 
 ## Layout and reading
 
 - No sideways scroll on any screen _(checked)_, and no text cut off _(checked)_
-- Running text keeps 45 to 75 characters per line, about `40rem` at 17px, on every width, including the band where a side panel first appears
+- Aim for 45 to 75 characters per line where width permits, about `40rem` at 17px. On narrow screens, fit text without sideways scroll
 - A tall tablet screen is filled by the composition, not a small block in its middle
 - The page ends with its last content: no dead scroll and no blank tail
 
@@ -17,7 +17,7 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 - Sizes in `rem`, so the browser's text size setting applies; container query thresholds in `rem` too
 - One scale: at most 8 sizes and 4 weights, line height 1.6 for text and 1.15 for titles
 - Headings `text-wrap: balance`, paragraphs `text-wrap: pretty`
-- French typography: a non-breaking space before `:` `;` `!` `?`, inside `« »`, between a number and its unit, and inside a brand name
+- French typography: non-breaking spaces before `:` `;` `!` `?`, inside `« »`, between a number and its unit, and within a brand name where needed
 - A long word fits its box at every width, without breaking mid-word
 
 ## Colour and themes
@@ -32,15 +32,15 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 
 ## Controls and touch
 
-- Hit areas of 44px on touch screens, except links inside running text _(checked by hit testing, so padding and pseudo-elements count)_
-- Nothing covers a control _(checked)_
+- Hit areas of 44px on touch screens, except controls inside running text _(checked by sampled hit testing, including labels, padding and pseudo-elements)_
+- Nothing covers a control _(checked at sampled target centres on touch screens; QA checks other states)_
 - Hover styles inside `@media (hover: hover)`; what hover reveals also shows on focus and on tap
 - `touch-action: manipulation` on buttons tapped in quick succession
 - An inline control wraps with its sentence and stays inside its box
 
 ## Keyboard and screen readers
 
-- Visible focus on every stop _(checked)_, never hidden under a sticky bar
+- Visible focus on every stop, never hidden under a sticky bar _(checked for up to 60 stops on one screen per scheme; QA covers the rest)_
 - `aria-current="step"` on the current step of a journey, `aria-expanded` on what opens and closes
 - One announcement per change: focus moves to the new heading, or `aria-live` speaks, not both
 - Every section has a heading, every icon button a name, foreign text its `lang`
@@ -49,7 +49,7 @@ Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tab
 ## Motion
 
 - Under `prefers-reduced-motion: reduce`, the page shows its finished state and nothing keeps moving _(checked)_
-- Nothing draws at rest _(checked)_; scroll frames stay under 50ms _(checked)_
+- No continuous drawing at rest _(checked for animation-frame callbacks and infinite CSS animations; QA checks timers, canvas and video)_; sampled scroll frames stay under 50ms _(checked)_
 - Native `scrollTo({ behavior: 'smooth' })` for jumps; a custom glide feels wrong to readers used to their browser
 
 ## Loading and head
