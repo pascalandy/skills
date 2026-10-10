@@ -1,6 +1,6 @@
 # CASS QA canaries
 
-Use only this registered canary during the functional gate. It was verified on CASS 0.9.0 on 2026-09-26
+Use only this registered canary during the functional gate. It was verified on CASS 0.10.0 on 2026-10-10
 
 - Query: `README`
 - Registered providers: `codex`, `pi_agent`, `opencode`, `claude_code`

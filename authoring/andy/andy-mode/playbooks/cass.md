@@ -6,7 +6,7 @@ description: "Search past coding-agent sessions with CASS, a CLI that indexes lo
 
 CASS indexes coding-agent sessions and exposes them through a CLI and TUI
 
-This skill is verified against cass 0.9.0. The project changes frequently, so the installed binary remains the authority for commands and schemas
+This skill is verified against cass 0.10.0. The project changes frequently, so the installed binary remains the authority for commands and schemas
 
 ## Non-negotiable rules
 
@@ -49,7 +49,7 @@ A wrapper error containing "No such file or directory" can mean a missing comman
 
 Keep the gate closed in every state. Install only under the install rule in [non-negotiable rules](#non-negotiable-rules), and do not search other directories for the binary
 
-When the version differs from 0.9.0, check the installed contract before relying on this skill. Do not load the entire capabilities response into context
+When the version differs from 0.10.0, check the installed contract before relying on this skill. Do not load the entire capabilities response into context
 
 ```bash
 cass capabilities --json | jq '{version, commands: [.commands[] | select(.name == "index" or .name == "status" or .name == "search" or .name == "expand" or .name == "sources") | {name, flags: [.arguments[]?.name]}]}'
@@ -58,7 +58,7 @@ cass robot-docs guide
 
 Add the user's requested command to the filter. Capabilities lists only parent commands, so the nested `sources agents list` probe in step 2 must still parse as valid JSON. If the contract differs from this skill, follow the binary, flag the skill drift, and run step 4
 
-Completion criterion: `cass --version` succeeds, and the version is 0.9.0 or the installed contract lists every command and flag this skill uses plus the requested operation. If `cass --version` fails, the gate stays closed and the report names one of the three failure states
+Completion criterion: `cass --version` succeeds, and the version is 0.10.0 or the installed contract lists every command and flag this skill uses plus the requested operation. If `cass --version` fails, the gate stays closed and the report names one of the three failure states
 
 ### 2. Pass the structural gate
 
@@ -183,6 +183,6 @@ cass robot-docs recipes
 cass robot-docs doctor
 ```
 
-Prose examples can lag the binary. In 0.9.0, `robot-docs examples` and the upstream `SKILL.md` still expand hits with `-n`. Argument descriptions in `capabilities` win
+Prose examples can lag the binary. Argument descriptions in `capabilities` win
 
 When this skill and the installed CLI disagree, follow the installed CLI. Then update this skill's source with the verified behavior and version, as described under shared-agent distribution in [references/maintenance.md](../references/cass/maintenance.md)

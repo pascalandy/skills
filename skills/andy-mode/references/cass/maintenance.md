@@ -96,6 +96,10 @@ cass doctor --json --check
 cass doctor repair --dry-run --json
 ```
 
+On a multi-GB archive, `doctor --check` can take several minutes despite the "few seconds" in `robot-docs recipes`. Its stderr heartbeat names the last completed phase. Run it in the background with a time budget. It defers the full-page integrity probe above its size limit, so warnings that report unchecked integrity or coverage do not signal damage
+
+A `repair-previously-failed` health class comes from a marker under `doctor/failure-markers/`. Read it before acting. When its `applied_actions` is empty and `user_data_modified` is false, the earlier repair changed nothing. The marker only blocks a repeated mutating repair
+
 Treat a dry run as authorized only when it returns a non-empty plan fingerprint and explicit actions. If it returns no plan, reports unchecked archive coverage, or requests operator review, stop without mutation
 
 Before applying a plan
