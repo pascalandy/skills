@@ -181,8 +181,8 @@ def test_every_private_package_installs_and_a_public_namesake_stops_the_install(
     missing = run(repo, home, "--private-root", str(repo / "absent"))
     assert missing.returncode == 1 and "private source" in missing.stderr
     assert not home.exists()
-    root = repo / "_skills_private"
-    private = skill(root / "knowledge", "secret", "private")
+    tree = repo / "_skills_private/authoring"
+    private = skill(tree / "knowledge", "secret", "private")
     skill(private / "references", "example")
     applied = run(repo, home)
     assert applied.returncode == 0, applied.stderr
@@ -190,20 +190,20 @@ def test_every_private_package_installs_and_a_public_namesake_stops_the_install(
     assert all((home / target / "secret/SKILL.md").exists() for target in MAC)
     assert not (repo / "skills/secret").exists()
     skill(repo / "authoring/content", "gamma")
-    skill(root / "content", "alpha", "private")
-    skill(root / "content", "gamma", "private")
+    skill(tree / "content", "alpha", "private")
+    skill(tree / "content", "gamma", "private")
     shadowed = run(repo, home)
     assert (shadowed.returncode, shadowed.stdout) == (1, "")
     assert shadowed.stderr == failed(
         *(
             f"skill '{name}' is public and private; remove authoring/content/{name} "
-            f"to keep it private, or delete {root / 'content' / name} to publish it, "
+            f"to keep it private, or delete {tree / 'content' / name} to publish it, "
             "then rerun: just install-skills"
             for name in ("alpha", "gamma")
         )
     )
     assert not any((home / target / "gamma").exists() for target in MAC)
-    shutil.rmtree(root / "content" / "alpha")
+    shutil.rmtree(tree / "content" / "alpha")
     shutil.rmtree(repo / "authoring/content/gamma")
     resolved = run(repo, home)
     assert (resolved.returncode, resolved.stderr) == (0, "")
@@ -218,7 +218,7 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    skill(repo / "_skills_private/content", "secret", "private")
+    skill(repo / "_skills_private/authoring/content", "secret", "private")
     worktree = repo.parent / "worktree"
     subprocess.run(
         ["git", "worktree", "add", "-q", str(worktree)], cwd=repo, check=True
@@ -240,7 +240,7 @@ def test_private_skill_promotes_to_public_without_flags(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    private = skill(repo / "_skills_private/content", "secret", "private")
+    private = skill(repo / "_skills_private/authoring/content", "secret", "private")
     assert run(repo, home).returncode == 0
     shutil.rmtree(private)
     skill(repo / "authoring/content", "secret", "public")
@@ -260,14 +260,16 @@ def test_private_skill_deleted_in_its_clone_leaves_every_target(
     repo, home = sandbox
     private = repo / "_skills_private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
-    retired = skill(private / "content", "retired")
-    outer = skill(private / "content", "outer")
+    retired = skill(private / "authoring/content", "retired")
+    outer = skill(private / "authoring/content", "outer")
     # A nested reference with its own SKILL.md is part of outer, not a skill.
     skill(outer / "references", "nested")
     commit(private)
     assert run(repo, home).returncode == 0
     nested = skill(home / ".claude/skills", "nested")
-    subprocess.run(["git", "rm", "-qr", "content/retired"], cwd=private, check=True)
+    subprocess.run(
+        ["git", "rm", "-qr", "authoring/content/retired"], cwd=private, check=True
+    )
     commit(private)
 
     result = run(repo, home)
@@ -278,6 +280,61 @@ def test_private_skill_deleted_in_its_clone_leaves_every_target(
     assert all((home / target / "outer/SKILL.md").is_file() for target in MAC)
     assert (nested / "SKILL.md").is_file()
     assert run(repo, home, "--check").returncode == 0
+
+
+def test_archived_private_packages_never_install_and_archiving_one_retires_it(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    private = repo / "_skills_private"
+    subprocess.run(["git", "init", "-q", str(private)], check=True)
+    skill(private / "authoring/content", "secret")
+    skill(private / "skill_archived/jeffreys-skills", "jsm")
+    commit(private)
+    # Another tool installed the archived skill on its own
+    foreign = skill(home / ".claude/skills", "jsm", "foreign")
+
+    installed = run(repo, home)
+
+    assert installed.returncode == 0, installed.stderr
+    assert {a["name"] for a in report(installed)} == {"alpha", "secret"}
+    subprocess.run(
+        ["git", "mv", "authoring/content/secret", "skill_archived/secret"],
+        cwd=private,
+        check=True,
+    )
+    commit(private)
+
+    archived = run(repo, home)
+
+    assert archived.returncode == 0, archived.stderr
+    assert [(a["kind"], a["target"], a["name"]) for a in report(archived)] == [
+        ("remove", target, "secret") for target in MAC
+    ]
+    assert (foreign / "SKILL.md").read_text(encoding="utf-8") == "# jsm\n\nforeign\n"
+    assert run(repo, home, "--check").returncode == 0
+
+
+def test_a_private_root_without_authoring_installs_and_removes_nothing(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    empty = repo.parent / "private"
+    empty.mkdir()
+    applied = run(repo, home, "--private-root", str(empty))
+    assert applied.returncode == 0, applied.stderr
+    assert {a["name"] for a in report(applied)} == {"alpha"}
+    # A clone laid out before authoring/: its history added a package elsewhere
+    private = repo / "_skills_private"
+    subprocess.run(["git", "init", "-q", str(private)], check=True)
+    skill(private / "content", "legacy", "private")
+    commit(private)
+    installed = skill(home / ".claude/skills", "legacy")
+
+    result = run(repo, home)
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, OK, "")
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == "# legacy\n\nold\n"
 
 
 def test_removes_only_published_names_and_overwrites_edits(

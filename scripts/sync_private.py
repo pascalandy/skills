@@ -29,6 +29,9 @@ from _common import exclusive, is_network_failure, main_checkout, run_git
 ROOT = Path(__file__).resolve().parent.parent
 # One clone per machine: a worktree uses the one in the main checkout
 PRIVATE = main_checkout(ROOT) / "_skills_private"
+# Every reader takes private packages from this folder of a private root. The
+# sync still carries the whole clone, skill_archived/ included, which never installs
+PACKAGES = "authoring"
 LABEL = "_skills_private"
 TIMEOUT = 300.0
 EPILOG = """\

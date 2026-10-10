@@ -7,15 +7,15 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-07
+date_updated: 2026-10-10
 ---
 
-`just install-skills` installs public skills, every package in the private tree, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
+`just install-skills` installs public skills, every package in the private clone's `authoring/`, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
 
 ## Run it
 
 - The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
-- Every package under `_skills_private/` installs; `--private-root PATH` points to another private tree
+- Every package under `_skills_private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root, and one without `authoring/` installs no private package
 - A name that is both public and private stops the install, a dry run included, and the error names both paths: remove the public package to keep the skill private, or delete the private copy to publish it
 - A run answers `{"ok":true,"changes":[...]}`, one change per entry, such as `["add","~/.claude/skills/concise"]`, and `{"ok":true}` when every target is current. `--dry-run` answers the same without writing; `--check` fails when a selected target needs work, with the changes beside the error. `-v` logs how many entries each target holds current
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
@@ -32,6 +32,7 @@ date_updated: 2026-10-07
 
 Private skills live in the private repository `pascalandy/skills-private`, cloned inside the main checkout at `_skills_private/`. Its URL is this checkout's `origin` with `skills` renamed to `skills-private`, so each machine reaches GitHub the way its public checkout does
 
+- The clone mirrors this repository: packages that install live in `authoring/<category>/<skill>/`, and `skill_archived/` holds packages that never install, such as the skills `jsm` installs. Move a package into `authoring/` to install it, and back to `skill_archived/` to retire it
 - Git uses the nearest `.git` above the current directory. Inside `_skills_private/`, git commands act on the private repository; anywhere else, on the public one
 - This repository's `.gitignore` line `/_skills_private/` keeps the clone and its `.git` out of the public repository; it is not a submodule. Keep that line, and never `git add -f` the folder
 - `scripts/sync_private.py` manages the clone; `just sync` and `just sync-fleet` run it. It clones a missing folder, commits uncommitted edits as `🧰 skill: private: save edits from <machine>`, pulls with rebase, and pushes. A folder that is not a clone, or a clone off `main`, stops it untouched. Edits that conflict with GitHub stay committed on that machine and stop it; resolve them with `git pull --rebase` in `_skills_private/`
@@ -50,7 +51,7 @@ GitHub's `main` is the source. Every machine in the fleet runs the same commands
 - `just merge` runs `just deploy` from this machine's main checkout after it merges a PR, when `main` holds the tree its checks ran on, so the fleet gets the new `main` without a pull
 - `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference in its errors, such as `~/.claude/skills waits for update 1`. It compares names and contents, so skills other tools installed do not count. A machine whose installer predates #490 answers no JSON line and only warns about a conflict, so `--check` fails on it until `just sync-fleet` brings it to `main`
 - Editing a private skill fires no hook, so run `just sync` or `just sync-fleet` afterwards; each sync also saves the private edits of the machines it reaches
-- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `fleet` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
+- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `fleet` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone's `authoring/`, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
 
 ```toml
 [machines.om1]
@@ -76,9 +77,9 @@ Background runs never make git wait on a sleeping laptop. They log to `~/.local/
 
 - The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still compiled in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
-- It also owns every package name the private clone's history ever added, so deleting a private skill and letting `just sync` commit the deletion removes its installed copies on every machine the deletion reaches. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
+- It also owns every package name the private clone's history ever added under `authoring/`, so deleting a private skill, or moving it to `skill_archived/`, and letting `just sync` commit the change removes its installed copies on every machine the change reaches. A name only ever added elsewhere, such as an archived skill `jsm` installed, stays untouched, unless this repository's history owns it too, as it owns `cass`. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or the private clone
-- To make a public skill private, remove it from `authoring/` in a PR, then copy its package into the private clone once the PR lands. An install while both copies exist stops and names them
+- To make a public skill private, remove it from `authoring/` in a PR, then copy its package into the private clone's `authoring/` once the PR lands. An install while both copies exist stops and names them
 - To promote a private skill, add it to `authoring/` in a PR, and delete the private copy right before the PR merges. An install while both copies exist stops and names them
 
 ## Cutover
@@ -96,8 +97,8 @@ Move one machine at a time from the old dotfiles skill engine to this installer,
    - `~/justfile` recipes `skills-update`, `sync-skills`, `pull-dotfiles`, and `om1`
    - The release clone in `~/.local/share/dotfiles-release/`
 2. **Preserve old state.** Copy `~/.local/state/dotfiles-skills/` outside every target. If `~/.local/state/dotfiles-skills/pending.json` exists, stop: the old engine has an unfinished recovery
-3. **Select the source.** Use a skills checkout at a reviewed `main` revision. Record the machine, `git rev-parse HEAD`, the profile, and the private packages already installed there. Make the private tree hold exactly the packages that remain private, and pass `--private-root PATH` when it is not `_skills_private/`
-4. **Preview.** Run `just install-skills --profile PROFILE --dry-run` with that source, then the same with `--check`. An in-place edit shows as `update`; move one worth keeping into `authoring/` or the private tree first. Resolve each conflict, a symlink or wrong type at a target path, by hand
+3. **Select the source.** Use a skills checkout at a reviewed `main` revision. Record the machine, `git rev-parse HEAD`, the profile, and the private packages already installed there. Make the private root's `authoring/` hold exactly the packages that remain private, and pass `--private-root PATH` when the root is not `_skills_private/`
+4. **Preview.** Run `just install-skills --profile PROFILE --dry-run` with that source, then the same with `--check`. An in-place edit shows as `update`; move one worth keeping into `authoring/` or the private clone's `authoring/` first. Resolve each conflict, a symlink or wrong type at a target path, by hand
 5. **Apply after approval.** Show Pascal the preview. After approval, run `just install-skills --profile PROFILE` with the same flags. The follow-up `--check` must exit 0
 6. **Verify discovery.** Run `just skills-discover --profile PROFILE` with the same `--private-root`. Claude Code has no command that lists its skills, so the check leaves it out: start a new Claude Code session and confirm the expected skills appear
 7. **Retire the old engine.** Only after step 6 passes, move the step 1 writers, the release clone, `~/.local/state/dotfiles-skills/`, and any `~/.local/state/install-skills/` left by an earlier installer version to the trash. Keep the step 2 copy until Pascal discards it. Switch the machine's chezmoi source to dotfiles `main`, which no longer ships the old writers. chezmoi does not delete files removed from its source, so the trash step is still needed

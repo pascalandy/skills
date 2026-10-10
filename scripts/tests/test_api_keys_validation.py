@@ -42,7 +42,7 @@ def write(path: Path, frontmatter: str) -> None:
 @pytest.fixture
 def machine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     authoring = tmp_path / "authoring"
-    private = tmp_path / "_skills_private"
+    private = tmp_path / "_skills_private/authoring"
     write(
         authoring / "andy/transcript/SKILL.md",
         'name: "transcript"\napi-key: "deepgram"\n',

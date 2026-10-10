@@ -19,7 +19,7 @@ from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
 
 # Where the fleet skill ships the registry; the seed's .gitignore keeps
 # it untracked, so it never reaches another machine's clone.
-REGISTRY = "_skills_private/integrations/fleet/references/fleet.toml"
+REGISTRY = "_skills_private/authoring/integrations/fleet/references/fleet.toml"
 
 # Drops the options, runs the remote command in the host's home, and refuses
 # the host named down the way ssh reports an unreachable machine. git uses it
@@ -198,7 +198,7 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     # editor has a private skill of its own, uncommitted, and an editor setting.
     editor = machine(homes, "editor", origin)
     git(editor, "clone", "-q", str(private), "_skills_private")
-    skill(editor / "_skills_private/content", "mine")
+    skill(editor / "_skills_private/authoring/content", "mine")
     (editor / ".vscode").mkdir()
     (editor / ".vscode/settings.json").write_text("{}\n")
     branch = machine(homes, "branch", origin)
@@ -208,14 +208,16 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     commit(ahead)
     # plain holds a private folder that is not a clone; linked a symlink to one.
     plain = machine(homes, "plain", origin)
-    kept = skill(plain / "_skills_private/content", "kept") / "SKILL.md"
+    kept = skill(plain / "_skills_private/authoring/content", "kept") / "SKILL.md"
     linked = machine(homes, "linked", origin)
     (linked / "_skills_private").symlink_to(editor / "_skills_private")
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
     # A commit GitHub lacks stays on the machine that made it.
     change(hub, "unpushed.txt", push=False)
-    (hub / "_skills_private/content/secret/SKILL.md").write_text("from the hub\n")
+    (hub / "_skills_private/authoring/content/secret/SKILL.md").write_text(
+        "from the hub\n"
+    )
     register(
         hub, "behind", "dirty", "editor", "branch", "ahead", "plain", "linked", "down"
     )
@@ -251,8 +253,12 @@ def test_sends_github_main_saves_private_edits_and_leaves_the_rest_untouched(
     assert (editor / ".vscode/settings.json").read_text() == "{}\n"
     assert git(origin, "rev-parse", "main") == head
     assert not (behind / "unpushed.txt").exists()
-    assert git(private, "show", "main:content/secret/SKILL.md") == "from the hub"
-    assert git(private, "show", "main:content/mine/SKILL.md") == "# mine\n\nold"
+    assert (
+        git(private, "show", "main:authoring/content/secret/SKILL.md") == "from the hub"
+    )
+    assert (
+        git(private, "show", "main:authoring/content/mine/SKILL.md") == "# mine\n\nold"
+    )
     assert git(hub / "_skills_private", "status", "--porcelain") == ""
     assert not (behind / REGISTRY).exists()
     assert (homes / "behind/just.log").read_text() == "install-skills\n"
@@ -308,7 +314,7 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     assert not (homes / "stale/.claude/skills/alpha").exists()
 
     # A sync first saves this machine's private edits, which every machine pulls
-    (hub / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    (hub / "_skills_private/authoring/content/secret/SKILL.md").write_text("edited\n")
     saving = run(hub, homes, bin_dir, "-n")
 
     assert (saving.returncode, saving.stderr) == (0, "")
@@ -332,7 +338,9 @@ def test_check_answers_ok_when_converged_and_names_each_difference(
     assert (converged.returncode, converged.stdout, converged.stderr) == (0, OK, "")
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
-    (lagging / "_skills_private/content/secret/SKILL.md").write_text("edited\n")
+    (lagging / "_skills_private/authoring/content/secret/SKILL.md").write_text(
+        "edited\n"
+    )
     # Another machine pushed a private edit that neither has pulled yet.
     other = hub.parent / "other-private"
     git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(other))
@@ -588,7 +596,7 @@ def test_a_failed_install_keeps_the_machines_completed_changes(
     if behind:
         change(hub)
     else:
-        (broken / "_skills_private/content/secret/SKILL.md").write_text(
+        (broken / "_skills_private/authoring/content/secret/SKILL.md").write_text(
             "saved before failure\n"
         )
     (homes / "broken/.config").write_text("not a directory\n")
@@ -608,7 +616,7 @@ def test_a_failed_install_keeps_the_machines_completed_changes(
             git(
                 hub.parent / "skills-private.git",
                 "show",
-                "main:content/secret/SKILL.md",
+                "main:authoring/content/secret/SKILL.md",
             )
             == "saved before failure"
         )
@@ -622,7 +630,9 @@ def test_others_reports_the_coordinators_private_save(
     register(hub, host)
     private = hub / "_skills_private"
     before = git(private, "rev-parse", "HEAD")
-    (private / "content/secret/SKILL.md").write_text("saved from the coordinator\n")
+    (private / "authoring/content/secret/SKILL.md").write_text(
+        "saved from the coordinator\n"
+    )
     expected = changed(["sync", host, git(hub, "rev-parse", "HEAD")[:7]])
 
     preview = run(hub, homes, bin_dir, "--others", "--dry-run")
@@ -635,7 +645,11 @@ def test_others_reports_the_coordinators_private_save(
     assert (result.returncode, result.stdout, result.stderr) == (0, expected, "")
     assert git(private, "rev-parse", "HEAD") != before
     assert (
-        git(hub.parent / "skills-private.git", "show", "main:content/secret/SKILL.md")
+        git(
+            hub.parent / "skills-private.git",
+            "show",
+            "main:authoring/content/secret/SKILL.md",
+        )
         == "saved from the coordinator"
     )
 

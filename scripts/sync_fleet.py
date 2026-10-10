@@ -14,10 +14,10 @@ or justfile, has commits GitHub lacks, or whose _skills_private is not a clone
 is left untouched. A machine that is offline or fails waits for the next sync,
 which catches it up.
 
-The registry is the one fleet.toml in the private repository, so every machine
-has it and hosts stay out of this public one; the fleet skill ships it in
-references/. Each path is relative to that machine's home, and other keys are
-notes for agents:
+The registry is the one fleet.toml in the private repository's authoring/, so
+every machine has it and hosts stay out of this public one; the fleet skill
+ships it in references/. Each path is relative to that machine's home, and
+other keys are notes for agents:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
@@ -67,7 +67,7 @@ from _common import (
     send,
     stop,
 )
-from sync_private import PRIVATE
+from sync_private import PACKAGES, PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTALLER = ROOT / "scripts" / "install_skills.py"
@@ -257,21 +257,19 @@ class Outcome:
 
 
 def registry() -> Path:
-    """The one fleet.toml in the private clone, wherever the skill that ships it lives."""
-    found = sorted(
-        path
-        for path in PRIVATE.rglob("fleet.toml")
-        if ".git" not in path.relative_to(PRIVATE).parts
-    )
+    """The one fleet.toml in the private clone's authoring/, wherever the skill
+    that ships it lives."""
+    tree = PRIVATE / PACKAGES
+    found = sorted(tree.rglob("fleet.toml"))
     if len(found) > 1:
         raise ScriptError(
-            f"{len(found)} fleet registries in {PRIVATE}: "
-            + ", ".join(str(path.relative_to(PRIVATE)) for path in found)
+            f"{len(found)} fleet registries in {tree}: "
+            + ", ".join(str(path.relative_to(tree)) for path in found)
             + "; keep one"
         )
     if not found:
         raise ScriptError(
-            f"no fleet.toml in {PRIVATE}; the fleet skill keeps it in references/"
+            f"no fleet.toml in {tree}; the fleet skill keeps it in references/"
         )
     return found[0]
 
@@ -792,7 +790,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fleet",
         type=Path,
-        help="machine registry (default: the one fleet.toml in _skills_private/)",
+        help="machine registry (default: the one fleet.toml in _skills_private/authoring/)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
