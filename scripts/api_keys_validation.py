@@ -25,7 +25,7 @@ TIMEOUT = 15.0
 
 EPILOG = """\
 rule:
-  A SKILL.md or playbook under authoring/, or under _skills_private/authoring/
+  A SKILL.md or playbook under authoring/, or under skills-private/authoring/
   when it exists, names in its api-key field the keyring entries that hold
   the keys it reads. Each entry is looked up with chezmoi, user api_key; no
   value is ever printed. Only presence is checked: a revoked or expired key

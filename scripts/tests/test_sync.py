@@ -16,7 +16,7 @@ from conftest import commit, skill
 PULLED_PRIVATE_SYNC = """from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PRIVATE = ROOT / "_skills_private"
+PRIVATE = ROOT.parent / "skills-private"
 PACKAGES = "authoring"
 
 if __name__ == "__main__":
@@ -119,7 +119,7 @@ def test_refuses_a_checkout_off_main_before_pulling_or_installing(
         "ok": False,
         "errors": ["this checkout is on feature; switch to main, then rerun just sync"],
     }
-    assert not (repo / "_skills_private").exists()
+    assert not (repo.parent / "skills-private").exists()
     assert not (home / ".claude").exists()
 
 
@@ -143,7 +143,7 @@ def test_previews_this_checkout_without_pulling(sandbox: tuple[Path, Path]) -> N
     assert verdict["errors"] == [
         "just install-skills failed; fix what its answer above says, then rerun just sync"
     ]
-    assert not (repo / "_skills_private").exists()
+    assert not (repo.parent / "skills-private").exists()
     assert not (home / ".claude").exists()
 
 

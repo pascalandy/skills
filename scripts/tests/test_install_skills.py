@@ -181,7 +181,7 @@ def test_every_private_package_installs_and_a_public_namesake_stops_the_install(
     missing = run(repo, home, "--private-root", str(repo / "absent"))
     assert missing.returncode == 1 and "private source" in missing.stderr
     assert not home.exists()
-    tree = repo / "_skills_private/authoring"
+    tree = repo.parent / "skills-private/authoring"
     private = skill(tree / "knowledge", "secret", "private")
     skill(private / "references", "example")
     applied = run(repo, home)
@@ -218,8 +218,9 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    skill(repo / "_skills_private/authoring/content", "secret", "private")
-    worktree = repo.parent / "worktree"
+    skill(repo.parent / "skills-private/authoring/content", "secret", "private")
+    # In another folder, so only the main checkout's neighbour holds the clone
+    worktree = repo.parent / "elsewhere/worktree"
     subprocess.run(
         ["git", "worktree", "add", "-q", str(worktree)], cwd=repo, check=True
     )
@@ -233,14 +234,15 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
         == "# secret\n\nprivate\n"
         for target in MAC
     )
-    assert not (worktree / "_skills_private").exists()
 
 
 def test_private_skill_promotes_to_public_without_flags(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    private = skill(repo / "_skills_private/authoring/content", "secret", "private")
+    private = skill(
+        repo.parent / "skills-private/authoring/content", "secret", "private"
+    )
     assert run(repo, home).returncode == 0
     shutil.rmtree(private)
     skill(repo / "authoring/content", "secret", "public")
@@ -258,7 +260,7 @@ def test_private_skill_deleted_in_its_clone_leaves_every_target(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    private = repo / "_skills_private"
+    private = repo.parent / "skills-private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     retired = skill(private / "authoring/content", "retired")
     outer = skill(private / "authoring/content", "outer")
@@ -286,7 +288,7 @@ def test_archived_private_packages_never_install_and_archiving_one_retires_it(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
-    private = repo / "_skills_private"
+    private = repo.parent / "skills-private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "authoring/content", "secret")
     skill(private / "skill_archived/jeffreys-skills", "jsm")
@@ -325,7 +327,7 @@ def test_a_private_root_without_authoring_installs_and_removes_nothing(
     assert applied.returncode == 0, applied.stderr
     assert {a["name"] for a in report(applied)} == {"alpha"}
     # A clone laid out before authoring/: its history added a package elsewhere
-    private = repo / "_skills_private"
+    private = repo.parent / "skills-private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "content", "legacy", "private")
     commit(private)
