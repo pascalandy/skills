@@ -156,10 +156,10 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             f"{PRIVATE} has uncommitted edits; move them to a worktree of "
             "skills-private and open a PR, then rerun"
         )
-    # Without the network, the last fetch tells whether main holds commits
-    # GitHub lacks; after the fetch, GitHub's main itself does
-    refuse_commits_beyond("origin/main", "its origin/main")
     if dry_run:
+        # Without the network, a dry run compares with the last fetch, which a
+        # stale or missing origin/main makes refuse
+        refuse_commits_beyond("origin/main", "its origin/main")
         return []
     before = git("rev-parse", "HEAD").stdout.strip()
     log.info("pull %s", LABEL)
@@ -183,9 +183,16 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
 
 
 def refuse_commits_beyond(ref: str, name: str) -> None:
-    """Stop when main holds commits `ref` lacks, since only a merged PR changes it."""
-    ahead = git("rev-list", "--count", f"{ref}..HEAD").stdout.strip()
-    if ahead not in ("", "0"):
+    """Stop when main holds commits `ref` lacks, since only a merged PR changes it,
+    or when the comparison fails."""
+    counted = git("rev-list", "--count", f"{ref}..HEAD")
+    ahead = counted.stdout.strip()
+    if counted.returncode or not ahead.isdigit():
+        raise ScriptError(
+            f"{PRIVATE} cannot compare with {name}; fetch it with "
+            f"git -C {PRIVATE} fetch origin main, then rerun"
+        )
+    if ahead != "0":
         raise ScriptError(
             f"{PRIVATE} has {ahead} commit{'s' if ahead != '1' else ''} {name} "
             "lacks; open a PR from a worktree of skills-private, then reset main to "

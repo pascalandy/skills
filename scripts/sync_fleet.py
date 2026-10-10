@@ -156,10 +156,21 @@ plain() {
 """
 # A private folder that is not a clone may hold edits, so it stops the
 # machine before anything is sent. A clone off main, with edits, or with
-# commits its origin/main lacks would stop scripts/sync_private.py, so a sync
-# leaves the machine untouched and a check reports it as drift. The last fetch
-# stands in for GitHub, so the inspection needs no network.
+# commits GitHub's main lacks would stop scripts/sync_private.py, so a sync
+# leaves the machine untouched and a check reports it as drift. ahead() reaches
+# GitHub only when origin/main leaves a doubt.
 INSPECT = """
+unshared() {
+    git -C "$private" rev-list --count origin/main..HEAD 2>/dev/null
+}
+# A count other than 0, or a failed comparison, may come from a stale or
+# missing origin/main, so only then does it fetch and count again; it prints
+# nothing when it cannot count
+ahead() {
+    count=$(unshared) && [ "$count" = 0 ] && { echo 0; return; }
+    git -C "$private" fetch -q origin main 2>/dev/null
+    unshared
+}
 step() {
     enter "$1" || return
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
@@ -173,9 +184,14 @@ step() {
         echo "private-needs $private is not on main; switch it to main, then rerun"
     elif [ -n "$(git -C "$private" status --porcelain)" ]; then
         echo "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
-    elif ahead=$(git -C "$private" rev-list --count origin/main..HEAD 2>/dev/null) && [ "$ahead" != 0 ]; then
-        [ "$ahead" = 1 ] && commits=commit || commits=commits
-        echo "private-needs $private has $ahead $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
+    else
+        count=$(ahead)
+        if [ -z "$count" ]; then
+            echo "private-needs $private cannot compare with origin/main; fetch it, then rerun"
+        elif [ "$count" != 0 ]; then
+            [ "$count" = 1 ] && commits=commit || commits=commits
+            echo "private-needs $private has $count $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
+        fi
     fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
     head=$(git rev-parse -q --verify HEAD) || head=-
@@ -445,8 +461,8 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
         return ["private repo is not cloned"]
     if state == "plain":
         return ["skills-private is not a clone of the private repo"]
-    # The inspection already names a clone with edits
-    problems: list[str] = []
+    # Edits made after the inspection show only here, so a repeat is fine
+    problems = ["private repo has uncommitted edits"] if state == "dirty" else []
     if expected and head != expected:
         problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
     return problems
@@ -738,7 +754,14 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         # origin/main lacks
         if mode == "preview" and sync_private.is_clone():
             sync_private.sync(dry_run=True)
-        fleet = load_registry(args.fleet or registry())
+        try:
+            fleet = load_registry(args.fleet or registry())
+        except ScriptError as error:
+            # The registry is unread, so the host name stands for this machine
+            if pulled:
+                host = socket.gethostname().split(".")[0]
+                error.report["changes"] = [["sync", host, source.sha[:7]]]
+            raise
         machines = select(fleet, args.machines)
         if args.others:
             machines = [machine for machine in machines if not machine.is_local()]

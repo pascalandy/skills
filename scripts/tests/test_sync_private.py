@@ -134,25 +134,66 @@ def test_a_local_change_stops_the_pull_untouched(
     head = git(clone, "rev-parse", "HEAD")
 
     result = run(one)
-    # A dry run finds the same without the network
+    # A dry run finds the same without the network, from the last fetch
     preview = run(one, "--dry-run")
 
     assert (result.returncode, result.stdout) == (1, "")
     assert (preview.returncode, preview.stdout) == (1, "")
     error = json.loads(result.stderr.splitlines()[-1])["errors"][0]
-    assert json.loads(preview.stderr.splitlines()[-1])["errors"] == [error]
+    previewed = json.loads(preview.stderr.splitlines()[-1])["errors"][0]
     assert error.startswith(str(clone))
     assert {
         "uncommitted": "has uncommitted edits;",
         "branch": "is on feature;",
-        "commit": "has 1 commit its origin/main lacks;",
-        "diverged": "has 1 commit its origin/main lacks;",
+        "commit": "has 1 commit GitHub's main lacks;",
+        "diverged": "has 1 commit GitHub's main lacks;",
     }[edit] in error
+    assert previewed == error.replace("GitHub's main", "its origin/main")
     assert "changes" not in json.loads(result.stderr.splitlines()[-1])
     assert git(clone, "rev-parse", "HEAD") == head
     assert git(remote, "rev-parse", "main") == github
     if edit != "branch":
         assert secret.read_text() == "from one\n"
+
+
+def test_a_stale_origin_main_does_not_block_a_clone_at_githubs_main(
+    machines: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    """The old code failed here: it compared with origin/main before fetching."""
+    one, _, remote = machines
+    assert run(one).returncode == 0
+    clone = private(one)
+    stale = git(clone, "rev-parse", "origin/main")
+    merge(remote, tmp_path)
+    # Fast-forward to GitHub's main without moving origin/main
+    git(clone, "fetch", "-q", "--refmap=", "origin", "main")
+    git(clone, "merge", "-q", "--ff-only", "FETCH_HEAD")
+    assert git(clone, "rev-parse", "origin/main") == stale
+
+    result = run(one)
+
+    assert quiet(result) == (0, '{"ok":true}\n', "")
+    assert git(clone, "rev-parse", "HEAD") == git(remote, "rev-parse", "main")
+
+
+def test_a_dry_run_without_origin_main_stops_instead_of_passing(
+    machines: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: a failed comparison counted as no commits."""
+    one, _, _ = machines
+    assert run(one).returncode == 0
+    clone = private(one)
+    git(clone, "update-ref", "-d", "refs/remotes/origin/main")
+
+    result = run(one, "--dry-run")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"{clone} cannot compare with its origin/main; fetch it with "
+            f"git -C {clone} fetch origin main, then rerun"
+        )
+    ]
 
 
 def test_leaves_a_folder_that_is_not_a_clone_untouched(

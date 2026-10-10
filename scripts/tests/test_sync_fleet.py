@@ -387,6 +387,130 @@ def test_others_still_stops_on_the_coordinators_unshared_private_commit(
     assert not (homes / "behind/just.log").exists()
 
 
+def merged_private(tmp_path: Path) -> str:
+    """Land a commit on the private main, the way a merged PR does."""
+    work = tmp_path / "private-pr"
+    git(tmp_path, "clone", "-q", str(tmp_path / "skills-private.git"), str(work))
+    (work / "merged.md").write_text("merged\n")
+    commit(work)
+    git(work, "push", "-q", "origin", "main")
+    return git(work, "rev-parse", "HEAD")
+
+
+def test_a_stale_origin_main_does_not_block_a_remote_clone_at_githubs_main(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: the inspection trusted a stale origin/main."""
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    clone = private(checkout)
+    stale = git(clone, "rev-parse", "origin/main")
+    github = merged_private(hub.parent)
+    # Fast-forward to GitHub's main without moving origin/main
+    git(clone, "fetch", "-q", "--refmap=", "origin", "main")
+    git(clone, "merge", "-q", "--ff-only", "FETCH_HEAD")
+    assert git(clone, "rev-parse", "origin/main") == stale
+    head = change(hub)
+
+    result = run(hub, homes, bin_dir, "--others")
+
+    assert (result.returncode, result.stderr) == (0, "")
+    assert git(checkout, "rev-parse", "HEAD") == head
+    assert git(clone, "rev-parse", "HEAD") == github
+
+
+def test_a_remote_clone_without_origin_main_stops_before_the_checkout_moves(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: a failed comparison counted as no commits, so
+    the preview passed and the sync moved the checkout, then refused the clone."""
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    clone = private(checkout)
+    skill(clone / "authoring/content", "mine")
+    commit(clone)
+    git(clone, "update-ref", "-d", "refs/remotes/origin/main")
+    before = git(checkout, "rev-parse", "HEAD")
+    change(hub)
+
+    preview = run(hub, homes, bin_dir, "--others", "--dry-run")
+    result = run(hub, homes, bin_dir, "--others")
+
+    unshared = (
+        f"remote needs-you: {clone} has 1 commit its origin/main lacks; open a PR "
+        "from a worktree of skills-private, then reset main to origin/main and "
+        "rerun; fix it on remote, then rerun just sync-fleet remote"
+    )
+    for answer in (preview, result):
+        assert (answer.returncode, answer.stdout) == (1, "")
+        assert json.loads(answer.stderr.splitlines()[-1])["errors"] == [unshared]
+    assert git(checkout, "rev-parse", "HEAD") == before
+    assert (homes / "remote/just.log").read_text() == "install-skills\n"
+
+
+def test_check_reports_private_edits_made_after_the_inspection(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: the check dropped the dirty state it saw, since
+    the inspection had found the clone clean a moment before."""
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    # The edit lands once the inspection, the step that prints private-needs, ends
+    late = """payload=$(cat)
+HOME="$FLEET_HOMES/$host" SHELL=/bin/sh /bin/sh -c "$*" <<EOF
+$payload
+EOF
+code=$?
+case "$payload" in
+    *private-needs*) echo late > "$FLEET_HOMES/$host/projects/skills-private/late.txt" ;;
+esac
+exit "$code"
+"""
+    ssh = bin_dir / "ssh"
+    ssh.write_text(
+        ssh.read_text().replace(
+            'HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"', late
+        )
+    )
+
+    result = run(hub, homes, bin_dir, "--check")
+
+    assert (private(checkout) / "late.txt").is_file()
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr)["errors"] == [
+        "remote drift: private repo has uncommitted edits; rerun just sync-fleet remote"
+    ]
+
+
+def test_a_broken_registry_keeps_the_private_pull_in_the_report(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: the error dropped the pull it had made."""
+    hub, homes, bin_dir = fleet
+    host = socket.gethostname().split(".")[0]
+    work = hub.parent / "private-pr"
+    git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(work))
+    (work / REGISTRY).parent.mkdir(parents=True)
+    (work / REGISTRY).write_text("[machines.broken\n")
+    git(work, "add", "-f", REGISTRY)
+    commit(work)
+    git(work, "push", "-q", "origin", "main")
+
+    result = run(hub, homes, bin_dir, "--others")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert "fleet.toml is not valid TOML" in answer["errors"][0]
+    assert answer["changes"] == [["sync", host, git(hub, "rev-parse", "HEAD")[:7]]]
+    assert git(private(hub), "rev-parse", "HEAD") == git(work, "rev-parse", "HEAD")
+
+
 def test_check_answers_ok_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
