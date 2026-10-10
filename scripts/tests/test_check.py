@@ -275,6 +275,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
         (
             "scripts/sync_private.py",
             [
+                "scripts/tests/test_api_keys_validation.py",
                 "scripts/tests/test_cli_contract.py",
                 "scripts/tests/test_commands.py",
                 "scripts/tests/test_discover_skills.py",

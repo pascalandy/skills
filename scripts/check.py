@@ -184,7 +184,11 @@ CHECKS = [
     Check("lint", *ruff("scripts")),
     # Skill scripts paste the block in _cli.py, and some run on Python 3.10
     Check("typecheck", pyright("scripts"), pyright("scripts/_cli.py", python="3.10")),
-    repo_test("api_keys_validation", "scripts/api_keys_validation.py"),
+    repo_test(
+        "api_keys_validation",
+        "scripts/api_keys_validation.py",
+        "scripts/sync_private.py",
+    ),
     repo_test("check"),
     repo_test("check_cli_block", "scripts/check_cli_block.py"),
     repo_test("check_frontmatter", "scripts/check_frontmatter.py"),

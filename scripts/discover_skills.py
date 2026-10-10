@@ -334,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--private-root",
         type=Path,
-        help="private package tree, as passed to install-skills",
+        help="private repository root whose authoring/ packages install, as passed to install-skills",
     )
     parser.add_argument(
         "--timeout",

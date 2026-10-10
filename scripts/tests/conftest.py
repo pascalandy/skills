@@ -79,7 +79,7 @@ def private_remote(parent: Path) -> Path:
     seed = parent / "private-seed"
     subprocess.run(["git", "init", "-q", "-b", "main", str(seed)], check=True)
     (seed / ".gitignore").write_text("fleet.toml\n")
-    skill(seed / "content", "secret")
+    skill(seed / "authoring/content", "secret")
     commit(seed)
     subprocess.run(["git", "push", "-q", str(remote), "main"], cwd=seed, check=True)
     shutil.rmtree(seed)

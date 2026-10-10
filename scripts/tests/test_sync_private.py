@@ -86,8 +86,8 @@ def test_clones_then_saves_edits_every_machine_receives(
     assert quiet(run(one)) == (0, changed(clone), "")
     assert quiet(run(two)) == (0, changed(clone), "")
     assert quiet(run(two)) == (0, '{"ok":true}\n', ""), "a current clone is a no-op"
-    (one / "_skills_private/content/secret/SKILL.md").write_text("from one\n")
-    skill(one / "_skills_private/content", "added")
+    (one / "_skills_private/authoring/content/secret/SKILL.md").write_text("from one\n")
+    skill(one / "_skills_private/authoring/content", "added")
     commit = ["commit", "_skills_private", f"save edits from {HOST}"]
     assert quiet(run(one, "-n")) == (0, changed(commit), "")
     push = ["push", "_skills_private", "1 commit"]
@@ -97,7 +97,7 @@ def test_clones_then_saves_edits_every_machine_receives(
     pull = ["pull", "_skills_private", f"{before}..{after}"]
     assert quiet(run(two)) == (0, changed(pull), "")
 
-    received = two / "_skills_private/content"
+    received = two / "_skills_private/authoring/content"
     assert (received / "secret/SKILL.md").read_text() == "from one\n"
     assert (received / "added/SKILL.md").is_file()
     assert git(remote, "log", "-1", "--format=%s").startswith(
@@ -112,9 +112,9 @@ def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     one, two, remote = machines
     for repo in (one, two):
         assert run(repo).returncode == 0
-    (one / "_skills_private/content/secret/SKILL.md").write_text("from one\n")
+    (one / "_skills_private/authoring/content/secret/SKILL.md").write_text("from one\n")
     assert run(one).returncode == 0
-    secret = two / "_skills_private/content/secret/SKILL.md"
+    secret = two / "_skills_private/authoring/content/secret/SKILL.md"
     secret.write_text("from two\n")
 
     result = run(two)
@@ -128,14 +128,14 @@ def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
     assert secret.read_text() == "from two\n"
     assert git(two / "_skills_private", "status", "--porcelain") == ""
     assert not (two / "_skills_private/.git/rebase-merge").exists()
-    assert git(remote, "show", "main:content/secret/SKILL.md") == "from one"
+    assert git(remote, "show", "main:authoring/content/secret/SKILL.md") == "from one"
 
 
 def test_leaves_a_folder_that_is_not_a_clone_untouched(
     machines: tuple[Path, Path, Path],
 ) -> None:
     one, _, _ = machines
-    kept = skill(one / "_skills_private/content", "local") / "SKILL.md"
+    kept = skill(one / "_skills_private/authoring/content", "local") / "SKILL.md"
 
     result = run(one)
 

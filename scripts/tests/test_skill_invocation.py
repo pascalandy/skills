@@ -6,8 +6,10 @@ import re
 import unittest
 from pathlib import Path
 
+from sync_private import PACKAGES, PRIVATE
+
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = (ROOT / "authoring", ROOT / "_skills_private")
+SOURCES = (ROOT / "authoring", PRIVATE / PACKAGES)
 
 HIDDEN = re.compile(r"^disable-model-invocation:\s*true\s*$", re.MULTILINE)
 CODEX_HIDDEN = re.compile(r"^\s*allow_implicit_invocation:\s*false\s*$", re.MULTILINE)

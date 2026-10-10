@@ -32,7 +32,7 @@ from typing import Any
 import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes, run_script
 from _common import FRONTMATTER, exclusive, frontmatter_description, run, swap
-from sync_private import PRIVATE
+from sync_private import PACKAGES, PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILES = {
@@ -225,7 +225,8 @@ def replace_command(source: Path, destination: Path) -> None:
 
 
 def private_packages(root: Path | None) -> dict[str, Path]:
-    """Map every package in the private tree; the default tree is optional."""
+    """Map every package under the private root's authoring/; the default root
+    is optional, and a root without authoring/ holds none."""
     if root is None:
         if not PRIVATE.exists():
             return {}
@@ -234,14 +235,15 @@ def private_packages(root: Path | None) -> dict[str, Path]:
         raise ScriptError(
             f"private source {root} is missing or invalid; fix --private-root"
         )
+    tree = root / PACKAGES
     packages: dict[str, Path] = {}
-    for entry in sorted(root.rglob("SKILL.md")):
+    for entry in sorted(tree.rglob("SKILL.md")):
         package = entry.parent
         # A nested reference with its own SKILL.md belongs to the outer package.
         if any(
             (parent / "SKILL.md").is_file()
             for parent in package.parents
-            if parent != root and root in parent.parents
+            if parent != tree and tree in parent.parents
         ):
             continue
         name = package.name
@@ -363,8 +365,11 @@ def owned_skills() -> set[str]:
 
 
 def owned_private(root: Path | None) -> set[str]:
-    """Package names the private clone's history ever added, so deleting one there
-    removes its installed copies. A private tree that is not a clone owns nothing."""
+    """Package names the private clone's history ever added under authoring/, so
+    deleting one there, or moving it to skill_archived/, removes its installed
+    copies. A name only ever added elsewhere, such as a skill_archived/ package
+    another tool installs, stays untouched. A private tree that is not a clone
+    owns nothing."""
     root = root or PRIVATE
     if root.is_symlink() or not (root / ".git").is_dir():
         return set()
@@ -386,10 +391,19 @@ def owned_private(root: Path | None) -> set[str]:
             f"shallow clone at {root} hides retired skills; run git fetch --unshallow there and rerun"
         )
     listed = git(
-        "log", "--no-renames", "--diff-filter=A", "--name-only", "--format=", "-z"
+        "log",
+        "--no-renames",
+        "--diff-filter=A",
+        "--name-only",
+        "--format=",
+        "-z",
+        "--",
+        PACKAGES,
     )
     added = {
-        Path(os.fsdecode(path).strip()) for path in listed.split(b"\0") if path.strip()
+        Path(os.fsdecode(path).strip()).relative_to(PACKAGES)
+        for path in listed.split(b"\0")
+        if path.strip()
     }
     entries = {path for path in added if path.name == "SKILL.md"}
     # A nested reference with its own SKILL.md belongs to the outer package.
@@ -716,7 +730,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--private-root",
         type=Path,
-        help="private package tree whose packages all install (default: the main checkout's _skills_private/ when present)",
+        help="private repository root whose authoring/ packages all install; a root without authoring/ installs none (default: the main checkout's _skills_private/ when present)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(

@@ -15,19 +15,21 @@ from pathlib import Path
 from typing import Any
 
 from _cli import Parser, ScriptError, TemporaryError, exit_codes, run_script
-from _common import frontmatter_value, main_checkout, run
+from _common import frontmatter_value, run
+from sync_private import PACKAGES, PRIVATE
 
 ROOT = Path(__file__).resolve().parent.parent
-TREES = (ROOT / "authoring", main_checkout(ROOT) / "_skills_private")
+TREES = (ROOT / "authoring", PRIVATE / PACKAGES)
 USER = "api_key"
 TIMEOUT = 15.0
 
 EPILOG = """\
 rule:
-  A SKILL.md or playbook under authoring/, or under _skills_private/ when it
-  exists, names in its api-key field the keyring entries that hold the keys it
-  reads. Each entry is looked up with chezmoi, user api_key; no value is ever
-  printed. Only presence is checked: a revoked or expired key still passes.
+  A SKILL.md or playbook under authoring/, or under _skills_private/authoring/
+  when it exists, names in its api-key field the keyring entries that hold
+  the keys it reads. Each entry is looked up with chezmoi, user api_key; no
+  value is ever printed. Only presence is checked: a revoked or expired key
+  still passes.
 
 examples:
   just api-keys-validation
