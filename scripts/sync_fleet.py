@@ -12,8 +12,9 @@ fast-forwards its checkout to it, pulls its own private clone from GitHub, and
 runs `just install-skills`. A machine whose checkout is off main, has
 uncommitted changes under authoring/, commands/, skills/, scripts/, or
 justfile, has commits GitHub lacks, or whose skills-private is not a clone,
-is off main, or has uncommitted edits is left untouched. A machine that is
-offline or fails waits for the next sync, which catches it up.
+is off main, has uncommitted edits, or has commits its origin/main lacks is
+left untouched. A machine that is offline or fails waits for the next sync,
+which catches it up.
 
 The registry is the one fleet.toml in the private repository's authoring/, so
 every machine has it and hosts stay out of this public one; the fleet skill
@@ -154,9 +155,10 @@ plain() {
 }
 """
 # A private folder that is not a clone may hold edits, so it stops the
-# machine before anything is sent. A clone off main or with edits would stop
-# scripts/sync_private.py, so a sync leaves the machine untouched; a check
-# reports it as drift instead.
+# machine before anything is sent. A clone off main, with edits, or with
+# commits its origin/main lacks would stop scripts/sync_private.py, so a sync
+# leaves the machine untouched and a check reports it as drift. The last fetch
+# stands in for GitHub, so the inspection needs no network.
 INSPECT = """
 step() {
     enter "$1" || return
@@ -171,6 +173,9 @@ step() {
         echo "private-needs $private is not on main; switch it to main, then rerun"
     elif [ -n "$(git -C "$private" status --porcelain)" ]; then
         echo "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
+    elif ahead=$(git -C "$private" rev-list --count origin/main..HEAD 2>/dev/null) && [ "$ahead" != 0 ]; then
+        [ "$ahead" = 1 ] && commits=commit || commits=commits
+        echo "private-needs $private has $ahead $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
     fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
     head=$(git rev-parse -q --verify HEAD) || head=-
@@ -440,7 +445,8 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
         return ["private repo is not cloned"]
     if state == "plain":
         return ["skills-private is not a clone of the private repo"]
-    problems = ["private repo has uncommitted edits"] if state == "dirty" else []
+    # The inspection already names a clone with edits
+    problems: list[str] = []
     if expected and head != expected:
         problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
     return problems
@@ -496,6 +502,7 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     behind = head != source.sha and source.contains(head)
     if head != source.sha and not behind:
         problems.append("checkout has commits GitHub lacks; push them")
+    problems += private
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind GitHub at {head[:7]}")
@@ -505,7 +512,6 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         problems += found
         status = "drift" if problems else "converged"
         return Outcome(machine.name, status, "; ".join(problems) or status)
-    problems += private
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
@@ -727,7 +733,9 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         # This machine pulls its private clone first, even when it is not
         # selected, so a registry change merged on GitHub applies to this run.
         pulled = sync_private.sync(timeout=args.timeout) if mode == "apply" else []
-        # A preview stops where a sync would, on a private clone it cannot pull
+        # A preview stops, without the network, where a sync would on this
+        # machine's private clone: off main, with edits, or with commits its
+        # origin/main lacks
         if mode == "preview" and sync_private.is_clone():
             sync_private.sync(dry_run=True)
         fleet = load_registry(args.fleet or registry())

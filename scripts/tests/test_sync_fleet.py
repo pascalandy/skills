@@ -227,6 +227,11 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
     feature = machine(homes, "feature", origin)
     git(feature.parent, "clone", "-q", str(remote), "skills-private")
     git(private(feature), "switch", "-q", "-c", "feature")
+    # unshared committed to its private main, which only a merged PR changes
+    unshared = machine(homes, "unshared", origin)
+    git(unshared.parent, "clone", "-q", str(remote), "skills-private")
+    skill(private(unshared) / "authoring/content", "mine")
+    commit(private(unshared))
     before = git(dirty, "rev-parse", "HEAD")
     head = change(hub)
     # A commit GitHub lacks stays on the machine that made it.
@@ -242,6 +247,7 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
         "linked",
         "edited",
         "feature",
+        "unshared",
         "down",
     )
 
@@ -269,6 +275,11 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
             "and open a PR, then rerun",
         ),
         stopped("feature", "is not on main; switch it to main, then rerun"),
+        stopped(
+            "unshared",
+            "has 1 commit its origin/main lacks; open a PR from a worktree of "
+            "skills-private, then reset main to origin/main and rerun",
+        ),
         "down: offline: ssh: connect to host down port 22: Connection refused",
     } <= set(log)
     answer = json.loads(log[-1])
@@ -298,6 +309,7 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
         ("linked", linked),
         ("edited", edited),
         ("feature", feature),
+        ("unshared", unshared),
     ):
         assert git(checkout, "rev-parse", "HEAD") == before
         assert not (homes / name / "just.log").exists()
@@ -353,6 +365,28 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     ]
 
 
+def test_others_still_stops_on_the_coordinators_unshared_private_commit(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The coordinator's private clone gates every run, even when --others skips it."""
+    hub, homes, bin_dir = fleet
+    machine(homes, "behind", hub.parent / "skills.git")
+    register(hub, "behind")
+    skill(private(hub) / "authoring/content", "mine")
+    commit(private(hub))
+
+    result = run(hub, homes, bin_dir, "--others", "--dry-run")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"{private(hub)} has 1 commit its origin/main lacks; open a PR from a "
+            "worktree of skills-private, then reset main to origin/main and rerun"
+        )
+    ]
+    assert not (homes / "behind/just.log").exists()
+
+
 def test_check_answers_ok_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -360,10 +394,22 @@ def test_check_answers_ok_when_converged_and_names_each_difference(
     origin = hub.parent / "skills.git"
     synced = machine(homes, "synced", origin)
     lagging = machine(homes, "lagging", origin)
-    register(hub, "synced", "lagging")
+    onbranch = machine(homes, "onbranch", origin)
+    detached = machine(homes, "detached", origin)
+    register(hub, "synced", "lagging", "onbranch", "detached")
     assert run(hub, homes, bin_dir).returncode == 0
     converged = run(hub, homes, bin_dir, "--check")
     assert (converged.returncode, converged.stdout, converged.stderr) == (0, OK, "")
+    # Off main at the expected commit: a sync refuses them, so a check does too
+    git(private(onbranch), "switch", "-q", "-c", "feature")
+    git(private(detached), "switch", "-q", "--detach")
+    off_main = run(hub, homes, bin_dir, "--check", "onbranch", "detached")
+    assert (off_main.returncode, off_main.stdout) == (1, "")
+    assert sorted(json.loads(off_main.stderr)["errors"]) == [
+        f"{name} drift: {private(checkout)} is not on main; switch it to main, "
+        f"then rerun; rerun just sync-fleet {name}"
+        for name, checkout in (("detached", detached), ("onbranch", onbranch))
+    ]
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
     (private(lagging) / "authoring/content/secret/SKILL.md").write_text("edited\n")
@@ -375,14 +421,16 @@ def test_check_answers_ok_when_converged_and_names_each_difference(
     git(other, "push", "-q", "origin", "main")
     github = git(other, "rev-parse", "HEAD")
 
-    result = run(hub, homes, bin_dir, "--check")
+    result = run(hub, homes, bin_dir, "--check", "synced", "lagging")
 
     assert (result.returncode, result.stdout) == (1, "")
     errors = sorted(json.loads(result.stderr)["errors"])
     assert len(errors) == 2
     lagging_error, synced_error = errors
-    assert lagging_error.startswith("lagging drift: checkout is behind ")
-    assert "private repo has uncommitted edits" in lagging_error
+    assert lagging_error.startswith(
+        f"lagging drift: {private(lagging)} has uncommitted edits; "
+    )
+    assert "; checkout is behind " in lagging_error
     assert f", GitHub at {github[:7]}" in lagging_error
     assert "~/.claude/skills waits for update 1" in lagging_error
     assert synced_error.startswith(

@@ -134,15 +134,19 @@ def test_a_local_change_stops_the_pull_untouched(
     head = git(clone, "rev-parse", "HEAD")
 
     result = run(one)
+    # A dry run finds the same without the network
+    preview = run(one, "--dry-run")
 
     assert (result.returncode, result.stdout) == (1, "")
+    assert (preview.returncode, preview.stdout) == (1, "")
     error = json.loads(result.stderr.splitlines()[-1])["errors"][0]
+    assert json.loads(preview.stderr.splitlines()[-1])["errors"] == [error]
     assert error.startswith(str(clone))
     assert {
         "uncommitted": "has uncommitted edits;",
         "branch": "is on feature;",
-        "commit": "has 1 commit GitHub's main lacks;",
-        "diverged": "has 1 commit GitHub's main lacks;",
+        "commit": "has 1 commit its origin/main lacks;",
+        "diverged": "has 1 commit its origin/main lacks;",
     }[edit] in error
     assert "changes" not in json.loads(result.stderr.splitlines()[-1])
     assert git(clone, "rev-parse", "HEAD") == head

@@ -156,6 +156,9 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             f"{PRIVATE} has uncommitted edits; move them to a worktree of "
             "skills-private and open a PR, then rerun"
         )
+    # Without the network, the last fetch tells whether main holds commits
+    # GitHub lacks; after the fetch, GitHub's main itself does
+    refuse_commits_beyond("origin/main", "its origin/main")
     if dry_run:
         return []
     before = git("rev-parse", "HEAD").stdout.strip()
@@ -167,13 +170,7 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             fetched,
             f"check the origin remote in {PRIVATE}",
         )
-    ahead = git("rev-list", "--count", "FETCH_HEAD..HEAD").stdout.strip()
-    if ahead not in ("", "0"):
-        raise ScriptError(
-            f"{PRIVATE} has {ahead} commit{'s' if ahead != '1' else ''} GitHub's main "
-            "lacks; open a PR from a worktree of skills-private, then reset main to "
-            "origin/main and rerun"
-        )
+    refuse_commits_beyond("FETCH_HEAD", "GitHub's main")
     merged = git("merge", "--quiet", "--ff-only", "FETCH_HEAD")
     if merged.returncode:
         raise ScriptError(
@@ -183,6 +180,17 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
     after = git("rev-parse", "HEAD").stdout.strip()
     log.debug("private repository at %s", after)
     return [["pull", LABEL, f"{before[:7]}..{after[:7]}"]] if after != before else []
+
+
+def refuse_commits_beyond(ref: str, name: str) -> None:
+    """Stop when main holds commits `ref` lacks, since only a merged PR changes it."""
+    ahead = git("rev-list", "--count", f"{ref}..HEAD").stdout.strip()
+    if ahead not in ("", "0"):
+        raise ScriptError(
+            f"{PRIVATE} has {ahead} commit{'s' if ahead != '1' else ''} {name} "
+            "lacks; open a PR from a worktree of skills-private, then reset main to "
+            "origin/main and rerun"
+        )
 
 
 def work(args: argparse.Namespace) -> dict[str, Any]:
