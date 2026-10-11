@@ -730,7 +730,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--private-root",
         type=Path,
-        help="private repository root whose authoring/ packages all install; a root without authoring/ installs none (default: the main checkout's _skills_private/ when present)",
+        help="private repository root whose authoring/ packages all install; a root without authoring/ installs none (default: skills-private/ beside the main checkout, when present)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(

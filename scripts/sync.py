@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Sync this machine: pull main, save and pull the private clone, then install.
+"""Sync this machine: pull main, pull the private clone, then install.
 
 It refuses a checkout off main and reaches only this machine; just sync-fleet
 reaches the others. --dry-run and --check skip the pulls and preview the
@@ -33,7 +33,7 @@ install-skills; {"ok":true} when nothing changed. When a step fails, its own
 answer comes just before this one.
 
 examples:
-  just sync             # pull, save and pull the private clone, then install
+  just sync             # pull main and the private clone, then install
   just sync --dry-run   # preview the install without pulling
   just sync --check     # exit 1 if this machine's skills differ from the checkout"""
 EXIT_CODES = exit_codes(
@@ -96,8 +96,7 @@ def step(name: str, *command: str) -> list[list[str]]:
         command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     replay(finished.stderr)
-    # A failed step, such as a private pull that conflicts after the edits were
-    # committed, still answers what it changed
+    # A failed step, such as an install conflict, still answers what it changed
     failed = answer_in(finished.stderr.splitlines()) or {}
     report = {"changes": failed["changes"]} if failed.get("changes") else None
     if finished.returncode == 75:

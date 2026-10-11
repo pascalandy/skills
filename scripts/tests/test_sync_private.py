@@ -6,14 +6,11 @@ import fcntl
 import json
 import os
 import shutil
-import socket
 import subprocess
 from pathlib import Path
 
 import pytest
 from conftest import GIT_IDENTITY, SCRIPTS, commit, private_remote, skill
-
-HOST = socket.gethostname().split(".")[0]
 
 
 def git(repo: Path, *args: str) -> str:
@@ -23,8 +20,9 @@ def git(repo: Path, *args: str) -> str:
 
 
 def checkout(parent: Path, name: str) -> Path:
-    """A public checkout whose origin is skills.git, as on each machine."""
-    repo = parent / name
+    """A public checkout whose origin is skills.git, in its own projects folder,
+    as on each machine."""
+    repo = parent / name / "skills"
     subprocess.run(
         ["git", "clone", "-q", str(parent / "skills.git"), str(repo)], check=True
     )
@@ -38,7 +36,7 @@ def machines(tmp_path: Path) -> tuple[Path, Path, Path]:
     (public / "scripts").mkdir(parents=True)
     for name in ("_cli.py", "_common.py", "sync_private.py"):
         shutil.copy2(SCRIPTS / name, public / "scripts" / name)
-    (public / ".gitignore").write_text("_skills_private/\n__pycache__/\n")
+    (public / ".gitignore").write_text("__pycache__/\n")
     subprocess.run(["git", "init", "-q", "-b", "main", str(public)], check=True)
     commit(public)
     subprocess.run(
@@ -77,72 +75,139 @@ def quiet(result: subprocess.CompletedProcess[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
-def test_clones_then_saves_edits_every_machine_receives(
-    machines: tuple[Path, Path, Path],
+def private(repo: Path) -> Path:
+    return repo.parent / "skills-private"
+
+
+def merge(remote: Path, tmp_path: Path) -> str:
+    """Land a commit on the private main, the way a merged PR does."""
+    work = tmp_path / "pr"
+    git(tmp_path, "clone", "-q", str(remote), str(work))
+    (work / "authoring/content/secret/SKILL.md").write_text("merged\n")
+    commit(work)
+    git(work, "push", "-q", "origin", "main")
+    return git(work, "rev-parse", "--short=7", "HEAD")
+
+
+def test_clones_beside_the_checkout_then_pulls_what_github_merged(
+    machines: tuple[Path, Path, Path], tmp_path: Path
 ) -> None:
     one, two, remote = machines
 
-    clone = ["clone", "_skills_private", str(remote)]
+    clone = ["clone", "skills-private", str(remote)]
     assert quiet(run(one)) == (0, changed(clone), "")
     assert quiet(run(two)) == (0, changed(clone), "")
     assert quiet(run(two)) == (0, '{"ok":true}\n', ""), "a current clone is a no-op"
-    (one / "_skills_private/authoring/content/secret/SKILL.md").write_text("from one\n")
-    skill(one / "_skills_private/authoring/content", "added")
-    commit = ["commit", "_skills_private", f"save edits from {HOST}"]
-    assert quiet(run(one, "-n")) == (0, changed(commit), "")
-    push = ["push", "_skills_private", "1 commit"]
-    assert quiet(run(one)) == (0, changed(commit, push), "")
-    before = git(two / "_skills_private", "rev-parse", "--short=7", "HEAD")
-    after = git(remote, "rev-parse", "--short=7", "main")
-    pull = ["pull", "_skills_private", f"{before}..{after}"]
-    assert quiet(run(two)) == (0, changed(pull), "")
-
-    received = two / "_skills_private/authoring/content"
-    assert (received / "secret/SKILL.md").read_text() == "from one\n"
-    assert (received / "added/SKILL.md").is_file()
-    assert git(remote, "log", "-1", "--format=%s").startswith(
-        "🧰 skill: private: save edits from "
+    before = git(private(two), "rev-parse", "--short=7", "HEAD")
+    after = merge(remote, tmp_path)
+    assert quiet(run(two, "-n")) == (0, '{"ok":true}\n', "")
+    assert quiet(run(two)) == (
+        0,
+        changed(["pull", "skills-private", f"{before}..{after}"]),
+        "",
     )
+
+    secret = private(two) / "authoring/content/secret/SKILL.md"
+    assert secret.read_text() == "merged\n"
+    assert not (two / "skills-private").exists()
     assert git(one, "status", "--porcelain") == ""
 
 
-def test_conflicting_edits_stop_with_the_edit_kept_as_a_commit(
+@pytest.mark.parametrize("edit", ["uncommitted", "branch", "commit", "diverged"])
+def test_a_local_change_stops_the_pull_untouched(
+    machines: tuple[Path, Path, Path], tmp_path: Path, edit: str
+) -> None:
+    """Private skills change through a PR, so the clone never commits or pushes."""
+    one, _, remote = machines
+    assert run(one).returncode == 0
+    clone = private(one)
+    secret = clone / "authoring/content/secret/SKILL.md"
+    if edit == "branch":
+        git(clone, "switch", "-q", "-c", "feature")
+    else:
+        secret.write_text("from one\n")
+    if edit in ("commit", "diverged"):
+        commit(clone)
+    if edit == "diverged":
+        merge(remote, tmp_path)
+    github = git(remote, "rev-parse", "main")
+    head = git(clone, "rev-parse", "HEAD")
+
+    result = run(one)
+    # A dry run finds the same without the network, from the last fetch
+    preview = run(one, "--dry-run")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert (preview.returncode, preview.stdout) == (1, "")
+    error = json.loads(result.stderr.splitlines()[-1])["errors"][0]
+    previewed = json.loads(preview.stderr.splitlines()[-1])["errors"][0]
+    assert error.startswith(str(clone))
+    assert {
+        "uncommitted": "has uncommitted edits;",
+        "branch": "is on feature;",
+        "commit": "has 1 commit GitHub's main lacks;",
+        "diverged": "has 1 commit GitHub's main lacks;",
+    }[edit] in error
+    assert previewed == error.replace("GitHub's main", "its origin/main")
+    assert "changes" not in json.loads(result.stderr.splitlines()[-1])
+    assert git(clone, "rev-parse", "HEAD") == head
+    assert git(remote, "rev-parse", "main") == github
+    if edit != "branch":
+        assert secret.read_text() == "from one\n"
+
+
+def test_a_stale_origin_main_does_not_block_a_clone_at_githubs_main(
+    machines: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    """The old code failed here: it compared with origin/main before fetching."""
+    one, _, remote = machines
+    assert run(one).returncode == 0
+    clone = private(one)
+    stale = git(clone, "rev-parse", "origin/main")
+    merge(remote, tmp_path)
+    # Fast-forward to GitHub's main without moving origin/main
+    git(clone, "fetch", "-q", "--refmap=", "origin", "main")
+    git(clone, "merge", "-q", "--ff-only", "FETCH_HEAD")
+    assert git(clone, "rev-parse", "origin/main") == stale
+
+    result = run(one)
+
+    assert quiet(result) == (0, '{"ok":true}\n', "")
+    assert git(clone, "rev-parse", "HEAD") == git(remote, "rev-parse", "main")
+
+
+def test_a_dry_run_without_origin_main_stops_instead_of_passing(
     machines: tuple[Path, Path, Path],
 ) -> None:
-    one, two, remote = machines
-    for repo in (one, two):
-        assert run(repo).returncode == 0
-    (one / "_skills_private/authoring/content/secret/SKILL.md").write_text("from one\n")
+    """The old code failed here: a failed comparison counted as no commits."""
+    one, _, _ = machines
     assert run(one).returncode == 0
-    secret = two / "_skills_private/authoring/content/secret/SKILL.md"
-    secret.write_text("from two\n")
+    clone = private(one)
+    git(clone, "update-ref", "-d", "refs/remotes/origin/main")
 
-    result = run(two)
+    result = run(one, "--dry-run")
 
-    assert result.returncode == 1
-    assert "private edits on " in result.stderr
-    assert "conflict with GitHub" in result.stderr
-    assert json.loads(result.stderr.splitlines()[-1])["changes"] == [
-        ["commit", "_skills_private", f"save edits from {HOST}"]
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"{clone} cannot compare with its origin/main; fetch it with "
+            f"git -C {clone} fetch origin main, then rerun"
+        )
     ]
-    assert secret.read_text() == "from two\n"
-    assert git(two / "_skills_private", "status", "--porcelain") == ""
-    assert not (two / "_skills_private/.git/rebase-merge").exists()
-    assert git(remote, "show", "main:authoring/content/secret/SKILL.md") == "from one"
 
 
 def test_leaves_a_folder_that_is_not_a_clone_untouched(
     machines: tuple[Path, Path, Path],
 ) -> None:
     one, _, _ = machines
-    kept = skill(one / "_skills_private/authoring/content", "local") / "SKILL.md"
+    kept = skill(private(one) / "authoring/content", "local") / "SKILL.md"
 
     result = run(one)
 
     assert result.returncode == 1
     assert "is not a clone of the private repository" in result.stderr
     assert kept.read_text() == "# local\n\nold\n"
-    assert not (one / "_skills_private/.git").exists()
+    assert not (private(one) / ".git").exists()
 
 
 def test_dry_run_names_the_clone_and_changes_nothing(
@@ -152,8 +217,8 @@ def test_dry_run_names_the_clone_and_changes_nothing(
 
     result = run(one, "--dry-run")
 
-    assert quiet(result) == (0, changed(["clone", "_skills_private", str(remote)]), "")
-    assert not (one / "_skills_private").exists()
+    assert quiet(result) == (0, changed(["clone", "skills-private", str(remote)]), "")
+    assert not private(one).exists()
 
 
 def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
@@ -172,7 +237,7 @@ def test_another_sync_holding_the_lock_past_the_timeout_exits_75(
         "errors": [f"another run still holds {lock} after 1s"],
         "retry": "scripts/sync_private.py --timeout 1s",
     }
-    assert not (one / "_skills_private").exists()
+    assert not private(one).exists()
 
 
 def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(

@@ -6,7 +6,7 @@ set positional-arguments
 default:
     @{{ just_executable() }} --justfile {{ quote(justfile()) }} --list --unsorted
 
-# Pull main, save and pull the private clone, then install skills here
+# Pull main and the private clone, then install skills here
 [group('commands')]
 [no-exit-message]
 sync *args:

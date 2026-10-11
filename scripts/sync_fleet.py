@@ -5,19 +5,22 @@
 # ///
 """Sync skills from GitHub's main to every machine in the fleet, from any of them.
 
-The machine running this fetches GitHub's main and saves and pulls its private
-clone. Then every selected machine, itself included, receives that commit over
-SSH, fast-forwards its checkout to it, saves and pulls its own private clone
-from GitHub, and runs `just install-skills`. A machine whose checkout is off
-main, has uncommitted changes under authoring/, commands/, skills/, scripts/,
-or justfile, has commits GitHub lacks, or whose _skills_private is not a clone
-is left untouched. A machine that is offline or fails waits for the next sync,
+The machine running this fetches GitHub's main and pulls its private clone,
+skills-private/ beside its checkout, then reads the registry from it. Then
+every selected machine, itself included, receives that commit over SSH,
+fast-forwards its checkout to it, pulls its own private clone from GitHub, and
+runs `just install-skills`. A machine whose checkout is off main, has
+uncommitted changes under authoring/, commands/, skills/, scripts/, or
+justfile, has commits GitHub lacks, or whose skills-private is not a clone,
+is off main, has uncommitted edits, or has commits its origin/main lacks is
+left untouched. A machine that is offline or fails waits for the next sync,
 which catches it up.
 
 The registry is the one fleet.toml in the private repository's authoring/, so
 every machine has it and hosts stay out of this public one; the fleet skill
-ships it in references/. Each path is relative to that machine's home, and
-other keys are notes for agents:
+ships it in references/, and a merged change to it applies to the same run.
+Each path is relative to that machine's home, and other keys are notes for
+agents:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
@@ -142,23 +145,59 @@ enter() {
         echo "no skills checkout at ~/$1"
         return 11
     }
+    private="$(dirname "$(pwd -P)")/skills-private"
 }
 edited() {
     [ -n "$(git status --porcelain -- authoring commands skills scripts justfile)" ]
 }
 plain() {
-    [ -L _skills_private ] || { [ -e _skills_private ] && [ ! -d _skills_private/.git ]; }
+    [ -L "$private" ] || { [ -e "$private" ] && [ ! -d "$private/.git" ]; }
 }
 """
-# A private folder that is not a clone may hold edits the sync cannot save, so
-# it stops the machine before anything is sent.
+# A private folder that is not a clone may hold edits, so it stops the
+# machine before anything is sent. A clone off main, with edits, or with
+# commits GitHub's main lacks would stop scripts/sync_private.py, so a sync
+# leaves the machine untouched and a check reports it as drift. ahead() reaches
+# GitHub only when origin/main leaves a doubt.
 INSPECT = """
+unshared() {
+    git -C "$private" rev-list --count origin/main..HEAD 2>/dev/null
+}
+# A count other than 0, or a failed comparison, may come from a stale or
+# missing origin/main, so only then does it fetch and count again; it prints
+# nothing when it cannot count, and "fetch-failed REASON" when the fetch fails.
+# The fetch leaves FETCH_HEAD alone, since scripts/sync_private.py merges it
+ahead() {
+    count=$(unshared) && [ "$count" = 0 ] && { echo 0; return; }
+    why=$(git -C "$private" fetch -q --no-write-fetch-head origin main 2>&1) || {
+        echo "fetch-failed $(printf '%s\n' "$why" | tail -n 1)"
+        return
+    }
+    unshared
+}
 step() {
     enter "$1" || return
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
     if plain; then
-        echo "~/$1/_skills_private is not a clone of the private repo; move it aside, then rerun"
+        echo "$private is not a clone of the private repo; move it aside, then rerun"
         return 11
+    fi
+    if [ ! -e "$private" ]; then
+        :
+    elif [ "$(git -C "$private" symbolic-ref --short -q HEAD)" != main ]; then
+        echo "private-needs $private is not on main; switch it to main, then rerun"
+    elif [ -n "$(git -C "$private" status --porcelain)" ]; then
+        echo "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
+    else
+        count=$(ahead)
+        if [ "${count#fetch-failed}" != "$count" ]; then
+            echo "private-needs $private could not fetch origin main to compare:${count#fetch-failed}; retry"
+        elif [ -z "$count" ]; then
+            echo "private-needs $private cannot compare with origin/main; fetch it, then rerun"
+        elif [ "$count" != 0 ]; then
+            [ "$count" = 1 ] && commits=commit || commits=commits
+            echo "private-needs $private has $count $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
+        fi
     fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-
     head=$(git rev-parse -q --verify HEAD) || head=-
@@ -196,11 +235,11 @@ step() {
     enter "$1" || return
     if plain; then
         echo "private - plain"
-    elif [ ! -e _skills_private ]; then
+    elif [ ! -e "$private" ]; then
         echo "private - missing"
     else
-        head=$(git -C _skills_private rev-parse -q --verify HEAD) || head=-
-        if [ -n "$(git -C _skills_private status --porcelain)" ]; then
+        head=$(git -C "$private" rev-parse -q --verify HEAD) || head=-
+        if [ -n "$(git -C "$private" status --porcelain)" ]; then
             echo "private $head dirty"
         else
             echo "private $head clean"
@@ -236,12 +275,10 @@ class Machine:
 
 @dataclass(frozen=True)
 class Source:
-    """GitHub's main, the private repository's main in a check or a preview, and
-    in a preview the private changes this machine saves before others pull."""
+    """GitHub's main, and the private repository's main in a check or a preview."""
 
     sha: str
     private: str = ""
-    saves: bool = False
 
     def contains(self, commit: str) -> bool:
         return git("merge-base", "--is-ancestor", commit, self.sha).returncode == 0
@@ -429,7 +466,8 @@ def private_problems(head: str, state: str, expected: str) -> list[str]:
     if state == "missing":
         return ["private repo is not cloned"]
     if state == "plain":
-        return ["_skills_private is not a clone of the private repo"]
+        return ["skills-private is not a clone of the private repo"]
+    # Edits made after the inspection show only here, so a repeat is fine
     problems = ["private repo has uncommitted edits"] if state == "dirty" else []
     if expected and head != expected:
         problems.append(f"private repo is at {head[:7]}, GitHub at {expected[:7]}")
@@ -473,6 +511,11 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
         return failure(machine.name, code, lines)
     _, branch, head, state = lines[-1].split()
     problems: list[str] = []
+    private = [
+        line.removeprefix("private-needs ")
+        for line in lines
+        if line.startswith("private-needs ")
+    ]
     if branch != "main":
         where = "a detached HEAD" if branch == "-" else branch
         problems.append(f"checkout is on {where}, not main")
@@ -481,6 +524,7 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     behind = head != source.sha and source.contains(head)
     if head != source.sha and not behind:
         problems.append("checkout has commits GitHub lacks; push them")
+    problems += private
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind GitHub at {head[:7]}")
@@ -500,13 +544,11 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
                 f"ready to move {head[:7]} to {source.sha[:7]}",
                 changes=[f"move {head[:7]} to {source.sha[:7]}"],
             )
-        # At GitHub's main already, a sync would still save and pull the
+        # At GitHub's main already, a sync would still pull the
         # private clone and install what differs
         pending = installed(machine, source)
         if isinstance(pending, Outcome):
             return pending
-        if source.saves:
-            pending.append("pull the private edits this sync saves first")
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
         return Outcome(machine.name, "ready", detail, changes=pending)
     if head != source.sha:
@@ -703,48 +745,48 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def sync(args: argparse.Namespace) -> dict[str, Any]:
-    fleet = load_registry(args.fleet or registry())
-    machines = select(fleet, args.machines)
-    if args.others:
-        machines = [machine for machine in machines if not machine.is_local()]
     mode = "check" if args.check else "preview" if args.dry_run else "apply"
-    local = next((machine.name for machine in fleet if machine.is_local()), None)
-    coordinator = local or socket.gethostname().split(".")[0]
     changed_machines: dict[str, None] = {}
     if args.after_push:
         wait_for_push(args.after_push, args.timeout)
     # Queue behind any other sync from here, so each run sends the newest commit.
     with exclusive(STATE / "fleet.lock", args.timeout):
         source = github_main()
-        # This machine pushes its private edits before any machine pulls, even
-        # when it is not selected.
-        if mode == "apply":
-            try:
-                saved = sync_private.sync(timeout=args.timeout)
-            except ScriptError as error:
-                if error.report.get("changes"):
-                    error.report["changes"] = [["sync", coordinator, source.sha[:7]]]
-                raise
-            if saved:
-                changed_machines[coordinator] = None
-            for change in saved:
-                log.info("%s", "\t".join(change))
-        # A check needs the private clone; a preview compares with it when here,
-        # and counts the edits a sync would save from it before others pull
+        # This machine pulls its private clone first, even when it is not
+        # selected, so a registry change merged on GitHub applies to this run.
+        pulled = sync_private.sync(timeout=args.timeout) if mode == "apply" else []
+        # A preview stops, without the network, where a sync would on this
+        # machine's private clone: off main, with edits, or with commits its
+        # origin/main lacks
+        if mode == "preview" and sync_private.is_clone():
+            sync_private.sync(dry_run=True)
+        try:
+            fleet = load_registry(args.fleet or registry())
+        except ScriptError as error:
+            # The registry is unread, so the host name stands for this machine
+            if pulled:
+                host = socket.gethostname().split(".")[0]
+                error.report["changes"] = [["sync", host, source.sha[:7]]]
+            raise
+        machines = select(fleet, args.machines)
+        if args.others:
+            machines = [machine for machine in machines if not machine.is_local()]
+        local = next((machine.name for machine in fleet if machine.is_local()), None)
+        coordinator = local or socket.gethostname().split(".")[0]
+        if pulled:
+            changed_machines[coordinator] = None
+        for change in pulled:
+            log.info("%s", "\t".join(change))
+        # A check needs the private clone; a preview compares with it when here
         if mode == "check" or (mode == "preview" and sync_private.is_clone()):
             source = Source(source.sha, sync_private.github_head(args.timeout))
-        if mode == "preview" and sync_private.is_clone():
-            saves = bool(sync_private.sync(dry_run=True))
-            if saves:
-                changed_machines[coordinator] = None
-            source = Source(source.sha, source.private, saves)
         public = git("ls-tree", "-d", "--name-only", f"{source.sha}:skills").stdout
         log.info(
             "%s: GitHub main at %s with %d public skills, from %s",
             f"{datetime.now().astimezone():%F %T}",
             source.sha[:7],
             len(public.split()),
-            local or socket.gethostname().split(".")[0],
+            coordinator,
         )
         with ThreadPoolExecutor(max_workers=max(len(machines), 1)) as pool:
             try:
@@ -790,7 +832,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fleet",
         type=Path,
-        help="machine registry (default: the one fleet.toml in _skills_private/authoring/)",
+        help="machine registry (default: the one fleet.toml in skills-private/authoring/)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(

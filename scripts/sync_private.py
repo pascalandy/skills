@@ -3,14 +3,14 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Save, pull, and push the private skills repository cloned at _skills_private/.
+"""Clone or pull the private skills repository at skills-private/, beside the checkout.
 
 The private repository's URL is this checkout's origin with skills renamed to
-skills-private, and the public .gitignore keeps the clone out of the public
-repository. A missing clone is cloned. Uncommitted edits are committed and
-pushed, so no machine loses them. A folder that is not a clone or a clone off
-main stops the run untouched; edits that conflict with GitHub stay committed
-here and stop the run.
+skills-private. A missing clone is cloned; a current one fast-forwards to
+GitHub's main. Private skills change through a worktree of skills-private and
+a PR, never in this clone, so a folder that is not a clone, a clone off main,
+one with uncommitted edits, or one with commits GitHub lacks stops the run
+untouched.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-import socket
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -27,18 +26,18 @@ from _cli import Parser, ScriptError, TemporaryError, duration, exit_codes, run_
 from _common import exclusive, is_network_failure, main_checkout, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
-# One clone per machine: a worktree uses the one in the main checkout
-PRIVATE = main_checkout(ROOT) / "_skills_private"
+# One clone per machine, next to the main checkout, which every worktree shares
+PRIVATE = main_checkout(ROOT).parent / "skills-private"
 # Every reader takes private packages from this folder of a private root. The
 # sync still carries the whole clone, skill_archived/ included, which never installs
 PACKAGES = "authoring"
-LABEL = "_skills_private"
+LABEL = "skills-private"
 TIMEOUT = 300.0
 EPILOG = """\
-A run answers {"ok":true,"changes":[...]}, one [action, _skills_private,
-detail] per change, where the action is clone, commit, pull, or push, and
-{"ok":true} when nothing changes. A dry run skips the network, so it lists
-only the clone or commit a run would make.
+A run answers {"ok":true,"changes":[...]}, one [action, skills-private,
+detail] per change, where the action is clone or pull, and {"ok":true} when
+nothing changes. A dry run skips the network, so it lists only the clone a run
+would make.
 
 examples:
   uv run scripts/sync_private.py
@@ -46,8 +45,8 @@ examples:
   uv run scripts/sync_private.py --timeout 30s"""
 EXIT_CODES = exit_codes(
     {
-        0: "the clone is saved and current, or nothing needed doing",
-        1: "the folder needs you: not a clone, off main, or conflicting edits",
+        0: "the clone is current, or nothing needed doing",
+        1: "the folder needs you: not a clone, off main, edited, or diverged",
         75: "the network failed, or another sync held the lock; retry",
     }
 )
@@ -117,17 +116,16 @@ def github_head(timeout: float = TIMEOUT) -> str:
 
 
 def sync(dry_run: bool = False, timeout: float = TIMEOUT) -> list[list[str]]:
-    """Clone, save, pull, and push; return one [action, LABEL, detail] per change. Runs from one
+    """Clone or pull; return one [action, LABEL, detail] per change. Runs from one
     repository take turns, each waiting up to `timeout` seconds."""
     if dry_run:
-        return save_and_pull(dry_run=True, timeout=timeout)
+        return clone_or_pull(dry_run=True, timeout=timeout)
     common = git("rev-parse", "--git-common-dir", cwd=ROOT).stdout.strip()
     with exclusive(ROOT / common / "sync-private.lock", timeout):
-        return save_and_pull(dry_run=False, timeout=timeout)
+        return clone_or_pull(dry_run=False, timeout=timeout)
 
 
-def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
-    host = socket.gethostname().split(".")[0]
+def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
     _, status = state()
     if status == "missing":
         url = private_url()
@@ -153,65 +151,53 @@ def save_and_pull(dry_run: bool, timeout: float) -> list[list[str]]:
         raise ScriptError(
             f"{PRIVATE} is on {branch or 'a detached HEAD'}; switch it to main, then rerun"
         )
-    changes = (
-        [["commit", LABEL, f"save edits from {host}"]] if status == "dirty" else []
-    )
-    if dry_run:
-        return changes
     if status == "dirty":
-        for step in (
-            ("add", "--all"),
-            ("commit", "--quiet", "-m", f"🧰 skill: private: save edits from {host}"),
-        ):
-            done = git(*step)
-            if done.returncode:
-                raise ScriptError(
-                    f"could not commit private edits: {last_line(done)}; see why with "
-                    f"git -C {PRIVATE} commit, then rerun uv run scripts/sync_private.py"
-                )
-    # A failure after the commit still answers it, so the saved edits stay known
-    try:
-        before = git("rev-parse", "HEAD").stdout.strip()
-        log.info("pull %s", LABEL)
-        pulled = git("pull", "--rebase", "--quiet", timeout=timeout)
-        if pulled.returncode:
-            rebasing = any(
-                (PRIVATE / git("rev-parse", "--git-path", part).stdout.strip()).exists()
-                for part in ("rebase-merge", "rebase-apply")
-            )
-            if rebasing:
-                git("rebase", "--abort")
-                raise ScriptError(
-                    f"private edits on {host} conflict with GitHub; resolve them with "
-                    f"git pull --rebase in {PRIVATE}, then rerun"
-                )
-            raise failed(
-                "could not pull the private repository",
-                pulled,
-                f"fix the clone at {PRIVATE}, then rerun",
-            )
-        after = git("rev-parse", "HEAD").stdout.strip()
-        if after != before:
-            changes.append(["pull", LABEL, f"{before[:7]}..{after[:7]}"])
-        ahead = git("rev-list", "--count", "@{upstream}..HEAD").stdout.strip()
-        if ahead not in ("", "0"):
-            log.info("push %s", LABEL)
-            pushed = git("push", "--quiet", timeout=timeout)
-            if pushed.returncode:
-                raise failed(
-                    f"could not push private edits from {host}",
-                    pushed,
-                    f"fix the clone at {PRIVATE}, then rerun",
-                )
-            changes.append(
-                ["push", LABEL, f"{ahead} commit{'s' if ahead != '1' else ''}"]
-            )
-    except ScriptError as error:
-        if changes:
-            error.report["changes"] = changes
-        raise
+        raise ScriptError(
+            f"{PRIVATE} has uncommitted edits; move them to a worktree of "
+            "skills-private and open a PR, then rerun"
+        )
+    if dry_run:
+        # Without the network, a dry run compares with the last fetch, which a
+        # stale or missing origin/main makes refuse
+        refuse_commits_beyond("origin/main", "its origin/main")
+        return []
+    before = git("rev-parse", "HEAD").stdout.strip()
+    log.info("pull %s", LABEL)
+    fetched = git("fetch", "--quiet", "origin", "main", timeout=timeout)
+    if fetched.returncode:
+        raise failed(
+            "could not fetch the private repository",
+            fetched,
+            f"check the origin remote in {PRIVATE}",
+        )
+    refuse_commits_beyond("FETCH_HEAD", "GitHub's main")
+    merged = git("merge", "--quiet", "--ff-only", "FETCH_HEAD")
+    if merged.returncode:
+        raise ScriptError(
+            f"could not fast-forward {PRIVATE}: {last_line(merged)}; fix the clone, "
+            "then rerun"
+        )
+    after = git("rev-parse", "HEAD").stdout.strip()
     log.debug("private repository at %s", after)
-    return changes
+    return [["pull", LABEL, f"{before[:7]}..{after[:7]}"]] if after != before else []
+
+
+def refuse_commits_beyond(ref: str, name: str) -> None:
+    """Stop when main holds commits `ref` lacks, since only a merged PR changes it,
+    or when the comparison fails."""
+    counted = git("rev-list", "--count", f"{ref}..HEAD")
+    ahead = counted.stdout.strip()
+    if counted.returncode or not ahead.isdigit():
+        raise ScriptError(
+            f"{PRIVATE} cannot compare with {name}; fetch it with "
+            f"git -C {PRIVATE} fetch origin main, then rerun"
+        )
+    if ahead != "0":
+        raise ScriptError(
+            f"{PRIVATE} has {ahead} commit{'s' if ahead != '1' else ''} {name} "
+            "lacks; open a PR from a worktree of skills-private, then reset main to "
+            "origin/main and rerun"
+        )
 
 
 def work(args: argparse.Namespace) -> dict[str, Any]:
@@ -230,13 +216,13 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         "--dry-run",
         action="store_true",
-        help="print the clone or commit a run would make without changing anything",
+        help="print the clone a run would make without changing anything",
     )
     parser.add_argument(
         "--timeout",
         type=duration,
         default="5m",
-        help="how long to wait for another sync, and for each clone, pull, or push (default: 5m)",
+        help="how long to wait for another sync, and for each clone or fetch (default: 5m)",
     )
     return run_script(parser, work, argv, debug="SYNC_PRIVATE_DEBUG")
 
