@@ -1,6 +1,6 @@
 # Threads route
 
-MAIN is the T3 thread I talk to. It runs `execute` by delegating each step to named threads.
+MAIN is the T3 thread I talk to.
 
 ## Names
 
@@ -19,14 +19,16 @@ The T3 roles in `AGENTS.md` define each role. Each thread title follows this for
 | Execute, Self-check | One 🐝 COD per card in the plan |
 | Blast-radius impacts | One 👀 RVW per card, on that card's PRs. MAIN writes its own premortem and relays each fix to the owning COD |
 | Code review across the whole stack | One 👀 RVW per stack, bound to its COD's worktree (`workspaceStrategy` `existing_worktree`) while the COD stays idle. The COD then keeps or reverts each change, as Reviews in `SKILL.md` says |
-| Docs | One 📚 DOC per repository whose docs change, bound to the worktree of that repository's COD while the COD stays idle. It writes with 🧰 andy-mode ; docs and opens the docs PR as the top layer of the stack with 🧰 gh-stack |
-| Final review | One 👀 RVW per stack, from base to top, docs included, with the **report** ending. MAIN relays each finding to the COD or DOC that owns its layer |
+| Docs | One 📚 DOC per repository whose docs change, bound to the worktree of that repository's COD while the COD stays idle. It opens the docs PR as the top layer of the stack with 🧰 gh-stack |
+| Final review | One 👀 RVW per stack, from base to top, with the **report** ending. MAIN relays each finding to the COD or DOC that owns its layer |
 | Report, Closing | MAIN |
-| Merge | MAIN relays the go to the COD that owns the stack, which lands it with 🧰 poteto-mode ; shipping through the project's merge command. MAIN settles each thread with `t3_thread_organize` action `settle` once `t3_thread_wait` confirms its turn ended |
+| Merge | MAIN relays the go to each COD, which lands its stack with 🧰 poteto-mode ; shipping through the project's merge command. MAIN settles each thread with `t3_thread_organize` action `settle` once `t3_thread_wait` confirms its turn ended |
 
 ## Launch
 
-- Each launch message carries the plan or the card, the steps the thread runs and the Rules copied from `SKILL.md`, MAIN's full threadId, and the worktree paths and PR URLs the thread needs
+- Each launch message carries MAIN's full threadId, the worktree paths and PR URLs the thread needs, and:
+	- for a 🐝 COD or a 📚 DOC: the plan or its card, and its steps and the Rules copied from `SKILL.md`
+	- for a 👀 RVW: its brief and ending
 - Every 👀 RVW sets `modelSelection` in `t3_thread_launch`:
 	- MAIN on Claude: provider `codex`, model `gpt-6.1-sol`, `reasoningEffort` `xhigh`
 	- MAIN on Codex: provider `claudeAgent`, model `claude-opus-5-5`, `effort` `xhigh`

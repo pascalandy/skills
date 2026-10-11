@@ -1,7 +1,5 @@
 # Solo route
 
-One agent runs every step in the stack's checkout. Each review runs through 🧰 headless.
-
 ## Who runs each step
 
 | Step | Who and how |

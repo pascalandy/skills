@@ -43,7 +43,7 @@ THEN ; **Blast-radius impacts**
 - Done when each medium or high finding from the review and both premortems is fixed and pushed to its layer, or dismissed with a written reason
 
 THEN ; **Code review across the whole stack**
-- Give the reviewer this brief with the **fix** ending, in the stack's checkout while no one else writes there:
+- Give the reviewer this brief with the **fix** ending:
 	> Use 🧰 poteto-mode to review this stack: every change from <base branch> to HEAD. The solution works; now make it great and pristine while keeping it simple.
 - If fixes were pushed, rerun the review on the restacked HEAD (max 3 rounds)
 - Done when the current stack is reviewed and each change is pushed to its layer or reverted with a reason, or you reported the blocker
