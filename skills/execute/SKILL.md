@@ -10,7 +10,7 @@ Break the problem down from first principles to leverage 🧰 poteto-mode playbo
 
 #### Pick the route
 
-- `execute`, `implement`, or a go-ahead → **threads**: a T3 MAIN delegates each step to named threads. Read [threads](references/threads.md). If `t3_thread_launch` is unavailable, stop and tell me to run `execute solo`
+- `execute`, `implement`, or a go-ahead → **threads**: a T3 MAIN delegates each step to named threads. Read [threads](references/threads.md). If `t3_thread_launch` is still unavailable after you load deferred tools or try it once, stop and tell me to run `execute solo`
 - `execute solo` → **solo**: one agent runs every step, with 🧰 headless reviews. Read [solo](references/solo.md)
 
 The steps below say what each step must achieve. The route file says who runs it and how.
@@ -19,7 +19,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]". The 
 
 #### Step by step
 
-- Run these steps in order, and finish each one before you start the next. Within a step, run the cards in parallel
+- Run these steps in order, and finish each one before you start the next. Within a step, run independent cards in parallel. A card that depends on another builds on that card's branch, in the same stack
 - Delegate as much of each step as the route allows
 - When the agreed work involves no PR, such as issue edits only, skip the Blast-radius impacts, Code review across the whole stack, Docs, Final review, and Merge steps, and say so in the report
 
