@@ -421,11 +421,13 @@ def test_a_stale_origin_main_does_not_block_a_remote_clone_at_githubs_main(
     assert git(clone, "rev-parse", "HEAD") == github
 
 
+@pytest.mark.parametrize("mode", [["--dry-run"], []], ids=["preview", "apply"])
 def test_a_remote_clone_without_origin_main_stops_before_the_checkout_moves(
-    fleet: tuple[Path, Path, Path],
+    fleet: tuple[Path, Path, Path], mode: list[str]
 ) -> None:
     """The old code failed here: a failed comparison counted as no commits, so
-    the preview passed and the sync moved the checkout, then refused the clone."""
+    the preview passed and the sync moved the checkout, then refused the clone.
+    Each mode gets its own fixture, since the first run fetches origin/main."""
     hub, homes, bin_dir = fleet
     checkout = machine(homes, "remote", hub.parent / "skills.git")
     register(hub, "remote")
@@ -437,19 +439,72 @@ def test_a_remote_clone_without_origin_main_stops_before_the_checkout_moves(
     before = git(checkout, "rev-parse", "HEAD")
     change(hub)
 
-    preview = run(hub, homes, bin_dir, "--others", "--dry-run")
-    result = run(hub, homes, bin_dir, "--others")
+    result = run(hub, homes, bin_dir, "--others", *mode)
 
-    unshared = (
-        f"remote needs-you: {clone} has 1 commit its origin/main lacks; open a PR "
-        "from a worktree of skills-private, then reset main to origin/main and "
-        "rerun; fix it on remote, then rerun just sync-fleet remote"
-    )
-    for answer in (preview, result):
-        assert (answer.returncode, answer.stdout) == (1, "")
-        assert json.loads(answer.stderr.splitlines()[-1])["errors"] == [unshared]
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr.splitlines()[-1])["errors"] == [
+        (
+            f"remote needs-you: {clone} has 1 commit its origin/main lacks; open a "
+            "PR from a worktree of skills-private, then reset main to origin/main "
+            "and rerun; fix it on remote, then rerun just sync-fleet remote"
+        )
+    ]
     assert git(checkout, "rev-parse", "HEAD") == before
     assert (homes / "remote/just.log").read_text() == "install-skills\n"
+
+
+def stale_remote(fleet: tuple[Path, Path, Path]) -> Path:
+    """A registered remote whose private clone is at GitHub's main, with a stale
+    origin/main that makes the inspection fetch."""
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    clone = private(checkout)
+    merged_private(hub.parent)
+    git(clone, "fetch", "-q", "--refmap=", "origin", "main")
+    git(clone, "merge", "-q", "--ff-only", "FETCH_HEAD")
+    return clone
+
+
+def test_the_inspection_fetch_leaves_fetch_head_to_the_sync(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: its fetch rewrote FETCH_HEAD outside the lock of
+    scripts/sync_private.py, so a concurrent inspection could empty it between
+    that sync's check and its merge, and the merge then did nothing."""
+    hub, homes, bin_dir = fleet
+    clone = stale_remote(fleet)
+    fetch_head = clone / ".git/FETCH_HEAD"
+    fetch_head.write_text("the sync's own fetch\n")
+    stale = git(clone, "rev-parse", "origin/main")
+
+    result = run(hub, homes, bin_dir, "--check")
+
+    assert (result.returncode, result.stdout) == (0, OK)
+    assert git(clone, "rev-parse", "origin/main") != stale, "the inspection fetched"
+    assert fetch_head.read_text() == "the sync's own fetch\n"
+
+
+def test_a_failed_inspection_fetch_asks_for_a_retry_not_a_pr(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: it ignored the failed fetch and called the
+    stale origin/main's missing commits unshared, asking for a PR."""
+    hub, homes, bin_dir = fleet
+    clone = stale_remote(fleet)
+    git(clone, "remote", "set-url", "origin", str(hub.parent / "absent.git"))
+
+    result = run(hub, homes, bin_dir, "--others", "--dry-run")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    [error] = json.loads(result.stderr)["errors"]
+    assert error.startswith(
+        f"remote needs-you: {clone} could not fetch origin main to compare: "
+    )
+    assert error.endswith(
+        "; retry; fix it on remote, then rerun just sync-fleet remote"
+    )
 
 
 def test_check_reports_private_edits_made_after_the_inspection(

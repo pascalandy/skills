@@ -165,10 +165,14 @@ unshared() {
 }
 # A count other than 0, or a failed comparison, may come from a stale or
 # missing origin/main, so only then does it fetch and count again; it prints
-# nothing when it cannot count
+# nothing when it cannot count, and "fetch-failed REASON" when the fetch fails.
+# The fetch leaves FETCH_HEAD alone, since scripts/sync_private.py merges it
 ahead() {
     count=$(unshared) && [ "$count" = 0 ] && { echo 0; return; }
-    git -C "$private" fetch -q origin main 2>/dev/null
+    why=$(git -C "$private" fetch -q --no-write-fetch-head origin main 2>&1) || {
+        echo "fetch-failed $(printf '%s\n' "$why" | tail -n 1)"
+        return
+    }
     unshared
 }
 step() {
@@ -186,7 +190,9 @@ step() {
         echo "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
     else
         count=$(ahead)
-        if [ -z "$count" ]; then
+        if [ "${count#fetch-failed}" != "$count" ]; then
+            echo "private-needs $private could not fetch origin main to compare:${count#fetch-failed}; retry"
+        elif [ -z "$count" ]; then
             echo "private-needs $private cannot compare with origin/main; fetch it, then rerun"
         elif [ "$count" != 0 ]; then
             [ "$count" = 1 ] && commits=commit || commits=commits
