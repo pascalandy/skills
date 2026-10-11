@@ -493,18 +493,19 @@ def test_a_failed_inspection_fetch_asks_for_a_retry_not_a_pr(
     stale origin/main's missing commits unshared, asking for a PR."""
     hub, homes, bin_dir = fleet
     clone = stale_remote(fleet)
-    git(clone, "remote", "set-url", "origin", str(hub.parent / "absent.git"))
+    # git's reason would quote the URL, token included
+    absent = f"{hub.parent / 'absent.git'}?access_token=SECRET"
+    git(clone, "remote", "set-url", "origin", absent)
 
     result = run(hub, homes, bin_dir, "--others", "--dry-run")
 
     assert (result.returncode, result.stdout) == (1, "")
-    [error] = json.loads(result.stderr)["errors"]
-    assert error.startswith(
-        f"remote needs-you: {clone} could not fetch origin main to compare: "
-    )
-    assert error.endswith(
-        "; retry; fix it on remote, then rerun just sync-fleet remote"
-    )
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"remote needs-you: {clone} could not fetch origin main to compare; "
+            "retry; fix it on remote, then rerun just sync-fleet remote"
+        )
+    ]
 
 
 def test_check_reports_private_edits_made_after_the_inspection(
