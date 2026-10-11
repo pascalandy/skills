@@ -1,23 +1,33 @@
 ---
 name: "execute"
-description: "Use only when explicitly invoked as `execute` or `implement`, or by a clear go-ahead to implement an agreed plan."
+description: "Use only when explicitly invoked as `execute`, `execute solo`, or `implement`, or by a clear go-ahead to implement an agreed plan."
 kind: "dev"
 ---
 
 Execute all of this! Show real **agency**: use your expert judgment on every decision and follow your gut on what most improves the project.
 
-Post a status update at each step: "📍 [what is going on] / [step name]"
+Break the problem down from first principles to leverage 🧰 poteto-mode playbooks. A card is a unit of work defined in the agreed plan.
+
+#### Pick the route
+
+- `execute`, `implement`, or a go-ahead → **threads**: a T3 MAIN delegates each step to named threads. Read [threads](references/threads.md). If `t3_thread_launch` is still unavailable after you load deferred tools or try it once, stop and tell me to run `execute solo`
+- `execute solo` → **solo**: one agent runs every step, with 🧰 headless reviews. Read [solo](references/solo.md)
+
+The steps below say what each step must achieve. The route file says who runs it and how.
+
+Post a status update at each step: "📍 [what is going on] / [step name]". The first one names the route.
 
 #### Step by step
 
-- Run these steps in order, and finish each one before you start the next
+- Run these steps in order, and finish each one before you start the next. Within a step, run independent cards in parallel. A card that depends on another in the same repository builds on its branch, in the same stack. Across repositories, the dependent card lands after its predecessor
+- Delegate as much of each step as the route allows
 - When the agreed work involves no PR, such as issue edits only, skip the Blast-radius impacts, Code review across the whole stack, Docs, Final review, and Merge steps, and say so in the report
 
 FIRST ; **Execute**
-- Use 🧰 poteto-mode to implement everything we agreed on. Commit as you go, then open the PRs
+- Use 🧰 poteto-mode to implement every card. Commit as you go, then open the PRs
 - Order the work by bang for the buck. Wiring in finished code that isn't connected yet is the typical quick win
 - Note each out-of-scope gap you find for the report. File one as an issue with 🧰 label-for-issues only when it deserves its own fix and no existing issue covers it
-- Done when every item is implemented and checks are green, or each remaining item is reported as blocked, with the reason
+- Done when every card is implemented and checks are green, or each remaining card is reported as blocked, with the reason
 
 THEN ; **Self-check**
 - Run 🧰 2nd-pass on each PR
@@ -26,33 +36,33 @@ THEN ; **Self-check**
 
 THEN ; **Blast-radius impacts**
 - Start only once the stack is ready for review
-- Run 🧰 headless `--review-only` and ask it:
-	> Use $poteto-mode and $blast-radius on <stack PR URLs>. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?
+- Give the reviewer this brief with the **report** ending (see Reviews):
+	> Use 🧰 poteto-mode and 🧰 blast-radius on <PR URLs>. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?
 - While it runs, write your own premortem. What could go wrong? Are we adding debt or code smells?
-- Fix or dismiss each finding with a reason. If you pushed fixes, rerun the review on the affected PR heads (max 2 rounds)
+- If fixes were pushed, rerun the review on the affected PR heads (max 2 rounds)
 - Done when each medium or high finding from the review and both premortems is fixed and pushed to its layer, or dismissed with a written reason
 
 THEN ; **Code review across the whole stack**
-- Run 🧰 headless `--review-fix` in a sandbox (`.git` read-only, no network) within the stack's checkout, and ask it:
-	> Use $poteto-mode to review this stack: every change from <base branch> to HEAD. The solution works; now make it great and pristine while keeping it simple. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason.
-- Keep or revert each change with a reason. Commit the kept ones to their owning layers, restack, and push. If you pushed, rerun the review on the restacked HEAD (max 3 rounds)
+- Give the reviewer this brief with the **fix** ending:
+	> Use 🧰 poteto-mode to review this stack: every change from <base branch> to HEAD. The solution works; now make it great and pristine while keeping it simple.
+- If fixes were pushed, rerun the review on the restacked HEAD (max 3 rounds)
 - Done when the current stack is reviewed and each change is pushed to its layer or reverted with a reason, or you reported the blocker
 
 THEN ; **Docs**
-- Run 🧰 andy-mode ; docs on the stack's final diff, and commit its edits to the layer they belong to
+- Run 🧰 andy-mode ; docs on the stack's final diff
 - Done when each doc that describes a behavior the stack changes matches the new behavior, and its edits are pushed
 
 THEN ; **Final review**
-- Run 🧰 headless `--review-fix` in a sandbox (`.git` read-only, no network) within the stack's checkout, and ask it:
-	> Use $poteto-mode to review every change from <base branch> to HEAD like you're looking for a reason to reject it. Don't hold back. You saved me in the past :) Basically, I want to make sure that I'm not about to do anything overkill. I want to keep things simple, efficient, and grounded in common sense. Make sure the docs stay $concise. Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason.
-- Keep or revert each change with a reason. Commit the kept ones to their owning layers, restack, and push. If you pushed, rerun the review on the restacked HEAD (max 3 rounds)
-- Done when the restacked HEAD is reviewed and each change is pushed to its layer or reverted with a reason, or you reported the blocker
+- One review covers the code and the docs. Give the reviewer this brief with the ending the route names:
+	> Use 🧰 poteto-mode to review every change from <base branch> to HEAD like you're looking for a reason to reject it. Don't hold back. You saved me in the past :) Basically, I want to make sure that I'm not about to do anything overkill. I want to keep things simple, efficient, and grounded in common sense. Make sure the docs stay 🧰 concise.
+- If fixes were pushed, rerun the review on the restacked HEAD (max 3 rounds)
+- Done when the restacked HEAD is reviewed and each change or finding is pushed to its layer, or reverted or dismissed with a reason, or you reported the blocker
 
 THEN ; **Report**
 - PR links and links to the issues you filed
 - The out-of-scope gaps you did not file
-- Every change you made outside what we agreed, and why
-- Each step or headless run you skipped or replaced, and why
+- Every change made outside what we agreed, and why
+- Each step or review you skipped or replaced, and why
 - What you couldn't confirm, and where you looked
 - Confidence to merge: XX%, and why it is below 100% when it is
 - Done when the report includes every item above
@@ -70,28 +80,32 @@ THEN ; **Closing**
 - End with "⛳ Implemented. [high-level summary of what you completed]" and say goodbye
 - Done when both retros are complete, the selected issues are filed, and you've said goodbye
 
+#### Reviews
+
+- The reviewer runs on the other model family: Codex reviews Claude's work, and Claude reviews Codex's
+- Each brief closes with one of two endings:
+	- **fix**: "Fix what you find by editing the files directly, leave the changes uncommitted, and list each change with its reason."
+	- **report**: "Edit no file. List each finding with its severity, its file and line, and the fix you propose."
+- After a **fix** review, keep or revert each change with a reason, commit the kept ones to their owning layers, restack, and push
+- After a **report** review, fix or dismiss each finding with a reason, and push each fix to its owning layer
+
 #### Rules
 
 - One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to pascalandy
-- For 🧰 headless runs, use the other harness as the reviewer, and show the command in a code block before you run it:
-	- If you are Claude -> review with `Codex`
-	- If you are Codex -> review with `Claude`
-	- Skip the sandbox when the reviewer's CLI has none
-	- When the reviewer's CLI isn't installed, as in a cloud environment, give the same prompt to your own subagent tool, as 🧰 headless describes
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 - As you see fit, leave comments on the PRs to help me understand what's happening
 - Keep going without me. You may push your own stack branches (`--force-with-lease` is fine), and open and update PRs and issues
 - Stop and ask only when:
 	- a contradiction or an unavailable live step blocks you (report it)
 	- you need a decision from me
-	- the next action deletes data, changes anything outside this repository and its PRs and issues, or force-pushes a branch you didn't create. The Merge step's deploy and the Closing step's retro issues in any of my repositories are allowed
+	- the next action deletes data, changes anything outside the agreed repositories and their PRs and issues, or force-pushes a branch you didn't create. The Merge step's deploy and the Closing step's retro issues in any of my repositories are allowed
 		- After a squash merge or merge commit, deleting a branch whose tip still matches the PR's head commit at merge time is not deleting data
 
 #### Questions
 
 ```md
-1) 🙋 [Question (pourquoi c'est important)]
-   - a) … (🟢 recommandé)
+1) 🙋 [Question (why it matters)]
+   - a) … (🟢 recommended)
    - b) …
    - c) …
 ```
