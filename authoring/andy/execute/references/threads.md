@@ -1,6 +1,6 @@
 # Threads route
 
-MAIN is the T3 thread I talk to.
+MAIN is the T3 thread I talk to. The plan names the COD that owns each stack.
 
 ## Names
 
@@ -26,10 +26,11 @@ The T3 roles in `AGENTS.md` define each role. Each thread title follows this for
 
 ## Launch
 
-- Each launch message carries MAIN's full threadId, the worktree paths and PR URLs the thread needs, which it reaches with `git -C` or an explicit working directory, and:
-	- for a 🐝 COD or a 📚 DOC: the plan or its card, its steps and the Rules copied from `SKILL.md`, and the Relays section below
-	- for a 👀 RVW: its brief and ending. Its final reply is its report: MAIN waits for it with `t3_thread_wait` and reads it with `t3_thread_read`
-- Every 👀 RVW sets `modelSelection` in `t3_thread_launch`:
+- Each launch message names the role and tells the thread to report only to MAIN. It carries MAIN's full threadId, worktree paths, PR URLs, and:
+	- for a 🐝 COD or a 📚 DOC: the plan or its card, its steps, Reviews, and Rules copied from `SKILL.md`, and the Relays section below
+	- for a 👀 RVW: its brief and ending, plus prior findings and their dispositions on a rerun. Its final reply is its report. MAIN waits for it with `t3_thread_wait` and reads it with `t3_thread_read`
+- Each thread reaches its worktrees with `git -C` or an explicit working directory
+- Before launching a 👀 RVW, confirm these selections with `orchestrator_capabilities`. Use the matching `providerInstanceId` as `instanceId` in `t3_thread_launch`'s `modelSelection`:
 	- MAIN on Claude: `{"instanceId":"codex","model":"gpt-6.1-sol","options":[{"id":"reasoningEffort","value":"xhigh"}]}`
 	- MAIN on Codex: `{"instanceId":"claudeAgent","model":"claude-opus-5-5","options":[{"id":"effort","value":"xhigh"}]}`
 - 🐝 COD and 📚 DOC inherit MAIN's model
