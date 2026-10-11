@@ -21,8 +21,9 @@ The T3 roles in `AGENTS.md` define each role. Each thread title follows this for
 | Code review across the whole stack | One 👀 RVW per stack, in its COD's worktree while the COD stays idle. The COD then keeps or reverts each change, as Reviews in `SKILL.md` says |
 | Docs | One 📚 DOC per stack whose docs change, in its COD's worktree while the COD stays idle. It opens the docs PR as the top layer of the stack with 🧰 gh-stack |
 | Final review | One 👀 RVW per stack, from base to top, with the **report** ending. MAIN relays each finding to the COD or DOC that owns its layer |
-| Report, Closing | MAIN |
-| Merge | MAIN relays the go to each COD, which lands its stack with 🧰 poteto-mode ; shipping through the project's merge command. MAIN settles each thread with `t3_thread_organize` action `settle` once `t3_thread_wait` confirms its turn ended |
+| Report | MAIN |
+| Merge | MAIN relays the go once per stack, to the COD that owns it, which lands the stack with 🧰 poteto-mode ; shipping through the project's merge command |
+| Closing | MAIN. It settles each thread with `t3_thread_organize` action `settle` once `t3_thread_wait` confirms its turn ended, and a COD with PRs only after its merge |
 
 ## Launch
 
