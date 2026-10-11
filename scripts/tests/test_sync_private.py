@@ -250,13 +250,21 @@ def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
     git(one, "remote", "set-url", "origin", str(tmp_path / "absent/skills.git"))
     missing = run(one)
 
+    clone = private(one)
     assert (offline.returncode, offline.stdout) == (75, "")
     answer = json.loads(offline.stderr.splitlines()[-1])
-    assert answer["errors"][0].startswith(
-        "could not clone http://127.0.0.1:9/skills-private.git: "
-    )
+    assert answer["errors"] == [
+        (
+            "could not clone http://127.0.0.1:9/skills-private.git; run git clone "
+            f"http://127.0.0.1:9/skills-private.git {clone} on this machine to see why"
+        )
+    ]
     assert answer["retry"] == "scripts/sync_private.py"
     assert (missing.returncode, missing.stdout) == (1, "")
-    assert json.loads(missing.stderr.splitlines()[-1])["errors"][0].endswith(
-        "; check that the private repository exists and you can read it"
-    )
+    url = tmp_path / "absent/skills-private.git"
+    assert json.loads(missing.stderr.splitlines()[-1])["errors"] == [
+        (
+            f"could not clone {url}; check that the private repository exists and "
+            f"you can read it; run git clone {url} {clone} on this machine to see why"
+        )
+    ]

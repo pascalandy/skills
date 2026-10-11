@@ -142,7 +142,7 @@ class Stopped(Exception):
 ENTER = """
 enter() {
     cd "$HOME/$1" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || {
-        echo "no skills checkout at ~/$1"
+        printf '%s\n' "no skills checkout at ~/$1"
         return 11
     }
     private="$(dirname "$(pwd -P)")/skills-private"
@@ -193,7 +193,7 @@ step() {
     else
         count=$(ahead)
         if [ "$count" = fetch-failed ]; then
-            printf '%s\n' "private-needs $private could not fetch origin main to compare; retry"
+            printf '%s\n' "private-needs $private could not fetch origin main to compare; run git -C $private fetch origin main on this machine to see why, then retry"
         elif [ -z "$count" ]; then
             printf '%s\n' "private-needs $private cannot compare with origin/main; fetch it, then rerun"
         elif [ "$count" != 0 ]; then
