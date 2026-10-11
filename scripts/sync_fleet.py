@@ -142,7 +142,7 @@ class Stopped(Exception):
 ENTER = """
 enter() {
     cd "$HOME/$1" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || {
-        echo "no skills checkout at ~/$1"
+        printf '%s\n' "no skills checkout at ~/$1"
         return 11
     }
     private="$(dirname "$(pwd -P)")/skills-private"
@@ -165,12 +165,14 @@ unshared() {
 }
 # A count other than 0, or a failed comparison, may come from a stale or
 # missing origin/main, so only then does it fetch and count again; it prints
-# nothing when it cannot count, and "fetch-failed REASON" when the fetch fails.
-# The fetch leaves FETCH_HEAD alone, since scripts/sync_private.py merges it
+# nothing when it cannot count, and "fetch-failed" when the fetch fails; git's
+# reason stays out, since it can quote a token from the remote URL. The fetch
+# leaves FETCH_HEAD alone, since scripts/sync_private.py merges it. Lines that
+# hold a path use printf, which prints a backslash as is
 ahead() {
     count=$(unshared) && [ "$count" = 0 ] && { echo 0; return; }
-    why=$(git -C "$private" fetch -q --no-write-fetch-head origin main 2>&1) || {
-        echo "fetch-failed $(printf '%s\n' "$why" | tail -n 1)"
+    git -C "$private" fetch -q --no-write-fetch-head origin main >/dev/null 2>&1 || {
+        echo fetch-failed
         return
     }
     unshared
@@ -179,24 +181,24 @@ step() {
     enter "$1" || return
     command -v just >/dev/null || { echo "just is not on the login shell PATH"; return 11; }
     if plain; then
-        echo "$private is not a clone of the private repo; move it aside, then rerun"
+        printf '%s\n' "$private is not a clone of the private repo; move it aside, then rerun"
         return 11
     fi
     if [ ! -e "$private" ]; then
         :
     elif [ "$(git -C "$private" symbolic-ref --short -q HEAD)" != main ]; then
-        echo "private-needs $private is not on main; switch it to main, then rerun"
+        printf '%s\n' "private-needs $private is not on main; switch it to main, then rerun"
     elif [ -n "$(git -C "$private" status --porcelain)" ]; then
-        echo "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
+        printf '%s\n' "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
     else
         count=$(ahead)
-        if [ "${count#fetch-failed}" != "$count" ]; then
-            echo "private-needs $private could not fetch origin main to compare:${count#fetch-failed}; retry"
+        if [ "$count" = fetch-failed ]; then
+            printf '%s\n' "private-needs $private could not fetch origin main to compare; run git -C $private fetch origin main on this machine to see why, then retry"
         elif [ -z "$count" ]; then
-            echo "private-needs $private cannot compare with origin/main; fetch it, then rerun"
+            printf '%s\n' "private-needs $private cannot compare with origin/main; fetch it, then rerun"
         elif [ "$count" != 0 ]; then
             [ "$count" = 1 ] && commits=commit || commits=commits
-            echo "private-needs $private has $count $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
+            printf '%s\n' "private-needs $private has $count $commits its origin/main lacks; open a PR from a worktree of skills-private, then reset main to origin/main and rerun"
         fi
     fi
     branch=$(git symbolic-ref --short -q HEAD) || branch=-

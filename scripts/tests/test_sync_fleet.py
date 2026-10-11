@@ -493,18 +493,48 @@ def test_a_failed_inspection_fetch_asks_for_a_retry_not_a_pr(
     stale origin/main's missing commits unshared, asking for a PR."""
     hub, homes, bin_dir = fleet
     clone = stale_remote(fleet)
-    git(clone, "remote", "set-url", "origin", str(hub.parent / "absent.git"))
+    # Nothing listens on port 0, and git's one line quotes the URL, token included
+    absent = "http://127.0.0.1:0/absent.git?access_token=SECRET"
+    git(clone, "remote", "set-url", "origin", absent)
 
     result = run(hub, homes, bin_dir, "--others", "--dry-run")
 
     assert (result.returncode, result.stdout) == (1, "")
-    [error] = json.loads(result.stderr)["errors"]
-    assert error.startswith(
-        f"remote needs-you: {clone} could not fetch origin main to compare: "
-    )
-    assert error.endswith(
-        "; retry; fix it on remote, then rerun just sync-fleet remote"
-    )
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"remote needs-you: {clone} could not fetch origin main to compare; "
+            f"run git -C {clone} fetch origin main on this machine to see why, "
+            "then retry; fix it on remote, then rerun just sync-fleet remote"
+        )
+    ]
+
+
+def test_a_failed_sync_fetch_keeps_the_remote_token_out_of_the_report(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    """The old code failed here: the sync's own fetch, which the inspection does
+    not run when origin/main matches, put git's last line, URL and token
+    included, in the error."""
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    clone = private(checkout)
+    absent = "http://127.0.0.1:0/absent.git?access_token=SECRET"
+    git(clone, "remote", "set-url", "origin", absent)
+    change(hub)
+
+    result = run(hub, homes, bin_dir, "--others")
+
+    assert (result.returncode, result.stdout) == (75, "")
+    assert "SECRET" not in result.stderr
+    assert json.loads(result.stderr.splitlines()[-1])["errors"] == [
+        (
+            f"remote failed: could not fetch the private repository; run git -C "
+            f"{clone} fetch origin main on this machine to see why; rerun just sync-fleet "
+            "remote --debug"
+        )
+    ]
 
 
 def test_check_reports_private_edits_made_after_the_inspection(

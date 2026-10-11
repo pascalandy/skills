@@ -27,7 +27,7 @@
 
 ```bash
 ( . "${RUN:?}/env" &&
-  rsync -a --exclude .git --exclude _skills_private "$CHECKOUT/" "$RUN/checkout/" &&
+  rsync -a --exclude .git "$CHECKOUT/" "$RUN/checkout/" &&
   cd "$RUN/checkout" && git init -q &&
   rm -r skills docs/references/skill-count.md docs/references/remote-skills*.md &&
   record compile-write just compile-skills &&

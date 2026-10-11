@@ -65,13 +65,15 @@ def last_line(result: subprocess.CompletedProcess[str]) -> str:
 
 
 def failed(
-    what: str, result: subprocess.CompletedProcess[str], fix: str
+    what: str, result: subprocess.CompletedProcess[str], fix: str, look: str
 ) -> ScriptError:
-    """The error for a failed network step: temporary when the network failed."""
-    reason = last_line(result)
+    """The error for a failed network step: temporary when the network failed.
+    git's own words stay out, since they can quote a token from the remote URL;
+    `look` is the command that shows them on this machine."""
+    hint = f"run {look} on this machine to see why"
     if is_network_failure(result.stderr):
-        return TemporaryError(f"{what}: {reason}")
-    return ScriptError(f"{what}: {reason}; {fix}")
+        return TemporaryError(f"{what}; {hint}")
+    return ScriptError(f"{what}; {fix}; {hint}")
 
 
 def private_url() -> str:
@@ -111,6 +113,7 @@ def github_head(timeout: float = TIMEOUT) -> str:
             "could not read the private repository",
             listed,
             f"check the origin remote in {PRIVATE}",
+            f"git -C {PRIVATE} ls-remote origin main",
         )
     return listed.stdout.split()[0]
 
@@ -139,6 +142,7 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
                     f"could not clone {url}",
                     cloned,
                     "check that the private repository exists and you can read it",
+                    f"git clone {url} {PRIVATE}",
                 )
         return [["clone", LABEL, url]]
     if status == "plain":
@@ -169,6 +173,7 @@ def clone_or_pull(dry_run: bool, timeout: float) -> list[list[str]]:
             "could not fetch the private repository",
             fetched,
             f"check the origin remote in {PRIVATE}",
+            f"git -C {PRIVATE} fetch origin main",
         )
     refuse_commits_beyond("FETCH_HEAD", "GitHub's main")
     merged = git("merge", "--quiet", "--ff-only", "FETCH_HEAD")
