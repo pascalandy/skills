@@ -73,13 +73,23 @@ Choose the smallest search that fits the evidence available:
 - Exact title, phrase, identifier, tag, or code symbol: start with `qmd search`
 - Concept remembered indirectly: use a structured `qmd query` with `intent:`,
   `lex:`, and `vec:` authored from the user's context
-- Unknown vocabulary or a quick low-stakes exploration: a plain `qmd query` is
-  acceptable
+- Unknown vocabulary or a quick low-stakes exploration in English: a plain
+  `qmd query` is acceptable; for a French query, write a structured query,
+  because QMD's expansion model produces unreliable French expansions
 - Weak or noisy first pass: read `references/qmd/semantic-recovery.md` relative to
   this skill directory and apply only the needed recovery pattern
 
 Add `hyde:` only when the semantic gap is substantial or an earlier structured
 query had poor recall. Do not generate it for every search.
+
+The vault mixes French and English. Write one `lex:` line per language, because
+a `lex:` line ANDs its words and matches each unquoted word as a prefix. Start
+with one `vec:` line in either language, because the embedding model matches
+across both:
+
+```bash
+qmd query $'intent: Find notes about roof leaks found during building inspections\nlex: infiltration toiture\nlex: roof leak\nvec: infiltration d\'eau par la toiture lors d\'une inspection de bâtiment'
+```
 
 ## Configuration
 
