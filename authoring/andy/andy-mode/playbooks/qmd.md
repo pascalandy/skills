@@ -75,7 +75,7 @@ Choose the smallest search that fits the evidence available:
   `lex:`, and `vec:` authored from the user's context
 - Unknown vocabulary or a quick low-stakes exploration in English: a plain
   `qmd query` is acceptable; for a French query, write a structured query,
-  because QMD's expansion model is trained on English only
+  because QMD's expansion model produces unreliable French expansions
 - Weak or noisy first pass: read `references/qmd/semantic-recovery.md` relative to
   this skill directory and apply only the needed recovery pattern
 
@@ -83,11 +83,12 @@ Add `hyde:` only when the semantic gap is substantial or an earlier structured
 query had poor recall. Do not generate it for every search.
 
 The vault mixes French and English. Write one `lex:` line per language, because
-a `lex:` line matches only documents that contain all its words. One `vec:` line
-in either language is enough, because the embedding model matches across both:
+a `lex:` line ANDs its words and matches each unquoted word as a prefix. Start
+with one `vec:` line in either language, because the embedding model matches
+across both:
 
 ```bash
-qmd query $'intent: How Pascal syncs skills across his machines\nlex: synchroniser skills machines\nlex: sync skills machines\nvec: comment synchroniser les skills sur toutes les machines'
+qmd query $'intent: Find notes about roof leaks found during building inspections\nlex: infiltration toiture\nlex: roof leak\nvec: infiltration d\'eau par la toiture lors d\'une inspection de bâtiment'
 ```
 
 ## Configuration
