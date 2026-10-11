@@ -24,7 +24,7 @@ agents:
 
   [machines.mbp]
   ssh = "andy16@mbp16.example.ts.net"
-  path = "Documents/github_local/skills"
+  path = "projects/skills"
 """
 
 from __future__ import annotations
