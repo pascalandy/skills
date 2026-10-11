@@ -28,7 +28,7 @@ The T3 roles in `AGENTS.md` define each role. Each thread title follows this for
 
 - Each launch message carries MAIN's full threadId, the worktree paths and PR URLs the thread needs, which it reaches with `git -C` or an explicit working directory, and:
 	- for a 🐝 COD or a 📚 DOC: the plan or its card, its steps and the Rules copied from `SKILL.md`, and the Relays section below
-	- for a 👀 RVW: its brief and ending
+	- for a 👀 RVW: its brief and ending. Its final reply is its report: MAIN waits for it with `t3_thread_wait` and reads it with `t3_thread_read`
 - Every 👀 RVW sets `modelSelection` in `t3_thread_launch`:
 	- MAIN on Claude: `{"instanceId":"codex","model":"gpt-6.1-sol","options":[{"id":"reasoningEffort","value":"xhigh"}]}`
 	- MAIN on Codex: `{"instanceId":"claudeAgent","model":"claude-opus-5-5","options":[{"id":"effort","value":"xhigh"}]}`

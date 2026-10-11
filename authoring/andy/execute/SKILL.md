@@ -19,7 +19,7 @@ Post a status update at each step: "📍 [what is going on] / [step name]". The 
 
 #### Step by step
 
-- Run these steps in order, and finish each one before you start the next. Within a step, run independent cards in parallel. A card that depends on another builds on that card's branch, in the same stack
+- Run these steps in order, and finish each one before you start the next. Within a step, run independent cards in parallel. A card that depends on another in the same repository builds on its branch, in the same stack. Across repositories, the dependent card lands after its predecessor
 - Delegate as much of each step as the route allows
 - When the agreed work involves no PR, such as issue edits only, skip the Blast-radius impacts, Code review across the whole stack, Docs, Final review, and Merge steps, and say so in the report
 
