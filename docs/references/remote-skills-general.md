@@ -98,7 +98,7 @@ A mode's routes run through that mode's SKILL.md.
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
 - `brainstorm`: Use only when explicitly invoked as `brainstorm`.
 - `concise`: Use when the user requests to be more concise.
-- `consensus`: Use only when explicitly invoked as: plan, consensus.
+- `feel-me`: Use when explicitly invoked as `feel me`, `same page`, or `same foot`, or when the user says they want to be on the same page or aligned with the agent.
 - `frontend-design`: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.

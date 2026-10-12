@@ -1,6 +1,6 @@
 # Le guide
 
-Mes skills donnent leur meilleur quand tu arrêtes de microgérer l'agent. Tu dis ce que tu veux et tu termines par `consensus`. L'agent s'aligne avec toi, puis il exécute au `go`. Ce guide enseigne ce réflexe avec des demandes réelles.
+Mes skills donnent leur meilleur quand tu arrêtes de microgérer l'agent. Tu dis ce que tu veux et tu termines par `feel-me`. L'agent s'aligne avec toi, puis il exécute au `go`. Ce guide enseigne ce réflexe avec des demandes réelles.
 
 Prérequis : une application d'IA qui ouvre des pages web, comme ChatGPT ou Claude. Aucun terminal.
 
@@ -22,9 +22,9 @@ In English: [the guide](../guide/README.md).
 ```text
 Je veux envoyer une infolettre mensuelle à mes clients.
 
-consensus
+feel-me
 ```
 
-Pas besoin de nommer un playbook ni de décrire les étapes. `consensus` oblige l'agent à reformuler ton but et à poser ses questions avant d'agir. Quand il n'en reste aucune, tu tapes `go`.
+Pas besoin de nommer un playbook ni de décrire les étapes. `feel-me` oblige l'agent à reformuler ton but et à poser ses questions avant d'agir. Quand il n'en reste aucune, tu tapes `go`.
 
 Suite : [Activer les skills](./01-demarrer.md).

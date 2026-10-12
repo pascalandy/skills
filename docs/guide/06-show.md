@@ -34,6 +34,14 @@ html-mode ; plan. Show this project's steps, owners, and deadlines: [paste the p
 
 The agent shows the commitments, their order, who owns each one, what depends on what, and the risks.
 
+## Turn a document into an interactive page with `html-mode ; interactive-page`
+
+```text
+html-mode ; interactive-page. Turn this PDF into a web page where a map follows the reading: [attach the PDF]
+```
+
+By default, the agent prepares a sketch, checks the result, then aims for 2 or 3 QA rounds. These rounds need T3 and permission to push a commit. For a client deliverable, say how many rounds you want. The agent asks only for missing context and tells you which checks it couldn't run.
+
 ## Open the file
 
 Some chat apps show a preview of the page right in the chat. Otherwise, download the file and open it in your web browser.
