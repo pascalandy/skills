@@ -1,0 +1,56 @@
+[main]
+merge-confidence = 92 # main-closing: merge without asking at or above this %
+retro-max-issues = 2  # main-closing: issues each thread files per retro
+retro = true
+
+[cod] # Step 1: Implement
+main-on-claude = { inherit = true }
+main-on-codex = { inherit = true }
+service-tier = "standard"
+runtime-mode = "inherit"
+skip-in-fast-track = false
+retro = true
+
+[adv] # Step 2: Adversarial review
+main-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+main-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+service-tier = "standard"
+runtime-mode = "inherit"
+max-passes = 3
+skip-in-fast-track = true
+retro = false
+
+[blast] # Step 3: Blast-radius review
+main-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+main-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+service-tier = "standard"
+runtime-mode = "inherit"
+max-passes = 2
+skip-in-fast-track = true
+retro = false
+
+[doc] # Step 4: Docs updates
+main-on-claude = { inherit = true }
+main-on-codex = { inherit = true }
+service-tier = "standard"
+runtime-mode = "inherit"
+skip-in-fast-track = false
+retro = false
+
+[rdoc] # Step 5: Docs review
+main-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+main-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" }
+service-tier = "standard"
+runtime-mode = "inherit"
+max-passes = 2
+skip-in-fast-track = true
+retro = false
+
+[pris] # Step 6: Pristine review
+main-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+main-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+service-tier = "standard"
+runtime-mode = "inherit"
+max-passes = 2
+skip-in-fast-track = true
+retro = false
