@@ -17,7 +17,7 @@ MAIN runs each step in order and launches each thread with `main-launch`.
 | 6 | Pristine review | PRIS<n>, then MAIN | `rev-pristine`, `main-triage` |
 | 7 | Closing | MAIN, COD<n> | `main-closing` |
 
-Fast track skips each step whose role sets `skip-in-fast-track` in `config.toml`.
+Fast track skips each step whose role sets `skip-in-fast-track` in `config.toml`. When the agreed work opens no PR, such as issue edits only, MAIN does it alone, skips steps 1 to 6, and says so in its report.
 
 ## Diagram
 
@@ -139,7 +139,7 @@ sequenceDiagram
     M->>U: Agent: Report, PR links, confidence to merge <-
     rect rgba(239, 159, 118, 0.2)
         alt Confident
-            M->>M: Merge the stack, remove the worktrees
+            M->>M: Merge the stack
         else Hesitant
             rect rgba(140, 170, 238, 0.18)
                 loop Align
@@ -148,7 +148,7 @@ sequenceDiagram
                 end
             end
             U->>M: USER: Merge ->
-            M->>M: Merge the stack, remove the worktrees
+            M->>M: Merge the stack
         end
     end
     M->>C1: Agent: Merged. Run your two retros, skill usage then global ->
@@ -162,6 +162,7 @@ sequenceDiagram
     C1-->>M: Agent: Retro issues filed <-
     destroy C1
     M->>C1: Settle COD1 ->
+    M->>M: Remove the clean, merged worktrees
     M->>U: Agent: ⛳ Implemented. Round 1 done <-
 
     Note over U,M: Round 2, summarized

@@ -38,7 +38,7 @@ Only MAIN talks to Pascal. Every other thread reports to MAIN with `t3_thread_se
 
 | SOP | Role | Read when |
 |---|---|---|
-| [main-launch](references/sop/main-launch.md) | MAIN | Before each thread you launch |
+| [main-launch](references/sop/main-launch.md) | MAIN | Before each thread you launch, and once BLAST runs |
 | [main-triage](references/sop/main-triage.md) | MAIN | A REV reports |
 | [main-closing](references/sop/main-closing.md) | MAIN | The reviews end: report, merge, retros, settle |
 | [cod-implement](references/sop/cod-implement.md) | COD | Launched, or MAIN relays findings or asks for your retros |
