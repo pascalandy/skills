@@ -11,7 +11,7 @@ Run the section MAIN requests.
 
 ## Fix
 
-- Fix each finding MAIN relays. Commit each fix to the layer it belongs to, restack, and push
+- Fix each finding MAIN relays and commit each fix to the layer it belongs to. Run 🧰 2nd-pass on the fixes, then restack and push
 - Done when each finding is pushed to its layer, or reported to MAIN with the reason it could not be
 
 ## Retros

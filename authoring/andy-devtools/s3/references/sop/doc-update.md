@@ -9,4 +9,4 @@ Run the section MAIN requests in COD<n>'s worktree while COD<n> stays idle.
 
 ## Fix
 
-1. Fix each finding MAIN relays on the docs PR, commit, and push. Done when each finding is pushed, or reported to MAIN with the reason it could not be
+1. Fix each finding MAIN relays on the docs PR and commit. Run 🧰 2nd-pass on the fixes, then push. Done when each finding is pushed, or reported to MAIN with the reason it could not be

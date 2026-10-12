@@ -65,7 +65,7 @@ sequenceDiagram
             A1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings ->
-            C1->>C1: Fix, push, then 2nd-pass
+            C1->>C1: Fix, 2nd-pass, then push
             C1-->>M: Agent: Fixed and pushed <-
             opt Fixes need a fresh look and passes remain
                 M->>A1: Agent: Rerun on the new heads, with prior findings ->
