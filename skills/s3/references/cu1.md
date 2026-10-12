@@ -67,7 +67,7 @@ sequenceDiagram
             M->>C1: Agent: Fix the accepted findings ->
             C1->>C1: Fix, 2nd-pass, then push
             C1-->>M: Agent: Fixed and pushed <-
-            opt Fixes need a fresh look and passes remain
+            opt Fixes need a fresh look and passes remain, or the last pass yields a code fix
                 M->>A1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
@@ -86,7 +86,7 @@ sequenceDiagram
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings ->
             C1-->>M: Agent: Fixed and pushed <-
-            opt Fixes need a fresh look and passes remain
+            opt Fixes need a fresh look and passes remain, or the last pass yields a code fix
                 M->>B1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
@@ -134,7 +134,7 @@ sequenceDiagram
                 M->>D1: Agent: Fix the accepted docs findings ->
                 D1-->>M: Agent: Fixed and pushed <-
             end
-            opt Fixes need a fresh look and passes remain
+            opt Fixes need a fresh look and passes remain, or the last pass yields a code fix
                 M->>R1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
