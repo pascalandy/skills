@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-07
+date_updated: 2026-10-12
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
@@ -58,7 +58,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 
 ## Land a stack
 
-A stack lands bottom-up, one layer at a time, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch:
+A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch, not with `just merge` on each layer:
 
 1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
 2. Sign off on macOS. The fleet also runs Linux, and a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path, so run `gh workflow run ci.yml --ref <top layer>` too. It proves the stack's end state on Linux, not the layers below: run it on a lower layer as well when that layer may land without the ones above it
