@@ -19,7 +19,7 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 ## Pick the branch
 
 - **Pascal invokes `s3`:** you are MAIN. Run [CU1](references/cu1.md) on the agreed plan
-- **A launch message starts with `s3 ; <sop>`:** you are the thread it names. Read `references/sop/<sop>.md` and follow it
+- **A launch message starts with `$s3 ; <sop>`:** you are the thread it names. Read `references/sop/<sop>.md` and follow it
 
 ## Roles
 
