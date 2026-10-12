@@ -1,6 +1,6 @@
 # main-closing
 
-MAIN runs this SOP once DOC<n> reports.
+MAIN runs this SOP once the reviews end, or once DOC<n> reports in fast track.
 
 1. **Report.** Send Pascal:
 	- PR links, and links to the issues filed
@@ -16,5 +16,5 @@ MAIN runs this SOP once DOC<n> reports.
 	- Pascal said merge, each PR is merged, and its deploy succeeded or its COD reported the failure
 	- Pascal said not to merge. A "not yet" keeps this step open
 3. **Retros.** Only MAIN and each COD of this round run retros. Once the PRs are merged, ask each COD to run its retros, and run yours: 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. Each of you files at most 2 issues per retro, the fixes with the most bang for the buck. Done when each COD reported its issue links, or that no finding passed, and yours are filed
-4. **Settle.** Settle each thread of this round with `t3_thread_organize` action `settle`, once `t3_thread_wait` confirms its turn ended. T3 refuses a thread with active work, with "has active or blocked work". Done when every thread of this round is settled
+4. **Settle.** Settle DOC<n> and each COD of this round. Done when every thread of this round is settled
 5. **End the round.** End with "⛳ Implemented. [high-level summary of what you completed]". Pascal starts the next round in this MAIN, or settles it
