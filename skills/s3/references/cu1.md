@@ -81,6 +81,7 @@ sequenceDiagram
     M->>M: Write its own premortem
     rect rgba(140, 170, 238, 0.18)
         loop Up to max-passes
+            B1->>B1: Review PR 35, then 2nd-pass on the report
             B1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings ->
@@ -104,6 +105,7 @@ sequenceDiagram
     M->>E1: Agent: $s3 #59; rev-docs, PR 36 ->
     rect rgba(140, 170, 238, 0.18)
         loop Up to max-passes
+            E1->>E1: Review PR 36, then 2nd-pass on the report
             E1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>D1: Agent: Fix the accepted findings ->
@@ -121,6 +123,7 @@ sequenceDiagram
     M->>R1: Agent: $s3 #59; rev-pristine, PR 35 and PR 36 ->
     rect rgba(140, 170, 238, 0.18)
         loop Up to max-passes
+            R1->>R1: Review PR 35 and PR 36, then 2nd-pass on the report
             R1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             opt Accepted code findings
