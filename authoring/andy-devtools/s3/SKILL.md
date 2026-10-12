@@ -25,8 +25,8 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 
 | Role | Thread name | Does |
 |---|---|---|
-| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches each thread, triages every finding, relays the merge. Never edits code |
-| COD | `🐝 COD<n> <id4>` | Implements its card in its worktrees, opens its PRs, applies the findings MAIN relays, merges on MAIN's go |
+| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches each thread, triages every finding, merges on Pascal's go. Never edits code |
+| COD | `🐝 COD<n> <id4>` | Implements its card in its worktrees, opens its PRs, applies the findings MAIN relays, runs its retros |
 | REV | `👀 ADV<n> <id4>`, `👀 BLAST<n> <id4>`, `👀 RDOC<n> <id4>`, `👀 PRIS<n> <id4>` | Reviews the stack of COD<n> and reports. Edits no file. Lists each finding with its severity, its file and line, and the fix it proposes |
 | DOC | `📚 DOC<n> <id4>` | Updates the docs the stack makes stale, in a docs PR at the top of the stack of COD<n>, and applies the findings MAIN relays on it |
 
@@ -41,7 +41,7 @@ Only MAIN talks to Pascal. Every other thread reports to MAIN with `t3_thread_se
 | [main-launch](references/sop/main-launch.md) | MAIN | Before each thread you launch |
 | [main-triage](references/sop/main-triage.md) | MAIN | A REV reports |
 | [main-closing](references/sop/main-closing.md) | MAIN | The reviews end: report, merge, retros, settle |
-| [cod-implement](references/sop/cod-implement.md) | COD | Launched, or MAIN relays findings, the merge, or the retros |
+| [cod-implement](references/sop/cod-implement.md) | COD | Launched, or MAIN relays findings or asks for your retros |
 | [rev-adverse](references/sop/rev-adverse.md) | REV | Launched as ADV |
 | [rev-blast-radius](references/sop/rev-blast-radius.md) | REV | Launched as BLAST |
 | [rev-docs](references/sop/rev-docs.md) | REV | Launched as RDOC |

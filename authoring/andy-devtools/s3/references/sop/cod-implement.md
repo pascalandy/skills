@@ -1,6 +1,6 @@
 # cod-implement
 
-COD runs this SOP from its launch to its merge. Each section starts when MAIN asks for it.
+COD runs this SOP from its launch to its retros. Each section starts when MAIN asks for it.
 
 ## Implement
 
@@ -13,12 +13,6 @@ COD runs this SOP from its launch to its merge. Each section starts when MAIN as
 
 - Fix each finding MAIN relays. Commit each fix to the layer it belongs to, restack, and push
 - Done when each finding is pushed to its layer, or reported with the reason it could not be
-
-## Merge
-
-- Land your stack with 🧰 poteto-mode ; shipping, through the project's merge command and any deploy it runs. The merge command can exit 0 after a failed deploy, so read its output
-- Remove your worktrees
-- Done when each PR is merged and its deploy succeeded, or you reported the failure
 
 ## Retros
 
