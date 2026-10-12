@@ -27,6 +27,8 @@ Draft one issue per finding for https://github.com/pascalandy/skills. Write in t
 
 ## The problem (CMO)
 
+**Agent role:** <the role a workflow gave the agent, such as MAIN or COD in s3, or solo>
+
 **Problem Statement:** <the end user's goal and the problem, restated plainly>
 
 List the **use cases**, edge cases included
