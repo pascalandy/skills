@@ -25,7 +25,7 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 
 | Role | Thread name | Does |
 |---|---|---|
-| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches each thread, triages every finding, merges on Pascal's go. Never edits code |
+| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches each thread, triages every finding, merges when confident or on Pascal's go. Never edits code |
 | COD | `🐝 COD<n> <id4>` | Implements its card in its worktrees, opens its PRs, applies the findings MAIN relays, runs its retros |
 | REV | `👀 ADV<n> <id4>`, `👀 BLAST<n> <id4>`, `👀 RDOC<n> <id4>`, `👀 PRIS<n> <id4>` | Reviews the stack of COD<n> and reports. Edits no file. Lists each finding with its severity, its file and line, and the fix it proposes |
 | DOC | `📚 DOC<n> <id4>` | Updates the docs the stack makes stale, in a docs PR at the top of the stack of COD<n>, and applies the findings MAIN relays on it |
