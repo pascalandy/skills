@@ -162,6 +162,10 @@ after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk> <bott
 
 ## Land
 
+When the project's AGENTS.md defines its own merge method, such as pushing a signed-off head to the
+trunk, use it instead of `gh stack merge`: one layer at a time from the bottom, retarget its PR to
+the trunk, apply the method, and wait for `MERGED` before the next layer.
+
 On a layer of a stack tracked locally, so `gh stack view --json` succeeds, `gh stack merge --yes`
 merges the whole stack without a number. After `gh stack link`, which tracks nothing locally, pass
 the top PR's number. A bare number is read as a stack number first, then as a PR number: a PR
