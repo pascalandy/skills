@@ -20,7 +20,7 @@ This glossary is for the user designing a brigade. The Chef does not need it, an
 | manic-1 | Every change in the stack, looking for a reason to reject it or anything overkill | ADV<n> |
 | manic-2 | What the stack could break. Includes a premortem that assumes it merged and broke something a week later | BLAST<n> |
 | manic-3 | Whether the docs match the changed behavior | RDOC<n> |
-| manic-4 | Nothing. It was never built, because of a design miscalculation. `$brigade ; <route> ; manic-4` runs the route in fast track: the Cook implements and no barrage runs | fast track |
+| manic-4 | Nothing. It was never built, because of a design miscalculation. `$brigade ; <route> ; manic-4` runs the route in fast track: the Cook implements, and no DocWriter or barrage runs | fast track |
 | manic-5 | The whole stack one last time. It works, so what would make it great and simple | PRIS<n> |
 
 ## Courses

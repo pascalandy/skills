@@ -36,7 +36,7 @@ chef-on-claude = { inherit = true }
 chef-on-codex = { inherit = true }
 service-tier = "standard"
 runtime-mode = "inherit"
-skip-in-fast-track = false
+skip-in-fast-track = true
 retro = false
 
 [manic-3] # Step 5: Docs review
