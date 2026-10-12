@@ -14,7 +14,7 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 - **SOP**: a procedure one thread runs, in `references/sop/`. Each file name starts with the role that runs it
 - **Card**: a unit of work in the agreed plan
 - **Round**: one request from Pascal, from alignment to closing. A MAIN can run several rounds
-- **Fast track**: Pascal says `fast track` to skip the REV threads. Pascal reviews the work with MAIN in real time, and says when to launch a reviewer
+- **Fast track**: Pascal says `fast track` to skip each step whose role sets `skip-in-fast-track` in `config.toml`. Pascal reviews the work with MAIN in real time, and says when to launch a reviewer
 
 ## Pick the branch
 
@@ -47,6 +47,18 @@ Only MAIN talks to Pascal. Every other thread reports to MAIN with `t3_thread_se
 | [rev-docs](references/sop/rev-docs.md) | REV | Launched as RDOC |
 | [rev-pristine](references/sop/rev-pristine.md) | REV | Launched as PRIS |
 | [doc-update](references/sop/doc-update.md) | DOC | Launched, or MAIN relays findings |
+
+## Settings
+
+[config.toml](config.toml) holds the numbers and switches the SOPs read. Change a setting in the skill's source copy, never in an installed copy.
+
+| Key | Table | Read by |
+|---|---|---|
+| `merge-confidence`, `retro-max-issues` | `[main]` | `main-closing` |
+| `retro` | `[main]` and each role | `main-closing`, `main-triage` |
+| `main-on-claude`, `main-on-codex`, `service-tier`, `runtime-mode` | Each role | `main-launch` |
+| `max-passes` | Each REV role | `main-triage` |
+| `skip-in-fast-track` | Each role | Fast track |
 
 ## Use cases
 

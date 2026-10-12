@@ -17,7 +17,7 @@ MAIN runs each step in order and launches each thread with `main-launch`.
 | 6 | Pristine review | PRIS<n>, then MAIN | `rev-pristine`, `main-triage` |
 | 7 | Closing | MAIN, COD<n> | `main-closing` |
 
-Fast track skips steps 2, 3, 5, and 6.
+Fast track skips each step whose role sets `skip-in-fast-track` in `config.toml`.
 
 ## Diagram
 
@@ -60,7 +60,7 @@ sequenceDiagram
     create participant A1 as 👀 ADV1 <id4>
     M->>A1: Agent: $s3 #59; rev-adverse PR 35 ->
     rect rgba(140, 170, 238, 0.18)
-        loop Up to 3 passes
+        loop Up to max-passes
             A1->>A1: Review PR 35, then 2nd-pass on the report
             A1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
@@ -80,7 +80,7 @@ sequenceDiagram
     M->>B1: Agent: $s3 #59; rev-blast-radius, PR 35 ->
     M->>M: Write its own premortem
     rect rgba(140, 170, 238, 0.18)
-        loop Up to 3 passes
+        loop Up to max-passes
             B1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings ->
@@ -103,7 +103,7 @@ sequenceDiagram
     create participant E1 as 👀 RDOC1 <id4>
     M->>E1: Agent: $s3 #59; rev-docs, PR 36 ->
     rect rgba(140, 170, 238, 0.18)
-        loop Up to 3 passes
+        loop Up to max-passes
             E1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>D1: Agent: Fix the accepted findings ->
@@ -120,7 +120,7 @@ sequenceDiagram
     create participant R1 as 👀 PRIS1 <id4>
     M->>R1: Agent: $s3 #59; rev-pristine, PR 35 and PR 36 ->
     rect rgba(140, 170, 238, 0.18)
-        loop Up to 3 passes
+        loop Up to max-passes
             R1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings, to each layer's owner ->
