@@ -11,7 +11,7 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 ## Vocabulary
 
 - **CU**: a use case. It shows the dynamics between Pascal and the threads, as a process and a sequence diagram. Each step names the SOP its thread follows
-- **SOP**: a procedure one thread runs, in `references/sop/`. Each file name starts with the role that runs it
+- **SOP**: a thread's procedure in `references/sop/`. Its file name starts with its role
 - **Card**: a unit of work in the agreed plan
 - **Round**: one request from Pascal, from alignment to closing. A MAIN can run several rounds
 - **Fast track**: Pascal says `fast track` to skip each step whose role sets `skip-in-fast-track` in `config.toml`. Pascal reviews the work with MAIN in real time, and says when to launch a reviewer
@@ -19,26 +19,26 @@ S3 is how Pascal works in T3 Code. From the `projects` desk, Pascal talks only t
 ## Pick the branch
 
 - **Pascal invokes `s3`:** you are MAIN. Run [CU1](references/cu1.md) on the agreed plan
-- **A launch message starts with `$s3 ; <sop>`:** you are the thread it names. Read `references/sop/<sop>.md` and follow it
+- **A launch message starts with `$s3 ; <sop>`:** follow the named SOP from the index below
 
 ## Roles
 
 | Role | Thread name | Does |
 |---|---|---|
-| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches each thread, triages every finding, merges when confident or on Pascal's go. Never edits code |
+| MAIN | `👑 MAIN <id4> <subject>` | The only thread Pascal talks to. Launches threads, triages findings, and closes the round. Never edits code |
 | COD | `🐝 COD<n> <id4>` | Implements its card in its worktrees, opens its PRs, applies the findings MAIN relays, runs its retros |
 | REV | `👀 ADV<n> <id4>`, `👀 BLAST<n> <id4>`, `👀 RDOC<n> <id4>`, `👀 PRIS<n> <id4>` | Reviews the stack of COD<n> and reports. Edits no file. Lists each finding with its severity, its file and line, and the fix it proposes |
 | DOC | `📚 DOC<n> <id4>` | Updates the docs the stack makes stale, in a docs PR at the top of the stack of COD<n>, and applies the findings MAIN relays on it |
 
-`<id4>` is the last 4 characters of MAIN's threadId. Searching it in T3, or passing it to `t3_thread_list` as `titleContains`, shows the whole family. `<n>` is the number of the COD the thread works for. CODs count from 1, in launch order.
+`<id4>` is the last 4 characters of MAIN's threadId. Find its threads with T3 search or `t3_thread_list` with `titleContains`. `<n>` identifies the COD the thread works for. CODs count from 1, in launch order.
 
-Only MAIN talks to Pascal. Every other thread reports to MAIN with `t3_thread_send`.
+Other threads report to MAIN with `t3_thread_send`.
 
 ## SOPs
 
 | SOP | Role | Read when |
 |---|---|---|
-| [main-launch](references/sop/main-launch.md) | MAIN | Before each thread you launch, and once BLAST runs |
+| [main-launch](references/sop/main-launch.md) | MAIN | Before each launch; step 4 applies only to BLAST |
 | [main-triage](references/sop/main-triage.md) | MAIN | A REV reports |
 | [main-closing](references/sop/main-closing.md) | MAIN | The reviews end: report, merge, retros, settle |
 | [cod-implement](references/sop/cod-implement.md) | COD | Launched, or MAIN relays findings or asks for your retros |
@@ -64,7 +64,7 @@ Only MAIN talks to Pascal. Every other thread reports to MAIN with `t3_thread_se
 
 | CU | Status |
 |---|---|
-| [CU1](references/cu1.md) | Approved. Run it for every `s3` request |
+| [CU1](references/cu1.md) | Approved |
 | [CU2](references/cu2.md) | Not approved. Never run it |
 | [CU3](references/cu3.md) | Not approved. Never run it |
 

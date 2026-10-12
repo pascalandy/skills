@@ -1,6 +1,6 @@
 # CU1. Rounds in one MAIN
 
-Pascal runs successive rounds in one MAIN. Each round implements one card with one COD, runs the reviews one at a time, and ends on the merge and the retros. The example runs two rounds: round 1 removes personal data from skill-xyz, and round 2, summarized, hands another issue to a second COD.
+Pascal runs successive rounds in one MAIN, with one COD per card and reviews in order. Round 1 removes personal data from skill-xyz. Round 2 is a short summary of another issue handed to the next COD.
 
 ## Process
 
@@ -17,7 +17,7 @@ MAIN runs each step in order and launches each thread with `main-launch`.
 | 6 | Pristine review | PRIS<n>, then MAIN | `rev-pristine`, `main-triage` |
 | 7 | Closing | MAIN, COD<n> | `main-closing` |
 
-Fast track skips each step whose role sets `skip-in-fast-track` in `config.toml`. When the agreed work opens no PR, such as issue edits only, MAIN does it alone, skips steps 1 to 6, and says so in its report.
+Apply Fast track from `SKILL.md`. When the agreed work opens no PR, such as issue edits only, MAIN does it alone, skips steps 1 to 6, and says so in its report.
 
 ## Diagram
 
@@ -33,7 +33,7 @@ Each step opens with a banner that holds its number and name from the process ta
 
 ```mermaid
 sequenceDiagram
-    accDescr: Pascal talks only to MAIN. In each round, MAIN launches a COD, then each reviewer and DOC one at a time, triages each report, settles each reviewer once its review ends, merges, and runs the retros
+    accDescr: Pascal talks only to MAIN. In each round, MAIN launches a COD, then each reviewer and DOC one at a time, triages each report, settles each reviewer once its review ends, records the merge outcome, and runs the retros
     autonumber
     actor U as USER
     participant M as 👑 MAIN <id4> [subject]
@@ -67,7 +67,7 @@ sequenceDiagram
             M->>C1: Agent: Fix the accepted findings ->
             C1->>C1: Fix, push, then 2nd-pass
             C1-->>M: Agent: Fixed and pushed <-
-            opt The fixes need a fresh look
+            opt Fixes need a fresh look and passes remain
                 M->>A1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
@@ -85,7 +85,7 @@ sequenceDiagram
             M->>M: Accept or reject each finding
             M->>C1: Agent: Fix the accepted findings ->
             C1-->>M: Agent: Fixed and pushed <-
-            opt The fixes need a fresh look
+            opt Fixes need a fresh look and passes remain
                 M->>B1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
@@ -108,7 +108,7 @@ sequenceDiagram
             M->>M: Accept or reject each finding
             M->>D1: Agent: Fix the accepted findings ->
             D1-->>M: Agent: Fixed and pushed <-
-            opt The fixes need a fresh look
+            opt Fixes need a fresh look and passes remain
                 M->>E1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
@@ -123,9 +123,15 @@ sequenceDiagram
         loop Up to max-passes
             R1-->>M: Agent: Findings <-
             M->>M: Accept or reject each finding
-            M->>C1: Agent: Fix the accepted findings, to each layer's owner ->
-            C1-->>M: Agent: Fixed and pushed <-
-            opt The fixes need a fresh look
+            opt Accepted code findings
+                M->>C1: Agent: Fix the accepted code findings ->
+                C1-->>M: Agent: Fixed and pushed <-
+            end
+            opt Accepted docs findings
+                M->>D1: Agent: Fix the accepted docs findings ->
+                D1-->>M: Agent: Fixed and pushed <-
+            end
+            opt Fixes need a fresh look and passes remain
                 M->>R1: Agent: Rerun on the new heads, with prior findings ->
             end
         end
