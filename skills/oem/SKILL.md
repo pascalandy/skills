@@ -111,7 +111,6 @@ When you need a decision from me, load `$feel-me` and ask your questions as it d
 - Fix CI failures, distinguishing real failures from known infrastructure flakes
 - If nothing is new, stay quiet, do not post filler comments
 - Stop monitoring when review bots are green on the latest commit
-- Merge only when the request specifies that disposition; otherwise, report the result and ask
 - Use `pascalandy@users.noreply.github.com` as the author and committer email so GitHub accepts the push
 
 ## Signature
