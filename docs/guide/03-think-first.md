@@ -10,7 +10,7 @@ I want to move my team's weekly status report from email to a shared dashboard.
 feel-me
 ```
 
-The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the FMO, the change it suggests, then the CMO, how things work today, for reference.
+The agent changes nothing yet. It restates your goal and the problem in its own words. Each question carries the FMO, the change it suggests, then the choices, and last the CMO, how things work today, for reference.
 
 For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
 

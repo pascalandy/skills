@@ -12,12 +12,10 @@ feel-me
 
 Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `feel-me` l'oblige à s'aligner avant d'agir.
 
-L'agent ne modifie rien. Il reformule ton but et le problème à résoudre, puis présente chaque point à trancher :
+L'agent ne modifie rien. Il reformule ton but et le problème à résoudre, puis pose les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu. Chaque question porte :
 
-- **FMO** : ce qu'il propose, assez concret pour que tu puisses agir
-- **CMO** : ce qui existe aujourd'hui, à consulter au besoin
-
-Viennent ensuite les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu.
+- **FMO** : ce qu'il propose, assez concret pour que tu puisses agir, suivi des choix
+- **CMO** : ce qui existe aujourd'hui, après les choix, à consulter au besoin
 
 ## Réponds jusqu'à zéro question
 
