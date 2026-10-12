@@ -11,6 +11,8 @@ A mode's routes run through that mode's SKILL.md.
 
 ## Modes
 
+- `brigade-mode`: Use only when explicitly invoked as `brigade` or `brigade-mode`, followed by `;` and a route name, where `brigade` may be any voice-to-text spelling that sounds like it, such as `brigad` or `brigade mode`.
+  - `arancini`: Run rounds in one Chef: one Cook per card, then the barrages in order, then closing.
 - `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests.
   - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
@@ -68,7 +70,6 @@ A mode's routes run through that mode's SKILL.md.
 - `json-config-schema`: Use when creating, reviewing, changing, versioning, or validating the JSON Schema of a JSON config file.
 - `label-for-issues`: Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
-- `s3`: Use only when explicitly invoked as `s3`, alone or followed by `;` and an SOP name, where `s3` may be any voice-to-text spelling that sounds like it, such as `S 3` or `S three`.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
 - `verify-transcript`: Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check.
 - `verify-video-archive`: Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery.
