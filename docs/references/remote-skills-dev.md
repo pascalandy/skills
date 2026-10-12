@@ -59,7 +59,6 @@ A mode's routes run through that mode's SKILL.md.
 - `commit`: Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
 - `epic-grooming`: Use only when explicitly invoked as `epic-grooming`, to rank open GitHub issues and group them into Epics.
-- `execute`: Use only when explicitly invoked as `execute`, `execute solo`, or `implement`, or by a clear go-ahead to implement an agreed plan.
 - `gh-stack`: Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.
 - `git-local`: Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries.
 - `grill-for-unknowns`: Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria.
@@ -69,6 +68,7 @@ A mode's routes run through that mode's SKILL.md.
 - `json-config-schema`: Use when creating, reviewing, changing, versioning, or validating the JSON Schema of a JSON config file.
 - `label-for-issues`: Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
+- `s3`: Use only when explicitly invoked as `s3`, alone or followed by `;` and an SOP name, where `s3` may be any voice-to-text spelling that sounds like it, such as `S 3` or `S three`.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
 - `verify-transcript`: Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check.
 - `verify-video-archive`: Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery.
