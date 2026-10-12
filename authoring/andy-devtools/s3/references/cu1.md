@@ -53,29 +53,44 @@ sequenceDiagram
     Note over U,M: Adverse review
     create participant A1 as 👀 ADV1 <id4>
     M->>A1: Agent: $s3 #59; rev-adverse, P1 ->
-    A1->>A1: Review P1, 2nd-pass on the report (internal)
-    A1-->>M: Agent: Findings <-
-    M->>M: Accept or reject each finding (internal)
-    M->>C1: Agent: Fix the accepted findings ->
-    C1->>C1: Fix, push, 2nd-pass (internal)
-    C1-->>M: Agent: Fixed and pushed <-
+    loop Up to 3 passes
+        A1->>A1: Review P1, 2nd-pass on the report (internal)
+        A1-->>M: Agent: Findings <-
+        M->>M: Accept or reject each finding (internal)
+        M->>C1: Agent: Fix the accepted findings ->
+        C1->>C1: Fix, push, 2nd-pass (internal)
+        C1-->>M: Agent: Fixed and pushed <-
+        opt The fixes need a fresh look
+            M->>A1: Agent: Rerun on the new heads, with prior findings ->
+        end
+    end
 
     Note over U,M: Blast-radius review
     create participant B1 as 👀 BLAST1 <id4>
     M->>B1: Agent: $s3 #59; rev-blast-radius, P1 ->
     M->>M: Write its own premortem (internal)
-    B1-->>M: Agent: Findings <-
-    M->>M: Accept or reject each finding (internal)
-    M->>C1: Agent: Fix the accepted findings ->
-    C1-->>M: Agent: Fixed and pushed <-
+    loop Up to 3 passes
+        B1-->>M: Agent: Findings <-
+        M->>M: Accept or reject each finding (internal)
+        M->>C1: Agent: Fix the accepted findings ->
+        C1-->>M: Agent: Fixed and pushed <-
+        opt The fixes need a fresh look
+            M->>B1: Agent: Rerun on the new heads, with prior findings ->
+        end
+    end
 
     Note over U,M: Pristine review
     create participant R1 as 👀 PRIS1 <id4>
     M->>R1: Agent: $s3 #59; rev-pristine, P1 ->
-    R1-->>M: Agent: Findings <-
-    M->>M: Accept or reject each finding, end the reviews (internal)
-    M->>C1: Agent: Fix the accepted findings ->
-    C1-->>M: Agent: Fixed and pushed <-
+    loop Up to 3 passes
+        R1-->>M: Agent: Findings <-
+        M->>M: Accept or reject each finding (internal)
+        M->>C1: Agent: Fix the accepted findings ->
+        C1-->>M: Agent: Fixed and pushed <-
+        opt The fixes need a fresh look
+            M->>R1: Agent: Rerun on the new heads, with prior findings ->
+        end
+    end
 
     Note over U,M: Docs updates
     create participant D1 as 📚 DOC1 <id4>
