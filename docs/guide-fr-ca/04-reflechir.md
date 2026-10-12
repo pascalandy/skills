@@ -1,6 +1,6 @@
 # Réfléchir avant de décider
 
-`consensus` aligne l'agent sur une tâche à exécuter. Les outils suivants t'aident à déposer tes idées ou à examiner une décision avant de t'engager.
+`feel-me` aligne l'agent sur une tâche à exécuter. Les outils suivants t'aident à déposer tes idées ou à examiner une décision avant de t'engager.
 
 ## Dépose tes idées avec `brainstorm`
 
@@ -8,7 +8,7 @@
 brainstorm
 ```
 
-Envoie ensuite tes idées en vrac, un message à la fois. L'agent écoute et répond "ok", sans analyser ni proposer. Quand tout est déposé, demande la suite, comme un `consensus` sur ce que tu viens d'écrire.
+Envoie ensuite tes idées en vrac, un message à la fois. L'agent écoute et répond "ok", sans analyser ni proposer. Quand tout est déposé, demande la suite, comme un `feel-me` sur ce que tu viens d'écrire.
 
 ## Mets un plan à l'épreuve avec `grilling`
 
@@ -42,6 +42,6 @@ research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux
 
 L'agent remonte chaque affirmation jusqu'à sa source et la cite. Ouvre au moins une source.
 
-**Piège :** confondre `consensus` et `grilling`. `consensus` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
+**Piège :** confondre `feel-me` et `grilling`. `feel-me` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
 
 Suite : [Écrire et réviser](./05-ecrire.md).

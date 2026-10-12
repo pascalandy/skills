@@ -2,15 +2,15 @@
 
 A vague request gets a vague answer, and a rushed decision costs more than the minutes it saved. In this page you use four skills and two `andy-mode` routes. They make the agent understand the goal first, or make your own thinking sharper before you decide.
 
-## Agree before doing with `consensus`
+## Agree before doing with `feel-me`
 
 ```text
 I want to move my team's weekly status report from email to a shared dashboard.
 
-consensus
+feel-me
 ```
 
-The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the CMO, how things work today, and the FMO, the change it suggests.
+The agent changes nothing yet. It restates your goal and the problem in its own words. For each point to settle, it shows the FMO, the change it suggests, then the CMO, how things work today, for reference.
 
 For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
 
@@ -22,7 +22,7 @@ It applies your answers, rethinks its proposals, and asks again until nothing is
 brainstorm
 ```
 
-Then send your ideas as they come, one message at a time. The agent listens and answers "ok", without analyzing or suggesting anything. Once you have sent everything, ask for the next step, such as a `consensus` on what you just wrote.
+Then send your ideas as they come, one message at a time. The agent listens and answers "ok", without analyzing or suggesting anything. Once you have sent everything, ask for the next step, such as a `feel-me` on what you just wrote.
 
 ## Get grilled with `grilling`
 
@@ -58,6 +58,6 @@ research how bakeries in Montreal price custom cakes. Cite your sources.
 
 The agent follows each claim back to the source that owns it, such as a business's own website or an official page, and cites it. Open at least one source to check the answer instead of trusting it.
 
-**Pitfall:** don't write "agree on it and do it" in one request. `consensus` stops before doing on purpose, so you can catch a wrong idea while it's still cheap. Say `go` once its proposals are right.
+**Pitfall:** don't write "agree on it and do it" in one request. `feel-me` stops before doing on purpose, so you can catch a wrong idea while it's still cheap. Say `go` once its proposals are right.
 
 Next: [Write and edit with the agent](./04-write.md).

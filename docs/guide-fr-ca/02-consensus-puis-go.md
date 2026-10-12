@@ -1,21 +1,21 @@
 # Viser le consensus, puis dire go
 
-Ma façon de travailler tient en deux mots. `consensus` aligne l'agent sur ce que je veux. `go` lance le travail.
+Ma façon de travailler tient en deux mots. `feel-me` aligne l'agent sur ce que je veux. `go` lance le travail.
 
-## Termine chaque demande par `consensus`
+## Termine chaque demande par `feel-me`
 
 ```text
 Je veux envoyer une infolettre mensuelle à mes clients.
 
-consensus
+feel-me
 ```
 
-Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `consensus` l'oblige à s'aligner avant d'agir.
+Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `feel-me` l'oblige à s'aligner avant d'agir.
 
 L'agent ne modifie rien. Il reformule ton but et le problème à résoudre, puis présente chaque point à trancher :
 
-- **CMO** : ce qui existe aujourd'hui
 - **FMO** : ce qu'il propose, assez concret pour que tu puisses agir
+- **CMO** : ce qui existe aujourd'hui, à consulter au besoin
 
 Viennent ensuite les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu.
 
@@ -41,12 +41,12 @@ go
 
 L'agent exécute ce que vous avez convenu, sans deviner. Si un point cloche, dis-le au lieu de taper `go`, et il revoit ses propositions.
 
-`consensus` se combine avec un mode. L'alignement vient d'abord, le playbook suit au `go` :
+`feel-me` se combine avec un mode. L'alignement vient d'abord, le playbook suit au `go` :
 
 ```text
 marketing ; launch. Je lance un service de tenue de livres par texto.
 
-consensus
+feel-me
 ```
 
 **Piège :** taper `go` sans lire les propositions. Le consensus existe pour attraper une mauvaise idée pendant qu'elle coûte peu.
