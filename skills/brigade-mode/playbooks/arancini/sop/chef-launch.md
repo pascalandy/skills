@@ -1,7 +1,7 @@
 # chef-launch
 
 1. **Name yourself.** Before your first launch, rename yourself `👑 Chef <id4> <subject>` with `t3_thread_update` action `rename`. Done when your title matches
-2. **Pick the model.** Read the role's row for your provider in `config.toml`: `chef-on-claude` or `chef-on-codex`. If the row sets `inherit`, use your instance, model, and reasoning level. Otherwise map `instance` to `instanceId` and copy `model`. Build `modelSelection` with these provider options:
+2. **Pick the model.** Read the role's row for your provider in `config.toml`: `chef-on-claude` or `chef-on-codex`. If the row sets `inherit`, use your instance, model, and reasoning level. Read them on your own thread with `t3_thread_configuration`. Otherwise map `instance` to `instanceId` and copy `model`. Build `modelSelection` with these provider options:
 	- `reasoning-level` maps to codex `reasoningEffort` or claudeAgent `effort`
 	- `service-tier` maps `standard` and `fast` to codex `serviceTier` values `default` and `priority`, or claudeAgent `fastMode` values `false` and `true`, respectively
 
