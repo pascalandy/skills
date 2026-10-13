@@ -12,7 +12,7 @@ Review the requested deliverable against the user's requirements and the evidenc
 
 Inspect related docs, skills, and project files only when the deliverable or current changes directly affect them. State the review boundary before expanding a check. Record unrelated pre-existing issues separately rather than turning the pass into a general project audit.
 
-- Only if you see impacts on `/docs`, use and reload `andy-mode ; docs`.
+- Only if the change leaves a page in `/docs` out of date, use and reload `andy-mode ; docs`, unless your workflow gives that page to another role: then report it.
 
 ## Quality Bar
 
