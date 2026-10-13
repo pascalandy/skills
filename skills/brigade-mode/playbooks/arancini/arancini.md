@@ -71,7 +71,7 @@ The Chef runs each step in order and launches each thread with `chef-launch`.
 | 6 | Pristine review | manic-5 Cook<n>, then Chef | `manic-5`, `chef-triage` |
 | 7 | Closing | Chef, Cook<n> | `chef-closing` |
 
-Apply [Fast track](#vocabulary). When the agreed work opens no PR, such as issue edits only, the Chef does it alone, skips steps 1 to 6, and says so in its report. When the Chef already opened the PRs during alignment, it skips step 1, applies the shared rules to those PRs, gives each later thread its worktrees and PRs in place of Cook<n>'s, and launches Cook<n> on them only to fix accepted findings.
+Apply [Fast track](#vocabulary). When the agreed work opens no PR, such as issue edits only, the Chef does it alone, skips steps 1 to 6, and says so in its report. When the Chef already opened the PRs during alignment, it skips step 1, applies the shared rules to those PRs, and uses them and their worktrees in place of Cook<n>'s, for each later thread and for the merge. It launches Cook<n> on those worktrees only when the stack needs a writer, to fix accepted findings or to restack it.
 
 ## Diagram
 
