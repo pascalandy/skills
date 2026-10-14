@@ -2,14 +2,14 @@
 name: debug-mode plan
 description: The build order for debug-mode, in small units that each end on a check
 date_created: 2026-10-13
-status: proposed
+status: superseded
 ---
 
-# Plan: build debug-mode
+# Plan: build debug-mode (round 1)
 
-This page lists the steps to build what [design.md](design.md) describes. Each unit ends on a check. A phase starts only when the previous phase's checks pass. Work in a worktree of `pascalandy/skills`, one PR per phase, as the repository's `AGENTS.md` says. Phases 0 and 1 share one PR: the compile script rejects files outside a package, so the fixtures land with the package's `SKILL.md`.
+This page lists the steps to build what [design-round-1.md](design-round-1.md) describes. [The current plan](../plan.md) replaces it. Each unit ends on a check. A phase starts only when the previous phase's checks pass. Work in a worktree of `pascalandy/skills`, one PR per phase, as the repository's `AGENTS.md` says. Phases 0 and 1 share one PR: the compile script rejects files outside a package, so the fixtures land with the package's `SKILL.md`.
 
-Before writing any skill text, load `writing-great-skills`. Before writing any script, read [script conventions](../../../references/script-conventions.md).
+Before writing any skill text, load `writing-great-skills`. Before writing any script, read [script conventions](../../../../references/script-conventions.md).
 
 ## Phase 0: evals and a baseline
 

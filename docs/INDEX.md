@@ -30,8 +30,8 @@ date_updated: 2026-10-13
 
 | File | Description |
 |------|-------------|
-| `ideas/references/2026-10-13-debug-mode/design.md` | Proposed design for `debug-mode`, distilled from Cindy Sridharan's debugging post: the principles, vocabulary, case file, both routes, accretion, and edits to existing skills. Its `sources/` folder keeps the brief, two independent designs, and a prior-art survey |
-| `ideas/references/2026-10-13-debug-mode/plan.md` | Build order for `debug-mode`, in phases that each end on a check |
+| `ideas/references/2026-10-13-verify-and-diagnose/design.md` | Agreed design, distilled from Cindy Sridharan's debugging post: one workflow for a feature request and a bug, each project's verify loop, the new `diagnose` skill, adversarial review in `interrogate`, and edits to existing skills. Its `sources/` folder keeps the inputs of both design rounds |
+| `ideas/references/2026-10-13-verify-and-diagnose/plan.md` | Build order for that design, in phases that each end on a check |
 
 ### kind/doc
 

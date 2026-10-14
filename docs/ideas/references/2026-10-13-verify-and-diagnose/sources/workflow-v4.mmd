@@ -1,0 +1,65 @@
+flowchart LR
+  accTitle: One workflow for a feature request and a bug
+  accDescr: A feature goes straight to the shared lane. A bug first goes to diagnose, which hands the reading that exposed it to the same lane. maintain-verification-skill is the only writer of the verify loop, and the verify loop appears once. Every verify failure goes to diagnose. A fixed bug returns to diagnose after merge to re-read the field. Retros file issues that come back as new requests.
+
+  feat(["`**A feature is requested**`"])
+  bug(["`**A bug arrives**`"])
+  diag["`**diagnose**
+  facts first, a working case,
+  hypotheses in a matrix`"]
+  maint["`**1. maintain-verification-skill**
+  only writer of the verify loop
+  adds or strengthens a reading
+  and its normal value`"]
+
+  bug --> diag
+  feat --> maint
+  diag == "cause confirmed:
+  the reading that exposed it" ==> maint
+
+  subgraph lane["ONE LANE: a feature or a fix"]
+    direction LR
+    maint
+    impl["`**2. poteto-mode**
+    feature or bug-fix
+    code that records the reading`"]
+    ci{"`**3. CI**
+    just check`"}
+    loop{"`**4. Verify loop**
+    verify-#lt;app#gt;, run by a delegate agent
+    readings vs last good run
+    a planted bug must fail`"}
+    barr["`**5. Barrages**`"]
+    merge(["`**6. Merge**`"])
+    maint --> impl --> ci
+    ci -- "pass" --> loop
+    ci -- "fail" --> impl
+    loop -- "pass" --> barr
+    barr -- "finding" --> impl
+    barr -- "clean" --> merge
+  end
+
+  retro["`**Retros**
+  file issues, never edit
+  an accepted issue comes back
+  as a new request or bug`"]
+  inter["`**interrogate**
+  eliminates, never confirms`"]
+
+  merge -- "feature" --> retro
+  diag -- "case closed" --> retro
+  diag -. "calls" .-> inter
+  barr -. "calls" .-> inter
+  loop -- "fails" --> diag
+  merge -- "fix: re-read the field" --> diag
+
+  classDef bugc fill:#303446,stroke:#ef9f76,color:#ffffff
+  classDef lanec fill:#303446,stroke:#8caaee,color:#ffffff
+  classDef loopc fill:#81c8be,stroke:#81c8be,color:#000000
+  classDef helperc fill:#303446,stroke:#ca9ee6,color:#ffffff
+  classDef entryc fill:#000000,stroke:#ffffff,color:#ffffff
+  class diag bugc
+  class maint,impl,ci,barr,merge lanec
+  class loop loopc
+  class inter,retro helperc
+  class feat,bug entryc

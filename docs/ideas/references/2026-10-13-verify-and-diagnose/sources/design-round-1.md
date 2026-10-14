@@ -2,12 +2,12 @@
 name: debug-mode design
 description: Why and how to turn Cindy Sridharan's debugging post into one mode, debug-mode, plus edits to the skills it touches
 date_created: 2026-10-13
-status: proposed
+status: superseded
 ---
 
-# Design: debug-mode
+# Design: debug-mode (round 1)
 
-This page explains the design. [plan.md](plan.md) holds the build steps. [sources/](sources/) holds the inputs: the brief, two independent designs (Codex GPT-6.1-Sol and Claude Opus 5.5), the lead's design written before reading them, and a prior-art survey.
+The first-round design, kept for the record. [The current design](../design.md) replaces it. A source in this folder that cites `design.md` or `plan.md` by line means this page or [plan-round-1.md](plan-round-1.md). This folder also holds the inputs: the brief, two independent designs (Codex GPT-6.1-Sol and Claude Opus 5.5), the lead's design written before reading them, and a prior-art survey.
 
 The ideas come from Cindy Sridharan, [How to effectively debug when you no longer understand the code](https://copyconstruct.medium.com/how-to-effectively-debug-when-you-no-longer-understand-the-code-bd3dcb2c5f7b) (2026-10-10). Every skill built from this design restates her ideas in our own words and credits her with that link. No skill quotes her prose.
 
@@ -185,7 +185,7 @@ One Markdown file per case, at `${XDG_STATE_HOME:-~/.local/state}/debug-cases/<r
 
 One file is the whole state of the investigation. An agent resuming after compaction, a session pickup, or a fresh subagent after a retraction reads `case.md` and knows where the case stands. Markdown tables are what agents edit well and what Pascal reads directly. Codex proposed five files with JSON and hashes. That buys tamper evidence the evals have not shown a need for, at a cost every case pays.
 
-Sections, each a strict table: header (variable, report, `verify-<app>` path, ladder, current layer), Controls, Facts, Hypotheses, Judgments, Log, Interventions, Decisions, Close. [sources/design-claude.md](sources/design-claude.md) section 4.1 has a filled example from the latency bug.
+Sections, each a strict table: header (variable, report, `verify-<app>` path, ladder, current layer), Controls, Facts, Hypotheses, Judgments, Log, Interventions, Decisions, Close. [design-claude.md](design-claude.md) section 4.1 has a filled example from the latency bug.
 
 Column rules that carry the method:
 
@@ -207,7 +207,7 @@ Who writes what:
 
 ### A script only if the evals ask for it
 
-`case.py check` would lint the tables, refuse edits to fact rows, render the matrix with strength per signal, and print the next step as one JSON line under the [script output rule](../../../references/script-output.md). Phase 1 ships prose only. The script ships if a Phase 1 eval run shows a miscounted strength, an ignored `x`, a descent without repair tactics, or a lost best finding. [sources/design-claude.md](sources/design-claude.md) section 4.3 has its next-step table.
+`case.py check` would lint the tables, refuse edits to fact rows, render the matrix with strength per signal, and print the next step as one JSON line under the [script output rule](../../../../references/script-output.md). Phase 1 ships prose only. The script ships if a Phase 1 eval run shows a miscounted strength, an ignored `x`, a descent without repair tactics, or a lost best finding. [design-claude.md](design-claude.md) section 4.3 has its next-step table.
 
 ## Goal 2: a bug arrives
 
@@ -336,7 +336,7 @@ Deferred until a real case asks for it:
 
 The survey added the bidirectional signal, the noise floor, the pre-registered prediction before each probe, the `H0` reservation, coverage on absences, cause roles, clustering for separate bugs, the fresh context after a retraction, and the independent re-gathering of the facts a conclusion rests on.
 
-A separate Codex review of this page, briefed only to eliminate, found 19 defects. All 19 are fixed in this version. The largest: diagnosis requests no longer reach repair, `confirmed` and `fixed` need stronger evidence, rejected repros no longer constrain the field diagnosis, the investigation has exits, and the latency gauge records lookups instead of a count that ties at pre-production scale. [sources/review-codex.md](sources/review-codex.md) lists them.
+A separate Codex review of this page, briefed only to eliminate, found 19 defects. All 19 are fixed in this version. The largest: diagnosis requests no longer reach repair, `confirmed` and `fixed` need stronger evidence, rejected repros no longer constrain the field diagnosis, the investigation has exits, and the latency gauge records lookups instead of a count that ties at pre-production scale. [review-codex.md](review-codex.md) lists them.
 
 ## Open questions for Pascal
 
