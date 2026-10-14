@@ -193,7 +193,7 @@ gh stack merge 42 --yes          # PR #42 and every unmerged PR below it
   `gh stack merge` would land the stack in the merged branch. Read the stack number as
   [Reading state](#reading-state) says, run `gh stack unstack <number>`, which keeps the PRs and
   branches, retarget the bottom PR with `gh pr edit <bottom> --base <trunk>`, then run
-  `gh stack link <PRs bottom to top>` before `gh stack merge`
+  `gh stack link --base <trunk> <PRs bottom to top>` before `gh stack merge`
 
 Done when `gh pr view <number> --json state` prints `MERGED` for every PR in the stack.
 
