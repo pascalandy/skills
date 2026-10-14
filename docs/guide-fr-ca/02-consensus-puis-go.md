@@ -12,17 +12,19 @@ feel-me
 
 Je le fais pour chaque demande, même celles qui semblent faciles. Une demande laisse toujours des trous, et l'agent les comble en devinant. `feel-me` l'oblige à s'aligner avant d'agir.
 
-L'agent ne modifie rien. Il reformule ton but et le problème à résoudre, puis pose les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu. Chaque question porte :
+L'agent ne modifie rien. Il reformule ton but et le problème à résoudre, puis pose les questions que toi seul peux trancher. Ici : l'outil d'envoi, la taille de la liste, qui écrit le contenu. Une question sur une décision porte :
 
 - **FMO** : ce qu'il propose, assez concret pour que tu puisses agir, suivi des choix
 - **CMO** : ce qui existe aujourd'hui, après les choix, à consulter au besoin
 
+Pour un fait que toi seul connais, comme la taille de ta liste, l'agent pose une question directe, sans FMO, choix ni recommandation. Quand le fait se résume à oui ou non, la question aussi.
+
 ## Réponds jusqu'à zéro question
 
-Chaque question est numérotée, avec des choix en lettres et une recommandation marquée 🟢. Au plus quatre par ronde, les plus importantes d'abord. Réponds en une ligne :
+Chaque question est numérotée. Au plus quatre par ronde, les plus importantes d'abord. Une décision porte des choix en lettres et une recommandation marquée 🟢. Réponds en une ligne :
 
 ```text
-1a, 2b, 3a
+1a, 2 : 400 adresses, 3a
 ```
 
 L'agent intègre tes réponses, revoit l'ensemble de ses propositions et repose une question tant qu'une décision reste ouverte. Quand il n'en reste aucune, il conclut :
