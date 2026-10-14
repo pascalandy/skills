@@ -11,6 +11,7 @@ import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import unquote
 
 from conftest import commit
 
@@ -174,7 +175,7 @@ def broken_links(root: Path) -> list[str]:
     return [
         f"{path.relative_to(root).as_posix()}:{number}: links to {target}, which does not exist"
         for path, number, target in relative_links(root)
-        if not (path.parent / target.split("#", 1)[0]).exists()
+        if not (path.parent / unquote(target.split("#", 1)[0])).exists()
     ]
 
 
@@ -290,8 +291,10 @@ def test_every_relative_link_leads_to_a_file() -> None:
 
 def test_broken_links_name_the_file_line_and_target(tmp_path: Path) -> None:
     (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/my page.md").touch()
     (tmp_path / "README.md").write_text(
         "[Start](docs/start.md#setup), [gone](docs/gone.md#part), [web](https://example.com),"
+        " [spaced](docs/my%20page.md),"
         " [scratch](/tmp/brief.md), and `[code](nope.md)`.\n",
         encoding="utf-8",
     )
