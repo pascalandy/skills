@@ -220,7 +220,7 @@ CHECKS = [
     ),
     repo_test("commands", "commands", "authoring", cheap=True),
     repo_test("common"),
-    repo_test("docs", "docs"),
+    repo_test("docs", "docs", "README.md", ".agents", "skills"),
     repo_test(
         "discover_skills",
         "scripts/discover_skills.py",
