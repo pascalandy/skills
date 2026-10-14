@@ -47,6 +47,8 @@ PYTHON = "3.11"
 PYTEST = "9.1.1"
 XDIST = "pytest-xdist==3.8.0"
 ACTIONLINT = "actionlint-py@1.7.12.25"
+# pnpm dlx runs this Bun without a global install on any machine or runner
+BUN = "bun@1.4.2"
 
 log = logging.getLogger("check")
 
@@ -142,6 +144,10 @@ def pytest(
     )
 
 
+def bun(command: str, cwd: str, *args: str) -> Command:
+    return ("pnpm", "dlx", BUN, command, "--cwd", cwd, *args)
+
+
 def repo_test(stem: str, *reads: str, cheap: bool = False) -> Check:
     return Check(
         f"test-{stem.replace('_', '-')}",
@@ -159,6 +165,7 @@ HTML_MODE = "authoring/andy/html-mode/scripts"
 PLAYWRIGHT = "playwright==1.63.0"
 PILLOW = "pillow==12.3.0"
 IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
+POTETO_MODE = "authoring/poteto/poteto-mode/scripts"
 HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
 COREY_MODE = "authoring/corey-mode/scripts"
@@ -322,7 +329,13 @@ CHECKS = [
     ),
     Check(
         "poteto-mode",
-        pytest("authoring/poteto/poteto-mode/scripts/tests/test_worktree_audit.py"),
+        pytest(f"{POTETO_MODE}/tests/test_worktree_audit.py"),
+    ),
+    Check(
+        "poteto-mode-ts",
+        bun("install", POTETO_MODE, "--frozen-lockfile"),
+        bun("test", POTETO_MODE, "orch", "watch-pr"),
+        bun("run", POTETO_MODE, "typecheck"),
     ),
     Check(
         "verify-video-archive",

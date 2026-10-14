@@ -63,9 +63,8 @@ A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#mer
 
 1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
 2. Sign off on macOS. The fleet also runs Linux, and a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path, so run `gh workflow run ci.yml --ref <top layer>` too. It proves the stack's end state on Linux, not the layers below: run it on a lower layer as well when that layer may land without the ones above it
-3. A suite `just check` does not run, such as poteto-mode's TypeScript tests, runs by hand on each layer that changes it, and its PR names the command and the result
-4. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
-5. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
+3. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
+4. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
 
 ## The signoff rule
 
@@ -77,11 +76,9 @@ A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#mer
 
 ## Add or change a check
 
-Keep `just check` CI-safe: it needs no secrets or private packages and uses the network only to download tools. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
+Keep `just check` CI-safe: it needs `uv` and `pnpm`, no secrets or private packages, and uses the network only to download tools, such as the Bun that `pnpm dlx` runs for poteto-mode's TypeScript tests. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
 
 A skill check whose commands name a path under `authoring/` belongs to the package holding that path. `just check` selects it when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them selects it too. The direct repository validators always run. When git cannot compare with `origin/main`, every check runs. `--only NAME` runs a named check regardless of changed paths. `--sweep` runs every check, including unrelated suites, for release or diagnosis. `--verbose` names each skipped check
-
-poteto-mode's TypeScript tests and typecheck stay outside `just check`, which runs only its Python worktree-audit test: they need Bun, which neither the machines nor the manual CI workflow install. A change to those CLIs runs them by hand from `authoring/poteto/poteto-mode/scripts/`, without a global install: `pnpm dlx bun@1.4.2 install --frozen-lockfile`, `pnpm dlx bun@1.4.2 test orch watch-pr`, and `pnpm dlx bun@1.4.2 run typecheck`. Its PR names each command and its result
 
 The root test suite has one `test-<stem>` check for each `scripts/tests/test_<stem>.py` module. Underscores in `<stem>` become hyphens in the check name. The registry fails before running checks if a test module has no route or a route is stale or duplicated. `just check` always includes the two cheap project-rule tests, `test-commands` and `test-skill-invocation`. It selects other root test modules when their file or a declared `reads` dependency changes. Changes to `scripts/check.py`, `scripts/_cli.py`, `scripts/_common.py`, `pytest.ini`, or `scripts/tests/conftest.py` select every root test module. Selected root modules run in one pytest process under Python 3.11, the `requires-python` minimum that pyright also checks against, so a bug only an older Python shows fails on every machine. When it fails, the rerun command names only the modules pytest reports as failed, or every module of the batch when its output cannot tell, as after a collection error. Use `just check --only test-sync-fleet` to rerun one module
 
