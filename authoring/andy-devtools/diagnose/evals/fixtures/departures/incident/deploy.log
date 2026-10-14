@@ -1,0 +1,14 @@
+2026-10-14T07:55:12Z deploy #212 departures-api 3.4.0 (tag v3.4) to api-1, api-2, api-3, one host at a time, by teo.brandvold
+2026-10-14T07:55:12Z api-1 out of pool, draining
+2026-10-14T07:55:31Z api-1 stopped departures-api 3.3.0
+2026-10-14T07:55:44Z api-1 started departures-api 3.4.0
+2026-10-14T07:55:58Z api-1 health check ok, back in pool
+2026-10-14T07:56:20Z api-2 out of pool, draining
+2026-10-14T07:56:36Z api-2 stopped departures-api 3.3.0
+2026-10-14T07:56:48Z api-2 started departures-api 3.4.0
+2026-10-14T07:57:01Z api-2 health check ok, back in pool
+2026-10-14T07:57:05Z api-3 out of pool, draining
+2026-10-14T07:57:18Z api-3 stopped departures-api 3.3.0
+2026-10-14T07:57:29Z api-3 started departures-api 3.4.0
+2026-10-14T07:57:40Z api-3 health check ok, back in pool
+2026-10-14T07:57:40Z deploy #212 finished: 3 of 3 hosts on 3.4.0

@@ -1,0 +1,45 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Fri 2026-10-09 (38)
+Date: Thu, 08 Oct 2026 21:00:02 -0400
+Message-ID: <20261008210002.3F2A1C0D12@ops-1.crumbandco.example>
+
+Orders for Fri 2026-10-09
+07:00  #50851  Emeric Laurier        2 baguette
+07:00  #50890  Rafferty Deschamps    1 baguette, 1 sourdough boule
+07:30  #50858  Rafferty Kessler      4 pain au chocolat  (gift box)
+07:30  #50866  Viveka Oyelaran       1 sourdough boule
+07:30  #50884  Oren Vukovic          1 olive loaf
+08:00  #50824  Odalys Beaulieu       6 croissant  (nut allergy)
+08:00  #50825  Joaquin Oduya         1 focaccia (rosemary), 1 seeded rye, 2 baguette
+08:00  #50839  Ximena Arceneaux      1 olive loaf, 1 pumpkin pie 9in
+08:00  #50849  Matteo Ostrowski      12 dinner roll, 1 pumpkin pie 9in
+08:00  #50857  Tancredi Okonjo       6 butter tart, 1 sourdough boule
+08:00  #50861  Oren Nakashima        1 pumpkin pie 9in
+08:00  #50872  Annika Ferreira       2 baguette  (call on arrival)
+08:00  #50888  Ximena Ostrowski      2 country loaf, 6 cinnamon bun, 6 butter tart
+08:30  #50753  Annika Galloway       6 croissant, 6 butter tart
+08:30  #50844  Oren Quintero         2 country loaf
+08:30  #50862  Tobiah Halvorsen      6 morning bun  (nut allergy)
+08:30  #50871  Arvid Marchand        1 focaccia (rosemary)
+08:30  #50876  Nadia Ostrowski       1 sourdough boule, 6 croissant
+08:30  #50880  Teodora Nakashima     1 challah, 1 focaccia (rosemary), 2 country loaf
+09:00  #50854  Marisela Mbeki        6 cinnamon bun, 6 croissant
+09:00  #50855  Joaquin Moreau-Diallo 2 baguette, 6 croissant
+09:00  #50867  Odalys Brennan        6 butter tart
+09:00  #50868  Lucan Ruelle          1 baguette
+09:00  #50878  Idris Pacheco         1 country loaf, 1 baguette
+09:00  #50889  Ilse Fairweather      1 seeded rye  (no sesame)
+09:30  #50863  Ilse Bergstrand       1 seeded rye  (slice the loaf)
+09:30  #50865  Halvard Halloran      2 country loaf  (gift box)
+09:30  #50870  Tancredi Tremaine     1 brioche loaf, 1 sourdough boule
+09:30  #50873  Ines Ferreira         1 country loaf
+09:30  #50882  Joaquin Marchand      6 cinnamon bun, 1 baguette
+10:00  #50860  Yesenia Moreau-Diallo 1 pumpkin pie 9in  (nut allergy)
+10:00  #50879  Rosalie Sandoval      6 morning bun, 1 pecan tart
+10:00  #50886  Arvid Kincaid         1 spelt loaf, 1 seeded rye, 1 country loaf
+10:30  #50874  Sylvain Vukovic       12 dinner roll
+10:30  #50885  Zofia Ibarra          1 seeded rye, 1 focaccia (rosemary)
+11:00  #50817  Marisela Brennan      1 seeded rye
+11:00  #50843  Mattias Vukovic       1 country loaf
+12:30  #50856  Thandiwe Tremaine     6 cinnamon bun, 1 seeded rye

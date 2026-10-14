@@ -1,0 +1,7 @@
+time     lookups/s   hit %
+14:00        1,078    72.1
+14:05        1,068    71.9
+14:10        1,086    72.0
+window       1,077    72.0
+
+lookups/s counts every /v2/search request routed to the pool; misses go on to the app

@@ -1,0 +1,9 @@
+[Unit]
+Description=Run skyrollup every night at 02:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

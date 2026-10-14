@@ -1,0 +1,61 @@
+# searches sampled from blue access logs, 2026-10-14 14:00-14:15 UTC, result cache misses, limit=24
+quick salad
+vegetarian soup
+spicy beef
+lentil
+beef stew
+spicy chicken
+spicy
+pork
+weeknight soup
+weeknight chicken
+curry
+stew
+lemon herb
+chicken curry
+miso salmon
+durian
+chicken thighs
+quick
+quick pasta
+pasta
+smoky
+spicy vegetarian
+garlic butter
+sourdough
+smoky tacos
+chicken
+quick chicken
+shrimp
+lentil soup
+noodles
+spicy noodles
+mushroom
+vegetarian curry
+grill vegetarian
+miso
+tofu stir fry
+quick tofu
+quick shrimp
+harissa
+tacos
+salmon
+halloumi
+quick noodles
+weeknight pasta
+vegetarian
+salad
+tofu
+beef
+coconut
+chickpea
+soup
+fried rice
+traybake
+vegetarian tacos
+halloumi skewers
+weeknight
+sesame
+spicy tofu
+grill
+green chile

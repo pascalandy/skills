@@ -1,0 +1,30 @@
+[
+  {
+    "skills": [
+      "maintain-verification-skill",
+      "create-verification-skill",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/tally-release.sh\""
+    ],
+    "query": "The occurrence-key branch is about to merge. Run maintain-verification-skill so verify-tally covers what this change could break, and show me the new check would catch it.",
+    "files": [
+      "evals/fixtures/tally-release.sh",
+      "evals/fixtures/tally-release"
+    ],
+    "expected_behavior": [
+      "Reads AGENTS.md, the verify-tally skill, its feature file, and the last good run before changing anything",
+      "Writes a failure model for the change that names a way it could break besides the intended change, such as a row the bank repeats at the top of a page being kept twice",
+      "Finds Birchwood's page-top copies in docs/formats.md",
+      "Notes that the existing readings would miss that break because the Birchwood sample has one page",
+      "Adds a check on a multi-page Birchwood statement built from the documented format, recording deduped and the balance check",
+      "Treats fernhill-sample inserted moving from 13 to 14 as the intended change and updates or flags its normal value, not as a failure",
+      "Shows the new check failing on the occurrence-key branch and passing on main",
+      "Changes only the verify-tally skill and its samples, not tally's code",
+      "Records each new reading's normal value from a run on main, not an invented one",
+      "Reports what it ran and where, and states no reading it did not gather"
+    ]
+  }
+]

@@ -1,0 +1,42 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Tue 2026-10-13 (35)
+Date: Mon, 12 Oct 2026 01:00:01 +0000
+Message-ID: <20261012010001.C17A3E9F02@ops-2.crumbandco.example>
+
+Orders for Tue 2026-10-13
+07:00  #50853  Henrike Laurier       1 lemon loaf, 6 butter tart, 1 sourdough boule
+07:00  #51002  Rafferty Halvorsen    2 baguette, 1 spelt loaf
+07:00  #51005  Ewan Vukovic          1 sourdough boule
+07:00  #51013  Pilar Galloway        6 morning bun
+07:00  #51022  Petra Vasquez-Lind    1 apple pie 9in, 1 spelt loaf
+07:30  #51021  Solene Ibarra         1 sourdough boule, 1 country loaf
+07:30  #51037  Noor Fairweather      1 baguette
+07:30  #51038  Idris Arceneaux       1 baguette
+08:00  #50999  Bastien Ostrowski     2 baguette
+08:00  #51039  Thandiwe Lindgren     1 baguette, 4 pain au chocolat, 12 dinner roll
+08:30  #51015  Oren Kincaid          1 pumpkin pie 9in, 6 croissant, 1 country loaf
+08:30  #51027  Sunniva Ibarra        4 pain au chocolat
+08:30  #51030  Amadou Ibarra         1 sourdough boule, 1 country loaf
+09:00  #51012  Sunniva Pacheco       1 seeded rye, 1 spelt loaf
+09:00  #51032  Liesl Deschamps       1 challah
+09:30  #50937  Odalys Kincaid        1 pumpkin pie 9in  (gift box)
+09:30  #50986  Wren Pacheco          1 olive loaf, 12 croissant
+09:30  #50989  Ewan Kincaid          1 sourdough boule  (pay at pickup)
+09:30  #51009  Kofi Corriveau        4 pain au chocolat, 1 baguette
+09:30  #51024  Solene Tremaine       4 pain au chocolat
+10:00  #50976  Joaquin Brennan       1 country loaf, 1 lemon loaf
+10:30  #51028  Kofi Kowalczyk        12 croissant, 1 country loaf
+10:30  #51035  Caius Whitcombe       4 pain au chocolat, 1 country loaf, 1 spelt loaf
+10:30  #51036  Brielle Marchand      1 olive loaf, 6 morning bun
+11:00  #51003  Hollis Mbeki          1 brioche loaf
+11:00  #51004  Halvard Sorensen      1 lemon loaf, 1 focaccia (rosemary)
+11:00  #51011  Rafferty Corriveau    1 sourdough boule
+11:00  #51018  Teodora Pellerin      1 olive loaf
+11:00  #51020  Idris Vukovic         6 cinnamon bun
+11:00  #51026  Noor Abernethy        1 sourdough boule, 6 butter tart  (gift box)
+11:00  #51029  Maelle Gauthier       1 country loaf, 1 focaccia (rosemary)
+12:00  #51008  Solene Drummond       1 country loaf, 6 croissant
+13:00  #51016  Anouk Pellerin        1 apple pie 9in
+13:00  #51031  Tobiah Vasquez-Lind   6 morning bun
+13:30  #51010  Arvid Ashdown         1 brioche loaf  (nut allergy)

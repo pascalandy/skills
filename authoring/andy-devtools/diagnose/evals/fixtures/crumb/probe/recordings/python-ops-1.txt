@@ -1,0 +1,4 @@
+$ readlink -f /usr/bin/python3   (ops-1 backup, 2026-10-09 10:00 EDT)
+/usr/bin/python3.10
+$ /usr/bin/python3 --version
+Python 3.10.12

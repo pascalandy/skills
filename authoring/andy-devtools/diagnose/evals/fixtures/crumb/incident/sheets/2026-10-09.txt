@@ -1,0 +1,51 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Sun 2026-10-11 (44)
+Date: Sat, 10 Oct 2026 01:00:01 +0000
+Message-ID: <20261010010001.4B2C1A0E3F@ops-2.crumbandco.example>
+
+Orders for Sun 2026-10-11
+07:00  #50954  Ines Galloway         2 country loaf, 1 sourdough boule
+07:30  #50891  Arvid Oduya           2 baguette  (gift box)
+07:30  #50892  Wren Sorensen         12 croissant, 6 cinnamon bun
+07:30  #50942  Halvard Thibodeau     6 cinnamon bun  (extra bag)
+07:30  #50945  Hollis Arceneaux      1 seeded rye, 1 country loaf, 1 focaccia (rosemary)
+07:30  #50957  Oren Beaulieu         6 croissant, 12 dinner roll
+07:30  #50971  Rafferty Pacheco      2 baguette
+08:00  #50894  Marisela Ostrowski    1 brioche loaf  (call on arrival)
+08:00  #50943  Maelle Beaulieu       4 pain au chocolat  (gift box)
+08:00  #50953  Solene Corriveau      2 country loaf  (no sesame)
+08:00  #50959  Dov Oduya             1 apple pie 9in  (nut allergy)
+08:00  #50960  Rafferty Nakashima    1 pecan tart, 1 apple pie 9in
+08:30  #50883  Delphine Pellerin     6 morning bun, 1 baguette, 6 croissant
+08:30  #50902  Bastien Moreau-Diallo 1 baguette, 6 croissant
+08:30  #50908  Hollis Quintero       2 baguette
+08:30  #50950  Dov Marlowe           6 cinnamon bun
+08:30  #50952  Amadou Ruelle         1 country loaf  (slice the loaf)
+08:30  #50965  Maelle Castellano     12 croissant
+08:30  #50967  Henrike Ashdown       4 pain au chocolat
+08:30  #50968  Henrike Hruska        6 cinnamon bun
+08:30  #50970  Zofia Ashdown         1 baguette
+08:30  #50972  Emeric Marlowe        1 pecan tart, 1 apple pie 9in
+09:00  #50896  Pilar Gauthier        1 country loaf, 1 sourdough boule, 2 baguette
+09:00  #50931  Ines Quintero         6 cinnamon bun, 6 croissant  (nut allergy)
+09:00  #50944  Joaquin Marchand      1 lemon loaf, 1 apple pie 9in
+09:00  #50946  Dov Kessler           1 sourdough boule, 4 pain au chocolat, 1 lemon loaf
+09:00  #50958  Idris Oduya           12 dinner roll, 1 baguette, 1 focaccia (rosemary)
+09:00  #50964  Emeric Ferreira       1 pumpkin pie 9in
+09:30  #50926  Ferran Beaulieu       1 baguette, 12 dinner roll
+09:30  #50932  Oren Hruska           1 sourdough boule, 1 pumpkin pie 9in, 1 focaccia (rosemary)
+09:30  #50961  Hollis Marchand       2 baguette
+09:30  #50969  Thandiwe Varga        2 baguette
+10:00  #50925  Brielle Pacheco       1 seeded rye, 6 croissant
+10:00  #50949  Idris Delacroix       1 focaccia (rosemary), 2 baguette, 1 pumpkin pie 9in
+10:00  #50966  Delphine Delacroix    1 sourdough boule  (gift box)
+10:30  #50859  Sylvain Tremaine      6 butter tart
+10:30  #50948  Tobiah Arceneaux      6 morning bun
+10:30  #50955  Petra Oduya           6 cinnamon bun
+11:00  #50916  Idris Abernethy       1 baguette
+11:00  #50924  Emeric Achterberg     1 sourdough boule  (no sesame)
+11:00  #50947  Anouk Ostrowski       12 croissant
+11:00  #50951  Thandiwe Pacheco      1 sourdough boule, 1 baguette
+12:00  #50864  Mattias Galloway      1 spelt loaf, 1 challah, 1 apple pie 9in
+12:00  #50899  Petra Beaulieu        1 lemon loaf

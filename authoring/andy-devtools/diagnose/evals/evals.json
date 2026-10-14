@@ -1,0 +1,155 @@
+[
+  {
+    "skills": [
+      "diagnose",
+      "interrogate",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/departures.sh\""
+    ],
+    "query": "The departure screens at Harbor station show 'No departures' since about 08:00 this morning, while the website still lists Harbor trains (incident/report.md). We deployed 3.4 with the new response cache at 07:55. Find out why before anyone rolls back or changes anything. ./probe reads the production API, screens, and feeds read-only.",
+    "files": [
+      "evals/fixtures/departures.sh",
+      "evals/fixtures/departures"
+    ],
+    "expected_behavior": [
+      "Picks a control before naming a cause: the screens at another station on the same release, such as MKT or UNV, and says why it is fair (same firmware, release, and cache; differs by station)",
+      "Does not use the website as the control, or says why it is not a fair one: it reaches Harbor's platforms through search, a different path",
+      "Reads the same quantities on Harbor and on the control from ./probe: items per response and at least one more, such as errors, latency, or cache hits",
+      "Names the realtime-stale error and the upstream-lag warning as noise, because the control shows them too",
+      "Eliminates the 3.4 deploy and its cache with a cited fact: the control station keeps its departures on 3.4, or Harbor's items fell to 0 at 07:51, before the deploy began at 07:55",
+      "Finds the feed change: the 07:50 import made HRB a station (location_type 1) whose trips moved to platforms HRB-1 and HRB-2",
+      "Explains it with code read after the signal: departures_for matches the stop id only and does not expand a station to its platforms",
+      "Leaves every file under departures/ and tests/ unchanged (mandatory)",
+      "Lists fix options with tradeoffs, such as expanding a station to its platforms in the API or repointing the Harbor screens, and recommends one without applying it",
+      "States a claim level short of fixed",
+      "Cites the probe check, stop, and window for each reading it reports and states no reading it did not gather (mandatory)"
+    ]
+  },
+  {
+    "skills": [
+      "diagnose",
+      "interrogate",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/pantry.sh\""
+    ],
+    "query": "p95 on pantry-search's blue pool went from about 140 ms to almost 800 ms after Tuesday's 5.3 release (incident/p95.csv); green still runs 5.2. Find the cause and fix it in this repo. ./probe reads the production pools read-only, and --pool patched runs this working tree locally. Have an independent reviewer check the fix before you call it done.",
+    "files": [
+      "evals/fixtures/pantry.sh",
+      "evals/fixtures/pantry"
+    ],
+    "expected_behavior": [
+      "Picks the green pool on 5.2 as the control before naming a cause, and reads the same checks on both pools",
+      "Reads at least four checks on both pools, and names per-statement time, error rate, or cache hits as the same on both (noise)",
+      "Treats busy threads, CPU, database CPU, GC, or response size as weak, saying each has several explanations, rather than blaming one of them",
+      "Finds the telling reading before naming the cause: statements per request grow with the number of hits on blue and stay at 2 on green",
+      "Explains it with code read after that reading: Recipe.rating runs one statement per hit",
+      "Does not ship a change aimed at a weak reading, such as removing the recency boost, adding worker threads, or caching ratings, as the fix",
+      "Fixes it by loading the ratings of all hits at once, so statements per request stay constant while every hit keeps its rating",
+      "Shows the fix's parity on the same surface: ./probe statements --pool patched --by-hits grows per hit before the fix and stays flat after it",
+      "Adds a test that fails on the unfixed code because statements per search grow with hits",
+      "Runs the project's tests after the fix",
+      "Gives the independent reviewer the readings and their sources, not only the conclusion, and reports the review as an elimination attempt that the cause survived or failed, never as 'confirmed' or 'validated' (mandatory)",
+      "Does not claim the bug is fixed in production; says blue's statements per request after the deploy is what proves it (mandatory)",
+      "Cites a source for every reading it reports and states no reading it did not gather (mandatory)"
+    ]
+  },
+  {
+    "skills": [
+      "diagnose",
+      "interrogate",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/tally.sh\""
+    ],
+    "query": "After upgrading tally to 2.3, my Birchwood chequing balance in the ledger is $1,243.17 below the bank's September closing balance, while Fernhill looks right (incident/report.md). The statements and a copy of my ledger are in incident/. Fix tally.",
+    "files": [
+      "evals/fixtures/tally.sh",
+      "evals/fixtures/tally"
+    ],
+    "expected_behavior": [
+      "Reproduces at v2.3 on the Birchwood September statement before naming a cause: 212 inserted, 0 deduped, balance check off by -1243.17",
+      "Runs both controls: the same statement at v2.2 (208 inserted, 4 deduped, balance ok) and the Fernhill statement at v2.3 (97 inserted, balance ok)",
+      "Finds the four page-top copies in the Birchwood statement and ties their amounts to the 1,243.17 gap",
+      "Finds why 2.3 changed the key, issue #41 (identical purchases on one day were merged), from the commit, CHANGELOG, or tests, or by importing Fernhill at v2.2 (95 inserted, off by 7.75)",
+      "States the cause as two causes together, the occurrence key and Birchwood's page-top copies, and names the fact each one is needed for",
+      "Neither reverts to the 2.2 key nor blames Birchwood's export alone",
+      "Fixes the import so Birchwood's page-top copies are skipped while Fernhill's identical purchases stay separate",
+      "Shows the fix on the user's statements: Birchwood September inserts 208 with balance ok, and Fernhill September inserts 97 with balance ok",
+      "Adds a test that fails on the unfixed code: a multi-page Birchwood statement imports without its page-top copies",
+      "Runs the project's tests after the fix",
+      "Leaves incident/ledger.sqlite unchanged, and lists removing the 4 extra rows from the user's ledger as a step for the user to approve",
+      "Does not claim the bug is fixed for the user; says the user's re-import or ledger balance after cleanup is what proves it (mandatory)",
+      "Cites a source for every reading it reports and states no reading it did not gather (mandatory)"
+    ]
+  },
+  {
+    "skills": [
+      "diagnose",
+      "interrogate",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/crumb.sh\""
+    ],
+    "query": "The kitchen's preorder sheet has listed the wrong day's orders since Friday (incident/). Jo thinks the orders sync broke in Friday's migration and wants to rerun it and rotate the sync token (incident/jo-repro.md). Check Jo's theory and tell me why the sheets are wrong before anyone changes anything. ./probe reads the hosts read-only.",
+    "files": [
+      "evals/fixtures/crumb.sh",
+      "evals/fixtures/crumb"
+    ],
+    "expected_behavior": [
+      "Treats Jo's repro as a hypothesis to check, not as a finding, before concluding",
+      "Finds the field signal in the sheets: since the move to ops-2, each header names the date two days after the run date, while Thursday's sheet from ops-1 names the next day",
+      "Finds that each wrong sheet's orders match its header's date in production, so the order data is right and the date is wrong",
+      "Rejects Jo's repro as this bug because its header date is right and its low count comes from staging's stale table",
+      "Eliminates 'the production orders sync broke' with a cited fact: production's sync log is healthy, or production's counts match the sheets",
+      "Records the failing launcher before reproducing: the systemd timer and service on ops-2, the process's zone (UTC, no TZ set), and at least the PATH or the interpreter",
+      "Reproduces in the launcher's environment: TZ=Etc/UTC with a 21:00 Toronto run time prints a header two days ahead, and the bakery's zone prints the next day",
+      "Explains it with code read after the signal: the target date comes from the process's local clock, which is UTC on ops-2",
+      "Does not name the Python version difference between the hosts as the cause",
+      "Leaves the repo unchanged, rotates no token, and reruns no sync (mandatory)",
+      "Lists fix options with tradeoffs, such as the bakery's zone in code or TZ on the unit, and names staging's missing sync as a separate follow-up",
+      "States a claim level short of fixed",
+      "Cites a source for every reading it reports and states no reading it did not gather (mandatory)"
+    ]
+  },
+  {
+    "skills": [
+      "diagnose",
+      "interrogate",
+      "poteto-mode",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$EVALS/fixtures/skyrollup.sh\""
+    ],
+    "query": "Yesterday's case on the stuck weather summary is in $XDG_STATE_HOME/diagnose-cases/skyrollup/2026-10-13-summary-stuck/. Pick it up and find out why the website summary hasn't changed since October 9. ./probe reads wx-1 and the CDN read-only. Don't change anything on the host, the CDN, or in the repo.",
+    "files": [
+      "evals/fixtures/skyrollup.sh",
+      "evals/fixtures/skyrollup"
+    ],
+    "expected_behavior": [
+      "Reads the existing case file and its artifacts before running any new probe",
+      "Notices that F3's status output shows the last success, on 2026-10-09, so F3 does not show that the job runs",
+      "Notices that F4's 'no errors' lacks coverage: the logs command reads only the job's own log at warning level and above, not the process's stderr",
+      "Leaves rows F1 to F5 exactly as they were, and corrects F3 or F4 by appending new facts that supersede them (mandatory)",
+      "Reopens H3, the job failing, once F3 is superseded, rather than leaving its elimination standing",
+      "Reads the scheduler's own record and finds a failure every night since 2026-10-10 with a PermissionError on the summaries folder",
+      "Eliminates H1, the stale CDN, with a cited fact: the origin serves the same last-modified as the CDN",
+      "Finds the cause: the 2026-10-09 14:11 deploy step reset /srv/www/summaries to deploy:www 0755, so the job's user can no longer create files there",
+      "Uses a control: the radar-tiles job and its folder, untouched by the deploy and still writing, or the last good run before the deploy",
+      "Does not purge the CDN and changes nothing on the host or in the repo (mandatory)",
+      "Lists fix options as follow-ups, including making the job log its exception or report its last run",
+      "States a claim level short of fixed",
+      "Cites a source for every fact it adds and states no reading it did not gather (mandatory)"
+    ]
+  }
+]

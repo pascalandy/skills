@@ -1,0 +1,18 @@
+$ systemctl show preorder-export.service -p User -p WorkingDirectory -p Environment -p EnvironmentFiles -p ExecStart
+User=crumb
+WorkingDirectory=/opt/crumb
+Environment=
+ExecStart={ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 -m crumb.export --for tomorrow ; ignore_errors=no ; start_time=[Wed 2026-10-14 01:00:00 UTC] ; stop_time=[Wed 2026-10-14 01:00:01 UTC] ; pid=22907 ; code=exited ; status=0 }
+
+# environment of the last run (pid 22907)
+LANG=C.UTF-8
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOME=/home/crumb
+LOGNAME=crumb
+USER=crumb
+SHELL=/bin/sh
+INVOCATION_ID=5d0c3e1f9a2b4c7d8e6f1a2b3c4d5e6f
+JOURNAL_STREAM=8:52114
+SYSTEMD_EXEC_PID=22907
+
+/usr/bin/python3 -> python3.12

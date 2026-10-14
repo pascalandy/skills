@@ -1,0 +1,40 @@
+five slowest traced /v2/search requests in the window (1 request in 200 is traced)
+
+14:06:41.208  GET /v2/search?q=chicken&limit=24  status=200  hits=24
+  total 1,318 ms = waiting for a worker 1,124 ms + handling 194 ms
+  26 statements, 74.2 ms in the store
+     n   total ms   statement
+     1        4.4   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.6   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+    24       66.2   SELECT avg(stars), count(*) FROM reviews WHERE recipe_id = ?
+
+14:11:03.775  GET /v2/search?q=vegetarian+curry&limit=24  status=200  hits=15
+  total 1,276 ms = waiting for a worker 1,139 ms + handling 137 ms
+  17 statements, 49.5 ms in the store
+     n   total ms   statement
+     1        4.6   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.4   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+    15       41.5   SELECT avg(stars), count(*) FROM reviews WHERE recipe_id = ?
+
+14:02:19.042  GET /v2/search?q=halloumi&limit=24  status=200  hits=24
+  total 1,251 ms = waiting for a worker 1,050 ms + handling 201 ms
+  26 statements, 78.9 ms in the store
+     n   total ms   statement
+     1        4.1   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.9   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+    24       70.9   SELECT avg(stars), count(*) FROM reviews WHERE recipe_id = ?
+
+14:09:55.610  GET /v2/search?q=chicken+thighs&limit=24  status=200  hits=0
+  total 1,233 ms = waiting for a worker 1,219 ms + handling 14 ms
+  2 statements, 8.1 ms in the store
+     n   total ms   statement
+     1        4.5   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.6   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+
+14:13:28.904  GET /v2/search?q=miso+salmon&limit=24  status=200  hits=4
+  total 1,219 ms = waiting for a worker 1,121 ms + handling 98 ms
+  6 statements, 18.9 ms in the store
+     n   total ms   statement
+     1        4.3   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.5   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+     4       11.1   SELECT avg(stars), count(*) FROM reviews WHERE recipe_id = ?

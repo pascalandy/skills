@@ -1,0 +1,7 @@
+time     Mon 2026-10-12 %   Wed 2026-10-14 %   change
+14:00                37.6               53.0    +41 %
+14:05                38.4               54.1    +41 %
+14:10                38.0               53.6    +41 %
+window               38.0               53.6    +41 %
+
+percent of the recipe store's capacity (all replicas serving this pool), same clock times

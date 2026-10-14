@@ -1,0 +1,20 @@
+orders-sync (env prod), every 10 min, times America/Toronto
+last ok run: 2026-10-14 09:40:06 on ops-2, 2 rows
+
+day          runs    ok  failed  rows  hosts
+2026-10-07    144   144       0    39  ops-1
+2026-10-08    144   144       0    50  ops-1
+2026-10-09    144   144       0    27  ops-1, ops-2
+2026-10-10    144   144       0    35  ops-2
+2026-10-11    144   144       0    37  ops-2
+2026-10-12    144   144       0    33  ops-2
+2026-10-13    144   144       0    45  ops-2
+2026-10-14     59    59       0    17  ops-2
+
+latest runs:
+2026-10-14 08:50:05  ok      ops-2  rows=1
+2026-10-14 09:00:04  ok      ops-2  rows=0
+2026-10-14 09:10:06  ok      ops-2  rows=0
+2026-10-14 09:20:05  ok      ops-2  rows=0
+2026-10-14 09:30:04  ok      ops-2  rows=0
+2026-10-14 09:40:06  ok      ops-2  rows=2

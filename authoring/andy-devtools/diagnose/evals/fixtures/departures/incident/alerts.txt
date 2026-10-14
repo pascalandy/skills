@@ -1,0 +1,12 @@
+Alerts for departures-api, exported 2026-10-14T08:12:30Z
+
+FIRING  screens-empty-departures  severity=page  since 2026-10-14T08:05:00Z
+  rule:    every screen of a stop shows 0 departures over the last 10 minutes (evaluated every 5 minutes)
+  stop:    HRB
+  screens: scr-hrb-01, scr-hrb-02, scr-hrb-03, scr-hrb-04
+  notified: on-call departures-api (teo.brandvold), acknowledged 08:06:12Z
+
+FIRING  realtime-stale-errors  severity=ticket  since 2026-10-14T06:15:00Z
+  rule:    "ERROR realtime: vehicle position stale" above 2% of departures requests over 15 minutes
+  value:   3.0% (all stops)
+  history: fired every day for the last 30 days; ticket OPS-4471 open with the vehicle tracking team since 2026-09-02

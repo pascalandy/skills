@@ -1,0 +1,36 @@
+five slowest traced /v2/search requests in the window (1 request in 200 is traced)
+
+14:07:12.330  GET /v2/search?q=vegetarian&limit=24  status=200  hits=24
+  total 402 ms = waiting for a worker 297 ms + handling 105 ms
+  2 statements, 8.3 ms in the store
+     n   total ms   statement
+     1        4.6   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.7   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+
+14:03:48.917  GET /v2/search?q=spicy+noodles&limit=24  status=200  hits=9
+  total 371 ms = waiting for a worker 302 ms + handling 69 ms
+  2 statements, 7.6 ms in the store
+     n   total ms   statement
+     1        4.0   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.6   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+
+14:12:05.144  GET /v2/search?q=tofu&limit=24  status=200  hits=24
+  total 344 ms = waiting for a worker 233 ms + handling 111 ms
+  2 statements, 9.9 ms in the store
+     n   total ms   statement
+     1        6.1   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.8   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+
+14:00:57.402  GET /v2/search?q=quick+pasta&limit=24  status=200  hits=9
+  total 329 ms = waiting for a worker 248 ms + handling 81 ms
+  2 statements, 7.9 ms in the store
+     n   total ms   statement
+     1        4.3   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.6   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...
+
+14:09:31.786  GET /v2/search?q=beef+stew&limit=24  status=200  hits=3
+  total 318 ms = waiting for a worker 271 ms + handling 47 ms
+  2 statements, 7.2 ms in the store
+     n   total ms   statement
+     1        3.9   SELECT r.id, r.slug, r.title, r.summary, (SELECT group_concat(t.tag, ?) FROM recipe_tags t W...
+     1        3.3   SELECT t.tag, count(*) AS n FROM recipe_tags t WHERE t.recipe_id IN (SELECT r.id FROM recipe...

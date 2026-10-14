@@ -1,0 +1,7 @@
+stop_id,stop_name,location_type,parent_station
+CEN,Central,0,
+MKT,Market Street,0,
+HRB,Harbor,0,
+PRD,Pier Road,0,
+B1204,Market St & 4th Ave,0,
+B1205,Alder Rd & 4th Ave,0,

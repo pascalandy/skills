@@ -1,0 +1,9 @@
+NEXT                        LEFT      LAST                        PASSED        UNIT                         ACTIVATES
+Wed 2026-10-14 09:45:00 UTC  3min 40s Wed 2026-10-14 09:30:00 UTC 11min 20s ago radar-tiles.timer            radar-tiles.service
+Wed 2026-10-14 21:12:30 UTC 11h 31min Tue 2026-10-13 21:12:30 UTC 12h 28min ago systemd-tmpfiles-clean.timer systemd-tmpfiles-clean.service
+Thu 2026-10-15 00:00:00 UTC 14h 18min Wed 2026-10-14 00:00:00 UTC  9h 41min ago logrotate.timer              logrotate.service
+Thu 2026-10-15 02:00:00 UTC 16h 18min Wed 2026-10-14 02:00:00 UTC  7h 41min ago skyrollup.timer              skyrollup.service
+Mon 2026-10-19 00:46:51 UTC    4 days Mon 2026-10-12 00:12:09 UTC    2 days ago fstrim.timer                 fstrim.service
+
+5 timers listed.
+Pass --all to see loaded but inactive timers, too.

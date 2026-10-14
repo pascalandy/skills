@@ -1,0 +1,19 @@
+Oct 09 10:02:51 wx-1 systemd[1]: Starting www-deploy.service - Website deploy...
+Oct 09 10:02:51 wx-1 www-deploy[117416]: release 2026.10.09-1 (site 7f2c9b0, pushed by t.amberley)
+Oct 09 10:02:51 wx-1 www-deploy[117416]: fetching site-2026.10.09-1.tar.gz
+Oct 09 10:02:53 wx-1 www-deploy[117416]: unpacked 214 files into /var/cache/www-deploy/2026.10.09-1/site
+Oct 09 10:02:55 wx-1 www-deploy[117416]: + rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.10.09-1/site/ /srv/www/
+Oct 09 10:02:56 wx-1 www-deploy[117416]: release 2026.10.09-1 live
+Oct 09 10:02:56 wx-1 systemd[1]: www-deploy.service: Deactivated successfully.
+Oct 09 10:02:56 wx-1 systemd[1]: Finished www-deploy.service - Website deploy.
+Oct 09 10:02:56 wx-1 systemd[1]: www-deploy.service: Consumed 1.188s CPU time, 23.8M memory peak.
+Oct 09 14:11:38 wx-1 systemd[1]: Starting www-deploy.service - Website deploy...
+Oct 09 14:11:38 wx-1 www-deploy[118658]: release 2026.10.09-2 (site 9c41e7a, pushed by d.wren)
+Oct 09 14:11:38 wx-1 www-deploy[118658]: fetching site-2026.10.09-2.tar.gz
+Oct 09 14:11:40 wx-1 www-deploy[118658]: unpacked 214 files into /var/cache/www-deploy/2026.10.09-2/site
+Oct 09 14:11:42 wx-1 www-deploy[118658]: + install -d -o deploy -g www -m 0755 /srv/www/summaries
+Oct 09 14:11:42 wx-1 www-deploy[118658]: + rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.10.09-2/site/ /srv/www/
+Oct 09 14:11:43 wx-1 www-deploy[118658]: release 2026.10.09-2 live
+Oct 09 14:11:43 wx-1 systemd[1]: www-deploy.service: Deactivated successfully.
+Oct 09 14:11:43 wx-1 systemd[1]: Finished www-deploy.service - Website deploy.
+Oct 09 14:11:43 wx-1 systemd[1]: www-deploy.service: Consumed 1.328s CPU time, 22.1M memory peak.
