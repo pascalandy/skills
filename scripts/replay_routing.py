@@ -214,6 +214,8 @@ def read_by(command: str, start: int) -> bool:
     """Whether the shell command around position `start` runs a reader."""
     words = [w.strip("'\"") for w in SEGMENT.split(command[:start])[-1].split()]
     while words and words[0] in ("rtk", "proxy", "command"):
+        if words[:2] == ["rtk", "read"]:
+            return True
         words = words[1:]
     return bool(words) and Path(words[0]).name in READERS
 

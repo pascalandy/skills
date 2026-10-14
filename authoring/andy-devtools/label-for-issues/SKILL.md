@@ -8,7 +8,7 @@ kind: "dev"
 
 Help the user decide what happens next on each issue. Labels carry the assessment.
 Apply this vocabulary to issues, not PRs. Keep one state and one priority
-per open triaged issue, one type except for epic parents, at most one epic role, and
+per open triaged issue, one type except for Epics, the optional Epic label, and
 optional impediments.
 
 Requires `gh` ([install](https://cli.github.com/)); confirm with `gh --version`
@@ -61,7 +61,11 @@ on scope before changing legacy labels; reuse approval within that scope. Rename
 delete, or reinterpret a label only with that approval. Preserve custom labels;
 continue unambiguous changes. Missing canonical labels alone need no migration
 approval. After metadata writes, reread the catalog and compare with the requested
-changes. Done when each requested metadata change is verified, proposed for a
+changes. Treat `4-epic:parent` as the old name of `4-epic`: propose renaming
+it, and never create `4-epic` beside it. Treat `4-epic:member` as retired:
+propose deleting it. Both changes require the migration approval above; until
+then, report the pending migration and leave those labels intact.
+Done when each requested metadata change is verified, proposed for a
 read-only request, or reported as missing, conflicting, or failed. A setup-only
 request ends here after reporting those results.
 
@@ -101,23 +105,27 @@ user asks for one, including a read-only preview, read
   `1-ready-for-agent` with `1-wip-by-agent`. Reading or triaging alone does not count.
   On handback, reassess readiness. On authorized closure, remove WIP
 - **Epics.** Optional for outcomes spanning independently useful issues; keep small
-  features standalone. Use `4-epic:parent` with boundaries, completion criteria,
-  and member links; it needs no type label. Members retain their bug, feature, or
-  task type plus `4-epic:member`. Features contain their own specification
-- **Membership.** Require a parent relationship to an issue labeled
-  `4-epic:parent` or explicitly designated as an epic, not just any parent or mention.
-  Prefer GitHub's native relationship; otherwise use reciprocal links and report
-  the fallback. Remove membership on detachment, not when the parent closes.
+  features standalone outside grooming. During an approved grooming, use
+  grooming-mode's placement rule. Use `4-epic` with boundaries, completion
+  criteria, and Story links; an Epic needs no type label. Stories retain their
+  bug, feature, or task type. Features contain their own specification
+- **Membership.** A Story requires a native parent relationship to an issue
+  labeled `4-epic`. A child of a non-Epic issue is a Sub-task and follows its
+  parent. Native relationship failures are reported, never replaced by text.
+  Membership ends on detachment, not when the parent closes.
   A merged PR alone proves neither issue nor epic completion
-- **Dependencies.** Record prerequisites through native relationships or issue/epic
-  content, not labels. Membership does not imply execution order
+- **Dependencies.** Set native blocked-by links only for real prerequisites,
+  including work that must wait to avoid conflicts in the same files. Report a
+  failed native operation. Membership and Rank do not imply a dependency
 - **Impediments.** Use `0-impediment` for a concrete obstacle preventing progress;
   explain it in the issue and remove the label when resolved. Preserve the state.
   Planned dependencies, missing details, and deliberate deferral do not automatically
   warrant this label. Label an epic only when its own progress is impeded
 - **Priority.** Preserve established priorities; default new issues to p2.
   Change priority from user direction or concrete urgency. Security work is not
-  automatically p0. Members and parents do not inherit each other's priority
+  automatically p0. An approved grooming sets each Story's priority from its
+  P1/P2/P3 tier; an Epic takes its highest-priority Story's priority.
+  Outside grooming, assess each issue's priority independently
 
 ## Labels
 
@@ -139,8 +147,7 @@ This JSON owns exact names, colors, and descriptions.
   {"name": "3-pty:p1", "color": "db8b40", "description": "High priority; takes precedence over ordinary planned work"},
   {"name": "3-pty:p2", "color": "8b949e", "description": "Normal planned work; default when no priority is established"},
   {"name": "3-pty:p3", "color": "8b949e", "description": "Low-priority work that can wait"},
-  {"name": "4-epic:member", "color": "8b949e", "description": "Belongs to an epic identified by the parent relationship"},
-  {"name": "4-epic:parent", "color": "8b949e", "description": "Groups linked member issues around a shared outcome"}
+  {"name": "4-epic", "color": "8b949e", "description": "Groups Stories around a shared outcome through native sub-issues"}
 ]
 ```
 

@@ -18,6 +18,10 @@ A mode's routes run through that mode's SKILL.md.
   - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
   - `thermo-quality-review`: Run an unusually strict review of production code for structure, file size, branching, types, and layering.
+- `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Organize GitHub Stories into Epics and Milestones or refine their readiness.
+  - `epic`: CU1: verify and prioritize backlog issues, place Stories in Epics, and propose Rank, blocked-by links and labels.
+  - `milestone`: CU2: group home-repo Epics without a Milestone into one Milestone with Epic Rank and justified blocked-by links.
+  - `refine`: CU3: reverify every Story in an Epic or Milestone, propose and apply approved refinements until grooming Done when holds.
 - `matt-mode`: Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets.
   - `codebase-design`: Shared vocabulary for designing deep modules.
   - `domain-modeling`: Build and sharpen a project's domain model.
@@ -62,7 +66,6 @@ A mode's routes run through that mode's SKILL.md.
 - `commit`: Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
 - `diagnose`: Use for any request to debug, find the root cause, or explain why something fails or got slower: incidents, latency jumps, error spikes, crashes, memory leaks, hangs and timeouts, regressions after a deploy or flag change. Load it before reading code. Also use when a verify-loop run fails, or when a claimed cause, repro, or fix needs checking against facts.
-- `epic-grooming`: Use only when explicitly invoked as `epic-grooming`, to rank open GitHub issues and group them into Epics.
 - `gh-stack`: Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.
 - `git-local`: Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries.
 - `grill-for-unknowns`: Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria.

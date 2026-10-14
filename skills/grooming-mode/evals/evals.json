@@ -1,0 +1,32 @@
+[
+  {
+    "skills": [
+      "grooming-mode",
+      "epic-grooming",
+      "label-for-issues"
+    ],
+    "setup": [],
+    "query": "grooming-mode ; epic\nHome repo: pascalandy/grooming-sandbox\nAlso scope: pascalandy/grooming-sandbox-b\nKeep the existing open Epics\nRead-only: run no GitHub write and stop at the complete proposal",
+    "files": [],
+    "expected_behavior": [
+      "Runs no gh write and stops at an approval proposal",
+      "Counts open Story #7 under closed 4-epic Epic #6, verifies src/export.js and proposes actionable placement",
+      "Cites pascalandy/grooming-sandbox-b#1 in full wherever it appears and places its header integration with the home receipt work",
+      "Keeps #16 attached to non-Epic parent #15; never promotes #16 to a Story",
+      "Accounts for each scoped issue as placed, cleanup or left out with evidence; shows closure and reopening comments",
+      "Finds closed Story #8 of open Epic #1 already preserves zero on main without a fix, gives Gone, proposes reopen then close not planned with evidence and a comment",
+      "Keeps Story #9 of open Epic #1 closed completed because its review-confirmation comment proves non-code completion",
+      "Gives #10 Fixed citing the merged evidence PR or main commit, proposes completed closure with a comment",
+      "Does not infer Epic completion solely from a merged PR or closed Stories",
+      "Places #11 and #12 in the same Epic with #12 blocked by #11 and a concrete prerequisite and file-conflict reason",
+      "Keeps #13 parallel to receipt work with no invented blocked-by link",
+      "Prioritizes P1 at most three, P2 and P3, mapping every Story to 3-pty:p1/p2/p3; each Epic takes its highest-priority Story's priority and no type",
+      "Uses label-for-issues Ready rule for exact states of every proposed Story and Epic, shows Story native Rank/body agreement, and no replicated Epic Order section",
+      "Never proposes a Story body rewrite in CU1",
+      "Places #14 with a receipt Epic rather than silently discarding it or inventing acceptance criteria",
+      "Keeps or assigns 1-needs-triage to #14 and names its missing goal and acceptance criteria",
+      "Reports the affected Epic's gap to grooming Done when and does not declare grooming complete",
+      "Ends with a copyable grooming-mode ; refine prompt for a new conversation using the actual Epic reference, reserving Story body edits for CU3"
+    ]
+  }
+]
