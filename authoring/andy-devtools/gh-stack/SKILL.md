@@ -45,6 +45,11 @@ Once per clone, `git config rerere.enabled true` makes a rebase reuse conflict r
 - **The layers would touch the same lines, or the change cannot land in parts:** open one PR, no
   stack
 - **Multi-part work with no stack yet:** [Start a stack](#start-a-stack)
+- **A new layer on an open PR in no stack:** branch from that PR's branch, commit, run
+  `git push <remote> <branch>`, and open the PR with `gh pr create --base <that PR's branch>`.
+  Read that PR's base with `gh pr view <that PR> --json baseRefName`, then run
+  `gh stack link --base <that base> <that PR> <new PR>`; without `--base`, `link` retargets that
+  PR to the default branch
 - **A change belongs to a layer of an existing stack:** [Change a layer](#change-a-layer)
 - **The trunk moved:** [Sync](#sync)
 - **The stack is approved:** [Land](#land)
