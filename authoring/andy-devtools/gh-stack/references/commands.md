@@ -85,8 +85,9 @@ branches managed by another tool or living in another worktree — see `troubles
   appended PRs chain on the stack's top branch.
 - Branch arguments are pushed automatically (non-force, atomic). Missing PRs are created with
   auto-generated titles and correctly chained bases; existing PRs with a wrong base are retargeted.
-  The right base for the bottom PR is `--base`, which defaults to the repository default branch, so
-  pass `--base <branch>` when the bottom PR targets another branch.
+  The right base for the bottom PR is `--base`. Without it, `link` reads the clone's `origin/HEAD`,
+  then a local `main`, then `master`, and never asks GitHub. Pass `--base` every time; for existing
+  PRs, pass the bottom PR's current base, from `gh pr view <bottom> --json baseRefName`.
 - Stack membership is **additive only** — `link` never removes a PR from a stack.
 
 ## sync
