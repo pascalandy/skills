@@ -7,7 +7,7 @@ status: accepted
 
 # Plan: build verify and diagnose
 
-This page lists the phases that build what [design.md](design.md) describes. Each phase ends on a check and lands as one PR. A phase starts only when the previous phase's check passes. Phases 0 and 1 share a PR, because the compile step rejects eval files outside a package, so the fixtures land with `diagnose/SKILL.md`. Work in a worktree of `pascalandy/skills`, as its `AGENTS.md` says.
+This page lists the phases that build what [design.md](design.md) describes. Each phase ends on a check and lands as one PR. A phase starts once the preceding required phase passes, so Phase 3 follows Phase 1 when Phase 2 is skipped. Phases 0 and 1 share a PR, because the compile step rejects eval files outside a package, so the fixtures land with `diagnose/SKILL.md`. Work in a worktree of `pascalandy/skills`, as its `AGENTS.md` says.
 
 Before writing any skill text, load `writing-great-skills`. Before writing any script, read [script conventions](../../../references/script-conventions.md). Every eval runs on both Claude and Codex.
 
@@ -28,7 +28,7 @@ Deeper evidence is reachable only through a `./probe` script in each fixture, so
 
 1. **Write `diagnose`.** `SKILL.md` holds steps 0 to 9, the quick path, the field re-read, and the credit to the post. The references are `glossary.md`, `principles.md`, `case-file.md`, `parity.md`, and `ladders.md` with the CLI ladder, Pascal's main stack, plus the service, desktop, web, and mobile ladders. Done when the skill validator answers `{"ok":true}`
 2. **Change `interrogate`.** Apply the rules in the design's interrogate section, and retire the consensus signal in `references/lead-judgment.md`. Done when the skill validator answers `{"ok":true}`
-3. **Beat the baseline.** Run the bug cases and their variants at this commit. The build-time case waits for Phase 3. Done when the bug cases beat the baseline, no run shows an invented fact, an edited fact, a `fixed` claim without the field re-read, or a repair on a diagnosis-only request, and `interrogate` never returns "confirmed"
+3. **Run against the baseline.** Run the bug cases and their variants at this commit. The build-time case waits for Phase 3. Done when every run meets the mandatory behaviors (no invented fact, no edited fact, no `fixed` claim without the field re-read, no repair on a diagnosis-only request, and `interrogate` never returns "confirmed"), no case scores below its baseline, and the targeted behaviors that failed the baseline improve. A case already at 100 percent passes by keeping its score
 4. **Ship.** Run `just compile-skills`, `just remote-skills`, and `just check`, review source and generated output together, and open the PR. Done when `just signoff` is green
 
 ## Phase 2: `case.py`, only if Phase 1 shows the need

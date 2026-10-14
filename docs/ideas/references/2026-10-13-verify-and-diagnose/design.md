@@ -285,7 +285,7 @@ Each step ends on a condition the agent can check.
 5. **Validate.** For the candidate: test its killing prediction, and where it is safe, toggle the suspected cause and watch the strong signal move. Judge it against every in-scope fact including noise and context, check repro parity, test each combination member's necessity, and re-gather the one to three facts the conclusion rests on by an independent path. Then `interrogate` reviews the case file and artifacts, never the transcript
 6. **When stuck.** Repair tactics in order, each logged. Then descend one layer down the ladder. Process captures run through poteto `runtime-forensics`, `trace-forensics`, or Omarchy's `diagnose-crash`, each returning facts. After a retraction, a fresh context hypothesizes from `case.md` alone. After three failed fixes, stop and attack the premise. Stop with claim level `open`, naming the missing observation, when the deepest reachable layer is read, no valid control can be obtained, access is refused, the case's budget is spent, or two descents in a row bring no new signal
 7. **Decide.** List fix options with tradeoffs. When the repair stays inside the agreed work, take the recommended option. Otherwise ask Pascal one question. In a brigade round, it goes through the Chef. Rollback, escalation, and dropping support stay Pascal's calls. When the cause sits in a component Pascal does not own, draft the owner's report with every claim citing a fact
-8. **Hand the fix to the lane.** For a `fix` request only. The confirmed cause enters lane step 1 carrying the reading that exposed it. Sweep for other instances of the same pattern
+8. **Hand the fix to the lane.** For a `fix` request only. The confirmed cause enters lane step 1 carrying the reading that exposed it. When a quick-path fix enters the lane, write its existing evidence into `case.md` for the handoff and the closure, without repeating intake. Sweep for other instances of the same pattern
 9. **Close.** After merge, re-read the reading that exposed the bug where the bug was seen. For a failure the verify loop caught, that place is the verify loop on the same machine. Only this re-read earns `fixed`, when the claim level's conditions hold. State the claim level in the reply, then hand the case to the retros
 
 ## interrogate
@@ -387,7 +387,6 @@ Still rejected from the first round:
 
 Deferred until a real case asks for it:
 
-- `case.py`, Phase 2 of the plan
 - Probes and Controls sections in `verify-<app>`. The ladders hold the probes and the last good run is the standing control. A retro files an issue when a case needed more
 - A run record for every CLI invocation, one JSON line in the state directory: the post's default collection, adopted per tool when a case needed a fact a run record would have held. It would live in `coding-standard`
 - A bug-report template that asks for last good and first bad versions, flags, artifacts, and unaffected instances, through `label-for-issues`
