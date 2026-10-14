@@ -347,7 +347,7 @@ CHECKS = [
     Check(
         "poteto-mode-ts",
         bun("install", POTETO_MODE, "--frozen-lockfile"),
-        bun("test", POTETO_MODE, "orch", "watch-pr"),
+        bun("run", POTETO_MODE, "test"),
         bun("run", POTETO_MODE, "typecheck"),
     ),
     Check(
