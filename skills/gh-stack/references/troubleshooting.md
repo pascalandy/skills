@@ -131,10 +131,10 @@ Use it when branches are managed by jj, Sapling, git-town, a separate worktree, 
 where the local `.git/gh-stack` file would be wrong or absent.
 
 ```bash
-gh stack link branch-a branch-b branch-c        # bottom to top
-gh stack link --base develop --open a b c       # non-default trunk, ready for review
-gh stack link 10 20 30                          # by PR number
-gh stack link 7 feature-d                       # append to existing stack #7
+gh stack link --base main branch-a branch-b branch-c   # bottom to top
+gh stack link --base develop --open a b c              # trunk develop, ready for review
+gh stack link --base <base> 10 20 30                   # by PR number; <base> is PR 10's base
+gh stack link 7 feature-d                              # append to stack #7; --base is ignored
 ```
 
 Because `link` writes no local state, the local navigation commands (`up`, `down`, `top`, `bottom`)

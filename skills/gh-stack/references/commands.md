@@ -81,9 +81,13 @@ branches managed by another tool or living in another worktree — see `troubles
 - **A numeric first argument is treated as a stack number only when a stack with that number
   exists.** In that case the remaining arguments are appended to the top of that stack and you do
   not re-list its current PRs: `gh stack link 7 feature-c`. Arguments already in the stack are
-  skipped; arguments belonging to a different stack are rejected.
+  skipped; arguments belonging to a different stack are rejected. `--base` is ignored, since the
+  appended PRs chain on the stack's top branch.
 - Branch arguments are pushed automatically (non-force, atomic). Missing PRs are created with
-  auto-generated titles and correctly chained bases; existing PRs with a wrong base are corrected.
+  auto-generated titles and correctly chained bases; existing PRs with a wrong base are retargeted.
+  The right base for the bottom PR is `--base`. Without it, `link` reads the clone's `origin/HEAD`,
+  then a local `main`, then `master`, and never asks GitHub. Pass `--base` every time; for existing
+  PRs, pass the bottom PR's current base, from `gh pr view <bottom> --json baseRefName`.
 - Stack membership is **additive only** — `link` never removes a PR from a stack.
 
 ## sync
