@@ -324,6 +324,13 @@ CHECKS = [
         "verify-transcript",
         pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests", python="3.12"),
     ),
+    # The free features run the branch's transcript CLI, so a contract change
+    # its verifier missed fails here; the paid real summary stays out of the default run
+    Check(
+        "verify-transcript-free",
+        uv_run(f"{VERIFY_TRANSCRIPT}/scripts/verify_transcript.py", "verify"),
+        reads=(TRANSCRIPT,),
+    ),
     Check(
         "poteto-mode",
         pytest("authoring/poteto/poteto-mode/scripts/tests/test_worktree_audit.py"),
