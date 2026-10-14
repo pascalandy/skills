@@ -40,8 +40,8 @@ Start this phase only if Phase 1 runs show case-file bookkeeping errors: a misco
 
 ## Phase 3: the verify loop
 
-1. **Extend `create-verification-skill`.** Feature files gain the `Readings` H2, the generated Evidence section names where past runs live, and the generated skill carries the planted-bug and last-good-run rules. Done when a generated skill on a scratch repo has readings for each mapped feature from the interview, with no placeholders
-2. **Add the focused pass to `maintain-verification-skill`,** with the offer to create a loop and the `AGENTS.md` opt-out. Done when the build-time case passes on both agents
+1. **Extend `create-verification-skill`.** Feature files gain the `Readings` H2, the generated Evidence section names where past runs live, and the generated skill carries the planted-bug rule, the last-good-run rule, and the baseline intake from [the verify loop](design.md#the-verify-loop). Done when a generated skill on a scratch repo has readings for each mapped feature from the interview, with no placeholders
+2. **Add the focused pass to `maintain-verification-skill`,** with the offer to create a loop and the `AGENTS.md` opt-out. Done when the build-time case passes on both agents, with its new reading checked against its declared normal value and its planted bug, since no base run includes it yet
 3. **Add the "verify loop" category to `retro-global`.** Done when `just check` passes
 4. **Pilot on `verify-video-archive`.** `parallel-batch` and `interruption` gain readings, and the verify loop compares them with the last good run. Done when, on a scratch branch, a planted bug that ignores the worker cap fails the run and the real code passes. This is the end-to-end proof of the build side
 
@@ -49,9 +49,9 @@ Start this phase only if Phase 1 runs show case-file bookkeeping errors: a misco
 
 1. **poteto-mode.** `feature.md` and `bug-fix.md` start the lane at `maintain-verification-skill`, and `SKILL.md` points the bug-fix non-negotiable at `diagnose`
 2. **Hand diagnosis to `diagnose`** in the six skills that hold pieces of the method today: `bug-fix`, `runtime-forensics`, `trace-forensics`, `perf-issue`, `fix-root-causes`, and andy-mode `qa`. Apply the rest of the design's "Changes to existing skills" table
-3. **Brigade.** In `arancini` and `bisque`, manic-1, manic-2, and manic-5 call `interrogate` with `reviewers = 2` from `config.toml`, and the Cook runs `diagnose` for a bug card
+3. **Brigade.** In `arancini` and `bisque`, manic-1, manic-2, and manic-5 call `interrogate` with `reviewers = 2` from `config.toml`, and the Cook runs `diagnose` for a bug card. `cook-implement`'s Fix section reruns the touched features through a delegate after each fix, and `chef-closing` requires one whole-loop run on the final head, which the Chef starts as a delegate when no Cook is open
 
-Done when `just check` passes, a poteto-mode bug-fix run on the latency case reaches `diagnose` before opening any source file and reaches lane step 1 carrying the DNS reading, and a barrage calls `interrogate` with two reviewers.
+Done when `just check` passes, a poteto-mode bug-fix run on the latency case reaches `diagnose` before opening any source file and reaches lane step 1 carrying the DNS reading, a barrage calls `interrogate` with two reviewers, and a brigade round reruns the touched features after a fix and the whole loop before merge.
 
 ## Phase 5: the first real case
 

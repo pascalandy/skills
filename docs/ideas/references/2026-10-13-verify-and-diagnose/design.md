@@ -111,9 +111,9 @@ A feature and a fix take the same six steps:
 1. **maintain-verification-skill** writes the feature's readings, their normal values, and the bug the check must catch, through its focused pass in [The verify loop](#the-verify-loop)
 2. **poteto-mode** `feature` or `bug-fix` writes the change, including the code that records each reading
 3. **CI** runs `just check` first, because it is cheap. A failure returns to step 2
-4. **The verify loop** runs in a delegate agent: a T3 child task the caller starts with `delegate_task`, in a fresh context. It compares each reading with the last good run. The planted bug must fail the first run of a new check. For a fix, the unfixed code is the planted bug. A failure goes to `diagnose`
+4. **The verify loop** runs in a delegate agent: a T3 child task the caller starts with `delegate_task`, in a fresh context. It compares each reading with the last good run. The planted bug must fail the first run of a new check. For a fix, the unfixed code is the planted bug, so the run shows the reading that exposed the bug failing on the unfixed code and passing on the fix, on the agreed test surface. With repro parity, that is the fix's pre-merge proof. A failure goes to `diagnose`
 5. **Barrages** review the stack and call `interrogate`. A finding returns to step 2
-6. **Merge**
+6. **Merge.** A fix merges on its pre-merge proof. The field re-read after merge, `diagnose` step 9, earns the `fixed` claim
 
 After a barrage fix, rerun only the features the fix touched. Run the whole loop once on the final head before merge.
 
@@ -215,9 +215,9 @@ One term per concept. The skills use no synonyms for these.
 | descend | Gather facts one layer down, paired with the same control |
 | repro | A hypothesis of the form "this setup produces the reported failure" |
 | parity | Two readings agree under a stated rule. Repro parity, fix parity, and the verify loop's comparison with the last good run use the same rules |
-| reviewer | An independent read-only agent that `interrogate` launches. It may only eliminate a claim or flag a defect in the facts |
+| reviewer | An independent read-only agent that `interrogate` launches. It may only propose an elimination or flag a defect in the facts. On a case file, the diagnosing agent appends what it proposes, with `by: reviewer` |
 | fact packet | What a reviewer gets in place of a diff: facts and their artifacts, such as a case file, without the author's story |
-| claim level | `consistent`: a candidate survives every in-scope fact gathered, among the hypotheses listed. `confirmed`: also passed a test no other live hypothesis passes, such as toggling the suspected cause and watching the strong signal move, or a directly observed causal chain. `fixed`: after merge, where the bug was seen, the reading that exposed it matches the control, the reported symptom is gone, and a residual check finds no other failing instance or signal. Other outcomes: `external` (the cause is in a component Pascal does not own) and `open` (stopped, naming the next observation needed) |
+| claim level | `consistent`: a candidate survives every in-scope fact gathered, among the hypotheses listed. `confirmed`: also passed a test no other live hypothesis passes, such as toggling the suspected cause and watching the strong signal move, or a directly observed causal chain. `fixed`: after merge, where the bug was seen, the reading that exposed it matches the control, the reported symptom is gone, and a residual check finds no other failing instance or signal. Before merge, a fix has only its pre-merge proof from lane step 4. Other outcomes: `external` (the cause is in a component Pascal does not own) and `open` (stopped, naming the next observation needed) |
 | requested outcome | Set at intake: `diagnosis` (read-only questions, andy-mode `qa`, audits of a claim) or `fix` |
 | intervention | Any human input that changed the course of a case |
 
@@ -264,10 +264,12 @@ Who writes what:
 
 | Part | Agent | Reviewer | Pascal |
 |---|---|---|---|
-| Facts | Appends rows for saved artifacts or quoted reports. Never edits | Flags gathering defects as `reverify` log rows | Appends observations, retires a fact with a reason |
+| Facts | Appends rows for saved artifacts or quoted reports. Never edits | Proposes `reverify` log rows for gathering defects | Appends observations, retires a fact with a reason |
 | Hypotheses | Adds with `from` and `killed if` | Reports facts no hypothesis explains | Adds as `by: human`, judged like any other |
-| Judgments | Writes with a reason. Corrects by appending a superseding row | Appends `x` rows citing a fact | Same as the reviewer |
+| Judgments | Writes with a reason. Corrects by appending a superseding row | Proposes `x` rows citing a fact | Appends `x` rows citing a fact |
 | Decisions | Writes options and a recommended default | None | Chooses |
+
+The reviewer writes nothing. The diagnosing agent appends each row it proposes, with `by: reviewer`.
 
 `case.py check` would lint the tables, refuse edits to fact rows, render the matrix with strength per signal, and print the next step as one JSON line under the [script output rule](../../../references/script-output.md). It ships only if Phase 1 runs show case-file bookkeeping errors. [sources/design-claude.md](sources/design-claude.md) section 4.3 has its next-step table.
 
@@ -284,7 +286,7 @@ Each step ends on a condition the agent can check.
 6. **When stuck.** Repair tactics in order, each logged. Then descend one layer down the ladder. Process captures run through poteto `runtime-forensics`, `trace-forensics`, or Omarchy's `diagnose-crash`, each returning facts. After a retraction, a fresh context hypothesizes from `case.md` alone. After three failed fixes, stop and attack the premise. Stop with claim level `open`, naming the missing observation, when the deepest reachable layer is read, no valid control can be obtained, access is refused, the case's budget is spent, or two descents in a row bring no new signal
 7. **Decide.** List fix options with tradeoffs. When the repair stays inside the agreed work, take the recommended option. Otherwise ask Pascal one question. In a brigade round, it goes through the Chef. Rollback, escalation, and dropping support stay Pascal's calls. When the cause sits in a component Pascal does not own, draft the owner's report with every claim citing a fact
 8. **Hand the fix to the lane.** For a `fix` request only. The confirmed cause enters lane step 1 carrying the reading that exposed it. Sweep for other instances of the same pattern
-9. **Close.** After merge, re-read the reading that exposed the bug where the bug was seen. For a failure the verify loop caught, that place is the verify loop on the same machine. State the claim level in the reply, `fixed` only when its conditions hold, then hand the case to the retros
+9. **Close.** After merge, re-read the reading that exposed the bug where the bug was seen. For a failure the verify loop caught, that place is the verify loop on the same machine. Only this re-read earns `fixed`, when the claim level's conditions hold. State the claim level in the reply, then hand the case to the retros
 
 ## interrogate
 
@@ -297,10 +299,10 @@ Each step ends on a condition the agent can check.
 - The caller sets the reviewer count. Direct use keeps four
 - It accepts a fact packet, such as `diagnose`'s case file, in place of a diff
 
-On a fact packet, a reviewer may return only:
+On a fact packet, a reviewer may return only the items below. It proposes rows and writes none. The diagnosing agent appends them, with `by: reviewer`.
 
-- a contradicting fact, as an `x` row citing it
-- a defect in a fact's gathering (wrong host, window, tool version, missing coverage), as a `reverify` row
+- a contradicting fact, as a proposed `x` row citing it
+- a defect in a fact's gathering (wrong host, window, tool version, missing coverage), as a proposed `reverify` row
 - a control broken the same way as the variable
 - a missing discriminating fact: one reading that would split the survivors
 - a checked null: "I looked for a contradiction in these facts and found none"
@@ -319,7 +321,7 @@ The verify loop is each project's `verify-<app>` skill. `create-verification-ski
 
 At lane step 2, the code records the readings by default, at the shallowest layer, in the unit of work's one wide record: a CLI's one-line JSON answer, a run manifest, or one structured log line per request. Include what pairs runs: build, flags, host, and fan-out counts such as addresses resolved, backends contacted, and retries. No debug flag. Give every wait a timeout that records what it waited on, so a hang leaves a fact before anyone restarts the process. Budget the cost.
 
-At lane step 4, the delegate fails the run when a reading in a feature's file is missing from the run, when a detector fails, or when a reading leaves parity with the last good run.
+At lane step 4, the delegate starts with the baseline intake. It pins the last good run. When none exists, it runs the base branch once to make one, or reports the missing control when it cannot. A new reading is checked against its declared normal value and its planted bug until a base run includes it. Then the delegate fails the run when a reading in a feature's file is missing from the run, when a detector fails, or when a reading leaves parity with the last good run.
 
 Applied to the post's latency feature before release: the failure model names "the mTLS path routes by shard", and the planted bug is the unsharded client. A count of addresses would not survive that plant at pre-production scale: with 2 shards of 1 replica each, the buggy client resolved only 2 addresses, a count a correct client can produce too. So the reading records the lookups themselves, which names the client resolves and how many answers each returns, compared with the last good run. That is the comparison the post says would have caught the bug before production.
 
@@ -346,14 +348,15 @@ All paths are under `authoring/`.
 | `andy/andy-mode/playbooks/qa.md` | The bounded diagnosis loop keeps phases 1 and 2 (feedback loop, capture the symptom). When the cause matters to the finding, phases 3 and 4 hand off to `diagnose` | Removes the sixth copy of the method |
 | `poteto/how/SKILL.md` | In a debugging case, run after facts isolate a signal, and ask which paths could produce it | Keeps `how` scoped to a signal |
 | `poteto/interrogate/SKILL.md` and `references/lead-judgment.md` | The rules in [interrogate](#interrogate): eliminate and never confirm, facts and not the story, a clean report lists its checks, a reviewer count the caller sets, a fact packet in place of a diff. The consensus signal retires | The cert-reload theory survived an independent reviewer |
-| `poteto/interrogate/references/rubric.md` | A bug-fix PR cites the reading that exposed the bug and shows it back at its normal value where the bug was seen. A fix justified by reading code alone is a hypothesis | Catches non-fixes in review |
-| `poteto/principle-prove-it-works/SKILL.md` | For a fix or a regression check, the proof is parity: the reading that differed now matches the control on the same surface | Tests passing is necessary, not sufficient |
-| `poteto/create-verification-skill/SKILL.md` and `references/feature-map-example/` | Feature files gain a fifth H2, `Readings`: each reading, its normal value, and the bug the check must catch. The generated Evidence section names where past runs live, so the delegate finds the last good run. The generated skill carries the planted-bug and last-good-run rules | Gives the verify loop its readings |
+| `poteto/interrogate/references/rubric.md` | A bug-fix PR shows the pre-merge proof of lane step 4, and leaves `fixed` to the field re-read after merge. A fix justified by reading code alone is a hypothesis | Catches non-fixes in review |
+| `poteto/principle-prove-it-works/SKILL.md` | For a fix, the proof before merge is the pre-merge proof of lane step 4. The field re-read after merge, `diagnose` step 9, earns `fixed` | Tests passing is necessary, not sufficient |
+| `poteto/create-verification-skill/SKILL.md` and `references/feature-map-example/` | Feature files gain a fifth H2, `Readings`: each reading, its normal value, and the bug the check must catch. The generated Evidence section names where past runs live, so the delegate finds the last good run. The generated skill carries the planted-bug rule, the last-good-run rule, and the baseline intake | Gives the verify loop its readings |
 | `poteto/maintain-verification-skill/SKILL.md` | Becomes the only writer of `verify-<app>`. Adds the focused "add or strengthen a feature" pass, run in the Cook's worktree. Offers `create-verification-skill` when a project has no loop, unless its `AGENTS.md` opts out. The full audit stays | Lane step 1 |
 | `andy/andy-mode/playbooks/retro-global.md` | Adds the "verify loop" category: what would make the loop stronger, filed in the repo where the loop lives | Lessons reach the loop as issues, through its one writer |
 | `andy-devtools/brigade-mode/playbooks/<route>/sop/manic-1.md`, `manic-2.md`, `manic-5.md`, in `arancini` and `bisque` | Each calls `interrogate` with its angle and the reviewer count from `config.toml` | One owner for adversarial review |
-| `andy-devtools/brigade-mode/playbooks/<route>/config.toml` and the route's playbook, in both routes | `[manic-1]`, `[manic-2]`, and `[manic-5]` gain `reviewers = 2`. The playbook's Settings table lists the key | The count lives with the other barrage settings |
-| `andy-devtools/brigade-mode/playbooks/<route>/sop/cook-implement.md`, in both routes | For a bug card, the Cook runs `diagnose`, and sends its one question for Pascal to its Chef | The user talks only to the top thread of the route |
+| `andy-devtools/brigade-mode/playbooks/<route>/config.toml` and the route's playbook, in both routes | `[manic-1]`, `[manic-2]`, and `[manic-5]` gain `reviewers = 2`. The playbook's Settings table lists the key, and its process table and diagram show the reruns below | The count lives with the other barrage settings |
+| `andy-devtools/brigade-mode/playbooks/<route>/sop/cook-implement.md`, in both routes | For a bug card, the Cook runs `diagnose`, and sends its one question for Pascal to its Chef. After each fix, its Fix section runs the verify loop on the features the fix touched, through a delegate agent, and sends any failure to `diagnose` | The user talks only to the top thread of the route, and a fix reruns only what it touched |
+| `andy-devtools/brigade-mode/playbooks/<route>/sop/chef-closing.md`, in both routes | Merge requires one whole-loop run on the final head. When no Cook is open, the Chef starts it as a delegate. A failure goes to `diagnose` | The lane runs the whole loop once before merge |
 | `poteto/show-me-your-work/SKILL.md` | A skill that keeps a typed record, such as the case file, keeps it and applies this skill's audit and review steps to it | Avoids a second audit format fight |
 | `verify-loops/verify-video-archive/` | Pilot: `parallel-batch` and `interruption` gain Readings, and the verifier compares them with the last good run | Its manifest already records peak simultaneous media processes, peak RSS, and CPU, so the first readings cost little |
 
