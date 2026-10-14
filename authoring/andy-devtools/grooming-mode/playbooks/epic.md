@@ -4,8 +4,6 @@ description: "CU1: verify and prioritize backlog issues, place Stories in Epics,
 
 # CU1. Backlog to Epics
 
-Use SKILL.md's shared rules and inline glossary throughout this process.
-
 ```
 Epic progress:
 - [ ] 1. Scope
@@ -44,14 +42,15 @@ Epic progress:
    a code prerequisite or a concurrent edit conflict. A possible future rewrite
    does not justify a wait when the Story can ship against the current default
    branch. Without a real wait, show parallel work without a link.
+   Before presenting the graph, order each pair of overlapping function or line
+   edits by a blocked-by path, and correct any such pair described as parallel.
    Set Story Rank in native order and the same Epic body order;
    order proposed Epics by prerequisites, then return. Add only justified
    blocked-by links between Epics CU1 creates.
-   Show every Story's verdict, evidence, Today, After, tier, exact priority and
-   state labels, Rank, target Epic and blockers. Show each kept or new Epic's
-   priority, state, outcome, checkable Done when and remaining readiness gaps.
-   Spell out every Story's and Epic's final canonical labels, including unchanged
-   labels.
+   Show every Story's verdict, evidence, Today, After, tier, complete final
+   canonical labels including unchanged labels, Rank, target Epic and blockers.
+   Show each kept or new Epic's complete final canonical labels, outcome,
+   checkable Done when and remaining readiness gaps.
    Include cleanup, left-out issues with missing evidence, moves, and exact
    closure/reopening comments. List missing goals, acceptance criteria and user
    decisions as CU3 handoff gaps.
