@@ -1,49 +1,29 @@
 [
   {
-    "skills": ["grooming-mode", "label-for-issues"],
+    "skills": [
+      "grooming-mode",
+      "epic-grooming",
+      "label-for-issues"
+    ],
     "setup": [],
-    "query": "grooming-mode. Home repo pascalandy/grooming-sandbox; also scope pascalandy/grooming-sandbox-b. Keep the open Epics. Read-only public fixture: no GitHub writes, stop at the complete proposal. Include backlog plus existing Epics and their Stories, especially open Story #7 under closed Epic #6 and cross-repo backlog pascalandy/grooming-sandbox-b#1. Sub-task #16 follows non-Epic parent #15. Read current code through gh api; no clone is necessary. Do not ask for scope or keep/restart again.",
+    "query": "grooming-mode ; epic\nHome repo: pascalandy/grooming-sandbox\nAlso scope: pascalandy/grooming-sandbox-b\nKeep the existing open Epics\nRead-only: run no GitHub write and stop at the complete proposal",
     "files": [],
     "expected_behavior": [
       "Runs no gh write and stops at an approval proposal",
       "Counts open Story #7 under closed 4-epic Epic #6, verifies src/export.js and proposes actionable placement",
       "Cites pascalandy/grooming-sandbox-b#1 in full wherever it appears and places its header integration with the home receipt work",
       "Keeps #16 attached to non-Epic parent #15; never promotes #16 to a Story",
-      "Accounts for each scoped issue as placed, cleanup or left out with evidence; shows closure and reopening comments"
-    ]
-  },
-  {
-    "skills": ["grooming-mode", "label-for-issues"],
-    "setup": [],
-    "query": "grooming-mode. Home repo pascalandy/grooming-sandbox. Keep open Epics and inspect closed issues #8 and #9 plus open #10 and all existing Epics for context. Read-only fixture: run no GitHub write and stop at the proposal. Verify src/export.js, src/status.js, comments, and merged PR evidence through gh. #8 was closed completed without landed work, #9 finished without code, #10 has a merged fix. Show the exact proposed cleanup and comments.",
-    "files": [],
-    "expected_behavior": [
+      "Accounts for each scoped issue as placed, cleanup or left out with evidence; shows closure and reopening comments",
       "Runs no gh write",
       "Finds #8 already preserves zero on main without a fix, gives Gone, proposes reopen then close not planned with evidence and a comment",
       "Keeps #9 closed completed because its review-confirmation comment proves non-code completion",
       "Gives #10 Fixed citing the merged evidence PR or main commit, proposes completed closure with a comment",
-      "Does not infer Epic completion solely from a merged PR or closed Stories"
-    ]
-  },
-  {
-    "skills": ["grooming-mode", "label-for-issues"],
-    "setup": [],
-    "query": "grooming-mode. Home repo pascalandy/grooming-sandbox. Keep open Epics. Scope backlog #11, #12 and #13 plus open Epics and their Stories. Read-only fixture: run no GitHub write, stop at the proposal. Verify the current code via gh api. #11 introduces the delimiter and #12 validates it in src/export.js; #13 documents the independent health response in README.md. Show each Story and Epic's exact proposed priority and state, Rank and blocked-by links.",
-    "files": [],
-    "expected_behavior": [
+      "Does not infer Epic completion solely from a merged PR or closed Stories",
       "Runs no gh write and proposes approval before changes",
       "Places #11 and #12 in the same Epic with #12 blocked by #11 and a concrete prerequisite and file-conflict reason",
       "Keeps #13 parallel to receipt work with no invented blocked-by link",
       "Prioritizes P1 at most three, P2 and P3, mapping every Story to 3-pty:p1/p2/p3; each Epic takes its highest-priority Story's priority and no type",
-      "Uses label-for-issues Ready rule for exact states of every proposed Story and Epic, shows Story native Rank/body agreement, and no replicated Epic Order section"
-    ]
-  },
-  {
-    "skills": ["grooming-mode", "label-for-issues"],
-    "setup": [],
-    "query": "grooming-mode. Home repo pascalandy/grooming-sandbox. Keep open Epics. Scope backlog #14 plus open Epics and their Stories. Read-only fixture: run no GitHub write and stop at the proposal. Verify src/export.js through gh api. #14 concerns receipt work but has no clear goal or acceptance criteria. Place it with the receipt outcome while preserving its unready state. Show the gap to grooming Done when and the next-conversation refine prompt. Do not rewrite its body.",
-    "files": [],
-    "expected_behavior": [
+      "Uses label-for-issues Ready rule for exact states of every proposed Story and Epic, shows Story native Rank/body agreement, and no replicated Epic Order section",
       "Runs no gh write and never proposes a Story body rewrite in CU1",
       "Places #14 with a receipt Epic rather than silently discarding it or inventing acceptance criteria",
       "Keeps or assigns 1-needs-triage to #14 and names its missing goal and acceptance criteria",
