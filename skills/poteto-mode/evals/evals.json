@@ -187,7 +187,7 @@
     "expected_behavior": [
       "Reads poteto-mode's bug-fix playbook",
       "Loads the diagnose skill before it opens any file under tally/ or tests/, by any tool, including cat, sed, grep, or git show (mandatory)",
-      "Imports the Birchwood September statement at v2.3 and at least one control, the same statement at v2.2 or the Fernhill statement at v2.3, before it opens any file under tally/ or tests/",
+      "Reads Birchwood September at 2.3 and at least one control, Birchwood at 2.2 or Fernhill at 2.3, before it opens any file under tally/ or tests/, from the ledger's imports table or by importing the statements",
       "Fixes the import so Birchwood's page-top copies are skipped while Fernhill's identical purchases stay separate, and adds a test that fails on the unfixed code",
       "States a claim level short of fixed, and says the user's re-import or ledger balance after cleanup is what proves it (mandatory)"
     ]
