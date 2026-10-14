@@ -8,7 +8,7 @@ Review the coding agent's **environment** so future runs go better. This is not 
 
 ## Procedure
 
-1. Read the primary sources for the session the user names: conversation, tool results, relevant diffs, and checks. Default to the current session. If the relevant history is inaccessible, identify what is missing and ask for it rather than reconstructing events.
+1. Read the primary sources for the session the user names: conversation, tool results, relevant diffs, and checks. Default to the current session. If the relevant history is inaccessible, identify what is missing and ask for it rather than reconstructing events. Inventory the user's inputs that changed the agent's course, reusing a `diagnose` case's Interventions when there is one; tag each as a gap the agent should have closed, an accountable decision, or a chosen process gate, and after step 3 record each gap's outcome: filed, deferred by an issue cap, or dismissed with a reason.
 2. Look for candidates for improvement in the categories below. Treat them as prompts, not a requirement to produce a finding in each category. Inspect the existing mechanism before proposing a replacement.
 3. Keep a finding only when you can cite a specific session observation and explain how the proposed change would help a future run. Rank by likely impact and recurrence, taking implementation cost into account. Separate facts from inference.
 4. Present the findings to the user. A finding is easier to act on when it covers what happened and the evidence, what exists today, the smallest change, and how to check it worked; tradeoffs and blast radius help when material. If none pass the evidence bar, say so and stop. Suggest changes; do not edit the environment as part of the retrospective.
