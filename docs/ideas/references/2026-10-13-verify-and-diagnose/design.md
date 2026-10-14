@@ -296,7 +296,7 @@ Each step ends on a condition the agent can check.
 - Reviewers get facts, not the author's story: the diff and its stated intent, or a fact packet. They never get the transcript or the author's account of why the change works
 - Agreement between reviewers is not proof. One cited contradiction outranks any number of agreeing reviewers, so the consensus signal in `references/lead-judgment.md` retires
 - A clean report says what was checked
-- The caller sets the reviewer count. Direct use keeps four
+- The caller sets the reviewer count. A caller that sets none gets four
 - It accepts a fact packet, such as `diagnose`'s case file, in place of a diff
 
 On a fact packet, a reviewer may return only the items below. It proposes rows and writes none. The diagnosing agent appends them, with `by: reviewer`.

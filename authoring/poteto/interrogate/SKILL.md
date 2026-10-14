@@ -38,7 +38,7 @@ Write one clear paragraph. If you're unsure about the intent, ask the user befor
 
 ## Step 3, Spawn Reviewers
 
-Launch the number of reviewers the caller sets, or four when invoked directly, as independent read-only agents with the `Reviewer` role. Use the same evidence snapshot and prompt for every reviewer, without sharing their findings before synthesis. A sequential run in separate contexts preserves independence when concurrency is unavailable. A parent self-review does not complete this review.
+Launch the number of reviewers the caller sets, or four when the caller sets none, as independent read-only agents with the `Reviewer` role. Use the same evidence snapshot and prompt for every reviewer, without sharing their findings before synthesis. A sequential run in separate contexts preserves independence when concurrency is unavailable. A parent self-review does not complete this review.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent
