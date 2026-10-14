@@ -151,6 +151,7 @@ SEO = "cat .agents/skills/demo/playbooks/seo.md"
     "read_command",
     [
         CRO,
+        "/usr/bin/bash -lc 'rtk read .agents/skills/demo/playbooks/cro.md'",
         f"{SKILL_MD} && {CRO}",
         "/bin/bash -lc 'rtk proxy sed -n \"1,80p\" .agents/skills/demo/playbooks/cro.md'",
         "/bin/bash -lc 'cd .agents/skills/demo && cat ./playbooks/cro.md'",
@@ -247,6 +248,7 @@ def test_each_row_passes_and_a_routed_run_stops_before_its_work(
                 "cat .agents/skills/demo/playbooks/cro.md.bak",
                 "cat .agents/skills/demo/playbooks/cro.mdx",
                 "ls .agents/skills/demo/playbooks/cro.md",
+                "read .agents/skills/demo/playbooks/cro.md",
                 "/bin/bash -lc 'test -f .agents/skills/demo/playbooks/cro.md && echo ok'",
                 "cat .agents/skills/demo/SKILL.md; ls .agents/skills/demo/playbooks/cro.md",
             )
