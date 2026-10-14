@@ -105,9 +105,11 @@ Create the stack before writing any file, so each concern lands in its own layer
    layers as [Force pushes](#force-pushes) says: `gh stack merge` lands only PRs in a stack on
    GitHub, and refuses drafts. `--auto` writes the titles and bodies; set them with
    `gh pr edit <number>`. `submit` can exit 0 when GitHub refused part of the stack, so check
-   GitHub itself. Done when `gh stack view --json` shows a `pr` on every layer, and
+   GitHub itself. Done when `gh stack view --json` shows a `pr` on every layer,
    `gh pr view <number> --json baseRefName,isDraft` shows each PR is not a draft and names the
-   layer below as its base, or `<trunk>` for the bottom one
+   layer below as its base, or `<trunk>` for the bottom one, and the stack on GitHub, read as
+   [Reading state](#reading-state) says, lists every layer's PR bottom to top. No output means
+   GitHub holds no stack, so the step is not done
 
 ```bash
 git fetch origin && git switch -c auth origin/main && gh stack init auth
@@ -152,7 +154,7 @@ gh stack top                    # return to where you were
 `gh stack sync > /dev/null` fetches, rebases the stack onto the remote trunk, pushes, and
 refreshes PR state; add `--prune` to also delete local branches of merged PRs. `sync` can exit 0
 even when a push failed or it aborted, so check the result yourself. Done when stderr has no
-`Sync aborted`, each PR's base passes the check in [Start a stack](#start-a-stack), step 3, and,
+`Sync aborted`, each PR passes the checks in [Start a stack](#start-a-stack), step 3, and,
 after `git fetch <remote>`, `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds and
 `git rev-parse <layer> <remote>/<layer>` prints the same commit twice for every layer.
 
@@ -226,6 +228,12 @@ Read a branch's tip with `git rev-parse <name>`. A stack on GitHub also prints `
 parent branch that this branch was last known to contain. It may be older than the parent's
 current tip. `needsRebase` is true when the current parent tip is no longer an ancestor of the
 branch.
+
+`gh stack view` reads only the stack tracked locally. To read the stack on GitHub, including PRs
+added with `gh stack link`, run
+`gh api 'repos/{owner}/{repo}/stacks?pull_request=<number>' --jq '.[] | {number, prs: [.pull_requests[].number]}'`.
+It prints the stack number and its PRs bottom to top, and prints nothing when the PR is in no
+stack.
 
 ## Exit codes
 
