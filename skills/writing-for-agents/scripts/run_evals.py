@@ -403,6 +403,10 @@ longest path with <skill>. A skill absent at <ref> is left out, which gives a
 no-skill baseline. Each scenario's setup is a list of
 shell commands run in the fresh repo, with $EVALS naming the evals folder.
 
+Each installed copy leaves out the skill's evals folder. Setup and agent
+run with XDG_STATE_HOME set to the run folder's state/, so whatever a skill
+keeps there stays with the run.
+
 Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
@@ -697,7 +701,8 @@ def wanted(plan: Plan, scenario: Scenario) -> list[str]:
 def install(
     plan: Plan, names: Sequence[str], target: Path, present: Mapping[str, list[str]]
 ) -> list[str]:
-    """Copy each named skill as it stood at the ref; return one line per name."""
+    """Copy each named skill as it stood at the ref, without its evals folder,
+    so a run cannot read its own expected behavior; return one line per name."""
     target.mkdir(parents=True)
     (target.parent / ".gitignore").write_text("*\n", encoding="utf-8")
     lines = []
@@ -707,7 +712,16 @@ def install(
             lines.append(f"absent\t{name}")
             continue
         archive = subprocess.run(
-            ["git", "-C", str(plan.repo), "archive", plan.sha, source],
+            [
+                "git",
+                "-C",
+                str(plan.repo),
+                "archive",
+                plan.sha,
+                "--",
+                source,
+                f":(exclude){source}/evals",
+            ],
             capture_output=True,
             check=True,
         )
@@ -853,6 +867,8 @@ def run_env(plan: Plan, folder: Path) -> dict[str, str]:
     env.update(
         {
             "EVALS": str(plan.evals),
+            # A skill's state, such as a case file, stays in the run folder
+            "XDG_STATE_HOME": str(folder / "state"),
             PARENT_ENV: "1",
             "GH_CONFIG_DIR": str(gh_config),
             "GIT_TERMINAL_PROMPT": "0",
