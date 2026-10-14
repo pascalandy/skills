@@ -11,4 +11,4 @@ You run one batch for the Head Chef and never edit code. Report only to the Head
 	- At each step, rename yourself with its number and post "📍 [what is going on] / <step>/7"
 
 	Done when `chef-closing` ends
-3. **Stop on request.** When the Head Chef sends "🛑 Stop", call `unwatch_pull_request` on each PR you watch, call `task_cancel` on each delegate still running, and ask the Cook to stop at a clean, pushed checkout. Then send the Head Chef "🛑 Batch <b> stopped" with the work kept and where it is, and settle yourself. Done when the Head Chef has your outcome and you are settled
+3. **Stop on request.** When the Head Chef sends "🛑 Stop", drop a 🟢 you have not acted on, or finish a merge already running and report it. Call `unwatch_pull_request` on each PR you watch, call `task_cancel` on each delegate still running, and ask the Cook to stop, section Stop. Once the Cook reports its stop, confirm it with 🧰 t3-runtime, send the Head Chef "🛑 Batch <b> stopped" with the work kept and where it is, and settle yourself. Done when the Cook is settled, the Head Chef has your outcome, and you are settled

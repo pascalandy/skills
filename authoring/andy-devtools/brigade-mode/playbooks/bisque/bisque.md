@@ -38,7 +38,7 @@ Load 🧰 t3-runtime before your first launch, delegation, watch, or settle. It 
 | [chef-launch](sop/chef-launch.md) | Chef | Before each launch or delegation; step 5 applies only to manic-2 |
 | [chef-triage](sop/chef-triage.md) | Chef | A barrage returns, or the watch wakes you |
 | [chef-closing](sop/chef-closing.md) | Chef | The reviews end: report, green light, merge, retros, settle |
-| [cook-implement](sop/cook-implement.md) | Cook | Launched, or the Chef relays findings or asks for your retros |
+| [cook-implement](sop/cook-implement.md) | Cook | Launched, or the Chef relays findings, asks you to stop, or asks for your retros |
 | [manic-1](sop/manic-1.md) | Barrage | Delegated as manic-1 |
 | [manic-2](sop/manic-2.md) | Barrage | Delegated as manic-2 |
 | [manic-3](sop/manic-3.md) | Barrage | Delegated as manic-3 |
@@ -136,14 +136,14 @@ sequenceDiagram
             C1->>C1: Delegate manic-2 on PR 35, write its own premortem
         end
     end
+    C1->>C1: Both results in, accept or reject each finding
     rect rgba(140, 170, 238, 0.18)
         loop Up to max-passes
-            C1->>C1: Both results in, accept or reject each finding
             C1->>K1: Agent: Fix the accepted findings ->
             K1->>K1: Fix, 2nd-pass, then push
             K1-->>C1: Agent: Fixed and pushed <-
             opt Fixes need a fresh look and passes remain, or the last pass yields a code fix
-                C1->>C1: Delegate a fresh pass on the new heads, with prior findings
+                C1->>C1: Delegate a fresh pass of that barrage on the new heads, with prior rounds, then decide on its findings
             end
         end
     end

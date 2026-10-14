@@ -9,7 +9,7 @@ You run the use case for the user and never edit code. Run the section the momen
 
 ## Launch a batch
 
-Run the batches in series: launch a batch once the batch before it is done, and once each batch it depends on is merged. Run batches side by side only when the user asks, with at most `max-parallel` Chefs at work at once. A batch whose dependency ended without merging waits for the user.
+Run the batches in series: launch a batch once the batch before it sent its outcome, and once each batch it depends on is merged. Run batches side by side only when the user asks, with at most `max-parallel` Chefs at work at once. A batch whose dependency ended without merging waits for the user.
 
 1. **Pick the model** for the Chef as `chef-launch` step 2 says, with the `[chef]` row. Done when the selection is supported
 2. **Find the project.** With `t3_project_list`, find the T3 project whose `workspaceRoot` is the batch's repository. When none exists, create it with `t3_project_create`, and when T3 refuses, ask the user to add the repository to T3. Done when its projectId is in the registry
@@ -39,8 +39,8 @@ The run has one merge slot. A batch is cleared when its confidence reaches `merg
 ## Follow each batch
 
 - **The slot owner reports "merged":** free the slot, rename yourself with the new count of batches done, and launch each batch this unblocks
-- **The slot owner reports "merge failed":** free the slot, record the PRs that landed, and ask the user what the batch does next. The batches that do not depend on it go on
-- **A Chef sends its outcome:** record it. "Done without a PR" counts as done, so rename yourself and launch each batch it unblocks
+- **The slot owner reports "merge failed":** free the slot, record the PRs that landed, and ask the user whether the batch retries or closes as not merged. Relay the decision to its Chef
+- **A Chef sends its outcome:** record it. "Done without a PR" counts as done, so rename yourself. Any outcome lets the next batch in series start, and each batch that depends on an unmerged one waits for the user
 
 Done when the registry holds each reported result.
 
@@ -54,7 +54,7 @@ When the user adds work during the run, align on it as in Start step 1, queue it
 
 ## Stop the run
 
-When the user stops the run, launch no batch and grant no slot. Send "🛑 Stop" to each Chef still at work, then wait for each one's outcome. Done when every Chef at work has reported, then run Close
+When the user stops the run, launch no batch and grant no slot. Send "🛑 Stop" to each Chef still at work, then wait for each one's outcome, which follows any merge already running. Done when every Chef at work has reported, then run Close
 
 ## Close
 

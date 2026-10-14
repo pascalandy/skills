@@ -15,6 +15,11 @@ Run the section the Chef requests.
 - Fix each finding the Chef relays and commit each fix to the layer it belongs to. Run 🧰 2nd-pass on the fixes, then restack and push
 - Done when each finding is pushed to its layer, or reported to the Chef with the reason it could not be
 
+## Stop
+
+- Stop at a clean, pushed checkout. Report your branches and their heads to the Chef, then settle yourself as 🧰 t3-runtime says
+- Done when the Chef has your branches and heads, and you are settled
+
 ## Retros
 
 - Run the retros the Chef requests, report your issue links to the Chef, then settle yourself as 🧰 t3-runtime says
