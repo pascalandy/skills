@@ -186,6 +186,9 @@ gh stack merge 42 --yes          # PR #42 and every unmerged PR below it
 - **All-or-nothing:** if any PR in the set cannot merge, none do
 - **Squash:** with GitHub's default squash setting, a PR with one commit lands under that commit's
   subject, not the PR title. Before `--squash`, amend the commit or retitle the PR so they match
+- **Closing keywords:** the squash commit's body lists every commit message, so a
+  `Fixes #<number>` in any commit closes that issue. Keep closing keywords in the PR description,
+  and reword a commit that holds one before `--squash`
 - **Method:** without a method flag, the last-used method is reused. A merge queue on the base
   branch queues the stack instead, picks the method, and ignores any method flag with a warning;
   queued PRs may land in separate groups
