@@ -25,7 +25,7 @@ When the user or project supplies its own CLI contract, follow it; use these sub
 
 | Request | Load |
 |---|---|
-| Write a CLI spec: design the surface and parameters before implementing, or refactor an existing surface: command tree, args and flags tables, output rules, exit code map, config precedence, examples, from a condensed [clig.dev](https://clig.dev/) rubric | [references/CliSpec/MetaSkill.md](references/CliSpec/MetaSkill.md) |
+| Write a CLI spec that designs the surface and parameters before implementing, or refactors an existing surface: command tree, args and flags tables, output rules, exit code map, config precedence, examples, from a condensed [clig.dev](https://clig.dev/) rubric | [references/CliSpec/MetaSkill.md](references/CliSpec/MetaSkill.md) |
 | Build or implement a CLI, or review its code or UX: I/O streams, help text, output, errors, argument parsing, interactivity, subcommands, robustness, signals, configuration, env vars, naming, distribution, and a 100+ item stress-test checklist | [references/CliImpl/MetaSkill.md](references/CliImpl/MetaSkill.md) |
 | Audit a CLI for agent-friendliness: requirements, structured output, composability and pipelines, all inputs via flags, idempotent and retry-safe commands, non-interactive operation, operability, errors resolvable in one attempt, safety checks with `--dry-run` and `--force` | [references/CliAudit/MetaSkill.md](references/CliAudit/MetaSkill.md) |
 
