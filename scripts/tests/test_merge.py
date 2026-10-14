@@ -72,6 +72,13 @@ def test_signs_off_an_unsigned_head_once_then_merges(github: Sandbox) -> None:
         ({"isDraft": True}, "run: gh pr ready 7"),
         ({"baseRefName": "lower-layer"}, "gh stack merge <stack> --yes --squash"),
         (
+            {"stack": {"number": 9, "position": 2, "size": 2}},
+            (
+                "PR #7 is part of a GitHub stack; land it with: gh stack merge 7 "
+                "--yes --squash, then rerun just merge to deploy"
+            ),
+        ),
+        (
             {"state": "MERGED", "baseRefName": "lower-layer"},
             "PR #7 was merged into lower-layer, not main",
         ),
@@ -205,9 +212,11 @@ def test_a_rerun_deploys_a_stack_layer_that_landed_on_main(github: Sandbox) -> N
     github.open_pr()
     github.sign(github.git("rev-parse", "HEAD"))
     assert github.run("merge.py").returncode == 0
-    # gh stack merge leaves the layer's base pointing at the layer below it
+    # gh stack merge leaves the layer's base pointing at the layer below it, and
+    # the PR in its stack
     state = github.state()
     state["prs"][0]["baseRefName"] = "lower-layer"
+    state["prs"][0]["stack"] = {"number": 9, "position": 2, "size": 2}
     github.save(state)
 
     result = github.run("merge.py")

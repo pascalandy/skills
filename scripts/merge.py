@@ -150,6 +150,19 @@ def require_mergeable_as_is(pr: PullRequest) -> None:
         )
 
 
+def require_outside_a_stack(number: int, timeout: float) -> None:
+    """GitHub refuses gh pr merge for any PR in a stack, even one that targets main,
+    such as the top layer once the layers below it landed."""
+    pull = json.loads(
+        gh("api", f"repos/{{owner}}/{{repo}}/pulls/{number}", timeout=timeout)
+    )
+    if pull.get("stack"):
+        raise ScriptError(
+            f"PR #{number} is part of a GitHub stack; land it with: gh stack merge "
+            f"{number} --yes --squash, then rerun just merge to deploy"
+        )
+
+
 def require_contains_main(sha: str, timeout: float) -> None:
     """Refuse `sha` unless it contains main's tip, so the squash lands its tree."""
     main = remote_tip("main", timeout)
@@ -305,6 +318,7 @@ def merge(args: argparse.Namespace) -> dict[str, Any]:
         deployed = [] if args.dry_run else deploy(pr.head, args)
         return {"changes": deployed} if deployed else {}
     require_mergeable_as_is(pr)
+    require_outside_a_stack(pr.number, args.timeout)
     require_clean_tree()
     sha = pushed_head(args.timeout)
     if sha != pr.head:

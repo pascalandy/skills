@@ -254,6 +254,11 @@ def merge(state: dict, number: str, sha: str, subject: str) -> tuple[int, str]:
         return 1, "Head branch was modified. Review and try the merge again."
     if pr["mergeStateStatus"] != "CLEAN":
         return 1, "the base branch policy prohibits the merge"
+    if pr.get("stack"):
+        return 1, (
+            "GraphQL: This pull request is part of a stack and must be merged "
+            "using the asynchronous merge REST API (mergePullRequest)"
+        )
     base = origin(state, "rev-parse", pr["baseRefName"]).stdout.strip()
     tree = squash_tree(state, base, sha) or ""
     commit = origin(state, "commit-tree", tree, "-p", base, "-m", subject)
@@ -285,6 +290,9 @@ def gh(state: dict, args: list[str]) -> tuple[int, str]:
         if hooked.returncode:
             return hooked.returncode, hooked.stderr.strip()
     if args[0] == "api":
+        pull = re.fullmatch(r"repos/\{owner\}/\{repo\}/pulls/(\d+)", args[1])
+        if pull:
+            return 0, json.dumps(pull_request(state, pull[1]))
         sha = re.fullmatch(r"repos/\{owner\}/\{repo\}/commits/(\w+)/status", args[1])
         assert sha, args
         state_of = state["statuses"].get(sha[1])
