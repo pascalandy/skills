@@ -254,6 +254,7 @@ def test_only_setup_gets_the_evals_folder(lab: Lab):
         str(lab.out),
         "--agent",
         "claude",
+        EVALS=str(lab.tmp / "inherited-evals"),
         FAKE_ACTION='printf "%s\\n" "${EVALS:-none}" > "$report/agent-evals"',
     )
 

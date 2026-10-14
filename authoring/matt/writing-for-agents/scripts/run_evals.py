@@ -864,10 +864,15 @@ def execute(
 
 def run_env(plan: Plan, folder: Path) -> dict[str, str]:
     """The environment of a run's setup and agent: no GitHub or git credentials,
-    so GitHub refuses any write, and a gh shim that logs each call."""
+    so GitHub refuses any write, a gh shim that logs each call, and no EVALS,
+    even one the caller exported, since only setup gets it."""
     gh_config = folder / "gh-config"
     gh_config.mkdir()
-    env = {key: value for key, value in os.environ.items() if key not in CREDENTIALS}
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in CREDENTIALS and key != "EVALS"
+    }
     env.update(
         {
             # A skill's state, such as a case file, stays in the run folder
