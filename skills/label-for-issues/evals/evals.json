@@ -1,7 +1,7 @@
 [
   {
     "skills": ["label-for-issues"],
-    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "setup": [],
     "query": "Triage issue #225 in pascalandy/skills. Read-only: tell me which labels you would change, and change nothing.",
     "files": [],
     "expected_behavior": [
@@ -13,7 +13,7 @@
   },
   {
     "skills": ["label-for-issues"],
-    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "setup": [],
     "query": "Preview the decision comment you would post on issue #273 in pascalandy/skills. Do not post it.",
     "files": [],
     "expected_behavior": [
@@ -25,13 +25,26 @@
   },
   {
     "skills": ["label-for-issues"],
-    "setup": "In an empty git repository, with gh authenticated to read pascalandy/skills and every gh write refused",
+    "setup": [],
     "query": "I'm about to file an issue in pascalandy/skills titled 'replay-routing: a pipe inside a request cell splits the row'. Which labels should it get? Don't create it.",
     "files": [],
     "expected_behavior": [
       "Reads the label catalog with gh and runs no gh write",
       "Proposes 2-type:bug, 3-pty:p2, and one state label such as 1-needs-triage",
       "Does not read references/decision-comments.md and drafts no comment"
+    ]
+  },
+  {
+    "skills": ["label-for-issues"],
+    "setup": [],
+    "query": "Use label-for-issues to list the backlog and open Epics without a Milestone in pascalandy/grooming-sandbox. Read-only fixture: run no GitHub write. Inspect the native parents so you distinguish Stories from Sub-tasks. Explain where open Story #7 under closed Epic #6 belongs and why Sub-task #16 is excluded. Use real issues #1 and #4 to prove the Milestone filter.",
+    "files": [],
+    "expected_behavior": [
+      "Runs no gh write and reads the new 4-epic label catalog",
+      "Lists the backlog with is:issue is:open no:parent-issue -label:4-epic",
+      "Lists open Epics without a Milestone with is:issue is:open label:4-epic no:milestone, including #1 and excluding #4",
+      "Includes backlog #11, #12, #13, #14 and #15; excludes Stories #2, #3, #5, #7 and Sub-task #16",
+      "Identifies #7 as an open Story of closed Epic #6 that a grooming scope must still count, and #16 as a Sub-task following non-Epic parent #15"
     ]
   }
 ]
