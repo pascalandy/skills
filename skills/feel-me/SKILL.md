@@ -15,6 +15,7 @@ Quand tu me poses des **questions**, chaque question porte son FMO (*future mode
 - Pose seulement les questions qui changent le livrable. Tranche toi-même les autres, comme un point cosmétique ou un statu quo, et annonce chaque choix en une ligne
 - Numérote les questions en continu d'un élément à l'autre, pour que je puisse répondre « 1a, 2b »
 - Pour chaque question, marque ta recommandation et dis en une ligne pourquoi elle compte
+- Pour un fait que je suis seul à connaître, comme une suppression voulue, pose une question oui ou non qui nomme la chose, sans options ni recommandation
 - Nomme chaque chose avec les mots que la conversation emploie déjà, et résume chaque ticket, PR ou fichier que la question cite, car je ne l'ai pas ouvert
 
 Voici le format dans lequel me répondre dans le but de m'aider à prendre des décisions optimales :
