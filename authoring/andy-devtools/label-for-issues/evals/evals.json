@@ -44,7 +44,7 @@
       "Lists the backlog with is:issue is:open no:parent-issue -label:4-epic",
       "Lists open Epics without a Milestone with is:issue is:open label:4-epic no:milestone, including #1 and excluding #4",
       "Includes backlog #11, #12, #13, #14 and #15; excludes Stories #2, #3, #5, #7 and Sub-task #16",
-      "Identifies #7 as an open Story of closed Epic #6 that a grooming scope must still count, and #16 as a Sub-task following non-Epic parent #15"
+      "Reports #7 separately as an open Story of closed Epic #6, and #16 as a Sub-task following non-Epic parent #15"
     ]
   }
 ]

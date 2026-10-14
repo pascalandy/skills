@@ -36,8 +36,8 @@ GitHub ignores `has:sub-issues`; use the Epic label to identify containers.
 There is no Story label. Membership is the native parent relationship.
 
 When listing backlog, also run the children filter. Report open Stories of closed
-Epics separately as issues a grooming scope must still count, and Sub-tasks with
-their non-Epic parents. Both stay outside the backlog list.
+Epics and Sub-tasks with their non-Epic parents separately. Both stay outside
+the backlog list.
 
 ## Rank and relation pagination
 
