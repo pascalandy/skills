@@ -57,17 +57,10 @@ relationship nodes alone do not establish Story membership or readiness.
 
 ## Milestones
 
-A Milestone belongs to one repository. Assign it only to Epics in the home repo;
-Stories remain in their own repositories without a Milestone.
-
 - List, with pagination: `gh api --paginate 'repos/OWNER/REPO/milestones?state=all&per_page=100'`
 - Read: `gh api repos/OWNER/REPO/milestones/N`
-- Create: `gh api --method POST repos/OWNER/REPO/milestones -f title='M<N> · <outcome>' -f description='<outcome and Epics by Rank>'`
+- Create: `gh api --method POST repos/OWNER/REPO/milestones -f title='<title>' -f description='<description>'`
 - Update: `gh api --method PATCH repos/OWNER/REPO/milestones/N -f description='<approved description>'`
-- Attach an Epic: `gh issue edit <epic> --repo OWNER/REPO --milestone '<title>'`
-- Detach: `gh issue edit <epic> --repo OWNER/REPO --remove-milestone`
+- Attach an issue: `gh issue edit <issue> --repo OWNER/REPO --milestone '<title>'`
+- Detach: `gh issue edit <issue> --repo OWNER/REPO --remove-milestone`
 - Read membership: `gh issue list --repo OWNER/REPO --state all --search 'is:issue milestone:"<title>"' --limit 1000 --json number,title,state,labels,milestone`
-
-The description's numbered Epic list owns Epic Rank; each entry carries its
-issue number. Apply Step 4's migration approval before renaming an existing
-Milestone or changing legacy labels.

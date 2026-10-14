@@ -37,7 +37,7 @@
   {
     "skills": ["label-for-issues"],
     "setup": [],
-    "query": "Use label-for-issues to list the backlog and open Epics without a Milestone in pascalandy/grooming-sandbox. Read-only fixture: run no GitHub write. Inspect the native parents so you distinguish Stories from Sub-tasks. Explain where open Story #7 under closed Epic #6 belongs and why Sub-task #16 is excluded. Use real issues #1 and #4 to prove the Milestone filter.",
+    "query": "label-for-issues: list the backlog and open Epics without a Milestone\nHome repo: pascalandy/grooming-sandbox\nRead-only: run no GitHub write and stop at the complete proposal",
     "files": [],
     "expected_behavior": [
       "Runs no gh write and reads the new 4-epic label catalog",
