@@ -7,7 +7,7 @@ When two or more fixes that share one premise have failed the same gate, suspect
 **Pattern:**
 - **Write the premise down.** The premise is the one sentence that every failed fix assumed.
 - **Take a census before the next fix.** Count the imbalance per actor. The census shows which actors hold the imbalance, not how large it is. Write the census as a rerunnable script per **Build the Lever**.
-- **Read the skew.** If the same few actors hold most of the imbalance on every run, something assigns them that role. Find what assigns the role. That assignment is the next "why" per **Fix Root Causes**.
+- **Read the skew.** If the same few actors hold most of the imbalance on every run, something assigns them that role. Find what assigns the role. That assignment is the next hypothesis per **Fix Root Causes**.
 - **Remove the asymmetry instead of compensating for it**, per the **Laziness Protocol**. Rotate the role between actors, randomize the assignment, or move the role, so that no actor holds it on every run. A return path, a shared pool, a batched hand-off, or a periodic rebalance leaves the assignment in place and adds work on every run.
 
 **Stop:**

@@ -36,7 +36,7 @@ A mode's routes run through that mode's SKILL.md.
   - `autopilot-full`: Run a queue of independent PRs to merged with full autonomy, one owner per PR and each merge verified first.
   - `autopilot-stack`: Build and verify a queue of changes autonomously, then hand over one reviewed stack for the operator to land.
   - `babysit`: Drive a PR or a stack to merge-ready by resolving conflicts, review threads, and CI.
-  - `bug-fix`: Reproduce, root-cause, and fix a reported defect with runtime evidence.
+  - `bug-fix`: Diagnose and fix a reported defect with runtime evidence.
   - `eval`: Test how a skill, structure, or prompt change affects agent behavior before promoting it.
   - `feature`: Build new or changed behavior, starting from a named data shape.
   - `hillclimb`: Improve one metric toward a target through measured hypotheses, a decision log, and one commit per accepted win.
