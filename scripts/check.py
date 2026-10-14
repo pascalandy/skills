@@ -42,6 +42,8 @@ EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
+# The requires-python minimum of scripts/: a bug only an older Python shows fails here (#508)
+PYTHON = "3.11"
 PYTEST = "9.1.1"
 XDIST = "pytest-xdist==3.8.0"
 ACTIONLINT = "actionlint-py@1.7.12.25"
@@ -105,7 +107,7 @@ def ruff(path: str) -> tuple[Command, Command]:
     )
 
 
-def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
+def pyright(path: str, *deps: str, python: str = PYTHON) -> Command:
     return (
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
@@ -117,9 +119,15 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
     )
 
 
-def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Command:
+def pytest(
+    path: str | tuple[str, ...],
+    *deps: str,
+    parallel: bool = True,
+    python: str | None = None,
+) -> Command:
     return (
         "uvx",
+        *(("--python", python) if python else ()),
         "--from",
         f"pytest@{PYTEST}",
         *with_deps(((XDIST,) if parallel else ()) + deps),
@@ -452,7 +460,10 @@ def in_scope(checks: list[Check]) -> list[Check]:
 
 def repo_batch(checks: list[Check]) -> Command:
     paths = tuple(check.test_path for check in checks if check.test_path)
-    return pytest(paths, parallel=any(not check.cheap for check in checks))
+    # Skill tests keep the Python each skill's scripts declare
+    return pytest(
+        paths, parallel=any(not check.cheap for check in checks), python=PYTHON
+    )
 
 
 # pytest's summary line for a failed test, or for a test whose setup failed
