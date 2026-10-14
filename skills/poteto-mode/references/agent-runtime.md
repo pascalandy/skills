@@ -4,7 +4,7 @@ Read this reference before a workflow uses delegation, model selection, history,
 
 ## Hosts
 
-T3 Code runs a harness and adds its own tools for delegates, threads, pull request watches, schedules, and thread history. Inside T3, load the **t3-runtime** skill before a step delegates, launches or messages a thread, watches a pull request, schedules work, or reads history. Where it picks a tool, its choice replaces the native-first rule and the continuation fallbacks below.
+Inside T3 Code, load the **t3-runtime** skill before orchestration, pull request tracking, scheduling, or thread-history work. Where it picks a tool, its choice replaces the native-first rule and the continuation fallbacks below.
 
 ## Load skills and configuration
 

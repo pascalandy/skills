@@ -1,57 +1,62 @@
 ---
 name: "t3-runtime"
-description: "Use inside T3 Code when a step delegates work, launches or messages a thread, links or watches a pull request, schedules work, settles a thread, or reads thread history through the `t3-code` tools."
-kind: "dev"
+description: "Use inside T3 Code before orchestration, pull request tracking, scheduling, or thread-history work: delegating, launching or messaging a thread, linking or watching a pull request, scheduling, settling a thread, or reading thread history through the `t3-code` tools."
+kind: "general"
 role: "helper"
 ---
 
 # T3 runtime
 
-T3 Code adds its orchestration rules to every thread it runs, and each `t3-code` tool describes its own contract. Both stay the source for how a tool works. This skill adds what they leave open: which mechanism a step uses, which thread owns a watch or a schedule, when a thread is done, and traps found in use. To drive T3 from a shell outside a thread, use `t3cli` instead.
-
-You are inside T3 when `orchestrator_capabilities` returns a `parentThreadId`. When the `t3-code` tools are not listed yet, make that one call before concluding they are absent.
+T3 Code adds its orchestration rules to every thread it runs, and each `t3-code` tool describes its own contract. Both stay the source for how a tool works. This skill holds what they leave open: which mechanism a step uses, which thread owns a watch or a schedule, when a thread is done, and the facts a plan needs before it loads a tool's description. To drive T3 from a shell outside a thread, use `t3cli` instead.
 
 ## Pick the mechanism
 
 | Word | Mechanism | Use for |
 |---|---|---|
-| Subagent | The harness's own tool, such as Claude Code's Agent tool or Codex subagents | Work on your provider, with a model that tool supports, that T3 need not show |
-| Delegate | `delegate_task`, a child of this thread | Other child work: another provider or model, or a route that wants T3 to show and track the child |
+| Subagent | The harness's own tool, such as Claude Code's Agent tool or Codex subagents | Child work T3's rules give to the native tool |
+| Delegate | `delegate_task`, a child of this thread | Other child work, and child work a route wants T3 to show and track |
 | Thread | `t3_thread_launch` or `create_threads`, a conversation in the sidebar | Only when the user asks for one, or the invoked route names the threads it launches |
 
 A worker that needs its own worktree stays a delegate. Its brief names the worktree path, and it aims each command there with `git -C`.
 
-- A delegate shares its parent's checkout, since `delegate_task` takes no workspace. It cannot watch a pull request: its parent thread owns the watch. The sidebar hides it, and the user opens it from the parent's Lineage panel
-- A thread keeps no link to the thread that launched it, and nothing tells the launcher when it finishes. Its first message names who it reports to, and it reports with `t3_thread_send`, which reaches any thread in the environment, in any project
+A plan needs these facts before it picks a mechanism:
+
+- A delegate shares its parent's checkout, since `delegate_task` takes no workspace. It cannot watch a pull request, so a thread owns each watch. The sidebar hides it, and the user opens it from the parent's Lineage panel
+- A launched thread has no parent lineage and no automatic completion notice. It hears only its first message
+
+## Launch a thread
+
+Its first message carries the contract it needs, since it sees none of your conversation:
+
+- The thread it reports to, with that threadId, and the tool to report with: `t3_thread_send`
+- What done means for it, and the instruction to load 🧰 t3-runtime and settle itself once done
+
+Keep each threadId a launch returns. Your own completion depends on them.
 
 ## Name threads
 
-The sidebar shows each title on one line and cuts the end. Put what identifies the thread first. The title is the only status an agent can set, since T3 has no labels, tags, or status fields.
+The sidebar shows each title on one line and cuts the end. Put what identifies the thread first. Use the title for a custom progress label, since T3 computes the runtime status and offers no labels or tags.
 
 ## Pull requests
 
-- Link each pull request with `link_pull_request`. `t3_thread_update` replaces the linked pull request, so linking A then B through it loses A
-- The thread that decides the merge holds the watch. Comments from the user's own `gh` account never wake it, so comments the agents post through that account stay silent. A watch ends after 10 wakes caused only by comments
-- When a pull request has nothing to monitor, oem's rule replaces the watch: one status pass, then `unwatch_pull_request`
+- Link each pull request with `link_pull_request`. A `t3_thread_update` link replaces the pull request linked before it
+- The thread that decides the merge holds the watch. Comments posted by the account T3 reads the host with do not wake it, so an agent that comments through that account also reports to the merge owner. A watch stops after 10 consecutive wakes caused only by comments
+- When a pull request has nothing to monitor, oem's rule replaces the watch
 
 ## Schedules
 
-Record each schedule's id with the condition that ends it. Delete the schedule when that condition holds, and disable it with `update_scheduled_task` `enabled: false` on a pause. Work that runs once gets no schedule.
+The thread responsible for the recurring objective owns the schedule: it records the schedule's id with the condition that ends it, and pauses it during a pause. Before it settles, it deletes the schedule, or records the thread that takes it over. Work that runs once gets no schedule.
 
 ## Done and settled
 
-T3 settles a thread on its own only when every pull request linked to it is merged or closed, or after its idle limit, three days by default. It never settles a pinned thread, and never settles one because a turn ended. So each thread settles itself:
+Turn completion never settles a thread. An open linked pull request or a pin keeps T3 from settling one on its own. So each thread settles itself:
 
-1. **Check.** The thread owes no review, fix, reply, or report. Done when nothing is owed
-2. **Settle.** Call `t3_thread_organize` action `settle` without `threadId`. It takes effect when your turn ends. Done when the call returns `settlesWhenTurnEnds: true`
-3. **Confirm.** A parent lists its threads with `t3_thread_list` `settled: true` before it reports its own completion. To settle another thread, wait until `t3_thread_wait` reports its turn ended, since T3 refuses a thread with active work. Done when every thread it launched is settled or named with the reason it stays open
+1. **Check.** The thread owes no review, fix, reply, or report, and holds no schedule. Done when nothing is owed
+2. **Settle.** Call `t3_thread_organize` action `settle` on yourself. Done when the call returns `settlesWhenTurnEnds: true`
+3. **Confirm.** Before a parent reports its own completion, it checks each threadId its launches returned, with `t3_thread_list` in that thread's project. To settle a finished thread that did not settle itself, wait until `t3_thread_wait` reports its turn ended, since T3 refuses a thread with active work. Done when each launched thread is settled or named with what it still owes
 
 Any message reactivates a settled thread. Settling clears its pin and ends its watches.
 
-## History and evidence
+## History
 
-- List threads with `t3_thread_list`, newest first, to cover a time window. `t3_thread_search` returns a bounded sample and can miss threads
-- Read tool calls with `t3_thread_read` `view: "activity"`; the default view holds messages only
-- `t3_worktree_status` reports the calling thread's binding only. Audit worktrees with `git worktree list`
-- `device_open` returns the agent-device CLI that drives the device; `device_screenshot` only captures
-- Parallel delegates that share a browser each open their own tab with `preview_open` `reuseExistingTab: false`, then pass its `tabId` on every call
+To cover every thread in a time window, list them with `t3_thread_list`, since `t3_thread_search` can miss threads. To audit worktrees, use `git worktree list`, since `t3_worktree_status` reports only the calling thread.

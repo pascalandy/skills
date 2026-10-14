@@ -115,6 +115,10 @@ A mode's routes run through that mode's SKILL.md.
 - `writing-for-agents`: Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read.
 - `writing-great-skills`: Use when creating, modifying, evaluating a skill.
 
+### Helpers
+
+- `t3-runtime`: Use inside T3 Code before orchestration, pull request tracking, scheduling, or thread-history work: delegating, launching or messaging a thread, linking or watching a pull request, scheduling, settling a thread, or reading thread history through the `t3-code` tools.
+
 ## Dev
 
 ### Modes
@@ -193,7 +197,6 @@ A mode's routes run through that mode's SKILL.md.
 - `reflect`: Use only when explicitly invoked as `reflect`.
 - `show-me-your-work`: Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away.
 - `swarm`: Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration.
-- `t3-runtime`: Use inside T3 Code when a step delegates work, launches or messages a thread, links or watches a pull request, schedules work, settles a thread, or reads thread history through the `t3-code` tools.
 - `tdd`: Use only when explicitly invoked as `tdd`.
 - `teach`: Use when the user asks to be taught, requests a guided technical explanation, or wants one account combining how something works with why it was designed that way.
 - `technical-writing`: Use for /technical-writing or when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages.

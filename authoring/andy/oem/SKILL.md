@@ -63,7 +63,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Prefer `uv` over `python3`, `rg` over `grep`, and `fd` over `find`
 - Default to `pnpm` for JavaScript/TypeScript; use alternatives (like `bun`) only when already present in the project; never use `npm` or `yarn`
 - On macOS, pnpm owns global JavaScript and TypeScript CLI applications. Use the skill's pnpm update command even when an embedded guide recommends npm, npx, yarn, Bun installation or a self-updater. Bun may run existing scripts, but must not install or update global applications
-- Inside T3 Code, load `$t3-runtime` before you delegate, launch or message a thread, watch a PR, or schedule work
+- Inside T3 Code, load `$t3-runtime` before orchestration, PR tracking, scheduling, or thread-history work
 - Prefer `gh` for GitHub, `trash` for safe deletion, `shellcheck` and `shfmt` for shell, `ruff`, `pyright`, and `bandit` for Python, and `biome` for JavaScript and TypeScript
 - Run CI through project commands such as `just`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
 - Sign off through the project's recipe, such as `just signoff`, which runs the checks before it calls `gh signoff`. A bare `gh signoff` posts a green status without running anything
