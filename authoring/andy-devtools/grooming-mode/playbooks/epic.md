@@ -26,6 +26,8 @@ Epic progress:
    for evidence and closing-reason corrections.
    Done when every candidate and container is read and counted
 2. **Verify.** Apply the shared verdicts against current code and merged changes.
+   Audit closed-completed issues in each scoped repo for completion corrections,
+   including issues outside the planning set; retain valid completions.
    Flag complete open Epics and wrongly completed issues. Identify the files each
    actionable Story touches, including cross-repo paths.
    Done when every issue has an evidenced verdict or a precise left-out reason
