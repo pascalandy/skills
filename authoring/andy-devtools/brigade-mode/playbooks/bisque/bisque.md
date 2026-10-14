@@ -58,6 +58,7 @@ A PR that changes an SOP step updates the process table and the diagram of this 
 | `merge-confidence`, `max-parallel` | `[head-chef]` | `head-chef` |
 | `retro` | `[head-chef]`, `[chef]`, and `[cook]` | `head-chef`, `chef-closing` |
 | `chef-on-claude`, `chef-on-codex`, `service-tier`, `runtime-mode` | `[chef]` and each role below it | `chef-launch` |
+| `delegate-on-claude` | `[cook]` | `cook-implement` |
 | `max-passes` | Each barrage | `chef-triage` |
 | `skip-in-fast-track` | Each role a Chef launches or delegates | Fast track |
 
