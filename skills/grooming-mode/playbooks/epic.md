@@ -20,12 +20,9 @@ Epic progress:
    and open Epics with all their Stories, open or closed. For another requested
    set such as a label, use that set plus open Epics and their Stories.
    Inspect parents with the children filter so closed-Epic Stories remain visible
-   and Sub-tasks stay with their parents. Read closed issues the set references
-   for evidence and closing-reason corrections.
+   and Sub-tasks stay with their parents.
    Done when every candidate and container is read and counted
 2. **Verify.** Apply the shared verdicts against current code and merged changes.
-   Audit closed-completed issues in each scoped repo for completion corrections,
-   including issues outside the planning set; retain valid completions.
    Flag complete open Epics and wrongly completed issues. Identify the files each
    actionable Story touches, including cross-repo paths.
    Done when every issue has an evidenced verdict or a precise left-out reason
@@ -35,7 +32,7 @@ Epic progress:
    Group duplicates or issues one change fixes and list cleanup.
    Done when every actionable issue has a tier or cleanup reason
 4. **Propose.** Use the Epic template. Place every actionable issue into exactly
-   one Epic by outcome, including unready Stories whose outcome fit is supported.
+   one Epic by outcome.
    A one-Story Epic is allowed only when no other Epic can take it. Keep Stories
    touching the same files in the same Epic and link later work blocked by earlier
    work where it must wait. Ground each link in current acceptance criteria,

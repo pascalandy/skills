@@ -65,6 +65,8 @@ including shortened repository aliases.
 Read every scoped issue's body, comments, labels, native parent, relationships,
 state and closing reason. Count every relationship against its `totalCount`
 and paginate incomplete lists with label-for-issues.
+Read closed issues the scoped set references for completion evidence and
+closing-reason corrections, including closed Stories of CU1's open Epics.
 
 When CU1 regroups existing open Epics, obtain the Product Manager's choice:
 
