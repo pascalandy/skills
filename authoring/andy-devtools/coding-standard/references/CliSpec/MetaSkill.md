@@ -108,4 +108,4 @@ Return the completed spec template with all sections filled in. Use tables for a
 
 - Prefer recommending a parsing library (language-specific) only when asked; otherwise keep this skill language-agnostic.
 - If the request is "design parameters", do not drift into implementation.
-- This skill produces the spec. For implementation, the root `SKILL.md` routes to CliImpl. For auditing, CliAudit.
+- This sub-skill produces the spec; CliImpl owns implementation and CliAudit owns audits.

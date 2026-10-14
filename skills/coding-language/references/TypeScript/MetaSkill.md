@@ -24,7 +24,7 @@ TypeScript and JavaScript-with-types conventions for practical implementation wo
 
 ## Routing
 
-Load `references/ROUTER.md` to choose the smallest relevant reference set. Do not load every reference by default.
+Resolve `references/ROUTER.md` relative to this sub-skill directory (`dirname MetaSkill.md`), then load it to choose the smallest relevant reference set; the files it lists sit beside it. Do not load every reference by default.
 
 ## Default Workflow
 

@@ -22,8 +22,8 @@ Load the file of the row that matches the request:
 
 ## Out of scope
 
-- CLI design principles, implementation patterns, or agent-friendliness auditing
-- General architectural design decisions
+- CLI design principles, implementation patterns, or agent-friendliness auditing: use `coding-standard`
+- General architectural design decisions: use `architect`
 
 ## Credits
 
