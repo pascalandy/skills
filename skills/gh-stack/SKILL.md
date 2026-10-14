@@ -275,6 +275,10 @@ stack.
   TUI-only; restructure with `unstack`, then `init`, instead.
 - `checkout <pr>` cannot be forced when a different local stack already covers those branches. Run
   `gh stack unstack --local` first, which keeps the stack on GitHub, then retry.
+- With `rebase.updateRefs=true` in git config, any rebase that replays a stack's commits moves
+  every branch pointing into that range, even a trial rebase in a detached worktree. To test a
+  rebase, run `git -c rebase.updateRefs=false rebase <trunk>` in a detached worktree, and
+  `git rebase --abort` if it stops on a conflict.
 
 ## More detail
 
