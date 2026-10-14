@@ -19,7 +19,7 @@
       "Does not use the website as the control, or says why it is not a fair one: it reaches Harbor's platforms through search, a different path",
       "Reads the same quantities on Harbor and on the control from ./probe: items per response and at least one more, such as errors, latency, or cache hits",
       "Names the realtime-stale error and the upstream-lag warning as noise, because the control shows them too",
-      "Eliminates the 3.4 deploy and its cache with a cited fact: the control station keeps its departures on 3.4, or Harbor's items fell to 0 at 07:51, before the deploy began at 07:55",
+      "Eliminates the 3.4 deploy and its cache with a cited fact read at Harbor itself: Harbor's items fell to 0 at 07:51, before the deploy began at 07:55, or Harbor still returns no departures with the cache off. Another stop working on 3.4 does not count, because the cache is keyed by stop",
       "Finds the feed change: the 07:50 import made HRB a station (location_type 1) whose trips moved to platforms HRB-1 and HRB-2",
       "Explains it with code read after the signal: departures_for matches the stop id only and does not expand a station to its platforms",
       "Leaves every file under departures/ and tests/ unchanged (mandatory)",
