@@ -18,11 +18,52 @@ reading timeline events.
 
 ## Issue-list filters
 
-- Overview: `is:issue is:open -label:4-epic:member`
-- Epics: `is:issue is:open label:4-epic:parent`
-- Members: `is:issue is:open label:4-epic:member`
-- One epic's members: `is:issue parent-issue:OWNER/REPO#N`
-- Members missing a parent: `is:issue is:open label:4-epic:member -has:parent-issue`
+Pass `--repo OWNER/REPO --search '<filter>' --limit 1000` to `gh issue list`.
+If the result reaches the limit, partition the search and account for every issue.
+Searches for closed issues also need `--state all`.
+
+- Backlog: `is:issue is:open no:parent-issue -label:4-epic`
+- Epics: `is:issue is:open label:4-epic`
+- Epics without a Milestone: `is:issue is:open label:4-epic no:milestone`
+- One Epic's Stories, open or closed: `is:issue parent-issue:OWNER/REPO#N`
+- Children with a parent: `is:issue is:open has:parent-issue`; read each
+  native parent's labels and state to distinguish Stories from Sub-tasks
 - Agent candidates: `is:issue is:open label:1-ready-for-agent -label:0-impediment`,
   then apply the blocker filter above and check prerequisites in issue content
 - Agent WIP: `is:issue is:open label:1-wip-by-agent`
+
+GitHub ignores `has:sub-issues`; use the Epic label to identify containers.
+There is no Story label. Membership is the native parent relationship.
+
+When listing backlog, also run the children filter. Report open Stories of closed
+Epics and Sub-tasks with their non-Epic parents separately. Both stay outside
+the backlog list.
+
+## Rank and relation pagination
+
+Attach Stories one at a time in approved Rank order with
+`gh issue edit <epic> --repo OWNER/REPO --add-sub-issue <story-url>`.
+An attachment appends to the native order. For an attached Story, obtain its
+numeric REST `id`, then reorder it with
+`gh api --method PATCH repos/OWNER/REPO/issues/EPIC/sub_issues/priority -F sub_issue_id=ID -F before_id=OTHER_ID`,
+or `after_id`. Read back native order and compare it with the Epic body.
+
+`gh issue view` relationship nodes can be truncated. Compare their length
+with `totalCount`, then page incomplete lists with `gh api --paginate`:
+
+- Stories: `repos/OWNER/REPO/issues/N/sub_issues?per_page=100`
+- Blockers: `repos/OWNER/REPO/issues/N/dependencies/blocked_by?per_page=100`
+- Blocking: `repos/OWNER/REPO/issues/N/dependencies/blocking?per_page=100`
+
+Keep each related issue's repository from its URL. Re-read its labels and state;
+relationship nodes alone do not establish Story membership or readiness.
+
+## Milestones
+
+- List, with pagination: `gh api --paginate 'repos/OWNER/REPO/milestones?state=all&per_page=100'`
+- Read: `gh api repos/OWNER/REPO/milestones/N`
+- Create: `gh api --method POST repos/OWNER/REPO/milestones -f title='<title>' -f description='<description>'`
+- Update: `gh api --method PATCH repos/OWNER/REPO/milestones/N -f description='<approved description>'`
+- Attach an issue: `gh issue edit <issue> --repo OWNER/REPO --milestone '<title>'`
+- Detach: `gh issue edit <issue> --repo OWNER/REPO --remove-milestone`
+- Read membership: `gh issue list --repo OWNER/REPO --state all --search 'is:issue milestone:"<title>"' --limit 1000 --json number,title,state,labels,milestone`
