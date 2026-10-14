@@ -34,7 +34,7 @@ Refine progress:
    Show all comments, left-out issues and gaps against each Done when condition.
    Done when the complete proposal is approved, or delivered as read-only
 4. **Apply and check Done when.** Follow the shared approval/apply/readback
-   checklist. CU3 alone applies approved Story body edits. Reassess labels with
+   checklist. Apply approved Story body edits. Reassess labels with
    the Ready rule and verify the actual graph against all grooming Done when
    conditions. If gaps remain, return to step 2 with another proposal; when
    evidence or a human decision is missing, name it and wait.
@@ -62,15 +62,23 @@ sequenceDiagram
     participant G as Grooming agent
     participant GH as GitHub
     participant H as Head Chef
+    Note over PM,H: CU3. Refine before Brigade<br>Step 1: Read the target
     PM->>G: Epic or Milestone target
+    G->>GH: Read complete target graph, including closed Stories
+    GH-->>G: Container bodies, Rank, native relations and labels
     loop Until grooming Done when holds
-        G->>GH: Read complete graph and current Story evidence
-        GH-->>G: Bodies, native relations, labels and completion proof
+        Note over PM,H: Step 2: Reverify every Story
+        G->>GH: Read current code, comments and merged changes
+        GH-->>G: Current Story evidence and completion proof
+        G->>G: Assess verdicts and readiness
+        Note over PM,H: Step 3: Propose refinements
         G-->>PM: Verdicts, proposed body edits, graph changes and gaps
         PM->>G: Decisions and approval
+        Note over PM,H: Step 4: Apply and check Done when
         G->>GH: Reread, apply approved refinements and verify
         G->>G: Check grooming Done when
     end
+    Note over PM,H: Step 5: Hand off or return after pushback
     G-->>PM: Ready target and evidence
     PM->>H: Hand off target
     alt Head Chef refuses incomplete or ambiguous plan

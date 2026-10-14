@@ -46,8 +46,8 @@ Epic progress:
    state labels, Rank, target Epic and blockers. Show each kept or new Epic's
    priority, state, outcome, checkable Done when and remaining readiness gaps.
    Include cleanup, left-out issues with missing evidence, moves, and exact
-   closure/reopening comments. Preserve Story bodies; send missing goals,
-   acceptance criteria or user decisions to CU3.
+   closure/reopening comments. List missing goals, acceptance criteria and user
+   decisions as CU3 handoff gaps.
    Done when the proposal accounts for every scoped issue and the Product Manager
    approves, or receives the proposal as the read-only result
 5. **Package and hand off.** Follow the shared approval/apply/readback checklist.
@@ -74,12 +74,21 @@ sequenceDiagram
     actor PM as Product Manager
     participant G as Grooming agent
     participant GH as GitHub
+    Note over PM,GH: CU1. Backlog to Epics<br>Step 1: Scope
     PM->>G: Home repo, scope, keep or restart
     G->>GH: Read backlog, open Epics, closed-Epic Stories and parents
-    GH-->>G: Issues, code and merged evidence
-    G->>G: Verify, prioritize, place and rank Stories
+    GH-->>G: Complete candidate and container scope
+    Note over PM,GH: Step 2: Verify
+    G->>GH: Read current code, comments and merged changes
+    GH-->>G: Evidence for verdicts and files touched
+    G->>G: Verify each issue and completion correction
+    Note over PM,GH: Step 3: Prioritize
+    G->>G: Tier actionable issues and group cleanup
+    Note over PM,GH: Step 4: Propose
+    G->>G: Place and rank Stories with justified blockers
     G-->>PM: Proposal, labels, blockers, cleanup and readiness gaps
     PM->>G: Approve exact actions
+    Note over PM,GH: Step 5: Package and hand off
     G->>GH: Reread scope, apply unchanged approved actions
     G->>GH: Read back native order, bodies, links and labels
     GH-->>G: Verified state or failed actions

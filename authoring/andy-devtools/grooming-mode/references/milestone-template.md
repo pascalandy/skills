@@ -16,7 +16,3 @@ Title: `M<N> · <outcome in plain words>`
 
 <The signature the user sets>
 ```
-
-The numbered list is the sole persistent Epic Rank. The proposal also names
-each justified native blocked-by link, why it must wait, which Epics can proceed
-in parallel, their label diffs and each gap to grooming Done when.

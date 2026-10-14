@@ -40,7 +40,7 @@ Use [routing cases](references/routing-cases.md) when changing routing.
 | Sub-task | A sub-issue of a non-Epic issue; it follows its parent | native sub-issue | It is not a Story |
 | Epic | Stories aiming at one outcome, possibly across repositories | `4-epic` issue in the home repo | |
 | Milestone | A group of Epics | Milestone in the home repo | In project management, a milestone is a date |
-| Rank | Work order: a Story within its Epic, an Epic within its Milestone | native sub-issue order; numbered list in Milestone description | Priority is a separate tier |
+| Rank | Work order: a Story within its Epic, an Epic within its Milestone | native sub-issue order; Milestone description's numbered list is the sole persistent Epic Rank | Priority is a separate tier |
 | Blocked by | B must wait for A, for a logical prerequisite or a conflict in the same files | native Blocked by / Blocking dependency | Membership imposes no order |
 | Parallel | Two elements with no blocked-by link between them | absence of a dependency | |
 | Home repo | The repository the Product Manager names | home of Epics and Milestones | A Milestone exists only in its own repo |
@@ -124,9 +124,8 @@ Number new Epics after the highest `Epic N` title, closed ones included.
 `Epic N · <outcome>` is a stable identifier; never renumber existing Epics.
 Create all approved Epics before resolving references between them; every cited
 Epic then carries its issue number. Without a Milestone, CU1 creates Epics in
-the proposed order, their initial Rank. Only a Milestone description persists
-Epic Rank. Epic bodies hold their own Stories in native Rank order, with Today
-and After entries, never a replicated Order section.
+the proposed order, their initial Rank. Epic bodies hold their own Stories in
+native Rank order, with Today and After entries, never a replicated Order section.
 
 ## Approval, apply and readback
 

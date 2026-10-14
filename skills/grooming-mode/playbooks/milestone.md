@@ -28,7 +28,7 @@ Milestone progress:
    without a link. Show the proposed Milestone description, membership, links
    and exact Story/Epic priority and readiness labels under the shared rules.
    Use each Story's recorded tier; flag an unsettled tier for approval.
-   Preserve Story bodies and name each Epic's gap to grooming Done when.
+   Name each Epic's gap to grooming Done when.
    Done when the Product Manager approves the complete proposal, or receives
    the proposal as the read-only result
 3. **Package and hand off.** Follow the shared approval/apply/readback checklist.
@@ -40,8 +40,8 @@ Milestone progress:
 
 ## Sequence
 
-Epic Rank has one persistent owner, the Milestone description. Story refinement
-continues in a new conversation.
+Package approved Epics, then hand remaining readiness gaps to a new refinement
+conversation.
 
 ```mermaid
 sequenceDiagram
@@ -50,11 +50,14 @@ sequenceDiagram
     actor PM as Product Manager
     participant G as Grooming agent
     participant GH as GitHub
+    Note over PM,GH: CU2. Epics to a Milestone<br>Step 1: Scope containers
     PM->>G: Home repo and desired outcome
     G->>GH: Read Epics without a Milestone and container context
     GH-->>G: Eligible Epics, Story states and dependencies
+    Note over PM,GH: Step 2: Propose
     G-->>PM: Ranked description, membership, links, labels and gaps
     PM->>G: Approve exact actions
+    Note over PM,GH: Step 3: Package and hand off
     G->>GH: Reread, create Milestone and apply approved actions
     G->>GH: Verify membership, ranked description, links and labels
     GH-->>G: Verified state or failed actions

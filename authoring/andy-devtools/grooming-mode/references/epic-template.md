@@ -1,7 +1,6 @@
 # Epic template
 
 Use for CU1 proposals and packaging, and CU3 container refinements.
-The Product Manager should be able to decide without opening every Story.
 Every Story entry stands alone. Keep the same order as native sub-issue Rank.
 Cross-repo references use `OWNER/REPO#N`.
 
@@ -34,10 +33,10 @@ REF: #<issue>, OWNER/REPO#<issue>
 <A checkable outcome with no open decision>
 Every Story has a documented disposition and the outcome holds on the default branch.
 
-## For the agent
+## 👨🏻‍🍳 For the agent
 
 <details>
-<summary>Details</summary>
+<summary>👨🏻‍🍳 Details</summary>
 
 ### Out of this Epic
 
@@ -52,8 +51,3 @@ approaches considered and related PRs. Keep execution batches with Brigade>
 
 </grooming-mode>
 ````
-
-For the approval proposal, add each Story's verdict, evidence, tier, exact
-priority/state labels, Rank, target Epic and blockers alongside the body preview.
-Add each Epic's label diff and gap to grooming Done when. An unready Story's
-unknown goal or criteria stays named as a gap; CU1 preserves its issue body.
