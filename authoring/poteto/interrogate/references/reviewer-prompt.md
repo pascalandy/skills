@@ -12,7 +12,7 @@ The author's stated intent for this change:
 
 > {INTENT}
 
-You are reviewing whether the code achieves this intent well. Do NOT question the intent itself. Assume the goal is correct and challenge the execution.
+You are reviewing whether the code achieves the intended behavior. Accept the goal, but treat any cause the intent claims as a hypothesis: try to contradict it with a cited fact, name any missing observation needed to test it, then challenge the execution.
 
 ## Code Under Review
 
