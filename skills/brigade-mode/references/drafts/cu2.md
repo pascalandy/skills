@@ -12,6 +12,8 @@ date_updated: 2026-10-12
 # CU2. Cook en parallèle sur plusieurs dépôts
 
 > Not approved. Never run this CU. [brigade-mode](../../SKILL.md)
+>
+> Remplacé par [bisque](../../playbooks/bisque/bisque.md) : son Head Chef donne à chaque dépôt son propre batch et son Chef.
 
 Le Chef lance un Cook par dépôt en même temps. Il regroupe les revues dans un seul message, puis settle chaque Cook dès son merge.
 
