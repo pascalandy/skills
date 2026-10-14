@@ -1,7 +1,8 @@
 """Keep the hand-written docs in step with the files they describe.
 
-docs/INDEX.md lists and counts every page (#521), and the pages a reader
-follows to pick a skill name no deleted one (#575).
+docs/INDEX.md lists and counts every page (#521), the pages a reader follows
+to pick a skill name no deleted one (#575), and every relative link of the
+README and docs/ leads to a file (#576).
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import unquote
 
 from conftest import commit
 
@@ -24,6 +26,10 @@ SKILL_GUIDES = ("README.md", "docs/guide", "docs/guide-fr-ca", ".agents")
 # same character, at least as long and with nothing after it, closes it
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 ROUTE_WORD = re.compile(r"\b(?:routes?|playbooks?)\b", re.IGNORECASE)
+INLINE_LINK = re.compile(r"\]\(<?([^)\s>]*)")
+REFERENCE_LINK = re.compile(r"^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)")
+# A URL, an absolute or home path, or an anchor in the same page
+NOT_RELATIVE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|[/~#])", re.IGNORECASE)
 
 
 def markdown(root: Path, *places: str) -> list[Path]:
@@ -152,6 +158,27 @@ def deleted_skill_mentions(root: Path) -> list[str]:
     return mentions
 
 
+def relative_links(root: Path) -> Iterator[tuple[Path, int, str]]:
+    """Each relative link of the README and docs/, outside code, with its file and line."""
+    for path in markdown(root, "README.md", "docs"):
+        for number, line, fenced in lines(path):
+            if fenced:
+                continue
+            targets = INLINE_LINK.findall(CODE_SPAN.sub("", line))
+            targets += REFERENCE_LINK.findall(line)
+            for target in targets:
+                if target and not NOT_RELATIVE.match(target):
+                    yield path, number, target
+
+
+def broken_links(root: Path) -> list[str]:
+    return [
+        f"{path.relative_to(root).as_posix()}:{number}: links to {target}, which does not exist"
+        for path, number, target in relative_links(root)
+        if not (path.parent / unquote(target.split("#", 1)[0])).exists()
+    ]
+
+
 def test_lines_close_a_fence_only_on_its_own_character_and_length(
     tmp_path: Path,
 ) -> None:
@@ -251,4 +278,36 @@ def test_deleted_skill_mentions_skip_routes_and_plain_words(tmp_path: Path) -> N
         "README.md:4: names `plan`, a deleted skill; name what replaced it, or its route as `<mode> ; plan`",
         "README.md:6: names `plan`, a deleted skill; name what replaced it, or its route as `<mode> ; plan`",
         "docs/guide/01-start.md:1: names `cass`, a deleted skill; name what replaced it, or its route as `<mode> ; cass`",
+    ]
+
+
+def test_every_relative_link_leads_to_a_file() -> None:
+    assert any(relative_links(ROOT)), (
+        "found no relative link; the link patterns match nothing"
+    )
+    broken = broken_links(ROOT)
+    assert not broken, "\n".join(broken)
+
+
+def test_broken_links_name_the_file_line_and_target(tmp_path: Path) -> None:
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/my page.md").touch()
+    (tmp_path / "README.md").write_text(
+        "[Start](docs/start.md#setup), [gone](docs/gone.md#part), [web](https://example.com),"
+        " [spaced](docs/my%20page.md),"
+        " [scratch](/tmp/brief.md), and `[code](nope.md)`.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs/start.md").write_text(
+        "[Home](../README.md) and [setup](#setup).\n"
+        "```text\n"
+        "[fenced](nope.md)\n"
+        "```\n"
+        "[old]: ./old.md\n",
+        encoding="utf-8",
+    )
+
+    assert broken_links(tmp_path) == [
+        "README.md:1: links to docs/gone.md#part, which does not exist",
+        "docs/start.md:5: links to ./old.md, which does not exist",
     ]

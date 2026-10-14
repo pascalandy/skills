@@ -243,6 +243,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             "-r",
             "fE",
             "scripts/tests/test_commands.py",
+            "scripts/tests/test_docs.py",
             "scripts/tests/test_skill_invocation.py",
         ]
     ]
@@ -256,6 +257,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             [
                 "scripts/tests/test_cli_contract.py",
                 "scripts/tests/test_commands.py",
+                "scripts/tests/test_docs.py",
                 "scripts/tests/test_discover_skills.py",
                 "scripts/tests/test_compile_skills.py",
                 "scripts/tests/test_install_skills.py",
@@ -269,6 +271,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             [
                 "scripts/tests/test_cli_contract.py",
                 "scripts/tests/test_commands.py",
+                "scripts/tests/test_docs.py",
                 "scripts/tests/test_discover_skills.py",
                 "scripts/tests/test_install_skills.py",
                 "scripts/tests/test_skill_invocation.py",
@@ -282,6 +285,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
                 "scripts/tests/test_api_keys_validation.py",
                 "scripts/tests/test_cli_contract.py",
                 "scripts/tests/test_commands.py",
+                "scripts/tests/test_docs.py",
                 "scripts/tests/test_discover_skills.py",
                 "scripts/tests/test_install_skills.py",
                 "scripts/tests/test_skill_invocation.py",
@@ -295,6 +299,7 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
             [
                 "scripts/tests/test_cli_contract.py",
                 "scripts/tests/test_commands.py",
+                "scripts/tests/test_docs.py",
                 "scripts/tests/test_skill_invocation.py",
                 "scripts/tests/test_sync.py",
             ],
