@@ -87,9 +87,9 @@ or read current files and commits with `gh api`. Give each issue a verdict:
 | Gone | The problem no longer occurs or never did, without a fix to cite; show why |
 | Stale fix | The problem holds, but the proposed fix quotes changed text |
 
-Insufficient evidence goes on the left-out list with the precise missing proof.
-Missing goal or acceptance criteria is a readiness gap: when evidence supports
-the outcome fit, place the Story provisionally and keep it unready.
+Put an issue on the left-out list when its outcome fit or required verification
+cannot be established, naming the precise missing proof. Assess readiness gaps
+under Labels and bodies separately from verification.
 For duplicates, name the covering issue and show the proposed closure comment.
 
 An Epic is complete only when its outcome holds and every Story has a documented
@@ -111,8 +111,11 @@ operations; a duplicate's comment supplies its covering reference.
 An approved grooming sets each Story's `3-pty:p1`, `p2` or `p3` from its
 P1/P2/P3 tier. Each Epic takes its highest-priority Story's priority, has
 `4-epic` and no type. Determine each Story's and Epic's state with
-label-for-issues' Ready rule. An unclear Story gets or keeps `1-needs-triage`;
-its Epic also stays unready until its readiness gaps are resolved.
+label-for-issues' Ready rule. Missing goals or acceptance criteria alone are
+readiness gaps, not grounds for leaving an issue out. Establish outcome fit from
+its title, body, domain and current files, then place it provisionally with that
+outcome. Give it `1-needs-triage`, preserve its unresolved goal and criteria, and
+list those gaps for CU3. Its Epic stays unready until the gaps are resolved.
 Left-out issues keep their labels. A `2-type:postmortem` Story takes bug for a
 `fix` title prefix, feature for `feat`, and task for every other prefix.
 
