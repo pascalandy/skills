@@ -210,7 +210,7 @@ One term per concept. The skills use no synonyms for these.
 | in scope | The facts a candidate must answer to: field facts of the variable, or of its cluster when instances were clustered, plus lab facts from repros that passed parity. Facts from a rejected repro stay in the file, out of scope |
 | strength | For an in-scope signal or symptom, the number of live hypotheses marked `+`, counting a combination and its members once. Strong is 1 or 2 |
 | candidate | A live hypothesis marked `+` on every in-scope signal and symptom and `x` on no in-scope fact |
-| combination | Hypotheses that together are a candidate, where removing any member leaves an in-scope fact unexplained. Its marks are derived: `x` where any member has `x`, `+` where any member has `+`, `0` otherwise |
+| combination | Hypotheses that together are a candidate, where removing any member leaves an in-scope fact unexplained. It is `x` where any member is `x`, since an `x` holds whatever cause is added. Its other marks are judged from what the members produce together, not from their own marks: two members that are each `0` on a fact can together be `+` |
 | repair tactic | One of the five moves when no candidate exists: reverify, split, merge, combine, new from facts |
 | descend | Gather facts one layer down, paired with the same control |
 | repro | A hypothesis of the form "this setup produces the reported failure" |
