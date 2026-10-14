@@ -16,7 +16,8 @@ The Principles section below grounds every trigger. Before a decision, read each
 
 Remaining triggers:
 
-- Nontrivial change, architecture decision, or "are we sure?" → the **how** skill.
+- Nontrivial change, architecture decision, or "are we sure?" → the **how** skill, unless the question is why something fails at runtime.
+- Bug report, or why something fails at runtime → the **diagnose** skill, before you open any source file. Reproduce on the same surface yourself, at repro parity as `diagnose` defines it. Hand to the user only under the narrow Bug fix step 1 exception.
 - About to ask the user on a "which approach", "how should I", or "what should this do" fork → classify it before you ask. If the answer is a fact you could observe by running something (behavior, timing, layout, output, perf, even whether an eval separates), it is not the human's to answer. Sketch it via the Prototype playbook (`playbooks/prototype.md`) and let the result decide. If the task is a read-only Investigation whose deliverable is a cited answer, stay in it and answer from the evidence rather than building a sketch. Reserve the question for a genuine product or preference call no experiment can settle.
 - Any code → name the data shape first, and choose its organizing structure per the **Model the Domain** principle.
 - Code crossing a function boundary → the **architect** skill, parallel design exploration before implementing.
@@ -27,7 +28,7 @@ Remaining triggers:
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
 - Before commit → the diff cleanup procedure in [agent runtime](references/agent-runtime.md#author-clean-up-and-verify).
 - Before review of a diff that changes source code → the **no-comments** skill (`/no-comments`).
-- Shipping UI / IDE / CLI → the project verification skill and an available shell, PTY, browser, or native application driver, as described in the runtime reference. For bug fixes, reproduce first on the same surface yourself. Hand to the user only under the narrow Bug fix step 1 exception.
+- Shipping UI / IDE / CLI → the project verification skill and an available shell, PTY, browser, or native application driver, as described in the runtime reference.
 - Any PR-status request → the **Babysit** playbook (`playbooks/babysit.md`). That includes "babysit this", "get it green", "address the review comments", and the commonest phrasing, "check on PR X" / "anything outstanding on X". Never triggered by merely opening a PR. Declare its mode before polling. The playbook's step 1 owns the request-to-mode mapping. Keep long-lived supervision in the coordinator so phase workers can return their results.
 - Multiple dependent PRs for one coherent effort → before implementation, load `gh-stack` unless the active playbook already owns stack topology or landing.
 - Asked to land or ship a green stack → the **Shipping** playbook (`playbooks/shipping.md`). Green is not safe. Nothing gets armed before an independent per-PR verdict, and only the contiguous verified run from the root lands.
@@ -119,7 +120,7 @@ Use the available task-list tool or a Markdown checklist whose first items are t
 A large or cross-cutting effort (a migration across many call sites, an ambitious multi-part change), or work the user steps away from to trust later, routes to the **figure-it-out** skill even when a narrower playbook like Feature fits. Use **figure-it-out** whenever no bundled playbook fits. It designs a bespoke, rigorous playbook for the task. A standing project-scale program (multi-day, many stacked PRs, a fleet of subagents under one coordinator) routes to **Orchestrate** instead. figure-it-out designs one bespoke run, orchestrate runs the program.
 
 - **Investigation.** Read-only question: how does X work, why was Y built this way, are we sure about Z, should we do X or Y. `playbooks/investigation.md`.
-- **Bug fix.** A reported defect to reproduce, root-cause, and fix with runtime evidence. `playbooks/bug-fix.md`.
+- **Bug fix.** A reported defect to diagnose and fix with runtime evidence. `playbooks/bug-fix.md`.
 - **Perf issue.** A measured slowness to trace and improve against a baseline. `playbooks/perf-issue.md`.
 - **Hillclimb.** Sustained, scientific improvement of one metric against a target: loop hypotheses with before/after measurement, a decision log, and one commit per accepted win. Distinct from Perf issue, which is a one-off fix. `playbooks/hillclimb.md`.
 - **Runtime forensics.** Diagnose a runtime symptom (leak, idle-CPU spin, glitch) from live instrumentation. The deliverable is a diagnosis, not a fix. `playbooks/runtime-forensics.md`.

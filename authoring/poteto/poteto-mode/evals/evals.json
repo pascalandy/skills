@@ -137,5 +137,59 @@
       "Reviews the README change and leaves no-comments unloaded, since the diff changes no source code",
       "Writes the reply without a long dash"
     ]
+  },
+  {
+    "skills": [
+      "poteto-mode",
+      "oem",
+      "how",
+      "unslop",
+      "no-comments",
+      "technical-writing",
+      "architect",
+      "principle-attack-the-premise",
+      "principle-boundary-discipline",
+      "principle-build-the-lever",
+      "principle-encode-lessons-in-structure",
+      "principle-exhaust-the-design-space",
+      "principle-experience-first",
+      "principle-fix-root-causes",
+      "principle-foundational-thinking",
+      "principle-guard-the-context-window",
+      "principle-laziness-protocol",
+      "principle-make-operations-idempotent",
+      "principle-migrate-callers-then-delete-legacy-apis",
+      "principle-minimize-reader-load",
+      "principle-model-the-domain",
+      "principle-never-block-on-the-human",
+      "principle-outcome-oriented-execution",
+      "principle-prove-it-works",
+      "principle-redesign-from-first-principles",
+      "principle-separate-before-serializing-shared-state",
+      "principle-sequence-verifiable-units",
+      "principle-subtract-before-you-add",
+      "principle-test-behavior-not-implementation",
+      "principle-type-system-discipline",
+      "diagnose",
+      "interrogate",
+      "why",
+      "tdd",
+      "headless"
+    ],
+    "setup": [
+      "bash \"$(git -C \"$EVALS\" rev-parse --show-toplevel)/authoring/andy-devtools/diagnose/evals/fixtures/tally.sh\""
+    ],
+    "query": "poteto: after upgrading tally to 2.3, my Birchwood chequing balance in the ledger is $1,243.17 below the bank's September closing balance, while Fernhill looks right (incident/report.md). The statements and a copy of my ledger are in incident/. Fix tally.",
+    "files": [
+      "authoring/andy-devtools/diagnose/evals/fixtures/tally.sh",
+      "authoring/andy-devtools/diagnose/evals/fixtures/tally"
+    ],
+    "expected_behavior": [
+      "Reads poteto-mode's bug-fix playbook",
+      "Loads the diagnose skill before it opens any file under tally/ or tests/, by any tool, including cat, sed, grep, or git show (mandatory)",
+      "Imports the Birchwood September statement at v2.3 and at least one control, the same statement at v2.2 or the Fernhill statement at v2.3, before it opens any file under tally/ or tests/",
+      "Fixes the import so Birchwood's page-top copies are skipped while Fernhill's identical purchases stay separate, and adds a test that fails on the unfixed code",
+      "States a claim level short of fixed, and says the user's re-import or ledger balance after cleanup is what proves it (mandatory)"
+    ]
   }
 ]
