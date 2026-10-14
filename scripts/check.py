@@ -125,6 +125,9 @@ def pytest(
     parallel: bool = True,
     python: str | None = None,
 ) -> Command:
+    # uv prefers a Python it manages, so once the root batch downloads 3.11, a
+    # check without python= runs under it too; a skill whose scripts need a
+    # newer Python passes their requires-python minimum
     return (
         "uvx",
         *(("--python", python) if python else ()),
@@ -300,7 +303,7 @@ CHECKS = [
     Check(
         "distill",
         *ruff(f"{ANDY_MODE}/scripts/distill"),
-        pytest(f"{ANDY_MODE}/scripts/distill/tests"),
+        pytest(f"{ANDY_MODE}/scripts/distill/tests", python="3.12"),
     ),
     Check(
         "tavily",
@@ -308,11 +311,20 @@ CHECKS = [
     ),
     Check(
         "transcript",
-        pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
+        pytest(
+            f"{TRANSCRIPT}/scripts/tests",
+            "httpx",
+            "yt-dlp==2026.7.4",
+            "rich",
+            python="3.12",
+        ),
         # Its doc test checks the flags these files pass to transcript
         reads=("justfile", "authoring/verify-loops/verify-transcript/SKILL.md"),
     ),
-    Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
+    Check(
+        "verify-transcript",
+        pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests", python="3.12"),
+    ),
     # The free features run the branch's transcript CLI, so a contract change
     # its verifier missed fails here; the paid real summary stays out of the default run
     Check(
@@ -468,7 +480,6 @@ def in_scope(checks: list[Check]) -> list[Check]:
 
 def repo_batch(checks: list[Check]) -> Command:
     paths = tuple(check.test_path for check in checks if check.test_path)
-    # Skill tests keep the Python each skill's scripts declare
     return pytest(
         paths, parallel=any(not check.cheap for check in checks), python=PYTHON
     )
