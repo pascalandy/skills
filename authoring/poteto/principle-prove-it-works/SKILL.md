@@ -14,8 +14,8 @@ Verify every task output by checking the real thing directly. Do not infer from 
 **Pattern:** After completing any task, ask: "how do I prove this actually works?"
 
 Check the real thing, not a proxy:
-- Check process liveness directly, not indirectly through derived state
-- Read the actual value, not a cached or derived representation
+- Check process liveness directly, not indirectly through derived state, and re-read live state before saying what is true now
+- Read the actual value, not a cached or derived representation, and state what a count or an absence claim covered
 - When verification fails, suspect the observation method before suspecting the system
 
 Code and features:
