@@ -1,0 +1,30 @@
+-	syslog (ops-1 backup), lines for the preorder export
+2026-10-06	Oct  6 21:00:01 ops-1 CRON[46012]: (crumb) CMD (cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow)
+2026-10-06	Oct  6 21:00:02 ops-1 postfix/smtp[46031]: 7C1E2A0B44: to=<kitchen@crumbandco.example>, relay=mx.crumbandco.example[10.20.0.5]:25, delay=0.38, delays=0.02/0.01/0.2/0.15, dsn=2.0.0, status=sent (250 2.0.0 Ok: queued as 41D7F3B2C5)
+2026-10-06	Oct  6 21:00:02 ops-1 postfix/local[46034]: 7E09C1D5A2: to=<crumb@ops-1.crumbandco.example>, orig_to=<crumb>, relay=local, delay=0.02, delays=0.01/0/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox)
+2026-10-07	Oct  7 21:00:01 ops-1 CRON[47130]: (crumb) CMD (cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow)
+2026-10-07	Oct  7 21:00:02 ops-1 postfix/smtp[47149]: A4F09B3D17: to=<kitchen@crumbandco.example>, relay=mx.crumbandco.example[10.20.0.5]:25, delay=0.44, delays=0.03/0.01/0.22/0.18, dsn=2.0.0, status=sent (250 2.0.0 Ok: queued as 92C4E07A1B)
+2026-10-07	Oct  7 21:00:02 ops-1 postfix/local[47152]: B3D8A2F610: to=<crumb@ops-1.crumbandco.example>, orig_to=<crumb>, relay=local, delay=0.02, delays=0.01/0/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox)
+2026-10-08	Oct  8 21:00:01 ops-1 CRON[48211]: (crumb) CMD (cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow)
+2026-10-08	Oct  8 21:00:02 ops-1 postfix/smtp[48230]: 3F2A1C0D12: to=<kitchen@crumbandco.example>, relay=mx.crumbandco.example[10.20.0.5]:25, delay=0.41, delays=0.03/0.01/0.21/0.16, dsn=2.0.0, status=sent (250 2.0.0 Ok: queued as D06B1F94E3)
+2026-10-08	Oct  8 21:00:02 ops-1 postfix/local[48233]: 4A11B0D3E7: to=<crumb@ops-1.crumbandco.example>, orig_to=<crumb>, relay=local, delay=0.02, delays=0.01/0/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox)
+-	
+-	/var/mail/crumb (ops-1 backup), cron output of the preorder export
+2026-10-06	From root@ops-1.crumbandco.example  Tue Oct  6 21:00:02 2026
+2026-10-06	Subject: Cron <crumb@ops-1> cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow
+2026-10-06	Date: Tue,  6 Oct 2026 21:00:02 -0400 (EDT)
+2026-10-06	
+2026-10-06	target date 2026-10-07, 26 orders
+2026-10-06	
+2026-10-07	From root@ops-1.crumbandco.example  Wed Oct  7 21:00:02 2026
+2026-10-07	Subject: Cron <crumb@ops-1> cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow
+2026-10-07	Date: Wed,  7 Oct 2026 21:00:02 -0400 (EDT)
+2026-10-07	
+2026-10-07	target date 2026-10-08, 27 orders
+2026-10-07	
+2026-10-08	From root@ops-1.crumbandco.example  Thu Oct  8 21:00:02 2026
+2026-10-08	Subject: Cron <crumb@ops-1> cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow
+2026-10-08	Date: Thu,  8 Oct 2026 21:00:02 -0400 (EDT)
+2026-10-08	
+2026-10-08	target date 2026-10-09, 38 orders
+2026-10-08	

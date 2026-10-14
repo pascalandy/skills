@@ -1,0 +1,55 @@
+# Installed as /etc/skyrollup/config.toml on wx-1.
+
+[source]
+url = "http://collector.fernlowwx.internal:8040/v1/readings"
+timeout = 20
+stations = [
+  "ws-01",
+  "ws-02",
+  "ws-03",
+  "ws-04",
+  "ws-05",
+  "ws-06",
+  "ws-07",
+  "ws-08",
+  "ws-09",
+  "ws-10",
+  "ws-11",
+  "ws-12",
+  "ws-13",
+  "ws-14",
+  "ws-15",
+  "ws-16",
+  "ws-17",
+  "ws-18",
+  "ws-19",
+  "ws-20",
+  "ws-21",
+  "ws-22",
+  "ws-23",
+  "ws-24",
+  "ws-25",
+  "ws-26",
+  "ws-27",
+  "ws-28",
+  "ws-29",
+  "ws-30",
+  "ws-31",
+  "ws-32",
+  "ws-33",
+  "ws-34",
+  "ws-35",
+  "ws-36",
+  "ws-37",
+  "ws-38",
+  "ws-39",
+  "ws-40",
+]
+
+[output]
+summaries_dir = "/srv/www/summaries"
+latest = "summary-latest.json"
+
+[state]
+status_file = "/var/lib/skyrollup/status.json"
+log_file = "/var/log/skyrollup/skyrollup.log"

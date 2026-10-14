@@ -1,0 +1,21 @@
+2026-10-09	2026-10-09T13:40:12+00:00 ops-2 systemd[1]: Started preorder-export.timer - Nightly preorder sheet for the kitchen.
+2026-10-10	2026-10-10T01:00:00+00:00 ops-2 systemd[1]: Starting preorder-export.service - Crumb preorder sheet for the kitchen...
+2026-10-10	2026-10-10T01:00:01+00:00 ops-2 python3[21844]: target date 2026-10-11, 44 orders
+2026-10-10	2026-10-10T01:00:01+00:00 ops-2 systemd[1]: preorder-export.service: Deactivated successfully.
+2026-10-10	2026-10-10T01:00:01+00:00 ops-2 systemd[1]: Finished preorder-export.service - Crumb preorder sheet for the kitchen.
+2026-10-11	2026-10-11T01:00:00+00:00 ops-2 systemd[1]: Starting preorder-export.service - Crumb preorder sheet for the kitchen...
+2026-10-11	2026-10-11T01:00:01+00:00 ops-2 python3[22161]: target date 2026-10-12, 29 orders
+2026-10-11	2026-10-11T01:00:01+00:00 ops-2 systemd[1]: preorder-export.service: Deactivated successfully.
+2026-10-11	2026-10-11T01:00:01+00:00 ops-2 systemd[1]: Finished preorder-export.service - Crumb preorder sheet for the kitchen.
+2026-10-12	2026-10-12T01:00:00+00:00 ops-2 systemd[1]: Starting preorder-export.service - Crumb preorder sheet for the kitchen...
+2026-10-12	2026-10-12T01:00:01+00:00 ops-2 python3[22476]: target date 2026-10-13, 35 orders
+2026-10-12	2026-10-12T01:00:01+00:00 ops-2 systemd[1]: preorder-export.service: Deactivated successfully.
+2026-10-12	2026-10-12T01:00:01+00:00 ops-2 systemd[1]: Finished preorder-export.service - Crumb preorder sheet for the kitchen.
+2026-10-13	2026-10-13T01:00:00+00:00 ops-2 systemd[1]: Starting preorder-export.service - Crumb preorder sheet for the kitchen...
+2026-10-13	2026-10-13T01:00:01+00:00 ops-2 python3[22693]: target date 2026-10-14, 33 orders
+2026-10-13	2026-10-13T01:00:01+00:00 ops-2 systemd[1]: preorder-export.service: Deactivated successfully.
+2026-10-13	2026-10-13T01:00:01+00:00 ops-2 systemd[1]: Finished preorder-export.service - Crumb preorder sheet for the kitchen.
+2026-10-14	2026-10-14T01:00:00+00:00 ops-2 systemd[1]: Starting preorder-export.service - Crumb preorder sheet for the kitchen...
+2026-10-14	2026-10-14T01:00:01+00:00 ops-2 python3[22907]: target date 2026-10-15, 31 orders
+2026-10-14	2026-10-14T01:00:01+00:00 ops-2 systemd[1]: preorder-export.service: Deactivated successfully.
+2026-10-14	2026-10-14T01:00:01+00:00 ops-2 systemd[1]: Finished preorder-export.service - Crumb preorder sheet for the kitchen.

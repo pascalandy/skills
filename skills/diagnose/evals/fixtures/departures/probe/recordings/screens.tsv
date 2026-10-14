@@ -1,0 +1,10 @@
+screen	firmware	stop_id	limit	last_poll	items	last_nonempty
+scr-hrb-01	4.2.1	HRB	8	08:44:37	0	07:50:37
+scr-hrb-02	4.2.1	HRB	8	08:44:42	0	07:50:42
+scr-hrb-03	4.2.1	HRB	8	08:44:49	0	07:50:49
+scr-hrb-04	4.2.1	HRB	8	08:44:54	0	07:50:54
+scr-mkt-01	4.2.1	MKT	8	08:44:33	8	08:44:33
+scr-mkt-02	4.2.1	MKT	8	08:44:45	8	08:44:45
+scr-mkt-03	4.2.1	MKT	8	08:44:57	8	08:44:57
+scr-unv-01	4.2.1	UNV	8	08:44:39	8	08:44:39
+scr-unv-02	4.2.1	UNV	8	08:44:51	8	08:44:51

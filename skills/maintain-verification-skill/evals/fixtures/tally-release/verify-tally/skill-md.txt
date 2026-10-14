@@ -1,0 +1,19 @@
+---
+name: verify-tally
+description: Use before merging a change to tally's importer or ledger, to import the sample statements and compare the readings with the last good run.
+---
+
+# verify-tally
+
+Run from the repo root:
+
+    python3 skills/verify-tally/scripts/smoke.py
+
+It imports each file in `samples/` into a fresh ledger in a temp folder with `python3 -m tally import`, and prints one JSON line per sample: its readings, the readings from `runs/last-good.json`, and whether they match. It exits 0 when every sample matches, 1 when one differs.
+
+A difference is not a failure by itself. Look the reading up in `features/` and decide whether the change meant to move it:
+
+- Intended: say so in the PR, and after merge record the new readings with `python3 skills/verify-tally/scripts/smoke.py --record`.
+- Not intended: stop and find out why before merging.
+
+Feature map: `features/README.md`.

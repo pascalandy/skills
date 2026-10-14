@@ -1,0 +1,20 @@
+staging-sync (env staging), every 10 min, times America/Toronto
+last ok run: 2026-10-09 09:50:03 on ops-1, 1 row
+
+day          runs    ok  failed  rows  hosts
+2026-10-07    144   144       0    39  ops-1
+2026-10-08    144   144       0    50  ops-1
+2026-10-09    144    60      84    10  ops-1
+2026-10-10    144     0     144     0  -
+2026-10-11    144     0     144     0  -
+2026-10-12    144     0     144     0  -
+2026-10-13    144     0     144     0  -
+2026-10-14     59     0      59     0  -
+
+latest runs:
+2026-10-14 08:50:00  failed  -      no run reported
+2026-10-14 09:00:00  failed  -      no run reported
+2026-10-14 09:10:00  failed  -      no run reported
+2026-10-14 09:20:00  failed  -      no run reported
+2026-10-14 09:30:00  failed  -      no run reported
+2026-10-14 09:40:00  failed  -      no run reported

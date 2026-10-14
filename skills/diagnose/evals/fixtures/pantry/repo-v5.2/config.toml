@@ -1,0 +1,10 @@
+# Local defaults. Each pool's deploy mounts its own config and sets
+# PANTRY_DB_URL to the pool's recipe store.
+
+[server]
+host = "127.0.0.1"
+port = 8080
+threads = 16
+
+[database]
+url = "dev/sample.sql"

@@ -1,0 +1,40 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Wed 2026-10-14 (33)
+Date: Tue, 13 Oct 2026 01:00:01 +0000
+Message-ID: <20261013010001.5D9B04E2A6@ops-2.crumbandco.example>
+
+Orders for Wed 2026-10-14
+07:00  #51019  Thandiwe Delacroix    1 focaccia (rosemary), 6 croissant
+07:00  #51043  Dov Ruelle            6 cinnamon bun
+07:00  #51055  Ines Hruska           12 croissant  (no sesame)
+07:30  #51007  Sunniva Ferreira      2 baguette
+07:30  #51042  Lucan Gauthier        1 seeded rye  (pay at pickup)
+07:30  #51044  Amadou Bergstrand     12 dinner roll, 2 country loaf
+07:30  #51064  Anouk Hruska          2 country loaf
+07:30  #51069  Delphine Sorensen     1 baguette, 1 country loaf, 1 sourdough boule  (gift box)
+08:00  #50930  Teodora Ibarra        1 seeded rye  (pay at pickup)
+08:00  #51017  Annika Abernethy      6 morning bun
+08:00  #51056  Zofia Okonjo          1 pumpkin pie 9in
+08:00  #51063  Rafferty Szabo        1 baguette
+08:00  #51073  Callum Halloran       6 croissant, 1 seeded rye
+08:30  #51033  Petra Achterberg      2 baguette
+08:30  #51052  Amadou Mbeki          6 croissant  (pay at pickup)
+08:30  #51057  Rosalie Sandoval      6 butter tart
+09:00  #51046  Hollis Corriveau      1 sourdough boule, 6 cinnamon bun
+09:00  #51050  Mattias Kincaid       1 country loaf
+09:00  #51072  Ines Oduya            12 dinner roll, 1 baguette
+10:00  #51025  Zofia Ostrowski       12 dinner roll
+10:00  #51060  Zofia Hruska          1 focaccia (rosemary), 6 butter tart, 1 sourdough boule
+10:30  #51071  Hollis Tremaine       4 pain au chocolat
+11:00  #50996  Tobiah Quintero       1 country loaf
+11:00  #51040  Rosalie Halloran      12 dinner roll, 1 sourdough boule, 1 spelt loaf
+11:00  #51048  Bastien Vasquez-Lind  1 sourdough boule, 1 baguette  (no sesame)
+11:00  #51049  Noor Beaulieu         6 croissant
+11:00  #51051  Halvard Whitcombe     6 croissant  (nut allergy)
+11:00  #51059  Brielle Kowalczyk     6 butter tart
+11:30  #51034  Sylvain Corriveau     12 dinner roll, 1 baguette
+11:30  #51045  Wren Lindgren         1 country loaf, 6 croissant, 1 focaccia (rosemary)
+12:00  #51066  Oren Moreau-Diallo    1 sourdough boule, 1 spelt loaf  (slice the loaf)
+12:30  #51058  Yesenia Lachance      1 country loaf
+13:30  #51067  Wren Ostrowski        12 croissant, 1 brioche loaf

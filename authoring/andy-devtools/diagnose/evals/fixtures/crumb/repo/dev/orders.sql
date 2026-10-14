@@ -1,0 +1,53 @@
+-- Sample orders for local runs and tests.
+-- Build: python3 -c "import sqlite3; sqlite3.connect('dev/orders.db').executescript(open('dev/orders.sql').read())"
+
+CREATE TABLE orders (
+    id INTEGER PRIMARY KEY,
+    placed_at TEXT NOT NULL,
+    pickup_date TEXT NOT NULL,
+    pickup_time TEXT NOT NULL,
+    customer TEXT NOT NULL,
+    items TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'paid'
+);
+
+INSERT INTO orders (id, placed_at, pickup_date, pickup_time, customer, items, note, status) VALUES
+    (1001, '2026-10-04T01:56:00Z', '2026-10-08', '09:00', 'Bastien Oduya', '1 pumpkin pie 9in, 6 butter tart', '', 'paid'),
+    (1002, '2026-10-05T14:56:00Z', '2026-10-08', '08:00', 'Maelle Ruelle', '1 brioche loaf', '', 'paid'),
+    (1003, '2026-10-06T10:21:00Z', '2026-10-09', '12:00', 'Thandiwe Lachance', '2 baguette', 'slice the loaf', 'paid'),
+    (1004, '2026-10-06T11:00:00Z', '2026-10-08', '09:00', 'Ilse Delacroix', '1 country loaf', '', 'paid'),
+    (1005, '2026-10-06T17:41:00Z', '2026-10-09', '08:00', 'Callum Marchand', '1 country loaf', '', 'paid'),
+    (1006, '2026-10-06T23:05:00Z', '2026-10-09', '10:30', 'Odalys Galloway', '1 country loaf, 6 croissant', '', 'paid'),
+    (1007, '2026-10-07T01:40:00Z', '2026-10-09', '10:30', 'Mattias Lachance', '6 croissant', '', 'paid'),
+    (1008, '2026-10-07T01:52:00Z', '2026-10-10', '07:00', 'Amadou Mbeki', '4 pain au chocolat, 1 country loaf', 'extra bag', 'cancelled'),
+    (1009, '2026-10-07T06:26:00Z', '2026-10-09', '11:30', 'Yesenia Halvorsen', '1 olive loaf', '', 'paid'),
+    (1010, '2026-10-07T09:40:00Z', '2026-10-11', '08:30', 'Bastien Castellano', '1 baguette, 1 pecan tart', '', 'paid'),
+    (1011, '2026-10-07T10:22:00Z', '2026-10-11', '07:00', 'Ewan Quintero', '6 morning bun', '', 'paid'),
+    (1012, '2026-10-07T10:28:00Z', '2026-10-10', '13:00', 'Emeric Fairweather', '1 baguette, 1 pumpkin pie 9in', '', 'paid'),
+    (1013, '2026-10-07T22:38:00Z', '2026-10-12', '07:00', 'Mattias Nakashima', '12 croissant', '', 'paid'),
+    (1014, '2026-10-07T23:29:00Z', '2026-10-10', '08:30', 'Noor Ferreira', '1 pumpkin pie 9in', '', 'paid'),
+    (1015, '2026-10-08T01:22:00Z', '2026-10-10', '11:00', 'Tancredi Halloran', '6 croissant', '', 'paid'),
+    (1016, '2026-10-08T08:51:00Z', '2026-10-10', '07:30', 'Nadia Lachance', '1 seeded rye, 2 baguette', '', 'paid'),
+    (1017, '2026-10-08T09:57:00Z', '2026-10-12', '08:00', 'Tobiah Szabo', '1 sourdough boule', '', 'paid'),
+    (1018, '2026-10-08T18:50:00Z', '2026-10-11', '07:00', 'Rafferty Drummond', '1 spelt loaf', '', 'paid'),
+    (1019, '2026-10-09T01:07:00Z', '2026-10-13', '07:30', 'Petra Abernethy', '2 baguette', '', 'paid'),
+    (1020, '2026-10-09T04:03:00Z', '2026-10-11', '08:30', 'Idris Drummond', '6 cinnamon bun', '', 'paid'),
+    (1021, '2026-10-09T08:39:00Z', '2026-10-11', '08:30', 'Ferran Tremaine', '1 baguette, 1 country loaf, 1 sourdough boule', '', 'paid'),
+    (1022, '2026-10-09T15:03:00Z', '2026-10-11', '09:00', 'Odalys Varga', '1 spelt loaf', '', 'paid'),
+    (1023, '2026-10-09T20:29:00Z', '2026-10-13', '08:30', 'Ferran Vasquez-Lind', '4 pain au chocolat, 1 pumpkin pie 9in', '', 'paid'),
+    (1024, '2026-10-10T00:12:00Z', '2026-10-12', '10:30', 'Hollis Delacroix', '1 seeded rye, 1 apple pie 9in', 'slice the loaf', 'paid'),
+    (1025, '2026-10-10T10:11:00Z', '2026-10-14', '08:00', 'Tancredi Gauthier', '4 pain au chocolat, 1 challah', '', 'paid'),
+    (1026, '2026-10-10T13:04:00Z', '2026-10-13', '07:30', 'Wren Mbeki', '1 pumpkin pie 9in', '', 'paid'),
+    (1027, '2026-10-11T03:08:00Z', '2026-10-13', '12:30', 'Sylvain Sorensen', '1 sourdough boule', '', 'paid'),
+    (1028, '2026-10-11T08:32:00Z', '2026-10-15', '07:00', 'Joaquin Sorensen', '12 dinner roll, 2 country loaf', '', 'paid'),
+    (1029, '2026-10-11T22:40:00Z', '2026-10-16', '07:30', 'Noor Quintero', '1 challah, 1 baguette', '', 'paid'),
+    (1030, '2026-10-12T04:20:00Z', '2026-10-16', '09:30', 'Liesl Ostrowski', '1 apple pie 9in', 'nut allergy', 'paid'),
+    (1031, '2026-10-12T08:18:00Z', '2026-10-14', '09:30', 'Ilse Ibarra', '2 country loaf', 'slice the loaf', 'paid'),
+    (1032, '2026-10-12T12:00:00Z', '2026-10-15', '09:00', 'Callum Galloway', '1 country loaf, 4 pain au chocolat', 'pay at pickup', 'paid'),
+    (1033, '2026-10-12T13:17:00Z', '2026-10-16', '10:30', 'Oren Pacheco', '1 olive loaf', '', 'paid'),
+    (1034, '2026-10-12T14:36:00Z', '2026-10-14', '13:00', 'Sylvain Galloway', '6 croissant, 1 spelt loaf', '', 'paid'),
+    (1035, '2026-10-12T15:25:00Z', '2026-10-14', '11:30', 'Anouk Castellano', '6 croissant, 4 pain au chocolat, 1 seeded rye', '', 'paid'),
+    (1036, '2026-10-12T16:34:00Z', '2026-10-16', '09:30', 'Callum Fairweather', '6 morning bun', '', 'paid'),
+    (1037, '2026-10-13T09:36:00Z', '2026-10-16', '07:30', 'Tobiah Oduya', '6 croissant', '', 'paid'),
+    (1038, '2026-10-13T10:56:00Z', '2026-10-15', '09:00', 'Ewan Oduya', '6 croissant, 1 olive loaf, 6 cinnamon bun', '', 'paid');

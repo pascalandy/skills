@@ -1,0 +1,46 @@
+Fernlow Weather Network: station dashboard
+Captured 2026-10-13 09:58 UTC from www.fernlowwx.example/stations/
+
+Reporting now: 38 of 40
+
+station  name               last report (UTC)  readings today  state
+ws-01    Alder Flats        2026-10-13 09:50               60  ok
+ws-02    Birch Hollow       2026-10-13 09:50               60  ok
+ws-03    Cedar Bend         2026-10-13 09:50               60  ok
+ws-04    Dunmore Hill       2026-10-13 09:50               60  ok
+ws-05    Elmstead           2026-10-13 09:50               60  ok
+ws-06    Foxglove Farm      2026-10-13 09:50               60  ok
+ws-07    Greywater          2026-10-13 09:50               60  ok
+ws-08    Hatchet Lake       2026-10-13 09:50               60  ok
+ws-09    Ironbridge         2026-10-13 09:50               60  ok
+ws-10    Juniper Cove       2026-10-13 09:50               60  ok
+ws-11    Kettle Pond        2026-10-13 09:50               60  ok
+ws-12    Larkspur           2026-10-13 09:50               60  ok
+ws-13    Millrace           2026-10-13 09:50               60  ok
+ws-14    North Fernlow      2026-10-13 09:50               60  ok
+ws-15    Oxbow              2026-10-13 09:50               60  ok
+ws-16    Pinecrest School   2026-10-13 09:50               60  ok
+ws-17    Quarry Road        2026-10-13 09:50               60  ok
+ws-18    Ravensgate         2026-10-13 09:50               60  ok
+ws-19    Stonebridge        2026-10-13 09:50               60  ok
+ws-20    Tamarack           2026-10-13 09:50               60  ok
+ws-21    Upper Fernlow      2026-10-13 09:50               60  ok
+ws-22    Vale End           2026-10-13 09:50               60  ok
+ws-23    Copperline Ridge   2026-09-12 14:20                0  offline
+ws-24    Westmoor           2026-10-13 09:50               60  ok
+ws-25    Yarrow Point       2026-10-13 09:50               60  ok
+ws-26    Bramble Heath      2026-10-13 09:50               60  ok
+ws-27    Coldspring         2026-10-13 09:50               60  ok
+ws-28    Driftwood Marina   2026-10-13 09:50               60  ok
+ws-29    Eastfield          2026-10-13 09:50               60  ok
+ws-30    Fernlow Library    2026-10-13 09:50               60  ok
+ws-31    Saltmarsh Lane     2026-09-26 17:40                0  offline
+ws-32    Gullhaven          2026-10-13 09:50               60  ok
+ws-33    Heronsgate         2026-10-13 09:50               60  ok
+ws-34    Inkpen Mill        2026-10-13 09:50               60  ok
+ws-35    Jasper Fields      2026-10-13 09:50               60  ok
+ws-36    Kingsmere          2026-10-13 09:50               60  ok
+ws-37    Lowfield           2026-10-13 09:50               60  ok
+ws-38    Marlpit            2026-10-13 09:50               60  ok
+ws-39    Netherby           2026-10-13 09:50               60  ok
+ws-40    Orchard Row        2026-10-13 09:50               60  ok

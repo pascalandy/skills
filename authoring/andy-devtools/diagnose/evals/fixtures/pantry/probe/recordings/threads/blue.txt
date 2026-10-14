@@ -1,0 +1,7 @@
+time     busy of 16   busy %   busiest instance %   waiting connections
+14:00          15.0       94                  100                    37
+14:05          15.1       94                  100                    41
+14:10          15.0       94                  100                    39
+window         15.0       94                  100                    39
+
+waiting connections: mean per instance, accepted and not yet picked up by a worker thread

@@ -1,0 +1,6 @@
+skyrollup 0.9.4
+last_success: 2026-10-09T02:04:11Z
+result: ok
+day: 2026-10-08
+stations: 38 of 40
+summary: summary-2026-10-08.json

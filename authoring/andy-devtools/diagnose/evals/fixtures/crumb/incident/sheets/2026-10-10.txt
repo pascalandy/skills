@@ -1,0 +1,36 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Mon 2026-10-12 (29)
+Date: Sun, 11 Oct 2026 01:00:01 +0000
+Message-ID: <20261011010001.8E5D20B7C1@ops-2.crumbandco.example>
+
+Orders for Mon 2026-10-12
+07:00  #50962  Zofia Kowalczyk       1 pumpkin pie 9in, 4 pain au chocolat
+07:00  #50992  Oren Moreau-Diallo    1 sourdough boule, 1 pumpkin pie 9in, 1 baguette
+07:30  #50956  Caius Hruska          2 baguette, 1 challah
+07:30  #50963  Tobiah Fairweather    1 sourdough boule  (nut allergy)
+07:30  #51000  Dov Brennan           4 pain au chocolat
+08:00  #50975  Viveka Sandoval       1 sourdough boule, 1 seeded rye
+08:00  #50978  Mattias Okonjo        1 sourdough boule
+08:30  #50982  Marisela Varga        1 baguette, 4 pain au chocolat, 1 apple pie 9in
+09:00  #50919  Saoirse Kincaid       6 butter tart
+09:00  #50981  Wren Delacroix        2 country loaf  (pay at pickup)
+09:00  #50983  Maelle Gauthier       1 sourdough boule, 1 focaccia (rosemary)
+09:00  #50993  Teodora Oyelaran      1 sourdough boule
+09:00  #50998  Tancredi Ibarra       1 pecan tart, 1 seeded rye
+09:30  #50974  Oren Lachance         12 dinner roll  (call on arrival)
+09:30  #50980  Wren Bergstrand       6 cinnamon bun
+09:30  #50985  Thandiwe Galloway     2 baguette, 1 focaccia (rosemary), 6 butter tart  (nut allergy)
+10:00  #50977  Maelle Drummond       1 olive loaf, 1 seeded rye
+10:00  #50979  Maelle Vasquez-Lind   4 pain au chocolat, 12 dinner roll
+10:00  #50984  Hollis Marchand       6 butter tart
+10:00  #50991  Saoirse Drummond      12 croissant
+10:00  #50995  Pilar Vukovic         1 baguette, 2 country loaf
+10:00  #51001  Nadia Whitcombe       1 country loaf
+10:30  #50997  Yesenia Vukovic       2 country loaf
+11:00  #50973  Brielle Okonjo        1 country loaf
+11:30  #50988  Hollis Lindgren       4 pain au chocolat, 6 croissant
+11:30  #50994  Oren Kowalczyk        2 country loaf
+12:00  #50941  Sunniva Quintero      1 country loaf
+12:00  #50987  Odalys Halvorsen      1 sourdough boule, 6 cinnamon bun
+12:30  #50990  Pilar Tremaine        1 olive loaf, 12 croissant

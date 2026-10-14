@@ -1,0 +1,37 @@
+www-deploy releases on wx-1, newest first (since 2026-09-16)
+
+2026.10.09-2  started 2026-10-09 14:11:38 UTC  site 9c41e7a  pushed by d.wren  result: ok
+  "Deploy: ensure the summaries folder exists on fresh hosts"
+  14:11:38  fetch artifact site-2026.10.09-2.tar.gz (2.1 MB)
+  14:11:40  unpack: 214 files
+  14:11:42  ensure summaries folder exists: install -d -o deploy -g www -m 0755 /srv/www/summaries
+  14:11:42  sync site: rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.10.09-2/site/ /srv/www/
+  14:11:43  release live
+
+2026.10.09-1  started 2026-10-09 10:02:51 UTC  site 7f2c9b0  pushed by t.amberley  result: ok
+  "Archive page lists the last 30 summaries"
+  10:02:51  fetch artifact site-2026.10.09-1.tar.gz (2.1 MB)
+  10:02:53  unpack: 214 files
+  10:02:55  sync site: rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.10.09-1/site/ /srv/www/
+  10:02:56  release live
+
+2026.10.06-1  started 2026-10-06 18:47:15 UTC  site 0b97d26  pushed by t.amberley  result: ok
+  "Station map uses the new marker set"
+  18:47:15  fetch artifact site-2026.10.06-1.tar.gz (2.1 MB)
+  18:47:17  unpack: 213 files
+  18:47:19  sync site: rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.10.06-1/site/ /srv/www/
+  18:47:20  release live
+
+2026.09.29-1  started 2026-09-29 20:05:31 UTC  site c38e1f4  pushed by d.wren  result: ok
+  "Fix the footer contact link"
+  20:05:31  fetch artifact site-2026.09.29-1.tar.gz (2.0 MB)
+  20:05:33  unpack: 209 files
+  20:05:35  sync site: rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.09.29-1/site/ /srv/www/
+  20:05:36  release live
+
+2026.09.18-1  started 2026-09-18 19:22:07 UTC  site 51d0a3e  pushed by t.amberley  result: ok
+  "Station pages: dew point chart"
+  19:22:07  fetch artifact site-2026.09.18-1.tar.gz (2.0 MB)
+  19:22:09  unpack: 209 files
+  19:22:11  sync site: rsync -a --delete --chown=deploy:www --exclude summaries/ --exclude radar/ /var/cache/www-deploy/2026.09.18-1/site/ /srv/www/
+  19:22:12  release live

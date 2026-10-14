@@ -1,0 +1,161 @@
+== cdn /summaries/summary-latest.json
+HTTP/2 200
+content-type: application/json
+content-length: 18342
+last-modified: Fri, 09 Oct 2026 02:04:11 GMT
+etag: "6ac84b9b-47a6"
+cache-control: public, max-age=300
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 142
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /summaries/summary-latest.json
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: application/json
+Content-Length: 18342
+Last-Modified: Fri, 09 Oct 2026 02:04:11 GMT
+Connection: keep-alive
+ETag: "6ac84b9b-47a6"
+Cache-Control: public, max-age=300
+Accept-Ranges: bytes
+== cdn /
+HTTP/2 200
+content-type: text/html
+content-length: 6124
+last-modified: Fri, 09 Oct 2026 14:09:51 GMT
+etag: "6ac8f5af-17ec"
+cache-control: public, max-age=300
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 61
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: text/html
+Content-Length: 6124
+Last-Modified: Fri, 09 Oct 2026 14:09:51 GMT
+Connection: keep-alive
+ETag: "6ac8f5af-17ec"
+Cache-Control: public, max-age=300
+Accept-Ranges: bytes
+== cdn /index.html
+HTTP/2 200
+content-type: text/html
+content-length: 6124
+last-modified: Fri, 09 Oct 2026 14:09:51 GMT
+etag: "6ac8f5af-17ec"
+cache-control: public, max-age=300
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 61
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /index.html
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: text/html
+Content-Length: 6124
+Last-Modified: Fri, 09 Oct 2026 14:09:51 GMT
+Connection: keep-alive
+ETag: "6ac8f5af-17ec"
+Cache-Control: public, max-age=300
+Accept-Ranges: bytes
+== cdn /archive/
+HTTP/2 200
+content-type: text/html
+content-length: 9810
+last-modified: Fri, 09 Oct 2026 14:09:51 GMT
+etag: "6ac8f5af-2652"
+cache-control: public, max-age=300
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 233
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /archive/
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: text/html
+Content-Length: 9810
+Last-Modified: Fri, 09 Oct 2026 14:09:51 GMT
+Connection: keep-alive
+ETag: "6ac8f5af-2652"
+Cache-Control: public, max-age=300
+Accept-Ranges: bytes
+== cdn /stations/
+HTTP/2 200
+content-type: text/html
+content-length: 11764
+last-modified: Fri, 09 Oct 2026 14:09:51 GMT
+etag: "6ac8f5af-2df4"
+cache-control: public, max-age=300
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 18
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /stations/
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: text/html
+Content-Length: 11764
+Last-Modified: Fri, 09 Oct 2026 14:09:51 GMT
+Connection: keep-alive
+ETag: "6ac8f5af-2df4"
+Cache-Control: public, max-age=300
+Accept-Ranges: bytes
+== cdn /radar/latest.png
+HTTP/2 200
+content-type: image/png
+content-length: 201833
+last-modified: Wed, 14 Oct 2026 09:30:06 GMT
+etag: "6acf4b9e-31469"
+cache-control: public, max-age=60
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 23
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /radar/latest.png
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: image/png
+Content-Length: 201833
+Last-Modified: Wed, 14 Oct 2026 09:30:06 GMT
+Connection: keep-alive
+ETag: "6acf4b9e-31469"
+Cache-Control: public, max-age=60
+Accept-Ranges: bytes
+== cdn /radar/frames.json
+HTTP/2 200
+content-type: application/json
+content-length: 2214
+last-modified: Wed, 14 Oct 2026 09:30:06 GMT
+etag: "6acf4b9e-8a6"
+cache-control: public, max-age=60
+accept-ranges: bytes
+date: Wed, 14 Oct 2026 09:41:20 GMT
+age: 23
+x-cache: HIT
+x-served-by: edge-ord-4
+via: 1.1 edgecache
+== origin /radar/frames.json
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 09:41:21 GMT
+Content-Type: application/json
+Content-Length: 2214
+Last-Modified: Wed, 14 Oct 2026 09:30:06 GMT
+Connection: keep-alive
+ETag: "6acf4b9e-8a6"
+Cache-Control: public, max-age=60
+Accept-Ranges: bytes

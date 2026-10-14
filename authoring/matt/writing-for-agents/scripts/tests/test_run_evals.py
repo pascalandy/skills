@@ -221,6 +221,48 @@ def test_a_ref_without_the_skill_gives_a_no_skill_baseline(lab: Lab):
     )
 
 
+def test_a_run_keeps_its_state_and_cannot_read_the_skills_evals(lab: Lab):
+    ref = commit(lab.skill.parent.parent, "demo with evals")
+    result = run(
+        lab,
+        "--ref",
+        ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "claude",
+        "--scenario",
+        "2",
+        FAKE_ACTION='ls -A .claude/skills/demo > "$report/files"; '
+        'printf "%s\\n" "$XDG_STATE_HOME" > "$report/state"',
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert report(lab, "s2-claude", "files").split() == ["SKILL.md"]
+    assert report(lab, "s2-claude", "state") == f"{lab.out / 's2-claude' / 'state'}\n"
+
+
+def test_only_setup_gets_the_evals_folder(lab: Lab):
+    evals = lab.skill / "evals" / "evals.json"
+    setup_probe = f'printf "%s\\n" "${{EVALS:-none}}" > {lab.reports / "setup-evals"}'
+    evals.write_text(json.dumps([{"query": "Go.", "setup": [setup_probe]}]))
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "claude",
+        EVALS=str(lab.tmp / "inherited-evals"),
+        FAKE_ACTION='printf "%s\\n" "${EVALS:-none}" > "$report/agent-evals"',
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert report(lab, "s1-claude", "agent-evals") == "none\n"
+    assert (lab.reports / "setup-evals").read_text() == f"{lab.skill / 'evals'}\n"
+
+
 def test_a_missing_agent_cli_stops_before_any_run(lab: Lab):
     tools = lab.tmp / "tools"
     tools.mkdir()

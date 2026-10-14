@@ -1,0 +1,127 @@
+Oct 07 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 07 02:04:08 wx-1 systemd[1]: skyrollup.service: Deactivated successfully.
+Oct 07 02:04:08 wx-1 systemd[1]: Finished skyrollup.service - Nightly weather summary.
+Oct 07 02:04:08 wx-1 systemd[1]: skyrollup.service: Consumed 3.298s CPU time, 41.5M memory peak.
+Oct 08 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 08 02:04:07 wx-1 systemd[1]: skyrollup.service: Deactivated successfully.
+Oct 08 02:04:07 wx-1 systemd[1]: Finished skyrollup.service - Nightly weather summary.
+Oct 08 02:04:07 wx-1 systemd[1]: skyrollup.service: Consumed 3.299s CPU time, 40.6M memory peak.
+Oct 09 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 09 02:04:11 wx-1 systemd[1]: skyrollup.service: Deactivated successfully.
+Oct 09 02:04:11 wx-1 systemd[1]: Finished skyrollup.service - Nightly weather summary.
+Oct 09 02:04:11 wx-1 systemd[1]: skyrollup.service: Consumed 3.014s CPU time, 42.4M memory peak.
+Oct 10 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 10 02:04:07 wx-1 skyrollup[122203]: Traceback (most recent call last):
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "<frozen runpy>", line 203, in _run_module_as_main
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "<frozen runpy>", line 88, in _run_code
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "/opt/skyrollup/skyrollup/__main__.py", line 3, in <module>
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     raise SystemExit(main())
+Oct 10 02:04:07 wx-1 skyrollup[122203]:                      ~~~~^^
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "/opt/skyrollup/skyrollup/cli.py", line 77, in main
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     return COMMANDS[args.command](cfg, args)
+Oct 10 02:04:07 wx-1 skyrollup[122203]:            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "/opt/skyrollup/skyrollup/cli.py", line 27, in cmd_run
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     job.run(cfg)
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     ~~~~~~~^^^^^
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "/opt/skyrollup/skyrollup/job.py", line 26, in run
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     path = publish.publish(cfg, summary)
+Oct 10 02:04:07 wx-1 skyrollup[122203]:   File "/opt/skyrollup/skyrollup/publish.py", line 13, in publish
+Oct 10 02:04:07 wx-1 skyrollup[122203]:     with open(path, "w", encoding="utf-8") as f:
+Oct 10 02:04:07 wx-1 skyrollup[122203]:          ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 10 02:04:07 wx-1 skyrollup[122203]: PermissionError: [Errno 13] Permission denied: '/srv/www/summaries/summary-2026-10-09.json'
+Oct 10 02:04:07 wx-1 systemd[1]: skyrollup.service: Main process exited, code=exited, status=1/FAILURE
+Oct 10 02:04:07 wx-1 systemd[1]: skyrollup.service: Failed with result 'exit-code'.
+Oct 10 02:04:07 wx-1 systemd[1]: Failed to start skyrollup.service - Nightly weather summary.
+Oct 10 02:04:07 wx-1 systemd[1]: skyrollup.service: Consumed 3.309s CPU time, 41.0M memory peak.
+Oct 11 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 11 02:04:02 wx-1 skyrollup[129404]: Traceback (most recent call last):
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "<frozen runpy>", line 203, in _run_module_as_main
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "<frozen runpy>", line 88, in _run_code
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "/opt/skyrollup/skyrollup/__main__.py", line 3, in <module>
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     raise SystemExit(main())
+Oct 11 02:04:02 wx-1 skyrollup[129404]:                      ~~~~^^
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "/opt/skyrollup/skyrollup/cli.py", line 77, in main
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     return COMMANDS[args.command](cfg, args)
+Oct 11 02:04:02 wx-1 skyrollup[129404]:            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "/opt/skyrollup/skyrollup/cli.py", line 27, in cmd_run
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     job.run(cfg)
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     ~~~~~~~^^^^^
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "/opt/skyrollup/skyrollup/job.py", line 26, in run
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     path = publish.publish(cfg, summary)
+Oct 11 02:04:02 wx-1 skyrollup[129404]:   File "/opt/skyrollup/skyrollup/publish.py", line 13, in publish
+Oct 11 02:04:02 wx-1 skyrollup[129404]:     with open(path, "w", encoding="utf-8") as f:
+Oct 11 02:04:02 wx-1 skyrollup[129404]:          ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 11 02:04:02 wx-1 skyrollup[129404]: PermissionError: [Errno 13] Permission denied: '/srv/www/summaries/summary-2026-10-10.json'
+Oct 11 02:04:02 wx-1 systemd[1]: skyrollup.service: Main process exited, code=exited, status=1/FAILURE
+Oct 11 02:04:02 wx-1 systemd[1]: skyrollup.service: Failed with result 'exit-code'.
+Oct 11 02:04:02 wx-1 systemd[1]: Failed to start skyrollup.service - Nightly weather summary.
+Oct 11 02:04:02 wx-1 systemd[1]: skyrollup.service: Consumed 3.017s CPU time, 39.7M memory peak.
+Oct 12 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 12 02:04:13 wx-1 skyrollup[136603]: Traceback (most recent call last):
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "<frozen runpy>", line 203, in _run_module_as_main
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "<frozen runpy>", line 88, in _run_code
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "/opt/skyrollup/skyrollup/__main__.py", line 3, in <module>
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     raise SystemExit(main())
+Oct 12 02:04:13 wx-1 skyrollup[136603]:                      ~~~~^^
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "/opt/skyrollup/skyrollup/cli.py", line 77, in main
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     return COMMANDS[args.command](cfg, args)
+Oct 12 02:04:13 wx-1 skyrollup[136603]:            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "/opt/skyrollup/skyrollup/cli.py", line 27, in cmd_run
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     job.run(cfg)
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     ~~~~~~~^^^^^
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "/opt/skyrollup/skyrollup/job.py", line 26, in run
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     path = publish.publish(cfg, summary)
+Oct 12 02:04:13 wx-1 skyrollup[136603]:   File "/opt/skyrollup/skyrollup/publish.py", line 13, in publish
+Oct 12 02:04:13 wx-1 skyrollup[136603]:     with open(path, "w", encoding="utf-8") as f:
+Oct 12 02:04:13 wx-1 skyrollup[136603]:          ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 12 02:04:13 wx-1 skyrollup[136603]: PermissionError: [Errno 13] Permission denied: '/srv/www/summaries/summary-2026-10-11.json'
+Oct 12 02:04:13 wx-1 systemd[1]: skyrollup.service: Main process exited, code=exited, status=1/FAILURE
+Oct 12 02:04:13 wx-1 systemd[1]: skyrollup.service: Failed with result 'exit-code'.
+Oct 12 02:04:13 wx-1 systemd[1]: Failed to start skyrollup.service - Nightly weather summary.
+Oct 12 02:04:13 wx-1 systemd[1]: skyrollup.service: Consumed 3.329s CPU time, 41.0M memory peak.
+Oct 13 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 13 02:03:58 wx-1 skyrollup[143803]: Traceback (most recent call last):
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "<frozen runpy>", line 203, in _run_module_as_main
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "<frozen runpy>", line 88, in _run_code
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "/opt/skyrollup/skyrollup/__main__.py", line 3, in <module>
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     raise SystemExit(main())
+Oct 13 02:03:58 wx-1 skyrollup[143803]:                      ~~~~^^
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "/opt/skyrollup/skyrollup/cli.py", line 77, in main
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     return COMMANDS[args.command](cfg, args)
+Oct 13 02:03:58 wx-1 skyrollup[143803]:            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "/opt/skyrollup/skyrollup/cli.py", line 27, in cmd_run
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     job.run(cfg)
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     ~~~~~~~^^^^^
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "/opt/skyrollup/skyrollup/job.py", line 26, in run
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     path = publish.publish(cfg, summary)
+Oct 13 02:03:58 wx-1 skyrollup[143803]:   File "/opt/skyrollup/skyrollup/publish.py", line 13, in publish
+Oct 13 02:03:58 wx-1 skyrollup[143803]:     with open(path, "w", encoding="utf-8") as f:
+Oct 13 02:03:58 wx-1 skyrollup[143803]:          ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 13 02:03:58 wx-1 skyrollup[143803]: PermissionError: [Errno 13] Permission denied: '/srv/www/summaries/summary-2026-10-12.json'
+Oct 13 02:03:58 wx-1 systemd[1]: skyrollup.service: Main process exited, code=exited, status=1/FAILURE
+Oct 13 02:03:58 wx-1 systemd[1]: skyrollup.service: Failed with result 'exit-code'.
+Oct 13 02:03:58 wx-1 systemd[1]: Failed to start skyrollup.service - Nightly weather summary.
+Oct 13 02:03:58 wx-1 systemd[1]: skyrollup.service: Consumed 3.312s CPU time, 42.4M memory peak.
+Oct 14 02:00:00 wx-1 systemd[1]: Starting skyrollup.service - Nightly weather summary...
+Oct 14 02:04:01 wx-1 skyrollup[151002]: Traceback (most recent call last):
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "<frozen runpy>", line 203, in _run_module_as_main
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "<frozen runpy>", line 88, in _run_code
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "/opt/skyrollup/skyrollup/__main__.py", line 3, in <module>
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     raise SystemExit(main())
+Oct 14 02:04:01 wx-1 skyrollup[151002]:                      ~~~~^^
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "/opt/skyrollup/skyrollup/cli.py", line 77, in main
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     return COMMANDS[args.command](cfg, args)
+Oct 14 02:04:01 wx-1 skyrollup[151002]:            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "/opt/skyrollup/skyrollup/cli.py", line 27, in cmd_run
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     job.run(cfg)
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     ~~~~~~~^^^^^
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "/opt/skyrollup/skyrollup/job.py", line 26, in run
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     path = publish.publish(cfg, summary)
+Oct 14 02:04:01 wx-1 skyrollup[151002]:   File "/opt/skyrollup/skyrollup/publish.py", line 13, in publish
+Oct 14 02:04:01 wx-1 skyrollup[151002]:     with open(path, "w", encoding="utf-8") as f:
+Oct 14 02:04:01 wx-1 skyrollup[151002]:          ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 14 02:04:01 wx-1 skyrollup[151002]: PermissionError: [Errno 13] Permission denied: '/srv/www/summaries/summary-2026-10-13.json'
+Oct 14 02:04:01 wx-1 systemd[1]: skyrollup.service: Main process exited, code=exited, status=1/FAILURE
+Oct 14 02:04:01 wx-1 systemd[1]: skyrollup.service: Failed with result 'exit-code'.
+Oct 14 02:04:01 wx-1 systemd[1]: Failed to start skyrollup.service - Nightly weather summary.
+Oct 14 02:04:01 wx-1 systemd[1]: skyrollup.service: Consumed 3.285s CPU time, 41.2M memory peak.

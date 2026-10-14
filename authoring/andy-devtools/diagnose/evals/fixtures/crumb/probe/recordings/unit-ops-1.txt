@@ -1,0 +1,5 @@
+# crontab -l -u crumb   (ops-1 backup, 2026-10-09 10:00 EDT)
+# m h  dom mon dow   command
+#*/10 * * * * cd /opt/crumb-sync && /usr/bin/python3 -m crumb_sync --env prod   # moved to ops-2 2026-10-09 sw
+*/10 * * * * cd /opt/crumb-sync && /usr/bin/python3 -m crumb_sync --env staging
+#0 21 * * * cd /opt/crumb && /usr/bin/python3 -m crumb.export --for tomorrow   # moved to ops-2 2026-10-09 sw

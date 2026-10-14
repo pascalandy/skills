@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly weather summary
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skyrollup
+Group=skyrollup
+WorkingDirectory=/opt/skyrollup
+Environment=SKYROLLUP_CONFIG=/etc/skyrollup/config.toml
+ExecStart=/usr/bin/python3 -m skyrollup run
+SyslogIdentifier=skyrollup

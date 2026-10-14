@@ -1,0 +1,112 @@
+  File: /srv/www
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1342723     Links: 7
+Access: (0755/drwxr-xr-x)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-14 09:12:40.551203387 +0000
+Modify: 2026-10-09 14:09:51.000000000 +0000
+Change: 2026-10-09 14:11:42.731905821 +0000
+ Birth: 2026-01-09 16:22:05.300118175 +0000
+  File: /srv/www/summaries
+  Size: 20480     	Blocks: 40         IO Block: 4096   directory
+Device: 259,2	Inode: 1338970     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:14.882013713 +0000
+Modify: 2026-10-09 02:04:11.065000689 +0000
+Change: 2026-10-09 14:11:42.518230139 +0000
+ Birth: 2026-01-17 21:06:33.204118669 +0000
+  File: /srv/www/radar
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1352429     Links: 3
+Access: (0775/drwxrwxr-x)  Uid: (  986/   radar)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:14.901377811 +0000
+Modify: 2026-10-14 09:30:06.755004385 +0000
+Change: 2026-10-14 09:30:06.755004385 +0000
+ Birth: 2026-03-02 18:40:12.774310217 +0000
+  File: /srv/www/radar/tiles
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1342216     Links: 2
+Access: (0775/drwxrwxr-x)  Uid: (  986/   radar)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:15.004410162 +0000
+Modify: 2026-10-14 09:30:06.703004522 +0000
+Change: 2026-10-14 09:30:06.703004522 +0000
+ Birth: 2026-03-02 18:40:12.790221282 +0000
+  File: /srv/www/archive
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1347750     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:15.200000277 +0000
+Modify: 2026-10-09 14:09:51.000000000 +0000
+Change: 2026-10-09 14:11:42.731905821 +0000
+ Birth: 2026-01-09 16:22:05.400118893 +0000
+  File: /srv/www/assets
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1306752     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:15.200000277 +0000
+Modify: 2026-10-09 14:09:51.000000000 +0000
+Change: 2026-10-09 14:11:42.731905821 +0000
+ Birth: 2026-01-09 16:22:05.400118893 +0000
+  File: /srv/www/stations
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1332704     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-14 06:25:15.200000277 +0000
+Modify: 2026-10-09 14:09:51.000000000 +0000
+Change: 2026-10-09 14:11:42.731905821 +0000
+ Birth: 2026-01-09 16:22:05.400118893 +0000
+  File: /srv/www/index.html
+  Size: 6124      	Blocks: 16         IO Block: 4096   regular file
+Device: 259,2	Inode: 1381951     Links: 1
+Access: (0644/-rw-r--r--)  Uid: ( 1001/  deploy)   Gid: ( 1050/     www)
+Access: 2026-10-09 14:11:44.020155627 +0000
+Modify: 2026-10-09 14:09:51.000000000 +0000
+Change: 2026-10-09 14:11:42.731905821 +0000
+ Birth: 2026-10-09 14:11:42.731905821 +0000
+  File: /srv/www/summaries/summary-latest.json -> summary-2026-10-08.json
+  Size: 23        	Blocks: 0          IO Block: 4096   symbolic link
+Device: 259,2	Inode: 1312062     Links: 1
+Access: (0777/lrwxrwxrwx)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-09 02:04:11.140221732 +0000
+Modify: 2026-10-09 02:04:11.065000689 +0000
+Change: 2026-10-09 02:04:11.065000689 +0000
+ Birth: 2026-10-09 02:04:11.064000541 +0000
+  File: /srv/www/summaries/summary-2026-10-08.json
+  Size: 18342     	Blocks: 40         IO Block: 4096   regular file
+Device: 259,2	Inode: 1307402     Links: 1
+Access: (0644/-rw-r--r--)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-09 02:04:11.151870774 +0000
+Modify: 2026-10-09 02:04:11.009000357 +0000
+Change: 2026-10-09 02:04:11.009000357 +0000
+ Birth: 2026-10-09 02:04:11.003000786 +0000
+  File: /var/lib/skyrollup
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1357747     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-14 06:25:16.010331727 +0000
+Modify: 2026-10-09 02:04:11.182000465 +0000
+Change: 2026-10-09 02:04:11.182000465 +0000
+ Birth: 2026-01-17 21:06:33.260771237 +0000
+  File: /var/lib/skyrollup/status.json
+  Size: 175       	Blocks: 8          IO Block: 4096   regular file
+Device: 259,2	Inode: 1312254     Links: 1
+Access: (0644/-rw-r--r--)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-13 09:54:02.718233012 +0000
+Modify: 2026-10-09 02:04:11.182000465 +0000
+Change: 2026-10-09 02:04:11.182000465 +0000
+ Birth: 2026-10-09 02:04:11.181000690 +0000
+  File: /var/log/skyrollup
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 259,2	Inode: 1365734     Links: 2
+Access: (0755/drwxr-xr-x)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-14 06:25:16.030227106 +0000
+Modify: 2026-10-01 00:00:02.130004002 +0000
+Change: 2026-10-01 00:00:02.130004002 +0000
+ Birth: 2026-01-17 21:06:33.271904853 +0000
+  File: /var/log/skyrollup/skyrollup.log
+  Size: 5924      	Blocks: 16         IO Block: 4096   regular file
+Device: 259,2	Inode: 1323006     Links: 1
+Access: (0644/-rw-r--r--)  Uid: (  987/skyrollup)   Gid: (  985/skyrollup)
+Access: 2026-10-13 09:55:07.003110149 +0000
+Modify: 2026-10-14 02:04:01.660508554 +0000
+Change: 2026-10-14 02:04:01.660508554 +0000
+ Birth: 2026-10-01 00:00:02.133120109 +0000

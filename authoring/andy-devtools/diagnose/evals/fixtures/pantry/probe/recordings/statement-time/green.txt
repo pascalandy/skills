@@ -1,0 +1,7 @@
+time     p50 ms   p95 ms   p99 ms
+14:00       2.3      3.7      6.5
+14:05       2.3      3.7      6.7
+14:10       2.3      3.6      6.6
+window      2.3      3.7      6.6
+
+measured in the app around each statement, round trip to the recipe store included

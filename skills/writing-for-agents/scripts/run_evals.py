@@ -403,6 +403,12 @@ longest path with <skill>. A skill absent at <ref> is left out, which gives a
 no-skill baseline. Each scenario's setup is a list of
 shell commands run in the fresh repo, with $EVALS naming the evals folder.
 
+Each installed copy leaves out the skill's evals folder, and only setup gets
+$EVALS: the agent's environment does not name it. The source files stay on
+disk, so this keeps the rubric out of the agent's way, not out of reach. Setup and agent
+run with XDG_STATE_HOME set to the run folder's state/, so whatever a skill
+keeps there stays with the run.
+
 Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
 at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
@@ -697,7 +703,8 @@ def wanted(plan: Plan, scenario: Scenario) -> list[str]:
 def install(
     plan: Plan, names: Sequence[str], target: Path, present: Mapping[str, list[str]]
 ) -> list[str]:
-    """Copy each named skill as it stood at the ref; return one line per name."""
+    """Copy each named skill as it stood at the ref, leaving out its evals
+    folder; return one line per name."""
     target.mkdir(parents=True)
     (target.parent / ".gitignore").write_text("*\n", encoding="utf-8")
     lines = []
@@ -707,7 +714,16 @@ def install(
             lines.append(f"absent\t{name}")
             continue
         archive = subprocess.run(
-            ["git", "-C", str(plan.repo), "archive", plan.sha, source],
+            [
+                "git",
+                "-C",
+                str(plan.repo),
+                "archive",
+                plan.sha,
+                "--",
+                source,
+                f":(exclude){source}/evals",
+            ],
             capture_output=True,
             check=True,
         )
@@ -798,12 +814,14 @@ def execute(
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
     env = run_env(plan, folder)
+    # Setup copies fixtures from $EVALS; the agent never gets that path
+    setup_env = {**env, "EVALS": str(plan.evals)}
     with (folder / "setup.log").open("wb") as setup_log:
         for command in scenario.setup:
             status = children.run(
                 ["bash", "-euo", "pipefail", "-c", command],
                 work,
-                env,
+                setup_env,
                 setup_log,
                 setup_log,
                 deadline,
@@ -846,13 +864,19 @@ def execute(
 
 def run_env(plan: Plan, folder: Path) -> dict[str, str]:
     """The environment of a run's setup and agent: no GitHub or git credentials,
-    so GitHub refuses any write, and a gh shim that logs each call."""
+    so GitHub refuses any write, a gh shim that logs each call, and no EVALS,
+    even one the caller exported, since only setup gets it."""
     gh_config = folder / "gh-config"
     gh_config.mkdir()
-    env = {key: value for key, value in os.environ.items() if key not in CREDENTIALS}
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in CREDENTIALS and key != "EVALS"
+    }
     env.update(
         {
-            "EVALS": str(plan.evals),
+            # A skill's state, such as a case file, stays in the run folder
+            "XDG_STATE_HOME": str(folder / "state"),
             PARENT_ENV: "1",
             "GH_CONFIG_DIR": str(gh_config),
             "GIT_TERMINAL_PROMPT": "0",

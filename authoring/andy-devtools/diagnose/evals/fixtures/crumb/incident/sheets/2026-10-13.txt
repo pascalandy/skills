@@ -1,0 +1,38 @@
+From: Crumb orders <orders@crumbandco.example>
+To: kitchen@crumbandco.example
+Subject: Preorders for Thu 2026-10-15 (31)
+Date: Wed, 14 Oct 2026 01:00:01 +0000
+Message-ID: <20261014010001.E2A61F8C37@ops-2.crumbandco.example>
+
+Orders for Thu 2026-10-15
+07:00  #51065  Ximena Vukovic        1 seeded rye
+07:00  #51075  Kofi Beaulieu         1 focaccia (rosemary), 6 morning bun
+07:00  #51099  Arvid Beaulieu        6 croissant
+07:30  #51105  Ximena Kincaid        6 butter tart
+08:00  #51053  Sylvain Delacroix     6 cinnamon bun
+08:00  #51054  Ines Kincaid          1 country loaf, 12 dinner roll  (slice the loaf)
+08:30  #51047  Delphine Thibodeau    1 baguette, 1 seeded rye
+08:30  #51101  Ilse Mbeki            1 olive loaf
+08:30  #51103  Sunniva Gauthier      12 dinner roll, 1 focaccia (rosemary), 1 pumpkin pie 9in
+08:30  #51108  Tobiah Pacheco        1 seeded rye
+09:00  #51084  Ferran Whitcombe      6 croissant
+09:00  #51085  Ines Vasquez-Lind     6 butter tart
+09:00  #51087  Joaquin Bergstrand    2 baguette, 1 spelt loaf
+09:00  #51107  Ewan Bergstrand       1 sourdough boule
+09:00  #51110  Zofia Sandoval        1 baguette, 4 pain au chocolat
+09:30  #51077  Delphine Pacheco      1 country loaf, 1 lemon loaf
+09:30  #51082  Thandiwe Drummond     1 sourdough boule, 1 seeded rye, 1 focaccia (rosemary)
+09:30  #51095  Noor Corriveau        1 pumpkin pie 9in
+10:00  #51014  Noor Deschamps        6 morning bun, 6 croissant
+10:00  #51062  Yesenia Halloran      12 dinner roll, 6 cinnamon bun
+10:00  #51079  Dov Ostrowski         1 sourdough boule
+10:00  #51098  Joaquin Quintero      1 pumpkin pie 9in, 2 baguette
+10:30  #51041  Halvard Whitcombe     1 focaccia (rosemary), 1 sourdough boule  (slice the loaf)
+10:30  #51078  Ximena Kowalczyk      1 lemon loaf, 1 pecan tart
+11:00  #51088  Amadou Gauthier       1 brioche loaf  (slice the loaf)
+11:00  #51100  Ines Gauthier         1 pecan tart
+11:30  #51083  Rafferty Oduya        1 country loaf
+11:30  #51096  Corentin Whitcombe    1 apple pie 9in, 1 brioche loaf
+13:30  #51074  Ximena Vasquez-Lind   1 pecan tart, 6 croissant
+13:30  #51106  Thandiwe Ibarra       1 pecan tart
+13:30  #51109  Tancredi Achterberg   6 croissant

@@ -1,0 +1,7 @@
+time      req/s   p50 ms   p95 ms   p99 ms
+14:00       301       58      138      211
+14:05       300       60      142      219
+14:10       304       59      140      214
+window      302       59      140      215
+
+req/s counts requests that reached the pool (result cache misses)

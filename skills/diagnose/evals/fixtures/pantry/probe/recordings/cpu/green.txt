@@ -1,0 +1,7 @@
+time     cpu %   user %   sys %
+14:00       51       44       7
+14:05       53       46       7
+14:10       52       45       7
+window      52       45       7
+
+percent of the instance's 4 vCPUs, mean over instances

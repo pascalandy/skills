@@ -1,0 +1,4 @@
+$ readlink -f /usr/bin/python3
+/usr/bin/python3.12
+$ /usr/bin/python3 --version
+Python 3.12.3
