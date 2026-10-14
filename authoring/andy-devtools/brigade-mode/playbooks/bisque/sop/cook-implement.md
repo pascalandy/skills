@@ -8,6 +8,7 @@ Run the section the Chef requests.
 - Order the work by bang for the buck. Wiring in finished code that isn't connected yet is the typical quick win
 - Note each out-of-scope gap you find for the Chef. File one as an issue with 🧰 label-for-issues only when it deserves its own fix and no existing issue covers it
 - Send a question you cannot settle to the Chef, with the default you would apply, and keep working on what it does not block
+- On Claude Code, delegate side work with `delegate_task` to the `delegate-on-claude` target of `[cook]` in `config.toml`, never to a native subagent, which runs on your own Claude quota
 - Done when every card is implemented and checks are green, or each remaining card is reported to the Chef as blocked, with the reason
 
 ## Fix
