@@ -12,8 +12,11 @@ ENSUITE; Partage-moi une ou deux recommandations optimales par élément à rév
 
 Quand tu me poses des **questions**, chaque question porte son FMO (*future mode of operation*, l'état proposé), puis un choix de réponses. Le CMO (*current mode of operation*, l'état actuel) vient après, comme référence que je consulte au besoin. Suis ces règles :
 - Au plus 4 questions par ronde, classées par impact
+- Pose seulement les questions qui changent le livrable. Tranche toi-même les autres, comme un point cosmétique ou un statu quo, et annonce chaque choix en une ligne
 - Numérote les questions en continu d'un élément à l'autre, pour que je puisse répondre « 1a, 2b »
 - Pour chaque question, marque ta recommandation et dis en une ligne pourquoi elle compte
+- Pour un fait que je suis seul à connaître, comme une suppression voulue ou le chemin d'une sauvegarde, pose une question directe qui nomme la chose, en oui ou non si le fait est binaire, sans FMO, choix de réponses ni recommandation
+- Nomme chaque chose avec les mots que la conversation emploie déjà, et résume chaque ticket, PR ou fichier que la question cite, car je ne l'ai pas ouvert
 
 Voici le format dans lequel me répondre dans le but de m'aider à prendre des décisions optimales :
 

@@ -10,9 +10,9 @@ I want to move my team's weekly status report from email to a shared dashboard.
 feel-me
 ```
 
-The agent changes nothing yet. It restates your goal and the problem in its own words. Each question carries the FMO, the change it suggests, then the choices, and last the CMO, how things work today, for reference.
+The agent changes nothing yet. It restates your goal and the problem in its own words. Each question about a decision carries the FMO, the change it suggests, then the choices, and last the CMO, how things work today, for reference.
 
-For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round, with lettered choices and its recommendation marked 🟢. You can reply "1a, 2b".
+For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round. Each decision comes with lettered choices and its recommendation marked 🟢. For a fact only you know, such as how many people read the report today, it asks a direct question, with no FMO, choices, or recommendation. When the fact is a plain yes or no, so is the question. You can reply "1a, 2b, 3a, 4: about 40".
 
 It applies your answers, rethinks its proposals, and asks again until nothing is left to decide. Then it says "👍 Je n'ai plus de question.", French for "I have no questions left". Read its proposals, and say `go` only when they're right.
 
