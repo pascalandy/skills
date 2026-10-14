@@ -251,7 +251,7 @@ stack.
 |---|---|---|
 | 0 | Success | — |
 | 1 | Generic error | Read stderr |
-| 2 | Not in a stack | `gh stack init`, or `gh stack checkout <target>`; for open PRs never linked, `gh stack link <pr>...` bottom to top |
+| 2 | Not in a stack | `gh stack init`, or `gh stack checkout <target>`; for open PRs never linked, `gh stack link --base <bottom PR's base> <pr>...` bottom to top |
 | 3 | Rebase conflict | Follow the Exit 3 recovery below |
 | 4 | GitHub API failure | Run `gh auth status`: signed in, retry; signed out, follow [Without gh stack](#without-gh-stack) |
 | 5 | Invalid arguments | Fix the invocation; see `<command> --help` |
