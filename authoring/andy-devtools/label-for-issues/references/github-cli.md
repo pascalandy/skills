@@ -27,14 +27,17 @@ Searches for closed issues also need `--state all`.
 - Epics without a Milestone: `is:issue is:open label:4-epic no:milestone`
 - One Epic's Stories, open or closed: `is:issue parent-issue:OWNER/REPO#N`
 - Children with a parent: `is:issue is:open has:parent-issue`; read each
-  native parent's labels to distinguish Stories from Sub-tasks. Count open
-  Stories even when their Epic is closed. A Sub-task stays with its non-Epic parent
+  native parent's labels and state to distinguish Stories from Sub-tasks
 - Agent candidates: `is:issue is:open label:1-ready-for-agent -label:0-impediment`,
   then apply the blocker filter above and check prerequisites in issue content
 - Agent WIP: `is:issue is:open label:1-wip-by-agent`
 
 GitHub ignores `has:sub-issues`; use the Epic label to identify containers.
 There is no Story label. Membership is the native parent relationship.
+
+When listing backlog, also run the children filter. Report open Stories of closed
+Epics separately as issues a grooming scope must still count, and Sub-tasks with
+their non-Epic parents. Both stay outside the backlog list.
 
 ## Rank and relation pagination
 
