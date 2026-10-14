@@ -2,6 +2,10 @@
 
 Read this reference before a workflow uses delegation, model selection, history, scheduling, application control, or skill installation. Resolve capabilities from the active session's tools and installed CLI help. Product names alone do not establish what this session can do.
 
+## Hosts
+
+T3 Code runs a harness and adds its own tools for delegates, threads, pull request watches, schedules, and thread history. Inside T3, load the **t3-runtime** skill before a step delegates, launches or messages a thread, watches a pull request, schedules work, or reads history. Where it picks a tool, its choice replaces the native-first rule and the continuation fallbacks below.
+
 ## Load skills and configuration
 
 Resolve a named skill in the session catalog and read its SKILL.md and the references needed for the current step. A slash command in a playbook is shorthand for that instruction, not a required executable. If the skill is absent, use the stated functional fallback or report the missing capability.

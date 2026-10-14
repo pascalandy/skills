@@ -8,7 +8,7 @@ Commit and push only when the session authorizes them. If either is forbidden, b
 
 - **A** is the agent that builds the page, on the model the user picked for its thread
 - **B** is a QA agent: `claude-haiku-5-5` at `xhigh` effort, in its own top-level T3 thread, reading the repository without changing a tracked file
-- A launches every B as a new thread: `create_threads` for several at once, sharing A's checkout, each entry with `target: {providerInstanceId: "claudeAgent", model: "claude-haiku-5-5", options: {effort: "xhigh"}}`. B is never a subagent. If those controls or settings are unavailable, ask the user to open the B sessions
+- A launches every B as a new thread: `create_threads` for several at once, sharing A's checkout, each entry with `target: {providerInstanceId: "claudeAgent", model: "claude-haiku-5-5", options: {effort: "xhigh"}}`. B is never a subagent or a delegate, and the **t3-runtime** skill covers how A follows and settles it. If those controls or settings are unavailable, ask the user to open the B sessions
 - A decides how many B to launch and what each covers
 
 ## Split the QA
