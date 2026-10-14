@@ -11,7 +11,7 @@ Load 🧰 t3-runtime before your first launch, delegation, watch, or settle. It 
 ## Vocabulary
 
 - **CU**: a use case. It shows the dynamics between the user and the threads, as a process and a sequence diagram. Each step names the SOP its thread follows
-- **SOP**: a thread's procedure in `sop/`. Its file name starts with its role, or names its barrage
+- **SOP**: a role's procedure in `sop/`. Its file name starts with its role, or names its barrage
 - **Batch**: the work one Chef cooks, reviews, and merges as one stack, in one repository. The plan's own grouping sets the batches: a milestone, an epic, a sprint, or a label. A batch keeps the short name the plan gives it, such as `M05 Doctor`
 - **Card**: a unit of work inside a batch, with one PR per verifiable unit
 - **Chain**: each thread reports to the thread that launched or delegated it: a Cook or a delegate to its Chef, a Chef to the Head Chef, the Head Chef to the user
@@ -21,20 +21,20 @@ Load 🧰 t3-runtime before your first launch, delegation, watch, or settle. It 
 
 | Role | Runs as | Title | Does |
 |---|---|---|---|
-| Head Chef | The user's thread, pinned | `Head Chef <id4> · <merged>/<batches> · <subject>` | The only thread the user talks to. Splits the plan into batches, launches one Chef per batch, answers the chain, gives each merge its green light, and closes the run. Never edits code |
+| Head Chef | The user's thread, pinned | `Head Chef <id4> · <done>/<batches> · <subject>` | The only thread the user talks to. Splits the plan into batches, launches one Chef per batch, answers the chain, gives each merge its green light, and closes the run. Never edits code |
 | Chef | Thread in the project of its batch's repository | `🧑‍🍳 Chef <b> <id4> · <step>/7 · <batch>` | Runs the process on its batch: launches the Cook, delegates the barrages and the DocWriter, triages the findings, watches the stack, merges, and closes the batch. Never edits code |
 | Cook | Thread bound to its batch's worktree | `🐝 Cook <b>.<c> <id4> · <batch>` | Implements its batch, opens and links its PRs, applies the findings the Chef relays, runs its retros |
 | Barrage | Delegate of the Chef | `👀 manic-1 · Cook <b>.<c> <id4>`, and likewise for manic-2, manic-3, and manic-5 | Reviews the stack of Cook <b>.<c>, runs 🧰 2nd-pass on its findings, then returns them as its result, on every pass. Edits no file. Lists each finding with its severity, its file and line, and the fix it proposes |
 | DocWriter | Delegate of the Chef | `📚 DocWriter · Cook <b>.<c> <id4>` | Updates the docs the stack makes stale, in a docs PR at the top of the stack, or applies the docs findings the Chef relays |
 
-`<id4>` is the last 4 characters of the Head Chef's threadId, so a T3 search for it lists every thread of the run. `<b>` numbers the batches in launch order. `<c>` numbers a batch's Cooks: the Chef launches Cook <b>.2 only when the stack needs a writer and Cook <b>.1 has settled. `<step>` is the Chef's step in the process table.
+`<id4>` is the last 4 characters of the Head Chef's threadId, so a T3 search for it lists every thread of the run. `<b>` numbers the batches in launch order. `<c>` numbers a batch's Cooks: the Chef launches Cook <b>.2 only when the stack needs a writer and Cook <b>.1 has settled. `<done>` counts the batches merged or done without a PR. `<step>` is the Chef's step in the process table.
 
 ## SOPs
 
 | SOP | Role | Read when |
 |---|---|---|
 | [head-chef](sop/head-chef.md) | Head Chef | From `$brigade ; bisque` until the run closes |
-| [chef-run](sop/chef-run.md) | Chef | Launched |
+| [chef-run](sop/chef-run.md) | Chef | Launched, or the Head Chef sends 🛑 Stop |
 | [chef-launch](sop/chef-launch.md) | Chef | Before each launch or delegation; step 5 applies only to manic-2 |
 | [chef-triage](sop/chef-triage.md) | Chef | A barrage returns, or the watch wakes you |
 | [chef-closing](sop/chef-closing.md) | Chef | The reviews end: report, green light, merge, retros, settle |
@@ -63,9 +63,9 @@ A PR that changes an SOP step updates the process table and the diagram of this 
 
 ## Process
 
-The Head Chef runs step 0 for the whole run. Each Chef runs steps 1 to 7 on its batch, and launches or delegates each thread with `chef-launch`.
+The Head Chef runs step 0 for the whole run. Each Chef runs steps 1 to 7 on its batch, and launches the Cook and delegates the barrages and the DocWriter with `chef-launch`.
 
-| # | Step | Threads | SOP |
+| # | Step | Roles | SOP |
 |---|---|---|---|
 | 0 | Align | Head Chef, the user | `head-chef` |
 | 1 | Implement | Cook <b>.<c> | `cook-implement` |
@@ -217,7 +217,7 @@ sequenceDiagram
     destroy C2
     C2-->>H: Agent: ⛳ Batch 2 merged, report <-
     H->>H: Rename itself Head Chef <id4> 2/2 [subject], then retro-skill-usage and retro-global
-    H->>U: Agent: ⛳ 2/2 batches merged, report <-
+    H->>U: Agent: ⛳ 2/2 batches done, report <-
     H->>H: Settle itself, which unpins it
     Note over U,H: USER adds work, which wakes the Head Chef, or leaves it settled
 ```
@@ -225,12 +225,11 @@ sequenceDiagram
 ## Shared rules
 
 - One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to `pr-assignee` from `config.toml`
-- Follow 🧰 t3-runtime to launch, delegate, link, watch, and settle. Each thread settles itself once it owes nothing, and the thread above it confirms
-- Each delegation is fresh: one `delegate_task` per pass or fix round, with the `clientRequestId` `<id4>-<b>-<sop>-<pass>`, reused only to retry that same call
+- Follow 🧰 t3-runtime to launch, delegate, link, watch, and settle
+- Each delegation is fresh: one `delegate_task` per pass or fix round, with the `clientRequestId` `<id4>-<b>-<sop>-<k>`, where `<k>` counts the batch's delegations from 1 and never resets. Reuse a key only to retry the same call
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 - As you see fit, leave comments on the PRs to help the user understand what's happening
 - One writer per worktree: the Chef gives a worktree to one writer at a time, the Cook or a DocWriter, and to the next only after the previous one reports a clean, pushed checkout. The Cook that owns the stack does every restack
-- At each step, the Chef renames itself with the step number and posts "📍 [what is going on] / <step>/7"
 - A question climbs the chain one level at a time, with the default its sender would apply. Each level answers when its own context settles the question and passes it up otherwise. A delegate lists its open questions in its result
 - Keep going without the user. You may push your stack branches, and open and update PRs and issues. A thread of this run may force-push with `--force-with-lease` any branch a thread of this run created
 - Stop only when one of these happens. The thread reports it up the chain, and the Head Chef asks the user:

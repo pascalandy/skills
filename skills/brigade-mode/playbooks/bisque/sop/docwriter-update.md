@@ -4,7 +4,7 @@ Run the section your brief names in Cook <b>.<c>'s worktree while Cook <b>.<c> s
 
 ## Update
 
-1. Run 🧰 andy-mode ; docs on the stack's final diff. Done when each doc that describes a behavior the stack changes matches the new behavior
+1. Run 🧰 andy-mode ; docs on the stack's final diff, and cover each finding your brief carries. Done when each doc that describes a behavior the stack changes matches the new behavior
 2. If docs changed, commit them and open the docs PR as the top layer with 🧰 gh-stack. Otherwise report that no doc needed a change. Done when your report holds the PR link or the no-docs decision
 
 ## Fix

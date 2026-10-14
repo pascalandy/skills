@@ -6,8 +6,8 @@
 	- `service-tier` maps `standard` and `fast` to codex `serviceTier` values `default` and `priority`, or claudeAgent `fastMode` values `false` and `true`, respectively
 
 	If `runtime-mode` is not `inherit`, pass it as `runtimeMode`. Confirm the selection with `orchestrator_capabilities`. If a configured value is unavailable, ask the Head Chef. Done when the instance, model, reasoning level, service tier, and runtime mode are supported
-3. **Launch the Cook.** Call `t3_thread_launch` in your own project with `workspaceStrategy` `existing_worktree`, the worktree's path and branch, the `modelSelection` from step 2, the Cook's title from Roles in `bisque.md`, and the message below. When your project is `projects`, use `workspaceStrategy` `root` instead, since `projects` has no worktrees. Keep the returned threadId. After an error or a lost response, find the thread with `t3_thread_list` before retrying. Done when `t3_thread_read` shows the thread started
-4. **Delegate a barrage or the DocWriter.** Call `delegate_task` with `mode` `async`, the title from Roles in `bisque.md`, the message below as `task`, and step 2's selection as `target`: `instance` as `providerInstanceId`, `model`, and the provider options. Omit `target` when the row sets `inherit`. Set `clientRequestId` as the shared rules say. In step 2, delegate manic-1 and manic-2 in the same turn. Then end your turn: each result wakes you. Done when every delegation of this step returned a taskId
+3. **Launch the Cook.** Call `t3_thread_launch` in your own project with `workspaceStrategy` `existing_worktree`, the worktree's path and branch, the `modelSelection` from step 2, the Cook's title from Roles in `bisque.md`, and the message below. Done when `t3_thread_read` shows the thread started
+4. **Delegate a barrage or the DocWriter.** Call `delegate_task` with `mode` `async`, the title from Roles in `bisque.md`, the message below as `task`, and step 2's selection as `target`: `instanceId` as `providerInstanceId`, `model`, and the provider options. Set `clientRequestId` as the shared rules say. In step 2, delegate manic-1 and manic-2 in the same turn. Then end your turn: each result wakes you. Done when every delegation of this step returned a taskId
 
 ```text
 $brigade-mode ; bisque ; <sop>
@@ -18,7 +18,7 @@ Worktrees: <absolute paths>
 Base branch: <the branch the stack starts from>
 PRs: <URLs>
 Plan: <this batch's cards>
-Prior findings: <on a later pass or a fix round: each finding and your decision on it>
+Prior rounds: <on a later pass or a fix round: each finding, your decision, the owner's fix with its commit, and each objection still open>
 When you finish your work, run 🧰 2nd-pass on it, then report.
 ```
 
