@@ -58,8 +58,10 @@ filters and pagination.
 
 Record the home repo and each scoped repo. Ask for the home repo if absent,
 before proposing a container there. An issue stays in its repository; Epics and
-Milestones live in the home repo. Cite another repo's Story as `OWNER/REPO#N`
-throughout proposals, dependencies, cleanup, comments and readback.
+Milestones live in the home repo. Before presenting a proposal, comments or
+readback, scan every table, body preview, dependency, cleanup entry, readiness
+gap and handoff prompt. Expand each cross-repo Story reference to `OWNER/REPO#N`,
+including shortened repository aliases.
 Read every scoped issue's body, comments, labels, native parent, relationships,
 state and closing reason. Count every relationship against its `totalCount`
 and paginate incomplete lists with label-for-issues.
