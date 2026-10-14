@@ -74,8 +74,8 @@ def test_signs_off_an_unsigned_head_once_then_merges(github: Sandbox) -> None:
         (
             {"stack": {"number": 9, "position": 2, "size": 2}},
             (
-                "PR #7 is part of a GitHub stack; land it with: gh stack merge 7 "
-                "--yes --squash, then rerun just merge to deploy"
+                "PR #7 is part of a GitHub stack; run: just signoff on each layer up "
+                "to #7, gh stack merge 7 --yes --squash, then just merge to deploy"
             ),
         ),
         (

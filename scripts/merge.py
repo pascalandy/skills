@@ -158,8 +158,9 @@ def require_outside_a_stack(number: int, timeout: float) -> None:
     )
     if pull.get("stack"):
         raise ScriptError(
-            f"PR #{number} is part of a GitHub stack; land it with: gh stack merge "
-            f"{number} --yes --squash, then rerun just merge to deploy"
+            f"PR #{number} is part of a GitHub stack; run: just signoff on each layer "
+            f"up to #{number}, gh stack merge {number} --yes --squash, then just merge "
+            "to deploy"
         )
 
 
