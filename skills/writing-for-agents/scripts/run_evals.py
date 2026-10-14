@@ -403,7 +403,9 @@ longest path with <skill>. A skill absent at <ref> is left out, which gives a
 no-skill baseline. Each scenario's setup is a list of
 shell commands run in the fresh repo, with $EVALS naming the evals folder.
 
-Each installed copy leaves out the skill's evals folder. Setup and agent
+Each installed copy leaves out the skill's evals folder, and only setup gets
+$EVALS: the agent's environment does not name it. The source files stay on
+disk, so this keeps the rubric out of the agent's way, not out of reach. Setup and agent
 run with XDG_STATE_HOME set to the run folder's state/, so whatever a skill
 keeps there stays with the run.
 
@@ -701,8 +703,8 @@ def wanted(plan: Plan, scenario: Scenario) -> list[str]:
 def install(
     plan: Plan, names: Sequence[str], target: Path, present: Mapping[str, list[str]]
 ) -> list[str]:
-    """Copy each named skill as it stood at the ref, without its evals folder,
-    so a run cannot read its own expected behavior; return one line per name."""
+    """Copy each named skill as it stood at the ref, leaving out its evals
+    folder; return one line per name."""
     target.mkdir(parents=True)
     (target.parent / ".gitignore").write_text("*\n", encoding="utf-8")
     lines = []
@@ -812,12 +814,14 @@ def execute(
     git(work, "config", "user.name", "Eval Runner")
     git(work, "config", "user.email", "eval@example.invalid")
     env = run_env(plan, folder)
+    # Setup copies fixtures from $EVALS; the agent never gets that path
+    setup_env = {**env, "EVALS": str(plan.evals)}
     with (folder / "setup.log").open("wb") as setup_log:
         for command in scenario.setup:
             status = children.run(
                 ["bash", "-euo", "pipefail", "-c", command],
                 work,
-                env,
+                setup_env,
                 setup_log,
                 setup_log,
                 deadline,
@@ -866,7 +870,6 @@ def run_env(plan: Plan, folder: Path) -> dict[str, str]:
     env = {key: value for key, value in os.environ.items() if key not in CREDENTIALS}
     env.update(
         {
-            "EVALS": str(plan.evals),
             # A skill's state, such as a case file, stays in the run folder
             "XDG_STATE_HOME": str(folder / "state"),
             PARENT_ENV: "1",
