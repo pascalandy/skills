@@ -115,7 +115,7 @@ A feature and a fix take the same six steps:
 5. **Barrages** review the stack and call `interrogate`. A finding returns to step 2
 6. **Merge.** A fix merges on its pre-merge proof. The field re-read after merge, `diagnose` step 9, earns the `fixed` claim
 
-After a barrage fix, rerun only the features the fix touched. Run the whole loop once on the final head before merge.
+After a barrage fix, rerun only the features the fix touched. Run the whole loop once on the final head before merge. The whole loop is every feature the verify skill runs by default, and a check it marks paid or opt-in runs only when the change touches its feature.
 
 ### Where a feature and a bug meet
 
@@ -127,9 +127,9 @@ Nothing enters the lane until it can name the reading that will prove it. A feat
 
 A bug enters and leaves through `diagnose`, because it was seen in the field and closes there. A feature closes at merge, because the verify loop already proved what was asked.
 
-### A project without a verify loop
+### A project's verify loop
 
-The agent offers `create-verification-skill` the first time a project needs a verify loop. A line in the project's `AGENTS.md`, "no verify loop, CI is enough", stops the offer and drops the loop parts of steps 1 and 4.
+The project's `AGENTS.md` names its verify loop, since a loop may live outside the repo it checks. `verify-video-archive` lives in the skills repo and checks the dotfiles checkout. The agent offers `create-verification-skill` the first time a project needs a verify loop. A line in the same place, "no verify loop, CI is enough", stops the offer and drops the loop parts of steps 1 and 4.
 
 ## Principles
 
@@ -321,7 +321,7 @@ The verify loop is each project's `verify-<app>` skill. `create-verification-ski
 
 At lane step 2, the code records the readings by default, at the shallowest layer, in the unit of work's one wide record: a CLI's one-line JSON answer, a run manifest, or one structured log line per request. Include what pairs runs: build, flags, host, and fan-out counts such as addresses resolved, backends contacted, and retries. No debug flag. Give every wait a timeout that records what it waited on, so a hang leaves a fact before anyone restarts the process. Budget the cost.
 
-At lane step 4, the delegate starts with the baseline intake. It pins the last good run. When none exists, it runs the base branch once to make one, or reports the missing control when it cannot. A new reading is checked against its declared normal value and its planted bug until a base run includes it. Then the delegate fails the run when a reading in a feature's file is missing from the run, when a detector fails, or when a reading leaves parity with the last good run.
+At lane step 4, the delegate starts with the baseline intake. It pins the last good run. When none exists, it runs the base branch once to make one, or reports the missing control when it cannot. A new reading is checked against its declared normal value and its planted bug until a base run includes it. The delegate plants a bug only in a scratch worktree or a disposable copy it owns, never in the candidate checkout it shares with its caller, and its passing proof names the candidate revision. Then the delegate fails the run when a reading in a feature's file is missing from the run, when a detector fails, or when a reading leaves parity with the last good run.
 
 Applied to the post's latency feature before release: the failure model names "the mTLS path routes by shard", and the planted bug is the unsharded client. A count of addresses would not survive that plant at pre-production scale: with 2 shards of 1 replica each, the buggy client resolved only 2 addresses, a count a correct client can produce too. So the reading records the lookups themselves, which names the client resolves and how many answers each returns, compared with the last good run. That is the comparison the post says would have caught the bug before production.
 
@@ -337,7 +337,7 @@ All paths are under `authoring/`.
 
 | File | Change | Why |
 |---|---|---|
-| `poteto/poteto-mode/playbooks/bug-fix.md` | Steps 1 and 2 become "run `diagnose`". The fix starts the lane at `maintain-verification-skill`. Step 4 verifies through CI, then the verify loop. The closing "Investigation fans out `how` + `why`" runs only after `diagnose` isolates a signal, scoped to it | Code-first seeding and repro-as-truth contradict the post |
+| `poteto/poteto-mode/playbooks/bug-fix.md` | On a fresh report, steps 1 and 2 become "run `diagnose`". On an existing confirmed case, it takes the case file path, the reading that exposed the bug, and its normal value, and runs no second intake. The fix starts the lane at `maintain-verification-skill`. Step 4 verifies through CI, then the verify loop. The closing "Investigation fans out `how` + `why`" runs only after `diagnose` isolates a signal, scoped to it | Code-first seeding and repro-as-truth contradict the post |
 | `poteto/poteto-mode/playbooks/feature.md` | After `architect`, the lane starts at `maintain-verification-skill`. The Builder writes the code that records the readings. Step 5 verifies through CI, then the verify loop | Goal 1 entry point |
 | `poteto/poteto-mode/SKILL.md` | The bug-fix non-negotiable points to `diagnose` and keeps "reproduce yourself on the same surface", with parity. The `how` trigger for a nontrivial change or "are we sure?" excludes runtime failures, which gather facts through `diagnose` before any source reading | One entry point for diagnosis |
 | `poteto/poteto-mode/principles/fix-root-causes.md` | "Reproduce first" becomes "facts and a control first, then reproduce with parity". "Ask why until the root cause" becomes "the hypothesis or minimal combination that explains every signal and that no fact contradicts". "When stuck, instrument" becomes "when stuck, descend one layer". Keep the restart-bug and pattern-sweep advice | Five Whys invites narrative depth and hides combinations |
@@ -350,13 +350,14 @@ All paths are under `authoring/`.
 | `poteto/interrogate/SKILL.md` and `references/lead-judgment.md` | The rules in [interrogate](#interrogate): eliminate and never confirm, facts and not the story, a clean report lists its checks, a reviewer count the caller sets, a fact packet in place of a diff. The consensus signal retires | The cert-reload theory survived an independent reviewer |
 | `poteto/interrogate/references/rubric.md` | A bug-fix PR shows the pre-merge proof of lane step 4, and leaves `fixed` to the field re-read after merge. A fix justified by reading code alone is a hypothesis | Catches non-fixes in review |
 | `poteto/principle-prove-it-works/SKILL.md` | For a fix, the proof before merge is the pre-merge proof of lane step 4. The field re-read after merge, `diagnose` step 9, earns `fixed` | Tests passing is necessary, not sufficient |
-| `poteto/create-verification-skill/SKILL.md` and `references/feature-map-example/` | Feature files gain a fifth H2, `Readings`: each reading, its normal value, and the bug the check must catch. The generated Evidence section names where past runs live, so the delegate finds the last good run. The generated skill carries the planted-bug rule, the last-good-run rule, and the baseline intake | Gives the verify loop its readings |
-| `poteto/maintain-verification-skill/SKILL.md` | Becomes the only writer of `verify-<app>`. Adds the focused "add or strengthen a feature" pass, run in the Cook's worktree. Offers `create-verification-skill` when a project has no loop, unless its `AGENTS.md` opts out. The full audit stays | Lane step 1 |
+| `poteto/create-verification-skill/SKILL.md` and `references/feature-map-example/` | Feature files gain a fifth H2, `Readings`: each reading, its normal value, and the bug the check must catch. The generated Evidence section names where past runs live, so the delegate finds the last good run. The generated skill carries the planted-bug rule, the last-good-run rule, and the baseline intake. Creation adds the line in the project's `AGENTS.md` that names the loop | Gives the verify loop its readings |
+| `poteto/maintain-verification-skill/SKILL.md` | Becomes the only writer of `verify-<app>`. Adds the focused "add or strengthen a feature" pass, run in the Cook's worktree. Finds the loop through the project's `AGENTS.md`, and offers `create-verification-skill` when it names none, unless that file opts out. The full audit stays | Lane step 1 |
 | `andy/andy-mode/playbooks/retro-global.md` | Adds the "verify loop" category: what would make the loop stronger, filed in the repo where the loop lives | Lessons reach the loop as issues, through its one writer |
 | `andy-devtools/brigade-mode/playbooks/<route>/sop/manic-1.md`, `manic-2.md`, `manic-5.md`, in `arancini` and `bisque` | Each calls `interrogate` with its angle and the reviewer count from `config.toml` | One owner for adversarial review |
 | `andy-devtools/brigade-mode/playbooks/<route>/config.toml` and the route's playbook, in both routes | `[manic-1]`, `[manic-2]`, and `[manic-5]` gain `reviewers = 2`. The playbook's Settings table lists the key, and its process table and diagram show the reruns below | The count lives with the other barrage settings |
 | `andy-devtools/brigade-mode/playbooks/<route>/sop/cook-implement.md`, in both routes | For a bug card, the Cook runs `diagnose`, and sends its one question for Pascal to its Chef. After each fix, its Fix section runs the verify loop on the features the fix touched, through a delegate agent, and sends any failure to `diagnose` | The user talks only to the top thread of the route, and a fix reruns only what it touched |
-| `andy-devtools/brigade-mode/playbooks/<route>/sop/chef-closing.md`, in both routes | Merge requires one whole-loop run on the final head. When no Cook is open, the Chef starts it as a delegate. A failure goes to `diagnose` | The lane runs the whole loop once before merge |
+| `andy-devtools/brigade-mode/playbooks/<route>/sop/chef-closing.md`, in both routes | Merge requires one whole-loop run on the final head. When no Cook is open, the Chef starts it as a delegate. A failure goes to `diagnose`. After a bug card merges, the Chef resumes the same case at `diagnose` step 9, through the Cook or a delegate when no Cook is open, with the case file path and the field surface. A bug case reaches the retros and cleanup only after a recorded re-read or an explicit `open` outcome | The lane runs the whole loop once before merge, and a bug closes in the field |
+| `andy-devtools/brigade-mode/playbooks/<route>/sop/docwriter-update.md` and `chef-triage.md`, in both routes | DocWriter keeps ordinary docs. `chef-triage` sends a finding on a `verify-<app>` file to the owning Cook, who runs `maintain-verification-skill`'s focused pass | The verify loop keeps one writer |
 | `poteto/show-me-your-work/SKILL.md` | A skill that keeps a typed record, such as the case file, keeps it and applies this skill's audit and review steps to it | Avoids a second audit format fight |
 | `verify-loops/verify-video-archive/` | Pilot: `parallel-batch` and `interruption` gain Readings, and the verifier compares them with the last good run | Its manifest already records peak simultaneous media processes, peak RSS, and CPU, so the first readings cost little |
 
