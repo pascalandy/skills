@@ -115,6 +115,10 @@ A mode's routes run through that mode's SKILL.md.
 - `writing-for-agents`: Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read.
 - `writing-great-skills`: Use when creating, modifying, evaluating a skill.
 
+### Helpers
+
+- `t3-runtime`: Use inside T3 Code before orchestration, pull request tracking, scheduling, or thread-history work: delegating, launching or messaging a thread, linking or watching a pull request, scheduling, settling a thread, or reading thread history through the `t3-code` tools.
+
 ## Dev
 
 ### Modes
