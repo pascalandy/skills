@@ -203,6 +203,8 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
     assert (code, stdout, stderr) == (0, OK, "")
     assert pytest_calls(routing_repo) == [
         [
+            "--python",
+            "3.11",
             "--from",
             "pytest@9.1.1",
             "--with",
@@ -231,6 +233,8 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
     assert verdict(monkeypatch, capfd, checks) == (0, OK, "")
     assert pytest_calls(routing_repo) == [
         [
+            "--python",
+            "3.11",
             "--from",
             "pytest@9.1.1",
             "pytest",
@@ -402,7 +406,7 @@ def test_verbose_list_shows_the_actual_cheap_test_command(
     ) == (
         0,
         '{"ok":true,"checks":["test-commands"]}\n',
-        "repository-tests: uvx --from pytest@9.1.1 pytest -W error -r fE scripts/tests/test_commands.py\n",
+        "repository-tests: uvx --python 3.11 --from pytest@9.1.1 pytest -W error -r fE scripts/tests/test_commands.py\n",
     )
     assert not (routing_repo / "pytest-calls").exists()
 

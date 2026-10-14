@@ -42,6 +42,8 @@ EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
+# The requires-python minimum of scripts/: a bug only an older Python shows fails here (#508)
+PYTHON = "3.11"
 PYTEST = "9.1.1"
 XDIST = "pytest-xdist==3.8.0"
 ACTIONLINT = "actionlint-py@1.7.12.25"
@@ -105,7 +107,7 @@ def ruff(path: str) -> tuple[Command, Command]:
     )
 
 
-def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
+def pyright(path: str, *deps: str, python: str = PYTHON) -> Command:
     return (
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
@@ -117,9 +119,18 @@ def pyright(path: str, *deps: str, python: str = "3.11") -> Command:
     )
 
 
-def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Command:
+def pytest(
+    path: str | tuple[str, ...],
+    *deps: str,
+    parallel: bool = True,
+    python: str | None = None,
+) -> Command:
+    # uv prefers a Python it manages, so once the root batch downloads 3.11, a
+    # check without python= runs under it too; a skill whose scripts need a
+    # newer Python passes their requires-python minimum
     return (
         "uvx",
+        *(("--python", python) if python else ()),
         "--from",
         f"pytest@{PYTEST}",
         *with_deps(((XDIST,) if parallel else ()) + deps),
@@ -291,7 +302,7 @@ CHECKS = [
     Check(
         "distill",
         *ruff(f"{ANDY_MODE}/scripts/distill"),
-        pytest(f"{ANDY_MODE}/scripts/distill/tests"),
+        pytest(f"{ANDY_MODE}/scripts/distill/tests", python="3.12"),
     ),
     Check(
         "tavily",
@@ -299,11 +310,20 @@ CHECKS = [
     ),
     Check(
         "transcript",
-        pytest(f"{TRANSCRIPT}/scripts/tests", "httpx", "yt-dlp==2026.7.4", "rich"),
+        pytest(
+            f"{TRANSCRIPT}/scripts/tests",
+            "httpx",
+            "yt-dlp==2026.7.4",
+            "rich",
+            python="3.12",
+        ),
         # Its doc test checks the flags these files pass to transcript
         reads=("justfile", "authoring/verify-loops/verify-transcript/SKILL.md"),
     ),
-    Check("verify-transcript", pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests")),
+    Check(
+        "verify-transcript",
+        pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests", python="3.12"),
+    ),
     Check(
         "poteto-mode",
         pytest("authoring/poteto/poteto-mode/scripts/tests/test_worktree_audit.py"),
@@ -452,7 +472,9 @@ def in_scope(checks: list[Check]) -> list[Check]:
 
 def repo_batch(checks: list[Check]) -> Command:
     paths = tuple(check.test_path for check in checks if check.test_path)
-    return pytest(paths, parallel=any(not check.cheap for check in checks))
+    return pytest(
+        paths, parallel=any(not check.cheap for check in checks), python=PYTHON
+    )
 
 
 # pytest's summary line for a failed test, or for a test whose setup failed
