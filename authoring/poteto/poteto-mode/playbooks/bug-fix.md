@@ -18,4 +18,4 @@ Be scientific. Every shipped line traces to runtime evidence. Belt-and-suspender
    This is the canonical **Sequence Work into Verifiable Units** principle, the failing test first and the fix on top.
 6. Run **Opening a PR**.
 
-**Reply:** what was broken, root cause and its claim level, fix, how you verified, and what the field re-read after the merge must show. Paste the step-4 proof's failing-then-passing output verbatim.
+**Reply:** lead with the root cause and its claim level, which stays below `fixed` until the field re-read after the merge. Then what was broken, the fix, how you verified, and what that re-read must show. Paste the step-4 proof's failing-then-passing output verbatim.
