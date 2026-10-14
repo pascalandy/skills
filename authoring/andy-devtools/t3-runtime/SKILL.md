@@ -40,7 +40,7 @@ The sidebar shows each title on one line and cuts the end. Put what identifies t
 ## Pull requests
 
 - Link each pull request with `link_pull_request`. A `t3_thread_update` link replaces the pull request linked before it
-- The thread that decides the merge holds the watch. Comments posted by the account T3 reads the host with do not wake it, so an agent that comments through that account also reports to the merge owner. A watch stops after 10 consecutive wakes caused only by comments
+- One thread tracks each pull request and holds its watch: the one the route names, or else the one that owns the merge. Comments posted by the account T3 reads the host with do not wake it, so an agent that comments through that account also reports to the tracking thread. A watch stops after 10 consecutive wakes caused only by comments
 - When a pull request has nothing to monitor, oem's rule replaces the watch
 
 ## Schedules
