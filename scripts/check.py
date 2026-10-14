@@ -227,7 +227,8 @@ CHECKS = [
     ),
     repo_test("commands", "commands", "authoring", cheap=True),
     repo_test("common"),
-    repo_test("docs", "docs", "README.md", ".agents", "skills"),
+    # A docs link can point at any file, so a deletion anywhere can break one
+    repo_test("docs", cheap=True),
     repo_test(
         "discover_skills",
         "scripts/discover_skills.py",

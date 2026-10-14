@@ -42,7 +42,6 @@ def candidate(root):
     return repo, worktree
 
 
-@unittest.skipUnless(shutil.which("rg"), "ripgrep is required by the audit")
 class WorktreeAuditTests(unittest.TestCase):
     def audit(self, repo, chats, worktree, **env):
         """The audit's one row; the real gh fails unless a test puts a fake first on PATH."""
@@ -61,6 +60,7 @@ class WorktreeAuditTests(unittest.TestCase):
         self.assertEqual(row["worktree"], str(worktree))
         return row
 
+    @unittest.skipUnless(shutil.which("rg"), "chat activity needs ripgrep")
     def test_recent_chat_with_spaces_and_unrelated_prefix(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
