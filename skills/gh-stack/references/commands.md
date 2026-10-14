@@ -122,7 +122,8 @@ to rebase only part of the stack.
 
 ## view
 
-- `--json` writes the machine-readable payload to stdout. Its schema is in `SKILL.md`.
+- `--json` writes the machine-readable payload to stdout. Its schema is in `SKILL.md`, under
+  [Reading state](../SKILL.md#reading-state).
 - Bare `view` opens a full-screen TUI when stdout is a TTY, and prints static text when piped.
 - `--short` prints a compact one-line-per-branch summary and never opens the TUI, but it is
   formatted for humans; parse `--json` instead.
