@@ -13,7 +13,7 @@ date_updated: 2026-10-13
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 28 | **Last updated:** 2026-10-13
+> **Total pages:** 28 | **Last updated:** 2026-10-14
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -30,7 +30,7 @@ date_updated: 2026-10-13
 
 | File | Description |
 |------|-------------|
-| `ideas/references/2026-10-13-verify-and-diagnose/design.md` | Agreed design, distilled from Cindy Sridharan's debugging post: one workflow for a feature request and a bug, each project's verify loop, the new `diagnose` skill, adversarial review in `interrogate`, and edits to existing skills. Its `sources/` folder keeps the inputs of both design rounds |
+| `ideas/references/2026-10-13-verify-and-diagnose/design.md` | Agreed design, distilled from Cindy Sridharan's debugging post: one workflow for a feature request and a bug, each project's verify loop, the new `diagnose` skill, adversarial review in `interrogate`, and edits to existing skills |
 | `ideas/references/2026-10-13-verify-and-diagnose/plan.md` | Build order for that design, in phases that each end on a check |
 
 ### kind/doc

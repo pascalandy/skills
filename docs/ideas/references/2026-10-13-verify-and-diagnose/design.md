@@ -7,13 +7,13 @@ status: accepted
 
 # Design: verify and diagnose
 
-This page explains the design. [plan.md](plan.md) holds the build phases. [sources/](sources/) holds the inputs of both design rounds, listed under [How the design came about](#how-the-design-came-about).
+This page explains the design. [plan.md](plan.md) holds the build phases. [How the design came about](#how-the-design-came-about) tells how it was reached.
 
 The ideas come from Cindy Sridharan, [How to effectively debug when you no longer understand the code](https://copyconstruct.medium.com/how-to-effectively-debug-when-you-no-longer-understand-the-code-bd3dcb2c5f7b) (2026-10-10). Every skill built from this design restates her ideas in our own words and credits her with that link. No skill quotes her prose.
 
 ## The problem
 
-Agents debug badly in predictable ways. They read code first and tell a story about what the code can do, not what it did. They take the first plausible cause for the cause. They skip the control, so they cannot tell signal from noise. They accept a repro because the symptom matches. They count a second agent's agreement as proof. In all three of the post's bugs, the agent was able to find the cause and did not, until a human supplied a control, a constraint, or a demand for citations.
+Agents debug badly in predictable ways. They read code first and tell a story about what the code can do, not what it did. They take the first plausible cause for the cause. They skip the control, so they cannot tell signal from noise. They accept a repro because the symptom matches. They count a second agent's agreement as proof. An agent can hold every fact it needs and still miss the cause until a human supplies a control, a constraint, or a demand for citations.
 
 Pascal's skills already hold pieces of the fix, scattered across six places with no shared vocabulary: poteto-mode's `bug-fix`, `runtime-forensics`, `trace-forensics`, and `perf-issue` playbooks, its `fix-root-causes` principle, and andy-mode's `qa` diagnosis loop. Two existing rules contradict the post outright. poteto-mode's `bug-fix` playbook seeds hypotheses by reading code with `how`, and `interrogate` treats reviewer agreement as evidence.
 
@@ -102,7 +102,7 @@ flowchart LR
   class feat,bug entryc
 ```
 
-Read it from the two doors on the left. Each skill appears once, and the verify loop has one writer. [sources/workflow-v4.mmd](sources/workflow-v4.mmd) is the source Pascal approved.
+Read it from the two doors on the left. Each skill appears once, and the verify loop has one writer. This is the fourth version of the diagram, the one Pascal approved.
 
 ### The lane
 
@@ -144,15 +144,15 @@ These are the post's ideas, sharpened by the prior-art survey, written as rules 
 **Facts**
 
 4. Facts are append-only. A suspect fact is gathered again, never edited or argued away
-5. An absence is a fact only with its coverage. "No logs" counts against a hypothesis only if the logs would have shown it *(survey: Heuer's expected-evidence check; the post's own auth team made this mistake)*
+5. An absence is a fact only with its coverage. "No logs" counts against a hypothesis only if the logs would have shown it *(survey: Heuer's expected-evidence check)*
 6. Keep the store fat and the working set thin. Raw artifacts stay on disk. The reasoning context holds one short row per fact with a pointer *(survey: more data raises confidence, not accuracy)*
-7. Prefer arithmetic to narrative: counts, sizes, durations. 5 addresses against 400 settles what a paragraph cannot
+7. Prefer arithmetic to narrative: counts, sizes, durations. 26 queries per request against 2 settles what a paragraph cannot
 
 **Controls and signals**
 
 8. No control, no signal. Pick a control that differs from the failing case in the suspected factor only, and write why it is not broken the same way
 9. A louder sad path that fails differently is often the cheapest good control
-10. A signal is any reading that differs between the failing case and the control, in either direction. A reply the control receives and the failing case never gets is a signal *(survey: the post defines one direction only, and its hang was decided by the other)*
+10. A signal is any reading that differs between the failing case and the control, in either direction. A reply the control receives and the failing case never gets is a signal *(survey: the post defines one direction only)*
 11. Measure the noise floor before calling a difference a signal: read two controls when readings vary *(survey: Diffy's A/A run)*
 12. A signal is strong when few hypotheses explain it, ideally one. Service aggregates such as P99 are detectors, not locators
 
@@ -164,7 +164,7 @@ These are the post's ideas, sharpened by the prior-art survey, written as rules 
 16. One cited contradicting fact eliminates a hypothesis. Lack of support does not
 17. When no row survives, repair the set before inventing: reverify facts, split coarse hypotheses, merge per-instance ones, combine complementary ones, and only then draw a new one from existing facts
 18. When every signal is weak or the repairs fail, gather one layer down instead of guessing. Stop at the strongest signal, not the deepest
-19. A combination is valid only when each member is needed to explain some fact. In an incident, the loop that sustains the failure matters more than the trigger *(survey: Bronson et al.)*
+19. A combination is valid only when each member is needed to explain some fact. In an incident, the loop that sustains the failure matters more than the trigger *(survey)*
 20. When failing instances disagree, they may be separate bugs. Cluster them and run one matrix per cluster *(survey)*
 
 **Repros, review, and claims**
@@ -249,7 +249,7 @@ One Markdown file per case, at `${XDG_STATE_HOME:-~/.local/state}/diagnose-cases
 
 One file is the whole state of the investigation. An agent resuming after compaction, a session pickup, or a fresh subagent after a retraction reads `case.md` and knows where the case stands. It is also the fact packet `interrogate` reviews. Markdown tables are what agents edit well and what Pascal reads directly.
 
-Sections, each a strict table: header (variable, report, `verify-<app>` path, ladder, current layer), Controls, Facts, Hypotheses, Judgments, Log, Interventions, Decisions, Close. [sources/design-claude.md](sources/design-claude.md) section 4.1 has a filled example from the latency bug.
+Sections, each a strict table: header (variable, report, `verify-<app>` path, ladder, current layer), Controls, Facts, Hypotheses, Judgments, Log, Interventions, Decisions, Close. The skill's `references/case-file.md` holds the template.
 
 Column rules that carry the method:
 
@@ -271,7 +271,7 @@ Who writes what:
 
 The reviewer writes nothing. The diagnosing agent appends each row it proposes, with `by: reviewer`.
 
-`case.py check` would lint the tables, refuse edits to fact rows, render the matrix with strength per signal, and print the next step as one JSON line under the [script output rule](../../../references/script-output.md). It ships only if Phase 1 runs show case-file bookkeeping errors. [sources/design-claude.md](sources/design-claude.md) section 4.3 has its next-step table.
+`case.py check` would lint the tables, refuse edits to fact rows, render the matrix with strength per signal, and print the next step as one JSON line under the [script output rule](../../../references/script-output.md). It ships only if Phase 1 runs show case-file bookkeeping errors. Until then, `references/case-file.md` holds the next-step table, read by hand.
 
 ### The steps
 
@@ -315,15 +315,15 @@ The verdict is "eliminated by F#" or "survives F1 to Fn, missing: ...". It is ne
 
 The verify loop is each project's `verify-<app>` skill. `create-verification-skill` creates it. `maintain-verification-skill` is its only writer. Its full audit stays as it is, and it gains a focused pass, "add or strengthen a feature", which runs at lane step 1 in the Cook's worktree, or the caller's outside brigade:
 
-1. **Write the failure model.** For each design assumption, write how its violation would look: "the new path routes by shard like the old one", "an exhausted state machine is never re-entered". Ask `blast-radius`'s question: the one fact this change is safe because of
+1. **Write the failure model.** For each design assumption, write how its violation would look: "a row the bank repeats at the top of a page is still merged once", "two identical purchases on one day stay two rows". Ask `blast-radius`'s question: the one fact this change is safe because of
 2. **Pick a reading or an invariant per row.** Never legitimate: an invariant that fails loudly. Legitimate but the value matters: a reading with a normal value, taken from config where possible. Score each reading by the strength question: if this reading differed, how many causes could explain it? Keep readings that answer one or two. Aggregates such as latency percentiles or success rate stay detectors, never a feature's readings
 3. **Write the feature's file.** The readings, their normal values, and the bug the check must catch. A fix strengthens the affected feature's file rather than creating a new one. A change meant to move a reading updates its normal value here, so parity covers every other reading
 
-At lane step 2, the code records the readings by default, at the shallowest layer, in the unit of work's one wide record: a CLI's one-line JSON answer, a run manifest, or one structured log line per request. Include what pairs runs: build, flags, host, and fan-out counts such as addresses resolved, backends contacted, and retries. No debug flag. Give every wait a timeout that records what it waited on, so a hang leaves a fact before anyone restarts the process. Budget the cost.
+At lane step 2, the code records the readings by default, at the shallowest layer, in the unit of work's one wide record: a CLI's one-line JSON answer, a run manifest, or one structured log line per request. Include what pairs runs: build, flags, host, and fan-out counts such as queries run, backends contacted, and retries. No debug flag. Give every wait a timeout that records what it waited on, so a hang leaves a fact before anyone restarts the process. Budget the cost.
 
 At lane step 4, the delegate starts with the baseline intake. It pins the last good run. When none exists, it runs the base branch once to make one, or reports the missing control when it cannot. A new reading is checked against its declared normal value and its planted bug until a base run includes it. The delegate plants a bug only in a scratch worktree or a disposable copy it owns, never in the candidate checkout it shares with its caller, and its passing proof names the candidate revision. Then the delegate fails the run when a reading in a feature's file is missing from the run, when a detector fails, or when a reading leaves parity with the last good run.
 
-Applied to the post's latency feature before release: the failure model names "the mTLS path routes by shard", and the planted bug is the unsharded client. A count of addresses would not survive that plant at pre-production scale: with 2 shards of 1 replica each, the buggy client resolved only 2 addresses, a count a correct client can produce too. So the reading records the lookups themselves, which names the client resolves and how many answers each returns, compared with the last good run. That is the comparison the post says would have caught the bug before production.
+Applied to the practice CLI `tally` before its 2.3 release: the failure model names "a row Birchwood repeats at the top of a page is still merged once", and the planted bug is the release's own dedupe key. The existing reading, rows inserted per sample statement, would not catch that plant: the Birchwood sample has one page, so the count moves only where the release meant it to, on Fernhill's identical purchases. So the new reading imports a multi-page statement built from the bank's documented format and records the rows deduped and the balance check against the statement, compared with the last good run. That comparison catches the regression before release.
 
 ## Brigade and the retros
 
@@ -342,12 +342,12 @@ All paths are under `authoring/`.
 | `poteto/poteto-mode/SKILL.md` | The bug-fix non-negotiable points to `diagnose` and keeps "reproduce yourself on the same surface", with parity. The `how` trigger for a nontrivial change or "are we sure?" excludes runtime failures, which gather facts through `diagnose` before any source reading | One entry point for diagnosis |
 | `poteto/poteto-mode/principles/fix-root-causes.md` | "Reproduce first" becomes "facts and a control first, then reproduce with parity". "Ask why until the root cause" becomes "the hypothesis or minimal combination that explains every signal and that no fact contradicts". "When stuck, instrument" becomes "when stuck, descend one layer". Keep the restart-bug and pattern-sweep advice | Five Whys invites narrative depth and hides combinations |
 | `poteto/poteto-mode/playbooks/runtime-forensics.md` | Capture the same signal on a control process when one exists. Inside a case, return facts. Live hotfixes or CDP injection on a daily-driver or production surface need explicit authority | Control first; Pascal's production rule |
-| `poteto/poteto-mode/playbooks/trace-forensics.md` | Get the paired control capture first, or name why none exists. A cited cause at a boundary Pascal does not own is a valid diagnosis without that component's source | The hang was solved without the auth daemon's source |
+| `poteto/poteto-mode/playbooks/trace-forensics.md` | Get the paired control capture first, or name why none exists. A cited cause at a boundary Pascal does not own is a valid diagnosis without that component's source | A cause can be shown from Pascal's side of a boundary |
 | `poteto/poteto-mode/playbooks/perf-issue.md` | A slowdown with a known-good control is a regression: run `diagnose`. This playbook is for making something faster against a baseline | Two owners for regressions otherwise |
 | `poteto/poteto-mode/playbooks/investigation.md` | A question about why something fails at runtime routes to `diagnose` | Read-only diagnosis has one home |
 | `andy/andy-mode/playbooks/qa.md` | The bounded diagnosis loop keeps phases 1 and 2 (feedback loop, capture the symptom). When the cause matters to the finding, phases 3 and 4 hand off to `diagnose` | Removes the sixth copy of the method |
 | `poteto/how/SKILL.md` | In a debugging case, run after facts isolate a signal, and ask which paths could produce it | Keeps `how` scoped to a signal |
-| `poteto/interrogate/SKILL.md` and `references/lead-judgment.md` | The rules in [interrogate](#interrogate): eliminate and never confirm, facts and not the story, a clean report lists its checks, a reviewer count the caller sets, a fact packet in place of a diff. The consensus signal retires | The cert-reload theory survived an independent reviewer |
+| `poteto/interrogate/SKILL.md` and `references/lead-judgment.md` | The rules in [interrogate](#interrogate): eliminate and never confirm, facts and not the story, a clean report lists its checks, a reviewer count the caller sets, a fact packet in place of a diff. The consensus signal retires | Agreement cannot see a missing fact |
 | `poteto/interrogate/references/rubric.md` | A bug-fix PR shows the pre-merge proof of lane step 4, and leaves `fixed` to the field re-read after merge. A fix justified by reading code alone is a hypothesis | Catches non-fixes in review |
 | `poteto/principle-prove-it-works/SKILL.md` | For a fix, the proof before merge is the pre-merge proof of lane step 4. The field re-read after merge, `diagnose` step 9, earns `fixed` | Tests passing is necessary, not sufficient |
 | `poteto/create-verification-skill/SKILL.md` and `references/feature-map-example/` | Feature files gain a fifth H2, `Readings`: each reading, its normal value, and the bug the check must catch. The generated Evidence section names where past runs live, so the delegate finds the last good run. The generated skill carries the planted-bug rule, the last-good-run rule, and the baseline intake. Creation adds the line in the project's `AGENTS.md` that names the loop | Gives the verify loop its readings |
@@ -400,9 +400,4 @@ Deferred until a real case asks for it:
 
 **Round 2** produced the workflow. Pascal rejected the v3 workflow diagram because the verify loop appeared in several places, sometimes changed through `maintain-verification-skill` and sometimes directly. A second brief went to two independent designers again, and the lead wrote a draft first. The lead draft made the verify loop one resource with one writer, and sent retro issues back in like any request. Claude's proposal moved the planted bug to the verify run, pinned the last good run to the base branch on the same machine, and asked whether a barrage fix could rerun only the features it touched. Codex's proposal added the focused pass in the Cook's worktree, a fix that strengthens the affected feature's file, and the rule that failed, incomplete, or planted runs never become the baseline. Pascal settled the open points and approved v4.
 
-| Round | Sources |
-|---|---|
-| 1 | [brief.md](sources/brief.md), [design-lead.md](sources/design-lead.md), [design-codex.md](sources/design-codex.md), [design-claude.md](sources/design-claude.md), [research-prior-art.md](sources/research-prior-art.md), [review-codex.md](sources/review-codex.md), [design-round-1.md](sources/design-round-1.md), [plan-round-1.md](sources/plan-round-1.md) |
-| 2 | [brief-workflow.md](sources/brief-workflow.md), [lead-draft-workflow.md](sources/lead-draft-workflow.md), [proposal-claude.md](sources/proposal-claude.md), [proposal-codex.md](sources/proposal-codex.md), [workflow-v4.mmd](sources/workflow-v4.mmd) |
-
-The sources cite paths as they stood when written. `/tmp` paths are not in the repository.
+**The evals** are invented practice bugs, each testing one move of the method. Pascal chose the method over the post's cases, so neither the evals nor this folder retell them.
