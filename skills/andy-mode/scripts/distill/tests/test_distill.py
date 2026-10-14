@@ -4,6 +4,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -463,6 +464,10 @@ def test_a_failed_input_copy_answers_the_file_already_written(
         [
             "uv",
             "run",
+            # The probe has no requires-python, so pin the tests' own Python
+            # rather than one an outer virtual environment hands down
+            "--python",
+            sys.executable,
             "--with-requirements",
             str(SCRIPT_PATH),
             str(probe),
