@@ -15,7 +15,7 @@ The ideas come from Cindy Sridharan, [How to effectively debug when you no longe
 
 Agents debug badly in predictable ways. They read code first and tell a story about what the code can do, not what it did. They take the first plausible cause for the cause. They skip the control, so they cannot tell signal from noise. They accept a repro because the symptom matches. They count a second agent's agreement as proof. In all three of the post's bugs, the agent was able to find the cause and did not, until a human supplied a control, a constraint, or a demand for citations.
 
-Pascal's skills already hold pieces of the fix, scattered across six places with no shared vocabulary: poteto-mode's `bug-fix`, `runtime-forensics`, `trace-forensics`, and `perf-issue` playbooks, its `fix-root-causes` principle, and andy-mode's `qa` diagnosis loop. Two skills contradict the post outright. `bug-fix` seeds hypotheses by reading code with `how`, and `interrogate` treats reviewer agreement as evidence.
+Pascal's skills already hold pieces of the fix, scattered across six places with no shared vocabulary: poteto-mode's `bug-fix`, `runtime-forensics`, `trace-forensics`, and `perf-issue` playbooks, its `fix-root-causes` principle, and andy-mode's `qa` diagnosis loop. Two existing rules contradict the post outright. poteto-mode's `bug-fix` playbook seeds hypotheses by reading code with `how`, and `interrogate` treats reviewer agreement as evidence.
 
 Pascal named two goals:
 
@@ -26,7 +26,7 @@ Pascal named two goals:
 
 **Facts constrain hypotheses, and a control turns facts into signals.**
 
-A fact is an observation a tool or a report made, saved with its source. The agent cites facts and never writes or edits them. A hypothesis is anything the agent derives. A hypothesis survives only while no fact contradicts it.
+A fact is an observation a tool or a report made, saved with its source. The agent appends facts from saved artifacts or quoted reports, cites their sources, and never invents or edits facts. A hypothesis is anything the agent derives. A hypothesis survives only while no fact contradicts it.
 
 The same comparison serves both goals. When a bug arrives, `diagnose` compares the failing case with a control to find the reading that differs. In the verify loop, a new build is compared with the last good run to confirm that no reading differs except the intended ones. A passing verify-loop run is a diagnosis that found no signal.
 

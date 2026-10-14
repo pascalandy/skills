@@ -48,10 +48,17 @@ Start this phase only if Phase 1 runs show case-file bookkeeping errors: a misco
 ## Phase 4: wire the lane
 
 1. **poteto-mode.** `feature.md` and `bug-fix.md` start the lane at `maintain-verification-skill`, `bug-fix.md` takes an existing confirmed case without a second intake, and `SKILL.md` points the bug-fix non-negotiable at `diagnose`
-2. **Hand diagnosis to `diagnose`** in the six skills that hold pieces of the method today: `bug-fix`, `runtime-forensics`, `trace-forensics`, `perf-issue`, `fix-root-causes`, and andy-mode `qa`. Apply the rest of the design's "Changes to existing skills" table
+2. **Hand diagnosis to `diagnose`** in the places that hold pieces of the method today: four poteto-mode playbooks (`bug-fix`, `runtime-forensics`, `trace-forensics`, `perf-issue`), its `fix-root-causes` principle, and andy-mode's `qa` playbook. Apply the rest of the design's "Changes to existing skills" table
 3. **Brigade.** In `arancini` and `bisque`, manic-1, manic-2, and manic-5 call `interrogate` with `reviewers = 2` from `config.toml`, and the Cook runs `diagnose` for a bug card. `cook-implement`'s Fix section reruns the touched features through a delegate after each fix, and `chef-closing` requires one whole-loop run on the final head, which the Chef starts as a delegate when no Cook is open. After a bug card merges, `chef-closing` resumes its case at `diagnose` step 9. `chef-triage` sends a finding on a `verify-<app>` file to the owning Cook, and DocWriter keeps ordinary docs
 
-Done when `just check` passes, a poteto-mode bug-fix run on the latency case reaches `diagnose` before opening any source file and reaches lane step 1 carrying the DNS reading, one case and its DNS reading survive into implementation with no second intake, a barrage calls `interrogate` with two reviewers, a brigade round reruns the touched features after a fix and the whole loop before merge, and a still-bad field reading cannot earn `fixed`.
+Phase 4 is done when all checks pass:
+
+- [ ] `just check` passes
+- [ ] A poteto-mode bug-fix run on the latency case reaches `diagnose` before opening any source file, and reaches lane step 1 carrying the DNS reading
+- [ ] One case and its DNS reading survive into implementation with no second intake
+- [ ] A barrage calls `interrogate` with two reviewers
+- [ ] A brigade round reruns the touched features after a fix, and the whole loop before merge
+- [ ] A still-bad field reading cannot earn `fixed`
 
 ## Phase 5: the first real case
 

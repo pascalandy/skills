@@ -279,7 +279,7 @@ https://how.complexsystems.fail/
 - Skill use: report format = "contributing factors with roles and evidence" plus the **intervention boundary** (what we can change) and a decision list for the human, matching the post's "present the options" instruction. Record hindsight risk: store what was known when each decision was made (timestamps in the experiment log).
 
 ### 6.3 Formalising "necessary" and where it breaks [S]/[inf]
-- Mackie's INUS condition: a cause is an Insufficient but Necessary part of an Unnecessary but Sufficient condition. https://www.webpages.uidaho.edu/~morourke/442-phil/Fall%202004/Handouts/Philosophical/INUS-Analysis.htm (course handout) This is the precise name for the post's combined hypotheses.
+- Mackie's INUS condition: a cause is an Insufficient but Necessary part of an Unnecessary but Sufficient condition. https://www.webpages.uidaho.edu/~morourke/442-phil/Fall%202004/Handouts/Philosophical/INUS-Analysis.htm (course handout, unreachable on 2026-10-13) This is the precise name for the post's combined hypotheses.
 - Failure of the "remove each cause" test [inf]: with **overdetermination** (two independent causes, each sufficient, e.g. two leaks) removing one leaves the symptom, so a reviewer applying the test would wrongly call that cause unnecessary. Define necessity per **fact** ("does removing this component leave some fact unexplained?") not per **symptom** ("does the bug go away?"), and after any fix re-measure the strong signal: a residual means another cause exists (Agans: fix one first; the local deadlock skill's "Fourth Instance" rule).
 
 ### 6.4 Independent multi-bug (the third case) [P/S]
