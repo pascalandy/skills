@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-12
+date_updated: 2026-10-13
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
@@ -28,7 +28,7 @@ Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just
 | Pushed more commits | `just signoff` again |
 | Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
 | Did this commit get signed off? | `gh signoff status` |
-| Merge blocked on `signoff` | `just merge` signs off the PR head, then merges it; never merge with `gh pr merge --admin` to skip the gate |
+| Merge blocked on `signoff` | For a PR that targets `main` and is not part of a GitHub stack, `just merge` signs off the PR head, then merges it. For stacked PRs, follow [Land a stack](#land-a-stack). Never merge with `gh pr merge --admin` to skip the gate |
 | Want a run on a clean GitHub runner | `gh workflow run ci.yml --ref <branch>`, then `gh run watch` |
 
 Commit hooks never sign off: git has no hook after a push, and GitHub accepts a status only for a commit it already has
@@ -37,7 +37,7 @@ Commit hooks never sign off: git has no hook after a push, and GitHub accepts a 
 
 Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-merges exactly the commit the checks ran on:
 
-1. It refuses in seconds when the PR is a draft or targets another branch, when the working tree has changes, when HEAD is not the PR head on GitHub, or when the branch lacks the tip of `main`
+1. It refuses in seconds when the PR is a draft, targets another branch, or is part of a GitHub stack, when the working tree has changes, when HEAD is not the PR head on GitHub, or when the branch lacks the tip of `main`
 2. It reuses a green `signoff` on the head, or runs the `just signoff` steps once. A later failure still lists that signoff under `changes`
 3. It waits up to `--timeout` for GitHub to accept the merge, and stops when the PR head, base, or state changes
 4. It checks the tip of `main` again, then runs `gh pr merge --squash --match-head-commit`, so GitHub refuses any other head. GitHub cannot pin the base, so a retarget in that last second is reported right after the merge. The subject is `<PR title> (#N)`
@@ -50,6 +50,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 |---|---|
 | Refused: the branch lacks the tip of `main` | `git merge origin/main`, `git push`, then `just merge` |
 | Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, run `gh stack merge <stack> --yes --squash`, then `just deploy` |
+| Refused: the PR is part of a GitHub stack | GitHub refuses `gh pr merge` for any PR in a stack, even one that targets `main`. Sign off each layer up to the PR, run the `gh stack merge` the message names, then `just merge` again; on the merged PR it only deploys |
 | GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
 | Interrupted | `just merge` again; on a merged PR it only deploys |
 | The merge landed, but `just deploy` did not reach every machine | Fix what its answer names, then `just deploy` |
@@ -58,7 +59,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 
 ## Land a stack
 
-A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch, not with `just merge` on each layer:
+A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch or is part of a GitHub stack, not with `just merge` on each layer:
 
 1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
 2. Sign off on macOS. The fleet also runs Linux, and a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path, so run `gh workflow run ci.yml --ref <top layer>` too. It proves the stack's end state on Linux, not the layers below: run it on a lower layer as well when that layer may land without the ones above it
