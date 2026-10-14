@@ -50,7 +50,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 |---|---|
 | Refused: the branch lacks the tip of `main` | `git merge origin/main`, `git push`, then `just merge` |
 | Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, run `gh stack merge <stack> --yes --squash`, then `just deploy` |
-| Refused: the PR is part of a GitHub stack | GitHub refuses `gh pr merge` for any PR in a stack, even one that targets `main`. Sign off the PR, run the `gh stack merge` the message names, then `just merge` again; on the merged PR it only deploys |
+| Refused: the PR is part of a GitHub stack | GitHub refuses `gh pr merge` for any PR in a stack, even one that targets `main`. Sign off each layer up to the PR, run the `gh stack merge` the message names, then `just merge` again; on the merged PR it only deploys |
 | GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
 | Interrupted | `just merge` again; on a merged PR it only deploys |
 | The merge landed, but `just deploy` did not reach every machine | Fix what its answer names, then `just deploy` |
