@@ -28,7 +28,7 @@ Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just
 | Pushed more commits | `just signoff` again |
 | Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
 | Did this commit get signed off? | `gh signoff status` |
-| Merge blocked on `signoff` | `just merge` signs off the PR head, then merges it; never merge with `gh pr merge --admin` to skip the gate |
+| Merge blocked on `signoff` | For a PR that targets `main` and is not part of a GitHub stack, `just merge` signs off the PR head, then merges it. For stacked PRs, follow [Land a stack](#land-a-stack). Never merge with `gh pr merge --admin` to skip the gate |
 | Want a run on a clean GitHub runner | `gh workflow run ci.yml --ref <branch>`, then `gh run watch` |
 
 Commit hooks never sign off: git has no hook after a push, and GitHub accepts a status only for a commit it already has
