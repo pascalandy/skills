@@ -14,6 +14,7 @@ A mode's routes run through that mode's SKILL.md.
 - `brigade-mode`: Use only when explicitly invoked as `brigade` or `brigade-mode`, followed by `;` and a route name, where `brigade` may be any voice-to-text spelling that sounds like it, such as `brigad` or `brigade mode`.
   - `arancini`: Run rounds in one Chef: one Cook per card, then the barrages in order, then closing.
   - `bisque`: Run batches under one Head Chef: one Chef per batch, a Cook thread per stack, the barrages and the DocWriter as delegates, then a merge the Head Chef green-lights.
+  - `carpaccio`: Run batches under one Head Chef: one Chef per batch, a Cook thread per stack, the barrages and the DocWriter as delegates, then a merge the Head Chef green-lights.
 - `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests.
   - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
