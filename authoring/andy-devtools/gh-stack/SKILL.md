@@ -119,10 +119,9 @@ Done when `gh pr view <number> --json state` prints `MERGED` for every PR of the
 - **The project merges by pushing a head to its trunk:** in a native stack, first run
   `gh stack unstack <stack-number>`. Then retarget every PR to the trunk, bottom to top, with
   `gh pr edit <number> --base <trunk>`, push every layer you rebased, and apply the project's method
-  once to the top layer. A PR turns `MERGED` when its head on GitHub reaches its base. When a PR of
-  the native stack already merged, the unstack fails: apply the method, then, for each PR still
-  open, bottom to top, run `git push <remote> <layer>:refs/heads/<layer below>`, a fast-forward
-  that marks it merged
+  once to the top layer. A PR turns `MERGED` when its head on GitHub reaches its base. When GitHub
+  refuses the unstack, apply the method, then, for each PR still open, bottom to top, run
+  `git push <remote> <layer>:refs/heads/<layer below>`, a fast-forward that marks it merged
 
 ## Recovery
 
