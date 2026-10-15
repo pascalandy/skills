@@ -41,5 +41,5 @@ Fast track: <yes/no>
 
 Begin once every launched Chef has reported its outcome and each queued batch has run, been dropped or been recorded as stopped.
 
-1. If `[head-chef].retro`, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global; each retro files the issues with the most value, up to `retro-max-issues`. Done when each has issue links or a recorded no-findings result
+1. If `[head-chef].retro`, follow [shared Retros](../carpaccio.md#retros). Done when each has issue links or a recorded no-findings result
 2. Confirm each launched Chef is settled using 🧰 t3-runtime. Send Pascal `⛳ <done>/<batches> batches done` with the shared Report. Settle yourself. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`
