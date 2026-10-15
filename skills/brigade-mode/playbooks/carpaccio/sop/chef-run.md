@@ -18,6 +18,8 @@ Plan: <assigned cards, requirements and batch threat model>
 Ownership: <your files; other Cooks' groups requiring Chef approval>
 Release: <yes/no; required release content and which Cook owns it>
 Fast track: <yes/no>
+Rules: <expand Shared rules in carpaccio.md>
+Work folder: <expand Work folders in carpaccio.md>
 ```
 
 ## Stop
