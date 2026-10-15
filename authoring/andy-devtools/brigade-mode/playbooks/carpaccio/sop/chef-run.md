@@ -1,14 +1,25 @@
 # chef-run
 
-You run one batch for the Head Chef and never edit code. Report only to the Head Chef, with `t3_thread_send`.
+Report to the Head Chef with `t3_thread_send`. Keep each Cook's threadId, worktree, branches and file ownership in your conversation.
 
-1. **Name yourself.** Rename yourself `🧑‍🍳 Chef <b> <id4> · 1/7 · <batch>` with `t3_thread_update` action `rename`, with the batch number, the Head Chef's `<id4>`, and the batch name from your launch message. Done when your title matches
-2. **Run the process.** Run steps 1 to 7 of the process table in `carpaccio.md`, in fast track when your launch message says so:
-	- Launch the Cook and delegate the barrages and the DocWriter with `chef-launch`
-	- Read each barrage result and each watch wake with `chef-triage`
-	- Watch each PR of the batch with `watch_pull_request` as soon as its owner reports it, unless oem's no-checks rule applies
-	- Run `chef-closing` from step 6
-	- At each step, rename yourself with its number and post "📍 [what is going on] / <step>/7"
+## Run
 
-	Done when `chef-closing` ends
-3. **Stop on request.** When the Head Chef sends "🛑 Stop", drop a 🟢 you have not acted on, or finish a merge already running and report it. Call `unwatch_pull_request` on each PR you watch, call `task_cancel` on each delegate still running, and ask the Cook to stop, section Stop. Once the Cook reports its stop, confirm it with 🧰 t3-runtime, send the Head Chef "🛑 Batch <b> stopped" with the work kept and where it is, and settle yourself. Done when the Cook is settled, the Head Chef has your outcome, and you are settled
+1. Rename yourself with the Chef title in Roles. At each process step, update `<step>/6` and post `📍 [progress] / <step>/6` in your own thread. Done when the title and progress name the current step
+2. Group independent cards by disjoint files when `Parallel Cooks: yes`, up to `max-cooks`. Otherwise launch one Cook; if no independent groups exist, say why. Give shared generated files to one group, or serialize their writers. Done when every card and file group has one Cook
+3. Fetch `origin`, then create each worktree from `origin/HEAD`, under `~/projects/.worktrees/<repo>-<branch>/`, with branch `<batch>-<c>`. Use `git -C <clone> worktree add <path> -b <branch> origin/HEAD`. Done when each worktree's status shows its assigned branch
+4. Select `[cook]` with shared Model selection. Launch each Cook with `t3_thread_launch` in your project, `workspaceStrategy: {type: "existing_worktree", worktreePath: <absolute path>, branch: <branch>}`, its title from Roles, and the message below. Done when each returned threadId is recorded and `t3_thread_read` shows it started
+5. Follow progress messages; arbitrate requests to cross file ownership before granting them. Forward a request you cannot resolve through the chain. On `🚦 Stack ready`, run `chef-closing`. Done when each Cook has an outcome and Closing ends
+
+```text
+$brigade-mode ; carpaccio ; cook-implement
+Role: Cook <b>.<c> <id4>. Report only to Chef <b>, threadId <full threadId>, with t3_thread_send.
+Worktree: <absolute path>, branch <branch>, base <trunk>
+Plan: <assigned cards, requirements and batch threat model>
+Ownership: <your files; other Cooks' groups requiring Chef approval>
+Release: <yes/no; required release content and which Cook owns it>
+Fast track: <yes/no>
+```
+
+## Stop
+
+Relay 🛑 Stop to every active Cook and discard unused merge approval. Finish a merge already running and report its result before completing the stop. Confirm each Cook's stop and settlement with 🧰 t3-runtime, then send the Head Chef `🛑 Batch <b> stopped` with the shared Report and retained work. Settle yourself. Done when each Cook is settled, the Head Chef has the outcome and you are settled.

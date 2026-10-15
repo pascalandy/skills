@@ -1,27 +1,33 @@
 # cook-implement
 
-Run the section the Chef requests.
+Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, Stop or Retros when their trigger arrives.
 
 ## Implement
 
-- Use 🧰 poteto-mode to implement every card of your batch, commit as you go, and open the PRs. Link each PR to your thread with `link_pull_request` as you open it
-- Order the work by bang for the buck. Wiring in finished code that isn't connected yet is the typical quick win
-- Note each out-of-scope gap you find for the Chef. File one as an issue with 🧰 label-for-issues only when it deserves its own fix and no existing issue covers it
-- Send a question you cannot settle to the Chef, with the default you would apply, and keep working on what it does not block
-- On Claude Code, delegate side work with `delegate_task` to the `delegate-on-claude` target of `[cook]` in `config.toml`, never to a native subagent, which runs on your own Claude quota
-- Done when every card is implemented and checks are green, or each remaining card is reported to the Chef as blocked, with the reason
+1. Read the worktree's repository instructions. Use 🧰 poteto-mode to implement every assigned card, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
+2. Link each PR with `link_pull_request` as you open it and own its `watch_pull_request`, unless oem's no-checks rule applies. Route CI failures and external reviews through `cook-review`. File worthwhile out-of-scope gaps with 🧰 label-for-issues after checking duplicates; record the rest. Done when every PR is linked and watched or has its no-checks decision recorded
+3. Run 🧰 2nd-pass, push and proceed to the first review pair, or Ready in fast track. Done when the checkout is clean and pushed
 
 ## Fix
 
-- Fix each finding the Chef relays and commit each fix to the layer it belongs to. Run 🧰 2nd-pass on the fixes, then restack and push
-- Done when each finding is pushed to its layer, or reported to the Chef with the reason it could not be
+1. Fix accepted findings in their owning layers. Run 🧰 2nd-pass, restack with 🧰 gh-stack and push. Done when each accepted finding is fixed or reported blocked to the Chef
+2. Return to `cook-review` for a barrage or watch finding. If the Chef reopened a rejection, requested a restack on `main` or returned a failed merge, rerun the checks and reviews the change invalidates, then Ready. Done when readiness covers the new stack
+
+## Docs
+
+1. Run 🧰 andy-mode ; docs on the final diff. If docs change, commit them and open a PR at the top of the stack; otherwise record the no-docs decision for manic-3. Done when every affected doc matches the behavior or the report explains the no-docs decision
+2. For `Release: yes`, add the release content required by the repository, such as `CHANGELOG.md`, as the final layer. With parallel Cooks, the Chef names the last Cook to own that layer. Proceed to manic-3 plus manic-5. Done when docs and required release content are in the review scope
+
+## Ready
+
+1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🚦 Stack ready` to the Chef with the shared Report. Done when the Chef has the readiness report
+2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged` or returns it to you. Forward watch wakes to the Chef during this freeze. A returned worktree goes through Fix and a fresh 🚦 before merging. Done when the Chef has acknowledged the handoff or returned ownership
 
 ## Stop
 
-- Stop at a clean, pushed checkout. Report your branches and their heads to the Chef, then settle yourself as 🧰 t3-runtime says
-- Done when the Chef has your branches and heads, and you are settled
+1. Cancel running delegates with `task_cancel` and wait for cancellation to complete; unwatch every PR with `unwatch_pull_request`. Remove each cancelled barrage's detached worktree and work folder once it has stopped. Done when no delegate can still access them and no watch remains
+2. Stop on a clean, pushed checkout; report your branches and heads to the Chef, then settle with 🧰 t3-runtime. Done when the Chef has the preserved work and you are settled
 
 ## Retros
 
-- Run the retros the Chef requests, report your issue links to the Chef, then settle yourself as 🧰 t3-runtime says
-- Done when the Chef has your issue links, or knows that no finding passed, and you are settled
+Run the retros the Chef requests, report issue links or the no-findings result, remove any remaining watches and settle with 🧰 t3-runtime. Done when the Chef has the results and you are settled.

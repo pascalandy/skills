@@ -1,62 +1,45 @@
-pr-assignee = "pascalandy"
-retro-max-issues = 2 # chef-closing, head-chef: issues each thread files per retro
+service-tier = "standard" # Launching role: default for thread and delegate selections
+runtime-mode = "inherit" # All threads: retain inherited modes throughout the run
+pr-assignee = "pascalandy" # Cook: assign every PR
+retro-max-issues = 2 # Head Chef and Chef: issue limit per thread per retro
 
 [head-chef]
-merge-confidence = 92 # head-chef: give the green light without asking at or above this %
-max-parallel = 2      # head-chef: Chefs at work at once, only when the user asks for parallel batches
-retro = true
+max-parallel = 2 # Head Chef: simultaneous Chefs when Pascal requests parallel batches
+retro = true # Head Chef: run its closing retros
 
-[chef] # Steps 1 to 7, one Chef per batch, launched by the Head Chef
-chef-on-claude = { inherit = true }
-chef-on-codex = { inherit = true }
-service-tier = "standard"
-runtime-mode = "inherit"
-retro = true
+[chef]
+chef-on-claude = { inherit = true } # Head Chef: Chef selection
+chef-on-codex = { inherit = true } # Head Chef: Chef selection
+max-cooks = 2 # Chef: simultaneous Cooks when Parallel Cooks is yes
+merge-confidence = 92 # Chef: minimum confidence for an unmarked batch to merge without a hold
+retro = true # Chef: run its closing retros
 
-[cook] # Step 1: Implement
-chef-on-claude = { inherit = true }
-chef-on-codex = { inherit = true }
-delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" } # cook-implement: a Cook on Claude Code delegates to this target
-service-tier = "standard"
-runtime-mode = "inherit"
-skip-in-fast-track = false
-retro = true
+[cook]
+chef-on-claude = { inherit = true } # Chef: Cook selection
+chef-on-codex = { inherit = true } # Chef: Cook selection
+delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" } # Cook on Claude: side work target
+retro = true # Chef: request Cook retros
 
-[manic-1] # Step 2: Adversarial review, beside manic-2
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
-service-tier = "standard"
-runtime-mode = "inherit"
-max-passes = 3
-skip-in-fast-track = true
+[manic-1] # Cook: step 2, beside manic-2
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 3 # Cook: normal pass limit
+skip-in-fast-track = true # Cook: omit this barrage in fast track
 
-[manic-2] # Step 2: Blast-radius review, beside manic-1
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
-service-tier = "standard"
-runtime-mode = "inherit"
-max-passes = 2
-skip-in-fast-track = true
+[manic-2] # Cook: step 2, beside manic-1
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 2 # Cook: normal pass limit
+skip-in-fast-track = true # Cook: omit this barrage in fast track
 
-[docwriter] # Step 3: Docs updates
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { inherit = true }
-service-tier = "standard"
-runtime-mode = "inherit"
-skip-in-fast-track = true
+[manic-3] # Cook: step 4, beside manic-5
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" }
+max-passes = 2 # Cook: normal pass limit
+skip-in-fast-track = true # Cook: omit this barrage in fast track
 
-[manic-3] # Step 4: Docs review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" }
-service-tier = "standard"
-runtime-mode = "inherit"
-max-passes = 2
-skip-in-fast-track = true
-
-[manic-5] # Step 5: Pristine review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
-service-tier = "standard"
-runtime-mode = "inherit"
-max-passes = 2
-skip-in-fast-track = true
+[manic-5] # Cook: step 4, beside manic-3
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 2 # Cook: normal pass limit
+skip-in-fast-track = true # Cook: omit this barrage in fast track
