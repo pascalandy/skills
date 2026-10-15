@@ -34,6 +34,7 @@ sequenceDiagram
     Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges
     Note over C,K: Step 1: Implement
     K->>K: Implement, link PR 35,<br>watch, 2nd-pass and push
+    Note over K: Watch findings: queue while passes run,<br>otherwise triage at once
     opt Cross-file ownership
         K-->>C: Agent: Request file access <-
         C->>K: Agent: Ownership decision ->
