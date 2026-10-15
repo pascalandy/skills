@@ -7,7 +7,7 @@
 
 ```text
 $brigade-mode ; carpaccio ; <sop>
-Role: Barrage <sop>, pass <k>, Cook <b>.<c> <id4>. Your final message is your report.
+Role: Barrage <sop>, delegation <k>, Cook <b>.<c> <id4>. Your final message is your report.
 Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
