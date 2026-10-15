@@ -1,6 +1,5 @@
 # Epic template
 
-Use for CU1 proposals and packaging, and CU3 container refinements.
 Every Story entry stands alone. Keep the same order as native sub-issue Rank.
 Cross-repo references use `OWNER/REPO#N`.
 
@@ -43,7 +42,7 @@ Every Story has a documented disposition and the outcome holds on the default br
 - <Neighboring work and its numbered Epic or issue reference>
 
 <Technical evidence, file conflicts, native blocked-by rationale, uncertainty,
-approaches considered and related PRs. Keep execution batches with Brigade>
+approaches considered and related PRs>
 
 </details>
 

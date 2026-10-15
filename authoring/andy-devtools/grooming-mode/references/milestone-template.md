@@ -1,7 +1,5 @@
 # Milestone template
 
-Use for CU2 proposals and packaging, and CU3 Milestone refinements.
-
 Title: `M<N> · <outcome in plain words>`
 
 ```md

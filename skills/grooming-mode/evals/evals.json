@@ -25,7 +25,7 @@
       "Never proposes a Story body rewrite in CU1",
       "Places #14 with a receipt Epic rather than silently discarding it or inventing acceptance criteria",
       "Keeps or assigns 1-needs-triage to #14 and names its missing goal and acceptance criteria",
-      "Reports the affected Epic's gap to grooming Done when and does not declare grooming complete",
+      "Reports the affected Epic's gap to the Definition of Ready and does not declare grooming complete",
       "Ends with a copyable grooming-mode ; refine prompt for a new conversation using the actual Epic reference, reserving Story body edits for CU3"
     ]
   }

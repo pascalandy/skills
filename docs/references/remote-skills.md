@@ -134,7 +134,7 @@ A mode's routes run through that mode's SKILL.md.
 - `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Organize GitHub Stories into Epics and Milestones or refine their readiness.
   - `epic`: CU1: verify and prioritize backlog issues, place Stories in Epics, and propose Rank, blocked-by links and labels.
   - `milestone`: CU2: group home-repo Epics without a Milestone into one Milestone with Epic Rank and justified blocked-by links.
-  - `refine`: CU3: reverify every Story in an Epic or Milestone, propose and apply approved refinements until grooming Done when holds.
+  - `refine`: CU3: reverify every Story in an Epic or Milestone, propose and apply approved refinements until the Definition of Ready holds.
 - `matt-mode`: Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets.
   - `codebase-design`: Shared vocabulary for designing deep modules.
   - `domain-modeling`: Build and sharpen a project's domain model.

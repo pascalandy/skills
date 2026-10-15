@@ -115,16 +115,16 @@ user asks for one, including a read-only preview, read
   Membership ends on detachment, not when the parent closes.
   A merged PR alone proves neither issue nor epic completion
 - **Dependencies.** Set native blocked-by links only for real prerequisites,
-  including work that must wait to avoid conflicts in the same files. Report a
-  failed native operation. Membership and Rank do not imply a dependency
+  including work that must wait to avoid conflicts in the same source files,
+  generated output excluded. Report a failed native operation.
+  Membership and Rank do not imply a dependency
 - **Impediments.** Use `0-impediment` for a concrete obstacle preventing progress;
   explain it in the issue and remove the label when resolved. Preserve the state.
   Planned dependencies, missing details, and deliberate deferral do not automatically
   warrant this label. Label an epic only when its own progress is impeded
 - **Priority.** Preserve established priorities; default new issues to p2.
   Change priority from user direction or concrete urgency. Security work is not
-  automatically p0. An approved grooming sets each Story's priority from its
-  P1/P2/P3 tier; an Epic takes its highest-priority Story's priority.
+  automatically p0. During approved grooming, use grooming-mode's priority rule.
   Outside grooming, assess each issue's priority independently
 
 ## Labels
