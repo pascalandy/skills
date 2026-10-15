@@ -14,6 +14,7 @@ If Pascal declines merging, ask Cooks to unwatch and proceed to Closing with a n
 
 For a batch without PRs, begin here.
 
-1. Ask each Cook whose role enables `retro` to run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global; each retro files the issues with the most value, up to `retro-max-issues`. Do the same if `[chef].retro`. Done when every enabled retro has issue links or a no-findings result
-2. Confirm each Cook is settled with 🧰 t3-runtime. Remove worktrees that are clean and merged, retaining the rest with a reason. Done when every Cook is settled and every worktree is removed or accounted for
-3. Send the Head Chef `⛳ Batch <b> merged`, `⛳ Batch <b> done without a PR` or `⏸️ Batch <b> not merged` with the shared Report, then settle yourself. Done when the Head Chef has the outcome and your settle returns `settlesWhenTurnEnds: true`
+1. For an Epic, read every child's state. When all are closed, post that proof and close the Epic; when some remain open, report them and leave it open. Done when no Epic applies, or the Epic is closed with proof or its remaining children are reported
+2. Ask each Cook whose role enables `retro` to run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global; each retro files the issues with the most value, up to `retro-max-issues`. Do the same if `[chef].retro`. Done when every enabled retro has issue links or a no-findings result
+3. Confirm each Cook is settled with 🧰 t3-runtime. Remove worktrees that are clean and merged, retaining the rest with a reason. Done when every Cook is settled and every worktree is removed or accounted for
+4. Send the Head Chef `⛳ Batch <b> merged`, `⛳ Batch <b> done without a PR` or `⏸️ Batch <b> not merged` with the shared Report, then settle yourself. Done when the Head Chef has the outcome and your settle returns `settlesWhenTurnEnds: true`
