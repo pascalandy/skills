@@ -1,65 +1,45 @@
 # head-chef
 
-You run the use case for the user and never edit code. Run the section the moment calls for. Keep the run's registry in your conversation: for each batch, its number, name, repository, T3 projectId, Chef threadId, the batches it depends on, and its outcome.
+Keep a registry in your conversation: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices and outcome.
 
-## Start
+## Align
 
-1. **Align.** Agree on the plan with the user, then split it into batches along the plan's own grouping: a milestone, an epic, a sprint, or a label. A batch targets one repository, so work that spans repositories becomes one batch per repository, in dependency order. Give each batch its short name from the plan. Ask the user which batches they want to validate before their merge. Done when the user agreed on the batches, their order, and the batches they validate
-2. **Name and pin yourself.** Rename yourself `Head Chef <id4> · 0/<batches> · <subject>` with `t3_thread_update` action `rename`, then pin yourself with `t3_thread_organize` action `pin`. The first number counts the batches done: merged, or done without a PR. Done when your title matches and you are pinned
+1. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch ask Pascal: validate before merge, parallel Cooks, release at the end? Record those answers; set `Fast track` from the invocation or Pascal's request, otherwise no. Done when the batches and their choices are recorded
+2. Rename yourself `Head Chef <id4> · 0/<batches> · <subject>` and pin yourself. Done when the title matches and the pin is set
 
-## Launch a batch
+## Launch
 
-Run the batches in series: launch a batch once the batch before it sent its outcome, and once each batch it depends on is merged. Run batches side by side only when the user asks, with at most `max-parallel` Chefs at work at once. A batch whose dependency ended without merging waits for the user.
+Run batches in series unless Pascal requests parallel batches, then respect `max-parallel`. Never run two batches of the same repository at once. Wait for dependencies to merge; escalate a dependency that ends unmerged.
 
-1. **Pick the model** for the Chef as `chef-launch` step 2 says, with the `[chef]` row. Done when the selection is supported
-2. **Find the project.** With `t3_project_list`, find the T3 project whose `workspaceRoot` is the batch's repository. When none exists, create it with `t3_project_create`, and when T3 refuses, ask the user to add the repository to T3. Done when its projectId is in the registry
-3. **Launch.** Call `t3_thread_launch` in that project with `workspaceStrategy` `root`, the `modelSelection` from step 1, the Chef's title from Roles in `carpaccio.md`, and the message below. Leave out a line that has nothing to carry. Done when `t3_thread_read` shows the thread started and its threadId is in the registry
+1. Select the Chef using Model selection in `carpaccio.md`. Find the repository's project with `t3_project_list`, or create it with `t3_project_create`. If unavailable, ask Pascal to add it. Done when the registry has a projectId and supported selection
+2. Launch with `t3_thread_launch`, the registry's explicit `projectId`, `workspaceStrategy: {type: "root"}`, the Chef title from Roles and the message below. Retain its threadId; inspect launch state before retrying a failed call. Done when `t3_thread_read` shows it started in that project and the registry holds its threadId
 
 ```text
 $brigade-mode ; carpaccio ; chef-run
-Read playbooks/carpaccio/sop/chef-run.md in the brigade-mode skill and follow it.
-Role: 🧑‍🍳 Chef <b> <id4>. Report only to the Head Chef, threadId <your full threadId>, with t3_thread_send.
-Batch: <b>, <batch name>, repository <absolute path of its clone>
-Plan: <this batch's cards, and what the user agreed for them>
-PRs: <URLs of the PRs you opened for this batch during alignment>
-Fast track: yes
+Role: Chef <b> <id4>. Report only to Head Chef, threadId <full threadId>, with t3_thread_send.
+Batch: <b>, <name>, repository <absolute clone path>
+Plan: <cards, requirements, threat model and dependencies>
+Validate: <yes/no>
+Parallel Cooks: <yes/no>
+Release: <yes/no>
+Fast track: <yes/no>
 ```
 
-## Answer the chain
+## Coordinate
 
-When a Chef sends a question, answer it when the plan or your conversation with the user settles it. Otherwise ask the user, naming the batch, then relay the answer. Done when the Chef has its answer
+1. Answer a Chef from the agreed requirements, or ask Pascal and relay the answer. When the Chef cannot resolve a problem, resume coordination: decide, split the batch again or relaunch its Chef after the earlier Chef has stopped. Done when each escalation has an owner and a next action
+2. On `🚦 Batch <b> ready`, show Pascal the shared Report and wait for his decision; relay 🟢 Merge or the hold. On `🔀 Batch <b> merging`, record the notice without a hold. Done when each readiness message has its decision or recorded notice
+3. Record merged, done-without-PR and closing outcomes; rename yourself with the updated done count. Start newly eligible batches. On a merge failure, record landed PRs while the Chef has its Cook fix the cause. Done when the registry matches reported outcomes
 
-## Give the green light
+## Status, added work and Stop
 
-The run has one merge slot. A batch is cleared when its confidence reaches `merge-confidence` and the user did not ask to validate it, or when the user reviewed it and said merge.
-
-1. **Clear.** When a Chef sends 🚦 for a batch that is not cleared, send the user the Chef's report and questions, and align until the user says merge or don't merge. Relay "don't merge" to the Chef. Done when the batch is cleared, or its Chef has "don't merge"
-2. **Grant.** Reply 🟢 to a cleared batch only while the slot is free, and record the batch as the slot's owner first. Each time the slot frees or a batch becomes cleared, check the waiting batches in the order they sent 🚦. Done when each cleared batch holds the slot or waits for it in order
-
-## Follow each batch
-
-- **The slot owner reports "merged":** free the slot, rename yourself with the new count of batches done, and launch each batch this unblocks
-- **The slot owner reports "merge failed":** free the slot, record the PRs that landed, and ask the user whether the batch retries or closes as not merged. Relay the decision to its Chef
-- **A Chef sends its outcome:** record it. "Done without a PR" counts as done, so rename yourself. Any outcome lets the next batch in series start, and each batch that depends on an unmerged one waits for the user
-
-Done when the registry holds each reported result.
-
-## Report status
-
-When the user asks for status, list the threads of each batch's project with `t3_thread_list` and `titleContains` set to `<id4>`, and read each batch's PRs. Reply with one line per batch: its Chef, the step in the Chef's title, its PRs, and what it waits for. Done when every batch has its line
-
-## Add work
-
-When the user adds work during the run, align on it as in Start step 1, queue its batches after the others, and rename yourself with the new batch count. Done when the new batches are queued
-
-## Stop the run
-
-When the user stops the run, launch no batch and grant no slot. Send "🛑 Stop" to each Chef still at work, then wait for each one's outcome, which follows any merge already running. Done when every Chef at work has reported, then run Close
+- For status, list threads in each project with `titleContains: <id4>` and read the PRs. Give one line per batch with Chef, step, PRs and what it awaits. Done when every batch is covered
+- For new work, repeat Align, queue batches and update the title. Done when the registry includes the agreed additions
+- On Pascal's Stop, launch no further batch and send 🛑 Stop to every active Chef. Wait for their outcomes, including any merge already running, then Close. Done when every launched Chef has reported
 
 ## Close
 
-Run this section once every launched batch has its outcome from its Chef, and every queued batch is launched or dropped by the user.
+Begin once every launched Chef has reported its outcome and each queued batch has run, been dropped or been recorded as stopped.
 
-1. **Report.** Send the user each batch with its outcome, its PR links, and the issues filed, the out-of-scope gaps not filed, every change made outside the agreed plan and why, each step skipped or replaced and why, and what no thread could confirm. Done when the report covers every batch
-2. **Retros.** If `[head-chef]` enables `retro`, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global, each limited to `retro-max-issues`. Done when each retro has issue links or a recorded no-findings result
-3. **Settle.** Confirm each Chef in the registry with 🧰 t3-runtime, send "⛳ <done>/<batches> batches done. [summary]", then settle yourself, which unpins you. Done when the user has the outcome and you are settled
+1. If `[head-chef].retro`, follow [shared Retros](../carpaccio.md#retros). Done when each has issue links or a recorded no-findings result
+2. Confirm each launched Chef is settled using 🧰 t3-runtime. Send Pascal `⛳ <done>/<batches> batches done` with the shared Report. Settle yourself. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`

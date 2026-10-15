@@ -1,19 +1,19 @@
 # chef-closing
 
-1. **Report.** Send the Head Chef:
-	- PR links, and links to the issues filed
-	- The out-of-scope gaps not filed
-	- Every change made outside what was agreed, and why
-	- The review passes run, the findings rejected and why, and why the reviews ended
-	- Each step skipped or replaced, and why
-	- What you couldn't confirm, and where you looked
-	- Confidence to merge: XX%, and why it is below 100% when it is
+## Validate and merge
 
-	Done when the report includes every item above
-2. **Green light.** If the batch opened no PR, record that no merge is needed and go to step 4. Otherwise send the Head Chef "🚦 Batch <b> ready" with the PR links and your confidence to merge, then wait for its answer. A hold keeps this step open. Done when the Head Chef replied 🟢, or said not to merge
-3. **Merge.** After 🟢, merge from the Cook's worktree. For a single PR, use the project's merge command. For a stack, follow the Land section of 🧰 gh-stack, then run the project's deploy. In skills, use `just merge` on the top branch for that deploy. Read the output because a merge command can exit 0 after a failed deploy. The merge ends your watch. Send the Head Chef "Batch <b> merged" with the deploy result, or "Batch <b> merge failed" with the PRs that landed and why the others did not. After "don't merge", call `unwatch_pull_request` on each PR instead. After a failed merge, wait for the Head Chef's decision: on retry, have the Cook fix the cause, then return to step 2; on close, unwatch each PR left open. Done when:
-	- each PR is merged, and its deploy succeeded or you reported the failure
-	- the Head Chef said not to merge, or closed a failed merge, and no watch remains
-4. **Retros.** Ask each thread of this batch whose role enables `retro` in `config.toml` to run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. Include `retro-max-issues` as its issue limit per retro. Follow the same routes and limit yourself if `[chef]` enables `retro`. Choose the fixes with the most value. Done when every enabled retro has issue links or a recorded no-findings result
-5. **Clean up.** Confirm each Cook of this batch with 🧰 t3-runtime. Remove each worktree of this batch that is clean and whose branch is merged. Name any you kept and why. Done when each Cook is settled and each worktree is removed or named with its reason
-6. **End the batch.** Send the Head Chef the batch's outcome: "⛳ Batch <b> merged", "⛳ Batch <b> done without a PR", or "⏸️ Batch <b> not merged", each with a high-level summary and what is left. Then settle yourself. Done when the Head Chef has the outcome and your settle call returned `settlesWhenTurnEnds: true`
+1. On `🚦 Stack ready`, read the Cook's shared Report, including rejected findings; reopen any rejection with your reason and return its worktree through Fix. Check conflicts between Cooks. Done when the report and cross-Cook conflicts support your merge confidence
+2. If `Validate: no` and confidence reaches `[chef].merge-confidence`, send `🔀 Batch <b> merging` with the shared Report to the Head Chef and proceed. Otherwise send `🚦 Batch <b> ready` with the report, then wait for Pascal's decision relayed by the Head Chef. A hold keeps this step open. Done when the notice is sent or 🟢 Merge is received
+3. Merge one stack at a time from the frozen Cook worktree, after checking its checkout is clean and pushed and GitHub holds the validated heads. A changed head invalidates validation; return to step 1. Use the project's merge procedure: for a single PR its merge command; for a stack 🧰 gh-stack Land, then the project's deploy. In skills, use `just merge` on the merged top branch for that deploy. Read the whole output, since an exit 0 may hide a failed deploy. Done when GitHub confirms the validated stack merged and the deploy result is recorded
+4. On failure, record landed PRs, send the Cook the cause and return its worktree for Fix. Report the partial outcome to the Head Chef. Resume at step 1 after a fresh 🚦. Done when each stack merged in order or the Head Chef has an unresolved blocker
+5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch <b> merged` with deploy results. For `Release: yes`, follow the remaining repository release procedure from `main`; report a failure before closing. Done when all merge and release outcomes are recorded
+
+If Pascal declines merging, ask Cooks to unwatch and proceed to Closing with a not-merged outcome. A frozen watch wake that brings a finding, such as a failed check, a review or comment, or a conflict, invalidates readiness until you have returned the worktree, the Cook has triaged it and sent a fresh 🚦. A wake reporting only passing checks preserves readiness.
+
+## Closing
+
+For a batch without PRs, begin here.
+
+1. Ask each Cook whose role enables `retro` to run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global; each retro files the issues with the most value, up to `retro-max-issues`. Do the same if `[chef].retro`. Done when every enabled retro has issue links or a no-findings result
+2. Confirm each Cook is settled with 🧰 t3-runtime. Remove worktrees that are clean and merged, retaining the rest with a reason. Done when every Cook is settled and every worktree is removed or accounted for
+3. Send the Head Chef `⛳ Batch <b> merged`, `⛳ Batch <b> done without a PR` or `⏸️ Batch <b> not merged` with the shared Report, then settle yourself. Done when the Head Chef has the outcome and your settle returns `settlesWhenTurnEnds: true`
