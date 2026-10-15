@@ -28,7 +28,7 @@ sequenceDiagram
         end
     end
     H->>H: Pin, register batches<br>and select Chef model
-    H->>C: Agent: Launch with Align choices ->
+    H->>C: Agent: Launch with registry projectId<br>and Align choices ->
     C->>C: Group disjoint files,<br>create worktrees
     C->>K: Agent: Launch with ownership ->
     Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges

@@ -12,7 +12,7 @@ Keep a registry in your conversation: batch number, name, repository, projectId,
 Run batches in series unless Pascal requests parallel batches, then respect `max-parallel`. Never run two batches of the same repository at once. Wait for dependencies to merge; escalate a dependency that ends unmerged.
 
 1. Select the Chef using Model selection in `carpaccio.md`. Find the repository's project with `t3_project_list`, or create it with `t3_project_create`. If unavailable, ask Pascal to add it. Done when the registry has a projectId and supported selection
-2. Launch with `t3_thread_launch`, `workspaceStrategy: {type: "root"}`, the Chef title from Roles and the message below. Retain its threadId; inspect launch state before retrying a failed call. Done when `t3_thread_read` shows it started and the registry holds its threadId
+2. Launch with `t3_thread_launch`, the registry's explicit `projectId`, `workspaceStrategy: {type: "root"}`, the Chef title from Roles and the message below. Retain its threadId; inspect launch state before retrying a failed call. Done when `t3_thread_read` shows it started in that project and the registry holds its threadId
 
 ```text
 $brigade-mode ; carpaccio ; chef-run
