@@ -10,7 +10,7 @@ Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, St
 
 ## Fix
 
-1. Fix accepted findings in their owning layers. Run 🧰 2nd-pass, restack with 🧰 gh-stack and push. Done when each accepted finding is fixed or reported blocked to the Chef
+1. Apply accepted findings using shared layer ownership. For a finding on a PR description, edit that PR without a commit. Run 🧰 2nd-pass on the fixes, then restack and push changed layers with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to the Chef
 2. Rerun affected checks; if Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection, requested a restack on `main` or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
 
 ## Docs
