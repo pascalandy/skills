@@ -6,27 +6,27 @@ kind: "dev"
 
 # Grooming mode
 
-Organize the backlog into Story → Epic → Milestone. The dependency graph is
-(Rank, Blocked by). Brigade executes the plan and forms its own batches.
+Organize the backlog into Story → Epic → Milestone with (Rank, Blocked by).
 Write in the conversation's language; keep the glossary terms in English.
 
 ## Pick one route
 
 Compare names with case, spaces, hyphens, and underscores ignored. Recognize
 voice-to-text spellings that sound like grooming-mode, including "grooming mode".
-Bare `grooming-mode` selects `epic`. An explicit name selects only that route.
+Bare `grooming-mode` selects `epic`. An explicit name selects only that route,
+with or without `;`, such as `grooming mode refine`.
 An unknown name, including `sprint`, shows this table and runs nothing.
 Routes never chain automatically.
 
 | Route | Use when |
 |---|---|
-| [epic](playbooks/epic.md) | CU1, default: place backlog issues into Epics with Story Rank and blocked-by links |
-| [milestone](playbooks/milestone.md) | CU2: group Epics without a Milestone and set their Rank and blocked-by links |
-| [refine](playbooks/refine.md) | CU3: reverify an Epic or Milestone and refine it until grooming Done when holds |
+| [epic](playbooks/epic.md) | Default: place backlog issues into Epics with Story Rank and blocked-by links |
+| [milestone](playbooks/milestone.md) | Group Epics without a Milestone and set their Rank and blocked-by links |
+| [refine](playbooks/refine.md) | Reverify an Epic or Milestone and refine it until the Definition of Ready holds |
 
-Read the selected playbook after this file. Before proposing Epic bodies in CU1
-or CU3, read the [Epic template](references/epic-template.md). Before proposing
-a Milestone description in CU2 or CU3, read the
+Read the selected playbook after this file. Before proposing Epic bodies in `epic`
+or `refine`, read the [Epic template](references/epic-template.md). Before proposing
+a Milestone description in `milestone` or `refine`, read the
 [Milestone template](references/milestone-template.md).
 Use [routing cases](references/routing-cases.md) when changing routing.
 
@@ -41,8 +41,8 @@ Use [routing cases](references/routing-cases.md) when changing routing.
 | Epic | Stories aiming at one outcome, possibly across repositories | `4-epic` issue in the home repo | |
 | Milestone | A group of Epics | Milestone in the home repo | In project management, a milestone is a date |
 | Rank | Work order: a Story within its Epic, an Epic within its Milestone | native sub-issue order; Milestone description's numbered list is the sole persistent Epic Rank | Priority is a separate tier |
-| Blocked by | B must wait for A, for a logical prerequisite or a conflict in the same files | native Blocked by / Blocking dependency | Membership imposes no order |
-| Parallel | Two elements with no blocked-by link between them | absence of a dependency | |
+| Blocked by | B must wait for A under label-for-issues' Dependencies rule | native Blocked by / Blocking dependency | Membership imposes no order |
+| Parallel | No blocked-by path connects two elements in either direction | absence of a dependency path | A → B → C makes A and C dependent |
 | Home repo | The repository the Product Manager names | home of Epics and Milestones | A Milestone exists only in its own repo |
 | Grooming | Organizing the backlog | | Scrum calls it backlog refinement |
 | Brigade | Executor; its Head Chef forms batches, one dish per batch with one or more PRs, and serves by Rank | | Grooming creates no batch |
@@ -54,7 +54,8 @@ Sprint means a fixed period; Wave duplicates Blocked by. Use neither as a level.
 Requires `gh` ([install](https://cli.github.com/)); confirm `gh --version`
 and `gh auth status` before GitHub reads. Load `label-for-issues` and its
 GitHub CLI reference before scoping. It owns labels, Ready, native operations,
-filters and pagination.
+filters and pagination. Run its Step 4 read-only before scope filters. If a label
+migration is pending, propose it and stop until it is resolved.
 
 Record the home repo and each scoped repo. Ask for the home repo if absent,
 before proposing a container there. An issue stays in its repository; Epics and
@@ -66,38 +67,26 @@ Read every scoped issue's body, comments, labels, native parent, relationships,
 state and closing reason. Count every relationship against its `totalCount`
 and paginate incomplete lists with label-for-issues.
 Read closed issues the scoped set references for completion evidence and
-closing-reason corrections, including closed Stories of CU1's open Epics.
+closing-reason corrections, including closed Stories of `epic`'s open Epics.
 
-When CU1 regroups existing open Epics, obtain the Product Manager's choice:
+For `epic` verification and `refine` reverification, read each Story's default
+branch after `git fetch origin`: resolve `origin/HEAD`, then read files and commits
+at that ref with `git show` and `git log`. Without a local checkout, resolve the
+default branch and read its current files and commits with `gh api`.
 
-- Keep: place a Story in a kept Epic when that outcome covers it, otherwise
-  propose a new Epic
-- Restart: record the exact Epics concerned. Close a complete one as completed.
-  Detach an incomplete one's open Stories, close it as not planned, keep its
-  body intact, and comment where every detached Story goes
-
-Reuse an explicit choice already given. A Sub-task stays attached to its
-non-Epic parent and follows that parent's placement; never promote it separately.
-An Epic's closure does not remove its open Stories from scope.
-
-For CU1 verification and CU3 reverification, use the current default branch and
-merged PRs, including each Story's own repo. Fetch a local checkout when available,
-or read current files and commits with `gh api`. Give each issue a verdict:
-
-| Verdict | Evidence required |
-|---|---|
-| Holds | The problem or requested outcome still needs work in current files |
-| Fixed | A merged PR or default-branch commit solves it; cite that change |
-| Gone | The problem no longer occurs or never did, without a fix to cite; show why |
-| Stale fix | The problem holds, but the proposed fix quotes changed text |
+| Verdict | Evidence required | Disposition |
+|---|---|---|
+| Holds | The problem or requested outcome still needs work in current files | Place |
+| Fixed | A merged PR or default-branch commit solves it; cite that change | Close as completed, citing the change |
+| Gone | The problem no longer occurs or never did, without a fix to cite; show why | Close as not planned, citing the proof |
+| Stale fix | The problem holds, but the proposed fix quotes changed text | Place; list stale text as a gap for `refine` |
 
 Put an issue on the left-out list when its outcome fit or required verification
 cannot be established, naming the precise missing proof. Assess readiness gaps
 under Labels and bodies separately from verification.
-For duplicates, name the covering issue and show the proposed closure comment.
+For duplicates, propose `gh issue close --duplicate-of <covering issue>`.
 
-An Epic is complete only when its outcome holds and every Story has a documented
-disposition. Closed Stories or a merged PR alone do not prove completion.
+An Epic is complete only when its outcome holds and every Story has a documented disposition.
 For a closed-completed issue, distinguish code work from non-code work:
 
 - Landed work or a comment proving the non-code acceptance criterion keeps completed
@@ -105,34 +94,26 @@ For a closed-completed issue, distinguish code work from non-code work:
   and placement
 - Gone without landed work: propose reopening, then closing as not planned, with proof
 
-Show these corrections and all closure/reopening comments in the proposal.
-Close Fixed as completed; close Gone as not planned; name the covering issue
-for a duplicate. Issue closure reasons and comments follow the host's supported
-operations; a duplicate's comment supplies its covering reference.
-
 ## Labels and bodies
 
 An approved grooming sets each Story's `3-pty:p1`, `p2` or `p3` from its
-P1/P2/P3 tier. Each Epic takes its highest-priority Story's priority, has
-`4-epic` and no type. Determine each Story's and Epic's state with
+P1/P2/P3 tier. Each Epic takes its highest-priority Story's priority.
+The tier replaces established priority, including `p0`.
+Limit P1 to three Stories per proposal. Determine each Story's and Epic's state with
 label-for-issues' Ready rule. Missing goals or acceptance criteria alone are
 readiness gaps, not grounds for leaving an issue out. Establish outcome fit from
 its title, body, domain and current files, then place it provisionally with that
-outcome. Give it `1-needs-triage`, preserve its unresolved goal and criteria, and
-list those gaps for CU3. Its Epic stays unready until the gaps are resolved.
+outcome. Preserve its unresolved goal and criteria, and list those gaps for `refine`.
+Its Epic stays unready until the gaps are resolved.
 Left-out issues keep their labels. A `2-type:postmortem` Story takes bug for a
 `fix` title prefix, feature for `feat`, and task for every other prefix.
 
-Only CU3 edits Story bodies, after approval. CU1 and CU2 propose placement,
-labels, Rank and dependencies while preserving Story bodies. They report each
-Epic's gap to Done when and finish with a new-conversation CU3 prompt.
+Only `refine` edits Story bodies, after approval. `epic` and `milestone` preserve them.
 
 Number new Epics after the highest `Epic N` title, closed ones included.
 `Epic N · <outcome>` is a stable identifier; never renumber existing Epics.
-Create all approved Epics before resolving references between them; every cited
-Epic then carries its issue number. Without a Milestone, CU1 creates Epics in
-the proposed order, their initial Rank. Epic bodies hold their own Stories in
-native Rank order, with Today and After entries, never a replicated Order section.
+Order Epics by prerequisites, then highest Story priority, then lowest issue number.
+Use that order to direct file-conflict links; use `Epic N` for new Epics until creation.
 
 ## Approval, apply and readback
 
@@ -140,6 +121,28 @@ Every route stops at a complete proposal before any GitHub write, including
 labels, comments and relationships. Approval covers the listed issues, exact
 actions, bodies the route may edit, comments and evidence, not future arrivals.
 For a read-only request, return the proposal and stop.
+
+### Proposal
+
+Use this form for every route; mark sections with no actions as `None`.
+Refer to a new Epic by `Epic N · <outcome>` until creation. Approval includes
+substituting its issue number in approved bodies, links, comments and prompts.
+
+- **Stories:** one table per Epic: Story reference, Rank, verdict, disposition,
+  evidence, Today, After, P1/P2/P3 tier, final canonical labels including unchanged
+  labels, and blocked-by references with reasons. For `milestone`, set both verdict
+  and evidence to `Not reverified`; fresh verification stays with `refine`
+- **Epics:** outcome, final canonical labels, blocked-by references with reasons,
+  Definition of Ready gaps and exact body previews using the Epic template.
+  Whenever a proposal creates or changes a Milestone, show these Epics in a table
+  by Rank with their references, reasons for their places and priorities; include
+  the Milestone description preview and membership
+- **Cleanup:** exact moves, detachments, closures, reopenings and duplicate targets
+- **Left out:** issue or action, and the precise missing proof or changed input
+- **Comments:** exact text and target of every proposed comment
+- **Body edits:** for `refine`, Story reference and exact before/after text per edit
+- **Gaps for refine:** missing goals, acceptance criteria, evidence and decisions
+  against the Definition of Ready, per Epic
 
 After approval, follow this checklist:
 
@@ -155,32 +158,31 @@ Approved grooming:
 
 1. Reread bodies, labels, state, evidence and membership of every touched object.
    Put an action whose scope, evidence or membership changed on the left-out list.
-   Put issues arriving after approval aside for the next grooming.
-   Done when the unchanged approved actions and excluded actions are explicit
+   Leave issues arriving after approval out for the next grooming, with the reason
+   that they arrived after approval.
+   Done when the unchanged approved actions and left-out actions are explicit
 2. Apply those actions using label-for-issues' reconciliation and native commands.
-   Report native failures; text never replaces a failed relationship. On a timeout,
-   reread before retrying only missing operations. Any new action needs a new
-   proposal. Done when each approved action is applied or reported as failed
-3. Read back with label-for-issues' filters and paginated relations. Compare
-   Story native order with Epic body order, blocked-by links, Milestone membership
-   and Epic Rank, labels, and every issue's disposition. Each scoped issue must
-   be placed, closed, or left out with its reason. Correct discrepancies within
-   approval and reread until every applied action matches; report anything
-   needing another approval. Done when every write is verified or reported failed
+   On a timeout, reread before retrying only missing operations. New actions need a
+   new proposal. Done when each approved action is applied or reported as failed
+3. Read back with label-for-issues' filters and paginated relations. Compare every
+   field and action in Proposal with GitHub, including native/body Rank agreement.
+   Each scoped issue must be placed, closed, or left out with its reason. Correct
+   discrepancies within approval and reread until every applied action matches;
+   report anything needing approval. Done when every write is verified or reported failed
 
-## Done when
+## Definition of Ready
 
 - Each Story has a clear goal and acceptance criteria
 - An Epic is ready when each Story is ready and ranked, its blocked-by links are set, and its Done when is checkable with no open decision
 - A Milestone is ready when each Epic is ready and ranked
 
-Only CU3 runs until these conditions hold. CU1 and CU2 hand off their remaining
-gaps. End their report with this prompt, substituting real references:
+Only `refine` runs until these conditions hold. For a new `refine` conversation,
+use this prompt with the actual target, adding any remaining gaps or refusal:
 
 ```text
 grooming-mode ; refine
 Home repo: OWNER/REPO
 Target: <Epic issue URL or Milestone URL>
 Reverify every Story, propose refinements and readiness labels, and apply after approval.
-Continue until grooming Done when holds.
+Continue until the Definition of Ready holds.
 ```

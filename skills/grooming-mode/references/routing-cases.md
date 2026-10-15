@@ -9,6 +9,7 @@ Replay with `just replay-routing grooming-mode`. Run
 | `grooming-mode ; milestone` | `playbooks/milestone.md` | |
 | `grooming-mode ; refine` | `playbooks/refine.md` | |
 | `grooming mode ; refine` | `playbooks/refine.md` | |
+| `grooming mode refine` | `playbooks/refine.md` | |
 | `grooming-mode ; sprint` | no route | |
 
 Grade the last row's answer by hand: it shows epic, milestone and refine,
