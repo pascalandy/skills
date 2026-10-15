@@ -8,7 +8,7 @@ kind: "dev"
 
 ## Pick the route
 
-- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
+- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque and carpaccio. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
 - **Three parts ending in `manic-4`, such as `$brigade ; arancini ; manic-4`:** you are the thread the user talks to. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan, in fast track as the playbook defines it
 - **Three parts ending in any other name, `$brigade-mode ; <route> ; <sop>`:** another thread of the route launched or delegated you. Read `playbooks/<route>/<route>.md` for your role and the shared rules, then read `playbooks/<route>/sop/<sop>.md` and follow it
 
@@ -22,3 +22,4 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 |---|---|---|
 | [`arancini`](playbooks/arancini/arancini.md) | | The approved CU1: rounds in one Chef, with one Cook per card, then the barrages in order, then closing |
 | [`bisque`](playbooks/bisque/bisque.md) | | The approved CU1, second version: a Head Chef splits the plan into batches, one Chef per batch runs a Cook and delegates the barrages, and the Head Chef green-lights each merge |
+| [`carpaccio`](playbooks/carpaccio/carpaccio.md) | | The approved CU1, third version, copied from bisque so its fixes land here: the same Head Chef, batches, and green-lit merges |
