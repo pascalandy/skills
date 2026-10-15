@@ -89,7 +89,8 @@ GitHub refuses, in a native stack:
 - `gh pr edit --base` on any PR: run `gh stack unstack <stack-number>` first, which keeps the PRs
   and branches, retarget, then relink with
   `gh stack link --open --base <trunk> <PRs bottom to top>` when the stack should stay. Once a PR
-  of the stack merged, GitHub keeps the stack: step 2's `gh api` check still prints it
+  of the stack merged, `unstack` leaves the stack in place, and step 2's `gh api` check still
+  prints it
 
 ## Plain stack
 
@@ -112,16 +113,16 @@ Use git and `gh pr` only, no `gh stack` command, so GitHub never groups the PRs.
 `--force-with-lease`. When a rule says to ask before any force push and a layer is already on the
 remote, add commits instead: commit on the owning layer and run `git push <remote> <layer>`. Then,
 for each layer above, bottom to top, run `git switch <upper>`,
-`git merge --no-ff --no-edit <layer below>`, and `git push <remote> <upper>`. To take in the trunk, merge `<remote>/<trunk>` into the
-bottom layer the same way, instead of `sync` or a rebase.
+`git merge --no-ff --no-edit <layer below>`, and `git push <remote> <upper>`. To take in the trunk,
+merge `<remote>/<trunk>` into the bottom layer the same way, instead of `sync` or a rebase.
 
 ## Land
 
 Land the PRs you were asked to land, from the bottom. Done when `gh pr view <number> --json state`
 prints `MERGED` for each of them.
 
-When the bottom PR's base is neither the trunk nor a layer, its base PR merged outside the stack:
-retarget the bottom PR to the trunk first, in a native stack as the refusals above say.
+When the bottom PR's base is a branch whose own PR merged outside the stack, retarget the bottom
+PR to the trunk first, in a native stack as the refusals above say.
 
 - **The project merges through GitHub:** in a native stack, `gh stack merge <PR> --yes` with the
   project's method flag, such as `--squash`, lands that PR and every unmerged PR below it, all or
