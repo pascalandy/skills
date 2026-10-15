@@ -88,9 +88,10 @@ sequenceDiagram
     C-->>H: Agent: Batch 1 merged, deploy result <-
     C->>C: Release yes: finish procedure<br>from main
     Note over H,K: Step 6: Closing
+    C->>C: Close Epic with child proof
     C->>K: Agent: Enabled retros ->
     K->>K: Retros, unwatch, report, settle
-    C->>C: Close Epic with child proof,<br>retros, confirm Cooks settled,<br>remove merged worktrees
+    C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
     C-->>H: Agent: ⛳ Batch 1 outcome, report <-
     C->>C: Settle
     H->>H: Count, next batches, retros<br>Confirm Chefs settled, clean folders<br>Prune worktree records
