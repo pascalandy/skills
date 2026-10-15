@@ -4,7 +4,7 @@ Keep a registry in your conversation: batch number, name, repository, projectId,
 
 ## Align
 
-1. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch ask Pascal: validate before merge, parallel Cooks, release at the end? Record `Validate`, `Parallel Cooks`, `Release`, and `Fast track` as yes/no. Done when Pascal agreed on the batches and all four choices
+1. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch ask Pascal: validate before merge, parallel Cooks, release at the end? Record those answers; set `Fast track` from the invocation or Pascal's request, otherwise no. Done when the batches and their choices are recorded
 2. Rename yourself `Head Chef <id4> · 0/<batches> · <subject>` and pin yourself. Done when the title matches and the pin is set
 
 ## Launch
@@ -38,6 +38,8 @@ Fast track: <yes/no>
 - On Pascal's Stop, launch no further batch and send 🛑 Stop to every active Chef. Wait for their outcomes, including any merge already running, then Close. Done when every launched Chef has reported
 
 ## Close
+
+Begin once every launched Chef has reported its outcome and each queued batch has run, been dropped or been recorded as stopped.
 
 1. If `[head-chef].retro`, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global; each retro files the issues with the most value, up to `retro-max-issues`. Done when each has issue links or a recorded no-findings result
 2. Confirm each launched Chef is settled using 🧰 t3-runtime. Send Pascal `⛳ <done>/<batches> batches done` with the shared Report. Settle yourself. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`

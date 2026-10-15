@@ -22,3 +22,5 @@ Contract: Review only; edit no project file. Execute code only in a detached wor
 3. When the last allowed pass yields a code fix, delegate one extra pass limited to that fix. This pass is final; list any fix it yields under what you could not confirm. Done when that final result is triaged and any unreviewed fix is reported
 
 Do not commit while any barrage runs in your worktree. Queue watch findings until all running passes return, then triage them together. A failed or interrupted pass remains unconfirmed: retry it with a fresh delegation or report the blocker to the Chef before readiness.
+
+Advance to the next process step only when every review in the current pair has ended with its reason recorded.

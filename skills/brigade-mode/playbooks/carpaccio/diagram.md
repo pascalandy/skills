@@ -97,4 +97,4 @@ sequenceDiagram
     H->>H: Settle and unpin
 ```
 
-Fast track skips steps 2 to 4 and uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On Stop, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks cancel delegates and remove watches before reporting clean pushed heads; a merge already running finishes before the Chef stops.
+Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On Stop, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks cancel delegates and remove watches before reporting clean pushed heads; a merge already running finishes before the Chef stops.
