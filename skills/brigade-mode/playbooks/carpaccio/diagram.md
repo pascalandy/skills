@@ -59,7 +59,7 @@ sequenceDiagram
         end
     end
     K->>K: End turn, then triage both
-    Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with code fix: one final limited pass
+    Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
     K-->>C: Agent: 🚦 Stack ready, report,<br>clean and pushed <-
     K->>K: Freeze, forward watch wakes
