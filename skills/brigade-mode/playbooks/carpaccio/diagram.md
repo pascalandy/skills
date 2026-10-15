@@ -93,7 +93,7 @@ sequenceDiagram
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
     C-->>H: Agent: ⛳ Batch 1 outcome, report <-
     C->>C: Settle
-    H->>H: Count, next batches, retros<br>Confirm Chefs settled
+    H->>H: Count, next batches, retros<br>Confirm Chefs settled, clean folders<br>Prune worktree records
     H->>U: Agent: ⛳ All batches done, report <-
     H->>H: Settle and unpin
 ```
