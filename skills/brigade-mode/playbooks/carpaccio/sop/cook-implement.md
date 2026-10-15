@@ -25,7 +25,7 @@ For `Release: yes`, add the repository's required release content, such as `CHAN
 ## Ready
 
 1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🚦 Stack ready` to the Chef with the shared Report. Done when the Chef has the readiness report
-2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged` or returns it to you. Forward watch wakes to the Chef during this freeze. A returned worktree goes through Fix and a fresh 🚦 before merging. Done when the Chef has acknowledged the handoff or returned ownership
+2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged` or returns it to you. Forward watch wakes to the Chef during this freeze, distinguishing findings from wakes reporting only passing checks. A returned worktree goes through Fix and a fresh 🚦 before merging. Done when the Chef has acknowledged the handoff or returned ownership
 
 ## Stop
 

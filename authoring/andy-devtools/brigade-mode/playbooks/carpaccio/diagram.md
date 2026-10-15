@@ -64,7 +64,7 @@ sequenceDiagram
     K-->>C: Agent: 🚦 Stack ready, report,<br>clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
-    opt Reopened finding or frozen watch wake
+    opt Reopened finding or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
         K->>K: Fix, checks and reviews,<br>fresh 🚦
     end

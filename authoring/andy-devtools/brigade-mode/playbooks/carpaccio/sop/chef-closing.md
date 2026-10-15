@@ -8,7 +8,7 @@
 4. On failure, record landed PRs, send the Cook the cause and return its worktree for Fix. Report the partial outcome to the Head Chef. Resume at step 1 after a fresh 🚦. Before the next stack, ask its Cook to restack on `main` and return a fresh 🚦. Done when each stack merged in order or the Head Chef has an unresolved blocker
 5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch <b> merged` with deploy results. For `Release: yes`, follow the remaining repository release procedure from `main`; report a failure before closing. Done when all merge and release outcomes are recorded
 
-If Pascal declines merging, ask Cooks to unwatch and proceed to Closing with a not-merged outcome. A frozen watch wake invalidates readiness until you have returned the worktree, the Cook has triaged it and sent a fresh 🚦.
+If Pascal declines merging, ask Cooks to unwatch and proceed to Closing with a not-merged outcome. A frozen watch wake that brings a finding, such as a failed check, a review or comment, or a conflict, invalidates readiness until you have returned the worktree, the Cook has triaged it and sent a fresh 🚦. A wake reporting only passing checks preserves readiness.
 
 ## Closing
 
