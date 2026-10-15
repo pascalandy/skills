@@ -2,7 +2,7 @@
 
 ## Delegate
 
-1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. Fill interrogate's `references/reviewer-prompt.md` from the brief's intent, scope, evidence and SOP angle, using its `references/rubric.md` and code-quality lens. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and each brief has its filled prompt or manic-3 docs scope
+1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and both briefs use the same recorded heads
 2. For each pass call `delegate_task` with `mode: "async"`, `role: "review"`, the target, title from Roles and brief below. Use `clientRequestId: <id4>-<b>.<c>-<sop>-<k>`; `<k>` counts this Cook's delegations from 1 without resetting. Reuse the key only to retry that call. Retain each taskId. Submit a pair in the same turn, then end your turn for completion notifications. Done when every requested pass has a taskId
 
 ```text
@@ -11,9 +11,7 @@ Role: Barrage <sop>, delegation <k>, Cook <b>.<c> <id4>. Your final message is y
 Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
 Intent: <one paragraph stating the intended behavior>
-Angle: <review angle from this barrage's SOP>
-Evidence: <diff or files at the recorded heads and necessary surrounding context>
-Review prompt: <filled interrogate reviewer prompt; manic-3 uses its technical-writing SOP>
+Evidence: <context the reviewer needs beyond the diff defined by Scope>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
 Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
