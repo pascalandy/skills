@@ -97,8 +97,8 @@ For a closed-completed issue, distinguish code work from non-code work:
 ## Labels and bodies
 
 An approved grooming sets each Story's `3-pty:p1`, `p2` or `p3` from its
-P1/P2/P3 tier. Each Epic takes its highest-priority Story's priority, has
-`4-epic` and no type. The tier replaces established priority, including `p0`.
+P1/P2/P3 tier. Each Epic takes its highest-priority Story's priority.
+The tier replaces established priority, including `p0`.
 Limit P1 to three Stories per proposal. Determine each Story's and Epic's state with
 label-for-issues' Ready rule. Missing goals or acceptance criteria alone are
 readiness gaps, not grounds for leaving an issue out. Establish outcome fit from
@@ -130,12 +130,13 @@ substituting its issue number in approved bodies, links, comments and prompts.
 
 - **Stories:** one table per Epic: Story reference, Rank, verdict, disposition,
   evidence, Today, After, P1/P2/P3 tier, final canonical labels including unchanged
-  labels, and blocked-by references with reasons
-- **Epics:** outcome, final canonical labels, Definition of Ready gaps and exact
-  body previews using the Epic template. For `milestone`, use an Epic table by
-  Rank: Epic reference, reason for its place, priority, final canonical labels,
-  blocked-by references with reasons, and Definition of Ready gaps; include the
-  Milestone description preview and membership
+  labels, and blocked-by references with reasons. For `milestone`, set both verdict
+  and evidence to `Not reverified`; fresh verification stays with `refine`
+- **Epics:** outcome, final canonical labels, blocked-by references with reasons,
+  Definition of Ready gaps and exact body previews using the Epic template.
+  Whenever a proposal creates or changes a Milestone, show these Epics in a table
+  by Rank with their references, reasons for their places and priorities; include
+  the Milestone description preview and membership
 - **Cleanup:** exact moves, detachments, closures, reopenings and duplicate targets
 - **Left out:** issue or action, and the precise missing proof or changed input
 - **Comments:** exact text and target of every proposed comment
@@ -157,7 +158,8 @@ Approved grooming:
 
 1. Reread bodies, labels, state, evidence and membership of every touched object.
    Put an action whose scope, evidence or membership changed on the left-out list.
-   Put issues arriving after approval aside for the next grooming.
+   Leave issues arriving after approval out for the next grooming, with the reason
+   that they arrived after approval.
    Done when the unchanged approved actions and left-out actions are explicit
 2. Apply those actions using label-for-issues' reconciliation and native commands.
    On a timeout, reread before retrying only missing operations. New actions need a

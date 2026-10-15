@@ -22,11 +22,11 @@
       "Keeps #13 parallel to receipt work with no invented blocked-by link",
       "Prioritizes P1 at most three, P2 and P3, mapping every Story to 3-pty:p1/p2/p3; each Epic takes its highest-priority Story's priority and no type",
       "Uses label-for-issues Ready rule for exact states of every proposed Story and Epic, shows Story native Rank/body agreement, and no replicated Epic Order section",
-      "Never proposes a Story body rewrite in CU1",
+      "Never proposes a Story body rewrite in epic",
       "Places #14 with a receipt Epic rather than silently discarding it or inventing acceptance criteria",
-      "Keeps or assigns 1-needs-triage to #14 and names its missing goal and acceptance criteria",
+      "Gives #14 the state label that label-for-issues' Ready rule selects and names its missing goal and acceptance criteria",
       "Reports the affected Epic's gap to the Definition of Ready and does not declare grooming complete",
-      "Ends with a copyable grooming-mode ; refine prompt for a new conversation using the actual Epic reference, reserving Story body edits for CU3"
+      "Ends with a copyable grooming-mode ; refine prompt for a new conversation using the actual Epic reference, reserving Story body edits for refine"
     ]
   }
 ]
