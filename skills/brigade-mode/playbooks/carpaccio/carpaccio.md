@@ -92,7 +92,7 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 Use this report for the Cook's 🚦, the Chef's report and the Head Chef's closing report. Aggregate earlier reports rather than repeating their contents in each SOP:
 
-- Outcome, PR links and issue links
+- Outcome, PR links, each branch with its head SHA, and issue links
 - Out-of-scope gaps not filed; changes outside the agreement and why
 - Review passes, accepted and rejected findings with reasons, and why each review ended
 - Steps skipped or replaced and why, including a no-docs decision

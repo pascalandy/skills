@@ -61,7 +61,7 @@ sequenceDiagram
     K->>K: End turn, then triage both
     Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
-    K-->>C: Agent: 🚦 Stack ready, report,<br>clean and pushed <-
+    K-->>C: Agent: 🚦 Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
     opt Reopened finding or frozen watch finding
