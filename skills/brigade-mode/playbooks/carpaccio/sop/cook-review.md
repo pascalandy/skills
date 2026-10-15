@@ -2,7 +2,7 @@
 
 ## Delegate
 
-1. Select each barrage with shared Model selection. Record the stack's current heads and the passes needed: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Done when every target is supported and every brief identifies the same heads
+1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and both briefs use the same recorded heads
 2. For each pass call `delegate_task` with `mode: "async"`, `role: "review"`, the target, title from Roles and brief below. Use `clientRequestId: <id4>-<b>.<c>-<sop>-<k>`; `<k>` counts this Cook's delegations from 1 without resetting. Reuse the key only to retry that call. Retain each taskId. Submit a pair in the same turn, then end your turn for completion notifications. Done when every requested pass has a taskId
 
 ```text
@@ -10,6 +10,8 @@ $brigade-mode ; carpaccio ; <sop>
 Role: Barrage <sop>, delegation <k>, Cook <b>.<c> <id4>. Your final message is your report.
 Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
+Intent: <one paragraph stating the intended behavior>
+Evidence: <context the reviewer needs beyond the diff defined by Scope>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
 Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
@@ -19,7 +21,7 @@ Contract: Review only; edit no project file. Work alone, with no subagent or oth
 
 ## Triage
 
-1. Wait for all currently running passes on the same heads, then accept or reject every finding with a one-line reason. Treat a CI failure or conflict as an accepted finding; decide on external reviews like barrage findings. Done when every result and watch wake has a recorded decision
+1. Wait for all currently running passes on the same heads, then use interrogate's `references/lead-judgment.md` to categorize every finding with a one-line reason: accept `Act on`; carry `Consider` in the 🚦 report for the Chef; reject `Noted` and `Dismissed` with their reasons. Keep reviewer attribution and what each checked in the verdict. Treat a CI failure or conflict as an accepted finding; judge external reviews like barrage findings. Done when every result and watch wake has a recorded decision
 2. Apply accepted findings through `cook-implement` Fix. Each barrage keeps its decisions and counts its own normal passes against `max-passes`. If a fix needs review and passes remain, delegate a fresh pass with the full brief and prior rounds. Otherwise record why its review ended. Done when each review ended or a new taskId is recorded
 3. When the last allowed pass yields any fix, including docs, delegate one extra pass limited to that fix. This pass is final; list any fix it yields under what you could not confirm. Done when that final result is triaged and any unreviewed fix is reported
 

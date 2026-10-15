@@ -4,4 +4,6 @@ Use 🧰 poteto-mode to review this stack: every change in Cook <b>.<c>'s stack 
 
 Polish what passed: duplication, misleading names or comments, a helper heavier than its only use, a test that freezes implementation, or a scattered rule. Leave style preferences aside.
 
-Done when your result lists your findings, or reports that you found none.
+Review as one 🧰 interrogate reviewer, following its `references/reviewer-prompt.md` and `references/rubric.md` through this polish angle. Review eliminates and never confirms.
+
+Done when your result lists your findings, or reports that you found none, and lists what you checked.

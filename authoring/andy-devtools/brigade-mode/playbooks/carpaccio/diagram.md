@@ -33,6 +33,10 @@ sequenceDiagram
     C->>K: Agent: Launch with ownership ->
     Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges
     Note over C,K: Step 1: Implement
+    opt Bug card
+        K->>K: diagnose before reading source
+        Note over H,K: Any question for Pascal climbs<br>through Chef and Head Chef
+    end
     K->>K: Implement, link PR 35,<br>watch, 2nd-pass and push
     Note over K: Watch findings: queue while passes run,<br>otherwise triage at once
     opt Cross-file ownership
@@ -42,12 +46,12 @@ sequenceDiagram
     Note over C,K: Step 2: manic-1 and manic-2
     rect rgba(166, 209, 137, 0.25)
         par manic-1
-            K->>K: Delegate adversarial review
+            K->>K: Delegate interrogate rejection reviewer
         and manic-2
-            K->>K: Delegate blast-radius review
+            K->>K: Delegate interrogate blast-radius<br>and premortem reviewer
         end
     end
-    K->>K: End turn, then triage both<br>Other provider for each barrage
+    K->>K: End turn, then interrogate lead judgment<br>Other provider, one reviewer per barrage
     Note over C,K: Step 3: Docs
     K->>K: andy-mode docs, PR 36 on top<br>or no-docs decision<br>Release yes: final content layer
     Note over C,K: Step 4: manic-3 and manic-5
@@ -55,10 +59,11 @@ sequenceDiagram
         par manic-3
             K->>K: Delegate docs review
         and manic-5
-            K->>K: Delegate pristine review
+            K->>K: Delegate interrogate polish reviewer
         end
     end
-    K->>K: End turn, then triage both
+    K->>K: End turn, then interrogate lead judgment
+    Note over C,K: Act on: accept#59; Consider: 🚦 for Chef<br>Noted and Dismissed: reject with reason
     Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
     K-->>C: Agent: 🚦 Stack ready, report,<br>branch heads, clean and pushed <-

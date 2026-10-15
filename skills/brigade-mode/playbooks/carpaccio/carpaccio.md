@@ -50,10 +50,10 @@ Copy the table and check off your role's steps:
 | # | Step | Owner and SOP |
 |---|---|---|
 | 0 | Align | Head Chef and Pascal, `head-chef` |
-| 1 | Implement | Cook, `cook-implement` |
-| 2 | manic-1 and manic-2 side by side | Cook delegates and triages, `cook-review` |
+| 1 | Implement, diagnose first for bug cards | Cook, `cook-implement` |
+| 2 | manic-1 and manic-2 side by side through interrogate | Cook leads, delegates and triages, `cook-review` |
 | 3 | Docs | Cook, `cook-implement` Docs |
-| 4 | manic-3 and manic-5 side by side | Cook delegates and triages, `cook-review` |
+| 4 | manic-3 and manic-5 side by side through interrogate | Cook leads, delegates and triages, `cook-review`; manic-3 uses technical-writing |
 | 5 | Validation and merge | Chef, `chef-closing`; Head Chef for held batches |
 | 6 | Closing | Chef and Cook, `chef-closing` and `cook-implement` Retros |
 

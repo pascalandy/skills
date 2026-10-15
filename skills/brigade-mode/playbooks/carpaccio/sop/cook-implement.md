@@ -4,7 +4,7 @@ Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, St
 
 ## Implement
 
-1. Implement every assigned card under the shared rules, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
+1. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef. Implement every assigned card under the shared rules, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
 2. Link each PR with `link_pull_request` as you open it and own its `watch_pull_request`, unless oem's no-checks rule applies. Route CI failures and external reviews through `cook-review`. File worthwhile out-of-scope gaps with 🧰 label-for-issues after checking duplicates; record the rest. Done when every PR is linked and watched or has its no-checks decision recorded
 3. Run 🧰 2nd-pass and push. Proceed to the first review pair; in fast track, do Release content, then Ready. Done when the checkout is clean and pushed
 
