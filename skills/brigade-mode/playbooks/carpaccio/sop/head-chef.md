@@ -23,7 +23,7 @@ Validate: <yes/no>
 Parallel Cooks: <yes/no>
 Release: <yes/no>
 Fast track: <yes/no>
-Rules: <expand Shared rules in carpaccio.md>
+Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
 Work folder: <expand Work folders in carpaccio.md>
 ```
 

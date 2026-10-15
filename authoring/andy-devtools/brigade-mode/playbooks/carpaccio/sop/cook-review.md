@@ -12,7 +12,7 @@ Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
-Rules: <expand Shared rules in carpaccio.md>
+Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
 Work folder: <expand Work folders in carpaccio.md>
 Contract: Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
 ```
