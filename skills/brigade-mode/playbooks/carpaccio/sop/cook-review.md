@@ -12,14 +12,16 @@ Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
-Contract: Review only; edit no project file. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
+Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
+Work folder: <expand Work folders in carpaccio.md>
+Contract: Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
 ```
 
 ## Triage
 
 1. Wait for all currently running passes on the same heads, then accept or reject every finding with a one-line reason. Treat a CI failure or conflict as an accepted finding; decide on external reviews like barrage findings. Done when every result and watch wake has a recorded decision
 2. Apply accepted findings through `cook-implement` Fix. Each barrage keeps its decisions and counts its own normal passes against `max-passes`. If a fix needs review and passes remain, delegate a fresh pass with the full brief and prior rounds. Otherwise record why its review ended. Done when each review ended or a new taskId is recorded
-3. When the last allowed pass yields a code fix, delegate one extra pass limited to that fix. This pass is final; list any fix it yields under what you could not confirm. Done when that final result is triaged and any unreviewed fix is reported
+3. When the last allowed pass yields any fix, including docs, delegate one extra pass limited to that fix. This pass is final; list any fix it yields under what you could not confirm. Done when that final result is triaged and any unreviewed fix is reported
 
 Do not commit while any barrage runs in your worktree. Queue watch findings while passes are running, then triage them with those results. When none is running, triage watch findings at once; fast track retains its skips. A failed or interrupted pass remains unconfirmed: retry it with a fresh delegation or report the blocker to the Chef before readiness.
 

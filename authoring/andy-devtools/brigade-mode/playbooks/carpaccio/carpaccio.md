@@ -61,8 +61,12 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 
 ## Shared rules
 
-- One PR per verifiable unit, stacked with 🧰 gh-stack when they depend on each other. Assign each PR to `pr-assignee`
+- One PR per verifiable unit, in one stack per Cook and repository with 🧰 gh-stack, even for independent cards. Assign each PR to `pr-assignee`
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
+- Put each fix in the layer that last changed its line; for a line from the trunk, use the layer whose change made it wrong
+- The Cook follows the repository's `AGENTS.md` procedure first; 🧰 poteto-mode fills what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to the Chef
+- Append `Rules: <inherited Rules plus each relevant standing rule the target project does not load>` to every launch message and barrage brief. Preserve inherited Rules for delegates, which see only their brief; omit an empty field
+- A comment posted through Pascal's account does not wake the Cook's watch; the Chef also sends it to the Cook with `t3_thread_send`
 - A question climbs the chain with the sender's default. Each level answers from its context or escalates. A Chef unable to resolve a batch problem asks the Head Chef to decide, split the work again or relaunch the Chef
 - Keep going without Pascal within the agreed repositories and their PRs and issues. The run may push and open or update PRs and issues, and force-push its own branches with `--force-with-lease`. Merge deploys and retro issues in Pascal's repositories are allowed
 - Escalate before deleting data, changing anything outside that scope or force-pushing a branch the run did not create. Deleting a merged branch whose tip matches its recorded PR head preserves the merged work
@@ -71,6 +75,10 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 ### Retros
 
 For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. Each retro files the issues with the most value, up to `retro-max-issues` per thread. Done when each has issue links or a recorded no-findings result.
+
+## Work folders
+
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>` or `<sop>-<b>.<c>-<k>`. Create both folders before work and remove the work folder before your final report, removing a barrage's detached worktree first. Recreate them when resumed. Append these instructions as an expanded `Work folder: <absolute path and instructions>` field to every launch message and barrage brief. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
 
 ## Model selection
 
@@ -84,7 +92,7 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 Use this report for the Cook's 🚦, the Chef's report and the Head Chef's closing report. Aggregate earlier reports rather than repeating their contents in each SOP:
 
-- Outcome, PR links and issue links
+- Outcome, PR links, each branch with its head SHA, and issue links
 - Out-of-scope gaps not filed; changes outside the agreement and why
 - Review passes, accepted and rejected findings with reasons, and why each review ended
 - Steps skipped or replaced and why, including a no-docs decision

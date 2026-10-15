@@ -23,6 +23,8 @@ Validate: <yes/no>
 Parallel Cooks: <yes/no>
 Release: <yes/no>
 Fast track: <yes/no>
+Rules: <inherited and standing rules per the Rules bullet under Shared rules in carpaccio.md>
+Work folder: <expand Work folders in carpaccio.md>
 ```
 
 ## Coordinate
@@ -42,4 +44,4 @@ Fast track: <yes/no>
 Begin once every launched Chef has reported its outcome and each queued batch has run, been dropped or been recorded as stopped.
 
 1. If `[head-chef].retro`, follow [shared Retros](../carpaccio.md#retros). Done when each has issue links or a recorded no-findings result
-2. Confirm each launched Chef is settled using 🧰 t3-runtime. Send Pascal `⛳ <done>/<batches> batches done` with the shared Report. Settle yourself. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`
+2. Confirm each launched Chef is settled using 🧰 t3-runtime and finish shared Work folders cleanup. Send Pascal `⛳ <done>/<batches> batches done` with the shared Report. Settle yourself. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`

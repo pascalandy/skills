@@ -59,9 +59,9 @@ sequenceDiagram
         end
     end
     K->>K: End turn, then triage both
-    Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with code fix: one final limited pass
+    Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
-    K-->>C: Agent: 🚦 Stack ready, report,<br>clean and pushed <-
+    K-->>C: Agent: 🚦 Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
     opt Reopened finding or frozen watch finding
@@ -88,12 +88,13 @@ sequenceDiagram
     C-->>H: Agent: Batch 1 merged, deploy result <-
     C->>C: Release yes: finish procedure<br>from main
     Note over H,K: Step 6: Closing
+    C->>C: Close Epic with child proof
     C->>K: Agent: Enabled retros ->
     K->>K: Retros, unwatch, report, settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
     C-->>H: Agent: ⛳ Batch 1 outcome, report <-
     C->>C: Settle
-    H->>H: Count, next batches, retros<br>Confirm Chefs settled
+    H->>H: Count, next batches, retros<br>Confirm Chefs settled, clean folders<br>Prune worktree records
     H->>U: Agent: ⛳ All batches done, report <-
     H->>H: Settle and unpin
 ```

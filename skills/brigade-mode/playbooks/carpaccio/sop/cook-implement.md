@@ -4,13 +4,13 @@ Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, St
 
 ## Implement
 
-1. Read the worktree's repository instructions. Use 🧰 poteto-mode to implement every assigned card, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
+1. Implement every assigned card under the shared rules, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
 2. Link each PR with `link_pull_request` as you open it and own its `watch_pull_request`, unless oem's no-checks rule applies. Route CI failures and external reviews through `cook-review`. File worthwhile out-of-scope gaps with 🧰 label-for-issues after checking duplicates; record the rest. Done when every PR is linked and watched or has its no-checks decision recorded
 3. Run 🧰 2nd-pass and push. Proceed to the first review pair; in fast track, do Release content, then Ready. Done when the checkout is clean and pushed
 
 ## Fix
 
-1. Fix accepted findings in their owning layers. Run 🧰 2nd-pass, restack with 🧰 gh-stack and push. Done when each accepted finding is fixed or reported blocked to the Chef
+1. Apply accepted findings using shared layer ownership. For a finding on a PR description, edit that PR without a commit. Run 🧰 2nd-pass on the fixes, then restack and push changed layers with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to the Chef
 2. Rerun affected checks; if Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection, requested a restack on `main` or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
 
 ## Docs
