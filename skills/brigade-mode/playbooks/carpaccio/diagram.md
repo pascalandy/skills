@@ -86,8 +86,8 @@ sequenceDiagram
     Note over C,K: Next stack: Cook restacks on main,<br>fresh 🚦, Chef validates and merges
     C->>K: Agent: merged ->
     C-->>H: Agent: Batch 1 merged, deploy result <-
-    Note over H,K: Step 6: Closing
     C->>C: Release yes: finish procedure<br>from main
+    Note over H,K: Step 6: Closing
     C->>K: Agent: Enabled retros ->
     K->>K: Retros, unwatch, report, settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
