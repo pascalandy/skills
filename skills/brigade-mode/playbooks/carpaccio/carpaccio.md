@@ -26,7 +26,7 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 
 A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
 
-Derive titles from the recorded state. The parent's `watch.toml` records acknowledged child phases, holds and report receipts. T3 establishes whether a thread is live or settled. GitHub establishes PR heads, checks and merges. The Watchdog's `wake.toml` owns wake counters. A stale title does not override these records.
+A title displays computed status. It does not prove that a report arrived or an external action finished. The parent's `watch.toml` records received child phases, holds and report receipts. Check T3 for a launched thread's run state and settlement. Check GitHub for PR heads, checks and merges.
 
 After renaming, read the title from T3. If the title is stale, retry the rename before ending the turn. Report a persistent failure to the parent. The Head Chef reports its own failure to Pascal.
 
