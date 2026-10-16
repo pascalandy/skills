@@ -119,4 +119,4 @@ sequenceDiagram
 
 At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns affected Cooks to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
 
-Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge already running finishes before the Chef stops.
+Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge or release already running finishes before each Chef follows Closing.
