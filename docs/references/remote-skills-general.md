@@ -107,6 +107,7 @@ A mode's routes run through that mode's SKILL.md.
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
 - `oem`: Load at the start of every session, before the first reply. Shared definitions and conventions for every task.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
+- `sharpen`: Use only when explicitly invoked as `sharpen`.
 - `tavily`: Use only when explicitly invoked as `tavily`.
 - `transcript`: Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording.
 - `unslop`: Use when communicating directly with the user or writing and editing documents.
