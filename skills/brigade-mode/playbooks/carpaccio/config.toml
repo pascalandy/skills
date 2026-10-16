@@ -11,6 +11,7 @@ retro = true # Head Chef: run its closing retros
 chef-on-claude = { inherit = true } # Head Chef: Chef selection
 chef-on-codex = { inherit = true } # Head Chef: Chef selection
 max-cooks = 2 # Chef: simultaneous Cooks when Parallel Cooks is yes
+max-returns = 2 # Chef: returns of one stack for the same cause before escalation
 merge-confidence = 92 # Chef: minimum confidence for an unmarked batch to merge without a hold
 retro = true # Chef: run its closing retros
 

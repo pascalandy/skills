@@ -13,8 +13,8 @@ Each step starts with its number and name. Chat messages start with `USER:` or `
 ```mermaid
 %%{init: {"sequence": {"diagramMarginX": 100}}}%%
 sequenceDiagram
-    accTitle: CU1 Cook-owned reviews
-    accDescr: Pascal aligns batches with the Head Chef. Cooks implement, watch, document and delegate reviews. Chefs validate and merge frozen stacks. Marked or low-confidence batches wait for Pascal. Chefs release and close.
+    accTitle: CU1 Statuses and Cook-owned reviews
+    accDescr: The Head Chef alone asks Pascal. Cooks serve frozen stacks; Chefs validate, merge, release and close before the Head Chef counts delivery.
     autonumber
     actor U as USER
     participant H as Head Chef
@@ -27,10 +27,10 @@ sequenceDiagram
             H->>U: Agent: Validate, parallel Cooks,<br>release for each batch? <-
         end
     end
-    H->>H: Pin, register batches<br>and select Chef model
-    H->>C: Agent: Launch with registry projectId<br>and Align choices ->
+    H->>H: Pin, register batches<br>❓ align → 🟢 working
+    H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
     C->>C: Group disjoint files,<br>create worktrees
-    C->>K: Agent: Launch with ownership ->
+    C->>K: Agent: Launch 🍳 Cook with ownership ->
     Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges
     Note over C,K: Step 1: Implement
     opt Bug card
@@ -40,7 +40,7 @@ sequenceDiagram
     K->>K: Implement, link PR 35,<br>watch, 2nd-pass and push
     Note over K: Watch findings: queue while passes run,<br>otherwise triage at once
     opt Cross-file ownership
-        K-->>C: Agent: Request file access <-
+        K-->>C: Agent: ⏸️ Request file access <-
         C->>K: Agent: Ownership decision ->
     end
     Note over C,K: Step 2: manic-1 and manic-2
@@ -63,45 +63,47 @@ sequenceDiagram
         end
     end
     K->>K: End turn, then interrogate lead judgment
-    Note over C,K: Act on: accept#59; Consider: 🚦 for Chef<br>Noted and Dismissed: reject with reason
+    Note over C,K: Act on: accept#59; Consider: 🍽️ for Chef<br>Noted and Dismissed: reject with reason
     Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
-    K-->>C: Agent: 🚦 Stack ready, report,<br>branch heads, clean and pushed <-
+    K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
     opt Reopened finding or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
-        K->>K: Fix, checks and reviews,<br>fresh 🚦
+        K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
         alt Validate no and confidence at least merge-confidence
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Marked or lower confidence
-            C-->>H: Agent: 🚦 Batch 1 ready <-
-            H->>U: Agent: Report, decision needed <-
+            C-->>H: Agent: 🍽️ Batch ready at x/x <-
+            H->>U: Agent: ❓ review batch 1, report <-
             U->>H: USER: Merge ->
-            H->>C: Agent: 🟢 Merge ->
+            H->>C: Agent: 🔀 Merge ->
         end
     end
     C->>C: Verify GitHub heads,<br>merge in frozen worktree
     opt Merge fails
         C->>K: Agent: Return worktree, fix cause ->
-        K->>K: Fix, checks and reviews,<br>fresh 🚦 for validation
+        K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
-    Note over C,K: Next stack: Cook restacks on main,<br>fresh 🚦, Chef validates and merges
+    Note over C,K: Next stack: Cook restacks on main<br>Same own diff keeps approval#59; changed diff needs review
     C->>K: Agent: merged ->
-    C-->>H: Agent: Batch 1 merged, deploy result <-
+    C-->>H: Agent: Batch merged, deploy result<br>No Head Chef count yet <-
     C->>C: Release yes: finish procedure<br>from main
     Note over H,K: Step 6: Closing
     C->>C: Close Epic with child proof
-    C->>K: Agent: Enabled retros ->
-    K->>K: Retros, unwatch, report, settle
+    C->>K: Agent: Close, run enabled retros ->
+    K->>K: 🧹 Retros, unwatch, report<br>🍽️ final after merge, then settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
-    C-->>H: Agent: ⛳ Batch 1 outcome, report <-
+    C-->>H: Agent: ⛳ Batch delivered, report <-
     C->>C: Settle
-    H->>H: Count, next batches, retros<br>Confirm Chefs settled, clean folders<br>Prune worktree records
-    H->>U: Agent: ⛳ All batches done, report <-
+    H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs<br>Prune worktree records
+    H->>U: Agent: ⛳ x/y batches done, report <-
     H->>H: Settle and unpin
 ```
 
-Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On Stop, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks cancel delegates and remove watches before reporting clean pushed heads; a merge already running finishes before the Chef stops.
+At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns affected Cooks to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
+
+Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge already running finishes before the Chef stops.
