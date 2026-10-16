@@ -6,7 +6,7 @@ harness = "codex"
 
 [codex]
 model = "gpt-6.1-sol"
-reasoning-level = "high"
+reasoning-level = "xhigh"
 
 [claude]
 model = "claude-opus-5-5"
@@ -19,7 +19,7 @@ reasoning-level = "xhigh"
 [pi]
 provider = "openai-codex"
 model = "gpt-6.1-sol"
-reasoning-level = "high"
+reasoning-level = "xhigh"
 
 [opencode]
 provider = "openai"
