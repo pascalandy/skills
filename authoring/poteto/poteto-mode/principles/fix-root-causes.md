@@ -12,4 +12,4 @@ When debugging, fix the fault, not the place where it surfaced. The symptom is w
 - When something fails only after a restart, suspect persisted state first: config files, caches, lock files, serialized state
 - Check for the pattern, not just the instance. Find every place with the same fault and fix them all
 - If a workaround needs a paragraph-long comment to justify it, the code is wrong. Fix the code, not the comment
-- If the deciding fact took a deep dig to find, propose the cheap, always-on signal that would have shown it at first look
+- If the deciding fact took a deep dig to find, propose the cheap, always-on reading that would have shown it at first look
