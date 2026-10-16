@@ -19,6 +19,7 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 | Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, launches and guides Chefs, resumes coordination on escalation. Never edits code or opens PRs |
 | Chef | Thread in the batch's repository project | `🚥 Chef <b> <id4> [<served>/<cooks>] <status> <batch>` | ⏳ 🔀 🧹 🍽️ ⏸️ ⛳ ⏹️ | Creates worktrees, launches Cooks, prevents conflicts, validates, merges, releases and closes. Never edits code |
 | Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.<c> <id4> <status> <batch>` | 🍳 🧹 🍽️ ⏸️ ⏹️ | Owns implementation, PRs, watches, docs, barrage delegation and triage, then reports readiness. Leaves merging to the Chef |
+| Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed or stalled threads and alerts its parent when repair is needed |
 | Barrage | Cook's delegate | `👀 <sop> · Cook <b>.<c> <id4>` | none | Reviews under the contract in its brief |
 
 `<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is its emoji and word, except ❓, which uses the item label. Put it before the subject, without `·` separators. A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
@@ -27,7 +28,7 @@ Read a title back after renaming. If it is stale, retry before ending the turn a
 
 ## Statuses
 
-Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
+Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. If T3 shows the pinned Head Chef failed and its Watchdog stopped, that failed row also needs Pascal's attention. Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
 
 | Status | Meaning | Final for |
 |---|---|---|
@@ -81,6 +82,8 @@ Use the status emoji caused by a handoff. Delivery counts when the parent receiv
 | ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Chef | Relays Pascal's answer to a review |
 | ⏹️ Cut `<card>` | Head Chef → Chef → Cook | Removes scope Pascal cut |
 | `Chef <b> <id4> is now threadId <id>, replacing <old threadId>` | New Chef → Cook | Transfers reporting to a replacement |
+| `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
+| `🐕 Watchdog <id4>: <finding>` | Watchdog → parent | Reports an interruption, exhausted wakes or a two-tick finding |
 
 ## When the Head Chef asks Pascal
 
@@ -107,6 +110,7 @@ Read only the SOP for your current role and step.
 | [chef-closing](sop/chef-closing.md) | Validating a stack, merging or closing the batch |
 | [cook-implement](sop/cook-implement.md) | Implementing, fixing, documenting, reporting, stopping or running retros |
 | [cook-review](sop/cook-review.md) | Delegating reviews or triaging results and watch wakes |
+| [watchdog](sop/watchdog.md) | Delegated per-parent tick, wake, alert and forbidden-combination checks |
 | [manic-1](sop/manic-1.md) | Delegated adversarial review |
 | [manic-2](sop/manic-2.md) | Delegated blast-radius review |
 | [manic-3](sop/manic-3.md) | Delegated docs review |
@@ -122,13 +126,13 @@ Copy the table and check off your role's steps:
 
 | # | Step | Owner and SOP |
 |---|---|---|
-| 0 | Align | Head Chef and Pascal, `head-chef` |
+| 0 | Align and arm Watchdog | Head Chef and Pascal, `head-chef` |
 | 1 | Implement, diagnose first for bug cards | Cook, `cook-implement` |
 | 2 | manic-1 and manic-2 side by side through interrogate | Cook leads, delegates and triages, `cook-review` |
 | 3 | Docs | Cook, `cook-implement` Docs |
 | 4 | manic-3 and manic-5 side by side through interrogate | Cook leads, delegates and triages, `cook-review`; manic-3 uses technical-writing |
 | 5 | Validation and merge | Chef, `chef-closing`; Head Chef for held batches |
-| 6 | Closing | Chef and Cook, `chef-closing` and `cook-implement` Retros |
+| 6 | Closing and remove Watchdogs | Head Chef, Chef and Cook, `head-chef`, `chef-closing` and `cook-implement` Retros |
 
 For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, and reports that choice. Fast track goes from Implement to the Cook's Ready section, then step 5.
 
@@ -152,14 +156,14 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>` or `<sop>-<b>.<c>-<k>`. Create both folders before work and remove the work folder before your final report, removing a barrage's detached worktree first. Recreate them when resumed. Append these instructions as an expanded `Work folder: <absolute path and instructions>` field to every launch message and barrage brief. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. The Head Chef and each Chef keep their work folders through the final report, delete their Watchdog schedules, cancel their tasks, then remove both their own and their Watchdog's work folders before settling. Recreate folders when resumed. Append these instructions as an expanded `Work folder: <absolute path and instructions>` field to every launch message and barrage brief. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
 
 ## Model selection
 
-The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects each barrage's table from `config.toml`.
+The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects each barrage's table from `config.toml`. The Head Chef and each Chef select `[watchdog]` for their own Watchdog.
 
 1. Read your selection with `t3_thread_configuration`. For a thread, choose `chef-on-claude` or `chef-on-codex` from the launching role's provider; for a barrage, choose `cook-on-claude` or `cook-on-codex` from the Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise resolve `instance` to a live provider instance in `orchestrator_capabilities`. Done when the provider and model exist
-2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`. Done when the catalog supports each option and every barrage uses the other provider
+2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the barrage rule. Done when the catalog supports each option, every barrage uses the other provider and every Watchdog uses its parent's provider
 3. Threads inherit runtime and interaction modes at launch; delegates inherit them from the Cook. Keep `runtime-mode = "inherit"` throughout the run, with no mode change. For launches use `modelSelection`; for delegations use `target`, renaming `instanceId` to `providerInstanceId`. Escalate an unavailable setting through the chain. Done when the selection is supported
 
 ## Report

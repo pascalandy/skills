@@ -13,8 +13,8 @@ Each step starts with its number and name. Chat messages start with `USER:` or `
 ```mermaid
 %%{init: {"sequence": {"diagramMarginX": 100}}}%%
 sequenceDiagram
-    accTitle: CU1 Statuses and Cook-owned reviews
-    accDescr: The Head Chef alone asks Pascal. Cooks serve frozen stacks; Chefs validate, merge, release and close before the Head Chef counts delivery.
+    accTitle: CU1 Statuses and Watchdogs
+    accDescr: The Head Chef alone asks Pascal. Parent Watchdogs wake stalled children or report faults. Chefs validate, merge, release and close before the Head Chef counts delivery.
     autonumber
     actor U as USER
     participant H as Head Chef
@@ -28,9 +28,20 @@ sequenceDiagram
         end
     end
     H->>H: Pin, register batches<br>❓ align → 🟢 working
+    H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
+    C->>C: Arm Chef Watchdog<br>Delegate owns its schedule
     C->>C: Group disjoint files,<br>create worktrees
     C->>K: Agent: Launch 🍳 Cook with ownership ->
+    Note over H,K: Watchdogs are hidden delegates, not participants<br>Each tick reads watch and wake files
+    opt Cook stalls or fails
+        C->>C: Watchdog queues one Cook wake<br>then alerts Chef after max-wakes
+        C->>C: Reconcile effects, resume<br>or replace Cook in its slot
+    end
+    opt Chef stalls or fails
+        H->>H: Watchdog queues one Chef wake<br>then alerts Head Chef after max-wakes
+        H->>H: Reconcile effects, resume<br>or replace Chef in its slot
+    end
     Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges
     Note over C,K: Step 1: Implement
     opt Bug card
@@ -98,12 +109,14 @@ sequenceDiagram
     K->>K: 🧹 Retros, unwatch, report<br>🍽️ final after merge, then settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
     C-->>H: Agent: ⛳ Batch delivered, report <-
+    C->>C: Delete Watchdog schedule<br>cancel task, remove work folder
     C->>C: Settle
     H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs<br>Prune worktree records
     H->>U: Agent: ⛳ x/y batches done, report <-
+    H->>H: Delete Watchdog schedule<br>cancel task, remove work folder
     H->>H: Settle and unpin
 ```
 
 At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns affected Cooks to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
 
-Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge already running finishes before the Chef stops.
+Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge or release already running finishes before each Chef follows Closing.

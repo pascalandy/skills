@@ -2,6 +2,8 @@
 
 Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, Stop or Closing when their trigger arrives. Apply [Statuses and Messages](../carpaccio.md#statuses) at phase entry and turn end. Stay 🍳 until `🍽️ Stack ready` reaches the Chef; show ⏸️ while awaiting the Chef's answer to a question.
 
+On `🐕 Watchdog <id4>: wake`, check T3, GitHub and the worktree for effects your current step may already have caused. Resume it, set your status and end without replying to the Watchdog. Before ending on 🍳 or 🧹 while waiting on delegates, a PR watch or a check, write or refresh `<work folder>/wait` as [watchdog](watchdog.md) defines; remove it when the wait ends.
+
 ## Implement
 
 1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every assigned card under the shared rules, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
