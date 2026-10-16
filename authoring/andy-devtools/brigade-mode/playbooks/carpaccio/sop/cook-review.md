@@ -1,5 +1,7 @@
 # cook-review
 
+The Cook stays 🍳 during barrages and triage. Apply [Statuses and Messages](../carpaccio.md#statuses) at phase entry and turn end.
+
 ## Delegate
 
 1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and both briefs use the same recorded heads
@@ -21,7 +23,7 @@ Contract: Review only; edit no project file. Work alone, with no subagent or oth
 
 ## Triage
 
-1. Wait for all currently running passes on the same heads, then use interrogate's `references/lead-judgment.md` to categorize every finding with a one-line reason: accept `Act on`; carry `Consider` in the 🚦 report for the Chef; reject `Noted` and `Dismissed` with their reasons. Keep reviewer attribution and what each checked in the verdict. Treat a CI failure or conflict as an accepted finding; judge external reviews like barrage findings. Done when every result and watch wake has a recorded decision
+1. Wait for all currently running passes on the same heads, then use interrogate's `references/lead-judgment.md` to categorize every finding with a one-line reason: accept `Act on`; carry `Consider` in the `🍽️ Stack ready` report for the Chef; reject `Noted` and `Dismissed` with their reasons. Keep reviewer attribution and what each checked in the verdict. Treat a CI failure or conflict as an accepted finding; judge external reviews like barrage findings. Done when every result and watch wake has a recorded decision
 2. Apply accepted findings through `cook-implement` Fix. Each barrage keeps its decisions and counts its own normal passes against `max-passes`. If a fix needs review and passes remain, delegate a fresh pass with the full brief and prior rounds. Otherwise record why its review ended. Done when each review ended or a new taskId is recorded
 3. When the last allowed pass yields any fix, including docs, delegate one extra pass limited to that fix. This pass is final; list any fix it yields under what you could not confirm. Done when that final result is triaged and any unreviewed fix is reported
 
