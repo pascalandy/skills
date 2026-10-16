@@ -1,17 +1,15 @@
 # Fix Root Causes
 
-When debugging, do not fix symptoms. Trace every problem to its root cause and fix it there. To find the root cause of a runtime failure, run the **diagnose** skill.
+When debugging, fix the fault, not the place where it surfaced. The symptom is where a wrong state became visible. The root cause is the first place the system did something it should not do, or failed to handle a state it should handle. To find it in a runtime failure, run the **diagnose** skill.
 
-**Why:** Symptom fixes accumulate. Each workaround makes the system harder to reason about, and the real bug remains. Root-cause fixes are slower upfront but reduce total debugging time.
+**Why:** A symptom fix hides the evidence and leaves the fault free to surface somewhere else. Each one makes the system harder to reason about, because the code now carries a workaround for a bug that nobody named.
 
 **Pattern:**
 - Facts and a control first, then reproduce with parity
-- The root cause is the hypothesis, or the minimal combination of hypotheses, that explains every signal and that no fact contradicts
-- Do not add guards (adding a nil check to silence a crash is a symptom fix)
-- If a workaround needs a paragraph-long comment to justify it, the code is wrong (fix the code, not the comment)
-- Check for the pattern, not just the instance (grep for the same pattern, fix all instances)
+- Accept as the cause only the hypothesis, or the minimal combination of hypotheses, that explains every signal and that no fact contradicts
 - When stuck, descend one layer: gather the same readings one level down the stack, against the same control. Don't guess
-
-**Restart bugs: suspect state before code**
-
-When something "fails after restart," suspect stale persistent state first: config files, caches, lock files, serialized state. If clearing a state file restores behavior, prioritize state validation as the fix.
+- Ask whether the state that triggered the symptom is legitimate. If the system may be in that state, the code that broke on it is the root cause, and handling the state there is the fix. If the state should never exist, a check where it broke hides the bug, so find what produced the state. Guards, retries, swallowed errors, clamped values, and discarded state are the usual ways to hide a bug
+- When something fails only after a restart, suspect persisted state first: config files, caches, lock files, serialized state
+- Check for the pattern, not just the instance. Find every place with the same fault and fix them all
+- If a workaround needs a paragraph-long comment to justify it, the code is wrong. Fix the code, not the comment
+- If the deciding fact took a deep dig to find, propose the cheap, always-on reading that would have shown it at first look

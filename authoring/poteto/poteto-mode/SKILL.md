@@ -70,6 +70,7 @@ Each entry links a principle's file and says when it applies.
 - [Fix Root Causes](principles/fix-root-causes.md): debugging
 - [Sequence Work into Verifiable Units](principles/sequence-verifiable-units.md): multi-step work, such as sweeps, migrations, and runs of similar edits, and how you stack commits and PRs
 - [Test Behavior, Not Implementation](principles/test-behavior-not-implementation.md): writing, changing, or keeping a test
+- [Explain the Number](principles/explain-the-number.md): about to trust, report, or act on a number you measured, such as a speedup, a regression, a latency, or an eval result
 
 **Delegation**
 
