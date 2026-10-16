@@ -4,7 +4,7 @@ description: "Answer a read-only question about how code works, why it was built
 
 ### Investigation
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own the answer. Plan, route, write.**
 
