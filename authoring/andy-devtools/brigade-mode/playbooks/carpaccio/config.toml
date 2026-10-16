@@ -17,25 +17,25 @@ retro = true # Chef: run its closing retros
 [cook]
 chef-on-claude = { inherit = true } # Chef: Cook selection
 chef-on-codex = { inherit = true } # Chef: Cook selection
-delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" } # Cook on Claude: side work target
+delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Cook on Claude: side work target
 retro = true # Chef: request Cook retros
 
 [manic-1] # Cook: step 2, beside manic-2
-cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
 max-passes = 3 # Cook: normal pass limit
 
 [manic-2] # Cook: step 2, beside manic-1
-cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
 max-passes = 2 # Cook: normal pass limit
 
 [manic-3] # Cook: step 4, beside manic-5
-cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" }
 max-passes = 2 # Cook: normal pass limit
 
 [manic-5] # Cook: step 4, beside manic-3
-cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
 max-passes = 2 # Cook: normal pass limit
