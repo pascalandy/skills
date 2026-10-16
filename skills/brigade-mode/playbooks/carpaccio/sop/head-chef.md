@@ -29,7 +29,15 @@ Work folder: <expand Work folders in carpaccio.md>
 
 ## Coordinate
 
-On each wake, check your Watchdog's schedule in `list_scheduled_tasks`; read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time. If missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming. On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state, then resume, replace or reconcile the child. Raise `❓ fault` only if you cannot repair it. On `🐕 Watchdog <id4>: wake`, check whether the action already happened, resume the current step, recompute your status and end without replying. Before ending on 🟢 while waiting for a child, write or refresh the `wait` file as [watchdog](watchdog.md) defines. Done when the schedule is live and each finding has an owner.
+On each wake, reconcile your Watchdog and its findings:
+
+- Check the schedule in `list_scheduled_tasks`. If it exists, read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time
+- If the schedule is missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming
+- On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state. Resume, replace or reconcile the child. Raise `❓ fault` only if you cannot repair it
+- On `🐕 Watchdog <id4>: wake`, check whether the action already happened. Resume the current step, recompute your status and end without replying
+- Before ending on 🟢 while waiting for a child, write or refresh the `wait` file as [watchdog](watchdog.md) defines
+
+Done when the schedule is live and each finding has an owner.
 
 1. Record each Chef's received phase and answer its questions from the agreed requirements. If you need Pascal's answer, show `❓ question Chef <b>` or the matching trigger label. Relay the answer; otherwise decide, split the batch or replace its Chef. Done when each escalation has an owner and next action
 2. On `🍽️ Batch ready`, check the shared Report and ask Pascal for review only under the [merge review trigger](../carpaccio.md#when-the-head-chef-asks-pascal). Keep other batches running. Relay `🔀 Merge`, `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop` as Pascal decides. A Hold remains live; show `❓ held batch <b>` only when nothing else progresses. A Drop is a scope cut and must come from Pascal. Done when each ready batch has a decision
@@ -41,8 +49,23 @@ On each wake, check your Watchdog's schedule in `list_scheduled_tasks`; read its
 
 When a Chef cannot continue, inspect the old thread and PRs before retrying or relaunching anything. Keep the batch slot and the Cooks' worktrees.
 
-1. Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it. Find its Watchdog childThreadId in the old Chef's watch file or the schedule's boundThreadId. Delete any Watchdog schedule by title and bound threadId; if deletion fails, send its exact childThreadId `delete your schedule` and wait. The Watchdog task belongs to the old Chef, so stop its childThreadId with `t3_thread_interrupt`, then list and cancel its queued runs with `t3_queue_list` and `t3_queue_cancel`. Verify no schedule, active run or queued turn remains before launching a replacement; escalate `❓ fault` if it cannot be stopped. Interrupt the old Chef, cancel its queued turns and rename it ⏹️. Read its cards, branch heads, PR URLs, review rounds and decisions. Done when neither the old Chef nor its Watchdog can act on the slot
-2. Launch a new Chef in the same project and slot at ⏳ with that state, then update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId. The new Chef links and watches the PRs, arms its Watchdog and tells every Cook its new threadId using the replacement message in Messages. Done when each Cook reports to the new Chef
+1. Stop the old Chef and its Watchdog:
+   - Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it
+   - Find its Watchdog childThreadId in the old Chef's watch file or the schedule's boundThreadId
+   - Delete any Watchdog schedule by title and bound threadId. If deletion fails, send its exact childThreadId `delete your schedule` and wait
+   - Stop the Watchdog childThreadId with `t3_thread_interrupt` because its task belongs to the old Chef. List its queued runs with `t3_queue_list`, then cancel them with `t3_queue_cancel`
+   - Before launching a replacement, verify that no Watchdog schedule, active run or queued turn remains. If the Watchdog cannot be stopped, escalate `❓ fault`
+   - Interrupt the old Chef. Cancel its queued turns and rename it ⏹️
+   - Read the old Chef's cards, branch heads, PR URLs, review rounds and decisions
+
+   Done when neither the old Chef nor its Watchdog can act on the slot
+
+2. Launch the replacement Chef:
+   - Launch a new Chef in the same project and slot at ⏳ with that state and the replacement procedure in [chef-run](chef-run.md#return-or-replace-a-cook)
+   - Update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId atomically
+
+   Done when the new Chef's Watchdog is armed, its PRs are linked and watched, and each Cook reports to the new Chef
+
 3. Archive the old thread. Ignore a late report from it. Done when the sidebar has one Chef for the slot
 
 ## Split a batch
