@@ -4,7 +4,7 @@ description: "Diagnose a captured profiling artifact such as a CPU profile, trac
 
 ### Trace forensics
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own the diagnosis from the artifact. Load it, shape it, narrow to the cause, attribute to source.**
 

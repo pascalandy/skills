@@ -4,7 +4,7 @@ description: "Make two UI implementations match pixel for pixel, or migrate a st
 
 ### Visual parity
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own pixel-exact equivalence. The baseline is the spec. You do not touch it.** Equivalence is verified by image diff, not by eye.
 

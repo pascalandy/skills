@@ -4,7 +4,7 @@ description: "Diagnose and fix a reported defect with runtime evidence."
 
 ### Bug fix
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own this task. Plan, review, verify.** Delegate investigation and the fix to subagents, stay in the lead.
 

@@ -4,7 +4,7 @@ description: "Independently verify each PR of a green stack, then land the verif
 
 ### Shipping
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own what lands. Verify each PR independently, land only the verified run from the root, then keep your hands off the queue.**
 

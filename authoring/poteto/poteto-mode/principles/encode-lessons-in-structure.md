@@ -10,7 +10,16 @@ When you catch yourself writing the same instruction a second time:
 2. If yes, encode it. Delete the instruction
 3. If no (requires judgment), make the instruction more prominent and add an example of the failure mode
 
-**Pick the strongest mechanism.** When more than one mechanism would work, choose the strongest the situation allows (an unrepresentable state that cannot compile, then a lint or banned API that fails CI, then a canonical helper, then a runtime check), because agents copy whatever the surrounding code already does and a weaker guard becomes the next template.
+**Pick the strongest mechanism.** When more than one mechanism would work, choose the strongest the situation allows, in this order:
+1. An architecture where the mistake has no place: one owner per piece of state, one supported way per task, internals hidden so the wrong import fails, one source of truth instead of hand-synced lists, and no old way or dead code left to copy
+2. A type that makes the bad state unrepresentable
+3. A lint or banned API that fails the check command with an error naming the file, type, or function to use instead. When the pattern is already common, fail only when a change adds more
+4. A canonical helper
+5. A runtime check
+6. A test of the behavior, per **Test Behavior, Not Implementation**
+7. An instruction, only for a judgment call
+
+Agents copy whatever the surrounding code already does, so a weaker guard becomes the next template. When the user invokes `correct`, that skill applies this ladder across a whole repository.
 
 **Corollary:** If the fix is structural, only use the structural fix. The instruction is the symptom.
 

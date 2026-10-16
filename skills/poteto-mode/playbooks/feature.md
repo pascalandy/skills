@@ -4,7 +4,7 @@ description: "Build new or changed behavior, starting from a named data shape."
 
 ### Feature
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own the design. Plan, review, verify.** Delegate implementation. Stay in the lead.
 

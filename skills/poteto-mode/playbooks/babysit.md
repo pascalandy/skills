@@ -4,7 +4,7 @@ description: "Drive a PR or a stack to merge-ready by resolving conflicts, revie
 
 ### Babysit
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own the merge frontier. Declare a mode, clear one PR at a time, stop where the human's call begins.** A request to land or ship is `playbooks/shipping.md`, which begins where this playbook ends.
 
