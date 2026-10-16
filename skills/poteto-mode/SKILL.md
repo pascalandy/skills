@@ -6,7 +6,7 @@ kind: "dev"
 
 # Poteto mode
 
-Read [agent runtime](references/agent-runtime.md) before choosing tools, models, delegation, history, or continuation. It defines the shared capability checks and fallbacks for Codex, Claude Code, Pi, and OpenCode. Repository rules and user authorization govern which playbook actions apply.
+Read [agent runtime](references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill. It splits the runtime rules with the **t3-runtime** skill. Repository rules and user authorization govern which playbook actions apply.
 
 For the rationale, capability mapping, and remaining limitations, read [portability notes](references/portability-notes.md).
 
@@ -92,11 +92,7 @@ Each entry links a principle's file and says when it applies.
 
 ## Subagents
 
-When delegation helps, brief each worker as the [agent runtime](references/agent-runtime.md#delegate-by-capability) describes, and pick its role, model, and reasoning level from what the session's delegation tool supports.
-
-Prefer asynchronous workers for independent tasks when the runtime supports them. Give reviewers the tools needed to inspect evidence and constrain them to read operations. Supply accessible file pointers or self-contained excerpts. Follow the runtime reference for supervision, nesting limits, shared checkouts, and remote execution.
-
-You own every subagent's work. Inspect the actual diff and evidence, then write your own summary. When an agent is interrupted, provide a consolidated brief before it continues. A second opinion requires a separate reviewer. Self-review does not satisfy an independent verification gate.
+When delegation helps, delegate as the [agent runtime](references/agent-runtime.md#delegate-by-capability) describes: the brief, fresh workers, your ownership of their results, and independent verification.
 
 ## Writing the reply
 
