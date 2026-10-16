@@ -96,6 +96,7 @@ A mode's routes run through that mode's SKILL.md.
 ## Skills
 
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
+- `asd-ste100`: Use when writing, rewriting, or reviewing an English spec, GitHub issue, or idea with ASD-STE100 Simplified Technical English (STE), or when a request cites an `STE_NN` checklist ID.
 - `brainstorm`: Use only when explicitly invoked as `brainstorm`.
 - `concise`: Use when the user requests to be more concise.
 - `feel-me`: Use when explicitly invoked as `feel me`, `same page`, or `same foot`, or when the user says they want to be on the same page or aligned with the agent.
