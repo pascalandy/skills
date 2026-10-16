@@ -8,7 +8,7 @@ kind: "dev"
 
 Read [agent runtime](references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill. It splits the runtime rules with the **t3-runtime** skill. Repository rules and user authorization govern which playbook actions apply.
 
-For the rationale, capability mapping, and remaining limitations, read [portability notes](references/portability-notes.md).
+Before syncing with upstream pstack, read [pstack sync](references/pstack-sync.md): the base of the last sync, and what it took or left.
 
 ## Non-negotiables
 
