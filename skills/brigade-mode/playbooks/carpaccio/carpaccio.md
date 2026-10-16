@@ -97,10 +97,10 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 | Choice | Rule | Decides |
 |---|---|---|
 | Parallel or serial | If the groups touch disjoint files and have no dependency, run them in parallel. If you have a doubt, run them in series. Stay within `max-parallel` and `max-cooks`. Never run two batches of one repository at the same time | Head Chef for batches, Chef for Cooks |
-| Merge | Batch confidence is the lowest Cook confidence. If it is at least `[chef].merge-confidence` and no `Act on` finding is open, merge and send `🔀 Batch merging`. Otherwise, send `🍽️ Batch ready`; the Head Chef then asks `🙋 merge` | Chef |
+| Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. If the requirements and required checks are met and you can explain why the remaining risk does not change the result, state your confidence, evidence and low-impact remainder in the Report, then merge with `🔀 Batch merging`. If a material uncertainty remains after you try to resolve it, send `🍽️ Batch ready` with your recommendation; the Head Chef asks Pascal one `🙋 merge` question | Chef |
 | Release | If the `AGENTS.md` or release doc of the repository requires a release after a merge, release. Otherwise, do not release | Head Chef, at Align |
 | Docs | Put the doc change of a card in the layer of that card. Open a top docs PR only for docs that no card owns | Cook |
-| Another machine, such as macOS | Run the check on that machine with 🧰 fleet, from the machine of the run. Do not skip it because it is on another machine. A check that is still not confirmed at Ready, such as a keychain prompt or a machine that is offline, caps confidence below `merge-confidence`. Name that check and its exact command | Cook; Chef reads the output |
+| Another machine, such as macOS | Run the check on that machine with 🧰 fleet, from the machine of the run. Do not skip it because it is on another machine. If a required check remains unconfirmed at Ready, name the check, its exact command and the blocker; the Chef asks Pascal before merging. For an optional check, the Chef explains why its absence cannot change the result | Cook; Chef reads the output |
 | Pascal-owned card ready, such as a mockup | Align marks these cards in the Plan. When such a card is ready, send `🙋 <card> : <URL>` up the chain at once. Keep the other work running | Cook sends; Head Chef posts |
 | Work after Close | Reopen the run. Align the addition, write `rules.md` again, re-arm the Watchdog and launch a Chef | Head Chef |
 | Anything else with a safe default, such as a cost trade-off | If you have the context, decide and log it. Otherwise, send it one level up with your default | The lowest role that has the context |
@@ -110,7 +110,7 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 Only these items produce ❓. For one item, label the title `align`, `merge <b>`, `scope`, `reserved action`, `fact`, `fault <what>`, `held batch <b>` or `card <card>`. For two or more items, label it `<n> for you`.
 
 1. Align: requirements and batches, or work added during the run. Never ask Pascal a choice that a Decisions row covers
-2. Merge that the merge rule in Decisions does not allow
+2. Merge with a material uncertainty that the Chef cannot resolve under Decisions
 3. Scope cut of a card, batch or required deliverable
 4. Reserved action: deleting data, leaving the agreed repositories or force-pushing a branch the run did not create
 5. Fact only Pascal knows, such as diagnose's one question when Align did not answer it
@@ -118,7 +118,7 @@ Only these items produce ❓. For one item, label the title `align`, `merge <b>`
 7. Held batch once nothing else in the run can progress
 8. Pascal-owned card ready, per Decisions
 
-Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 ? 85 % : test macOS non confirmé` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the confidence and the reason this batch needs Pascal. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
+Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 sans test macOS requis ? Confiance incertaine ; je recommande d'attendre` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the material uncertainty and the Chef's recommendation. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
 
 Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️. A change to its own diff needs a new merge decision. Stop voids an unused approval. After `max-returns` returns of one stack for the same cause, the Chef sends its history up the chain as item 6. Before you retry a launch, merge, deploy or release, look in T3, GitHub or the deploy output to see if that action already occurred.
 
@@ -206,11 +206,11 @@ The Head Chef's Close removes the cache folders. Thus a message to Pascal cites 
 PR: #<n> <sha> · #<n> <sha>, checks <state>
 Reviews: <accepted> accepted, <rejected> rejected
 Not confirmed: <what and the command that would confirm it, or none>
-Confidence: <n>%
+Confidence: <level, evidence and remaining risk>
 Detail: <Cook threadId>
 ```
 
-`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, batch confidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
+`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
 
 Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. For the final report, use this template:
 

@@ -85,11 +85,11 @@ sequenceDiagram
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
-        alt Confidence at least merge-confidence and no open Act on finding
+        alt Requirements and checks met; Chef confident after Pareto 90-10 review
             C-->>H: Agent: 🔀 Batch 1 merging <-
-        else Merge rule not met
+        else Material uncertainty remains
             C-->>H: Agent: 🍽️ Batch ready at x/x <-
-            H->>U: Agent: 🙋 merge #… ? <-
+            H->>U: Agent: 🙋 merge #… ? reason and recommendation <-
             U->>H: USER: Merge ->
             H->>C: Agent: 🔀 Merge ->
         end
