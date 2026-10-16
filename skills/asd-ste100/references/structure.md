@@ -65,9 +65,9 @@ Edge cases:
 - Put requirements, limits, and expected test results in the applicable step.
 - A note sentence uses the descriptive length limit.
 
-## STE_17 Risk note before the risky step
+## STE_17 Risk note before the risky instruction
 
-Place the risk note before the step that can cause harm. After its label, give the safe action or condition, then state the consequence.
+Place the risk note before the instruction that can cause harm. After its label, give the safe action or condition, then state the consequence.
 Permits: Software risks can use the project's own labels. Issue 9 requires a consequence when the consequence can be identified.
 Rules: 7.1, 7.2, 7.3.
 Before: "1. Confirm that the selected database is the disposable test database, then reset the selected database. Note: The reset deletes all rows."

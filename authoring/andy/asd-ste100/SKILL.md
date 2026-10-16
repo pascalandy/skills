@@ -35,8 +35,8 @@ Choose the branch that matches the request:
 
 1. Collect the project glossary from the repository, request, and user.
    Done when each thing named in the target text has one name.
-2. Sort the content into descriptive text, steps, and risk notes.
-   Done when each block belongs to one of these three types.
+2. Sort the content into descriptive text, instructions, notes, and risk notes.
+   Done when each block belongs to one of these four types.
 3. Draft or rewrite the target text against the checklist.
    For a rewrite, change the wording only, and keep every fact, number, condition, actor, scope limit, and open question.
    When the source leaves an actor, a condition, or the meaning of a term unknown, keep it as an open question instead of inventing an answer.
@@ -51,7 +51,7 @@ Choose the branch that matches the request:
 
 ## Review
 
-1. Mark descriptive text, steps, and risk notes in the target text.
+1. Mark descriptive text, instructions, notes, and risk notes in the target text.
    Use the applicability table below. Done when each block has a type.
 2. Check each applicable item, starting with STE_01, STE_07, STE_15, STE_02, STE_06, and STE_12.
    When the text leaves an actor, a condition, or the meaning of a term unknown, report an open question instead of inventing the answer.
@@ -83,7 +83,7 @@ Use each item for the text types in this table:
 | STE_01–STE_13 | All text |
 | STE_14–STE_15 | Instructions |
 | STE_16 | Notes |
-| STE_17 | An instruction that carries a risk |
+| STE_17 | An instruction that can cause harm |
 
 In the Pass line, mark an item that does not apply as `n/a`.
 
@@ -113,7 +113,7 @@ In the Pass line, mark an item that does not apply as `n/a`.
 - [ ] **STE_14 One instruction per step**: Each step gives one action, in command form, after any leading condition. Sequential actions have separate steps. Simultaneous actions may share a step. _(Issue 9: 5.2, 5.3)_
 - [ ] **STE_15 Condition before command**: A condition, prerequisite, or purpose precedes the command that it governs. _(Issue 9: 5.4)_
 - [ ] **STE_16 Notes hold no instructions**: A note contains information only. Steps or risk notes hold actions, requirements, and risks. The steps work without the notes. _(Issue 9: 5.5)_
-- [ ] **STE_17 Risk note before the risky step**: Before a risky step, a risk note gives a label, a safe action or condition, and the consequence. Risks include data loss, production failure, secret exposure, and irreversible changes. _(Issue 9: 7.1, 7.2, 7.3)_
+- [ ] **STE_17 Risk note before the risky instruction**: Before an instruction that can cause harm, a risk note gives a label, a safe action or condition, and the consequence. Risks include data loss, production failure, secret exposure, and irreversible changes. _(Issue 9: 7.1, 7.2, 7.3)_
 
 IDs never change and are never reused. To change an item, move its line under `### Voided` with `void <date>, replaced by STE_NN`. Give the new item the next free ID.
 
