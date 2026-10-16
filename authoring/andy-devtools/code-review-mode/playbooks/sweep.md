@@ -22,11 +22,11 @@ Sweep progress:
 
 **Step 1: Learn the project.** Read `AGENTS.md`, `README.md`, and the docs they name for the target. Done when you can state in one sentence what the target is for.
 
-**Step 2: Trace flows.** Pick files at random across the target. Follow each into the files it imports and the files that import it, until you can say which workflow it serves. Then read that workflow for bugs: wrong conditions, swallowed errors, and callers that break a callee's contract. Done when traced flows cover every top-level folder of the target that holds code.
+**Step 2: Trace flows.** Pick files at random across the target's maintained code, leaving out generated and vendored files. Follow each into the files it imports and the files that import it, until you can say which workflow it serves. Then read that workflow for bugs: wrong conditions, swallowed errors, and callers that break a callee's contract. Done when traced flows cover every top-level folder of that code.
 
-**Step 3: Hunt hard-coded values.** Find literals that must change for the code to stay correct: paths, hosts, limits, dates, versions, and copies of a value that lives elsewhere. Done when you have judged each literal you found as a finding or as fine.
+**Step 3: Hunt hard-coded values.** Find literals that must change for the code to stay correct: paths, hosts, limits, dates, versions, and copies of a value that lives elsewhere. Done when you have searched every folder that step 2 covered and judged each literal you found as a finding or as fine.
 
-**Step 4: Hunt unfinished code.** Find `TODO` and `FIXME` markers, comments that promise later behavior such as "will" or "for now", stubs that return a placeholder, and mocks or fakes that production code can reach. When the `mock-code-finder` skill is installed, run it on the target for this step. Done when you have judged each match as a finding or as fine.
+**Step 4: Hunt unfinished code.** Find `TODO` and `FIXME` markers, comments that promise later behavior such as "will" or "for now", stubs that return a placeholder, and mocks or fakes that production code can reach. Done when you have searched every folder that step 2 covered and judged each match as a finding or as fine.
 
 **Step 5: Prove each finding.** Back each finding with what you observed: a call path, a command and its output, a failing test, or the line that contradicts the docs. Drop each finding you cannot prove. Done when every finding left carries its proof.
 
@@ -40,4 +40,4 @@ Sweep progress:
 - Severity: high | medium | low
 ```
 
-Order the issues by severity. The drafts are the deliverable. File them only when the request asks. Done when every proven finding sits in exactly one issue.
+Order the issues by severity, then list the folders you swept and the ones you left out. The drafts are the deliverable. File them only when the request asks. Done when every proven finding sits in exactly one issue.
