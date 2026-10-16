@@ -11,6 +11,7 @@ This glossary is for Pascal designing a brigade.
 | Head Chef | Bridges needs and requirements, splits batches and guides Chefs. In carpaccio, holds merges only for Pascal's validation or low confidence. Not in arancini | New |
 | Chef | In bisque and carpaccio, coordinates a batch for the Head Chef. In carpaccio, launches Cooks, prevents conflicts, validates, merges, releases and closes | MAIN |
 | Cook<n> | Owns its worktree and stack. In carpaccio, also writes docs, watches PRs, delegates reviews and triages findings | COD<n> |
+| Watchdog | A Head Chef's or Chef's hidden delegate, scheduled in its own thread to wake or report stalled and failed work in carpaccio | New |
 | DocWriter<n> | Writes docs in arancini and bisque; not in carpaccio | DOC<n> |
 
 ## Barrages

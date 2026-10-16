@@ -1,10 +1,10 @@
 # head-chef
 
-Keep a registry in your conversation: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last reported phase and outcome. Apply [Statuses, Messages and triggers](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
+Keep the batch registry in `watch.toml` in your work folder: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last received phase, hold and outcome. Include the watched slots and Watchdog ids required by [watchdog](watchdog.md). Write it atomically after each launch, received report, status or subject change, hold, scope change and replacement. Apply [Statuses, Messages and triggers](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
 
 ## Align
 
-1. Rename yourself `Head Chef <id4> 0/0 🟢 working <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Show `❓ align` while waiting for his answers. Done when the pinned title matches the current work or wait
+1. Rename yourself `Head Chef <id4> 0/0 🟢 working <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md) after pinning. Show `❓ align` while waiting for his answers. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
 2. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch ask Pascal: validate before merge, parallel Cooks, release at the end? Record those answers; set `Fast track` from the invocation or Pascal's request, otherwise no. Update the title with the in-scope batch count. Done when the batches, choices and title agree
 
 ## Launch
@@ -12,7 +12,7 @@ Keep a registry in your conversation: batch number, name, repository, projectId,
 Run batches in series unless Pascal requests parallel batches, then respect `max-parallel`. Never run two batches of the same repository at once. Wait for its prior batch to be final, even if its PRs have merged. Wait for dependencies to be delivered. Escalate a dependency that ends without delivery.
 
 1. Select the Chef using Model selection in `carpaccio.md`. Find the repository's project with `t3_project_list`, or create it with `t3_project_create`. If unavailable, ask Pascal to add it. Done when the registry has a projectId and supported selection
-2. Before a retry, check whether a launch already created the Chef. Launch with `t3_thread_launch`, the registry's explicit `projectId`, `workspaceStrategy: {type: "root"}`, the Chef title from Roles at ⏳, and the message below. Retain its threadId. Done when `t3_thread_read` shows it started in that project and the registry holds its threadId
+2. Before a retry, check whether a launch already created the Chef. Launch with `t3_thread_launch`, the registry's explicit `projectId`, `workspaceStrategy: {type: "root"}`, the Chef title from Roles at ⏳, and the message below. Retain its threadId and add the Chef slot to `watch.toml` atomically. Done when `t3_thread_read` shows it started in that project and the registry holds its threadId
 
 ```text
 $brigade-mode ; carpaccio ; chef-run
@@ -29,6 +29,8 @@ Work folder: <expand Work folders in carpaccio.md>
 
 ## Coordinate
 
+On each wake, check your Watchdog's schedule in `list_scheduled_tasks`; read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time. If missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming. On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state, then resume, replace or reconcile the child. Raise `❓ fault` only if you cannot repair it. On `🐕 Watchdog <id4>: wake`, check whether the action already happened, resume the current step, recompute your status and end without replying. Before ending on 🟢 while waiting for a child, write or refresh the `wait` file as [watchdog](watchdog.md) defines. Done when the schedule is live and each finding has an owner.
+
 1. Record each Chef's received phase and answer its questions from the agreed requirements. If you need Pascal's answer, show `❓ question Chef <b>` or the matching trigger label. Relay the answer; otherwise decide, split the batch or replace its Chef. Done when each escalation has an owner and next action
 2. On `🍽️ Batch ready`, check the shared Report and ask Pascal for review only under the [merge review trigger](../carpaccio.md#when-the-head-chef-asks-pascal). Keep other batches running. Relay `🔀 Merge`, `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop` as Pascal decides. A Hold remains live; show `❓ held batch <b>` only when nothing else progresses. A Drop is a scope cut and must come from Pascal. Done when each ready batch has a decision
 3. Record `🔀 Batch merging` and `Batch merged` as notices, without incrementing the counter. On `⛳ Batch delivered` or `⏹️ Batch stopped`, record the final outcome and update the title. Start newly eligible batches. On merge failure, retain the landed PRs while the Chef has its Cook fix the cause. Done when the registry and title match received outcomes
@@ -39,18 +41,18 @@ Work folder: <expand Work folders in carpaccio.md>
 
 When a Chef cannot continue, inspect the old thread and PRs before retrying or relaunching anything. Keep the batch slot and the Cooks' worktrees.
 
-1. Interrupt the old Chef, cancel queued turns and rename it ⏹️. Read its cards, branch heads, PR URLs, review rounds and decisions. Done when the old thread cannot act on its slot
-2. Launch a new Chef in the same project and slot at ⏳ with that state, then update the registry's threadId. The new Chef links and watches the PRs and tells every Cook its new threadId using the replacement message in Messages. Done when each Cook reports to the new Chef
+1. Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it. Delete its Watchdog schedule by title and bound threadId, then cancel its Watchdog task. Interrupt the old Chef, cancel queued turns and rename it ⏹️. Read its cards, branch heads, PR URLs, review rounds and decisions. Done when neither the old Chef nor its Watchdog can act on the slot
+2. Launch a new Chef in the same project and slot at ⏳ with that state, then update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId. The new Chef links and watches the PRs, arms its Watchdog and tells every Cook its new threadId using the replacement message in Messages. Done when each Cook reports to the new Chef
 3. Archive the old thread. Ignore a late report from it. Done when the sidebar has one Chef for the slot
 
 ## Split a batch
 
-Split card groups without adding or cutting cards or required deliverables. Mark the old Chef as replaced, interrupt and archive it at ⏹️, preserve its Cooks' worktrees and branch heads, and remove its batch slot from the count. Register the successor batches and assign every card and Cook to exactly one successor. A Cook whose cards move to another owner closes at ⏹️. Launch successors under the one live batch per repository rule. The first Chef adopts its assigned live Cooks with the replacement message. Cooks assigned to a queued successor close at ⏹️ with their work preserved; that successor relaunches them in the same worktrees. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
+Split card groups without adding or cutting cards or required deliverables. Set the old Chef's `replacedBy = "split"` in `watch.toml`, delete its Watchdog schedule, and cancel its task before interrupting and archiving it at ⏹️. Preserve its Cooks' worktrees and branch heads, and remove its batch slot from the count. Register the successor batches as current or queued slots in `watch.toml`, then assign every card and Cook to exactly one successor. A Cook whose cards move to another owner closes at ⏹️. Launch successors under the one live batch per repository rule. The first Chef adopts its assigned live Cooks with the replacement message. Cooks assigned to a queued successor close at ⏹️ with their work preserved; that successor relaunches them in the same worktrees. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
 
 ## Status, added work and Stop
 
 - For status, list threads in each project with `titleContains: <id4>` and read the PRs. Give one line per batch with Chef, phase, PRs and what it awaits. Recompute your own title before ending the turn. Done when every batch is covered
-- For new work, repeat Align, add batches and update the title. Reopen and pin your thread first if the run had ended. Done when the registry includes the agreed additions
+- For new work, repeat Align, add batches and update the title. Reopen and pin your thread first if the run had ended; recreate `watch.toml` and re-arm your Watchdog. Done when the registry includes the agreed additions and its schedule is live
 - On Pascal's Stop, clear open review items, launch no further batch and send `⏹️ Stop` to every active Chef. Mark unlaunched batches stopped in the registry. Wait for each launched Chef, including any merge already running, then Close. Done when every batch has an outcome
 
 ## Close
@@ -58,4 +60,4 @@ Split card groups without adding or cutting cards or required deliverables. Mark
 Begin once each launched Chef is final and settled, and every queued batch ran, was cut or stopped. Show 🟢 during your own closing work.
 
 1. If `[head-chef].retro`, follow [shared Retros](../carpaccio.md#retros). Done when each has issue links or a recorded no-findings result
-2. Confirm each launched Chef is settled using 🧰 t3-runtime and finish shared Work folders cleanup. Compute ⛳ or ⏹️ from the final outcomes, send Pascal `<status> <done>/<batches> batches done` with the shared Report, then settle. Done when every batch has an outcome, Pascal has the report and your settle returns `settlesWhenTurnEnds: true`
+2. Confirm each launched Chef is settled using 🧰 t3-runtime and clean up the completed child work folders. Compute ⛳ or ⏹️ from the final outcomes and send Pascal `<status> <done>/<batches> batches done` with the shared Report. Mark your own final report received in `watch.toml` and set the title to the final status. As the last step before settling, delete your Watchdog's schedule, cancel its task and remove its work folder and your own, then remove the run's root cache folder. Then settle. Done when every batch has an outcome, Pascal has the report, no Watchdog schedule remains and your settle returns `settlesWhenTurnEnds: true`
