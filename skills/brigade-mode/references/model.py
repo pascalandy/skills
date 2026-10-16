@@ -130,7 +130,7 @@ CHEF_KINDS = {
 }
 CHEF_FINAL = {"⛳", "⏹️cut", "⏹️stop"}
 # pm_item: an open PM item of the Head Chef's own: Align or added work, a scope cut,
-# a reserved action, a fact only the PM knows, a fault it cannot repair (triggers 1, 3 to 6).
+# a reserved action, a fact only the PM knows, a fault it cannot repair (items 1, 3 to 6 and 8).
 HC_FACTS = ("pm_item", "own", "stop")
 
 

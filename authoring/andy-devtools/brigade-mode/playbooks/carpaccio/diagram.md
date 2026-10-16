@@ -24,10 +24,10 @@ sequenceDiagram
     rect rgba(140, 170, 238, 0.18)
         loop Until agreement
             U->>H: USER: Plan and requirements ->
-            H->>U: Agent: Validate, parallel Cooks,<br>release for each batch? <-
+            H->>U: Agent: Batches, choices from Decisions <-
         end
     end
-    H->>H: Pin, register batches<br>❓ align → 🟢 working
+    H->>H: Pin, register batches<br>❓ align → 🟢
     H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
     C->>C: Arm Chef Watchdog<br>Delegate owns its schedule
@@ -85,11 +85,11 @@ sequenceDiagram
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
-        alt Validate no and confidence at least merge-confidence
+        alt Confidence at least merge-confidence
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Marked or lower confidence
             C-->>H: Agent: 🍽️ Batch ready at x/x <-
-            H->>U: Agent: ❓ review batch 1, report <-
+            H->>U: Agent: 🙋 merge #… ? <-
             U->>H: USER: Merge ->
             H->>C: Agent: 🔀 Merge ->
         end

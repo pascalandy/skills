@@ -16,13 +16,13 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 
 | Role | Runs as | Title | Statuses | Responsibility |
 |---|---|---|---|---|
-| Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, launches and guides Chefs, resumes coordination on escalation. Never edits code or opens PRs |
+| Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, launches and guides Chefs, resumes coordination on escalation. Never edits a repository or opens a PR, even after Close |
 | Chef | Thread in the batch's repository project | `🚥 Chef <b> <id4> [<served>/<cooks>] <status> <batch>` | ⏳ 🔀 🧹 🍽️ ⏸️ ⛳ ⏹️ | Creates worktrees, launches Cooks, prevents conflicts, validates, merges, releases and closes. Never edits code |
 | Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.<c> <id4> <status> <batch>` | 🍳 🧹 🍽️ ⏸️ ⏹️ | Owns implementation, PRs, watches, docs, barrage delegation and triage, then reports readiness. Leaves merging to the Chef |
 | Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed or stalled threads and alerts its parent when repair is needed |
 | Barrage | Cook's delegate | `👀 <sop> · Cook <b>.<c> <id4>` | none | Reviews under the contract in its brief |
 
-`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is its emoji and word, except ❓, which uses the item label. Put it before the subject, without `·` separators.
+`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is its emoji alone; ❓ adds its item label. Words in the Statuses table are a glossary, never title text. Put the status before the subject, without `·` separators. Progress goes in `📍` lines, never in a title.
 
 A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
 
@@ -41,7 +41,7 @@ Every thread computes its status from its own facts and the last phases received
 | 🟢 working | Head Chef does its own work, including answering a Chef and closing the run | none |
 | ⏳ monitoring | Head Chef follows unfinished batches; Chef launches, answers, validates or follows Cooks | none |
 | 🍳 cooking | Cook implements, runs barrages, writes docs or fixes its stack | none |
-| ❓ `<item>` | Head Chef waits on Pascal for a trigger below | none |
+| ❓ `<item>` | Head Chef waits on Pascal for an item in Asking Pascal | none |
 | 🔀 merging | Chef merges stacks and releases | none |
 | 🧹 closing | Chef or Cook runs retros and cleanup | none |
 | 🍽️ served | Cook handed up its stack, or finished after its stack merged; Chef has a ready batch at x/x | Cook, after closing |
@@ -64,7 +64,7 @@ For a batch without PRs, finishing the Chef's own work satisfies its checks, mer
 
 Head Chef, in priority order:
 
-1. ❓ while Pascal owes an answer to a trigger below. A held batch adds an item once no other batch or Head Chef work can progress
+1. ❓ while Pascal owes an answer to an item in Asking Pascal. A held batch adds an item once no other batch or Head Chef work can progress
 2. 🟢 while doing its own work or answering a Chef
 3. ⏳ while any in-scope batch is unfinished, launched or not
 4. ⛳ when at least one batch was delivered and no Stop came; otherwise ⏹️. A batch Pascal cuts leaves the count
@@ -85,25 +85,43 @@ Use the status emoji caused by a handoff. Delivery counts when the parent receiv
 | ⛳ Batch delivered or ⏹️ Batch stopped | Chef → Head Chef | Counts final batch outcome |
 | ⏹️ Stop | Pascal → Head Chef → Chef → Cook | Closes remaining work after an active merge finishes |
 | ⛳ or ⏹️ `<done>/<batches>` batches done | Head Chef → Pascal | Reports final run outcome |
-| ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Chef | Relays Pascal's answer to a review |
+| ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Chef | Relays Pascal's answer to a merge ask |
 | ⏹️ Cut `<card>` | Head Chef → Chef → Cook | Removes scope Pascal cut |
 | `Chef <b> <id4> is now threadId <id>, replacing <old threadId>` | New Chef → Cook | Transfers reporting to a replacement |
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
 | `🐕 Watchdog <id4>: <finding>` | Watchdog → parent | Reports an interruption, exhausted wakes or a two-tick finding |
 
-## When the Head Chef asks Pascal
+## Decisions
 
-Only these triggers produce ❓. Label the title `align`, `review batch <b>`, `question Chef <b>`, `scope`, `reserved action`, `fact`, `fault <what>` or `held batch <b>`. For several open items, label it `<n> for you`. End each ❓ turn with the open items as the last lines of the message, and repost the list when it changes. Decide other requests within the chain using the sender's default, and log the answer in the report.
+The one source for every choice in the run. Apply the table without asking anyone, log each choice as one line in your work folder's `decisions.md`, and cite that path in your report. Other files link here instead of restating a rule.
 
-1. Align, or work added or changed during the run
-2. Merge review under `Validate: yes`, below `merge-confidence`, or with an open `Act on` finding that caps confidence below it
+| Choice | Rule | Decides |
+|---|---|---|
+| Parallel or serial | Parallel when the groups touch disjoint files and have no dependency; serial on any doubt. Stay within `max-parallel` and `max-cooks`; never two batches of one repository at once | Head Chef for batches, Chef for Cooks |
+| Merge | Confidence at least `[chef].merge-confidence` with no open `Act on` finding: merge and send `🔀 Batch merging`. Otherwise `🍽️ Batch ready`, and the Head Chef asks `🙋 merge` | Chef |
+| Release | Release when the repository's `AGENTS.md` or release doc requires one after a merge; otherwise none | Head Chef, at Launch |
+| Docs | Each card's doc change goes in that card's layer. Open a top docs PR only for docs no card owns | Cook |
+| Another machine, such as macOS | Run the check there from om1 with 🧰 fleet. Missing evidence is a task, not a confidence cap; only a check that cannot run unattended, such as a keychain prompt, lowers confidence, named with its exact command | Cook; Chef verifies |
+| Pascal-owned card ready, such as a mockup | Post `🙋 <card> : <URL>` as soon as it is ready when it gates later work; keep the rest running | Head Chef |
+| Work after Close | Reopen the run: Align the addition, re-arm the Watchdog and launch a Chef. The Head Chef never writes code, docs or PRs | Head Chef |
+| Anything else, such as a cost trade-off or a start question | Take the sender's default and log it | The first level with the context |
+
+### Asking Pascal
+
+Only these items produce ❓. Label the title `align`, `merge <b>`, `scope`, `reserved action`, `fact`, `fault <what>`, `held batch <b>` or `card <card>`; for several, `<n> for you`.
+
+1. Align: requirements and batches, or work added during the run. Never ask the choices in Decisions
+2. Merge below `merge-confidence`, or with an open `Act on` finding that caps it
 3. Scope cut of a card, batch or required deliverable
-4. Reserved action: deleting data, leaving the agreed repositories or force-pushing a branch the run did not create, including under `Validate: no`
+4. Reserved action: deleting data, leaving the agreed repositories or force-pushing a branch the run did not create
 5. Fact only Pascal knows, such as diagnose's one question when Align did not answer it
 6. Fault the brigade cannot repair, including a stack returned `max-returns` times for the same cause
 7. Held batch once nothing else in the run can progress
+8. Pascal-owned card ready, per Decisions
 
-Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️. A change to its own diff needs fresh review under `Validate: yes`. Stop voids an unused approval. After `max-returns` returns of one stack for the same cause, the Chef sends its history up the chain as trigger 6. Before retrying a launch, merge, deploy or release, check whether it already happened in T3, GitHub or the deploy output.
+Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 ?` or `🙋 looks M07-T1 : <URL>`. No option menus, no CMO or FMO blocks, no protocol names, no cache paths. End each ❓ turn with the open items as its last lines and repost them when they change. Read Pascal's reply as the decision; a bare `oui` or `merge` approves.
+
+Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️. A change to its own diff needs a new merge decision. Stop voids an unused approval. After `max-returns` returns of one stack for the same cause, the Chef sends its history up the chain as item 6. Before retrying a launch, merge, deploy or release, check whether it already happened in T3, GitHub or the deploy output.
 
 ## SOPs
 
@@ -148,7 +166,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
 - Put each fix in the layer that last changed its line; for a line from the trunk, use the layer whose change made it wrong
 - The Cook follows the repository's `AGENTS.md` procedure first; 🧰 poteto-mode fills what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to the Chef
-- Append `Rules: <inherited Rules plus each relevant standing rule the target project does not load>` to every launch message and barrage brief. Preserve inherited Rules for delegates, which see only their brief; omit an empty field
+- The Head Chef writes the standing rules the target projects do not load once to `~/.cache/brigade-<id4>/rules.md`. Every launch message and barrage brief carries `Rules: <that path>` plus only its own additions; omit an empty field
 - A comment posted through Pascal's account does not wake the Cook's watch; the Chef also sends it to the Cook with `t3_thread_send`
 - A question climbs the chain with the sender's default. Each level answers from its context or escalates. A Chef unable to resolve a batch problem asks the Head Chef to decide, split the work again or relaunch the Chef
 - When Pascal writes to a Chef or Cook directly, that thread acts on the message and tells its parent so the status tree stays current
@@ -169,16 +187,32 @@ Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMP
 The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects each barrage's table from `config.toml`. The Head Chef and each Chef select `[watchdog]` for their own Watchdog.
 
 1. Read your selection with `t3_thread_configuration`. For a thread, choose `chef-on-claude` or `chef-on-codex` from the launching role's provider; for a barrage, choose `cook-on-claude` or `cook-on-codex` from the Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise resolve `instance` to a live provider instance in `orchestrator_capabilities`. Done when the provider and model exist
-2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the barrage rule. Done when the catalog supports each option, every barrage uses the other provider and every Watchdog uses its parent's provider
+2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`, sending each option only when the model's catalog entry lists it. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the barrage rule. Done when the catalog supports each option, every barrage uses the other provider and every Watchdog uses its parent's provider
 3. Threads inherit runtime and interaction modes at launch; delegates inherit them from the Cook. Keep `runtime-mode = "inherit"` throughout the run, with no mode change. For launches use `modelSelection`; for delegations use `target`, renaming `instanceId` to `providerInstanceId`. Escalate an unavailable setting through the chain. Done when the selection is supported
 
 ## Report
 
-Use this report for the Cook's `🍽️ Stack ready`, the Chef's report and the Head Chef's closing report. Aggregate earlier reports rather than repeating their contents in each SOP:
+Write the detail once to `<work folder>/report.md`: review rounds, accepted and rejected findings with reasons, skipped steps, gaps not filed. The message carries only the fixed fields of its template below, at most 8 lines and 1200 characters. A parent cites a child's report by thread and path and never copies it. A Cook lists its PRs once, in `🍽️ Stack ready`; the Chef lists the batch's PRs once, in `🍽️ Batch ready` or `🔀 Batch merging`. Later messages name the PR range only. Cache paths die at Close, so a message to Pascal cites only PR, issue and artifact URLs.
 
-- Outcome, PR links, each branch with its head SHA, and issue links
-- Out-of-scope gaps not filed; changes outside the agreement and why
-- Review passes, accepted and rejected findings with reasons, and why each review ended
-- Steps skipped or replaced and why, including a no-docs decision
-- What you could not confirm and where you looked
-- Confidence to merge as a percentage, explaining anything below 100%
+`🍽️ Stack ready`, Cook → Chef:
+
+```text
+🍽️ Stack ready · Cook <b>.<c> <id4>
+PR: #<n> <sha> · #<n> <sha>, checks <state>
+Reviews: <accepted> accepted, <rejected> rejected
+Not confirmed: <what and the command that would confirm it, or none>
+Confidence: <n>%
+Detail: <work folder>/report.md
+```
+
+`🍽️ Batch ready`, `🔀 Batch merging`, `⛳ Batch delivered` or `⏹️ Batch stopped`, Chef → Head Chef: the same fields with every Cook's PRs, plus `Decisions: <work folder>/decisions.md` and `For Pascal: <🙋 lines, or none>`.
+
+Head Chef → Pascal, in Canadian French: the open `🙋` lines only, or for the final report:
+
+```text
+⛳ <done>/<batches> lots livrés : <one-line outcome>
+PR : #<n>–#<n> fusionnées
+Reste pour toi : <🙋 lines, or rien>
+```
+
+`📍` progress, Cook → Chef: `📍 <card> <step>/6 · <PR URL> · checks <state>`. Watchdog alert: `🐕 Watchdog <id4>: <finding> <slot> <threadId> · <one line of evidence>`.

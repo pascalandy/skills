@@ -6,7 +6,7 @@ On `🐕 Watchdog <id4>: wake`, check T3, GitHub and the worktree for effects yo
 
 ## Implement
 
-1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every assigned card under the shared rules, commit as you go and open the PRs. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
+1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every assigned card under the shared rules, commit as you go and open the PRs. Run checks for other machines with 🧰 fleet per Decisions. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
 2. Link each PR with `link_pull_request` as you open it and own its `watch_pull_request`, unless oem's no-checks rule applies. Renew an ended watch or reconcile the PR state when registration fails. Route CI failures and external reviews through `cook-review`. File worthwhile out-of-scope gaps with 🧰 label-for-issues after checking duplicates; record the rest. Done when every PR is linked and watched or has its no-checks decision recorded
 3. Run 🧰 2nd-pass and push. Proceed to the first review pair; in fast track, do Release content, then Ready. Done when the checkout is clean and pushed
 
@@ -17,7 +17,7 @@ On `🐕 Watchdog <id4>: wake`, check T3, GitHub and the worktree for effects yo
 
 ## Docs
 
-1. Run 🧰 andy-mode ; docs on the final diff. If docs change, commit them and open a PR at the top of the stack; otherwise record the no-docs decision for manic-3. Done when every affected doc matches the behavior or the report explains the no-docs decision
+1. Run 🧰 andy-mode ; docs on the final diff. Put each doc change in its card's layer per [Decisions](../carpaccio.md#decisions); otherwise record the no-docs decision for manic-3. Done when every affected doc matches the behavior or the report explains the no-docs decision
 2. Do Release content, then proceed to manic-3 plus manic-5. Done when docs and required release content are in the review scope
 
 ## Release content
@@ -26,16 +26,8 @@ For `Release: yes`, add the repository's required release content, such as `CHAN
 
 ## Ready
 
-1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🍽️ Stack ready` to the Chef with the shared Report. Keep 🍳 until the Chef receives it, then show 🍽️. Done when the Chef has the readiness report and your title shows 🍽️
-2. Freeze the worktree:
-   - Make no commit, checkout, restack or push until the Chef says `merged`, requests a restack or returns it for Fix
-   - During the freeze, forward watch wakes to the Chef. Distinguish findings from wakes reporting only passing checks
-   - On a restack request, compare the stack's own diff with its approved diff
-   - If only the base changed and the new heads pass checks, push and send refreshed heads in `🍽️ Stack ready`. Keep 🍽️ and the approval
-   - If the stack's own diff changed or checks fail, show 🍳, tell the Chef readiness is withdrawn and enter Fix
-   - If the Chef returns the worktree for another finding, enter Fix
-
-   Done when the Chef has the current heads or returned ownership
+1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🍽️ Stack ready` to the Chef with its [Report](../carpaccio.md#report) template. Keep 🍳 until the Chef receives it, then show 🍽️. Done when the Chef has the readiness report and your title shows 🍽️
+2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged`, requests a restack or returns it for Fix. Forward watch wakes to the Chef during this freeze, distinguishing findings from wakes reporting only passing checks. On a restack request, compare the stack's own diff with its approved diff. If only the base changed and the new heads pass checks, push and send refreshed heads in `🍽️ Stack ready`; keep 🍽️ and the approval. If its own diff changed or checks fail, show 🍳, tell the Chef readiness is withdrawn and enter Fix. A worktree returned for another finding also goes through Fix. Done when the Chef has the current heads or returned ownership
 
 ## Changed scope and reporting
 
