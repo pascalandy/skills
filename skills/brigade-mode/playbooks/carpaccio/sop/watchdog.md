@@ -53,17 +53,14 @@ Final phases: a Head Chef or Chef on ⛳ or ⏹️; a Cook on ⏹️, or on 🍽
 
 ## One tick
 
-The active list can omit settled threads. For an activity read, `limit: 1` alone reads the first item, not the latest.
-
 1. Resolve the parent and current slots:
    - Read `watch.toml`, `wake.toml` and the config values in your brief
    - If the watch file is gone, its `parentThreadId` differs from the parent in your brief, or its parent is replaced, delete your schedule and end
    - Call `t3_thread_list` once per run project with `titleContains: <id4>` for the active fast path
    - Match each current slot and the parent by threadId, not title alone. Read a Chef's parent for combination checks; only its Head Chef's Watchdog wakes it
-   - If a current slot is absent from the active list, read its exact threadId with `t3_thread_read`. Distinguish a settled or archived thread from a missing thread
-   - To inspect a flagged thread's latest activity, use its `itemCount`. If `itemCount <= 5`, call `t3_thread_read` with `view: "activity", limit: 5` from the start. Otherwise call it with `view: "activity", afterPosition: itemCount - 6, limit: 5`
+   - If a current slot is absent from the active list, read its exact threadId with `t3_thread_read`. The active list can omit settled threads. Distinguish a settled or archived thread from a missing thread
+   - To inspect a flagged thread's latest activity, use its `itemCount`. `limit: 1` alone reads the first item, not the latest. If `itemCount <= 5`, call `t3_thread_read` with `view: "activity", limit: 5` from the start. Otherwise call it with `view: "activity", afterPosition: itemCount - 6, limit: 5`
    - If the parent is final, check F2 or F3 first
-   - If the parent is final and every child is final, settled and its final report received, delete your schedule and end
 
    Done when every current slot and its parent have a T3 state, title and last update, or a missing-thread finding
 
@@ -77,6 +74,7 @@ The active list can omit settled threads. For an activity read, `limit: 1` alone
    - If you watch the Head Chef, check the Chef Watchdog schedules
    - Check forbidden combinations only for slots without a higher-precedence finding
    - Use the same two-tick and once-per-finding alert rule for both checks
+   - If the parent is final, every child is final, settled and its final report received, and no finding remains pending or active, delete your schedule and end
 
    Done when every standing finding is recorded or alerted once
 

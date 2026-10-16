@@ -49,33 +49,22 @@ Done when the schedule is live and each finding has an owner.
 
 When a Chef cannot continue, inspect the old thread and PRs before retrying or relaunching anything. Keep the batch slot and the Cooks' worktrees.
 
-The Watchdog task belongs to the old Chef.
-
 1. Stop the old Chef and its Watchdog:
    - Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it
    - Find its Watchdog childThreadId in the old Chef's watch file or the schedule's boundThreadId
-   - Delete any Watchdog schedule by title and bound threadId
-   - If deletion fails, send its exact childThreadId `delete your schedule` and wait
-   - Stop the Watchdog childThreadId with `t3_thread_interrupt`
-   - List the Watchdog's queued runs with `t3_queue_list`
-   - Cancel them with `t3_queue_cancel`
-   - Before launching a replacement, verify that no Watchdog schedule, active run or queued turn remains
-   - If the Watchdog cannot be stopped, escalate `❓ fault`
-   - Interrupt the old Chef
-   - Cancel the old Chef's queued turns
-   - Rename the old Chef ⏹️
+   - Delete any Watchdog schedule by title and bound threadId. If deletion fails, send its exact childThreadId `delete your schedule` and wait
+   - Stop the Watchdog childThreadId with `t3_thread_interrupt` because its task belongs to the old Chef. List its queued runs with `t3_queue_list`, then cancel them with `t3_queue_cancel`
+   - Before launching a replacement, verify that no Watchdog schedule, active run or queued turn remains. If the Watchdog cannot be stopped, escalate `❓ fault`
+   - Interrupt the old Chef. Cancel its queued turns and rename it ⏹️
    - Read the old Chef's cards, branch heads, PR URLs, review rounds and decisions
 
    Done when neither the old Chef nor its Watchdog can act on the slot
 
 2. Launch the replacement Chef:
-   - Launch a new Chef in the same project and slot at ⏳ with that state
+   - Launch a new Chef in the same project and slot at ⏳ with that state and the replacement procedure in [chef-run](chef-run.md#return-or-replace-a-cook)
    - Update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId atomically
-   - Have the new Chef link and watch the PRs
-   - Have the new Chef arm its Watchdog
-   - Have the new Chef tell every Cook its new threadId using the replacement message in Messages
 
-   Done when each Cook reports to the new Chef
+   Done when the new Chef's Watchdog is armed, its PRs are linked and watched, and each Cook reports to the new Chef
 
 3. Archive the old thread. Ignore a late report from it. Done when the sidebar has one Chef for the slot
 

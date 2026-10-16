@@ -29,9 +29,9 @@ Apply [Statuses, Messages and triggers](../carpaccio.md#statuses) at phase entry
    - Run the merge command bare, with no pipe or redirect, so its permission rule matches
    - Read the whole output, since an exit 0 may hide a failed deploy
    - If a merge result is uncertain, check GitHub before retrying it
-   - If GitHub confirms the stack merged and another stack remains, ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
+   - If GitHub confirms the stack merged, its deploy succeeded or was not required, and another stack remains, ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
 
-   Done when GitHub confirms the validated stack merged and the deploy result is recorded
+   Done when GitHub confirms the validated stack merged and its deploy succeeded or was not required
 
 4. On failure:
    - Record landed PRs

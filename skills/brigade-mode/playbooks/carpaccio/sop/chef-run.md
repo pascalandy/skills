@@ -30,7 +30,7 @@ On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state. Res
 
 On a Watchdog wake sent to you, check whether the action already happened. Resume the current step. Recompute your status and end without replying.
 
-Before ending on ⏳ with no counted Cook on 🍳 or ⏸️, 🔀 or 🧹 while waiting for a check or child, write or refresh `wait`.
+If you wait for a check or child, write or refresh `wait` before ending on 🔀 or 🧹, or on ⏳ with no counted Cook on 🍳 or ⏸️.
 
 Done when the schedule is live and each finding has an owner.
 
