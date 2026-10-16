@@ -42,7 +42,7 @@ sequenceDiagram
         H->>H: Watchdog queues one Chef wake<br>then alerts Head Chef after max-wakes
         H->>H: Reconcile effects, resume<br>or replace Chef in its slot
     end
-    Note over C,K: Parallel Cooks yes: up to max-cooks<br>Separate worktrees, serialized merges
+    Note over C,K: Parallel per Decisions: up to max-cooks<br>Separate worktrees, serialized merges
     Note over C,K: Step 1: Implement
     opt Bug card
         K->>K: diagnose before reading source
@@ -87,7 +87,7 @@ sequenceDiagram
     rect rgba(239, 159, 118, 0.2)
         alt Confidence at least merge-confidence
             C-->>H: Agent: 🔀 Batch 1 merging <-
-        else Marked or lower confidence
+        else Merge rule not met
             C-->>H: Agent: 🍽️ Batch ready at x/x <-
             H->>U: Agent: 🙋 merge #… ? <-
             U->>H: USER: Merge ->

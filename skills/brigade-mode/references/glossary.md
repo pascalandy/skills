@@ -8,7 +8,7 @@ This glossary is for Pascal designing a brigade.
 |---|---|---|
 | Executive Chef | The user as a CTO. Oversees several kitchens, one Chef per project. Not in arancini | New |
 | Product Manager | The user managing one project. Decides what to build and why, and has the last word | Not renamed. The user, USER in the CU diagrams |
-| Head Chef | Bridges needs and requirements, splits batches and guides Chefs. In carpaccio, holds merges only for Pascal's validation or low confidence. Not in arancini | New |
+| Head Chef | Bridges needs and requirements, splits batches and guides Chefs. In carpaccio, holds a merge only when the merge rule in Decisions is not met. Not in arancini | New |
 | Chef | In bisque and carpaccio, coordinates a batch for the Head Chef. In carpaccio, launches Cooks, prevents conflicts, validates, merges, releases and closes | MAIN |
 | Cook<n> | Owns its worktree and stack. In carpaccio, also writes docs, watches PRs, delegates reviews and triages findings | COD<n> |
 | Watchdog | A Head Chef's or Chef's hidden delegate, scheduled in its own thread to wake or report stalled and failed work in carpaccio | New |
