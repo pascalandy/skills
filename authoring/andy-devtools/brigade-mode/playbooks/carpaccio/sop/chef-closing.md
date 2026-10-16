@@ -4,11 +4,52 @@ Apply [Statuses, Messages and triggers](../carpaccio.md#statuses) at phase entry
 
 ## Validate and merge
 
-1. On `🍽️ Stack ready`, read the Cook's shared Report, including rejected findings; reopen any rejection with your reason and return its worktree through Fix. Check conflicts between Cooks. Wait for every counted Cook to serve and for checks on all frozen heads to finish before sending `🍽️ Batch ready`. Done when the reports and checks support your merge confidence
-2. If `Validate: no`, confidence reaches `[chef].merge-confidence` and no open `Act on` finding caps it below that threshold, record merge authorization, show 🔀, send `🔀 Batch merging` with the shared Report to the Head Chef and proceed. Otherwise send `🍽️ Batch ready` with the report, show 🍽️ and wait for Pascal's decision relayed by the Head Chef. `⏳ Rework` returns affected Cooks to Fix; `🍽️ Hold` keeps the batch ready; `⏹️ Drop` cuts the batch, sends `⏹️ Stop` to its Cooks and goes to Closing. Done when the notice is sent, `🔀 Merge` is received for current heads, or the cut is recorded
-3. Show 🔀 while merging. Merge one stack at a time from the frozen Cook worktree, after checking its checkout is clean and pushed and GitHub holds the approved heads. Compare the stack's own diff after a restack: keep approval and the Cook 🍽️ if only its base changed and checks pass; require a new review under `Validate: yes` if its own diff changed. Check GitHub before retrying an uncertain merge. Use the project's merge procedure: for a single PR its merge command; for a stack 🧰 gh-stack Land, then the project's deploy. In skills, use `just merge` on the merged top branch for that deploy. Run the merge command bare, with no pipe or redirect, so its permission rule matches. Read the whole output, since an exit 0 may hide a failed deploy. Before the next stack, ask its Cook to restack on `main` and return fresh `🍽️ Stack ready`. Done when GitHub confirms the validated stack merged and the deploy result is recorded
-4. On failure, record landed PRs, send the Cook the cause and return its worktree for Fix. Tell the Head Chef if a previously ready batch lost readiness, so it withdraws its review item. Report the partial outcome. Resume at step 1 after fresh `🍽️ Stack ready`. Done when each stack merged in order or the Head Chef has an unresolved blocker
-5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch merged` with deploy results. For `Release: yes`, follow the remaining repository release procedure from `main`; check its outcome before retrying an uncertain release and report a failure before closing. Done when all merge and release outcomes are recorded
+1. Validate each `🍽️ Stack ready` report:
+   - Read the Cook's shared Report, including rejected findings
+   - If you reopen a rejection, give your reason and return its worktree through Fix
+   - Check conflicts between Cooks
+   - Before sending `🍽️ Batch ready`, wait for every counted Cook to serve and for checks on all frozen heads to finish
+
+   Done when the reports and checks support your merge confidence
+
+2. Choose the merge path:
+   - If `Validate: no`, confidence reaches `[chef].merge-confidence` and no open `Act on` finding caps it below that threshold, record merge authorization, show 🔀 and send `🔀 Batch merging` with the shared Report to the Head Chef. Then proceed
+   - Otherwise send `🍽️ Batch ready` with the report, show 🍽️ and wait for Pascal's decision relayed by the Head Chef
+   - On `⏳ Rework`, return affected Cooks to Fix
+   - On `🍽️ Hold`, keep the batch ready
+   - On `⏹️ Drop`, cut the batch, send `⏹️ Stop` to its Cooks and go to Closing
+
+   Done when the notice is sent, `🔀 Merge` is received for current heads, or the cut is recorded
+
+3. Merge one stack at a time:
+   - Show 🔀 while merging
+   - Before merging each stack, check that its frozen Cook worktree has a clean, pushed checkout and that GitHub holds the approved heads
+   - After a restack, compare the stack's own diff. If only its base changed and checks pass, keep approval and the Cook 🍽️. If its own diff changed, require a new review under `Validate: yes`
+   - Use the project's merge procedure from the frozen Cook worktree: for a single PR its merge command; for a stack 🧰 gh-stack Land, then the project's deploy. In skills, use `just merge` on the merged top branch for that deploy
+   - Run the merge command bare, with no pipe or redirect, so its permission rule matches
+   - Read the whole output, since an exit 0 may hide a failed deploy
+   - If a merge result is uncertain, check GitHub before retrying it
+   - If GitHub confirms the stack merged and another stack remains, ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
+
+   Done when GitHub confirms the validated stack merged and the deploy result is recorded
+
+4. On failure:
+   - Record landed PRs
+   - Send the Cook the cause and return its worktree for Fix
+   - If a previously ready batch lost readiness, tell the Head Chef so it withdraws its review item
+   - Report the partial outcome
+   - After fresh `🍽️ Stack ready`, resume at step 1
+
+   Done when each stack merged in order or the Head Chef has an unresolved blocker
+
+5. After the last stack:
+   - Tell each Cook `merged`
+   - Send the Head Chef `Batch merged` with deploy results
+   - For `Release: yes`, follow the remaining repository release procedure from `main`
+   - If `Release: yes` and its outcome is uncertain, check the outcome before retrying
+   - If the release fails, report the failure before closing
+
+   Done when all merge and release outcomes are recorded
 
 If Pascal says Stop, finish a merge already running, discard unused approval and follow `chef-run` Stop. A frozen watch wake that brings a finding, such as a failed check, a review or comment, or a conflict, invalidates readiness until you return the worktree, the Cook triages it and sends fresh `🍽️ Stack ready`. Tell the Head Chef to withdraw a pending review item. A wake reporting only passing checks preserves readiness.
 

@@ -24,7 +24,15 @@ Work folder: <expand Work folders in carpaccio.md>
 
 ## Return or replace a Cook
 
-On each wake, check your Watchdog's schedule in `list_scheduled_tasks`; read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time. If missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming. On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state, then resume, replace or reconcile the Cook; escalate an unrepairable fault to the Head Chef. On a Watchdog wake sent to you, check whether the action already happened, resume the current step, recompute your status and end without replying. Write or refresh `wait` before ending on ⏳ with no counted Cook on 🍳 or ⏸️, 🔀 or 🧹 while waiting for a check or child. Done when the schedule is live and each finding has an owner.
+On each wake, check your Watchdog's schedule in `list_scheduled_tasks`. If the schedule exists, read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time. If the schedule is missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming.
+
+On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state. Resume, replace or reconcile the Cook. Escalate an unrepairable fault to the Head Chef.
+
+On a Watchdog wake sent to you, check whether the action already happened. Resume the current step. Recompute your status and end without replying.
+
+Before ending on ⏳ with no counted Cook on 🍳 or ⏸️, 🔀 or 🧹 while waiting for a check or child, write or refresh `wait`.
+
+Done when the schedule is live and each finding has an owner.
 
 Return a worktree for Fix when a finding, changed diff or merge failure withdraws readiness. Tell the Head Chef when a previously ready batch loses readiness. Count each return of the same stack for the same cause; at `max-returns`, show ⏸️ and send the history to the Head Chef as a fault. Done when the Cook either sends fresh `🍽️ Stack ready` or the fault has an owner.
 

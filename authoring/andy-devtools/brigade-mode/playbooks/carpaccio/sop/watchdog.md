@@ -53,9 +53,32 @@ Final phases: a Head Chef or Chef on ⛳ or ⏹️; a Cook on ⏹️, or on 🍽
 
 ## One tick
 
-1. Read `watch.toml`, `wake.toml` and the config values in your brief. If the watch file is gone, its `parentThreadId` differs from the parent in your brief, or its parent is replaced, delete your schedule and end. Otherwise call `t3_thread_list` once per run project with `titleContains: <id4>` for the active fast path. Match each slot and the parent by threadId, not title alone; a Chef's parent is read for combination checks but only its Head Chef's Watchdog wakes it. If a current slot is absent, read its exact threadId with `t3_thread_read` to distinguish settled or archived from missing; the active list can omit settled threads. To inspect a flagged thread's latest activity, use its `itemCount`: call `t3_thread_read` with `view: "activity", limit: 5` from the start when `itemCount <= 5`, or `view: "activity", afterPosition: itemCount - 6, limit: 5` otherwise. `limit: 1` alone reads the first item, not the latest. When the parent is final, check F2 or F3 first; delete your schedule only after every child is final, settled and its final report received. Done when every current slot and its parent have a T3 state, title and last update, or a missing-thread finding
-2. For each current slot, apply the first matching line below. Persist its finding before any new send. A skipped slot clears a pending two-tick finding. Done when each slot has exactly one new outcome for this tick
-3. Check the Chef Watchdog schedules if you watch the Head Chef. Check forbidden combinations only for slots without a higher-precedence finding. Use the same two-tick and once-per-finding alert rule for both checks. Done when every standing finding is recorded or alerted once
+The active list can omit settled threads. For an activity read, `limit: 1` alone reads the first item, not the latest.
+
+1. Resolve the parent and current slots:
+   - Read `watch.toml`, `wake.toml` and the config values in your brief
+   - If the watch file is gone, its `parentThreadId` differs from the parent in your brief, or its parent is replaced, delete your schedule and end
+   - Call `t3_thread_list` once per run project with `titleContains: <id4>` for the active fast path
+   - Match each current slot and the parent by threadId, not title alone. Read a Chef's parent for combination checks; only its Head Chef's Watchdog wakes it
+   - If a current slot is absent from the active list, read its exact threadId with `t3_thread_read`. Distinguish a settled or archived thread from a missing thread
+   - To inspect a flagged thread's latest activity, use its `itemCount`. If `itemCount <= 5`, call `t3_thread_read` with `view: "activity", limit: 5` from the start. Otherwise call it with `view: "activity", afterPosition: itemCount - 6, limit: 5`
+   - If the parent is final, check F2 or F3 first
+   - If the parent is final and every child is final, settled and its final report received, delete your schedule and end
+
+   Done when every current slot and its parent have a T3 state, title and last update, or a missing-thread finding
+
+2. Classify each current slot:
+   - Apply the first matching line below
+   - Persist its finding before any new send. A skipped slot clears a pending two-tick finding
+
+   Done when each slot has exactly one new outcome for this tick
+
+3. Check cross-slot findings:
+   - If you watch the Head Chef, check the Chef Watchdog schedules
+   - Check forbidden combinations only for slots without a higher-precedence finding
+   - Use the same two-tick and once-per-finding alert rule for both checks
+
+   Done when every standing finding is recorded or alerted once
 
 First matching line for a watched thread:
 
