@@ -22,7 +22,7 @@ Sweep progress:
 
 **Step 1: Learn the project.** Read `AGENTS.md`, `README.md`, and the docs they name for the target. Done when you can state in one sentence what the target is for.
 
-**Step 2: Trace flows.** Pick files at random across the target. Follow each into the files it imports and the files that import it, until you can say which workflow it serves. Then read that workflow for bugs: wrong conditions, swallowed errors, and callers that break a callee's contract. Done when traced flows cover every top-level folder of the target.
+**Step 2: Trace flows.** Pick files at random across the target. Follow each into the files it imports and the files that import it, until you can say which workflow it serves. Then read that workflow for bugs: wrong conditions, swallowed errors, and callers that break a callee's contract. Done when traced flows cover every top-level folder of the target that holds code.
 
 **Step 3: Hunt hard-coded values.** Find literals that must change for the code to stay correct: paths, hosts, limits, dates, versions, and copies of a value that lives elsewhere. Done when you have judged each literal you found as a finding or as fine.
 
