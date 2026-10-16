@@ -85,7 +85,7 @@ sequenceDiagram
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
-        alt Confidence at least merge-confidence
+        alt Confidence at least merge-confidence and no open Act on finding
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Merge rule not met
             C-->>H: Agent: 🍽️ Batch ready at x/x <-

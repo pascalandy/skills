@@ -24,8 +24,6 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 
 `<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is the emoji alone. ❓ adds the item label. The words in the Statuses table are a glossary; never put them in a title. Put the status before the subject, without `·` separators. Progress goes in `📍` lines, never in a title.
 
-A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
-
 A title displays computed status. It does not prove that a report arrived or an external action finished. The parent's `watch.toml` records received child phases, holds and report receipts. Check T3 for a launched thread's run state and settlement. Check GitHub for PR heads, checks and merges.
 
 After renaming, read the title from T3. If the title is stale, retry the rename before ending the turn. Report a persistent failure to the parent. The Head Chef reports its own failure to Pascal.
@@ -53,10 +51,10 @@ Cook: show 🍳 while building, ⏸️ while waiting on the Chef, 🍽️ when t
 
 Chef, in priority order:
 
-1. ⏸️ while waiting on the Head Chef
+1. ⏸️ while waiting on the Head Chef for an answer other than merge approval
 2. ⏳ while any Cook builds or asks
 3. Once the batch stops, or all its in-scope stacks merge and its release is done, 🧹 until every Cook is final and settled and the Chef has closed; then ⛳ for a merged and released batch, otherwise ⏹️
-4. 🔀 after the Head Chef says to merge, through release
+4. 🔀 after the merge rule in Decisions authorizes the frozen heads or the Head Chef relays Pascal's approval, through release
 5. 🍽️ when every Cook in its count has served and checks passed on the frozen heads
 6. ⏳ while validating or working alone on a batch without PRs
 
@@ -84,7 +82,7 @@ Use the status emoji caused by a handoff. Delivery counts when the parent receiv
 | Batch merged, with deploy results | Chef → Head Chef | Records merge progress, without counting delivery |
 | ⛳ Batch delivered or ⏹️ Batch stopped | Chef → Head Chef | Counts final batch outcome |
 | ⏹️ Stop | Pascal → Head Chef → Chef → Cook | Closes remaining work after an active merge finishes |
-| ⛳ or ⏹️ `<done>/<batches>` batches done | Head Chef → Pascal | Reports final run outcome |
+| ⛳ or ⏹️ `<done>/<batches>` lots livrés | Head Chef → Pascal | Reports final run outcome |
 | ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Chef | Relays Pascal's answer to a merge ask |
 | `🙋 <card> : <URL>` | Cook → Chef → Head Chef → Pascal | Shows a Pascal-owned card as soon as it is ready; each level relays it unchanged |
 | ⏹️ Cut `<card>` | Head Chef → Chef → Cook | Removes scope Pascal cut |
@@ -94,7 +92,7 @@ Use the status emoji caused by a handoff. Delivery counts when the parent receiv
 
 ## Decisions
 
-This section is the only source for the choices of a run. Apply the table without asking; only the items in Asking Pascal go to Pascal. An explicit instruction from Pascal overrides a row; the Head Chef writes it in the Plan of the Chef. Log each choice as one line in `decisions.md` in your work folder. Cite that file in your Report. Other files link to this section and do not repeat its rules.
+Apply this table without asking. Only the items in Asking Pascal go to Pascal. An explicit instruction from Pascal overrides a row; the Head Chef writes it in the Plan of the Chef. Record overrides, exceptional calls and merge authorization in your thread's Detail message. The SOPs link here for these choices.
 
 | Choice | Rule | Decides |
 |---|---|---|
@@ -120,7 +118,7 @@ Only these items produce ❓. For one item, label the title `align`, `merge <b>`
 7. Held batch once nothing else in the run can progress
 8. Pascal-owned card ready, per Decisions
 
-Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 ?` or `🙋 choisir les looks M07-T1 : <URL>`. No option menus, no CMO or FMO blocks, no protocol names, no cache paths. Put the open items as the last lines of each ❓ turn. Post the items again when they change. Pascal's reply is the decision. If only one item is open, a reply of only `oui` or `merge` approves it. If more items are open, `oui` approves all open merge items. Any other reply holds the batch; act on what the reply says, such as a rework, a drop or a question.
+Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 ? 85 % : test macOS non confirmé` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the confidence and the reason this batch needs Pascal. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
 
 Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️. A change to its own diff needs a new merge decision. Stop voids an unused approval. After `max-returns` returns of one stack for the same cause, the Chef sends its history up the chain as item 6. Before you retry a launch, merge, deploy or release, look in T3, GitHub or the deploy output to see if that action already occurred.
 
@@ -181,7 +179,7 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. The Head Chef and each Chef keep their work folders through the final report, delete their Watchdog schedules, cancel their tasks, then remove both their own and their Watchdog's work folders before settling. Recreate folders when resumed. Append these instructions as an expanded `Work folder: <absolute path and instructions>` field to every launch message and barrage brief. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. The Head Chef and each Chef delete their Watchdog schedules, cancel their tasks, then remove their own and their Watchdog's work folders before settling. Recreate folders when resumed. Append these instructions as an expanded `Work folder: <absolute path and instructions>` field to every launch message and barrage brief. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
 
 ## Model selection
 
@@ -193,11 +191,11 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 ## Report
 
-Write the detail once in `<work folder>/report.md`: review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps and gaps not filed.
+Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a `Detail` message in its own thread. Name the frozen heads it covers. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId; the detail survives work-folder cleanup.
 
-A Report message carries only the fields of its template below. It has a maximum of 8 lines and 1200 characters, plus its `🙋` lines. A parent cites a child's `report.md` by thread and path; it never copies that file.
+A Report message uses only its field set below. It has a maximum of 8 lines and 1200 characters, plus its `🙋` lines. A parent cites a child's `Detail` by threadId and never copies it.
 
-A Cook lists its PRs and heads in `🍽️ Stack ready`, and again after a restack. The Chef lists the batch's PRs once, in `🍽️ Batch ready` or `🔀 Batch merging`. Other messages give only the PR range.
+A Cook lists its PRs and heads in `🍽️ Stack ready`, and again after a restack. The Chef gives the batch's PR range in `🍽️ Batch ready` or `🔀 Batch merging`. Later messages give the range only if needed to identify a partial outcome.
 
 The Head Chef's Close removes the cache folders. Thus a message to Pascal cites only PR, issue and artifact URLs.
 
@@ -209,12 +207,12 @@ PR: #<n> <sha> · #<n> <sha>, checks <state>
 Reviews: <accepted> accepted, <rejected> rejected
 Not confirmed: <what and the command that would confirm it, or none>
 Confidence: <n>%
-Detail: <work folder>/report.md
+Detail: <Cook threadId>
 ```
 
-`🍽️ Batch ready`, `🔀 Batch merging`, `⛳ Batch delivered` or `⏹️ Batch stopped`, Chef → Head Chef: use the fields of the Cook template, with every Cook's PRs and the batch confidence. Add `Decisions: <work folder>/decisions.md` and `For Pascal: <🙋 lines, or none>`.
+`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, batch confidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
 
-Head Chef → Pascal, in Canadian French. To ask, send only the open `🙋` lines. For the final report, use this template:
+Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. For the final report, use this template:
 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
