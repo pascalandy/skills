@@ -4,7 +4,7 @@ description: "Resume or take over another agent's in-flight work from a transcri
 
 ### Session pickup
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 **You own the resume point. Read the prior trail, don't redo it.**
 

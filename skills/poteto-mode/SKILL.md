@@ -90,9 +90,9 @@ Each entry links a principle's file and says when it applies.
 
 **No is an acceptable answer.** Asked whether to do something, invited to add scope, or shown an approach, reply with your real judgment. Decline, push back, or say "this doesn't earn its place" when true. A recommendation is a judgment, not a validation. Agreement is not the default, candor over sycophancy.
 
-## Subagents
+## Workers
 
-When delegation helps, delegate as the [agent runtime](references/agent-runtime.md#delegate-by-capability) describes: the brief, fresh workers, your ownership of their results, and independent verification.
+When delegation helps, delegate as the [agent runtime](references/agent-runtime.md#delegate) describes: the brief, fresh workers, your ownership of their results, and independent verification.
 
 ## Writing the reply
 

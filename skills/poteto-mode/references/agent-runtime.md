@@ -3,9 +3,9 @@
 Read this reference before a workflow delegates, resumes, reads history, or authors a skill. pstack runs inside T3 Code, and two files split its runtime rules:
 
 - The **t3-runtime** skill owns how work runs in T3: which mechanism runs a worker (subagent, delegate, or thread), pull request watches, schedules, settling, and thread history. Load it before the first delegation, watch, schedule, or history read, and use the tool it picks
-- This file owns what holds whatever the mechanism: what a delegation contains, what counts as independent verification, how long work resumes, and the cleanup before a commit
+- This file owns what holds whatever the mechanism: what a delegation contains, what counts as independent verification, how work continues and resumes, and the cleanup before a commit
 
-A worker is any agent you start: a subagent, a delegate, or a thread. Pick each worker's model and reasoning level from the active route's settings when it has them, otherwise from what the delegation tool offers.
+A worker is any agent you start: a subagent, a delegate, or a thread. Take each worker's model and reasoning level from the active route's settings, such as a brigade-mode `config.toml`. Without route settings, run it at the parent's reasoning level.
 
 ## Load skills and configuration
 
@@ -13,23 +13,25 @@ Resolve a named skill in the session catalog and read its SKILL.md and the refer
 
 Keep edits in the repository's source of truth, one canonical copy, and ship them through the workflow its `AGENTS.md` describes.
 
-## Delegate by capability
+## Delegate
 
-Brief each worker with a bounded task, input paths, permitted writes, required tools, the evidence to return, and a completion criterion. A worker sees only its brief, so include the instructions and excerpts it needs, or file pointers it can open. Prefer asynchronous workers for independent tasks. Give reviewers the tools that inspect evidence, and state in the brief that they only read. Give workers that share a checkout disjoint files. Check concurrency and nesting limits before fan-out, and flatten nested work under the parent when needed.
+Brief each worker with a bounded task, input paths, permitted writes, required tools, the evidence to return, and a completion criterion. A worker sees only its brief, so include the instructions and excerpts it needs, or file pointers it can open. Prefer asynchronous workers for independent tasks. Give reviewers the tools that inspect evidence, restrict them to reads where the mechanism allows it, and say so in the brief. Give workers that share a checkout disjoint files. Check concurrency and nesting limits before fan-out, and flatten nested work under the parent when needed.
 
-**Fresh workers by default.** Give new work to a fresh worker with a consolidated brief: the original brief, every later directive, and the prior worker's report and branch. This holds for a fix round, a follow-up, a retry, and the next queue item. Message or resume an existing worker only when the new work needs state that lives in it and is costly to move: its checkout, its uncommitted changes, or a process it still runs, such as a dev server or a watch. A stop or hold order is not reuse. A role such as a PR owner outlives its worker, so a fresh worker takes the role's next round. A resumed worker can silently drop earlier directives, so never accept its "done" without a consolidated brief behind it.
+**Fresh workers by default.** Give new work to a fresh worker with a consolidated brief: the original brief, every later directive, and the prior worker's report and branch. This holds for a fix round, a follow-up, a retry, and the next queue item. Message, resume, or queue a follow-up on an existing worker only when the new work needs state that lives in it and is costly to move: its checkout, its uncommitted changes, or a process it still runs, such as a dev server or a watch. A stop or hold order is not reuse. A role such as a PR owner outlives its worker: once that worker returns, a fresh worker takes the role's next round and re-arms the watch as t3-runtime describes. A resumed worker can silently drop earlier directives, so never accept its "done" without a consolidated brief behind it.
 
 You own every worker's result. Inspect the actual diff and evidence, then write your own summary. A second opinion needs a separate reviewer, on another model family when one is available. A second pass by the same agent is self-review, not independent verification: when independence is a shipping gate, leave it unmet until another agent or a person verifies. When delegation is unavailable or disallowed, do the work sequentially and name the lost parallelism.
 
 ## Continue and resume
 
-Record the objective, stop predicate, current artifact or head SHA, next action, and outstanding worker IDs in a durable task checkpoint. A checkpoint records work; it does not schedule work. To continue after a turn ends, use a T3 watch or schedule as t3-runtime describes.
+Record the objective, stop predicate, current artifact or head SHA, next action, and outstanding worker IDs in a durable task checkpoint. A checkpoint records work; it does not schedule work.
+
+Wake on what T3 delivers to the agent: a delegate's completion notice, a thread's pull request watch, or a schedule for timed checks, as t3-runtime describes. Without one, keep checking while the session is active, checkpoint the exact next check before the turn ends, and report that unattended continuation is unavailable.
 
 After a restart, check each worker's actual status, then reconcile the checkpoint with git, review state, and durable results before resuming or respawning. Assume neither that a worker died nor that it survived. The bundled `orch` CLI stores coordination records; it does not spawn agents or schedule wakeups. Pass its `--store` option or `ORCH_STORE` an explicit task-scoped path when no store is provided.
 
 ## Read history and discover evidence tools
 
-Read thread history as t3-runtime describes. A summary does not prove which tools an agent ran, so read the actual tool events. When history is unavailable, name the missing evidence and reconstruct only from the conversation, the checkpoint, git, and artifacts.
+Read thread history as t3-runtime describes, only this project's threads in the task's time window. Never search unrelated projects to fill a gap. A summary does not prove which tools an agent ran, so read the actual tool events. When history is unavailable, name the missing evidence and reconstruct only from the conversation, the checkpoint, git, and artifacts.
 
 Find evidence sources, such as MCP servers and installed CLIs, in the active tool catalog. Record a missing category instead of inventing a tool.
 

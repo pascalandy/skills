@@ -4,7 +4,7 @@ description: "Write or edit a skill's SKILL.md and supporting files."
 
 ### Authoring or modifying a skill
 
-Read [agent runtime](../references/agent-runtime.md) before choosing delegation, models, skill loading, live controls, state storage, or watchers. Follow its capability checks and report unavailable guarantees.
+Read [agent runtime](../references/agent-runtime.md) before delegating, resuming, reading history, or authoring a skill.
 
 1. Resolve and load `writing-for-agents` through the runtime contract. Stop with the missing dependency if the authority cannot be resolved.
 2. Follow its ownership, placement, invocation, and pruning decisions while this playbook retains delivery sequencing and the reply contract.
