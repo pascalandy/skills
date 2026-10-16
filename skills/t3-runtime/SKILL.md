@@ -21,7 +21,7 @@ A worker that needs its own worktree stays a delegate. Its brief names the workt
 
 A plan needs these facts before it picks a mechanism:
 
-- A delegate shares its parent's checkout, since `delegate_task` takes no workspace. It cannot watch a pull request, so a thread owns each watch. The sidebar hides it, and the user opens it from the parent's Lineage panel
+- A delegate shares its parent's checkout unless the call sets `isolation: "worktree"`, which gives it a separate checkout of the parent's last local commit, without uncommitted edits. It cannot watch a pull request, so a thread owns each watch. The sidebar hides it, and the user opens it from the parent's Lineage panel
 - A launched thread has no parent lineage and no automatic completion notice. It hears only its first message
 
 ## Launch a thread
