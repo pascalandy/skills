@@ -22,13 +22,19 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 | Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed or stalled threads and alerts its parent when repair is needed |
 | Barrage | Cook's delegate | `👀 <sop> · Cook <b>.<c> <id4>` | none | Reviews under the contract in its brief |
 
-`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is its emoji and word, except ❓, which uses the item label. Put it before the subject, without `·` separators. A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
+`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is its emoji and word, except ❓, which uses the item label. Put it before the subject, without `·` separators.
 
-Read a title back after renaming. If it is stale, retry before ending the turn and report a persistent failure to the parent. The Head Chef reports its own failure to Pascal.
+A Chef posts `📍` progress in its own thread instead of putting `<step>/6` in its title.
+
+Derive titles from the recorded state. The parent's `watch.toml` records acknowledged child phases, holds and report receipts. T3 establishes whether a thread is live or settled. GitHub establishes PR heads, checks and merges. The Watchdog's `wake.toml` owns wake counters. A stale title does not override these records.
+
+After renaming, read the title from T3. If the title is stale, retry the rename before ending the turn. Report a persistent failure to the parent. The Head Chef reports its own failure to Pascal.
 
 ## Statuses
 
-Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. If T3 shows the pinned Head Chef failed and its Watchdog stopped, that failed row also needs Pascal's attention. Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
+Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. If T3 shows the pinned Head Chef failed and its Watchdog stopped, that failed row also needs Pascal's attention.
+
+Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
 
 | Status | Meaning | Final for |
 |---|---|---|

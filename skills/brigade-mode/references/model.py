@@ -24,7 +24,7 @@ COOK = {
     "ask": "⏸️",  # waits on its Chef's answer
     "served": "🍽️",  # stack handed up, retro not done
     "close": "🧹",  # retro or cleanup
-    "done": "🍽️",  # stack merged, retro done: final
+    "done": "🍽️",  # stack merged, retro done, T3 settlement confirmed: final
     "stopped": "⏹️",  # the whole batch stopped: final
     "cut_close": "🧹",  # its cards were cut, cleaning up; out of the count
     "cut_stopped": "⏹️",
