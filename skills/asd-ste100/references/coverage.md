@@ -49,7 +49,7 @@ The item wording is a software adaptation. A mapping records coverage, not full 
 | 7.3 | STE_17 |
 | 8.1 | STE_09 |
 | 8.2 | STE_05 |
-| 8.3 | Left out. The Global English section in technical-writing already limits parentheses, so another check adds little value |
+| 8.3 | Left out. Parentheses caused no observed harm in sampled specs and issues |
 | 8.4 | STE_11 |
 | 8.5 | STE_11 |
 | 8.6 | STE_11 |
@@ -64,5 +64,5 @@ The item wording is a software adaptation. A mapping records coverage, not full 
 | GR-4 | STE_06 |
 | GR-5 | STE_03 |
 | GR-6 | STE_03 |
-| GR-7 | Left out. Pascal's observed texts showed no harm that required an inclusive-language item |
-| GR-8 | Left out. Pascal's observed texts showed no harm that required a possessive-form item |
+| GR-7 | Left out. Inclusive language caused no observed harm in sampled specs and issues |
+| GR-8 | Left out. Possessive forms caused no observed harm in sampled specs and issues |

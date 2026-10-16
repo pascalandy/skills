@@ -8,7 +8,7 @@ Open each section and paragraph with its problem, answer, or decision. Add detai
 Permits: Issue 9 sets no fixed pace for new information. A paragraph can contain up to six sentences.
 Rules: 6.1, 6.4, 6.5, 6.6.
 Before: "Users can open the history page. Each page requests all records. Large accounts exhaust the server's memory."
-After: "The history page exhausts the server's memory for large accounts. Users can open the history page. Each page requests all records."
+After: "The history page exhausts the server's memory for large accounts. The page requests all records in one query."
 Edge case: Start a new paragraph when the topic changes, even before six sentences.
 
 ## STE_13 Lists for complex text

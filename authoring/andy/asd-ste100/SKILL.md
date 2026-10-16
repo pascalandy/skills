@@ -77,7 +77,7 @@ Example report for descriptive text:
 ```text
 STE_06 One referent per pronoun: 1
 - issue.md:12 "It retries failed jobs." Fix: "The scheduler retries failed jobs."
-Pass: STE_01–STE_05, STE_07–STE_13, STE_14–STE_17 n/a
+Pass: STE_01–STE_05, STE_07–STE_13, STE_14–STE_17 (n/a)
 Scope: Issue 9 writing rules, adapted to software. Dictionary not checked.
 ```
 
@@ -95,7 +95,7 @@ In the Pass line, mark an item that does not apply as `n/a`.
 
 ## Priority
 
-Check names and new terms first. Next check pronouns and the point of each paragraph. Then check actors and linking words.
+When time is short, check STE_01, STE_07, STE_15, STE_02, STE_06, and STE_12 first. Most extra review rounds come from one label with two meanings, a missing actor, a missing condition, or an unexplained name. Long sentences are common but rarely the cause, so treat STE_11 as a target.
 
 ## Checklist
 
@@ -105,7 +105,7 @@ Check names and new terms first. Next check pronouns and the point of each parag
 - [ ] **STE_02 New terms explained at first use**: Each unfamiliar name, acronym, or project term has a plain explanation at first use. _(Issue 9: 1.6, 1.10, 2.2)_
 - [ ] **STE_03 Plain words, one meaning each**: General prose uses everyday words in their usual senses. Specialized words name real software concepts. Replace team slang, Latin abbreviations, and words mistaken for similar words in another language. _(Issue 9: 1.1, 1.3, 1.5, 1.12, 9.2, GR-5, GR-6)_
 - [ ] **STE_04 Each word keeps its role**: Nouns stay nouns and verbs stay verbs. Use ordinary word forms. _(Issue 9: 1.2, 1.4, 1.7, 1.13)_
-- [ ] **STE_05 Short noun groups**: A noun group that the writer creates has at most three words. A longer official name appears in full with an explanation at first use. Later uses keep that exact name. _(Issue 9: 1.9, 2.1, 2.2, 8.2)_
+- [ ] **STE_05 Short noun groups**: A noun group that the writer creates has at most three words. A longer official name appears in full with an explanation at first use. Later uses keep that exact name, or a short form defined at first use. _(Issue 9: 1.9, 2.1, 2.2, 8.2)_
 - [ ] **STE_06 One referent per pronoun**: Each pronoun or shortened reference, such as "the skill", points to one thing. A noun follows "this". _(Issue 9: 4.5, GR-3, GR-4)_
 
 ### Sentences

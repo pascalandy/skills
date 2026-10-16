@@ -38,13 +38,13 @@ Use a noun to name a thing and a verb to describe an action. Keep normal verb en
 Permits: One spelling can serve both roles when each role independently fits the context. A verb form can describe a state, as in "archived record".
 Rules: 1.2, 1.4, 1.7, 1.13.
 Before: "PR the fix after the verify."
-After: "Create a pull request for the fix after verification."
+After: "Verify the fix. Then open a pull request for the fix."
 Edge case: A technical noun does not become a verb merely because the team uses it as one.
 
 ## STE_05 Short noun groups
 
 Keep a noun group that you create to three words or fewer. Explain a longer official name in full, then preserve its exact form.
-Permits: Issue 9 allows a defined shorter form after the full name. This checklist instead keeps the official name stable.
+Permits: A short form defined at first use can replace the full name after that point, such as "Issue 9" for the full title of the standard. The short form then becomes the one name under STE_01.
 Rules: 1.9, 2.1, 2.2, 8.2.
 Before: "Change the background task retry delay setting."
 After: "Change the setting for the delay between retries of background tasks."
