@@ -11,7 +11,7 @@ Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, St
 ## Fix
 
 1. Show 🍳 and tell the Chef readiness is withdrawn. Apply accepted findings using shared layer ownership. For a finding on a PR description, edit that PR without a commit. Run 🧰 2nd-pass on the fixes, then restack and push changed layers with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to the Chef
-2. Rerun affected checks; if Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection, requested a restack on `main` or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
+2. Rerun affected checks; if Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
 
 ## Docs
 
@@ -25,7 +25,7 @@ For `Release: yes`, add the repository's required release content, such as `CHAN
 ## Ready
 
 1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🍽️ Stack ready` to the Chef with the shared Report. Keep 🍳 until the Chef receives it, then show 🍽️. Done when the Chef has the readiness report and your title shows 🍽️
-2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged` or returns it to you. Forward watch wakes to the Chef during this freeze, distinguishing findings from wakes reporting only passing checks. A returned worktree goes through Fix and fresh `🍽️ Stack ready` before merging. Done when the Chef has acknowledged the handoff or returned ownership
+2. Freeze the worktree: no commit, checkout, restack or push until the Chef says `merged`, requests a restack or returns it for Fix. Forward watch wakes to the Chef during this freeze, distinguishing findings from wakes reporting only passing checks. On a restack request, compare the stack's own diff with its approved diff. If only the base changed and the new heads pass checks, push and send refreshed heads in `🍽️ Stack ready`; keep 🍽️ and the approval. If its own diff changed or checks fail, show 🍳, tell the Chef readiness is withdrawn and enter Fix. A worktree returned for another finding also goes through Fix. Done when the Chef has the current heads or returned ownership
 
 ## Changed scope and reporting
 
