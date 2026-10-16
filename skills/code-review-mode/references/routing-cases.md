@@ -14,6 +14,10 @@ Run each request in a fresh session that has code-review-mode installed, from a 
 | "Audit the tests in `scripts/tests`" | Any | `test-audit` alone. It reports candidates and edits nothing |
 | "Run a thermonuclear review" | Branch changes production code | `thermo-quality-review` alone |
 | "Run a thermonuclear review of `scripts/`" | Branch changes files outside `scripts/` | `thermo-quality-review` alone on `scripts/`, not on the branch |
+| "Sweep `scripts/` for bugs and unfinished code" | Any | `sweep` alone on `scripts/`. It drafts issues and edits nothing |
+| "Fais un sweep du dépôt" | Branch changes production code | `sweep` alone on the whole repository, not on the branch |
+| "Sweep the tests in `scripts/tests`" | Any | `test-audit` alone |
+| `code-review-mode ; sweep` | Default branch with no changes | `sweep` alone on the whole repository. No question about the area |
 | "Add a test for the new flag", during a feature | Any | The authoring gate in `test-audit`, then continuation of the feature. No review plan |
 | "Change the existing test for the new flag", during a feature | Any | The same authoring gate and continuation |
 | `code-review-mode ; thermonuclear` | Branch changes production code | `thermo-quality-review` alone |

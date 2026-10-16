@@ -1,6 +1,6 @@
 ---
 name: "code-review-mode"
-description: "Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests."
+description: "Use for a code review of a branch or code area, an architecture review, a test audit, a thermonuclear review, or a sweep for bugs and unfinished code outside any diff, and whenever writing or changing tests."
 kind: "dev"
 ---
 
@@ -13,6 +13,7 @@ Route by the objects under review. Combined reviews return one plan.
 | [`test-audit`](playbooks/test-audit.md) | | Tests, and production code that exists only for tests |
 | [`thermo-quality-review`](playbooks/thermo-quality-review.md) | `thermonuclear`, `thermo-nuclear-code-quality-review` | Production code: structure, file size, branching, types, and layering |
 | [`architecture-review`](playbooks/architecture-review.md) | `improve-codebase-architecture` | Module shape across an area: depth, seams, and locality |
+| [`sweep`](playbooks/sweep.md) | | Code that no diff touches: bugs, hard-coded values, and unfinished code |
 
 ## Pick the route
 
@@ -20,7 +21,7 @@ Take the first rule that fits:
 
 1. **A test is being written or changed outside a review.** Apply the authoring gate in `test-audit`, then return to the calling task. No review plan.
 2. **A name follows the mode**, as in `code-review-mode ; test-audit`. Run that playbook alone, through its own procedure and report. Compare names with case, spaces, hyphens, and underscores ignored; an alias counts as its playbook's name. If no name matches, list the choices and stop.
-3. **The request limits the review to tests or to code quality.** A test audit or sweep runs `test-audit` alone, and a thermonuclear review runs `thermo-quality-review` alone, each through its own procedure and report.
+3. **The request limits the review to tests, to code quality, or to a sweep.** A test audit, including a sweep of tests, runs `test-audit` alone. A thermonuclear review runs `thermo-quality-review` alone. Any other sweep runs `sweep` alone. Each follows its own procedure and report.
 4. **Any other review** follows the steps below.
 
 For every review route, find the target below before loading a playbook. It replaces the playbook's default scope. Reviews are read-only unless the request asks for changes, including changes to domain documentation.
@@ -32,6 +33,7 @@ Before running a review, announce the chosen playbooks, those skipped, and why.
 - **A branch:** its changes since it left the default branch, plus uncommitted changes.
 - **An area the request names**, such as a directory or a module: the code in that area.
 - **An architecture review of a branch:** the modules the branch touches.
+- **A sweep:** the area the request names, or the whole repository when it names none, even on a branch with changes.
 - **No changes and no area:** ask which area to review, and wait for the answer.
 
 ## 2. Pick the playbooks
