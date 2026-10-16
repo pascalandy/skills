@@ -14,7 +14,8 @@ Edge case: "The backup was deleted" can remain if the evidence does not identify
 ## STE_08 Actions in simple verbs
 
 Name the action with a verb and keep its tense simple. A phrasal verb combines a verb with another short word, sometimes with an idiomatic meaning.
-Permits: Issue 9 allows commands, infinitives, and simple present, past, and future forms. A past participle can describe a state. Established terms can contain "-ing".
+Permits: Issue 9 allows commands, infinitives, and simple present, past, and future forms. A past participle can describe a state.
+Issue 9 limits -ing forms to technical names and a few modifier uses. This skill rewrites an -ing form only when it reads two ways, and keeps technical names.
 Rules: 3.2, 3.3, 3.4, 3.5, 3.7, 9.3.
 Before: "The worker will carry out validation of the payload."
 After: "The worker will validate the payload."
@@ -27,8 +28,8 @@ Edge cases:
 
 Give each sentence one complete idea. When a word replacement damages grammar or meaning, rebuild the sentence around the same facts. Use words instead of arrows or slashes for prose relationships.
 Permits: General plurals and abstract qualities need no article. "That" can be absent when the sentence remains clear. Literal code keeps its required punctuation.
-Rules: 4.1, 4.2, 4.5, 8.1, 9.1, GR-1, GR-2.
-Before: "Worker reads cache; worker doesn't retry."
+Rules: 4.1, 4.2, 4.5, 6.1, 8.1, 9.1, GR-1, GR-2.
+Before: "Worker reads cache / worker doesn't retry."
 After: "The worker reads the cache. The worker does not retry."
 Edge cases:
 - A command can omit "you". A list can use fragments that fit its introductory sentence.
@@ -44,16 +45,16 @@ Before: "The worker reads the cache first. The worker reads the database next."
 After: "The worker reads the cache first. Then the worker reads the database."
 Edge case: A rewrite keeps the source's causal claims. A connector must not invent a cause.
 
-## STE_11 Length within target
+## STE_11 Sentence length limits
 
-Count each sentence by its type. If a sentence exceeds its target, split it while keeping its full meaning or state why it must remain longer.
-Permits: Issue 9 gives a note sentence up to 25 words. This adaptation also permits a longer sentence with a reported reason.
+Count each sentence by its type. If a sentence exceeds its limit and carries two ideas, split it while keeping its full meaning.
+Permits: Issue 9 sets hard limits. This skill splits a long sentence that carries two ideas and reports the rest as a count.
 Rules: 5.1, 6.3, 8.4, 8.5, 8.6, 8.7.
 Before: "The worker writes each accepted event to the database before it sends a receipt to the client that submitted the event for processing through the public endpoint."
 After: "The worker writes each accepted event to the database. Then the worker sends a receipt to the client that submitted the event for processing through the public endpoint."
 Edge cases:
-- An instruction has a 20-word target. A descriptive sentence has a 25-word target.
-- Count a command in a risk note as an instruction. Count its descriptive consequence as a descriptive sentence.
+- An instruction has a 20-word limit. A descriptive sentence has a 25-word limit.
+- Count every sentence of a risk note as an instruction.
 
 ## Word count conventions
 

@@ -9,13 +9,16 @@ Permits: Different things can have different names. A different action can need 
 Rules: 1.8, 1.11, 6.2, 9.4.
 Before: "The retry queue holds failed jobs. The backlog keeps jobs for an hour."
 After: "The retry queue holds failed jobs. The retry queue keeps jobs for an hour."
-Edge case: Keep the exact spelling of code symbols, paths, commands, and interface labels.
+Edge cases:
+- Keep the exact spelling of code symbols, paths, commands, and interface labels.
+- One label for two states is a finding, such as one status icon that means both waiting for review and not merged.
 
 ## STE_02 New terms explained at first use
 
 Explain an unfamiliar term where the reader first meets it. Use the project glossary to connect the term to its meaning.
 Permits: An established software term can remain when it names a real concept. A familiar term needs no extra explanation.
-Rules: 1.6, 1.10, 2.2.
+Rules: 2.2.
+Issue 9 asks to explain long technical names. This skill explains every unfamiliar term, as a software adaptation.
 Before: "The scheduler checks the lease before each job."
 After: "The lease grants one worker temporary control of a job. The scheduler checks the lease before each job."
 Edge case: Explain an acronym before later uses of that acronym.
@@ -24,7 +27,7 @@ Edge case: Explain an acronym before later uses of that acronym.
 
 Choose a familiar English word for general prose. Keep specialized words for the actual software concept that needs them.
 Permits: The same spelling can have distinct valid meanings in separate contexts. A precise software verb can be clearer than a general verb.
-Rules: 1.1, 1.3, 1.5, 1.12, 9.2, GR-5, GR-6.
+Rules: 1.1, 1.3, 1.5, 1.6, 1.10, 1.12, 9.2, GR-5, GR-6.
 Before: "Actualize the issue's estimate."
 After: "Update the issue's estimate."
 Edge cases:
@@ -56,11 +59,11 @@ Edge cases:
 ## STE_06 One referent per pronoun
 
 A referent is the thing that a pronoun points to. Repeat the noun when a pronoun or shortened reference could point to two things.
-Permits: A pronoun can remain when its referent is clear. General plurals and abstract qualities can omit articles.
+Permits: A pronoun can remain when its referent is clear. General plurals and abstract qualities can omit articles. A noun followed by an identifier can omit "the", as in "field B2".
 Rules: 4.5, GR-3, GR-4.
-Before: "The parser calls the worker. It stores the result. This prevents a retry."
-After: "The parser calls the worker. The worker stores the result. This stored result prevents a retry."
+Before: "The client sends the token to the server. It checks the expiry date."
+After: If the design says the server checks it: "The client sends the token to the server. The server checks the expiry date."
 Edge cases:
 - Issue 9 permits a clear "this" reference. This checklist always puts a noun after "this".
 - "The skill" is unclear when the text names two skills. Use the skill's name.
-- A noun followed by an identifier can omit "the", as in "field B2".
+- When the source does not show the referent, report an open question instead of choosing one.

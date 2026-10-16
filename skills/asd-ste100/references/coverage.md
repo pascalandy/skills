@@ -2,6 +2,7 @@
 
 This map assigns each Issue 9 rule and general recommendation once. GR means general recommendation.
 The item wording is a software adaptation. A mapping records coverage, not full compliance with Issue 9.
+Rules 1.1 to 1.4 and 9.2 depend on the dictionary. Their items keep only the intent.
 
 | Rule | Item or reason left out |
 |---|---|
@@ -10,11 +11,11 @@ The item wording is a software adaptation. A mapping records coverage, not full 
 | 1.3 | STE_03 |
 | 1.4 | STE_04 |
 | 1.5 | STE_03 |
-| 1.6 | STE_02 |
+| 1.6 | STE_03 |
 | 1.7 | STE_04 |
 | 1.8 | STE_01 |
 | 1.9 | STE_05 |
-| 1.10 | STE_02 |
+| 1.10 | STE_03 |
 | 1.11 | STE_01 |
 | 1.12 | STE_03 |
 | 1.13 | STE_04 |
@@ -38,12 +39,12 @@ The item wording is a software adaptation. A mapping records coverage, not full 
 | 5.3 | STE_14 |
 | 5.4 | STE_15 |
 | 5.5 | STE_16 |
-| 6.1 | STE_12 |
+| 6.1 | STE_09 |
 | 6.2 | STE_01, STE_10 |
 | 6.3 | STE_11 |
 | 6.4 | STE_12 |
 | 6.5 | STE_12 |
-| 6.6 | STE_12 |
+| 6.6 | Left out. The six-sentence paragraph cap caused no observed harm. STE_12 checks the topic of each paragraph instead |
 | 7.1 | STE_17 |
 | 7.2 | STE_17 |
 | 7.3 | STE_17 |

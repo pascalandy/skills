@@ -69,7 +69,18 @@ Source: developers.google.com/style, fetched 2026-07-18.
 
 ## Make statements load one at a time (STE rules)
 
-Load the `asd-ste100` skill and apply its checklist to each sentence. The STE rules and their sources live there.
+- One instruction per sentence. One thought per sentence everywhere else.
+- Split instructions longer than about 20 words and other sentences longer than about 25.
+- Put the warning or condition before the step it guards: "If hot oil touches your skin, injuries can occur."
+- Keep "the" and "a": "Remove backup file" reads two ways. "Remove the backup file" reads one.
+- Give each word one meaning and one job, then keep it. If "check" means inspect, don't also use it for restrain.
+- Pick one word per action and stick to it: "start", not "start" here and "initiate" there.
+- Write procedures as direct commands, never as narration and never in the passive: "Install the component", not "the component must be installed".
+- Avoid "-ing" words where you can. They take too many grammatical jobs and breed misreadings.
+
+Source: asd-ste100.org (Issue 9, 2025), fetched 2026-07-18. The numbered rules and dictionary live in the spec PDF. The principles above are the transferable core.
+
+When a request names STE or ASD-STE100, or cites an `STE_NN` checklist ID, load the `asd-ste100` skill for the full checklist.
 
 ## Leave no sentence open to two readings (Global English)
 

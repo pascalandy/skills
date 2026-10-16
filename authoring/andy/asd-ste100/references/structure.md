@@ -5,24 +5,25 @@ These entries explain STE_12–STE_17 for software text. Each Before example sho
 ## STE_12 Point first
 
 Open each section and paragraph with its problem, answer, or decision. Add details about that one topic in an order the reader can follow.
-Permits: Issue 9 sets no fixed pace for new information. A paragraph can contain up to six sentences.
-Rules: 6.1, 6.4, 6.5, 6.6.
-Before: "Users can open the history page. Each page requests all records. Large accounts exhaust the server's memory."
-After: "The history page exhausts the server's memory for large accounts. The page requests all records in one query."
-Edge case: Start a new paragraph when the topic changes, even before six sentences.
+Permits: Point first is a software adaptation. Issue 9 asks for one topic per paragraph and a first sentence that states it.
+Rules: 6.4, 6.5.
+Before: "We added caching last sprint. Several users reported slow loads. The history page takes 9 seconds for accounts with more than 10,000 records."
+After: "The history page takes 9 seconds for accounts with more than 10,000 records. Several users reported slow loads. We added caching last sprint."
 
 ## STE_13 Lists for complex text
 
-Use a vertical list for at least three parallel items or for dependent actions. Give the list an introductory sentence and keep the items grammatically parallel.
-Permits: Issue 9 allows sentence fragments or complete sentences in lists. A publication can choose the list markers.
+A long sentence that lists many items, or a series of dependent actions, becomes a vertical list after an introductory sentence. List items use parallel forms. A list keeps facts and instructions apart.
+Permits: Issue 9 offers a vertical list for a long sentence with many items. A short inline series stays inline.
 Rules: 4.3.
-Before: "The issue needs the failing command, the expected result, and the actual result."
+Before: "To reproduce the bug, the issue needs the failing command, the full error output, the expected result, the actual result, and the commit where the failure first appeared."
 After:
-> The issue needs these details:
+> To reproduce the bug, the issue needs these details:
 >
 > - The failing command
+> - The full error output
 > - The expected result
 > - The actual result
+> - The commit where the failure first appeared
 
 Edge cases:
 - Use a colon after the introductory sentence.
@@ -42,7 +43,6 @@ After:
 Edge cases:
 - A critical risk condition can use "must". Ordinary actions use command verbs.
 - A step can have several sentences when they describe simultaneous actions or an immediate result.
-- A condition may precede the command verb, as STE_15 requires.
 
 ## STE_15 Condition before command
 
@@ -63,7 +63,7 @@ After: "Before the migration, stop the worker."
 Edge cases:
 - Read the steps without their notes. The reader must still have everything needed to complete the work.
 - Put requirements, limits, and expected test results in the applicable step.
-- A note sentence uses the descriptive length target.
+- A note sentence uses the descriptive length limit.
 
 ## STE_17 Risk note before the risky step
 
