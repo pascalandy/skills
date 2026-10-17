@@ -1,8 +1,8 @@
 # pele.run snapshot
 
-The Markdown that https://pele.run serves for its home page, its documentation, and each diagram type's examples, fetched 2026-10-17: pele 1.6.0 on npm, `obsidianmd/pele` main at `659c3593`. The examples index is left out: each type's page holds its examples. MIT, see [LICENSE](LICENSE). Links to other pages point at https://pele.run.
+This folder holds the Markdown that https://pele.run serves for its home page, its documentation, and the examples of each diagram type. The fetch date is 2026-10-17, with pele 1.6.0 on npm and `obsidianmd/pele` main at `659c3593`. The snapshot omits the examples index, because each type's page holds its examples. Links to other pages point at https://pele.run. MIT, see [LICENSE](LICENSE).
 
-To refresh, run from this folder:
+To refresh the snapshot, run these commands from this folder:
 
 ```bash
 pnpm --dir ~/.cache/pele add pele@latest
@@ -14,4 +14,10 @@ perl -pi -e 's#\]\(/#](https://pele.run/#g' *.md examples/*.md
 uv run ../../scripts/render_diagrams.py *.md examples/*.md
 ```
 
-The last command renders every example with the pele it finds. Done when it answers `{"ok":true,...}`, its `pele.version` matches the latest on npm, and this README names that version, the new main commit, and the date. A new or removed examples page also changes the table in `SKILL.md`.
+The last command renders every example with the pele that it finds. The refresh is done when these conditions are true:
+
+- The last command answers `{"ok":true,...}`
+- Its `pele.version` is the latest version on npm
+- This README names that version, the new main commit, and the date
+
+If an examples page is new or removed, update the table in `SKILL.md`.
