@@ -135,10 +135,10 @@ A mode's routes run through that mode's SKILL.md.
   - `sweep`: Sweep code that no diff touches for bugs, hard-coded values that should vary, and unfinished code, and draft one issue per finding.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
   - `thermo-quality-review`: Run an unusually strict review of production code for structure, file size, branching, types, and layering.
-- `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Organize GitHub Stories into Epics and Milestones or refine their readiness.
-  - `epic`: CU1: verify and prioritize backlog issues, place Stories in Epics, and propose Rank, blocked-by links and labels.
-  - `milestone`: CU2: group home-repo Epics without a Milestone into one Milestone with Epic Rank and justified blocked-by links.
-  - `refine`: CU3: reverify every Story in an Epic or Milestone, propose and apply approved refinements until the Definition of Ready holds.
+- `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Assemble and refine GitHub Stories, Epics and Milestones until ready.
+  - `epic`: CU1: verify backlog issues, assemble and refine Epics, then a Milestone when useful, before one final approval.
+  - `milestone`: CU2: assemble and refine eligible Epics into a Milestone with its own checkable outcome, then deliver one combined proposal.
+  - `refine`: CU3: refine an existing Epic or Milestone and its Stories until ready, including gaps returned by Brigade.
 - `matt-mode`: Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets.
   - `codebase-design`: Shared vocabulary for designing deep modules.
   - `domain-modeling`: Build and sharpen a project's domain model.
