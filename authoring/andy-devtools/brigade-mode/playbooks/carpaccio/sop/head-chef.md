@@ -22,7 +22,7 @@ Plan: <cards, requirements, threat model and dependencies>
 Release: <yes/no, per Decisions>
 Fast track: <yes/no>
 Rules: <rules.md path, plus additions>
-Work folder: <expand Work folders in carpaccio.md>
+Work folder: <absolute path>
 ```
 
 ## Coordinate

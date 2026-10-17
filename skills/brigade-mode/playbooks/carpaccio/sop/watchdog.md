@@ -12,7 +12,7 @@ Role: Watchdog for <Head Chef | Chef b> <id4>
 Parent: threadId <id>, projectId <id>, provider <provider>
 Watch file: <absolute parent work folder>/watch.toml
 Wake file: <absolute watchdog work folder>/wake.toml
-Work folder: <absolute watchdog work folder and shared Work folders instructions>
+Work folder: <absolute watchdog work folder>
 Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>, max-wait-minutes <n>
 Rules: <rules.md path>
 ```

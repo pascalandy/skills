@@ -9,12 +9,12 @@ Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entr
 3. Merge one stack at a time:
    - Show 🔀. Check that the frozen Cook worktree is clean and pushed, and that GitHub holds the approved heads
    - After a restack, compare the stack's own diff. Keep approval and the Cook 🍽️ if only its base changed and checks pass. Get a new merge decision if its own diff changed
-   - Use the project's merge procedure from the frozen Cook worktree. For a single PR, use its merge command. For a stack, use 🧰 gh-stack Land, then the project's deploy. In skills, use `just merge` on the merged top branch for that deploy
+   - Use the project's merge procedure from the frozen Cook worktree. For a single PR, use its merge command. For a stack, follow 🧰 gh-stack Land through its Done, even when the project's procedure covers only a single PR, then run the project's deploy. In skills, use `just merge` on the merged top branch for that deploy
    - Run the merge command bare, with no pipe or redirect, so its permission rule matches. Read the whole output, since exit 0 can hide a failed deploy
    - Check GitHub before retrying an uncertain merge
    - If another stack remains, wait until GitHub confirms the merge and its deploy succeeded or was not required. Then ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
 
-   Done when GitHub confirms the approved stack merged and its deploy succeeded or was not required
+   Done when GitHub shows `MERGED` for every PR of the approved stack and its deploy succeeded or was not required
 4. On failure, record landed PRs, send the Cook the cause and return its worktree for Fix. Tell the Head Chef if a previously ready batch lost readiness, so it withdraws its merge item. Report the partial outcome. Resume at step 1 after fresh `🍽️ Stack ready`. Done when each stack merged in order or the Head Chef has an unresolved blocker
 5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch merged` with deploy results. For `Release: yes`, follow the remaining repository release procedure from `main`; check its outcome before retrying an uncertain release and report a failure before closing. Done when all merge and release outcomes are recorded
 

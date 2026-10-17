@@ -6,14 +6,14 @@ On `🐕 Watchdog <id4>: wake`, check T3, GitHub and the worktree for effects yo
 
 ## Implement
 
-1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every assigned card under the shared rules, commit as you go and open the PRs. Run the checks for other machines with 🧰 fleet, as [Decisions](../carpaccio.md#decisions) tells. Apply shared Model selection for delegated side work. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
+1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every assigned card under the shared rules, commit as you go and open the PRs. Run the checks for other machines with 🧰 fleet, as [Decisions](../carpaccio.md#decisions) tells. Apply shared Model selection for delegated side work, and copy its title from Roles word for word. Obtain the Chef's approval before touching another Cook's file group. Done when every card is implemented with green checks, or reported blocked with its reason
 2. Link each PR with `link_pull_request` as you open it and own its `watch_pull_request`, unless oem's no-checks rule applies. Renew an ended watch or reconcile the PR state when registration fails. Route CI failures and external reviews through `cook-review`. File worthwhile out-of-scope gaps with 🧰 label-for-issues after checking duplicates; record the rest. Done when every PR is linked and watched or has its no-checks decision recorded
 3. Run 🧰 2nd-pass and push. Proceed to the first review pair; in fast track, do Release content, then Ready. Done when the checkout is clean and pushed
 
 ## Fix
 
 1. Show 🍳 and tell the Chef readiness is withdrawn. Apply accepted findings using shared layer ownership. For a finding on a PR description, edit that PR without a commit. Run 🧰 2nd-pass on the fixes, then restack and push changed layers with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to the Chef
-2. Rerun affected checks; if Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
+2. Rerun affected checks. When a fix changes behavior that the evidence of the repository's Verify step covers, such as a prompt, an output or an exit code, run that Verify again at the new heads. A fix to docs, comments or tests alone keeps the existing evidence. If Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
 
 ## Docs
 

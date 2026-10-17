@@ -19,7 +19,7 @@ Ownership: <your files; other Cooks' groups requiring Chef approval>
 Release: <yes/no; required release content and which Cook owns it>
 Fast track: <yes/no>
 Rules: <rules.md path, plus additions>
-Work folder: <expand Work folders in carpaccio.md>
+Work folder: <absolute path>
 ```
 
 ## Return or replace a Cook
