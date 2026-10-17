@@ -17,8 +17,8 @@ Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>, max-wait-minutes <n
 Rules: <rules.md path>
 ```
 
-1. Create your work folder and an empty `wake.toml`. Create one schedule with `schedule_task`, `bindToCurrentThread: true`, `schedule: {type: "interval", everyMs: <watch-minutes> * 60000}`, and the title above. Its prompt is `$brigade-mode ; carpaccio ; watchdog — one tick. Read <absolute sop/watchdog.md>, <watch file> and <wake file>, then run one tick.` Use a stable `clientRequestId` for a retry and check `list_scheduled_tasks` before creating a second schedule. Done when the returned `boundThreadId` is your childThreadId
-2. Keep the schedule id in `wake.toml` and return `armed <scheduledTaskId>` as your delegation result. The parent reads the completed task result and records the id. If scheduling fails, return the reason; the parent retries once, then escalates if it cannot arm you. End your turn without an alternate polling loop. Done when the parent has the id and healthy ticks need no parent message
+1. Create your work folder and an empty `wake.toml`. Create one schedule with `schedule_task`, `bindToCurrentThread: true`, `schedule: {type: "interval", everyMs: <watch-minutes> * 60000}`, and the title above. Its prompt is `$brigade-mode ; carpaccio ; watchdog — one tick. Read <absolute sop/watchdog.md>, <watch file> and <wake file>, then run one tick.` Use a stable `clientRequestId` for a retry and check `list_scheduled_tasks` before creating a second schedule. Done when `schedule_task` returns the schedule
+2. Keep the schedule id in `wake.toml` and return `armed <scheduledTaskId>` as your delegation result. The parent reads the completed task result, checks with `list_scheduled_tasks` that the schedule's `boundThreadId` is the childThreadId that `delegate_task` returned, and records the id. If it differs, the parent deletes that schedule and handles it as a scheduling failure. If scheduling fails, return the reason; the parent retries once, then escalates if it cannot arm you. End your turn without an alternate polling loop. Done when the parent has the id and healthy ticks need no parent message
 
 ## Files
 

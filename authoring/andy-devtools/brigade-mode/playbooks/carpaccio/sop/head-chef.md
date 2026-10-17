@@ -4,7 +4,7 @@ Keep the batch registry in `watch.toml` in your work folder: batch number, name,
 
 ## Align
 
-1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md) after pinning. Show `❓ align` while you wait for Pascal's answers. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
+1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md#arm) after pinning. Show `❓ align` while you wait for Pascal's answers. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
 2. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../carpaccio.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
 
 ## Launch
