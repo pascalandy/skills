@@ -44,13 +44,13 @@ Rules 1.1 to 1.4 and 9.2 depend on the dictionary. Their items keep only the int
 | 6.3 | STE_11 |
 | 6.4 | STE_12 |
 | 6.5 | STE_12 |
-| 6.6 | Left out. The six-sentence paragraph cap caused no observed harm. STE_12 checks the topic of each paragraph instead |
+| 6.6 | Left out by scope. STE_12 checks the topic of each paragraph instead |
 | 7.1 | STE_17 |
 | 7.2 | STE_17 |
 | 7.3 | STE_17 |
 | 8.1 | STE_09 |
 | 8.2 | STE_05 |
-| 8.3 | Left out. Parentheses caused no observed harm in sampled specs and issues |
+| 8.3 | Left out by scope |
 | 8.4 | STE_11 |
 | 8.5 | STE_11 |
 | 8.6 | STE_11 |
@@ -65,5 +65,5 @@ Rules 1.1 to 1.4 and 9.2 depend on the dictionary. Their items keep only the int
 | GR-4 | STE_06 |
 | GR-5 | STE_03 |
 | GR-6 | STE_03 |
-| GR-7 | Left out. Inclusive language caused no observed harm in sampled specs and issues |
-| GR-8 | Left out. Possessive forms caused no observed harm in sampled specs and issues |
+| GR-7 | Left out by scope |
+| GR-8 | Left out by scope |

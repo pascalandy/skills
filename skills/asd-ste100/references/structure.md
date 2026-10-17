@@ -35,7 +35,7 @@ Edge cases:
 Start each step's action with a command verb. Give sequential actions separate steps so that the reader can follow their order.
 Permits: Simultaneous actions can share a sentence or step. An immediate result or limit can follow the action in the same step.
 Rules: 5.2, 5.3.
-Before: "The operator checks the backup and resets the test database."
+Before: "Check the backup and reset the test database."
 After:
 > 1. Check the backup.
 > 2. Reset the test database.

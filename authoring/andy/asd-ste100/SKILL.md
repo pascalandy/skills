@@ -18,10 +18,17 @@ The checklist guides writing and sets the acceptance criteria for a review.
 - **Project glossary**: the project's names and their plain meanings. See [words](references/words.md)
 - **Step**: one marked unit in an ordered set of instructions. See [structure](references/structure.md)
 - **Instruction**: a sentence that directs the reader to act. See [structure](references/structure.md)
-- **Descriptive sentence**: a sentence that explains a fact or behavior. See [sentences](references/sentences.md)
+- **Descriptive text**: text that explains a fact or behavior. See [sentences](references/sentences.md)
 - **Note**: extra information that the reader can skip. See [structure](references/structure.md)
 - **Risk note**: a labeled message that states a safe action or condition and the harm if the reader ignores the precaution. See [structure](references/structure.md)
 - **Noun group**: words that together name one thing. See [words](references/words.md)
+
+## Keep the meaning
+
+In every branch, each rewrite and each proposed fix changes wording only.
+Keep every fact, number, actor, condition, scope limit, and open question.
+Keep the strength of each "must", "should", "may", and "not".
+If no source establishes an actor, a condition, or the meaning of a term, state an open question.
 
 ## Pick the branch
 
@@ -29,7 +36,7 @@ Choose the branch that matches the request:
 
 - Write or rewrite: follow **Write**
 - Review: follow **Review**
-- Fix named items, such as `fix STE_06`: apply those items to the specified lines. Then report through Review step 3
+- Fix named items, such as `fix STE_06`: apply those items to the specified lines. Then check the changed lines against every applicable item, and report through Review step 3
 
 ## Write
 
@@ -38,8 +45,6 @@ Choose the branch that matches the request:
 2. Sort the content into descriptive text, instructions, notes, and risk notes.
    Done when each block belongs to one of these four types.
 3. Draft or rewrite the target text against the checklist.
-   For a rewrite, change the wording only, and keep every fact, number, condition, actor, scope limit, and open question.
-   When the source leaves an actor, a condition, or the meaning of a term unknown, keep it as an open question instead of inventing an answer.
    Done when the draft preserves the source meaning and covers every applicable item.
 4. Run the Review branch on the draft.
    Fix each finding and repeat the review.
@@ -54,13 +59,12 @@ Choose the branch that matches the request:
 1. Mark descriptive text, instructions, notes, and risk notes in the target text.
    Use the applicability table below. Done when each block has a type.
 2. Check each applicable item, starting with STE_01, STE_07, STE_15, STE_02, STE_06, and STE_12.
-   When the text leaves an actor, a condition, or the meaning of a term unknown, report an open question instead of inventing the answer.
    If an item's condition is unclear for a sentence, read that item's reference entry.
    Done when each item has findings, passes, or does not apply.
 3. Report findings by item, with a count for each item.
    A finding that fits two items goes under the more specific one.
-   Give each finding's location and proposed fix.
-   Report STE_11 as a count of the sentences over the limit that you keep.
+   Give each finding's location and its proposed fix or open question.
+   For kept STE_11 overruns, give a count and a shared reason instead of individual locations and fixes.
    Then give a `Pass:` line for checked items without findings, including items marked `n/a`.
    End with the fixed scope line shown below.
    Done when every checked item has a result and the report states its scope.
@@ -69,9 +73,9 @@ Example report for descriptive text:
 
 ```text
 STE_06 One referent per pronoun: 1
-- issue.md:12 "It retries failed jobs." Fix: "The scheduler retries failed jobs."
+- issue.md:12 "It retries failed jobs." Open question: does the scheduler or the worker retry failed jobs?
 Pass: STE_01–STE_05, STE_07–STE_13, STE_14–STE_17 (n/a)
-Scope: Issue 9 writing rules, adapted to software. Dictionary not checked.
+Scope: Selected Issue 9 writing rules, adapted to software. Dictionary not checked.
 ```
 
 ## Applicability
@@ -101,10 +105,10 @@ In the Pass line, mark an item that does not apply as `n/a`.
 ### Sentences
 
 - [ ] **STE_07 The actor is named**: A sentence about an action names the actor. Descriptive text permits passive voice when the actor is unknown or does not matter. _(Issue 9: 3.6)_
-- [ ] **STE_08 Actions in simple verbs**: An action uses a verb in a simple tense. Replace a phrasal verb, or an action noun such as "perform validation", with one verb. Rewrite an ambiguous "-ing" form. _(Issue 9: 3.2, 3.3, 3.4, 3.5, 3.7, 9.3)_
+- [ ] **STE_08 Actions in simple verbs**: An action uses a verb in a simple tense. Replace a phrasal verb, or an action noun such as "perform validation", with one equally precise verb. Rewrite an ambiguous "-ing" form. _(Issue 9: 3.2, 3.3, 3.4, 3.5, 3.7, 9.3)_
 - [ ] **STE_09 One idea per complete sentence**: Each sentence keeps one idea and its needed words, including articles and "that". Spell out contractions. Use complete prose instead of arrows, slashes, semicolons, or missing words. List items can be fragments that fit their introductory sentence. When "with" can mean two relationships, name the relationship. _(Issue 9: 4.1, 4.2, 4.5, 6.1, 8.1, 9.1, GR-1, GR-2)_
 - [ ] **STE_10 Linked sentences**: A sentence that continues, explains, or contrasts the preceding sentence states that link with a connecting word or a repeated key term. _(Issue 9: 4.4, 6.2)_
-- [ ] **STE_11 Sentence length limits**: An instruction, including each sentence of a risk note, has at most 20 words. A descriptive sentence has at most 25. Split a longer sentence when it carries two ideas, and report the others as a count. _(Issue 9: 5.1, 6.3, 8.4, 8.5, 8.6, 8.7)_
+- [ ] **STE_11 Sentence length limits**: Each instruction, and each sentence in a step or a risk note, has at most 20 words. Other sentences, including notes, have at most 25. Before you report a sentence over its limit, count its words by the conventions in [sentences](references/sentences.md). Split a longer sentence when it carries two ideas, and report the others as a count. _(Issue 9: 5.1, 6.3, 8.4, 8.5, 8.6, 8.7)_
 
 ### Structure
 
@@ -115,7 +119,7 @@ In the Pass line, mark an item that does not apply as `n/a`.
 - [ ] **STE_16 Notes hold no instructions**: A note contains information only. Steps or risk notes hold actions, requirements, and risks. The steps work without the notes. _(Issue 9: 5.5)_
 - [ ] **STE_17 Risk note before the risky instruction**: Before an instruction that can cause harm, a risk note gives a label, a safe action or condition, and the consequence. Risks include data loss, production failure, secret exposure, and irreversible changes. _(Issue 9: 7.1, 7.2, 7.3)_
 
-IDs never change and are never reused. To change an item, move its line under `### Voided` with `void <date>, replaced by STE_NN`. Give the new item the next free ID.
+IDs never change and are never reused. To change the meaning of a published item, move its line under `### Voided` with `void <date>, replaced by STE_NN`. Give the new item the next free ID.
 
 ## References
 

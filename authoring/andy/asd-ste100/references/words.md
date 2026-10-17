@@ -8,7 +8,7 @@ Use the name that the repository or user gives each thing. Repeat that name and 
 Permits: Different things can have different names. A different action can need different wording.
 Rules: 1.8, 1.11, 6.2, 9.4.
 Before: "The retry queue holds failed jobs. The backlog keeps jobs for an hour."
-After: "The retry queue holds failed jobs. The retry queue keeps jobs for an hour."
+After: If the glossary says the backlog is the retry queue: "The retry queue holds failed jobs. The retry queue keeps jobs for an hour."
 Edge cases:
 - Keep the exact spelling of code symbols, paths, commands, and interface labels.
 - One label for two states is a finding, such as one status icon that means both waiting for review and not merged.
@@ -20,7 +20,7 @@ Permits: An established software term can remain when it names a real concept. A
 Rules: 2.2.
 Issue 9 asks to explain long technical names. This skill explains every unfamiliar term, as a software adaptation.
 Before: "The scheduler checks the lease before each job."
-After: "The lease grants one worker temporary control of a job. The scheduler checks the lease before each job."
+After: If the glossary defines the lease: "The lease grants one worker temporary control of a job. The scheduler checks the lease before each job."
 Edge case: Explain an acronym before later uses of that acronym.
 
 ## STE_03 Plain words, one meaning each

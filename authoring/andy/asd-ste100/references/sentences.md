@@ -47,13 +47,13 @@ Edge case: A rewrite keeps the source's causal claims. A connector must not inve
 
 ## STE_11 Sentence length limits
 
-Count each sentence by its type. If a sentence exceeds its limit and carries two ideas, split it while keeping its full meaning.
+Give each sentence the limit of the block that holds it. If a sentence exceeds its limit and carries two ideas, split it while keeping its full meaning.
 Permits: Issue 9 sets hard limits. This skill splits a long sentence that carries two ideas and reports the rest as a count.
 Rules: 5.1, 6.3, 8.4, 8.5, 8.6, 8.7.
 Before: "The worker writes each accepted event to the database before it sends a receipt to the client that submitted the event for processing through the public endpoint."
 After: "The worker writes each accepted event to the database. Then the worker sends a receipt to the client that submitted the event for processing through the public endpoint."
 Edge cases:
-- An instruction has a 20-word limit. A descriptive sentence has a 25-word limit.
+- Each instruction and each sentence in a step has a 20-word limit, such as a sentence that states the expected result. Descriptive text and notes have a 25-word limit.
 - Count every sentence of a risk note as an instruction.
 
 ## Word count conventions
@@ -72,6 +72,6 @@ Count ordinary prose words separately, with these exceptions:
 
 Prose in code font still counts as prose. For example, `pnpm run lint` is one word because it is a complete command.
 
-A list's introductory text before its colon is one sentence. Each list item is its own sentence under its type's limit.
+A list's introductory text before its colon is one sentence. Each list item is its own sentence under the limit of its block.
 A group in parentheses counts as one word in the outer sentence. Check the group's contents as a separate sentence too.
 List markers and step numbers add no words to the sentence.
