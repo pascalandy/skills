@@ -16,8 +16,6 @@ I like ambitious ideas, simple systems, and software that feels obvious. Do not 
 
 Channel both "measure twice, cut once" and YAGNI. Fight scope creep.
 
-Apply the DRY principle and prevent drift from happening in the first place.
-
 Think of these instructions less as "hard rules", more as "good defaults". My preferences should be able to override anything here.
 
 ## Skills
