@@ -93,7 +93,7 @@ sequenceDiagram
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Material uncertainty remains
             C-->>H: Agent: 🍽️ Batch ready at x/x <-
-            H->>U: Agent: 🙋 merge #… ? reason and recommendation <-
+            H->>U: Agent: 🙋 merge #… URL ? reason and recommendation <-
             U->>H: USER: Merge ->
             H->>C: Agent: 🔀 Merge ->
         end
