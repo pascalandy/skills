@@ -90,7 +90,7 @@ On macOS, use `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` i
 
 ## Pele in an app
 
-- **Rendering, mounting, errors, and bundle size**: read [API](references/source/api.md)
+- **Rendering, mounting, errors, and imports**: read [API](references/source/api.md)
 - **Diagrams from untrusted authors**: before you insert their SVG or an error message, read [Security](references/source/security.md)
 - **Fonts**: pele measures labels before it draws them. Pass the page's font as [Fonts](references/source/theming.md#fonts) describes
 - **Pele compared with Mermaid.js**: read the [home page](references/source/index.md) for the bundle size and the render time
