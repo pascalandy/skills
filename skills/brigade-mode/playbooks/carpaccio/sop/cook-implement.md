@@ -13,7 +13,7 @@ On `🐕 Watchdog <id4>: wake`, check T3, GitHub and the worktree for effects yo
 ## Fix
 
 1. Show 🍳 and tell the Chef readiness is withdrawn. Apply accepted findings using shared layer ownership. For a finding on a PR description, edit that PR without a commit. Run 🧰 2nd-pass on the fixes, then restack and push changed layers with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to the Chef
-2. Rerun affected checks. When a fix changes behavior that the evidence of the repository's Verify step covers, such as a prompt, an output or an exit code, run that Verify again at the new heads. A fix to docs, comments or tests alone keeps the existing evidence. If Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
+2. Rerun affected checks. When a fix changes behavior that the evidence of the repository's Verify step covers, such as a prompt, an output or an exit code, run that Verify again at the new heads, with its title from Roles copied word for word. A fix to docs, comments or tests alone keeps the existing evidence. If Docs already ran, refresh any newly stale docs. Return to `cook-review` for the passes the changes invalidate. If the Chef reopened a rejection or returned a failed merge, follow the same loop, then Ready. Fast track retains its skips. Done when readiness covers the new stack
 
 ## Docs
 

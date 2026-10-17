@@ -166,7 +166,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
 - Put each fix in the layer that last changed its line; for a line from the trunk, use the layer whose change made it wrong
 - The Cook follows the repository's `AGENTS.md` procedure first; 🧰 poteto-mode fills what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to the Chef
-- The Head Chef writes the standing rules the target projects do not load once to `~/.cache/brigade-<id4>/rules.md`. Every launch message and barrage brief carries `Rules: <rules.md path>`, plus the additions it inherited and its own. Omit an empty field
+- The Head Chef writes the standing rules the target projects do not load, including [Work folders](#work-folders), once to `~/.cache/brigade-<id4>/rules.md`. Every launch message and barrage brief carries `Rules: <rules.md path>`, plus the additions it inherited and its own. Omit an empty field
 - A comment posted through Pascal's account does not wake the Cook's watch; the Chef also sends it to the Cook with `t3_thread_send`
 - A question climbs the chain with the sender's default. Each level answers from its context or escalates. A Chef unable to resolve a batch problem asks the Head Chef to decide, split the work again or relaunch the Chef
 - When Pascal writes to a Chef or Cook directly, that thread acts on the message and tells its parent so the status tree stays current
@@ -180,7 +180,7 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. The Head Chef and each Chef delete their Watchdog schedules, cancel their tasks, then remove their own and their Watchdog's work folders before settling. Recreate folders when resumed. The Head Chef copies this section into `rules.md`, so each `Work folder:` field in an SOP template holds only the absolute path. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. The Head Chef and each Chef delete their Watchdog schedules, cancel their tasks, then remove their own and their Watchdog's work folders before settling. Recreate folders when resumed. Each `Work folder:` field in an SOP template holds only the absolute path, since `rules.md` carries this section. At run close the Head Chef removes `~/.cache/brigade-<id4>/` and runs `git worktree prune` in every run repository after all workers stop.
 
 ## Model selection
 
@@ -200,7 +200,7 @@ A Cook lists its PRs and heads in `🍽️ Stack ready`, and again after a resta
 
 The Head Chef's Close removes the cache folders. Thus a message to Pascal cites only PR, issue and artifact URLs.
 
-Write every clock time in America/Montreal, in a Detail as in a message. GitHub and T3 return UTC times, so convert them first.
+Write every clock time in a message or a Detail in America/Montreal time. GitHub and T3 return UTC times, so convert them first.
 
 `🍽️ Stack ready`, Cook → Chef:
 
@@ -215,7 +215,7 @@ Detail: <Cook threadId>
 
 `🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
 
-Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. Between asks, send a notice of at most 3 lines with the outcome, the PR range and the next step, and no table or `<details>`. For the final report, use this template:
+Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. Any other message to Pascal before the final report is a notice of at most 3 lines with the outcome, the PR range and the next step, and no table or `<details>`. For the final report, use this template:
 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
