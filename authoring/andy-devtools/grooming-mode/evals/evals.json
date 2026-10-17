@@ -65,7 +65,9 @@
       "Preserves the concrete Story prerequisites, derives the Epic prerequisite from #1 to #2, and checks Milestone Rank and joint outcome",
       "Recomputes priorities from the affected Stories and retains #10 p1 and #20 p2",
       "Invalidates affected prior reviews, delegates reviews of the changed Epics and Stories, then a separate Milestone review",
-      "Presents one final refined proposal without treating the PM answer as write approval, requesting a new conversation or claiming application"
+      "Detects that returning and displaying a URL does not establish that it serves the stored report, despite the snapshot's claim of complete criteria",
+      "Keeps the affected Epic and Milestone unready, asks the PM how to cover the unsupported outcome, and continues independent Epic refinement",
+      "Presents the revised hierarchy without inventing a serving requirement inside Story #2, treating the PM answer as write approval, requesting a new conversation or claiming application"
     ]
   }
 ]
