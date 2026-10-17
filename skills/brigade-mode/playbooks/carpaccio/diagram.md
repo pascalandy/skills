@@ -89,13 +89,18 @@ sequenceDiagram
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
-        alt Requirements and checks met; Chef confident after Pareto 90-10 review
+        alt Requirements and checks met#59; Chef confident after Pareto 90-10 review
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Material uncertainty remains
             C-->>H: Agent: 🍽️ Batch ready at x/x <-
-            H->>U: Agent: 🙋 merge #… URL ? reason and recommendation <-
-            U->>H: USER: Merge ->
-            H->>C: Agent: 🔀 Merge ->
+            alt Requirements or specs settle a question
+                H->>C: Agent: Answers from requirements or specs ->
+                C-->>H: Agent: Merge rule again: 🔀 Batch 1 merging<br>or a new 🍽️ Batch ready <-
+            else Open uncertainty
+                H->>U: Agent: 🙋 merge PR 35–36 URL ? reason and recommendation <-
+                U->>H: USER: Merge ->
+                H->>C: Agent: 🔀 Merge ->
+            end
         end
     end
     C->>C: Verify GitHub heads,<br>merge in frozen worktree
