@@ -385,8 +385,7 @@ TIMEOUT = 120
 
 log = logging.getLogger("render_diagrams")
 
-# Finds pele from each folder in turn, then renders every source with it. Only
-# PeleError counts as a diagram error; anything else is a pele bug.
+# Only PeleError counts as a diagram error; anything else is a pele bug
 RENDER_JS = """
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
