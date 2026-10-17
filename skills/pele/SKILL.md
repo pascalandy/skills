@@ -68,7 +68,7 @@ Requires `uv` (`uv --version`) and Node.js 20 or later (`node --version`). Run [
 ```bash
 # Check only; writes nothing
 uv run <this-skill-folder>/scripts/render_diagrams.py diagram.mmd
-# Also write one SVG per diagram, styled with assets/theme.css
+# Also write one SVG per diagram
 uv run <this-skill-folder>/scripts/render_diagrams.py notes.md --output /tmp/pele
 ```
 

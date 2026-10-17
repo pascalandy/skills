@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).parents[1] / "render_diagrams.py"
+THEME = Path(__file__).parents[2] / "assets/theme.css"
 PELE = "pele@1.6.0"
 
 
@@ -69,7 +70,7 @@ def test_the_bundled_theme_styles_each_svg_unless_turned_off(
     assert answer["pele"]["version"] == "1.6.0"
     assert answer["diagrams"][0]["type"] == "pie"
     svg = Path(answer["diagrams"][0]["svg"]).read_text()
-    assert ("--pele-bg: #000000" in svg) is styled
+    assert (THEME.read_text() in svg) is styled
 
 
 def test_a_check_without_output_writes_nothing(project: Path) -> None:
