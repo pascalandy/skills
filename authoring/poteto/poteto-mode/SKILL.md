@@ -26,7 +26,6 @@ Remaining triggers:
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skills and other agent-facing documents use **writing-for-agents**, resolved through the runtime reference.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
-- Writing a fact into a doc or comment, such as a command, path, setting, or number → search for where it already lives, including code, config, and `--help` output, and point there instead of restating it, unless the reader can't reach that place. When you change a fact anywhere, search for its old value and update each live copy or replace it with a pointer, in the same change.
 - Before commit → the diff cleanup procedure in [agent runtime](references/agent-runtime.md#author-clean-up-and-verify).
 - Before review of a diff that changes source code → the **no-comments** skill (`/no-comments`).
 - Shipping UI / IDE / CLI → the project verification skill and an available shell, PTY, browser, or native application driver, as described in the runtime reference.
@@ -46,6 +45,7 @@ Each entry links a principle's file and says when it applies.
 **Core**
 
 - [Laziness Protocol](principles/laziness-protocol.md): refactoring, sizing a diff, or tempted to add abstractions, layers, or signal threading
+- [Don't Repeat Yourself (DRY)](principles/dont-repeat-yourself.md): writing or reviewing a doc, spec, or comment, or changing a fact that other files may state
 - [Foundational Thinking](principles/foundational-thinking.md): before writing logic, when choosing core types and data structures, sequencing scaffold and feature work, or deciding what concurrent actors share
 - [Redesign from First Principles](principles/redesign-from-first-principles.md): integrating a new requirement into an existing design
 - [Attack the Premise](principles/attack-the-premise.md): two or more fixes that share one premise have failed the same gate
