@@ -6,7 +6,7 @@ The Cook stays 🍳 during barrages and triage. Apply [Statuses and Messages](..
 
 1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and both briefs use the same recorded heads
 2. Delegate each review pair:
-   - For each pass, call `delegate_task` with `mode: "async"`, `role: "review"`, the target, title from Roles and brief below
+   - For each pass, call `delegate_task` with `mode: "async"`, `role: "review"`, the target and the brief below. Copy the barrage title from Roles word for word
    - Use `clientRequestId: <id4>-<b>.<c>-<sop>-<k>`; `<k>` counts this Cook's delegations from 1 without resetting. Reuse the key only to retry that call
    - Retain each taskId. Submit a pair in the same turn
    - Write `<work folder>/wait` with both taskIds, then end your turn for completion notifications
@@ -24,8 +24,8 @@ Evidence: <context the reviewer needs beyond the diff defined by Scope>
 Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
 Rules: <rules.md path, plus additions>
-Work folder: <expand Work folders in carpaccio.md>
-Contract: Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
+Work folder: <absolute path>
+Contract: Read and follow the Rules file. Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
 ```
 
 ## Triage

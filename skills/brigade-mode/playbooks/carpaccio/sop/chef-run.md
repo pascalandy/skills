@@ -1,6 +1,6 @@
 # chef-run
 
-Report to the Head Chef with `t3_thread_send`. Keep each Cook's threadId, worktree, branches, file ownership, last received phase, hold and report receipt in `watch.toml` in your work folder. Write it atomically after each launch, received report, status change, hold and replacement as [watchdog](watchdog.md) defines. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end.
+Report to the Head Chef with `t3_thread_send`. Keep each Cook's threadId, worktree, branches, file ownership, last received phase, hold and report receipt in `watch.toml` in your work folder. Write it atomically as [watchdog](watchdog.md#files) defines. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end.
 
 ## Run
 
@@ -19,18 +19,16 @@ Ownership: <your files; other Cooks' groups requiring Chef approval>
 Release: <yes/no; required release content and which Cook owns it>
 Fast track: <yes/no>
 Rules: <rules.md path, plus additions>
-Work folder: <expand Work folders in carpaccio.md>
+Work folder: <absolute path>
 ```
 
 ## Return or replace a Cook
 
-On each wake, check your Watchdog's schedule in `list_scheduled_tasks`. If the schedule exists, read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time. If the schedule is missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming.
+On each wake, check your Watchdog's schedule under [Schedule health](watchdog.md#schedule-health). If it is unhealthy, delete any old schedule, cancel its task and re-arm your Watchdog.
 
-On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state. Resume, replace or reconcile the Cook. Escalate an unrepairable fault to the Head Chef.
+On `🐕 Watchdog <id4>: <finding>`, act as its row in [Messages](../carpaccio.md#messages) says.
 
-On a Watchdog wake sent to you, check whether the action already happened. Resume the current step. Recompute your status and end without replying.
-
-If you wait for a check or child, write or refresh `wait` before ending on 🔀 or 🧹, or on ⏳ with no counted Cook on 🍳 or ⏸️.
+Before you end a turn to wait, write or refresh your `wait` file as [watchdog](watchdog.md#files) defines.
 
 Done when the schedule is live and each finding has an owner.
 
