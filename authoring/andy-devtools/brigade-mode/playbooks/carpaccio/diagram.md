@@ -32,6 +32,10 @@ sequenceDiagram
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
     C->>C: Arm Chef Watchdog<br>Delegate owns its schedule
     C->>C: Group disjoint files,<br>create worktrees
+    opt Open PR outside the run changes a group's files or cited specs
+        C-->>H: Agent: ⏸️ Overlap and default <-
+        H->>C: Agent: Answer, then launch that group's Cook ->
+    end
     C->>K: Agent: Launch 🍳 Cook with ownership ->
     Note over H,K: Watchdogs are hidden delegates, not participants<br>Each tick reads watch and wake files
     opt Cook stalls or fails
