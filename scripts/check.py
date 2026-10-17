@@ -168,6 +168,7 @@ HTML_MODE = "authoring/andy/html-mode/scripts"
 PLAYWRIGHT = "playwright==1.63.0"
 PILLOW = "pillow==12.3.0"
 IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
+PELE = "authoring/andy/pele/scripts"
 POTETO_MODE = "authoring/poteto/poteto-mode/scripts"
 HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
@@ -375,6 +376,12 @@ CHECKS = [
         *ruff(IMAGE_CREATOR),
         pyright(IMAGE_CREATOR, "pillow"),
         pytest(f"{IMAGE_CREATOR}/tests", "pillow"),
+    ),
+    Check(
+        "pele",
+        *ruff(PELE),
+        pyright(PELE, python="3.10"),
+        pytest(f"{PELE}/tests"),
     ),
 ]
 

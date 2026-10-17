@@ -7,12 +7,12 @@ description: How many skills authoring/ holds, by category and kind
 
 | Category | General | Dev | Unknown | Total |
 |---|---|---|---|---|
-| andy | 14 | 0 | 0 | 14 |
+| andy | 15 | 0 | 0 | 15 |
 | andy-devtools | 1 | 13 | 0 | 14 |
 | matt | 5 | 2 | 0 | 7 |
 | poteto | 2 | 23 | 0 | 25 |
 | verify-loops | 0 | 3 | 0 | 3 |
 | (top level) | 1 | 0 | 0 | 1 |
-| **Total** | 23 | 41 | 0 | 64 |
+| **Total** | 24 | 41 | 0 | 65 |
 
-authoring 64 · skills 64
+authoring 65 · skills 65

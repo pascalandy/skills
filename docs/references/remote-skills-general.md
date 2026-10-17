@@ -107,6 +107,7 @@ A mode's routes run through that mode's SKILL.md.
 - `image-creator`: Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter.
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
 - `oem`: Load at the start of every session, before the first reply. Shared definitions and conventions for every task.
+- `pele`: Use when a request names pele or pele.run, or a project depends on the `pele` npm package: writing diagrams for pele, rendering them to SVG, theming them with CSS variables, or calling its render and mount API.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `sharpen`: Use only when explicitly invoked as `sharpen`.
 - `tavily`: Use only when explicitly invoked as `tavily`.
