@@ -128,8 +128,9 @@ A mode's routes run through that mode's SKILL.md.
   - `arancini`: Run rounds in one Chef: one Cook per card, then the barrages in order, then closing.
   - `bisque`: Run batches under one Head Chef: one Chef per batch, a Cook thread per stack, the barrages and the DocWriter as delegates, then a merge the Head Chef green-lights.
   - `carpaccio`: Run batches under a Head Chef: Cooks implement, document, watch and delegate reviews; each Chef validates, merges and closes its batch.
-- `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, or a thermonuclear review, and whenever writing or changing tests.
+- `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, a thermonuclear review, or a sweep for bugs and unfinished code outside any diff, and whenever writing or changing tests.
   - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
+  - `sweep`: Sweep code that no diff touches for bugs, hard-coded values that should vary, and unfinished code, and draft one issue per finding.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
   - `thermo-quality-review`: Run an unusually strict review of production code for structure, file size, branching, types, and layering.
 - `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Organize GitHub Stories into Epics and Milestones or refine their readiness.
