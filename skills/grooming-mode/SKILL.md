@@ -119,8 +119,9 @@ Use that order to direct file-conflict links; use `Epic N` for new Epics until c
 
 ## Approval, apply and readback
 
-Every route stops at a complete proposal before any GitHub write, including
-labels, comments and relationships. Approval covers the listed issues, exact
+Apart from the `4-epic` migration before scope filters, every route stops at a
+complete proposal before any GitHub write, including labels, comments and
+relationships. Approval covers the listed issues, exact
 actions, bodies the route may edit, comments and evidence, not future arrivals.
 For a read-only request, return the proposal and stop.
 
