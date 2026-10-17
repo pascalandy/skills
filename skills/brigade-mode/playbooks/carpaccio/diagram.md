@@ -28,9 +28,9 @@ sequenceDiagram
         end
     end
     H->>H: Pin, register batches<br>❓ align → 🟢
-    H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule
+    H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
-    C->>C: Arm Chef Watchdog<br>Delegate owns its schedule
+    C->>C: Arm Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     C->>C: Group disjoint files,<br>create worktrees
     opt Open PR outside the run changes a group's files or cited specs
         C-->>H: Agent: ⏸️ Overlap and default <-
