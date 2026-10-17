@@ -1,22 +1,22 @@
 ---
-description: "CU1: verify and prioritize backlog issues, place Stories in Epics, and propose Rank, blocked-by links and labels."
+description: "CU1: verify backlog issues, assemble and refine Epics, then a Milestone when useful, before one final approval."
 ---
 
-# CU1. Backlog to Epics
+# CU1. Backlog to a ready hierarchy
 
 ```
 Epic progress:
 - [ ] 1. Scope
-- [ ] 2. Verify
-- [ ] 3. Prioritize
-- [ ] 4. Propose
-- [ ] 5. Package and hand off
+- [ ] 2. Verify and prioritize
+- [ ] 3. Assemble Epics
+- [ ] 4. Refine and delegate Epic reviews, then assess a Milestone
+- [ ] 5. Deliver the whole proposal
 ```
 
 ## Process
 
-1. **Scope.** Resolve the home repo and scoped repos. For existing open Epics,
-   reuse the Product Manager's explicit choice or obtain it:
+1. **Scope.** Resolve the home repo and scoped repos. Reuse the Product Manager's
+   choice for existing open Epics, or ask whether to keep or restart them:
 
    - Keep: place a Story in a kept Epic when its outcome covers it; otherwise
      propose a new Epic
@@ -27,70 +27,36 @@ Epic progress:
    Default scope is each repo's backlog, open Stories whose Epic is closed,
    and open Epics with all their Stories, open or closed. For another requested
    set such as a label, use that set plus open Epics and their Stories.
-   Inspect parents with the children filter so closed-Epic Stories remain visible
-   and Sub-tasks follow their non-Epic parent's placement under the Membership rule.
-   Done when every candidate and container is read and counted
-2. **Verify.** Apply the shared verdicts against current code and merged changes.
-   Flag complete open Epics and wrongly completed issues. Identify the files each
-   actionable Story touches, including cross-repo paths.
-   Done when every issue has an evidenced verdict or a precise left-out reason
-3. **Prioritize.** Weigh observed recurrence and cost against estimated effort.
-   Identify areas collecting findings and recent PRs leaving problems unresolved.
-   State uncertainty. Tier actionable issues under Labels and bodies.
-   Group duplicates or issues one change fixes and list cleanup.
-   Done when every actionable issue has a tier or cleanup reason
-4. **Propose.** Use SKILL.md's Proposal form. Place every actionable issue into
-   exactly one Epic by outcome. A one-Story Epic is allowed only when no other
-   Epic can take it. Apply label-for-issues' Dependencies rule within each Epic
-   and between Epics whose Stories have file conflicts. Link the later Epic
-   blocked by the earlier one using the shared Epic order.
-   Ground other waits in current acceptance criteria or code prerequisites.
-   A possible future rewrite does not justify a wait when the Story can ship
-   against the current default branch. Check Parallel against the full graph.
-   Set Story Rank in native order and the same Epic body order.
-   Done when the proposal accounts for every scoped issue and the Product Manager
-   approves, or receives the proposal as the read-only result
-5. **Package and hand off.** Follow the shared approval/apply/readback checklist.
-   Create all new Epics in approved order, then resolve their numbered references.
-   Without a Milestone, this creation order is their initial Rank.
-   Apply approved completion corrections, cleanup and restart dispositions.
-   Attach Stories one at a time in Rank order, reorder existing native relations
-   as needed, set justified blocked-by links and approved labels, and update
-   open Epic bodies to match actual Stories, including closed Stories.
-   Preserve the bodies of retired or already closed Epics.
-   Report kept and new Epics with URLs and Story counts, applied cleanup,
-   failed actions, left-out issues and each Epic's gap to the Definition of Ready.
-   Give one shared `refine` prompt per Epic, each with its actual reference.
-   When two or more Epics lack a Milestone, suggest `grooming-mode ; milestone`
-   as an option; the Product Manager may finish assembling Epics first.
-   Done when every write is read back and the refinement handoff is explicit
-
-## Sequence
-
-```mermaid
-sequenceDiagram
-    accTitle: CU1 Backlog to Epics
-    accDescr: Scope and verify before proposal. GitHub writes follow approval. Readback and a refine prompt end the route.
-    actor PM as Product Manager
-    participant G as Grooming agent
-    participant GH as GitHub
-    Note over PM,GH: CU1. Backlog to Epics<br>Step 1: Scope
-    PM->>G: Home repo, scope, keep or restart
-    G->>GH: Read backlog, open Epics, closed-Epic Stories and parents
-    GH-->>G: Complete candidate and container scope
-    Note over PM,GH: Step 2: Verify
-    G->>GH: Read current code, comments and merged changes
-    GH-->>G: Evidence for verdicts and files touched
-    G->>G: Verify each issue and completion correction
-    Note over PM,GH: Step 3: Prioritize
-    G->>G: Tier actionable issues and group cleanup
-    Note over PM,GH: Step 4: Propose
-    G->>G: Place and rank Stories with justified blockers
-    G-->>PM: Proposal, labels, blockers, cleanup and readiness gaps
-    PM->>G: Approve exact actions
-    Note over PM,GH: Step 5: Package and hand off
-    G->>GH: Reread scope, apply unchanged approved actions
-    G->>GH: Read back native order, bodies, links and labels
-    GH-->>G: Verified state or failed actions
-    G-->>PM: Results and new-conversation refine prompt
-```
+   Inspect native parents so closed-Epic Stories remain visible and Sub-tasks
+   follow their non-Epic parent's placement. Read affected existing Milestones
+   and their members before proposing changes to their outcomes or Rank.
+   Done when every candidate and affected container is read and counted
+2. **Verify and prioritize.** Apply the shared verdicts against current code and
+   merged changes. Flag complete open Epics and wrongly completed issues.
+   Identify the files each actionable Story touches, including cross-repo paths.
+   Weigh observed recurrence and cost against estimated effort; state uncertainty.
+   Include recurring findings and recent PRs that leave the problem unresolved.
+   Tier actionable issues under Labels and bodies. Group duplicates or issues one
+   change fixes and list cleanup.
+   Done when every issue has an evidenced verdict, tier or precise left-out reason
+3. **Assemble Epics.** Place every actionable issue into exactly one Epic by outcome.
+   A one-Story Epic is allowed only when no other Epic can take it.
+   Apply label-for-issues' Dependencies rule within and between Epics, including
+   source-file conflicts. Use the shared Epic order to direct conflict links.
+   Ground other waits in acceptance criteria or current code prerequisites.
+   A possible future rewrite does not justify a wait for work that can ship now.
+   Check Parallel against the full graph. Draft native Story Rank and matching
+   Epic body order, including closed Stories.
+   Note candidate Milestones now. Ask about unclear product intent before it
+   changes grouping or criteria; keep independent work moving.
+   Done when every candidate has a proposed placement or disposition
+4. **Refine and group.** Run steps 1–4 of the shared refinement loop on these
+   Stories, Epics and affected existing Milestones. Reuse current evidence.
+   If at least two scoped open Epics without a Milestone support one shared
+   deliverable outcome, continue with the `milestone` playbook in this conversation.
+   Otherwise state why no new Milestone is needed.
+   Done when the hierarchy meets the Definition of Ready or its missing input is named
+5. **Deliver.** Complete step 5 of the shared loop once for the whole hierarchy.
+   If `milestone` handled delivery, return its result. Report URLs, membership, readiness evidence,
+   cleanup, failed actions and left-out issues.
+   Done when shared delivery finishes

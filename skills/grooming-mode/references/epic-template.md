@@ -29,8 +29,9 @@ REF: #<issue>, OWNER/REPO#<issue>
 
 ## Done when
 
-<A checkable outcome with no open decision>
-Every Story has a documented disposition and the outcome holds on the default branch.
+<Observable result, the command, scenario or artifact that checks it, and the
+Stories that cover it. Name any joint check that individual Story checks miss>
+Every Story has a documented disposition and the outcome has delivery evidence.
 
 ## 👨🏻‍🍳 For the agent
 

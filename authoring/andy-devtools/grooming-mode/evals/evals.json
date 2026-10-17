@@ -2,7 +2,6 @@
   {
     "skills": [
       "grooming-mode",
-      "epic-grooming",
       "label-for-issues"
     ],
     "setup": [],
@@ -22,11 +21,53 @@
       "Keeps #13 parallel to receipt work with no invented blocked-by link",
       "Prioritizes P1 at most three, P2 and P3, mapping every Story to 3-pty:p1/p2/p3; each Epic takes its highest-priority Story's priority and no type",
       "Uses label-for-issues Ready rule for exact states of every proposed Story and Epic, shows Story native Rank/body agreement, and no replicated Epic Order section",
-      "Never proposes a Story body rewrite in epic",
-      "Places #14 with a receipt Epic rather than silently discarding it or inventing acceptance criteria",
+      "Proposes evidence-backed Story body refinements in the same run, with exact before/after text",
+      "Places #14 provisionally with a receipt Epic, investigates its sources and asks for any product decision the evidence cannot settle without inventing acceptance criteria",
       "Gives #14 the state label that label-for-issues' Ready rule selects and names its missing goal and acceptance criteria",
-      "Reports the affected Epic's gap to the Definition of Ready and does not declare grooming complete",
-      "Ends with a copyable grooming-mode ; refine prompt for a new conversation using the actual Epic reference, reserving Story body edits for refine"
+      "Keeps affected containers unready while required input is missing and continues independent refinement",
+      "Delegates each Epic review with its Stories, addresses findings and evaluates a shared Milestone outcome before the final proposal",
+      "Never transfers unfinished refinement back to the Product Manager through a new-conversation prompt"
+    ]
+  },
+  {
+    "skills": ["grooming-mode", "label-for-issues"],
+    "setup": [],
+    "query": "grooming-mode\nHome repo: example/receipts. Keep the two existing Epics. Read-only offline exercise: use the following complete current GitHub/code snapshot as the evidence; do not call GitHub or fetch repositories. This run has native agent delegation but no T3 connector. Produce the proposal from this snapshot without claiming anything was written.\nSnapshot: all issues are open, canonical labels are already reconciled, no Milestone exists, no other issues/comments/parents/relationships exist. Epic 1 #10 contains Story #1 then #2; Epic 2 #20 contains Story #3 then #4. All Stories are 2-type:feature, 3-pty:p2, 1-needs-triage; Epics are 4-epic, 3-pty:p2, 1-needs-triage.\n#1 goal: compute receipt total with decimal arithmetic. AC: prices 0.10 and 0.20 produce exactly 0.30 before formatting. src/total.ts sums as IEEE 754 numbers and returns 0.30000000000000004 for this input; no merged fix. #2 goal: render the computed total in a preview. Body says 'display a total'; PM comment C2: render exactly two decimal places, so the #1 example appears as 0.30. src/preview.ts currently shows raw numbers.\n#3 goal: create a downloadable receipt from the computed total. AC: generated receipt includes that total formatted with two decimals. src/export.ts currently serializes the raw total. #4 goal: download the generated receipt. AC: returned bytes equal the generated artifact. src/download.ts currently responds 501.\nEpic #10 body: outcome 'correct receipt preview', Done when 'Stories closed'. Epic #20 body: outcome 'downloadable receipts', Done when 'Stories closed'. PM comment C5: keep these two independently useful Epics; together deliver a receipt whose downloaded total matches its preview. Out of scope: tax, discounts, email delivery. Dependencies: #2 blocked by #1; #3 blocked by #1; #4 blocked by #3. The files above have no other conflicts. No unresolved product decision. Finish the preparation now; implementation is not requested.",
+    "files": [],
+    "expected_behavior": [
+      "Refines Story #2 using C2 and both Epic Done when criteria against the supplied current code, without asking the PM to perform refinement",
+      "Uses actual delegated tasks to review each Epic and its Stories before the Milestone review; records results and dispositions",
+      "Assembles a Milestone for the shared receipt outcome without a second invocation and delegates its separate review after Epic findings are resolved",
+      "Defines the Milestone's own observable joint check: the downloaded total matches the preview for the decimal example, rather than only closing its Epics",
+      "Presents one combined proposal with exact Story edits, Epic bodies, Milestone description, ranks, dependencies, labels and review evidence",
+      "Makes no GitHub writes, claims no delivered result and requests no separate approval per level or new refine conversation"
+    ]
+  },
+  {
+    "skills": ["grooming-mode", "label-for-issues"],
+    "setup": [],
+    "query": "grooming-mode\nHome repo: example/tools. Keep the existing Epics. Read-only offline exercise: the following is the complete current GitHub/code snapshot; do not call GitHub or fetch. Native agent delegation is available, without a T3 connector.\nThere are two open Epics and no Milestones, other issues, comments or relationships. Labels are canonical. Epic 1 #10 has Story #1 as its only child; Epic 2 #20 has Story #2. Epics carry 4-epic, 3-pty:p2, 1-needs-triage; Stories carry 2-type:bug, 3-pty:p2, 1-needs-triage.\nStory #1 fixes a CLI crash on an empty config; AC: 'tool check empty.json' exits 2 and prints 'missing configuration'. src/config.ts currently dereferences the missing root. Epic #10 outcome and Done when match that check. Story #2 makes the site's contact link usable; AC: selecting Contact opens mailto:help@example.test. web/footer.tsx currently renders a span with no link. Epic #20 outcome and Done when match that behavior. The files are independent and there are no blockers. Complete grooming preparation now; do not execute implementation.",
+    "files": [],
+    "expected_behavior": [
+      "Completes delegated reviews of both Epics with their Stories and resolves findings",
+      "Does not invent a Milestone from the count of two Epics, their shared repository or a generic quality theme",
+      "Explains the lack of evidence for a shared outcome, may ask a product question if needed, and preserves parallel work in the Epic proposal",
+      "Does not request another grooming route or fabricate GitHub writes"
+    ]
+  },
+  {
+    "skills": ["grooming-mode", "label-for-issues"],
+    "setup": [],
+    "query": "grooming-mode ; refine\nHome repo: example/reports. Target: Milestone M1. Read-only offline exercise using this complete current snapshot instead of GitHub/git reads; no external writes. Native agent delegation is available, without a T3 connector.\nM1 contains open Epic 1 #10 then Epic 2 #20. Epic #10 contains open Story #1 then #2, Epic #20 contains open Story #3. Labels are canonical: Epics 4-epic; Stories 2-type:feature; all carry 1-needs-triage; #1/#10 are 3-pty:p1, the rest 3-pty:p2. No other issues exist.\n#1 goal/AC: persist a report and return its ID; src/store.ts currently does not save. #2 goal/AC: publish its URL after the report exists; src/publish.ts currently returns no URL. #3 goal/AC: display an already published URL; web/report.tsx currently has no link. Native dependencies: #2 blocked by #1 and #3 blocked by #2. Native Epic dependency: #20 blocked by #10.\nThe draft #10 outcome is 'store and publish reports', with both Story checks in Done when. Draft #20 outcome is 'display published reports', with #3's check in Done when. M1 outcome is 'a stored report is accessible from its displayed link'; description has that joint check and the Epic order above. Original scope has no missing criteria.\nA new PM answer changes the packaging: Story #2 belongs in Epic #20; keep Epic identifiers, retain #2's publishing behavior and dependencies. Existing delegated Epic and Milestone reviews predate this answer. Apply the answer to the proposed hierarchy, complete preparation and show the final proposal. This answer is not approval to write.",
+    "files": [],
+    "expected_behavior": [
+      "Moves Story #2 to the proposed membership of Epic #20 and ranks it before #3, updating both Epic bodies and boundaries",
+      "Preserves the concrete Story prerequisites, derives the Epic prerequisite from #1 to #2, and checks Milestone Rank and joint outcome",
+      "Recomputes priorities from the affected Stories and retains #10 p1 and #20 p2",
+      "Invalidates affected prior reviews, delegates reviews of the changed Epics and Stories, then a separate Milestone review",
+      "Detects that returning and displaying a URL does not establish that it serves the stored report, despite the snapshot's claim of complete criteria",
+      "Keeps the affected Epic and Milestone unready, asks the PM how to cover the unsupported outcome, and continues independent Epic refinement",
+      "Presents the revised hierarchy without inventing a serving requirement inside Story #2, treating the PM answer as write approval, requesting a new conversation or claiming application"
     ]
   }
 ]
