@@ -80,6 +80,8 @@ Source: developers.google.com/style, fetched 2026-07-18.
 
 Source: asd-ste100.org (Issue 9, 2025), fetched 2026-07-18. The numbered rules and dictionary live in the spec PDF. The principles above are the transferable core.
 
+When a request names STE or ASD-STE100, or cites an `STE_NN` checklist ID, load the `asd-ste100` skill for the full checklist.
+
 ## Leave no sentence open to two readings (Global English)
 
 - Keep words like "only" and "not" next to the word they change: "only fails on growth" and "fails only on growth" say different things.
