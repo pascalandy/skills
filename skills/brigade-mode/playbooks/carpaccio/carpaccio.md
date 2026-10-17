@@ -98,7 +98,7 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 | Choice | Rule | Decides |
 |---|---|---|
 | Parallel or serial | If the groups touch disjoint files and have no dependency, run them in parallel. If you have a doubt, run them in series. Stay within `max-parallel` and `max-cooks`. Never run two batches of one repository at the same time | Head Chef for batches, Chef for Cooks |
-| Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. If the requirements and required checks are met and you can explain why the remaining risk does not change the result, state your confidence, evidence and low-impact remainder in the Report, then merge with `🔀 Batch merging`. If a material uncertainty remains after you try to resolve it, send `🍽️ Batch ready` with your recommendation; the Head Chef asks Pascal one `🙋 merge` question | Chef |
+| Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. If the requirements and required checks are met and you can explain why the remaining risk does not change the result, state your confidence, evidence and low-impact remainder in the Report, then merge with `🔀 Batch merging`. If a material uncertainty remains after you try to resolve it, send `🍽️ Batch ready` with your recommendation; the Head Chef answers what the agreed requirements or specs settle and asks Pascal one `🙋 merge` question only for the rest | Chef |
 | Release | If the `AGENTS.md` or release doc of the repository requires a release after a merge, release. Otherwise, do not release | Head Chef, at Align |
 | Docs | Put the doc change of a card in the layer of that card. Open a top docs PR only for docs that no card owns | Cook |
 | Another machine, such as macOS | Run the check with 🧰 fleet, from the machine of the run. For a macOS check, use the mini if fleet's `repos.toml` marks the repository `mini = true` and the mini has the tools. Otherwise, run the macOS check on the mbp. Name the machine in the report. Do not skip it because it is on another machine. If a required check remains unconfirmed at Ready, name the check, its exact command and the blocker; the Chef asks Pascal before merging. For an optional check, the Chef explains why its absence cannot change the result | Cook; Chef reads the output |
@@ -119,7 +119,7 @@ Only these items produce ❓. For one item, label the title `align`, `merge <b>`
 7. Held batch once nothing else in the run can progress
 8. Pascal-owned card ready, per Decisions
 
-Each item is one line in Canadian French, starting with `🙋`, such as `🙋 merge #122–#129 sans test macOS requis ? Confiance incertaine ; je recommande d'attendre` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the material uncertainty and the Chef's recommendation. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
+Each item is one line in Canadian French, starting with `🙋` and carrying any link needed to answer it, such as `🙋 merge #122–#129 <URL> sans test macOS requis ? Confiance incertaine ; je recommande d'attendre` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the material uncertainty and the Chef's recommendation. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
 
 Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️ when checks pass on the new heads. A change to its own diff needs a new merge decision. Stop voids an unused approval. Before you retry a launch, merge, deploy or release, look in T3, GitHub or the deploy output to see if that action already occurred.
 
@@ -164,7 +164,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 
 - One PR per verifiable unit, in one stack per Cook and repository with 🧰 gh-stack, even for independent cards. Assign each PR to `pr-assignee`
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
-- Put each fix in the layer that last changed its line; for a line from the trunk, use the layer whose change made it wrong
+- Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from the trunk, use the layer whose change made it wrong
 - The Cook follows the repository's `AGENTS.md` procedure first; 🧰 poteto-mode fills what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to the Chef
 - The Head Chef writes the standing rules that the target projects do not load, including [Work folders](#work-folders), once to `~/.cache/brigade-<id4>/rules.md`. Every launch message and barrage brief carries `Rules: <rules.md path>`, plus the additions it inherited and its own. Omit an empty field
 - A comment posted through Pascal's account does not wake the Cook's watch; the Chef also sends it to the Cook with `t3_thread_send`
@@ -180,7 +180,7 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. Recreate folders when resumed.
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Keep a Cook's work folder, briefs included, through `🍽️ Stack ready` and any Fix. Remove it before its final report, after any enabled retros: in Closing, Stop or a cut that leaves no card. Remove a barrage's work folder before its final report, removing its detached worktree first. Recreate folders when resumed.
 
 ## Model selection
 

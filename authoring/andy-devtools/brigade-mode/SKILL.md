@@ -8,7 +8,7 @@ kind: "dev"
 
 ## Pick the route
 
-- For any role except a barrage, load 🧰 t3-runtime before following the route
+- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio Head Chef, Chef or Cook also loads 🧰 oem first; carpaccio's chain and Asking Pascal replace oem's When You Need Me
 - **A delegated carpaccio barrage, ending in `manic-1`, `manic-2`, `manic-3` or `manic-5`:** read only `playbooks/carpaccio/sop/<sop>.md` and your brief, then review under that contract
 - **A delegated carpaccio Watchdog, ending in `watchdog`:** read only `playbooks/carpaccio/sop/watchdog.md` and your brief, then run its scheduled tick
 - **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque and carpaccio. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan

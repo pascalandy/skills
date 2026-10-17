@@ -120,6 +120,7 @@ CHEF_KINDS = {
     "🔀": "🔀",
     "🧹": "🧹",
     "🍽️review": "🍽️",  # batch ready, waits on the PM's review
+    "🍽️answer": "🍽️",  # batch ready, the Head Chef answers from the requirements or specs
     "🍽️held": "🍽️",  # the PM holds it
     "⏸️answer": "⏸️",  # question the Head Chef answers itself
     "⏸️escalated": "⏸️",  # question that needs the PM
@@ -135,7 +136,7 @@ HC_FACTS = ("pm_item", "own", "stop")
 
 
 def hc_items(h, kinds):
-    progress = bool(kinds & {"⏳", "🔀", "🧹", "⏸️answer"}) or h["own"]
+    progress = bool(kinds & {"⏳", "🔀", "🧹", "⏸️answer", "🍽️answer"}) or h["own"]
     items = set()
     if h["pm_item"]:
         items.add("own item")
@@ -152,7 +153,7 @@ def hc_status(h, kinds):
     """First line that applies wins."""
     if hc_items(h, kinds):
         return "❓"  # the PM owes an answer
-    if h["own"] or "⏸️answer" in kinds:
+    if h["own"] or kinds & {"⏸️answer", "🍽️answer"}:
         return "🟢"  # works, or answers a Chef
     if not kinds <= CHEF_FINAL:
         return "⏳"  # a Chef is not final
@@ -183,7 +184,7 @@ def hc_properties(h, kinds, s):
         broken.append("H2 delivered after a Stop or with nothing delivered")
     if (s == "❓") != bool(items):
         broken.append("H3 ❓ without a PM item, or a PM item without ❓")
-    if kinds & {"⏸️answer", "⏸️escalated"} and s not in {"🟢", "❓"}:
+    if kinds & {"⏸️answer", "🍽️answer", "⏸️escalated"} and s not in {"🟢", "❓"}:
         broken.append("H4 a Chef's question has no owner")
     if "🍽️review" in kinds and s != "❓":
         broken.append("H5 a ready batch does not reach the PM")
