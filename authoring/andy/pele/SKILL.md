@@ -6,7 +6,7 @@ kind: "general"
 
 # Pele
 
-Pele is a new renderer, not Mermaid. It reads Mermaid 12.1.0 syntax and draws it with its own layout, in a browser or in Node, with colors from CSS variables. Mermaid habits carry over for syntax only: before you reuse one, read [Differences from Mermaid](references/source/compatibility.md#differences-from-mermaid).
+Pele is a new renderer, not Mermaid. It reads Mermaid syntax and draws it with its own layout, in a browser or in Node, with colors from CSS variables. Mermaid habits carry over for syntax only: before you reuse one, read [Differences from Mermaid](references/source/compatibility.md#differences-from-mermaid).
 
 Resolve bundled paths relative to this skill directory. `references/source/` holds the pele.run pages at the version its [README](references/source/README.md) names. When the project uses a newer pele, read the live page instead: `https://pele.run/<page>.md`, such as `https://pele.run/api.md`.
 
@@ -63,7 +63,7 @@ A diagram computes nothing: no critical path, causal inference, or statistics. U
 
 ## Render and verify
 
-Requires `uv` (`uv --version`) and Node.js 20 or later (`node --version`). [scripts/render_diagrams.py](scripts/render_diagrams.py) loads the pele of the project in the current folder, else the one in `~/.cache/pele`. When neither exists, run `pnpm --dir ~/.cache/pele add pele`.
+Requires `uv` (`uv --version`) and Node.js 20 or later (`node --version`). Run [scripts/render_diagrams.py](scripts/render_diagrams.py) from the project's folder so it uses the project's pele. When it finds no pele, its error gives the install command.
 
 ```bash
 # Check only; writes nothing
