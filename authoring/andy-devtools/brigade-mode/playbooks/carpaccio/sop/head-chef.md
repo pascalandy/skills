@@ -1,6 +1,6 @@
 # head-chef
 
-Keep the batch registry in `watch.toml` in your work folder: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last received phase, hold and outcome. Include the watched slots and Watchdog ids required by [watchdog](watchdog.md). Write it atomically as [watchdog](watchdog.md#files) defines. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
+Keep the batch registry in `watch.toml` in your work folder: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last received phase, hold and outcome. Include the watched slots and Watchdog ids, and write it atomically, as [watchdog](watchdog.md#files) defines. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
 
 ## Align
 

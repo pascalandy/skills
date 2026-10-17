@@ -101,7 +101,7 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 | Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. If the requirements and required checks are met and you can explain why the remaining risk does not change the result, state your confidence, evidence and low-impact remainder in the Report, then merge with `🔀 Batch merging`. If a material uncertainty remains after you try to resolve it, send `🍽️ Batch ready` with your recommendation; the Head Chef asks Pascal one `🙋 merge` question | Chef |
 | Release | If the `AGENTS.md` or release doc of the repository requires a release after a merge, release. Otherwise, do not release | Head Chef, at Align |
 | Docs | Put the doc change of a card in the layer of that card. Open a top docs PR only for docs that no card owns | Cook |
-| Another machine, such as macOS | Run the check with 🧰 fleet, from the machine of the run. If fleet's `repos.toml` marks the repository `mini = true` and the mini has the check's tools, use the mini for macOS. Otherwise use the mbp. Name the machine in the report. Do not skip it because it is on another machine. If a required check remains unconfirmed at Ready, name the check, its exact command and the blocker; the Chef asks Pascal before merging. For an optional check, the Chef explains why its absence cannot change the result | Cook; Chef reads the output |
+| Another machine, such as macOS | Run the check with 🧰 fleet, from the machine of the run. For a macOS check, use the mini if fleet's `repos.toml` marks the repository `mini = true` and the mini has the tools. Otherwise, run the macOS check on the mbp. Name the machine in the report. Do not skip it because it is on another machine. If a required check remains unconfirmed at Ready, name the check, its exact command and the blocker; the Chef asks Pascal before merging. For an optional check, the Chef explains why its absence cannot change the result | Cook; Chef reads the output |
 | Pascal-owned card ready, such as a mockup | Align marks these cards in the Plan. When such a card is ready, send `🙋 <card> : <URL>` up the chain at once. Keep the other work running | Cook sends; Head Chef posts |
 | Work after Close | Reopen the run. Align the addition, write `rules.md` again, re-arm the Watchdog and launch a Chef | Head Chef |
 | Anything else with a safe default, such as a cost trade-off | If you have the context, decide and log it. Otherwise, send it one level up with your default | The lowest role that has the context |
@@ -125,7 +125,7 @@ Approval binds to the frozen heads and the stack's own diff. A restack that chan
 
 ## SOPs
 
-Read only the SOP for your current role and step.
+Read only the SOP for your current role and step, plus each section it links to.
 
 | SOP | Read when |
 |---|---|
@@ -180,7 +180,7 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. Recreate folders when resumed. Each `Work folder:` field in an SOP template holds only the absolute path, because `rules.md` carries this section.
+Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `chef-<b>`, `cook-<b>.<c>`, `watchdog-head-chef`, `watchdog-<b>` or `<sop>-<b>.<c>-<k>`. Create both folders before work. Remove a Cook or barrage work folder before its final report, removing a barrage's detached worktree first. Recreate folders when resumed.
 
 ## Model selection
 
@@ -215,7 +215,7 @@ Detail: <Cook threadId>
 
 `🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
 
-Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. Any other message to Pascal before the final report is a notice. A notice has at most 3 lines: the outcome, the PR range and the next step. It has no table or `<details>`. For the final report, use this template:
+Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. Any other unrequested message to Pascal before the final report is a notice. A notice has at most 3 lines: the outcome, the PR range and the next step. It has no table or `<details>`. For the final report, use this template:
 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>

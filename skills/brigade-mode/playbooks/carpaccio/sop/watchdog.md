@@ -94,8 +94,6 @@ A Watchdog schedule is unhealthy when one of these is true:
 
 To read the last run, call `t3_thread_read` on the schedule's `boundThreadId` with `limit: 1, runLimit: 1`. Inspect `recentRuns[0]`, which is newest even though `items` starts at the oldest. Use `completedAt` for a completed run and `requestedAt` for a running or queued one. When `lastRunStatus` is never, use the initial `nextRunAt` minus `watch-minutes` as the time of that last run.
 
-Each parent checks its own Watchdog's schedule on each wake. The Head Chef's Watchdog also checks the schedule of each live Chef.
-
 ## Forbidden combinations at rest
 
 Check these against the title and received phases in `watch.toml`. At rest means no thread is mid-turn and no report is in flight. A two-tick observation gives an in-flight handoff time to settle. A hold in the watch file permits F5's exception.

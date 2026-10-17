@@ -25,7 +25,7 @@ Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
 Rules: <rules.md path, plus additions>
 Work folder: <absolute path>
-Contract: Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
+Contract: Read and follow the Rules file. Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
 ```
 
 ## Triage

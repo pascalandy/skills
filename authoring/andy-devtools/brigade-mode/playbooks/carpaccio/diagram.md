@@ -111,9 +111,9 @@ sequenceDiagram
     C-->>H: Agent: ⛳ Batch delivered, report <-
     C->>C: Delete Watchdog schedule<br>cancel task, remove work folder
     C->>C: Settle
-    H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs<br>Prune worktree records
+    H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs
     H->>U: Agent: ⛳ x/y batches done, report <-
-    H->>H: Delete Watchdog schedule<br>cancel task, remove work folder
+    H->>H: Delete Watchdog schedule<br>cancel task, remove work folders<br>Prune worktree records
     H->>H: Settle and unpin
 ```
 
