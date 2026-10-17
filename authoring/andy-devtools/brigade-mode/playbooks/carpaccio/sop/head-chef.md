@@ -1,6 +1,6 @@
 # head-chef
 
-Keep the batch registry in `watch.toml` in your work folder: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last received phase, hold and outcome. Include the watched slots and Watchdog ids required by [watchdog](watchdog.md). Write it atomically after each launch, received report, status or subject change, hold, scope change and replacement. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
+Keep the batch registry in `watch.toml` in your work folder: batch number, name, repository, projectId, Chef threadId, dependencies, Align choices, last received phase, hold and outcome. Include the watched slots and Watchdog ids required by [watchdog](watchdog.md). Write it atomically as [watchdog](watchdog.md#files) defines. Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entry and turn end. A registered but unlaunched batch remains live.
 
 ## Align
 
@@ -29,16 +29,14 @@ Work folder: <absolute path>
 
 On each wake, reconcile your Watchdog and its findings:
 
-- Check the schedule in `list_scheduled_tasks`. If it exists, read its `boundThreadId` with `t3_thread_read`, `runLimit: 1` for the latest run time
-- If the schedule is missing, disabled, failed or late by twice `watch-minutes`, delete any old schedule and cancel its task before re-arming
-- On `🐕 Watchdog <id4>: <finding>`, read the current slot and thread state. Resume, replace or reconcile the child. Raise `❓ fault` only if you cannot repair it
-- On `🐕 Watchdog <id4>: wake`, check whether the action already happened. Resume the current step, recompute your status and end without replying
-- Before ending on 🟢 while waiting for a child, write or refresh the `wait` file as [watchdog](watchdog.md) defines
+- Check your Watchdog's schedule under [Schedule health](watchdog.md#schedule-health). If it is unhealthy, delete any old schedule, cancel its task and re-arm your Watchdog
+- On `🐕 Watchdog <id4>: <finding>`, act as its row in [Messages](../carpaccio.md#messages) says
+- Before you end a turn to wait, write or refresh your `wait` file as [watchdog](watchdog.md#files) defines
 
 Done when the schedule is live and each finding has an owner.
 
 1. Record each Chef's received phase and answer its questions from the agreed requirements. If you need Pascal's answer, show the matching label from [Asking Pascal](../carpaccio.md#asking-pascal). Relay the answer; otherwise decide, split the batch or replace its Chef. Done when each escalation has an owner and next action
-2. On `🍽️ Batch ready`, check the Report. Send Pascal one `🙋 merge` line with the material uncertainty and the Chef's recommendation, as [Asking Pascal](../carpaccio.md#asking-pascal) tells. When a Chef relays a `🙋 <card>` line, post it to Pascal in the same turn and relay Pascal's choice back down the chain. Keep other batches running. Relay `🔀 Merge`, `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop` as Pascal decides. A Hold remains live; show `❓ held batch <b>` only when nothing else progresses. A Drop is a scope cut and must come from Pascal. Done when each ready batch has a decision
+2. On `🍽️ Batch ready`, check the Report. Send Pascal one `🙋 merge` line as [Asking Pascal](../carpaccio.md#asking-pascal) tells. When a Chef relays a `🙋 <card>` line, post it to Pascal in the same turn and relay Pascal's choice back down the chain. Keep other batches running. Relay `🔀 Merge`, `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop` as Pascal decides. A Hold remains live; show `❓ held batch <b>` only when nothing else progresses. A Drop is a scope cut and must come from Pascal. Done when each ready batch has a decision
 3. Record `🔀 Batch merging` and `Batch merged` as notices, without incrementing the counter. On `⛳ Batch delivered` or `⏹️ Batch stopped`, record the final outcome and update the title. Start newly eligible batches. On merge failure, retain the landed PRs while the Chef has its Cook fix the cause. Done when the registry and title match received outcomes
 4. If a ready batch loses readiness, withdraw its merge item, post one line explaining the withdrawal and keep any other open items. When Pascal changes batch choices or asks for fast track, relay the new choices to the Chef. Done when each affected Chef has the current decision
 5. Ask Pascal before cutting a card, a batch or a required deliverable. Relay `⏹️ Cut <card>` or `⏹️ Drop` and remove a cut batch from the count only after its Chef reports ⏹️. Done when the reduced scope and titles match the received outcomes
@@ -81,4 +79,4 @@ Split card groups without adding or cutting cards or required deliverables. Set 
 Begin once each launched Chef is final and settled, and every queued batch ran, was cut or stopped. Show 🟢 during your own closing work.
 
 1. If `[head-chef].retro`, follow [shared Retros](../carpaccio.md#retros). Done when each has issue links or a recorded no-findings result
-2. Confirm each launched Chef is settled using 🧰 t3-runtime. Compute ⛳ or ⏹️ from the final outcomes and send Pascal the final report from [Report](../carpaccio.md#report). Mark your own final report received in `watch.toml` and set the title to the final status. As the last step before settling, delete your Watchdog's schedule, cancel its task and remove its work folder and your own, then remove the run's root cache folder. Then settle. Done when every batch has an outcome, Pascal has the report, no Watchdog schedule remains and your settle returns `settlesWhenTurnEnds: true`
+2. Confirm each launched Chef is settled using 🧰 t3-runtime. Compute ⛳ or ⏹️ from the final outcomes and send Pascal the final report from [Report](../carpaccio.md#report). Mark your own final report received in `watch.toml` and set the title to the final status. As the last step before settling, delete your Watchdog's schedule, cancel its task and remove its work folder and your own. Then remove the run's root cache folder and run `git worktree prune` in every run repository. Then settle. Done when every batch has an outcome, Pascal has the report, no Watchdog schedule remains and your settle returns `settlesWhenTurnEnds: true`

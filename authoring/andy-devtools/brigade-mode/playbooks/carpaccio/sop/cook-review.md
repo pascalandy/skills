@@ -6,7 +6,7 @@ The Cook stays 🍳 during barrages and triage. Apply [Statuses and Messages](..
 
 1. Run each pair through 🧰 interrogate as its lead, with one reviewer per barrage: manic-1 plus manic-2 after Implement; manic-3 plus manic-5 after Docs. Select each barrage with shared Model selection. manic-3 keeps its technical-writing method. Give the pair the same evidence snapshot at the stack's current heads. Done when every target is supported and both briefs use the same recorded heads
 2. Delegate each review pair:
-   - For each pass, call `delegate_task` with `mode: "async"`, `role: "review"`, the target, the title from Roles copied word for word and the brief below
+   - For each pass, call `delegate_task` with `mode: "async"`, `role: "review"`, the target and the brief below. Copy the barrage title from Roles word for word
    - Use `clientRequestId: <id4>-<b>.<c>-<sop>-<k>`; `<k>` counts this Cook's delegations from 1 without resetting. Reuse the key only to retry that call
    - Retain each taskId. Submit a pair in the same turn
    - Write `<work folder>/wait` with both taskIds, then end your turn for completion notifications
