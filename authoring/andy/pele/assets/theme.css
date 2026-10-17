@@ -1,0 +1,21 @@
+.pele {
+  --pele-bg: #000000;
+  --pele-fg: #ffffff;
+  --pele-muted: #a5adce;
+  --pele-line: #ffffff;
+  --pele-surface: #303446;
+  --pele-surface-alt: #000000;
+  --pele-border: #8caaee;
+  --pele-accent: #8caaee;
+  --pele-critical: #e78284;
+  --pele-error: #e78284;
+  --pele-series-1: #8caaee;
+  --pele-series-2: #ef9f76;
+  --pele-series-3: #a6d189;
+  --pele-series-4: #ca9ee6;
+  --pele-series-5: #81c8be;
+  --pele-series-6: #e5c890;
+  --pele-series-7: #e78284;
+  --pele-series-8: #f4b8e4;
+  background: var(--pele-bg);
+}
