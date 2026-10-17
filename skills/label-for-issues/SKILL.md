@@ -61,10 +61,11 @@ on scope before changing legacy labels; reuse approval within that scope. Rename
 delete, or reinterpret a label only with that approval. Preserve custom labels;
 continue unambiguous changes. Missing canonical labels alone need no migration
 approval. After metadata writes, reread the catalog and compare with the requested
-changes. Treat `4-epic:parent` as the old name of `4-epic`: propose renaming
-it, and never create `4-epic` beside it. Treat `4-epic:member` as retired:
-propose deleting it. Both changes require the migration approval above; until
-then, report the pending migration and leave those labels intact.
+changes. Treat `4-epic:parent` as the old name of `4-epic`: rename it, and
+never create `4-epic` beside it. Treat `4-epic:member` as retired: delete it
+once every issue carrying it has a native parent, and otherwise keep it and
+report those issues. These two changes need no approval: apply them whenever
+the run may write labels, and report them for a read-only request.
 Done when each requested metadata change is verified, proposed for a
 read-only request, or reported as missing, conflicting, or failed. A setup-only
 request ends here after reporting those results.

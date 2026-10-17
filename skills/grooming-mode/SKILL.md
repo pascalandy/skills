@@ -54,8 +54,10 @@ Sprint means a fixed period; Wave duplicates Blocked by. Use neither as a level.
 Requires `gh` ([install](https://cli.github.com/)); confirm `gh --version`
 and `gh auth status` before GitHub reads. Load `label-for-issues` and its
 GitHub CLI reference before scoping. It owns labels, Ready, native operations,
-filters and pagination. Run its Step 4 read-only before scope filters. If a label
-migration is pending, propose it and stop until it is resolved.
+filters and pagination. Run its Step 4 before scope filters. Its `4-epic`
+migration is the only write allowed there, even in a read-only grooming, since
+the Epic filters need that label. If another label migration is pending, propose
+it and stop until it is resolved.
 
 Record the home repo and each scoped repo. Ask for the home repo if absent,
 before proposing a container there. An issue stays in its repository; Epics and
