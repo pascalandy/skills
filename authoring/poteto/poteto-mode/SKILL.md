@@ -26,7 +26,7 @@ Remaining triggers:
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface → the **unslop** skill. Your reply is a prose surface. Write it per **Writing the reply**. Skills and other agent-facing documents use **writing-for-agents**, resolved through the runtime reference.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
-- Writing or changing a fact in any file, such as a command, path, setting, rule, or number → first search for where it already lives, including code, config, and `--help` output. Point to that place, or move the fact there, instead of restating it. When you change a fact, make each other copy you find point to that place in the same change.
+- Writing a fact into a doc or comment, such as a command, path, setting, or number → search for where it already lives, including code, config, and `--help` output, and point there instead of restating it, unless the reader can't reach that place. When you change a fact anywhere, search for its old value and update each live copy or replace it with a pointer, in the same change.
 - Before commit → the diff cleanup procedure in [agent runtime](references/agent-runtime.md#author-clean-up-and-verify).
 - Before review of a diff that changes source code → the **no-comments** skill (`/no-comments`).
 - Shipping UI / IDE / CLI → the project verification skill and an available shell, PTY, browser, or native application driver, as described in the runtime reference.
