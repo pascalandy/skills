@@ -128,4 +128,4 @@ Apply to any prose this skill covers. Item 1 applies only to document sets:
 6. Does each thing have exactly one name across the docs?
 7. Would a developer say these words out loud? Replace invented metaphors and fancy synonyms with the plain word or the real symbol name.
 8. Are all symbols, paths, and counts real at this commit, with the commands that regenerate the counts?
-9. Does a fact here already live in another file, in code, in config, or in `--help` output? Point there, per poteto-mode's [Don't Repeat Yourself (DRY)](../poteto-mode/principles/dont-repeat-yourself.md) principle.
+9. Fact already lives elsewhere (file, code, config, `--help` output)? Point there, per poteto-mode's [Don't Repeat Yourself (DRY)](../poteto-mode/principles/dont-repeat-yourself.md) principle.

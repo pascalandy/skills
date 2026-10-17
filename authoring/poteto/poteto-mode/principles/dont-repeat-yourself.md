@@ -1,13 +1,13 @@
 # Don't Repeat Yourself (DRY)
 
-Every piece of knowledge has one authoritative place, and every other mention points to it. Hunt and Thomas named the principle in *The Pragmatic Programmer* for knowledge, not for text that looks alike.
+Each piece of knowledge → one authoritative place; every other mention points there. Hunt and Thomas (*The Pragmatic Programmer*): knowledge, not lookalike text.
 
-**Why:** A restated fact drifts. The next change updates one copy, the other copies turn false, and agents copy the false ones forward.
+**Why:** Restated fact drifts. Next change updates one copy → others turn false → agents copy false ones forward.
 
 **The pattern:**
-- Before you write a fact into a doc, spec, or comment, such as a command, path, setting, or number, search for where it already lives, including code, config, and `--help` output. Point there instead of restating it
-- Restate a fact only when the reader can't reach its place, such as an install command in a README for someone who hasn't cloned the repo
-- When you change a fact anywhere, search for its old value. Update each live copy or replace it with a pointer, in the same change. Dated records keep their old value, and generated copies come from their generator
-- In code, follow **Foundational Thinking** and the **Laziness Protocol**
+- Before writing fact (command, path, setting, number) into doc, spec, or comment → search where it lives: code, config, `--help` output. Point there instead of restating
+- Restate only when reader can't reach source, like README install command for reader without clone
+- Fact changes anywhere → search old value; update each live copy or replace with pointer, same change. Dated records keep old value; generated copies come from generator
+- Code → **Foundational Thinking**, **Laziness Protocol**
 
-**The test:** Change the fact in its one place. Does any other file now say something false?
+**The test:** Change fact in its one place. Any other file now false?

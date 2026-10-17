@@ -45,7 +45,7 @@ Each entry links a principle's file and says when it applies.
 **Core**
 
 - [Laziness Protocol](principles/laziness-protocol.md): refactoring, sizing a diff, or tempted to add abstractions, layers, or signal threading
-- [Don't Repeat Yourself (DRY)](principles/dont-repeat-yourself.md): writing or reviewing a doc, spec, or comment, or changing a fact that other files may state
+- [Don't Repeat Yourself (DRY)](principles/dont-repeat-yourself.md): writing or reviewing docs, specs, comments, or changing a fact other files state
 - [Foundational Thinking](principles/foundational-thinking.md): before writing logic, when choosing core types and data structures, sequencing scaffold and feature work, or deciding what concurrent actors share
 - [Redesign from First Principles](principles/redesign-from-first-principles.md): integrating a new requirement into an existing design
 - [Attack the Premise](principles/attack-the-premise.md): two or more fixes that share one premise have failed the same gate
