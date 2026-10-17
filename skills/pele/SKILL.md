@@ -10,14 +10,16 @@ Pele is a new renderer, not Mermaid. It reads Mermaid syntax and draws the diagr
 
 Resolve bundled paths relative to this skill directory. `references/source/` holds the pele.run pages at the version that its [README](references/source/README.md) names. When the project uses a newer pele, read the live page at `https://pele.run/<page>.md`, such as `https://pele.run/api.md`.
 
-## Workflow
+To draw a diagram, follow [Draw a diagram](#draw-a-diagram). To add pele to an app, go to [Pele in an app](#pele-in-an-app).
+
+## Draw a diagram
 
 1. State the reader's question and the takeaway in one sentence each. Say whether the input is measured data, an estimate, or a made-up example
 2. Choose the type in [Choose by question](#choose-by-question). For an exploratory request, compare two or three types that show different facts about the same subject. For other requests, use one type
-3. List the headings of the type's examples page with `rg -n '^#' <page>`. Copy the closest example as the start. Done when the source starts with that example's keyword
-4. Model the meaning before the style: units, direction, the meaning of each arrow, and any scale. Do not invent observations or turn a hypothesis into a proven cause. Done when the diagram alone shows each unit and the meaning of each arrow
+3. List the headings of the type's examples page with `rg -n '^#' <page>`. Copy the closest example as the start
+4. Model the meaning before the style: units, direction, the meaning of each arrow, and any scale. Do not invent observations or turn a hypothesis into a proven cause. When the type accepts them, add the accessibility title and description, `accTitle` and `accDescr`. Done when the diagram alone shows each unit and the meaning of each arrow
 5. Run [Render and verify](#render-and-verify) until the script answers `{"ok":true,...}` and the screenshot shows the takeaway
-6. Deliver the SVG, its screenshot, the editable source, one sentence on how to read the diagram, and the pele version that the script reported. Add the accessibility title and description, `accTitle` and `accDescr`, to the source
+6. Deliver the SVG, its screenshot, the editable source, one sentence on how to read the diagram, and the pele version that the script reported
 
 ## Choose by question
 
@@ -63,7 +65,7 @@ A diagram computes nothing: no critical path, causal inference, or statistics. W
 
 ## Render and verify
 
-Requires `uv` (`uv --version`) and Node.js 20 or later (`node --version`). To use the project's pele, run [scripts/render_diagrams.py](scripts/render_diagrams.py) from the project's folder. When the script finds no pele, its error gives the install command.
+Requires `uv` (`uv --version`), Node.js 20 or later (`node --version`), and pnpm (`pnpm --version`). To use the project's pele, run [scripts/render_diagrams.py](scripts/render_diagrams.py) from the project's folder. When the script finds no pele, its error gives the install command.
 
 ```bash
 # Check only, without files
@@ -72,7 +74,7 @@ uv run <this-skill-folder>/scripts/render_diagrams.py diagram.mmd
 uv run <this-skill-folder>/scripts/render_diagrams.py notes.md --output /tmp/pele
 ```
 
-For the inputs, theme options, and answer fields, run the script with `--help`. Fix each error at the `file:line:column` that the script names. Then run the script again.
+For the inputs, the theme option, and the answer fields, run the script with `--help`. Fix each error at the `file:line:column` that the script names. Then run the script again.
 
 To inspect an SVG, take a screenshot of it in a Chromium browser (`chromium --version`), at the `width` and `height` that the answer gives. `rsvg-convert` and ImageMagick ignore pele's CSS variables and draw every shape black.
 
@@ -84,10 +86,11 @@ On macOS, use `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` i
 
 ## Theme
 
-[assets/theme.css](assets/theme.css) sets a black canvas, white text, and Catppuccin Frappe accents as pele variables. The script embeds this theme in each SVG. In an app, add the theme to the page's CSS. [Theming](references/source/theming.md) lists every variable and class name.
+[assets/theme.css](assets/theme.css) sets a black canvas, white text, and Catppuccin Frappe accents as pele variables. The script embeds this theme in each SVG. The embedded theme applies to every pele diagram on an HTML page. Before you put an SVG inline in a page, render it with `--no-theme`. In an app, add the theme to the page's CSS. [Theming](references/source/theming.md) lists every variable and class name.
 
 ## Pele in an app
 
 - **Rendering, mounting, errors, and bundle size**: read [API](references/source/api.md)
 - **Diagrams from untrusted authors**: before you insert their SVG or an error message, read [Security](references/source/security.md)
 - **Fonts**: pele measures labels before it draws them. Pass the page's font as [Fonts](references/source/theming.md#fonts) describes
+- **Pele compared with Mermaid.js**: read the [home page](references/source/index.md) for the bundle size and the render time

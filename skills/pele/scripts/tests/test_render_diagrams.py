@@ -73,6 +73,19 @@ def test_the_bundled_theme_styles_each_svg_unless_turned_off(
     assert (THEME.read_text() in svg) is styled
 
 
+def test_two_diagrams_that_would_write_one_svg_fail_before_rendering(
+    project: Path,
+) -> None:
+    for folder in ("one", "two"):
+        (project / folder).mkdir(exist_ok=True)
+        (project / folder / "same.mmd").write_text("flowchart LR\n  A --> B\n")
+    out = project / "out-same"
+    code, _, answer = run(project, "one/same.mmd", "two/same.mmd", "--output", str(out))
+    assert code == 2
+    assert "one/same.mmd:1 and two/same.mmd:1" in answer["errors"][0]
+    assert not out.exists()
+
+
 def test_a_check_without_output_writes_nothing(project: Path) -> None:
     diagram = project / "check.mmd"
     diagram.write_text("sequenceDiagram\n  A->>B: Hi\n")

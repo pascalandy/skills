@@ -9,8 +9,9 @@ diagram, and - as one diagram from stdin. Loads the pele installed in the
 current folder's project, or else the one in ~/.cache/pele ($XDG_CACHE_HOME/pele).
 
 Without --output, checks that every diagram renders and writes nothing. With
---output, also writes one SVG per diagram that renders, styled with the bundled
-assets/theme.css unless --theme or --no-theme says otherwise.
+--output, also writes one SVG per diagram that renders, named after its input,
+and styled with the bundled assets/theme.css unless --no-theme is set. Two
+diagrams that would write one file fail the run before anything renders.
 
 Answers in one JSON line. A success prints {"ok":true,"pele":{...},"diagrams":[...]}
 on stdout: the pele version and folder, then each diagram's source position,
@@ -521,7 +522,7 @@ def run_pele(diagrams: list[Diagram]) -> dict[str, Any]:
     if reply.get("missing"):
         raise ScriptError(
             f"pele not found from {os.getcwd()} or {cache_dir()}; "
-            f"run `pnpm add pele` in the project, or `pnpm --dir {cache_dir()} add pele`, "
+            f"run `mkdir -p {cache_dir()} && pnpm --dir {cache_dir()} add pele`, "
             "then run this command again"
         )
     return reply
@@ -540,14 +541,17 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     diagrams = read_diagrams(args.files)
     if not diagrams:
         raise UsageError("no diagram found: a .md input needs a ```mermaid fence")
-    css = ""
-    if args.output and not args.no_theme:
-        try:
-            css = args.theme.read_text(encoding="utf-8")
-        except OSError as error:
-            raise ScriptError(
-                f"{args.theme}: {error.strerror}; pass an existing CSS file to --theme"
-            ) from None
+    if args.output:
+        claimed: dict[Path, str] = {}
+        for diagram in diagrams:
+            svg = args.output / f"{diagram.stem}.svg"
+            if svg in claimed:
+                raise UsageError(
+                    f"{claimed[svg]} and {diagram.origin}:{diagram.line} would both write {svg}; "
+                    "rename one input or render them in separate runs"
+                )
+            claimed[svg] = f"{diagram.origin}:{diagram.line}"
+    css = "" if args.no_theme else THEME.read_text(encoding="utf-8")
     reply = run_pele(diagrams)
     if args.output:
         try:
@@ -601,15 +605,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=Path,
         help="folder for the SVG files; without it, only check",
     )
-    look = parser.add_mutually_exclusive_group()
-    look.add_argument(
-        "--theme",
-        type=Path,
-        default=THEME,
-        help="CSS added inside each SVG (default: bundled assets/theme.css)",
-    )
-    look.add_argument(
-        "--no-theme", action="store_true", help="keep pele's default colors"
+    parser.add_argument(
+        "--no-theme",
+        action="store_true",
+        help="keep pele's default colors instead of the bundled assets/theme.css",
     )
     return run_script(parser, render, argv)
 
