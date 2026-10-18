@@ -626,7 +626,7 @@ def check_fold(con: t3.sqlite3.Connection, snap: t3.Snapshot) -> dict:
         mismatches += [
             f"{name} {k}"
             for k in sorted(set(mine) | set(theirs))
-            if mine.get(k) != theirs.get(k)
+            if t3.plain(mine.get(k)) != theirs.get(k)
         ]
     return {"counts": counts, "mismatches": mismatches}
 

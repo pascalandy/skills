@@ -260,3 +260,27 @@ def test_committed_recording_fits_the_whitelist(path: Path) -> None:
         "the recorded Head Chef keeps its id4 title"
     )
     assert data["head"][-4:] == path.name.split(".")[0]
+
+
+def test_fold_keeps_when_each_fact_arrived() -> None:
+    item = {
+        "thread": "t",
+        "ordinal": 1,
+        "type": "dynamic_tool",
+        "status": "running",
+        "start": "2026-01-01T00:00:00.000Z",
+        "end": None,
+    }
+    done = {**item, "status": "completed", "end": "2026-01-01T00:00:01.000Z"}
+    snap = t3.fold(
+        [
+            [1, "2026-01-01T00:00:00.500Z", "item", "i1", item],
+            [2, "2026-01-01T00:00:01.300Z", "item", "i1", done],
+            [3, "2026-01-01T00:00:09.000Z", "item", "i1", done],
+        ]
+    )
+    folded = snap.items["i1"]
+    assert t3.plain(folded) == done
+    # its end is stamped before the record that carries it arrived: the page waits for the record
+    assert folded["seen"] == "2026-01-01T00:00:00.500Z"
+    assert t3.later(folded["end"], folded["endSeen"]) == "2026-01-01T00:00:01.300Z"

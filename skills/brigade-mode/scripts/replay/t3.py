@@ -655,13 +655,22 @@ class Snapshot:
             "run": self.runs,
             "subagent": self.subagents,
         }[kind]
-        if table.get(key) == data:
+        old = table.get(key)
+        if plain(old) == data:
             return False
         if data is None:
-            old = table.pop(key, None)
+            table.pop(key, None)
             if kind == "item" and old:
                 self._by_thread.get(old["thread"], {}).pop(key, None)
             return old is not None
+        if kind != "thread":
+            # when the record of each fact arrived: a fact never shows before its record
+            ended = data.get("completed" if kind != "item" else "end")
+            data = {
+                **data,
+                "seen": old["seen"] if old else time,
+                "endSeen": (old or {}).get("endSeen") or (time if ended else None),
+            }
         table[key] = data
         if kind == "item":
             self._by_thread.setdefault(data["thread"], {})[key] = data
@@ -684,7 +693,10 @@ class Snapshot:
     def titles(self, thread: str) -> list[tuple[str, dict | None]]:
         """The thread's titles over time: thread records, then completed renames."""
         renames = [
-            (item["end"] or item["start"], item["title"])
+            (
+                later(item["end"], item.get("endSeen")) or item["start"],
+                item["title"],
+            )
             for items in self._by_thread.values()
             for item in items.values()
             if item.get("tool") == "rename"
@@ -708,6 +720,20 @@ class Snapshot:
             if head_chef_title(thread, title):
                 return time
         return None
+
+
+ARRIVAL = ("seen", "endSeen")
+
+
+def plain(data: dict | None) -> dict | None:
+    """An entity's recorded fields, without the arrival times the fold adds."""
+    return None if data is None else {k: v for k, v in data.items() if k not in ARRIVAL}
+
+
+def later(fact: str | None, arrived: str | None) -> str | None:
+    """When the page can show a fact: its own time, or its record's arrival if later."""
+    known = [t for t in (fact, arrived) if t]
+    return max(known) if known else None
 
 
 def head_chef_title(thread: str, title: dict | None) -> bool:
