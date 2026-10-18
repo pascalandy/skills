@@ -120,3 +120,71 @@ def test_replay_command_reads_a_recording(tmp_path: Path) -> None:
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout)["changes"] == [["write", str(out)]]
     assert "Head Chef" in out.read_text(encoding="utf-8")
+
+
+def test_no_frame_shows_before_its_fact() -> None:
+    events = [*launches(), fact(4, "cook", COOK, "run_start", detail={"run": "1"})]
+    events[-1]["time"] = "2026-01-01T00:00:04.949Z"
+    frames = cook_frames(board.build(events, set(), {}, {}, HEADS))
+    active = next(f[0] for f in frames if f[1] == "active")
+    assert active == board.R.ts("2026-01-01T00:00:05Z")  # a tenth up, never down
+
+
+def test_an_item_naming_two_prs_waits_on_pascal_until_both_are_done() -> None:
+    events = [
+        *launches(),
+        fact(
+            3,
+            "head_chef",
+            HC,
+            "ask_pascal",
+            detail={"items": ["item"], "irefs": [["#1", "o/r#2"]]},
+        ),
+        fact(5, "pascal", HC, "pascal_github", pr="o/r#1"),
+        fact(7, "pascal", HC, "pascal_github", pr="o/r#2"),
+    ]
+    frames = board.build(events, set(), {}, {}, HEADS)["brigades"][0]["frames"]
+    start = board.R.ts("2026-01-01T00:00:00Z")
+
+    def hc(second: float) -> str:
+        return [f[2] for f in frames if f[1] == "hc" and f[0] <= start + second][-1]
+
+    assert [hc(4), hc(6), hc(8)] == ["you", "you", "active"]
+
+
+@pytest.mark.parametrize(
+    "text, src, dst, kind",
+    [
+        (
+            "❓ Cook 1.1 abcd · look question. I'm still building on my defaults below.",
+            "cook",
+            "chef",
+            "question_note",
+        ),
+        ("⚠️ Incident · Cook 4.1 abcd, om1", "cook", "chef", "incident"),
+        (
+            "Chef 4 abcd · ⚠️ incident on om1. The batch continues.",
+            "chef",
+            "head_chef",
+            "incident",
+        ),
+        (
+            "Chef 4 abcd · 🔀 progress: Stack A landed.",
+            "chef",
+            "head_chef",
+            "status_note",
+        ),
+        (
+            "Chef 4 abcd · ⏳ 0/2. Both Cooks are building.",
+            "chef",
+            "head_chef",
+            "status_note",
+        ),
+        ("Chef 1: 📍 1/6 received for #197", "chef", "cook", "progress_note"),
+        ("Chef 4 abcd · 🦄 a symbol no rule reads", "chef", "head_chef", "info"),
+    ],
+)
+def test_notices_outside_the_messages_table_have_a_kind(
+    text: str, src: str, dst: str, kind: str
+) -> None:
+    assert t3.classify(t3.signature(text), src, dst) == kind

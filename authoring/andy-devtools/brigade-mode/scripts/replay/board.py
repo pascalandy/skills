@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -28,6 +29,11 @@ CHEF = {
 
 # A Cook idles only after this long without a new turn, in live and replay alike
 IDLE_AFTER = 120
+
+
+def tenth(t: float) -> float:
+    """A frame time in tenths of a second, rounded up: no frame shows before its fact."""
+    return math.ceil(round(t * 10, 6)) / 10
 
 
 def batch_of(slot: str) -> int:
@@ -64,8 +70,7 @@ class Board:
         if self.cur.get(node) != v:
             self.cur[node] = v
             self.frames.append(
-                [round(t, 1), node, state, step, note]
-                + ([round(since, 1)] if since else [])
+                [tenth(t), node, state, step, note] + ([tenth(since)] if since else [])
             )
 
     def paint_cook(self, t: float, s: str) -> None:

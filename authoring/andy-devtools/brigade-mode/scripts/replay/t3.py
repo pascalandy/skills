@@ -188,6 +188,21 @@ def checks_of(text: str) -> str:
     return m.group(1).lower() if m else "unstated"
 
 
+# Notices outside the Messages table, read by their leading symbol after any
+# sender header: a ❓ question its sender keeps working through, a ⚠️ incident,
+# a 📍 progress line or a note that opens with the sender's own status. None
+# hands off work, so no status reads them; any other leading symbol stays
+# "info", which the parser-coverage oracle counts as unclassified.
+NOTES = {"❓": "question_note", "⚠️": "incident", "📍": "progress_note"}
+
+
+def note(sig: dict, src: str) -> str:
+    lead = sig.get("lead")
+    if lead in NOTES:
+        return NOTES[lead]
+    return "status_note" if lead in STATUSES.get(src, ()) else "info"
+
+
 def classify(sig: dict, src: str, dst: str) -> str:
     """Message kind, per carpaccio's Messages table.
 
@@ -206,7 +221,7 @@ def classify(sig: dict, src: str, dst: str) -> str:
             return "cook_final"
         if "pause" in first:
             return "question"
-        return "info"
+        return note(sig, src)
     if src == "chef" and dst == "cook":
         if "restack" in first:
             return "restack"
@@ -218,12 +233,12 @@ def classify(sig: dict, src: str, dst: str) -> str:
             return "close_request"  # a card with nothing to merge closes on the Chef's word
         if "return" in first:
             return "return"
-        return "info"
+        return note(sig, src)
     if src == "chef" and dst == "head_chef":
-        return "question" if "pause" in first else "info"
+        return "question" if "pause" in first else note(sig, src)
     if src == "head_chef" and dst == "chef":
         return "escalated" if "escalate" in first else "answer"
-    return "info"
+    return note(sig, src)
 
 
 def ask_items(text: str) -> tuple[list[str], list[list[str]]]:

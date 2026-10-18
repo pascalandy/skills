@@ -121,7 +121,11 @@ class Brigade:
         for tid, info in list(self.threads.items()):
             role, parent = info["role"], info["parent"]
             for item in self.snap.thread_items(tid):
-                t0, tool = item["start"], item.get("tool")
+                # a fact shows once its record arrived, never at an earlier stamp
+                t0, tool = t3.later(item["start"], item.get("seen")), item.get("tool")
+                end = (
+                    t3.later(item["end"], item.get("endSeen")) if item["end"] else None
+                )
                 if item["type"] == "user_message":
                     self.ev(t0, "pascal", tid, "pascal_msg", intent=item["intent"])
                 elif item["type"] == "assistant_message" and role == "head_chef":
@@ -141,7 +145,7 @@ class Brigade:
                         "cmd",
                         parent=parent,
                         release=True,
-                        end=item["end"],
+                        end=end,
                         ok=item["status"] == "completed",
                     )
                 if item.get("watch") and role in ("head_chef", "chef"):
@@ -149,8 +153,9 @@ class Brigade:
                 if tool == "launch":
                     child = self.threads.get(item.get("child") or "")
                     if child is not None and child["parent"] == tid:
+                        # the child's threadId exists once the call returns
                         self.ev(
-                            t0,
+                            end or t0,
                             child["role"],
                             item["child"],
                             "launch",
@@ -186,7 +191,7 @@ class Brigade:
                         tid,
                         "ask_pascal",
                         items=["question"],
-                        answered=item["end"],
+                        answered=end,
                     )
                 elif tool == "organize":
                     target = item.get("target") or tid
@@ -207,13 +212,19 @@ class Brigade:
                     ):
                         self.prs[k] = {"by": tid, "at": t0}
                     # the run knows it from the first link, whoever owns it
-                    self.prs[k]["at"] = min(t0, (cur or {}).get("at") or t0)
+                    self.prs[k]["at"] = min(t for t in (t0, (cur or {}).get("at")) if t)
             for _, run in self.snap.thread_runs(tid):
                 n = str(run["ordinal"])
-                self.ev(run["requested"], role, tid, "run_start", run=n)
+                self.ev(
+                    t3.later(run["requested"], run.get("seen")),
+                    role,
+                    tid,
+                    "run_start",
+                    run=n,
+                )
                 if run["completed"]:
                     self.ev(
-                        run["completed"],
+                        t3.later(run["completed"], run.get("endSeen")),
                         role,
                         tid,
                         "run_end",
@@ -283,7 +294,8 @@ class Brigade:
         for me, role, item in delegates:
             if role != "cook":
                 continue
-            sop, t0 = item["sop"], item["start"]
+            sop, t0 = item["sop"], t3.later(item["start"], item.get("seen"))
+            done = t3.later(item["end"], item.get("endSeen")) if item["end"] else None
             kind = (
                 "watchdog"
                 if sop == "watchdog"
@@ -294,7 +306,7 @@ class Brigade:
             if not item.get("task"):
                 if item["status"] in ENDED:  # a call still running has no task yet
                     self.ev(
-                        t0,
+                        done or t0,
                         kind,
                         f"{kind}:{me}:{sop}",
                         "delegate_error",
@@ -309,14 +321,29 @@ class Brigade:
             )
             sub = self.snap.subagents.get(item["task"])
             sa, ca, st = (
-                (sub["started"], sub["completed"], sub["status"])
+                (
+                    t3.later(sub["started"], sub.get("seen")),
+                    t3.later(sub["completed"], sub.get("endSeen"))
+                    if sub["completed"]
+                    else None,
+                    sub["status"],
+                )
                 if sub
                 else (t0, None, "unknown")
             )
-            self.ev(sa or t0, kind, dk, "delegate_start", parent=me, sop=sop, round=r)
+            # known once the delegate_task call returned its task
+            known = max(t for t in (sa, done, t0) if t)
+            self.ev(known, kind, dk, "delegate_start", parent=me, sop=sop, round=r)
             if ca:
                 self.ev(
-                    ca, kind, dk, "delegate_end", parent=me, sop=sop, round=r, state=st
+                    max(ca, known),
+                    kind,
+                    dk,
+                    "delegate_end",
+                    parent=me,
+                    sop=sop,
+                    round=r,
+                    state=st,
                 )
 
     def main_repo(self) -> str | None:

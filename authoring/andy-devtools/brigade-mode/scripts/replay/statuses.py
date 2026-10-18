@@ -59,6 +59,9 @@ class Brigade:
         self.cook_checks = {}  # cook -> its last Stack ready reported passing checks
         self.restacking = set()  # Cooks asked for a base-only restack
         self.open_items = []  # Head Chef items for Pascal: (label, PR refs, own item)
+        self.acted = (
+            set()
+        )  # PR refs Pascal merged or closed on GitHub, as items name them
         self.stories = {}  # story -> Epic, batch, pre-run completion and assigned Cook
         self.planned = defaultdict(
             dict
@@ -336,9 +339,10 @@ def apply(b: Brigade, e: dict, t: float, deltas: list[dict]) -> None:
             x["cut"] = bool(d.get("cut"))  # a slot stopped before its launch
         x["epics"] = d.get("epics") or x.get("epics", [])
     elif kind == "pascal_github":
-        # Pascal answered on GitHub the items that name this PR; the others stay open
+        # Pascal answered on GitHub an item once he merged or closed every PR it names
         _, n = e["pr"].split("#")
-        answered = [x for x in b.open_items if {e["pr"], f"#{n}"} & x[1]]
+        b.acted |= {e["pr"], f"#{n}"}
+        answered = [x for x in b.open_items if x[1] and x[1] <= b.acted]
         for x in answered:
             b.item_since.pop(x[1], None)
         b.open_items = [x for x in b.open_items if x not in answered]
