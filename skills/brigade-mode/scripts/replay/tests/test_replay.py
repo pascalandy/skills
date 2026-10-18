@@ -201,6 +201,13 @@ def test_private_data_is_refused_before_embedding(
         )
 
 
+def test_short_private_name_matches_whole_words_only(replay: ModuleType) -> None:
+    page = replay.render_page({"state": "todo"}, {"example-owner/do": "private-A"})
+    assert '"todo"' in page
+    with pytest.raises(replay.ScriptError, match="Privacy check refused the data"):
+        replay.render_page({"repo": "do#12"}, {"example-owner/do": "private-A"})
+
+
 @pytest.mark.parametrize(
     "arguments, code",
     [

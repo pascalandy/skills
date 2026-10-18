@@ -487,9 +487,13 @@ def repository_names(
 
 
 def render_page(data: dict, private: Mapping[str, str]) -> str:
-    private_names = {
-        name.casefold() for repo in private for name in (repo, repo.rsplit("/", 1)[-1])
-    }
+    names = {name for repo in private for name in (repo, repo.rsplit("/", 1)[-1])}
+    # whole names only: a private repository named "do" must not match "todo"
+    private_name = re.compile(
+        "|".join(rf"(?<![\w.-]){re.escape(name)}(?![\w.-])" for name in names)
+        or "(?!)",
+        re.IGNORECASE,
+    )
 
     def strings(value: Any) -> Iterator[str]:
         if isinstance(value, str):
@@ -503,7 +507,7 @@ def render_page(data: dict, private: Mapping[str, str]) -> str:
                 yield from strings(item)
 
     if any(
-        any(name in value.casefold() for name in private_names)
+        private_name.search(value)
         or LOCAL_PATH.search(value)
         or str(Path.home()).casefold() in value.casefold()
         for value in strings(data)
