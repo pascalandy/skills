@@ -23,6 +23,7 @@ A plan needs these facts before it picks a mechanism:
 
 - A delegate shares its parent's checkout unless the call sets `isolation: "worktree"`, which gives it a separate checkout of the parent's last local commit, without uncommitted edits. It cannot watch a pull request, so a thread owns each watch. The sidebar hides it, and the user opens it from the parent's Lineage panel
 - A launched thread has no parent lineage and no automatic completion notice. It hears only its first message
+- `t3_thread_send` refuses a target whose permission modes are broader than the sender's. After the user widens your modes, a thread launched before cannot send you its report: read it with `t3_thread_read` instead of waiting. Launch a replacement only after you reconcile the first thread's work
 
 ## Launch a thread
 
