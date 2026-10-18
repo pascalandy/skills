@@ -83,26 +83,31 @@ def parse_title(title: str | None) -> dict | None:
 
 
 # ---------------------------------------------------------------- messages ---
-HANDOFFS = [  # (pattern at a line start, kind, roles that may send it)
-    (r"^🍽️ stack ready", "stack_ready", {"cook"}),
-    (r"^🍽️ batch ready", "batch_ready", {"chef"}),
-    (r"^🔀 batch merging", "batch_merging", {"chef"}),
-    (r"^🔀 merge", "merge", {"head_chef"}),
-    (r"^batch merged", "batch_merged", {"chef"}),
-    (r"^⛳ batch delivered", "batch_delivered", {"chef"}),
-    (r"^⏹️ batch stopped", "batch_stopped", {"chef"}),
-    (r"^⏹️ stopped", "cook_stopped", {"cook"}),
-    (r"^⏹️ stop", "stop", {"head_chef", "chef"}),
-    (r"^⏹️ cut", "cut", {"head_chef", "chef"}),
-    (r"^⏹️ drop", "drop", {"head_chef"}),
-    (r"^⏳ rework", "rework", {"head_chef"}),
-    (r"^🍽️ hold", "hold", {"head_chef"}),
+# carpaccio's Messages table (playbooks/carpaccio/carpaccio.md): each prefix as
+# the table writes it, the kind it hands off, and the roles that may send it.
+# The contract test fails when the table drops one of these prefixes
+HANDOFFS = [
+    ("🍽️ Stack ready", "stack_ready", {"cook"}),
+    ("🍽️ Batch ready", "batch_ready", {"chef"}),
+    ("🔀 Batch merging", "batch_merging", {"chef"}),
+    ("🔀 Merge", "merge", {"head_chef"}),
+    ("Batch merged", "batch_merged", {"chef"}),
+    ("⛳ Batch delivered", "batch_delivered", {"chef"}),
+    ("⏹️ Batch stopped", "batch_stopped", {"chef"}),
+    ("⏹️ Stopped", "cook_stopped", {"cook"}),
+    ("⏹️ Stop", "stop", {"head_chef", "chef"}),
+    ("⏹️ Cut", "cut", {"head_chef", "chef"}),
+    ("⏹️ Drop", "drop", {"head_chef"}),
+    ("⏳ Rework", "rework", {"head_chef"}),
+    ("🍽️ Hold", "hold", {"head_chef"}),
 ]
-# Features of a message's first line, or of its whole text, that classify() reads
+# A Cook's stop report from runs before the table named none; matched, not required
+LEGACY_PREFIXES = {"⏹️ Stopped"}
+# First-line prefixes: the Watchdog's messages and 🙋 from the Messages table, 📍 from Report
 FIRST = [
-    ("watchdog", r"^🐕"),
-    ("pascal_card", r"^🙋"),
-    ("progress", r"^📍"),
+    ("watchdog", "🐕 Watchdog"),
+    ("pascal_card", "🙋"),
+    ("progress", "📍"),
 ]
 SENDER = re.compile(
     r"^(?:🚥\s*)?(?:head )?(?:chef|cook) [\d.]+(?: \w{4})?\s*(?:→\s*[^·:,—-]*)?\s*[:·,—-]*\s*"
@@ -126,13 +131,13 @@ def signature(text: str) -> dict:
             )  # an example in a fence or a quote hands nothing off
     handoffs = []
     for ln in lines:
-        kinds = [kind for pat, kind, _ in HANDOFFS if re.search(pat, ln)]
+        kinds = [kind for prefix, kind, _ in HANDOFFS if ln.startswith(prefix.lower())]
         if kinds:
             handoffs.append(kinds)
     line = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
     low, full = line.lower(), (text or "").lower()
     body = SENDER.sub("", low)
-    first = [name for name, pat in FIRST if re.search(pat, low)]
+    first = [name for name, prefix in FIRST if low.startswith(prefix[0])]
     features = {
         "dish": line.startswith("🍽️"),
         "final": bool(
@@ -189,7 +194,7 @@ def classify(sig: dict, src: str, dst: str) -> str:
     A handoff counts on any line, since a Cook may put a 📍 line before its
     🍽️ Stack ready block. Most other kinds use the first line only."""
     for kinds in sig.get("handoffs", []):
-        for pat, kind, senders in HANDOFFS:
+        for _, kind, senders in HANDOFFS:
             if kind in kinds and src in senders:
                 return kind
     first = set(sig.get("first", []))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -18,11 +19,24 @@ def ts(s: str) -> float:
     return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
 
 
+def batch_of(slot: str) -> int | None:
+    """The batch of a slot: chef-2 and cook-2.1 belong to batch 2."""
+    m = re.match(r"(?:chef|cook)-(\d+)", slot)
+    return int(m.group(1)) if m else None
+
+
 class Brigade:
-    def __init__(self, id4: str) -> None:
-        self.id4 = id4
+    """One run's status fold. Threads are keyed by full threadId; `head` is the Head Chef's."""
+
+    def __init__(self, id4: str, head: str) -> None:
+        self.id4, self.head = id4, head
         self.threads: dict[str, dict] = {
-            "hc": {"role": "head_chef", "label": f"Head Chef {id4}", "parent": None}
+            head: {
+                "role": "head_chef",
+                "label": f"Head Chef {id4}",
+                "parent": None,
+                "slot": "hc",
+            }
         }
         self.cook = {}  # key -> phase (model.COOK keys)
         self.cook_prev = {}  # phase to restore after an answered question
@@ -34,8 +48,10 @@ class Brigade:
         self.asked_review = set()  # chefs whose 🍽️ went to Pascal
         self.escalated = set()  # chefs whose ⏸️ went to Pascal
         self.first_launch: float | None = None
-        self.own_until = 0.0  # ownership ends at the next Head Chef act or the reply-handling turn's end
+        # Pascal's reply belongs to the Head Chef until its next act or the end of its turn
+        self.owning, self.own_since = False, 0.0
         self.closed = False  # HC settled itself after every batch went final
+        self.settled_at: float | None = None
         self.prs = {}  # (pr, story) -> ownership, scope and PR lifecycle timestamps
         self.release_end = {}  # chef -> time its release command ended
         self.active = {}  # key -> open run count
@@ -48,14 +64,12 @@ class Brigade:
             dict
         )  # chef -> {watch.toml field: registered Cook slots}
         self.item_since = {}  # PR refs of an open item -> when the Head Chef first asked it
-        self.carry, self.carry_until = (
-            {},
-            0.0,
-        )  # items open at Pascal's last reply, kept if re-asked next
-        self.hc_acts_all: list[tuple[float, str]] = []
+        # items open at Pascal's last reply, kept if re-asked in the turn that handles it
+        self.carry: dict = {}
+        self.carry_open = False
 
     def cook_kinds(self, chef: str) -> list[str]:
-        launched = {c.split("#")[0] for c in self.chef_cooks[chef]}
+        launched = {self.threads[c]["slot"] for c in self.chef_cooks[chef]}
         planned = (
             set().union(*self.planned[chef].values()) - launched
             if self.planned[chef]
@@ -134,7 +148,7 @@ class Brigade:
             return not self.hc[
                 "pm_item"
             ]  # Align: the Head Chef's own work until it launches
-        if now < self.own_until:
+        if self.owning:
             return True  # handles Pascal's message until its next act or turn end
         live = [k for k in kinds if k not in M.CHEF_FINAL and k != "queued"]
         if (
@@ -155,43 +169,25 @@ class Brigade:
             elif info["role"] == "chef" and k in self.chef:
                 out[k] = self.chef_status(k, now)
         if self.started:
-            out["hc"] = self.hc_status(now)[0]
+            out[self.head] = self.hc_status(now)[0]
         return out
 
 
-def replay(events: list[dict]) -> tuple[dict[str, Brigade], list[dict]]:
+# The Head Chef's own acts end its hold on Pascal's reply
+ACTS = {"send", "launch", "ask_pascal", "batch_register", "organize"}
+
+
+def replay(
+    events: list[dict], heads: dict[str, str]
+) -> tuple[dict[str, Brigade], list[dict]]:
+    """Fold facts in time order. `heads` maps each run's id4 to its Head Chef threadId.
+
+    Every rule reads only facts up to the event it folds, so a replay cut at
+    any time shows what the full replay shows at that time.
+    """
     brigades: dict[str, Brigade] = {}
     deltas = []
     last = {}
-
-    # Pascal's reply belongs to the Head Chef until its next act or turn end.
-    runs = defaultdict(list)
-    for e in events:
-        if e["kind"] == "run_start" or e["kind"] == "run_end":
-            runs[(e["brigade"], e["thread"], e["detail"]["run"])].append(ts(e["time"]))
-    intervals = defaultdict(list)
-    for (b, th, _), v in runs.items():
-        intervals[(b, th)].append((v[0], v[1] if len(v) > 1 else float("inf")))
-    for v in intervals.values():
-        v.sort()
-
-    ACTS = {"send", "launch", "ask_pascal", "batch_register", "organize"}
-    acts = defaultdict(list)  # (b, thread) -> sorted (time, act) of its own acts
-    for e in events:
-        if e["kind"] in ACTS:
-            who = (
-                e["parent"]
-                if e["kind"] in ("launch", "delegate_start")
-                else e["thread"]
-            )
-            act = (
-                (e["detail"] or {}).get("msg")
-                or (e["detail"] or {}).get("action")
-                or e["kind"]
-            )
-            acts[(e["brigade"], who)].append((ts(e["time"]), act))
-    for v in acts.values():
-        v.sort()
 
     def emit(b: Brigade, t: float) -> None:
         snap = b.snapshot(t)
@@ -205,28 +201,29 @@ def replay(events: list[dict]) -> tuple[dict[str, Brigade], list[dict]]:
         t = ts(e["time"])
         bid = e["brigade"]
         if bid not in brigades:
-            brigades[bid] = Brigade(bid)
-            brigades[bid].hc_acts_all = acts[(bid, "hc")]
+            brigades[bid] = Brigade(bid, heads[bid])
         b = brigades[bid]
-        apply(b, e, t, deltas, intervals)
+        apply(b, e, t, deltas)
         emit(b, t)
+        if b.settled_at is not None:  # after the final status it closes
+            deltas.append({"t": b.settled_at, "b": b.id4, "k": "settled"})
+            b.settled_at = None
 
     return brigades, deltas
 
 
-def apply(
-    b: Brigade,
-    e: dict,
-    t: float,
-    deltas: list[dict],
-    intervals: dict[tuple[str, str], list[tuple[float, float]]],
-) -> None:
+def apply(b: Brigade, e: dict, t: float, deltas: list[dict]) -> None:
     kind, th, d = e["kind"], e["thread"], e["detail"] or {}
     role = e["role"]
+    who = e["parent"] if kind == "launch" else th
+    if kind in ACTS and who == b.head and t > b.own_since:
+        b.owning = False
+    if kind == "run_end" and th == b.head:
+        b.owning = b.carry_open = False
     if kind == "pascal_msg":
-        if (d.get("text") or "").lstrip().startswith("/"):
+        if d.get("intent") == "slash":
             return  # a slash command such as /compact answers nothing
-        if th == "hc":
+        if th == b.head:
             b.started = True
             if b.asks:
                 deltas.append({"t": t, "b": b.id4, "k": "ask", "v": [], "since": None})
@@ -234,9 +231,7 @@ def apply(
             b.carry = {
                 r: b.item_since[r] for _, r, _ in b.open_items if r in b.item_since
             }
-            b.carry_until = next(
-                (en for s, en in intervals[(b.id4, "hc")] if s <= t + 5 and en >= t), t
-            )
+            b.carry_open = True
             b.item_since = {}
             b.asks = []
             b.open_items = []
@@ -244,20 +239,18 @@ def apply(
             # Pascal answered what he was asked: a 🍽️ batch or an escalated ⏸️ goes back to the Head Chef
             b.asked_review.clear()
             b.escalated.clear()
-            end = next(
-                (en for s, en in intervals[(b.id4, "hc")] if s <= t + 5 and en >= t), t
-            )
-            nxt = next((a for a, _ in b.hc_acts_all if a > t), float("inf"))
-            b.own_until = max(b.own_until, min(end, nxt))
+            b.owning, b.own_since = True, t
             if d.get("intent") == "stop":
                 b.hc["stop"] = True
         deltas.append(
             {"t": t, "b": b.id4, "k": "pascal", "th": th, "v": d.get("intent")}
         )
-    elif kind == "ask_pascal" and th == "hc":
+    elif kind == "ask_pascal" and th == b.head:
         if b.closed and all(i == "left" for i in d.get("items", [])):
             return
-        b.closed = False  # a new question after Close reopens the run (carpaccio: Work after Close)
+        reopen(
+            b, t, deltas
+        )  # a new question after Close reopens the run (carpaccio: Work after Close)
         ready = [c for c in b.chef if b.chef_status(c, t) == "🍽️"]
         asking = [c for c in b.chef if b.chef[c]["f"]["question"]]
         own = False
@@ -279,7 +272,7 @@ def apply(
         ]
         b.hc["pm_item"] = own or b.hc["pm_item"]
         b.asks = list(d.get("items", []))
-        carry = b.carry if t <= b.carry_until else {}
+        carry = b.carry if b.carry_open else {}
         b.carry = {}
         since = []
         for _, r, _ in b.open_items:
@@ -304,6 +297,8 @@ def apply(
             "label": d.get("label"),
             "parent": e["parent"],
             "repo": d.get("repo"),
+            "slot": d.get("slot"),
+            "b": batch_of(d.get("slot") or ""),
         }
         deltas.append(
             {
@@ -315,11 +310,12 @@ def apply(
                 "role": role,
                 "label": d.get("label"),
                 "repo": d.get("repo"),
+                "slot": d.get("slot"),
             }
         )
-        b.closed = False  # a launch after Close reopens the run
+        reopen(b, t, deltas)  # a launch after Close reopens the run
         if role == "chef":
-            bn = int(th.split("-")[1].split("#")[0])
+            bn = b.threads[th]["b"]
             b.batches.setdefault(bn, {"registered": t, "chef": None})["chef"] = th
             b.chef[th] = {
                 "f": {k: False for k in M.CHEF_FACTS},
@@ -336,12 +332,9 @@ def apply(
             b.chef_cooks[e["parent"]].append(th)
     elif kind == "batch_register":
         x = b.batches.setdefault(d["batch"], {"registered": t, "chef": None})
-        if d.get("state") == "proposed-cut":
-            x["proposed_cut"] = True
-    elif kind == "batch_cut":
-        for x in b.batches.values():
-            if x.get("proposed_cut") and x["chef"] is None:
-                x["cut"] = True
+        if x["chef"] is None:
+            x["cut"] = bool(d.get("cut"))  # a slot stopped before its launch
+        x["epics"] = d.get("epics") or x.get("epics", [])
     elif kind == "pascal_github":
         # Pascal answered on GitHub the items that name this PR; the others stay open
         _, n = e["pr"].split("#")
@@ -362,7 +355,7 @@ def apply(
                     "since": min(since) if since else None,
                 }
             )
-        deltas.append({"t": t, "b": b.id4, "k": "pascal", "th": "hc", "v": "github"})
+        deltas.append({"t": t, "b": b.id4, "k": "pascal", "th": b.head, "v": "github"})
     elif kind == "send":
         to, msg = d.get("to"), d.get("msg")
         src = b.threads.get(th, {}).get("role")
@@ -463,7 +456,7 @@ def apply(
         if kind == "pr_open":
             p["open"] = t
             if e["story"] not in b.stories:
-                bn = int(p["chef"].split("-")[1].split("#")[0]) if p["chef"] else None
+                bn = b.threads[p["chef"]]["b"] if p["chef"] in b.threads else None
                 b.stories[e["story"]] = {
                     "epic": e["epic"],
                     "batch": bn,
@@ -482,7 +475,7 @@ def apply(
                         "t": t,
                         "b": b.id4,
                         "k": "pascal",
-                        "th": "hc",
+                        "th": b.head,
                         "v": "merged-himself",
                         "pr": e["pr"],
                     }
@@ -507,12 +500,13 @@ def apply(
     elif (
         kind == "organize"
         and d.get("action") == "settle"
-        and th == "hc"
-        and d.get("target") == "hc"
+        and th == b.head
+        and d.get("target") == b.head
     ):
         _, kinds = b.hc_status(t)
-        if kinds and kinds <= M.CHEF_FINAL:
+        if kinds and kinds <= M.CHEF_FINAL and not b.closed:
             b.closed = True  # every batch is final, cut ones included: the Head Chef closed the run
+            b.settled_at = t
     elif kind in ("run_start", "run_end"):
         n = b.active.get(th, 0) + (1 if kind == "run_start" else -1)
         b.active[th] = max(n, 0)
@@ -549,10 +543,16 @@ def apply(
             },
         )
     elif kind == "cook_planned" and th in b.chef:
-        b.planned[th][d["field"]] = set(d.get("slots") or [])
+        b.planned[th]["slots"] = set(d.get("slots") or [])
     elif kind == "story_assign":
         if e["story"] in b.stories:
             b.stories[e["story"]]["cook"] = th
+
+
+def reopen(b: Brigade, t: float, deltas: list[dict]) -> None:
+    if b.closed:
+        deltas.append({"t": t, "b": b.id4, "k": "reopened"})
+    b.closed = False
 
 
 def synthetic(events: list[dict]) -> list[dict]:

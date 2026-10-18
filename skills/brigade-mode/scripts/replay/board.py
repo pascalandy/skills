@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -27,12 +26,13 @@ CHEF = {
 }
 
 
-def slot(key: str) -> str:
-    return key.split("#")[0]  # a replacement takes its slot's cell
+# A Cook idles only after this long without a new turn, in live and replay alike
+IDLE_AFTER = 120
 
 
-def batch_of(key: str) -> int:
-    return int(key.split("-")[1].split("#")[0].split(".")[0])
+def batch_of(slot: str) -> int:
+    """chef-2 and cook-2.1 belong to batch 2."""
+    return int(slot.split("-")[1].split(".")[0])
 
 
 class Board:
@@ -47,7 +47,7 @@ class Board:
             defaultdict(set),
             None,
         )
-        self.current = {}  # slot -> the key that holds it now
+        self.current = {}  # slot -> the threadId that holds it now
         self.settled = False
 
     def set(
@@ -101,15 +101,23 @@ class Board:
         step = self.step.get(s, 0)
         self.set(t, s, state, note, STEP.get(step, step))
 
+    def role(self, th: str | None) -> str | None:
+        return self.b.threads.get(th or "", {}).get("role")
+
+    def slot(self, th: str) -> str:
+        """A thread's slot; a replacement takes its slot's cell."""
+        return self.b.threads[th]["slot"]
+
     def apply(self, d: dict) -> None:
         t, k = d["t"], d["k"]
-        if k == "launch" and d["role"] == "cook":
-            s = slot(d["th"])
-            self.current[s] = d["th"]
-            self.step[s] = 1
+        if k == "launch":
+            if d["role"] == "cook":
+                s = d["slot"]
+                self.current[s] = d["th"]
+                self.step[s] = 1
         elif k == "status":
             th = d["th"]
-            if th == "hc":
+            if th == self.b.head:
                 if self.settled:
                     return  # the run closed: a question left in the final report is not a wait
                 if d["v"] == "❓":
@@ -129,17 +137,17 @@ class Board:
                     )
                 if d["v"] in ("⛳", "⏹️"):
                     self.close_run(t)
-            elif th.startswith("chef-"):
+            elif self.role(th) == "chef":
                 self.set(
                     t,
-                    f"batch-{batch_of(th)}",
+                    f"batch-{batch_of(self.slot(th))}",
                     CHEF.get(d["v"], "active"),
                     {"🔀": "shipping", "🍽️": "ready to ship", "⏸️": "question"}.get(
                         d["v"]
                     ),
                 )
-            elif th.startswith("cook-"):
-                s = slot(th)
+            elif self.role(th) == "cook":
+                s = self.slot(th)
                 if self.current.get(s) not in (None, th):
                     return  # a replaced Cook's late status: the slot follows its replacement
                 self.current[s] = th
@@ -148,8 +156,8 @@ class Board:
                     self.step[s] = 5
                     self.skip_barrages(t, s)
                 self.paint_cook(t, s)
-        elif k == "deleg" and d.get("parent", "").startswith("cook-"):
-            key, s, sop = d["parent"], slot(d["parent"]), d.get("sop")
+        elif k == "deleg" and self.role(d.get("parent")) == "cook":
+            key, s, sop = d["parent"], self.slot(d["parent"]), d.get("sop")
             if d["v"] == 1:
                 self.running[key][d["id"]] = sop
                 if sop in BARRAGES:
@@ -166,10 +174,11 @@ class Board:
                         + (f", {d.get('state') or 'error'}" if d["v"] == -1 else ""),
                     )
             self.paint_cook(t, s)
-        elif k in ("pr_open", "pr_merge", "pr_close") and (
-            d.get("th") or ""
-        ).startswith("cook-"):
-            s = slot(d["th"])
+        elif (
+            k in ("pr_open", "pr_merge", "pr_close")
+            and self.role(d.get("th")) == "cook"
+        ):
+            s = self.slot(d["th"])
             if k == "pr_open":
                 self.prs[s].add(d["pr"])
             elif k == "pr_merge":
@@ -183,13 +192,17 @@ class Board:
             self.ask = d
         elif k == "cookrun":
             (self.live.add if d["v"] else self.live.discard)(d["th"])
-            self.paint_cook(t, slot(d["th"]))
+            self.paint_cook(t, self.slot(d["th"]))
         elif k == "settled":
             self.settled = True
             self.set(t, "hc", "done", "run over")
             self.close_run(t)
+        elif k == "reopened":
+            self.settled = (
+                False  # work after Close: the next status repaints the Head Chef
+            )
         elif k == "progress":
-            s = slot(d["th"])
+            s = self.slot(d["th"])
             self.step[s] = max(1, min(d["step"] + 1, 6))  # 📍 k/6 ends step k
             self.paint_cook(t, s)
 
@@ -228,15 +241,15 @@ def shape(
     numbers: dict[str, int | None],
     public: set[str],
 ) -> tuple[list[dict], dict[str, dict]]:
-    """Epics -> Cooks -> Stories, as the run ended. `ref` writes an issue ref for the page."""
+    """Epics -> Cooks -> Stories, as known at the end of the facts. `ref` writes an issue ref for the page."""
     cooks = {}
-    for key, info in b.threads.items():
-        if info.get("role") == "cook":
-            s = slot(key)
+    for info in b.threads.values():
+        if info.get("role") == "cook" and info.get("slot"):
+            s = info["slot"]
             cooks.setdefault(
                 s,
                 {
-                    "label": info["label"].split("#")[0].strip(),
+                    "label": info["label"],
                     "batch": batch_of(s),
                     "stories": set(),
                     "prs": set(),
@@ -253,18 +266,23 @@ def shape(
                     "prs": set(),
                 },
             )
+
+    def slot_of(thread: str | None) -> str | None:
+        return b.threads.get(thread or "", {}).get("slot")
+
     for p in b.prs.values():
+        s = slot_of(p.get("cook"))
         if (
-            p.get("cook")
-            and slot(p["cook"]) in cooks
+            s in cooks
             and not p.get("closed")
             and not b.stories.get(p["story"], {}).get("pre")
         ):
-            cooks[slot(p["cook"])]["stories"].add(p["story"])
-            cooks[slot(p["cook"])]["prs"].add(p["pr"])
+            cooks[s]["stories"].add(p["story"])
+            cooks[s]["prs"].add(p["pr"])
     for st, info in b.stories.items():
-        if info.get("cook") and slot(info["cook"]) in cooks and not info.get("pre"):
-            cooks[slot(info["cook"])]["stories"].add(st)
+        s = slot_of(info.get("cook"))
+        if s in cooks and not info.get("pre"):
+            cooks[s]["stories"].add(st)
     batches = []
     for n in sorted(set(b.batches) | {c["batch"] for c in cooks.values()}):
         stories = sorted(
@@ -279,7 +297,9 @@ def shape(
             (s for s, c in cooks.items() if c["batch"] == n),
             key=lambda s: tuple(int(x) for x in s.split("-")[1].split(".")),
         )
-        top = [e for e, _ in epics.most_common()]
+        top = [e for e, _ in epics.most_common()] or [
+            e for e in b.batches.get(n, {}).get("epics", [])
+        ]
         num = numbers.get(top[0]) if top else None
         epic = {"n": num, "ref": ref(top[0])} if top else None
         if epic and top[0].split("#")[0] in public:
@@ -308,32 +328,28 @@ def shape(
 
 
 def progress_events(events: list[dict], bid: str) -> list[dict]:
-    out = []
-    for e in events:
-        if (
-            e["brigade"] == bid
-            and e["kind"] == "send"
-            and (e["detail"] or {}).get("msg") == "progress"
-            and e["thread"].startswith("cook-")
-        ):
-            m = re.search(r"\b([1-6])/6\b", e["detail"].get("first") or "")
-            if m:
-                out.append(
-                    {
-                        "t": R.ts(e["time"]),
-                        "k": "progress",
-                        "th": e["thread"],
-                        "step": int(m.group(1)),
-                    }
-                )
-    return out
+    return [
+        {
+            "t": R.ts(e["time"]),
+            "k": "progress",
+            "th": e["thread"],
+            "step": e["detail"]["step"],
+        }
+        for e in events
+        if e["brigade"] == bid
+        and e["kind"] == "send"
+        and e["role"] == "cook"
+        and (e["detail"] or {}).get("msg") == "progress"
+        and (e["detail"] or {}).get("step")
+    ]
 
 
-def turns(deltas: list[dict], grace: float = 120) -> list[dict]:
-    """Each Cook's T3 turns, gaps up to `grace` seconds joined, as cookrun deltas."""
+def turns(deltas: list[dict], b: R.Brigade, now: float) -> list[dict]:
+    """Each Cook's activity as cookrun deltas, causal: on when a turn starts, off
+    IDLE_AFTER seconds after a turn ends with no new turn, once that time has come."""
     spans = defaultdict(list)
     for d in deltas:
-        if d["k"] == "run" and d["th"].startswith("cook-"):
+        if d["k"] == "run" and b.threads.get(d["th"], {}).get("role") == "cook":
             if d["v"]:
                 spans[d["th"]].append([d["t"], None])
             elif spans[d["th"]] and spans[d["th"]][-1][1] is None:
@@ -342,31 +358,15 @@ def turns(deltas: list[dict], grace: float = 120) -> list[dict]:
     for th, xs in spans.items():
         joined = []
         for a, z in xs:
-            if joined and joined[-1][1] is not None and a - joined[-1][1] <= grace:
+            if joined and joined[-1][1] is not None and a - joined[-1][1] <= IDLE_AFTER:
                 joined[-1][1] = z
             else:
                 joined.append([a, z])
         for a, z in joined:
             out.append({"t": a, "k": "cookrun", "th": th, "v": 1})
-            if z is not None:
-                out.append({"t": z, "k": "cookrun", "th": th, "v": 0})
+            if z is not None and z + IDLE_AFTER <= now:
+                out.append({"t": z + IDLE_AFTER, "k": "cookrun", "th": th, "v": 0})
     return out
-
-
-def settle_time(events: list[dict], b: R.Brigade, bid: str) -> list[dict]:
-    """When the Head Chef closed the run: its last self-settle, if replay kept the run closed."""
-    if not b.closed:
-        return []
-    ts = [
-        R.ts(e["time"])
-        for e in events
-        if e["brigade"] == bid
-        and e["kind"] == "organize"
-        and (e["detail"] or {}).get("action") == "settle"
-        and e["thread"] == "hc"
-        and (e["detail"] or {}).get("target") == "hc"
-    ]
-    return [{"t": max(ts), "k": "settled"}] if ts else []
 
 
 def build(
@@ -374,9 +374,17 @@ def build(
     public: set[str],
     numbers: dict[str, int | None],
     names: dict[str, str],
+    heads: dict[str, str],
+    now: float | None = None,
 ) -> dict:
+    """The page data of every run in `events`, as known at `now` (default: the last fact).
+
+    `heads` maps each run's id4 to its Head Chef threadId.
+    """
     events = R.synthetic(events)
-    brigades, deltas = R.replay(events)
+    brigades, deltas = R.replay(events, heads)
+    if now is None:
+        now = max((R.ts(e["time"]) for e in events), default=0.0)
     planned = defaultdict(lambda: defaultdict(set))
     for e in events:
         if e["kind"] == "cook_planned":
@@ -396,16 +404,13 @@ def build(
             else lambda x: names[x.split("#")[0]] + "#" + x.split("#")[1]
         )
         ds = sorted(
-            by_b[bid]
-            + progress_events(events, bid)
-            + turns(by_b[bid])
-            + settle_time(events, b, bid),
+            by_b[bid] + progress_events(events, bid) + turns(by_b[bid], b, now),
             key=lambda d: d["t"],
         )  # stable within a time
+        if not ds:
+            continue
         board = Board(b)
         batches, cooks = shape(b, planned[bid], ref, numbers, public)
-        if not batches:
-            continue  # a Head Chef that launched no Chef has nothing to draw
         for s in cooks:
             board.set(ds[0]["t"], s, "todo", step=0)
             for sop in BARRAGES:
@@ -417,7 +422,7 @@ def build(
         starts = [d["t"] for d in ds if d["k"] in ("pascal", "launch")]
         hc = [f for f in board.frames if f[1] == "hc"]
         final = hc[-1][2] if hc and hc[-1][2] in ("done", "stopped") else None
-        end = hc[-1][0] if final else max(f[0] for f in board.frames)
+        end = hc[-1][0] if final else max([now, *(f[0] for f in board.frames)])
         busy, cs, last = [], {}, None  # Cooks on the job (active or wait) over time
         for f in board.frames:
             if f[1] in cooks:
@@ -446,6 +451,8 @@ def build(
             }
         )
     return {
-        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated": datetime.fromtimestamp(now, timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        ),
         "brigades": out,
     }
