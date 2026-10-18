@@ -195,7 +195,7 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 ## Report
 
-Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a `Detail` message in its own thread. Name the frozen heads it covers. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
+Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a message in its own thread that starts with `Detail · <role and id>`, such as `Detail · Cook 1.2 7f3a`. Name the frozen heads it covers. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
 
 A Report message uses only its field set below. It has a maximum of 8 lines and 1200 characters, plus its `🙋` lines.
 

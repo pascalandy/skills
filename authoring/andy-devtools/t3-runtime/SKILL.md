@@ -62,3 +62,5 @@ Any message reactivates a settled thread. Settling clears its pin and ends its w
 ## History
 
 To cover every thread in a time window, list them with `t3_thread_list`, since `t3_thread_search` can miss threads. To audit worktrees, use `git worktree list`, since `t3_worktree_status` reports only the calling thread.
+
+`t3_thread_read` pages forward from the oldest item, or from the item after `afterPosition`, so `limit: 1` alone returns item 0. Positions count every timeline item, activity included, but in `view: "messages"` `limit` counts messages, not items. To find a recent message that starts with a known prefix, read windows of k items from the newest, with `view: "messages"` and a small `maxCharsPerItem`: pass `afterPosition: itemCount - j*k - 1` and `limit: k` for j = 1, 2, … until the message appears, and omit `afterPosition` once that value falls below 0. A window of k items holds at most k messages, so `limit: k` returns all of that window's messages first; from j = 2 it can then return positions at `itemCount - (j-1)*k` or later, which you already read and skip. `t3_thread_list` and every `t3_thread_read` result give `itemCount`.
