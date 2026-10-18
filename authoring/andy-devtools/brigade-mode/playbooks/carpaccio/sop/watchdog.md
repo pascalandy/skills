@@ -40,7 +40,7 @@ slot = "<head-chef | chef-b | cook-b.c>"
 threadId = "<full threadId>"
 projectId = "<projectId>"
 workFolder = "<absolute path>"
-lastReceivedPhase = "<phase>"
+lastReceivedPhase = "<status emoji the last received report implies, or queued>"
 hold = false
 reportReceived = false
 ```
