@@ -36,7 +36,11 @@ Opening PRs needs `gh auth status --active --hostname github.com` to pass; local
 When it fails, push the layers with git, open no PR, and say the PRs wait for a signed-in `gh`.
 
 A stack is consistent when `git merge-base --is-ancestor <lower> <upper>` succeeds for each pair of
-adjacent layers.
+adjacent layers. Run each `git rebase --update-refs` from `<top>`, the top layer checked out: git
+moves the branch it rebases, but skips without an error every other branch checked out in a
+worktree when the rebase starts, the one you started from included. Check that the stack is
+consistent before you push, and report a layer that another worktree holds instead of pushing it
+stale.
 
 ## Native stack
 
@@ -99,13 +103,17 @@ Use git and `gh pr` only, no `gh stack` command, so GitHub never groups the PRs.
 1. Branch each layer from the one below, commit, and push it. Open its PR with
    `gh pr create --fill --base <layer below>`, or `--base <trunk>` for the bottom one. Done when
    `gh pr view <number> --json baseRefName` names the layer below for each PR
-2. To change a layer, commit on it, then run `git rebase --update-refs <layer> <top>`, which
-   replays the layers above and moves their branches, except one checked out in another worktree.
-   When you amended or rebased the layer instead, run
-   `git rebase --update-refs --onto <layer> <its old tip> <top>`. To take in the trunk, run
-   `git fetch <remote>` and `git rebase --update-refs <remote>/<trunk> <top>`. Push each moved
-   branch with `git push --force-with-lease <remote> <branch>...`, or follow
-   [Force pushes](#force-pushes). Done when the stack is consistent
+2. To change a layer, commit on it, then, from `<top>`, run `git rebase --update-refs <layer> <top>`,
+   which replays the layers above and moves their branches. When you amended or rebased the layer
+   instead, run `git rebase --update-refs --onto <layer> <its old tip> <top>`. To take in the
+   trunk, run `git fetch <remote>` and `git rebase --update-refs <remote>/<trunk> <top>`. To fold
+   fixes committed on `<top>` with `git commit --fixup=<commit>` into their layers, run
+   `top_before=$(git rev-parse HEAD)` after the last fixup, then
+   `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash --update-refs "$(git merge-base <remote>/<trunk> <bottom>)"`,
+   and check that `git diff --exit-code "$top_before" HEAD` exits 0: a conflict resolved wrong can
+   drop a line while the stack stays consistent. Push each moved branch with
+   `git push --force-with-lease <remote> <branch>...`, or follow [Force pushes](#force-pushes).
+   Done when the stack is consistent
 
 ## Force pushes
 
@@ -128,9 +136,9 @@ PR to the trunk first, in a native stack as the refusals above say.
   project's method flag, such as `--squash`, lands that PR and every unmerged PR below it, all or
   nothing unless a merge queue takes them; a stack number lands the whole stack. Pass the method
   each time, since the last one used is reused otherwise. A plain stack lands with the project's
-  merge command, one PR at a time. After each merge, run `gh pr edit <next> --base <trunk>`, then
-  `git rebase --update-refs --onto <remote>/<trunk> <merged layer's old tip> <top>`, and push the
-  moved branches
+  merge command, one PR at a time. After each merge, run `gh pr edit <next> --base <trunk>`, then,
+  from `<top>`, `git rebase --update-refs --onto <remote>/<trunk> <merged layer's old tip> <top>`,
+  and push the moved branches
 - **The project merges by pushing a head to its trunk:** in a native stack, first run
   `gh stack unstack <stack-number>`. Then retarget every PR to the trunk, bottom to top, with
   `gh pr edit <number> --base <trunk>`, push every layer you rebased, and apply the project's method
