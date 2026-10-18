@@ -354,18 +354,13 @@ def answer_failure(
 import gzip
 import tempfile
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 
 import github
 import privacy
 import t3
 
-FORMAT = 1
-CACHE = Path("~/.cache")
-# Fields of reduced records that hold a repository name, rewritten to a public
-# owner/name or a private-<letter> label before anything is written
-Ref = tuple[str, int]
+Ref = tuple[str, int]  # (owner/name, number)
 
 
 class Recorder:
@@ -590,7 +585,7 @@ class Recorder:
             "items": {ref(k): v for k, v in facts["items"].items()},
         }
         return {
-            "format": FORMAT,
+            "format": t3.FORMAT,
             "brigade": self.head[-4:].lower(),
             "head": self.head,
             "sequence": self.snap.seq,
@@ -601,18 +596,13 @@ class Recorder:
 
     def disk(self, slot: Callable[[dict], dict]) -> dict:
         """The run's watch.toml files while it is live; its Close removes them."""
-        root = (CACHE / f"brigade-{self.head[-4:].lower()}").expanduser()
-        out = {}
-        for path in sorted(root.glob("*/watch.toml")):
-            doc = t3.parse_toml(path.read_text(encoding="utf-8"))
-            if doc is None:
-                continue
-            mtime = datetime.fromtimestamp(path.stat().st_mtime, UTC)
-            out[path.parent.name] = {
-                "time": mtime.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
-                "plan": {name: slot(s) for name, s in t3.plan_of(doc).items()},
+        return {
+            folder: {
+                "time": info["time"],
+                "plan": {name: slot(s) for name, s in info["plan"].items()},
             }
-        return out
+            for folder, info in t3.disk_plans(self.head[-4:].lower()).items()
+        }
 
 
 def private_label(index: int) -> str:
@@ -768,19 +758,6 @@ def check_recording(data: dict) -> list[str]:
         doc = {"tool": "watch", "watch": {"full": info["plan"]}, "end": info["time"]}
         errors += t3.whitelist_errors(["disk", None, "item", folder, doc])
     return errors
-
-
-def load_recording(path: str | Path) -> dict:
-    """A recording written by this command, gzipped or not."""
-    raw = Path(path).read_bytes()
-    if raw[:2] == b"\x1f\x8b":
-        raw = gzip.decompress(raw)
-    data = json.loads(raw)
-    if data.get("format") != FORMAT:
-        raise ValueError(
-            f"{path} is recording format {data.get('format')}, expected {FORMAT}"
-        )
-    return data
 
 
 def main(argv: Sequence[str] | None = None) -> int:

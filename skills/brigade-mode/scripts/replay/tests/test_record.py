@@ -170,7 +170,7 @@ def test_recording_keeps_the_run_and_drops_free_text(tmp_path: Path) -> None:
     assert answer["ok"] and answer["changes"] == [["write", str(out)]]
     text = gzip.decompress(out.read_bytes()).decode()
     assert PLANTED not in text and "/home/" not in text and "secret-thing" not in text
-    data = record.load_recording(out)
+    data = t3.load_recording(out)
     assert record.check_recording(data) == []
     assert data["brigade"] == "abcd" and data["head"] == HC
     assert set(data["github"]["repositories"]) == {"example-owner/widget", "private-A"}
@@ -253,7 +253,7 @@ def test_watch_writes(
 
 @pytest.mark.parametrize("path", RECORDINGS, ids=lambda p: p.name)
 def test_committed_recording_fits_the_whitelist(path: Path) -> None:
-    data = record.load_recording(path)
+    data = t3.load_recording(path)
     assert record.check_recording(data) == []
     snap = t3.fold(data["records"])
     assert snap.head_chef_since(data["head"]), (

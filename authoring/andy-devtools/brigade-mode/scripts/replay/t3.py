@@ -9,11 +9,13 @@ each thread, turn item, run and subagent, which is T3's own projection as of N.
 
 from __future__ import annotations
 
+import gzip
 import json
 import re
 import sqlite3
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -956,3 +958,39 @@ def whitelist_errors(record: Record) -> list[str]:
     if data is not None:
         obj(kind, data, WHITELIST[kind])
     return errors
+
+
+# -------------------------------------------------------------- recordings ---
+FORMAT = 1
+
+
+def load_recording(path: str | Path) -> dict:
+    """A recording written by record.py, gzipped or not."""
+    raw = Path(path).read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    data = json.loads(raw)
+    if data.get("format") != FORMAT:
+        raise ValueError(
+            f"{path} is recording format {data.get('format')}, expected {FORMAT}"
+        )
+    return data
+
+
+def disk_plans(id4: str, root: Path = Path("~/.cache")) -> dict[str, dict]:
+    """A live run's watch.toml files by work folder, with their write time; Close removes them."""
+    out = {}
+    for path in sorted((root / f"brigade-{id4}").expanduser().glob("*/watch.toml")):
+        try:
+            doc = parse_toml(path.read_text(encoding="utf-8"))
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue  # removed between the listing and the read
+        if doc is None:
+            continue
+        stamp = datetime.fromtimestamp(mtime, UTC).isoformat(timespec="milliseconds")
+        out[path.parent.name] = {
+            "time": stamp.replace("+00:00", "Z"),
+            "plan": plan_of(doc),
+        }
+    return out
