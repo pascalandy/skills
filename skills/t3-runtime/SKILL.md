@@ -46,7 +46,7 @@ The sidebar shows each title on one line and cuts the end. Put what identifies t
 
 ## Schedules
 
-The thread responsible for the recurring objective owns the schedule: it records the schedule's id with the condition that ends it, and pauses it during a pause. Before it settles, it deletes the schedule, or records the thread that takes it over. Work that runs once gets no schedule.
+The thread responsible for the recurring objective owns the schedule: it records the schedule's id with the condition that ends it, and pauses it during a pause. Before it settles, it deletes the schedule, or records the thread that takes it over. Work that runs once gets no schedule, unless it must start at a set time: then create one `fixed_time` schedule on that weekday and check that its `nextRunAt`, given in UTC, is the requested instant; if it is not, delete it, confirm with `list_scheduled_tasks` and report that the instant cannot be scheduled. Its run deletes it as its first step and confirms with `list_scheduled_tasks` before the work starts; a failed deletion stops the run.
 
 A delegate can bind a schedule to its own thread with `bindToCurrentThread: true`. Its ticks run there without waking its parent; the delegate must send the parent an explicit message when the parent needs to act.
 
