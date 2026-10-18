@@ -176,7 +176,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 
 ### Retros
 
-For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. Each retro files the issues with the most value, up to `retro-max-issues` per thread. Done when each has issue links or a recorded no-findings result.
+For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mode ; retro-global. Each retro files the issues with the most value, up to `retro-max-issues` per thread. Quote in the issue the lines of any log or report it relies on, with the command and exit code when there is one; for a screenshot, describe what it shows. Never cite a path under `~/.cache/brigade-<id4>/`, which Close removes. Read the issue back before your final report, while the folder it quotes still exists. Done when each has issue links or a recorded no-findings result.
 
 ## Work folders
 
