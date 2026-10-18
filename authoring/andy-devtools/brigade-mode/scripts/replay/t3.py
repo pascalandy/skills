@@ -13,6 +13,7 @@ import gzip
 import json
 import re
 import sqlite3
+import unicodedata
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -110,8 +111,19 @@ FIRST = [
     ("progress", "📍"),
 ]
 SENDER = re.compile(
-    r"^(?:🚥\s*)?(?:head )?(?:chef|cook) [\d.]+(?: \w{4})?\s*(?:→\s*[^·:,—-]*)?\s*[:·,—-]*\s*"
+    r"^(?:(?:🚥|🧑‍🍳)\s*)?(?:head )?(?:chef|cook) [\d.]+(?: \w{4})?\s*(?:→\s*[^·:,—-]*)?\s*[:·,—-]*\s*"
 )
+
+
+def leading_symbol(body: str) -> str | None:
+    """The pictograph a line opens with, such as ❓ or ⚠️; `#79` or a code span is text."""
+    lead = ""
+    for ch in body:
+        if unicodedata.category(ch) == "So" or (lead and ch in "\u200d\ufe0f"):
+            lead += ch
+        else:
+            break
+    return lead[:4] or None
 
 
 def signature(text: str) -> dict:
@@ -166,12 +178,12 @@ def signature(text: str) -> dict:
         "escalate": bool(re.search(r"question à pascal|asking pascal", full)),
     }
     first += [name for name, on in features.items() if on]
-    lead = re.match(r"[^\w\s(\[]+", body)
+    lead = leading_symbol(body)
     out: dict[str, Any] = {"first": sorted(first)}
     if handoffs:
         out["handoffs"] = handoffs
     if lead:
-        out["lead"] = lead.group(0).strip()[:4]
+        out["lead"] = lead
     step = re.search(r"\b([1-6])/6\b", line) if "progress" in first else None
     if step:
         out["step"] = int(step.group(1))

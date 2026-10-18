@@ -182,9 +182,15 @@ def test_an_item_naming_two_prs_waits_on_pascal_until_both_are_done() -> None:
         ),
         ("Chef 1: 📍 1/6 received for #197", "chef", "cook", "progress_note"),
         ("Chef 4 abcd · 🦄 a symbol no rule reads", "chef", "head_chef", "info"),
+        # free text: an issue reference, a code span or a Cook's emoji header opens no notice
+        ("Cook 1.1 abcd · #79 finding, no blocker", "cook", "chef", "info"),
+        ("Chef 2 abcd → Cook 2.2: `origin/main` moved", "chef", "cook", "info"),
+        ("🧑‍🍳 Cook 1.1 abcd started M09-T1", "cook", "chef", "info"),
     ],
 )
 def test_notices_outside_the_messages_table_have_a_kind(
     text: str, src: str, dst: str, kind: str
 ) -> None:
-    assert t3.classify(t3.signature(text), src, dst) == kind
+    sig = t3.signature(text)
+    assert t3.classify(sig, src, dst) == kind
+    assert (kind == "info" and "🦄" not in text) == ("lead" not in sig)
