@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-14
+date_updated: 2026-10-18
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
@@ -29,7 +29,7 @@ Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just
 | Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
 | Did this commit get signed off? | `gh signoff status` |
 | Merge blocked on `signoff` | For a PR that targets `main` and is not part of a GitHub stack, `just merge` signs off the PR head, then merges it. For stacked PRs, follow [Land a stack](#land-a-stack). Never merge with `gh pr merge --admin` to skip the gate |
-| Want a run on a clean GitHub runner | `gh workflow run ci.yml --ref <branch>`, then `gh run watch` |
+| Want a run on the other system | Follow step 2 of [Land a stack](#land-a-stack). GitHub Actions runs only to publish a release, as [Manual CI workflow](#manual-ci-workflow) says |
 
 Commit hooks never sign off: git has no hook after a push, and GitHub accepts a status only for a commit it already has
 
@@ -62,7 +62,7 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch or is part of a GitHub stack, not with `just merge` on each layer:
 
 1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
-2. Sign off on macOS. The fleet also runs Linux, and a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path, so run `gh workflow run ci.yml --ref <top layer>` too. It proves the stack's end state on Linux, not the layers below: run it on a lower layer as well when that layer may land without the ones above it
+2. When `git diff --name-only <stack base> <top>` touches `scripts/`, a package's `scripts/` folder, the justfile, `lefthook.yml` or `scripts/check.py`, prove the top layer on both systems, since a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path. The stack base is `git merge-base origin/main <top>`. On this machine, the top layer's `just signoff` is the proof; when it reused an existing signoff, run `just check` at the top SHA too. Then run 🧰 fleet's `check_remote.py --machine <alias> --repo https://github.com/pascalandy/skills.git --sha <top SHA> --base <stack base> --expect-os <its uname -s>` for a machine whose `uname -s` differs from this one's, and paste its `{"ok":true,…}` receipt in the top PR. After a restack, run it again with the new SHAs. Prove a lower layer the same way, with its own diff from the base, when it may land without the layers above. A stack outside those paths needs no other-system proof. GitHub Actions never runs to land a stack; it runs only to publish a release, as [Manual CI workflow](#manual-ci-workflow) says
 3. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
 4. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
 
@@ -72,7 +72,7 @@ A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#mer
 
 ## Manual CI workflow
 
-`.github/workflows/ci.yml` runs only when started by hand, and its result is not the `signoff` status. `gh workflow run ci.yml --ref <branch>` runs `just check --sweep` on a GitHub runner. Started on a `vX.Y.Z` tag, it also validates and publishes that release, a fallback for the local publish step in [[release]]
+`.github/workflows/ci.yml` runs only when started by hand, to publish a release, and its result is not the `signoff` status. `gh workflow run ci.yml --ref vX.Y.Z` runs `just check --sweep` on a GitHub runner, then validates and publishes that release, a fallback for the local publish step in [[release]]
 
 ## Add or change a check
 
