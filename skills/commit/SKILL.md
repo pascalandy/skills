@@ -71,3 +71,4 @@ Write the body for non-trivial commits. Optional fields, when useful: `File(s) c
 - Body says why the change matters
 - Name the concrete change instead of `improve`, `enhance`, `streamline`, or `optimize`
 - No periods at body line ends
+- No body line starts with `#`: git's default cleanup drops it as a comment when an amend or a rebase opens the editor. Wrap so an issue or PR number sits inside the line, as in `The stack #201 ran checks`
