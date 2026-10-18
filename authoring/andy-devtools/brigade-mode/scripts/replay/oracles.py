@@ -379,7 +379,6 @@ GITHUB_TIMEOUT = 20.0  # the live service's longest GitHub read
 LAG = GITHUB_CADENCE + GITHUB_TIMEOUT + 2 * POLL
 SETTLE = 120.0  # oracle 2: a thread retitles only when it enters a phase or ends a turn
 EPSILON = 0.001
-GENERIC = {"info", "answer"}  # what classify() answers for a message no rule reads
 MONTREAL = ZoneInfo("America/Montreal")
 Points = list[tuple[float, str | None]]
 
@@ -746,15 +745,8 @@ def freshness(recompute: list[float]) -> dict:
 
 def coverage(run: Run) -> dict:
     """Oracle 6: messages whose leading symbol no rule reads, and unread watch.toml writes."""
-    unclassified = [
-        {"t": e["time"], "role": e["role"], "lead": e["detail"]["lead"]}
-        for e in run.events
-        if e["kind"] == "send"
-        and e["detail"].get("msg") in GENERIC
-        and e["detail"].get("lead")
-    ]
-    unread = [{"t": e["time"]} for e in run.events if e["kind"] == "watch_unread"]
-    return {"unclassified": unclassified, "unread": unread}
+    found = pipeline.unparsed(run.events)
+    return {"unclassified": found["messages"], "unread": found["watch"]}
 
 
 def report(rec: dict) -> dict:

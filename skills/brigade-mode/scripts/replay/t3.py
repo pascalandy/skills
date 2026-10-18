@@ -14,7 +14,7 @@ import json
 import re
 import sqlite3
 import unicodedata
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -908,20 +908,125 @@ def load(
         seen.add(stream)
         mine = list(events(con, stream=stream, upto=upto))
         records += mine
-        for _, _, kind, _, data in mine:
-            if (
-                kind == "item"
-                and data
-                and data.get("tool") == "launch"
-                and data.get("child")
-            ):
-                queue.append(data["child"])
+        queue += [child for child in map(launched, mine) if child]
     records.sort(key=lambda r: r[0])
     snap = Snapshot(projects=project_repos(con))
     for record in records:
         snap.apply(record)
     snap.seq = max(snap.seq, upto)
     return snap, records
+
+
+def launched(record: Record) -> str | None:
+    """The thread a launch item started, once the launch completed."""
+    _, _, kind, _, data = record
+    if kind == "item" and data and data.get("tool") == "launch":
+        return data.get("child")
+    return None
+
+
+PR_EVENT = "thread.pull-request-link-updated"  # carries T3's snapshot of a linked PR
+
+
+@dataclass
+class Follower:
+    """The Head Chef runs `load()` would read, folded as T3 writes their events.
+
+    Each thread's records apply in sequence order, which is all a snapshot
+    needs: no entity spans two threads. A read runs in one short read
+    transaction, and every query fetches its rows at once, so no read
+    transaction stays open between reads and T3's WAL can checkpoint.
+    """
+
+    con: sqlite3.Connection
+    since: Callable[[], str]  # Head Chefs created from then on, asked at each read
+    snap: Snapshot = field(default_factory=Snapshot)
+    heads: list[str] = field(default_factory=list)
+    members: set[str] = field(default_factory=set)
+    seq: int | None = None  # the last sequence read; None before the first read
+    version: int | None = None
+    pr_states: dict[tuple[str, int], tuple] = field(default_factory=dict)
+
+    def changed(self) -> bool:
+        """Whether another connection committed since the last call (PRAGMA data_version)."""
+        ((version,),) = self.con.execute("pragma data_version").fetchall()
+        changed, self.version = version != self.version, version
+        return changed
+
+    def read(self) -> set[str]:
+        """Fold the events written since the last read; return the repositories
+        whose linked PRs T3 saw change state, merged or closed for instance."""
+        self.con.execute("begin")
+        try:
+            return self._read()
+        except BaseException:
+            self.reset()  # a half-applied read starts over from scratch next time
+            raise
+        finally:
+            self.con.execute("commit")
+
+    def reset(self) -> None:
+        self.snap, self.heads, self.members, self.seq = Snapshot(), [], set(), None
+
+    def _read(self) -> set[str]:
+        ((upto,),) = self.con.execute(
+            "select coalesce(max(sequence), 0) from orchestration_events"
+        ).fetchall()
+        heads = head_chefs(self.con, self.since())
+        if set(self.heads) - set(heads):
+            self.reset()  # a run left the window: its threads leave memory too
+        self.heads = heads
+        self.snap.projects = project_repos(self.con)
+        changed: set[str] = set()
+        found = [h for h in heads if h not in self.members]
+        if self.seq is not None:
+            rows = self.con.execute(
+                "select sequence, stream_id, occurred_at, event_type, payload_json from orchestration_events "
+                "where aggregate_kind = 'thread' and sequence > ? and sequence <= ? order by sequence",
+                (self.seq, upto),
+            ).fetchall()
+            for seq, stream, occurred, event_type, payload in rows:
+                if event_type == PR_EVENT:
+                    # every thread's, so a thread that joins later already has its PRs' states
+                    moved = self.pr_state(json.loads(payload))
+                    if stream in self.members:
+                        changed |= moved
+                if stream not in self.members:
+                    continue
+                if event_type not in EVENTS and not event_type.startswith("thread."):
+                    continue
+                data = json.loads(payload)
+                reduced = reduce(event_type, data)
+                if reduced is not None:
+                    record = [seq, norm(occurred), *reduced]
+                    self.snap.apply(record)
+                    child = launched(record)
+                    if child and child not in self.members:
+                        found.append(child)
+        while found:
+            stream = found.pop(0)
+            if stream in self.members:
+                continue
+            self.members.add(stream)
+            for record in events(self.con, stream=stream, upto=upto):
+                self.snap.apply(record)
+                child = launched(record)
+                if child and child not in self.members:
+                    found.append(child)
+        self.seq = upto
+        self.snap.seq = max(self.snap.seq, upto)
+        return changed
+
+    def pr_state(self, payload: dict) -> set[str]:
+        """The PR's repository when its state differs from the one T3 showed before."""
+        repo, n = payload.get("repository"), payload.get("number")
+        if not isinstance(repo, str) or not isinstance(n, int):
+            return set()
+        snapshot = payload.get("snapshot") or {}
+        state = tuple(snapshot.get(k) for k in ("state", "mergedAt", "closedAt"))
+        before = self.pr_states.get((repo, n))
+        self.pr_states[(repo, n)] = state
+        return {repo} if before is not None and before != state else set()
 
 
 def projection(con: sqlite3.Connection, threads: Iterable[str]) -> Snapshot:

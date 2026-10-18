@@ -113,7 +113,7 @@ def test_private_run_keeps_epic_cook_and_story_count(tmp_path: Path, repo: str) 
     output = tmp_path / "replay.html"
     output.write_text(pipeline.render_page(data, {repo: names[repo]}), encoding="utf-8")
     page = output.read_text(encoding="utf-8")
-    match = re.search(r"\bconst\s+DATA\s*=\s*", page)
+    match = re.search(r"\b(?:const|let)\s+DATA\s*=\s*", page)
     assert match
     embedded, _ = json.JSONDecoder().raw_decode(page[match.end() :])
     assert embedded == data

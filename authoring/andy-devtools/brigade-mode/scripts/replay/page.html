@@ -32,6 +32,9 @@ a { color: var(--focus); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .wrap { max-width: 90rem; margin: 0 auto; padding: 0 1rem; }
 header.top { padding: 1.5rem 0 1rem; display: grid; gap: 0.5rem; }
+/* live.py's banner: how old the data is; stale or failing reads stand out, never in the red of "waits on you" */
+.live { font-size: 0.9rem; color: var(--ink-2); }
+.live[data-stale] { color: var(--ink); font-weight: 600; outline: 1px dashed var(--axis); outline-offset: 4px; border-radius: 2px; }
 
 /* states, in SVG and in HTML */
 svg :not(text)[data-st] { transition: fill 220ms, stroke 220ms; }
@@ -127,6 +130,7 @@ code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 <div class="wrap"><header class="top">
   <h1>Brigade replay</h1>
   <ul class="legend" id="legend" aria-label="States"></ul>
+  <p class="live" id="live" role="status" hidden></p>
 </header></div>
 
 <div class="bar" role="region" aria-label="Time scrubber"><div class="wrap">
@@ -151,7 +155,9 @@ code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 
 <script>
 "use strict";
-const DATA = /*__DATA__*/null;
+let DATA = /*__DATA__*/null;
+// live.py sets LIVE: { data: URL to poll, poll: ms, version, read, error }; a replay file has none
+const LIVE = /*__LIVE__*/null;
 const STATES = {
   todo: { label: "to do" },
   active: { label: "working" },
@@ -160,7 +166,7 @@ const STATES = {
   stopped: { label: "not done in this run" },
   you: { label: "waits on you" },
 };
-const BR = Object.fromEntries(DATA.brigades.map((b) => [b.id, b]));
+let BR = Object.fromEntries(DATA.brigades.map((b) => [b.id, b]));
 const $ = (s) => document.querySelector(s);
 const dur = (s) => { const m = Math.max(0, Math.floor(s / 60)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`; };
 const localTime = (t) => new Date(t * 1000).toLocaleString("en-CA", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
@@ -299,6 +305,7 @@ function legend() {
 
 function picker() {
   const box = $("#pick");
+  for (const old of box.querySelectorAll("button")) old.remove();
   for (const b of DATA.brigades) {
     const btn = document.createElement("button");
     btn.type = "button"; btn.textContent = b.id; btn.dataset.b = b.id;
@@ -447,11 +454,85 @@ function setPlaying(on) {
   else savePosition();
 }
 
+function controls(on) {
+  document.querySelectorAll(".bar button, .bar select, .bar input").forEach((el) => { el.disabled = !on; });
+}
+
+function generated() {
+  $("#gen").textContent = `Data snapshot ${localTime(Date.parse(DATA.generated) / 1000)}, from T3 Code and GitHub, read-only.`;
+}
+
+// ---------------------------------------------------------------- live
+// live.py serves the page with LIVE set. It polls new data, keeps the last good
+// data when a read fails, and follows now unless you moved back in time
+const L = { version: LIVE && LIVE.version, read: LIVE && LIVE.read, error: LIVE && LIVE.error, unreachable: null };
+const ago = (s) => (s < 90 ? `${Math.round(s)} s` : dur(s));
+const clockTime = (t) => new Date(t * 1000).toLocaleTimeString("en-CA", { hour12: false });
+
+function banner() {
+  const el = $("#live");
+  el.hidden = false;
+  const age = L.read ? Math.max(0, Date.now() / 1000 - L.read) : null;
+  let text = !L.version ? "Live: reading T3 and GitHub for the first page" : `Live: data ${ago(age || 0)} old`;
+  if (L.unreachable) text += `. The dashboard service is unreachable since ${clockTime(L.unreachable)}; showing the last data it sent`;
+  else if (L.error) text += `. ${L.error}`;
+  el.textContent = text;
+  el.toggleAttribute("data-stale", Boolean(L.unreachable || L.error || !L.version || age === null || age > 10));
+}
+
+function running() {
+  const on = DATA.brigades.filter((b) => !b.final).map((b) => b.id);
+  return on.length ? on : DATA.brigades.slice(-1).map((b) => b.id);
+}
+
+function update(next, version) {
+  const following = !S.sel.length || S.t >= domain()[1] - 1;
+  const before = DATA.brigades.map((b) => b.id).join();
+  DATA = next;
+  L.version = version;
+  BR = Object.fromEntries(DATA.brigades.map((b) => [b.id, b]));
+  S.sel = S.sel.filter((id) => BR[id]);
+  if (!S.sel.length) S.sel = running();
+  if (DATA.brigades.map((b) => b.id).join() !== before) picker();
+  generated();
+  if (!S.sel.length) { $("#views").textContent = "No Head Chef runs in this time window."; controls(false); return; }
+  controls(true);
+  mountAll();
+  seek(following ? domain()[1] : S.t, false);
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`${LIVE.data}?v=${encodeURIComponent(L.version)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    Object.assign(L, { read: j.read, error: j.error, unreachable: null });
+    if (j.data) update(j.data, j.version);
+  } catch {
+    L.unreachable = L.unreachable || Date.now() / 1000;
+  }
+  banner();
+}
+
 function init() {
   legend(); picker();
+  $("#t").addEventListener("input", (e) => { const [a, b] = domain(); seek(a + (Number(e.target.value) / 1000) * (b - a || 1)); });
+  $("#play").addEventListener("click", () => setPlaying(!S.playing));
+  $("#prev").addEventListener("click", () => { const c = changes().filter((x) => x < S.t - 0.5); if (c.length) seek(c[c.length - 1]); });
+  $("#next").addEventListener("click", () => { const c = changes().find((x) => x > S.t + 0.5); if (c !== undefined) seek(c); });
+  generated();
+  // a view lays out once for its panel's width; a new width lays it out again
+  let w = innerWidth, wait = 0;
+  addEventListener("resize", () => { clearTimeout(wait); wait = setTimeout(() => { if (innerWidth !== w && S.sel.length) { w = innerWidth; mountAll(); paint(); } }, 200); });
+  if (LIVE) {
+    banner();
+    setInterval(poll, LIVE.poll);
+    setInterval(banner, 1000);
+    S.sel = DATA.brigades.length ? running() : [];
+  }
   if (!DATA.brigades.length) {
     $("#views").textContent = "No Head Chef runs in this time window.";
-    document.querySelectorAll(".bar button, .bar select, .bar input").forEach((el) => { el.disabled = true; });
+    controls(false);
     return;
   }
   const h = new URLSearchParams(location.hash.slice(1));
@@ -460,15 +541,7 @@ function init() {
   mountAll();
   const [a, b] = domain();
   const requested = h.has("t") ? Number(h.get("t")) : NaN;
-  seek(Number.isFinite(requested) ? requested : a + (b - a || 1) * 0.45);
-  $("#t").addEventListener("input", (e) => { const [a, b] = domain(); seek(a + (Number(e.target.value) / 1000) * (b - a || 1)); });
-  $("#play").addEventListener("click", () => setPlaying(!S.playing));
-  $("#prev").addEventListener("click", () => { const c = changes().filter((x) => x < S.t - 0.5); if (c.length) seek(c[c.length - 1]); });
-  $("#next").addEventListener("click", () => { const c = changes().find((x) => x > S.t + 0.5); if (c !== undefined) seek(c); });
-  $("#gen").textContent = `Data snapshot ${localTime(Date.parse(DATA.generated) / 1000)}, from T3 Code and GitHub, read-only.`;
-  // a view lays out once for its panel's width; a new width lays it out again
-  let w = innerWidth, wait = 0;
-  addEventListener("resize", () => { clearTimeout(wait); wait = setTimeout(() => { if (innerWidth !== w) { w = innerWidth; mountAll(); paint(); } }, 200); });
+  seek(Number.isFinite(requested) ? requested : LIVE ? b : a + (b - a || 1) * 0.45);
 }
 init();
 </script>

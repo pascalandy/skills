@@ -53,20 +53,25 @@ def repository_names(gh: Facts) -> tuple[set[str], dict[str, str]]:
     return public, names
 
 
-def page_data(
+def run_events(
     snap: t3.Snapshot,
     gh: Facts,
     heads: Iterable[str],
     disk: Mapping[str, dict] | None = None,
-    now: float | None = None,
-) -> tuple[dict, dict[str, str]]:
-    """The page data of each Head Chef run, and the private repositories it must hide.
+) -> tuple[list[str], list[dict]]:
+    """The Head Chefs a snapshot holds, and the extractor's facts of their runs.
 
     A thread is a Head Chef once its title's id4 is its own threadId suffix;
     before that, its run has nothing to draw.
     """
     heads = [h for h in heads if snap.head_chef_since(h)]
-    events = facts.extract(snap, gh, heads, dict(disk or {}))
+    return heads, facts.extract(snap, gh, heads, dict(disk or {}))
+
+
+def page_of(
+    events: list[dict], gh: Facts, heads: list[str], now: float | None = None
+) -> tuple[dict, dict[str, str]]:
+    """The page data of the runs' facts, and the private repositories it must hide."""
     numbers = {
         ref: gh.epic_number(*unkey(ref))
         for ref in sorted({e["epic"] for e in events if e["epic"]})
@@ -77,6 +82,34 @@ def page_data(
     )
     private = {repo: names[repo] for repo in names if repo not in public}
     return data, private
+
+
+def page_data(
+    snap: t3.Snapshot,
+    gh: Facts,
+    heads: Iterable[str],
+    disk: Mapping[str, dict] | None = None,
+    now: float | None = None,
+) -> tuple[dict, dict[str, str]]:
+    """The page data of each Head Chef run, and the private repositories it must hide."""
+    heads, events = run_events(snap, gh, heads, disk)
+    return page_of(events, gh, heads, now)
+
+
+GENERIC = {"info", "answer"}  # what t3.classify() answers for a message no rule reads
+
+
+def unparsed(events: Iterable[dict]) -> dict[str, list[dict]]:
+    """Messages whose leading symbol no rule reads, and watch.toml writes the
+    parser could not read; both stay 0 on the recorded runs (oracle 6)."""
+    messages, watch = [], []
+    for e in events:
+        d = e["detail"] or {}
+        if e["kind"] == "send" and d.get("msg") in GENERIC and d.get("lead"):
+            messages.append({"t": e["time"], "role": e["role"], "lead": d["lead"]})
+        elif e["kind"] == "watch_unread":
+            watch.append({"t": e["time"]})
+    return {"messages": messages, "watch": watch}
 
 
 def recording_data(
@@ -104,8 +137,14 @@ def t3_time(seconds: float) -> str:
     return stamp.replace("+00:00", "Z")
 
 
-def render_page(data: dict, private: Mapping[str, str]) -> str:
-    """The self-contained page; refuses data that names a private repository or a local path."""
+def render_page(
+    data: dict, private: Mapping[str, str], live: dict | None = None
+) -> str:
+    """The self-contained page; refuses data that names a private repository or a local path.
+
+    `live` turns the replay into the live dashboard: where to poll new data
+    and how often, as live.py serves it.
+    """
     if privacy.leaks(data, private):
         raise PrivacyError(
             "Privacy check refused the data; remove private repository names or local paths from the replay data, then rerun"
@@ -117,4 +156,5 @@ def render_page(data: dict, private: Mapping[str, str]) -> str:
     page = page.replace(
         "/*__BOARD__*/", (HERE / "board.js").read_text(encoding="utf-8")
     )
+    page = page.replace("/*__LIVE__*/null", json.dumps(live, separators=(",", ":")))
     return page.replace("/*__DATA__*/null", payload)
