@@ -17,7 +17,7 @@ The Cook stays 🍳 during barrages and triage. Apply [Statuses and Messages](..
 ```text
 $brigade-mode ; carpaccio ; <sop>
 Role: Barrage <sop>, delegation <k>, Cook <b>.<c> <id4>. Your final message is your report.
-Scope: <absolute Cook worktree>, <base branch>, <branch/head pairs>, <PR URLs>
+Scope: <absolute Cook worktree, the source for git worktree add>, <base branch>, <branch/head pairs>, <PR URLs>
 Plan: <cards, acceptance criteria and batch threat model>
 Intent: <one paragraph stating the intended behavior>
 Evidence: <context the reviewer needs beyond the diff defined by Scope>
@@ -25,7 +25,7 @@ Docs: <Cook's docs PR or no-docs decision, for manic-3>
 Prior rounds: <original brief, findings, decisions, fixes with commits and unresolved objections>
 Rules: <rules.md path, plus additions>
 Work folder: <absolute path>
-Contract: Read and follow the Rules file. Review only; edit no project file. Work alone, with no subagent or other model. Execute code only in a detached worktree inside your work folder. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict. Respect prior decisions unless new evidence reopens them. Give each finding its severity, file, line and proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
+Contract: Read and follow the Rules file. Review only; edit no project file. Work alone, with no subagent or other model. Read project files and execute code only in a detached worktree inside your work folder at the recorded heads, or through `git show <head>:<path>`; never read project files through the Cook's worktree, which switches branches during sign-off. Read your brief and the Rules file where they are. Never move a Cook branch ref: no checkout, commit, rebase, reset or push that touches it. A trial rebase follows gh-stack with git -c rebase.updateRefs=false; abort it on conflict, and label any check you run on its unrecorded head as such. Respect prior decisions unless new evidence reopens them. Give each finding its severity, its location as a path in your detached worktree or as `<head>:<path>:<line>`, and its proposed fix. Run 🧰 2nd-pass on your findings, then list open questions in your report.
 ```
 
 ## Triage
