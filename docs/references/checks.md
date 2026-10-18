@@ -49,8 +49,8 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 | Situation | Do |
 |---|---|
 | Refused: the branch lacks the tip of `main` | `git merge origin/main`, `git push`, then `just merge` |
-| Refused: the PR targets another branch | A stack lands through its stack: sign off each layer, run `gh stack merge <stack> --yes --squash`, then `just deploy` |
-| Refused: the PR is part of a GitHub stack | GitHub refuses `gh pr merge` for any PR in a stack, even one that targets `main`. Sign off each layer up to the PR, run the `gh stack merge` the message names, then `just merge` again; on the merged PR it only deploys |
+| Refused: the PR targets another branch | Land its stack as [Land a stack](#land-a-stack) says |
+| Refused: the PR is part of a GitHub stack | GitHub refuses `gh pr merge` for any PR in a stack, even one that targets `main`. Land the layers up to the PR as [Land a stack](#land-a-stack) says, with the `gh stack merge` the message names |
 | GitHub did not accept the merge in time, exit 75 | `just merge` again; it reuses the signoff |
 | Interrupted | `just merge` again; on a merged PR it only deploys |
 | The merge landed, but `just deploy` did not reach every machine | Fix what its answer names, then `just deploy` |
@@ -59,12 +59,13 @@ Run `just merge` on the PR branch, pushed, with a clean working tree. It squash-
 
 ## Land a stack
 
-A stack lands with `gh stack merge <stack> --yes --squash`, as [Merge a PR](#merge-a-pr) says for a PR that targets another branch or is part of a GitHub stack, not with `just merge` on each layer:
+A stack lands with these steps, not with `just merge` on each layer, which refuses a PR that targets another branch or is part of a GitHub stack:
 
 1. Sign off each layer at its exact head. A restack changes every head, so each layer signs again. A layer that changes `scripts/check.py` runs every check
 2. When `git diff --name-only <stack base> <top>` touches `scripts/`, a package's `scripts/` folder, the justfile, `lefthook.yml` or `scripts/check.py`, prove the top layer on both systems, since a check can pass on one only, such as a Bash 3.2 parse or a `/private/var` path. The stack base is `git merge-base origin/main <top>`. On this machine, the top layer's `just signoff` is the proof; when it reused an existing signoff, run `just check` at the top SHA too. Then run 🧰 fleet's `check_remote.py --machine <alias> --repo https://github.com/pascalandy/skills.git --sha <top SHA> --base <stack base> --expect-os <its uname -s>` for a machine whose `uname -s` differs from this one's, and paste its `{"ok":true,…}` receipt in the top PR. After a restack, run it again with the new SHAs. Prove a lower layer the same way, with its own diff from the base, when it may land without the layers above. A stack outside those paths needs no other-system proof. GitHub Actions never runs to land a stack; it runs only to publish a release, as [Manual CI workflow](#manual-ci-workflow) says
-3. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
-4. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
+3. Run `gh stack merge <stack> --yes --squash`, then `just deploy` from the main checkout
+4. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
+5. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
 
 ## The signoff rule
 

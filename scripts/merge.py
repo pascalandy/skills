@@ -300,6 +300,11 @@ def deploy(sha: str, args: argparse.Namespace) -> list[list[str]]:
 
 def merge(args: argparse.Namespace) -> dict[str, Any]:
     name = branch()
+    if name == "main":
+        # After gh stack merge, main holds nothing to merge, only to deploy (#688)
+        raise ScriptError(
+            "on main there is no PR to merge; to deploy main, run: just deploy"
+        )
     pr = branch_pr(name, args.timeout)
     if pr.state == "MERGED":
         # A stack layer keeps its lower layer as base after gh stack merge lands
