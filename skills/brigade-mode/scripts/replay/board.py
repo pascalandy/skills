@@ -27,27 +27,6 @@ CHEF = {
 }
 
 
-def hc_titles(events: list[dict], bid: str, private: bool) -> list[list]:
-    """The Head Chef's T3 title over time, as its thread shows it. A private run keeps only
-    its id, counter and status: its subject words could name private work."""
-    out = []
-    for e in events:
-        if e["brigade"] == bid and e["kind"] == "rename" and e["thread"] == "hc":
-            t = e["detail"]["title"]
-            if private:
-                t = " ".join(
-                    x
-                    for x in [
-                        f"Head Chef {bid}",
-                        e["detail"].get("counter"),
-                        e.get("status"),
-                    ]
-                    if x
-                )
-            out.append([round(R.ts(e["time"]), 1), t])
-    return out
-
-
 def slot(key: str) -> str:
     return key.split("#")[0]  # a replacement takes its slot's cell
 
@@ -179,8 +158,9 @@ class Board:
                     self.set(
                         t,
                         f"{s}/{sop}",
-                        "done",
-                        f"round {d.get('round')}" + (", error" if d["v"] == -1 else ""),
+                        "stopped" if d["v"] == -1 else "done",
+                        f"round {d.get('round')}"
+                        + (f", {d.get('state') or 'error'}" if d["v"] == -1 else ""),
                     )
             self.paint_cook(t, s)
         elif k in ("pr_open", "pr_merge", "pr_close") and (
@@ -255,7 +235,6 @@ def shape(
                 {
                     "label": info["label"].split("#")[0].strip(),
                     "batch": batch_of(s),
-                    "launched": info.get("launched"),
                     "stories": set(),
                     "prs": set(),
                 },
@@ -269,7 +248,6 @@ def shape(
                 {
                     "label": "Cook " + s.split("-")[1],
                     "batch": batch_of(s),
-                    "launched": None,
                     "stories": set(),
                     "prs": set(),
                 },
@@ -316,12 +294,10 @@ def shape(
                 "cooks": mine,
             }
         )
-    order = sorted(cooks, key=lambda s: (cooks[s]["launched"] or float("inf"), s))
     out = {
         s: {
             "label": c["label"],
             "batch": c["batch"],
-            "order": order.index(s) + 1,
             "stories": sorted(ref(x) for x in c["stories"]),
             "prs": len(c["prs"]),
         }
@@ -456,9 +432,6 @@ def build(
             {
                 "id": bid,
                 "repos": [names[r] for r in repos],
-                "titles": hc_titles(
-                    events, bid, not repos or any(r not in public for r in repos)
-                ),
                 "start": min(starts or [ds[0]["t"]]),
                 "end": end,
                 "final": final,

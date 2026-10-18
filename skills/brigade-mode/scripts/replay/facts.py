@@ -16,14 +16,15 @@ KEYS = (
     "thread",
     "parent",
     "kind",
-    "status",
     "epic",
     "story",
     "pr",
     "detail",
 )
-EMOJI = ["🟢", "⏳", "🍳", "❓", "🔀", "🧹", "🍽️", "⏸️", "⛳", "⏹️"]
 PR_URL = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)")
+RELEASE_COMMAND = re.compile(
+    r"\b(?:just (?:sync-fleet|release|publish)|gh release create)(?![\w-])"
+)
 
 
 def norm(ts: str | None) -> str | None:
@@ -55,22 +56,6 @@ def out_of(d: dict) -> dict | None:
         except (TypeError, ValueError):
             return None
     return None
-
-
-def emoji_of(title: str) -> str | None:
-    """The status a title claims: the first status emoji after the role prefix."""
-    title = re.sub(r"^(🧑‍🍳|🚥)\s*", "", title)  # 🧑‍🍳 holds 🍳: skip the role mark
-    best = None
-    for e in EMOJI:
-        i = title.find(e)
-        if i >= 0 and (best is None or i < best[0]):
-            best = (i, e)
-    return best[1] if best else None
-
-
-def counter_of(title: str) -> str | None:
-    m = re.search(r"\[?(\d+)/(\d+)\]?", title)
-    return f"{m.group(1)}/{m.group(2)}" if m else None
 
 
 def repo_of_project(con: sqlite3.Connection, project_id: str | None) -> str | None:
@@ -224,28 +209,6 @@ def ask_items(text: str) -> tuple[list[str], list[list[str]]]:
     return out, refs
 
 
-def cmd_verbs(cmd: str) -> list[str]:
-    v = set()
-    for m in re.finditer(
-        r"\bgh (pr|issue|api|stack|repo|run|release|signoff|search)\b(?: (\w[\w-]*))?",
-        cmd,
-    ):
-        v.add(
-            f"gh {m.group(1)}"
-            + (
-                f" {m.group(2)}"
-                if m.group(1) in ("pr", "issue", "stack", "release", "run")
-                and m.group(2)
-                else ""
-            )
-        )
-    for m in re.finditer(r"\bjust ([a-z][\w-]*)", cmd):
-        v.add(f"just {m.group(1)}")
-    if re.search(r"git push origin \S+:main", cmd):
-        v.add("git push :main")
-    return sorted(v)
-
-
 class Brigade:
     def __init__(self, con: sqlite3.Connection, thread_id: str) -> None:
         self.con = con
@@ -268,7 +231,6 @@ class Brigade:
         thread: str,
         kind: str,
         parent: str | None = None,
-        status: str | None = None,
         epic: str | None = None,
         story: str | None = None,
         pr: str | None = None,
@@ -282,7 +244,6 @@ class Brigade:
                 "thread": thread,
                 "parent": parent,
                 "kind": kind,
-                "status": status,
                 "epic": epic,
                 "story": story,
                 "pr": pr,
@@ -422,15 +383,14 @@ class Brigade:
                 elif typ == "command_execution":
                     command = d.get("input")
                     cmd = command if isinstance(command, str) else ""
-                    verbs = cmd_verbs(cmd)
-                    if verbs:
+                    if role == "chef" and RELEASE_COMMAND.search(cmd):
                         self.ev(
                             t0,
                             role,
                             me,
                             "cmd",
                             parent=parent,
-                            verbs=verbs,
+                            release=True,
                             end=norm(d.get("completedAt")),
                             ok=status == "completed",
                         )
@@ -480,19 +440,7 @@ class Brigade:
                 elif typ == "dynamic_tool":
                     tn = d["toolName"].split("__")[-1]
                     i = d.get("input") or {}
-                    if tn == "t3_thread_update" and i.get("action") == "rename":
-                        title = i.get("title", "")
-                        self.ev(
-                            t0,
-                            role,
-                            me,
-                            "rename",
-                            parent=parent,
-                            status=emoji_of(title),
-                            title=title,
-                            counter=counter_of(title),
-                        )
-                    elif tn == "t3_thread_launch":
+                    if tn == "t3_thread_launch":
                         o = out_of(d)
                         if o and o.get("threadId"):
                             ci = self.threads.get(o["threadId"])
@@ -507,11 +455,7 @@ class Brigade:
                                 label=ci["label"],
                                 repo=ci.get("repo"),
                                 release=ci.get("release"),
-                                threadId=o["threadId"],
-                                title=i.get("title"),
                             )
-                        else:
-                            self.ev(t0, role, me, "launch_error", title=i.get("title"))
                     elif tn == "t3_thread_send":
                         to = i.get("threadId")
                         tk = self.key(to)
@@ -798,23 +742,25 @@ class Brigade:
             chef = self.key(v["parent"])
             scope = {int(st.split("#")[1]): st for st in by_chef.get(chef, ())}
             at = launches.get(v["key"]) or ""
-            named = [
-                scope[n]
-                for n in v.get("refs", [])
-                if n in scope and pr_at.get(scope[n], "9") > at
-            ]
-            if named:
-                firsts.setdefault((chef, named[0]), []).append((v["key"], len(named)))
+            first = next(
+                (
+                    scope[n]
+                    for n in v.get("refs", [])
+                    if n in scope and pr_at.get(scope[n], "9") > at
+                ),
+                None,
+            )
+            if first:
+                firsts.setdefault((chef, first), []).append(v["key"])
         for (chef, story), cooks in sorted(firsts.items()):
             if len(cooks) == 1:
                 self.ev(
-                    launches.get(cooks[0][0]),
+                    launches.get(cooks[0]),
                     "github",
-                    cooks[0][0],
+                    cooks[0],
                     "story_assign",
                     story=story,
                     parent=chef,
-                    named=cooks[0][1],
                 )
 
     def scope(
@@ -1028,7 +974,6 @@ def extract(
                 "run_start",
                 "pascal_msg",
                 "send",
-                "rename",
                 "ask_pascal",
             ]
         )

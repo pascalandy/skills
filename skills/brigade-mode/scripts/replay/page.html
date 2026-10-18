@@ -178,7 +178,7 @@ function stateAt(br, t) {
   return st;
 }
 
-// the barrages of each review, from board.json: { 2: ["manic-1", "manic-2"], 3: ["manic-3", "manic-5"] }
+// the barrages of each review: { 2: ["manic-1", "manic-2"], 3: ["manic-3", "manic-5"] }
 const pairs = (br) => br.barrages.reduce((o, b) => ((o[br.barrageStep[b]] ||= []).push(b), o), {});
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const node = (st, id) => st[id] || { s: "todo", step: 0 };
@@ -190,8 +190,10 @@ function cookSteps(br, st, id) {
   const c = node(st, id);
   const implement = c.s === "todo" || !c.step ? "todo" : c.step > 1 ? "done" : c.s;
   const review = (k) => {
-    const b = (pairs(br)[k] || []).map((x) => node(st, `${id}/${x}`).s);
+    const barrages = (pairs(br)[k] || []).map((x) => node(st, `${id}/${x}`));
+    const b = barrages.map((x) => x.s);
     if (b.includes("active")) return "active";
+    if (barrages.some((x) => x.s === "stopped" && x.note !== "skipped" && x.note !== "not run")) return "stopped";
     if (b.length && b.every((x) => x === "stopped")) return "stopped";
     if (b.some((x) => x === "done")) return b.every((x) => x === "done" || x === "stopped") ? "done" : "wait";
     if (c.s === "stopped") return "stopped";
@@ -278,16 +280,10 @@ function runTitle(br, st) {
 
 // what a view gets: helpers only, no state of its own
 const ui = {
-  STATES, dur, localTime, plural,
-  label: (s) => STATES[s].label,
+  plural,
   mark(el, s) { if (el) el.setAttribute("data-st", s); },
-  steps: cookSteps,
-  ship: epicShip,
   say,
-  pairs,
   cooksOf: (br, batch) => batch.cooks.map((id) => ({ id, ...br.cooks[id] })),
-  epicName: (batch) => batch.label, // "Epic 3", as Pascal counts them; "Batch 1" without an Epic
-  epicRef: (batch) => (batch.epic ? batch.epic.ref : ""), // its ticket, such as #151
 };
 
 /*__BOARD__*/
@@ -298,7 +294,7 @@ const sel = () => S.sel.map((id) => BR[id]);
 const domain = () => [Math.min(...sel().map((b) => b.start)), Math.max(...sel().map((b) => b.end))];
 
 function legend() {
-  $("#legend").innerHTML = Object.entries(STATES).map(([k, v]) => `<li><span class="sw" data-st="${k}"></span>${v.label}</li>`).join("")
+  $("#legend").innerHTML = Object.entries(STATES).filter(([k]) => k !== "you").map(([k, v]) => `<li><span class="sw" data-st="${k}"></span>${v.label}</li>`).join("")
     + `<li><span class="sw" data-st="quiet"></span>inside a shipped Epic</li>`;
 }
 
@@ -347,7 +343,7 @@ function head(br) {
   }
   return `<div class="bline" data-b="${br.id}"><article class="ticket" aria-label="Head Chef ${br.id}">
       <p class="t-title" data-title></p>
-      <p class="t-meta">Epics in run order, ${n} Cook${n === 1 ? "" : "s"}, at most ${peak} at once</p>
+      <p class="t-meta">Epics in run order, ${ui.plural(n, "Cook")}, at most ${peak} at once</p>
       <ol class="rail">${br.batches.map((bt) => {
         const face = `<span class="n">${bt.epic && bt.epic.n ? bt.epic.n : "B" + bt.n}</span><span class="ref">${bt.epic ? bt.epic.ref : "no Epic"}</span>`;
         // a public ticket: the whole card opens it on GitHub
@@ -427,10 +423,10 @@ function paint() {
     try { m.paint(states[m.br.id], S.t); }
     catch (e) { console.error(m.v.id, e); }
   }
-  history.replaceState(null, "", `#t=${Math.round(S.t)}&b=${S.sel.join(",")}`);
 }
 
-function seek(t) { const [a, b] = domain(); S.t = Math.min(b, Math.max(a, t)); paint(); }
+function savePosition() { history.replaceState(null, "", `#t=${Math.round(S.t)}&b=${S.sel.join(",")}`); }
+function seek(t, save = true) { const [a, b] = domain(); S.t = Math.min(b, Math.max(a, t)); paint(); if (save) savePosition(); }
 
 function changes() {
   return [...new Set(sel().flatMap((b) => b.frames.map((f) => f[0])))].sort((x, y) => x - y);
@@ -441,7 +437,7 @@ function tick(now) {
   const dt = S.last ? (now - S.last) / 1000 : 0;
   S.last = now;
   const [, b] = domain();
-  seek(S.t + dt * Number($("#speed").value));
+  seek(S.t + dt * Number($("#speed").value), false);
   if (S.t >= b) { setPlaying(false); return; }
   requestAnimationFrame(tick);
 }
@@ -450,6 +446,7 @@ function setPlaying(on) {
   $("#play").textContent = on ? "❚❚" : "▶";
   $("#play").setAttribute("aria-label", on ? "Pause" : "Play");
   if (on) { const [a, b] = domain(); if (S.t >= b) S.t = a; requestAnimationFrame(tick); }
+  else savePosition();
 }
 
 function init() {

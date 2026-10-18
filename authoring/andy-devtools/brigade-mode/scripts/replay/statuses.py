@@ -13,8 +13,6 @@ assert spec is not None and spec.loader is not None
 M = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M)
 
-RELEASE_VERBS = {"just sync-fleet", "gh release create", "just release", "just publish"}
-
 
 def ts(s: str) -> float:
     return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
@@ -210,8 +208,6 @@ def replay(events: list[dict]) -> tuple[dict[str, Brigade], list[dict]]:
             brigades[bid] = Brigade(bid)
             brigades[bid].hc_acts_all = acts[(bid, "hc")]
         b = brigades[bid]
-        if e["kind"] == "rename":
-            continue
         apply(b, e, t, deltas, intervals)
         emit(b, t)
 
@@ -308,7 +304,6 @@ def apply(
             "label": d.get("label"),
             "parent": e["parent"],
             "repo": d.get("repo"),
-            "launched": t,
         }
         deltas.append(
             {
@@ -537,9 +532,12 @@ def apply(
                 "role": role,
                 "sop": d.get("sop"),
                 "round": d.get("round"),
-                "v": {"delegate_start": 1, "delegate_end": 0, "delegate_error": -1}[
-                    kind
-                ],
+                "state": d.get("state"),
+                "v": 1
+                if kind == "delegate_start"
+                else 0
+                if kind == "delegate_end" and d.get("state") == "completed"
+                else -1,
             }
         )
     elif kind == "story_scope":
@@ -568,7 +566,7 @@ def synthetic(events: list[dict]) -> list[dict]:
         if (
             e["kind"] == "cmd"
             and e["role"] == "chef"
-            and set(d.get("verbs", [])) & RELEASE_VERBS
+            and d.get("release")
             and d.get("ok")
             and d.get("end")
         ):

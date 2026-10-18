@@ -351,7 +351,6 @@ def answer_failure(
 
 # <<< cli-block
 
-import html
 import sqlite3
 import subprocess
 import tempfile
@@ -364,7 +363,7 @@ import facts
 
 HERE = Path(__file__).resolve().parent
 LOCAL_PATH = re.compile(
-    r"(?:/home/|/Users/|[A-Za-z]:[\\/]Users[\\/]|~[\\/])[^\s\"'<>]*|[^\s\"'<>]*\.worktrees[^\s\"'<>]*",
+    r"/home/|/Users/|[A-Za-z]:[\\/]Users[\\/]|~[\\/]|\.worktrees",
     re.IGNORECASE,
 )
 
@@ -415,11 +414,7 @@ def github_read(args: list[str], timeout: float) -> dict:
             partial = json.loads(done.stdout)
         except ValueError:
             partial = {}
-        if (
-            partial.get("data")
-            and partial.get("errors")
-            and all(error.get("type") == "NOT_FOUND" for error in partial["errors"])
-        ):
+        if "data" in partial and partial.get("errors"):
             return partial
         message = done.stderr.strip()
         logging.getLogger(__name__).debug("gh %s: %s", shlex.join(args), message)
@@ -437,33 +432,25 @@ def github_read(args: list[str], timeout: float) -> dict:
 
 @contextmanager
 def database(path: str, timeout: float) -> Iterator[sqlite3.Connection]:
-    with tempfile.TemporaryDirectory(prefix="brigade-replay-") as folder:
-        source = Path(path).expanduser().resolve()
-        if path == "-":
-            source = Path(folder) / "stdin.sqlite"
-            source.write_bytes(sys.stdin.buffer.read())
-        try:
-            con = sqlite3.connect(
-                source.as_uri() + "?mode=ro", uri=True, timeout=timeout
-            )
-        except sqlite3.OperationalError as error:
-            raise ScriptError(
-                f"Cannot open T3 database read-only: {source}; rerun with --db PATH pointing to statev2.sqlite"
-            ) from error
-        try:
-            con.execute("pragma query_only=on")
-            con.execute("begin")
-            yield con
-        except sqlite3.OperationalError as error:
-            if "locked" in str(error).lower():
-                raise TemporaryError(
-                    "T3 database is busy; retry this command"
-                ) from error
-            raise ScriptError(
-                f"Cannot read T3 projections: {error}; rerun with --db PATH pointing to a T3 statev2.sqlite database"
-            ) from error
-        finally:
-            con.close()
+    source = Path(path).expanduser().resolve()
+    try:
+        con = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=timeout)
+    except sqlite3.OperationalError as error:
+        raise ScriptError(
+            f"Cannot open T3 database read-only: {source}; rerun with --db PATH pointing to statev2.sqlite"
+        ) from error
+    try:
+        con.execute("pragma query_only=on")
+        con.execute("begin")
+        yield con
+    except sqlite3.OperationalError as error:
+        if "locked" in str(error).lower():
+            raise TemporaryError("T3 database is busy; retry this command") from error
+        raise ScriptError(
+            f"Cannot read T3 projections: {error}; rerun with --db PATH pointing to a T3 statev2.sqlite database"
+        ) from error
+    finally:
+        con.close()
 
 
 def private_label(index: int) -> str:
@@ -500,64 +487,56 @@ def repository_names(
 
 
 def render_page(data: dict, private: Mapping[str, str]) -> str:
-    replacements = {
-        name: alias
-        for repo, alias in private.items()
-        for name in (repo, repo.rsplit("/", 1)[-1])
+    private_names = {
+        name.casefold() for repo in private for name in (repo, repo.rsplit("/", 1)[-1])
     }
 
-    def scrub(value: Any) -> Any:
+    def strings(value: Any) -> Iterator[str]:
         if isinstance(value, str):
-            for name, alias in sorted(
-                replacements.items(), key=lambda pair: -len(pair[0])
-            ):
-                value = re.sub(
-                    re.escape(name),
-                    lambda _match, replacement=alias: replacement,
-                    value,
-                    flags=re.IGNORECASE,
-                )
-            return LOCAL_PATH.sub("[local path]", value)
-        if isinstance(value, list):
-            return [scrub(item) for item in value]
-        if isinstance(value, dict):
-            return {key: scrub(item) for key, item in value.items()}
-        return value
+            yield value
+        elif isinstance(value, list):
+            for item in value:
+                yield from strings(item)
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                yield key
+                yield from strings(item)
+
+    if any(
+        any(name in value.casefold() for name in private_names)
+        or LOCAL_PATH.search(value)
+        or str(Path.home()).casefold() in value.casefold()
+        for value in strings(data)
+    ):
+        raise ScriptError(
+            "Privacy check refused the data; remove private repository names or local paths from the replay data, then rerun"
+        )
 
     payload = json.dumps(
-        scrub(data), ensure_ascii=False, separators=(",", ":"), allow_nan=False
+        data, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     ).replace("<", "\\u003c")
     page = (HERE / "page.html").read_text(encoding="utf-8")
     page = page.replace(
         "/*__BOARD__*/", (HERE / "board.js").read_text(encoding="utf-8")
     )
-    page = page.replace("/*__DATA__*/null", payload)
-    decoded = html.unescape(page).casefold()
-    if (
-        any(name.casefold() in decoded for name in replacements)
-        or LOCAL_PATH.search(decoded)
-        or str(Path.home()).casefold() + "/" in decoded
-    ):
-        raise ScriptError(
-            "Privacy check refused the page; remove repository names or local paths from the source titles, then rerun"
-        )
-    return page
+    return page.replace("/*__DATA__*/null", payload)
 
 
 def work(args: argparse.Namespace) -> dict:
+    if args.db == "-":
+        raise UsageError("--db needs a SQLite file path; stdin is not supported")
     if args.output == "-":
         raise UsageError(
             "--output needs an HTML file path; stdout is reserved for the JSON answer"
         )
     output = Path(args.output).expanduser().resolve()
-    if args.db != "-":
-        source = Path(args.db).expanduser().resolve()
-        if str(output) in {
-            str(source) + suffix for suffix in ("", "-wal", "-shm", "-journal")
-        }:
-            raise UsageError(
-                "--output would overwrite the T3 database; choose a separate HTML file"
-            )
+    source = Path(args.db).expanduser().resolve()
+    if str(output) in {
+        str(source) + suffix for suffix in ("", "-wal", "-shm", "-journal")
+    }:
+        raise UsageError(
+            "--output would overwrite the T3 database; choose a separate HTML file"
+        )
     gh = facts.GitHub(lambda command: github_read(command, args.timeout))
     with database(args.db, args.timeout) as con:
         try:
@@ -600,10 +579,7 @@ def work(args: argparse.Namespace) -> dict:
             raise ScriptError(
                 f"Cannot write {output}: {error}; rerun with --output PATH in a writable directory"
             ) from error
-    result: dict = {"changes": [["write", str(output)]]}
-    if args.dry_run:
-        result["dry_run"] = True
-    return result
+    return {"changes": [["write", str(output)]]}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -622,7 +598,7 @@ examples:
     parser.add_argument(
         "--db",
         default="~/.t3/userdata/statev2.sqlite",
-        help="T3 SQLite database, opened read-only; - reads a SQLite snapshot from stdin (default: %(default)s)",
+        help="T3 SQLite database, opened read-only (default: %(default)s)",
     )
     parser.add_argument(
         "--since",

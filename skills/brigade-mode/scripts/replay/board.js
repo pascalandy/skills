@@ -1,5 +1,5 @@
 const BOARD = {
-  id: "mainline-opus",
+  id: "board",
   mount(el, br, ui) {
     const NS = "http://www.w3.org/2000/svg";
     const add = (parent, tag, attrs = {}, text) => {

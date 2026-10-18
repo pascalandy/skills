@@ -6,8 +6,6 @@ kind: "dev"
 
 # Brigade mode
 
-To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`
-
 ## Pick the route
 
 - For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio Head Chef, Chef or Cook also loads 🧰 oem first; carpaccio's chain and Asking Pascal replace oem's When You Need Me
@@ -28,3 +26,5 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 | [`arancini`](playbooks/arancini/arancini.md) | | The approved CU1: rounds in one Chef, with one Cook per card, then the barrages in order, then closing |
 | [`bisque`](playbooks/bisque/bisque.md) | | The approved CU1, second version: a Head Chef splits the plan into batches, one Chef per batch runs a Cook and delegates the barrages, and the Head Chef green-lights each merge |
 | [`carpaccio`](playbooks/carpaccio/carpaccio.md) | | CU1: a Head Chef aligns batches, Cooks own implementation, docs and delegated reviews, and each Chef validates, merges and closes its batch |
+
+To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`
