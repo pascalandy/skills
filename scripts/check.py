@@ -355,6 +355,8 @@ CHECKS = [
         *ruff(BRIGADE_REPLAY),
         pyright(BRIGADE_REPLAY, python="3.12"),
         pytest(f"{BRIGADE_REPLAY}/tests", parallel=False),
+        # test_page.py opens a recorded page with html-mode's checker (#808)
+        reads=(f"{HTML_MODE}/check_page.py",),
     ),
     Check(
         "distill",
