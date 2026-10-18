@@ -131,7 +131,8 @@ merge `<remote>/<trunk>` into the bottom layer the same way, instead of `sync` o
 ## Land
 
 Land the PRs you were asked to land, from the bottom. Done when `gh pr view <number> --json state`
-prints `MERGED` for each of them.
+prints `MERGED` for each of them and, for each PR merged outside the default branch, you reported
+every issue its closing keywords name that is still open, as the last item below says.
 
 When the bottom PR's base is a branch whose own PR merged outside the stack, retarget the bottom
 PR to the trunk first, in a native stack as the refusals above say.
@@ -149,6 +150,10 @@ PR to the trunk first, in a native stack as the refusals above say.
   once to the top layer. A PR turns `MERGED` when its head on GitHub reaches its base. When the
   stack remains after the unstack, apply the method, then, for each PR still open, bottom to top,
   run `git push <remote> <layer>:refs/heads/<layer below>`, a fast-forward that marks it merged
+  into the layer below. GitHub ignores the closing keywords of a PR whose base is not the default
+  branch, so list the issues each such PR body names with a closing keyword, as `#N` in the PR's
+  repository or `owner/repo#N`, check each with `gh issue view <N> -R <owner/repo> --json state`,
+  and report every one still open with its PR
 
 ## Recovery
 
