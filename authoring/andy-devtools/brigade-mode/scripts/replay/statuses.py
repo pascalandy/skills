@@ -30,13 +30,13 @@ class Brigade:
         self.chef_cooks = defaultdict(list)  # chef -> [cook keys]
         self.batches = {}  # b -> {"registered": t, "chef": key|None}
         self.hc = {"pm_item": False, "own": False, "stop": False}
-        self.asks = []  # open items: "merge" | "item"
+        self.asks = []  # ask_pascal item labels, including "left" and "question"
         self.asked_review = set()  # chefs whose 🍽️ went to Pascal
         self.escalated = set()  # chefs whose ⏸️ went to Pascal
         self.first_launch: float | None = None
-        self.own_until = 0.0  # end of the HC run that handles Pascal's last message
+        self.own_until = 0.0  # ownership ends at the next Head Chef act or the reply-handling turn's end
         self.closed = False  # HC settled itself after every batch went final
-        self.prs = {}  # pr -> {"cook", "open", "merged", "closed"}
+        self.prs = {}  # (pr, story) -> ownership, scope and PR lifecycle timestamps
         self.release_end = {}  # chef -> time its release command ended
         self.active = {}  # key -> open run count
         self.started = False  # the Head Chef exists once Pascal's first message arrives
@@ -46,7 +46,7 @@ class Brigade:
         self.stories = {}  # story -> Epic, batch, pre-run completion and assigned Cook
         self.planned = defaultdict(
             dict
-        )  # chef -> {watch.toml field: Cook slots registered, not launched}
+        )  # chef -> {watch.toml field: registered Cook slots}
         self.item_since = {}  # PR refs of an open item -> when the Head Chef first asked it
         self.carry, self.carry_until = (
             {},
@@ -135,7 +135,7 @@ class Brigade:
                 "pm_item"
             ]  # Align: the Head Chef's own work until it launches
         if now < self.own_until:
-            return True  # handles Pascal's message until its next act
+            return True  # handles Pascal's message until its next act or turn end
         live = [k for k in kinds if k not in M.CHEF_FINAL and k != "queued"]
         if (
             "queued" in kinds
@@ -271,7 +271,7 @@ def apply(
             else:
                 own = True
         irefs = d.get("irefs") or [[] for _ in d.get("items", [])]
-        # open items: (label, refs); an own item keeps the Head Chef at ❓ until answered
+        # an own item keeps the Head Chef at ❓ until answered
         b.open_items = [
             (i, frozenset(r), i != "merge" or not ready)
             for i, r in zip(d.get("items", []), irefs)
@@ -462,9 +462,7 @@ def apply(
         )
         if kind == "pr_open":
             p["open"] = t
-            if (
-                e["story"] not in b.stories
-            ):  # a PR without an issue is its own Story, committed when its Cook launched
+            if e["story"] not in b.stories:
                 bn = int(p["chef"].split("-")[1].split("#")[0]) if p["chef"] else None
                 b.stories[e["story"]] = {
                     "epic": e["epic"],
@@ -476,7 +474,7 @@ def apply(
             p["merged"] = t
             ch = p["chef"]
             if ch in b.chef and not b.chef[ch]["f"]["merge"]:
-                # no approval reached the Chef: Pascal merged it himself, which approves it
+                # A merge without recorded approval supplies authorization and passing checks.
                 b.chef[ch]["f"]["merge"] = b.chef[ch]["f"]["checks"] = True
                 b.chef[ch]["auth"] = t
                 deltas.append(

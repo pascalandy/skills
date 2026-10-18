@@ -84,7 +84,10 @@ class Board:
                 " + ".join(sorted(run.values())),
             )  # the Cook stands by, its checks work
         elif state == "active" and key not in self.live:
-            state, note = "wait", "idle"  # green means a turn or a delegate runs now
+            state, note = (
+                "wait",
+                "idle",
+            )  # green is reserved for the Cook's own turn intervals
         elif state == "wait":
             note = "question to its Chef"
         elif state == "done":
@@ -240,9 +243,7 @@ def shape(
                 },
             )
     for slots in planned.values():
-        for (
-            s
-        ) in slots:  # planned in watch.toml, never launched: a gray cell all run long
+        for s in slots:  # keep registered slots visible even if they never launch
             cooks.setdefault(
                 s,
                 {
@@ -329,7 +330,7 @@ def progress_events(events: list[dict], bid: str) -> list[dict]:
 
 
 def turns(deltas: list[dict], grace: float = 120) -> list[dict]:
-    """Each Cook's T3 turns, gaps under `grace` seconds joined, as cookrun deltas."""
+    """Each Cook's T3 turns, gaps up to `grace` seconds joined, as cookrun deltas."""
     spans = defaultdict(list)
     for d in deltas:
         if d["k"] == "run" and d["th"].startswith("cook-"):

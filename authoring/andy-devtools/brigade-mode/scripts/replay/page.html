@@ -86,7 +86,7 @@ main section { padding: 1.5rem 0 0; display: grid; grid-template-columns: minmax
 .run { display: grid; gap: 0.5rem; }
 .run > .panel { margin-top: 1rem; }
 main section > * { min-width: 0; } /* a wide drawing scrolls inside its panel, never past the screen */
-.panel { overflow-x: auto; max-width: 100%; min-width: 0; } /* the view draws its own cards; the checker fails a panel that scrolls sideways */
+.panel { overflow-x: auto; max-width: 100%; min-width: 0; }
 .panel svg { max-width: none; }
 .err { color: #ff8a8a; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.8rem; }
 
@@ -108,7 +108,7 @@ main section > * { min-width: 0; } /* a wide drawing scrolls inside its panel, n
 .ticket [data-st="stopped"] { background: repeating-linear-gradient(135deg, #e2e1da 0 6px, #cfcec6 6px 8px); color: var(--paper-2); border-color: #a9a8a0; }
 .ticket .t-now { font-size: 1rem; }
 .ticket .t-you { font-weight: 700; color: #a3221f; }
-/* the board sits under the ticket: its changing lines keep their room, so the board never jumps */
+/* reserve space for changing ticket text above the board */
 .ticket .t-now, .ticket .t-you { min-height: 1lh; }
 @media (max-width: 40rem) { .ticket .t-now, .ticket .t-you { min-height: 2lh; } }
 .strip-label { color: var(--muted); font-size: 0.875rem; }
@@ -152,7 +152,6 @@ code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 <script>
 "use strict";
 const DATA = /*__DATA__*/null;
-// the six states: a color each in the CSS, a word each for the legend and the hover text
 const STATES = {
   todo: { label: "to do" },
   active: { label: "working" },
@@ -184,8 +183,8 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const node = (st, id) => st[id] || { s: "todo", step: 0 };
 const held = (x, t) => (x.s !== "todo" && Number.isFinite(x.since) ? ` · for ${dur(t - x.since)}` : "");
 
-// a Cook's three cells: Implement, Review 1/2, Review 2/2. A review shows its barrages only:
-// green while one runs, blue once they finished, hatched when skipped. Ship belongs to the Epic
+// Cook cells show Implement and both reviews; Ship is shared at batch level.
+// Recorded barrage outcomes take precedence over the Cook's inferred review progress.
 function cookSteps(br, st, id) {
   const c = node(st, id);
   const implement = c.s === "todo" || !c.step ? "todo" : c.step > 1 ? "done" : c.s;
@@ -212,12 +211,12 @@ function stackShip(br, st, id) {
   return node(st, `batch-${br.cooks[id].batch}`).note === "shipping" ? "active" : "wait";
 }
 
-// the Epic's Ship: one per Epic. Green while its Chef ships, blue once every stack is in main,
-// yellow while a stack waits or only part shipped. shipped/of count the stacks
+// This batch's Ship mark summarizes its Cook stacks; shipped/of count stacks
+// after excluding stopped ones
 function epicShip(br, st, batch) {
   const b = node(st, batch.id);
   const ss = batch.cooks.map((id) => stackShip(br, st, id));
-  const real = ss.filter((x) => x !== "stopped"); // a stopped stack has nothing to ship
+  const real = ss.filter((x) => x !== "stopped");
   const shipped = real.filter((x) => x === "done").length;
   let s = "todo";
   if (b.note === "shipping" || ss.includes("active")) s = "active";
@@ -227,8 +226,8 @@ function epicShip(br, st, batch) {
   return { s, shipped, of: real.length };
 }
 
-// An Epic is done once every stack is in main. A done Epic shows one blue mark at its own level;
-// everything inside it, Cooks, steps and Ship, turns "quiet" so the done part of the run reads at a glance
+// A batch completes when its counted stacks ship, or its Chef is done with none to ship
+// Mute completed contents so the batch's blue mark carries completion
 function epicState(br, st, batch) {
   const b = node(st, batch.id), ship = epicShip(br, st, batch);
   if (ship.s === "done" || (b.s === "done" && ship.s === "stopped")) return "done";
@@ -238,8 +237,8 @@ function epicState(br, st, batch) {
 const quiet = (br, st, batch, s) => (epicState(br, st, batch) === "done" ? "quiet" : s);
 const batchOf = (br, id) => br.batches.find((b) => b.cooks.includes(id));
 
-// What a view shows of each mark. The color carries the state: a view writes names, Story counts and
-// step titles, never a state word or a glyph. Every word of state lives in `tip`, the hover text
+// Views render names, Story counts and step icons. Textual state descriptions live
+// in `tip` for hover text; `s` selects the state color
 const say = {
   // { s, name: "Epic 5", ref: "#183", tip }
   epic(br, st, batch, t) {
@@ -305,7 +304,7 @@ function picker() {
     btn.type = "button"; btn.textContent = b.id; btn.dataset.b = b.id;
     btn.addEventListener("click", () => {
       const on = S.sel.includes(b.id);
-      if (on && S.sel.length === 1) return; // one Head Chef at least
+      if (on && S.sel.length === 1) return;
       S.sel = on ? S.sel.filter((x) => x !== b.id) : DATA.brigades.map((x) => x.id).filter((x) => x === b.id || S.sel.includes(x));
       mountAll(); seek(S.t);
     });
@@ -346,7 +345,6 @@ function head(br) {
       <p class="t-meta">Epics in run order, ${ui.plural(n, "Cook")}, at most ${peak} at once</p>
       <ol class="rail">${br.batches.map((bt) => {
         const face = `<span class="n">${bt.epic && bt.epic.n ? bt.epic.n : "B" + bt.n}</span><span class="ref">${bt.epic ? bt.epic.ref : "no Epic"}</span>`;
-        // a public ticket: the whole card opens it on GitHub
         return `<li data-batch="${bt.id}">${bt.epic && bt.epic.url ? `<a class="card" href="${bt.epic.url}" target="_blank" rel="noopener" aria-label="${bt.label}, ticket ${bt.epic.ref} on GitHub">${face}</a>` : `<span class="card">${face}</span>`}</li>`;
       }).join("")}</ol>
       <p class="t-now" data-now></p><p class="t-you" data-you></p></article>

@@ -89,7 +89,7 @@ def classify(text: str, src: str, dst: str) -> str:
     """Message kind, per carpaccio's Messages table.
 
     A handoff counts on any line, since a Cook may put a 📍 line before its
-    🍽️ Stack ready block; everything else reads the first line only."""
+    🍽️ Stack ready block. Most other kinds use the first line only."""
     lines, fenced = [], False
     for ln in (text or "").strip().splitlines():
         if ln.strip().startswith("```"):
@@ -153,8 +153,9 @@ def ask_items(text: str) -> tuple[list[str], list[list[str]]]:
     """Items a Head Chef leaves for Pascal at the end of a message.
 
     carpaccio writes `🙋 <label> ...` lines; older routes wrote a `❓ Pour toi :`
-    or `En attente de ta réponse :` block of numbered lines. Each item is
-    returned as `merge` when it asks for a merge or a batch review, else `item`.
+    or `En attente de ta réponse :` block of numbered lines. Items return
+    `merge` for merge or review requests, `item` otherwise, and `left` for
+    final-report "Reste pour toi" entries.
     """
     out, refs, in_code, block = [], [], False, False
     for ln in (text or "").splitlines():
@@ -218,8 +219,8 @@ class Brigade:
             str, dict
         ] = {}  # threadId -> {key, role, parent, label, repo}
         self.events: list[dict] = []
-        self.prs: dict[tuple[str, int], dict] = {}  # (repo, n) -> {cook, opened_by}
-        self.batch_refs: dict[int, dict] = {}  # batch -> {repo, refs, time, how}
+        self.prs: dict[tuple[str, int], dict] = {}  # (repo, n) -> {by, at}
+        self.batch_refs: dict[int, dict] = {}  # batch -> {repo, refs, time}
 
     def q(self, sql: str, *args: object) -> list:
         return self.con.execute(sql, args).fetchall()
@@ -349,7 +350,7 @@ class Brigade:
 
     def t3(self) -> None:
         self.threads_by_key = {v["key"]: v["role"] for v in self.threads.values()}
-        delegates = []  # (thread, d)
+        delegates = []
         for tid, info in self.threads.items():
             me, role = info["key"], info["role"]
             parent = self.key(info["parent"]) if info["parent"] else None
@@ -644,7 +645,7 @@ class Brigade:
                             pr=f"{repo}#{n}",
                             action="closed",
                         )
-        # Scope: a batch names Stories or an Epic; an Epic brings every sub-issue.
+        # Scope uses explicit Stories, or an Epic's sub-issues when no Stories are named.
         launches = {
             e["thread"]: e["time"] for e in self.events if e["kind"] == "launch"
         }
@@ -690,7 +691,7 @@ class Brigade:
                                 ep,
                                 b,
                             )
-        # A Story found only through a PR, or a PR without an issue, joins the scope when its batch did
+        # Unscoped PR Stories use the earliest batch-registration, Chef-launch, or PR-open time.
         regs_t = {}
         for e in self.events:
             if e["kind"] == "batch_register":
