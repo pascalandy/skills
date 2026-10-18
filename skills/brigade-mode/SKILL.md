@@ -6,6 +6,8 @@ kind: "dev"
 
 # Brigade mode
 
+To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`
+
 ## Pick the route
 
 - For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio Head Chef, Chef or Cook also loads 🧰 oem first; carpaccio's chain and Asking Pascal replace oem's When You Need Me

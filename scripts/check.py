@@ -212,6 +212,7 @@ PELE = "authoring/andy/pele/scripts"
 POTETO_MODE = "authoring/poteto/poteto-mode/scripts"
 HEADLESS = "authoring/andy-devtools/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
+BRIGADE_REPLAY = "authoring/andy-devtools/brigade-mode/scripts/replay"
 COREY_MODE = "authoring/corey-mode/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
 # Every compiled skill, so a new skill is validated without a new row
@@ -348,6 +349,12 @@ CHECKS = [
         pyright(COREY_MODE),
         pytest(f"{COREY_MODE}/tests"),
         uv_run(f"{COREY_MODE}/update_corey_mode.py", "check"),
+    ),
+    Check(
+        "brigade-replay",
+        *ruff(BRIGADE_REPLAY),
+        pyright(BRIGADE_REPLAY, python="3.12"),
+        pytest(f"{BRIGADE_REPLAY}/tests", parallel=False, python="3.12"),
     ),
     Check(
         "distill",

@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14171a">
+<title>Brigade replay</title>
+<meta name="description" content="Replay brigade Epics, Cooks, reviews and shipping from T3 Code and GitHub.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Crect x='5' y='6' width='9' height='9' rx='2' fill='%233987e5'/%3E%3Crect x='18' y='6' width='9' height='9' rx='2' fill='%23199e70'/%3E%3Crect x='5' y='18' width='9' height='9' rx='2' fill='%23c98500'/%3E%3Crect x='18' y='18' width='9' height='9' rx='2' fill='%23444'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: dark;
+  /* brushed steel of a kitchen pass, and the paper of an order ticket */
+  --bg: #14171a; --surface: #1b1f23; --surface-2: #23282d; --ink: #ecebe6; --ink-2: #bcbfbb; --muted: #949893;
+  --line: #2c3238; --axis: #3a4148; --focus: #8caaee; --r: 6px;
+  --paper: #efeee8; --paper-ink: #16191c; --paper-2: #5b6066;
+  /* the six states: one vocabulary for every view */
+  --todo: #262624; --todo-line: #6b6a64;
+  --active: #199e70; --wait: #c98500; --done: #3987e5; --you: #d03b3b; --stop: #6b6a64;
+  --on-color: #0b0b0a;
+  /* inside a shipped Epic: pale gray, filled and borderless, so it never reads as an empty to-do box */
+  --quiet: #3a3f45; --quiet-line: #3a3f45; --quiet-ink: #b9bdc1;
+  --font: system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--ink); font: 1rem/1.6 var(--font); -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; } /* a scrollbar that appears never narrows a view after it laid out */
+body { margin: 0; }
+h1 { font-size: 1rem; font-weight: 700; color: var(--ink-2); line-height: 1.15; margin: 0; }
+p { text-wrap: pretty; margin: 0; }
+a { color: var(--focus); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wrap { max-width: 90rem; margin: 0 auto; padding: 0 1rem; }
+header.top { padding: 1.5rem 0 1rem; display: grid; gap: 0.5rem; }
+
+/* states, in SVG and in HTML */
+svg :not(text)[data-st] { transition: fill 220ms, stroke 220ms; }
+svg :not(text)[data-st="todo"] { fill: var(--todo); stroke: var(--todo-line); }
+svg :not(text)[data-st="active"] { fill: var(--active); stroke: var(--active); }
+svg :not(text)[data-st="wait"] { fill: var(--wait); stroke: var(--wait); }
+svg :not(text)[data-st="done"] { fill: var(--done); stroke: var(--done); }
+svg :not(text)[data-st="you"] { fill: var(--you); stroke: var(--you); }
+svg :not(text)[data-st="stopped"] { fill: url(#st-hatch); stroke: var(--stop); stroke-dasharray: 4 3; }
+svg :not(text)[data-st="quiet"] { fill: var(--quiet); stroke: var(--quiet-line); }
+/* a step icon: the badge is any marked shape; its .glyph lines take the ink that reads on that state */
+svg .glyph[data-st] { fill: none; stroke: var(--on-color); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: stroke 220ms; }
+svg .glyph[data-st="todo"], svg .glyph[data-st="stopped"] { stroke: var(--ink-2); }
+svg .glyph[data-st="quiet"] { stroke: var(--quiet-ink); }
+svg .glyph[data-st="you"] { stroke: #fff; }
+svg .glyph-fill[data-st] { fill: var(--on-color); stroke: none; transition: fill 220ms; }
+svg .glyph-fill[data-st="todo"], svg .glyph-fill[data-st="stopped"] { fill: var(--ink-2); }
+svg .glyph-fill[data-st="quiet"] { fill: var(--quiet-ink); }
+svg .glyph-fill[data-st="you"] { fill: #fff; }
+svg text[data-st], svg tspan[data-st] { fill: var(--on-color); transition: fill 220ms; }
+svg text[data-st="todo"], svg text[data-st="stopped"], svg tspan[data-st="todo"], svg tspan[data-st="stopped"] { fill: var(--ink-2); }
+svg text[data-st="quiet"], svg tspan[data-st="quiet"] { fill: var(--quiet-ink); }
+svg text[data-st="you"], svg tspan[data-st="you"] { fill: #fff; } /* dark ink on red stays under 4.5:1 */
+:not(svg *)[data-st] { transition: background-color 220ms, color 220ms, border-color 220ms; }
+:not(svg *)[data-st="todo"] { background: var(--todo); color: var(--ink-2); border-color: var(--todo-line); }
+:not(svg *)[data-st="active"] { background: var(--active); color: var(--on-color); border-color: var(--active); }
+:not(svg *)[data-st="wait"] { background: var(--wait); color: var(--on-color); border-color: var(--wait); }
+:not(svg *)[data-st="done"] { background: var(--done); color: var(--on-color); border-color: var(--done); }
+:not(svg *)[data-st="you"] { background: var(--you); color: #fff; border-color: var(--you); }
+:not(svg *)[data-st="stopped"] { background: repeating-linear-gradient(135deg, #1b1b19 0 6px, #2c2c2a 6px 8px); color: var(--muted); border-color: var(--stop); border-style: dashed; }
+:not(svg *)[data-st="quiet"] { background: var(--quiet); color: var(--quiet-ink); border-color: var(--quiet-line); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.9rem; color: var(--ink-2); padding: 0; margin: 0; list-style: none; }
+.legend li { display: flex; align-items: center; gap: 0.4rem; }
+.legend .sw { display: inline-block; width: 1.6rem; height: 1.1rem; border-radius: 4px; border: 1px solid; }
+
+/* the shared scrubber */
+.bar { position: sticky; top: 0; z-index: 5; background: rgba(20,23,26,.95); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+.bar .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+#pick { flex: 1 1 22rem; min-width: 0; } /* the Head Chef chips scroll on a phone */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.15rem; min-width: 11ch; }
+button, select { font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--axis); border-radius: var(--r); min-height: 44px; min-width: 44px; padding: 0 0.75rem; cursor: pointer; touch-action: manipulation; }
+button[aria-pressed="true"] { background: #1d3a2f; border-color: var(--active); }
+@media (hover: hover) { button:hover { border-color: var(--ink-2); } }
+.chips { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; align-items: center; }
+.chips > * { flex: none; white-space: nowrap; font-size: 0.875rem; }
+.chips .lbl { color: var(--muted); }
+input[type=range] { width: 100%; min-height: 44px; accent-color: var(--active); background: transparent; }
+
+main section { padding: 1.5rem 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; scroll-margin-top: 9rem; }
+.run { display: grid; gap: 0.5rem; }
+.run > .panel { margin-top: 1rem; }
+main section > * { min-width: 0; } /* a wide drawing scrolls inside its panel, never past the screen */
+.panel { overflow-x: auto; max-width: 100%; min-width: 0; } /* the view draws its own cards; the checker fails a panel that scrolls sideways */
+.panel svg { max-width: none; }
+.err { color: #ff8a8a; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+
+/* Cooks on the job: one strip per brigade */
+.bline { display: grid; gap: 0.5rem; }
+/* the order ticket: the one loud thing on the page */
+.ticket { background: var(--paper); color: var(--paper-ink); padding: 1rem 1.25rem 1.4rem; border-radius: 2px; max-width: 60rem;
+  -webkit-mask: radial-gradient(circle 6px at 50% 100%, #0000 98%, #000) 50% 100% / 18px 100%; mask: radial-gradient(circle 6px at 50% 100%, #0000 98%, #000) 50% 100% / 18px 100%; }
+.ticket .t-title { font-weight: 700; font-size: 1.25rem; line-height: 1.3; }
+.ticket .t-meta { color: var(--paper-2); font-size: 0.9rem; }
+.rail { list-style: none; margin: 0.75rem 0 0.6rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.rail li { min-width: 3.6rem; border: 2px solid transparent; border-radius: 4px; }
+.rail .card { display: grid; justify-items: center; padding: 0.35rem 0.5rem 0.3rem; color: inherit; text-decoration: none; }
+.rail .n { font-size: 2.4rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.rail .ref { font-size: 0.8rem; }
+.rail a.card .ref { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.rail a.card:focus-visible { outline: 2px solid var(--paper-ink); outline-offset: 2px; }
+.ticket [data-st="todo"] { background: transparent; color: var(--paper-2); border-color: #c4c3bb; }
+.ticket [data-st="stopped"] { background: repeating-linear-gradient(135deg, #e2e1da 0 6px, #cfcec6 6px 8px); color: var(--paper-2); border-color: #a9a8a0; }
+.ticket .t-now { font-size: 1rem; }
+.ticket .t-you { font-weight: 700; color: #a3221f; }
+/* the board sits under the ticket: its changing lines keep their room, so the board never jumps */
+.ticket .t-now, .ticket .t-you { min-height: 1lh; }
+@media (max-width: 40rem) { .ticket .t-now, .ticket .t-you { min-height: 2lh; } }
+.strip-label { color: var(--muted); font-size: 0.875rem; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.strip { width: 100%; height: 56px; display: block; cursor: crosshair; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.strip .cur { stroke: var(--ink); stroke-width: 2; }
+.readout { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+footer { padding: 2.5rem 0 3rem; color: var(--muted); font-size: 0.85rem; }
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="st-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#1b1b19"/><rect width="2" height="8" fill="#3a3a37"/></pattern>
+</defs></svg>
+<div class="wrap"><header class="top">
+  <h1>Brigade replay</h1>
+  <ul class="legend" id="legend" aria-label="States"></ul>
+</header></div>
+
+<div class="bar" role="region" aria-label="Time scrubber"><div class="wrap">
+  <div class="row">
+    <button type="button" id="play" aria-label="Play">▶</button>
+    <button type="button" id="prev" aria-label="Previous change">◀︎</button>
+    <button type="button" id="next" aria-label="Next change">▶︎</button>
+    <div class="clock" id="clock" aria-live="off"></div>
+    <label class="chips"><span class="lbl">Speed</span>
+      <select id="speed" aria-label="Replay speed">
+        <option value="60">1 min / s</option><option value="120" selected>2 min / s</option><option value="180">3 min / s</option><option value="240">4 min / s</option><option value="300">5 min / s</option><option value="360">6 min / s</option><option value="420">7 min / s</option><option value="480">8 min / s</option><option value="540">9 min / s</option><option value="600">10 min / s</option><option value="3600">1 h / s</option><option value="10800">3 h / s</option>
+      </select></label>
+    <div class="chips" id="pick" role="group" aria-label="Head Chefs to show"><span class="lbl">Head Chefs</span></div>
+  </div>
+  <input type="range" id="t" min="0" max="1000" value="0" step="1" aria-label="Replay time">
+</div></div>
+
+<main class="wrap">
+  <div id="views"></div>
+  <footer><p id="gen"></p></footer>
+</main>
+
+<script>
+"use strict";
+const DATA = /*__DATA__*/null;
+// the six states: a color each in the CSS, a word each for the legend and the hover text
+const STATES = {
+  todo: { label: "to do" },
+  active: { label: "working" },
+  wait: { label: "stands by" },
+  done: { label: "done" },
+  stopped: { label: "not done in this run" },
+  you: { label: "waits on you" },
+};
+const BR = Object.fromEntries(DATA.brigades.map((b) => [b.id, b]));
+const $ = (s) => document.querySelector(s);
+const dur = (s) => { const m = Math.max(0, Math.floor(s / 60)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`; };
+const localTime = (t) => new Date(t * 1000).toLocaleString("en-CA", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
+
+// state of every node at t: { id: { s, step, note, since } }; since = when this state began
+// (a frame's sixth field when the wait began before its frame, such as a question asked again)
+function stateAt(br, t) {
+  const st = {};
+  for (const f of br.frames) {
+    if (f[0] > t) break;
+    const prev = st[f[1]];
+    st[f[1]] = { s: f[2], step: f[3], note: f[4], since: f[5] ?? (prev && prev.s === f[2] ? prev.since : f[0]) };
+  }
+  return st;
+}
+
+// the barrages of each review, from board.json: { 2: ["manic-1", "manic-2"], 3: ["manic-3", "manic-5"] }
+const pairs = (br) => br.barrages.reduce((o, b) => ((o[br.barrageStep[b]] ||= []).push(b), o), {});
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const node = (st, id) => st[id] || { s: "todo", step: 0 };
+const held = (x, t) => (x.s !== "todo" && Number.isFinite(x.since) ? ` · for ${dur(t - x.since)}` : "");
+
+// a Cook's three cells: Implement, Review 1/2, Review 2/2. A review shows its barrages only:
+// green while one runs, blue once they finished, hatched when skipped. Ship belongs to the Epic
+function cookSteps(br, st, id) {
+  const c = node(st, id);
+  const implement = c.s === "todo" || !c.step ? "todo" : c.step > 1 ? "done" : c.s;
+  const review = (k) => {
+    const b = (pairs(br)[k] || []).map((x) => node(st, `${id}/${x}`).s);
+    if (b.includes("active")) return "active";
+    if (b.length && b.every((x) => x === "stopped")) return "stopped";
+    if (b.some((x) => x === "done")) return b.every((x) => x === "done" || x === "stopped") ? "done" : "wait";
+    if (c.s === "stopped") return "stopped";
+    return c.step > k ? "done" : "todo";
+  };
+  return [implement, review(2), review(3)];
+}
+
+// one Cook's stack: yellow once the Cook is done, green while its Chef ships, blue once in main
+function stackShip(br, st, id) {
+  const c = node(st, id);
+  if (c.s === "stopped") return "stopped";
+  if (c.s !== "done") return "todo";
+  if (c.note === "shipped") return "done";
+  if (c.note === "nothing to ship") return "stopped";
+  return node(st, `batch-${br.cooks[id].batch}`).note === "shipping" ? "active" : "wait";
+}
+
+// the Epic's Ship: one per Epic. Green while its Chef ships, blue once every stack is in main,
+// yellow while a stack waits or only part shipped. shipped/of count the stacks
+function epicShip(br, st, batch) {
+  const b = node(st, batch.id);
+  const ss = batch.cooks.map((id) => stackShip(br, st, id));
+  const real = ss.filter((x) => x !== "stopped"); // a stopped stack has nothing to ship
+  const shipped = real.filter((x) => x === "done").length;
+  let s = "todo";
+  if (b.note === "shipping" || ss.includes("active")) s = "active";
+  else if (real.length && shipped === real.length) s = "done";
+  else if (b.note === "ready to ship" || real.some((x) => x === "wait" || x === "done")) s = "wait";
+  else if (b.s === "stopped" || (!real.length && (ss.length || b.s === "done"))) s = "stopped";
+  return { s, shipped, of: real.length };
+}
+
+// An Epic is done once every stack is in main. A done Epic shows one blue mark at its own level;
+// everything inside it, Cooks, steps and Ship, turns "quiet" so the done part of the run reads at a glance
+function epicState(br, st, batch) {
+  const b = node(st, batch.id), ship = epicShip(br, st, batch);
+  if (ship.s === "done" || (b.s === "done" && ship.s === "stopped")) return "done";
+  if (b.s === "done") return ship.s === "todo" ? "wait" : ship.s; // its Chef finished, its stacks wait to ship
+  return b.s;
+}
+const quiet = (br, st, batch, s) => (epicState(br, st, batch) === "done" ? "quiet" : s);
+const batchOf = (br, id) => br.batches.find((b) => b.cooks.includes(id));
+
+// What a view shows of each mark. The color carries the state: a view writes names, Story counts and
+// step titles, never a state word or a glyph. Every word of state lives in `tip`, the hover text
+const say = {
+  // { s, name: "Epic 5", ref: "#183", tip }
+  epic(br, st, batch, t) {
+    const b = node(st, batch.id), s = epicState(br, st, batch), n = batch.cooks.length;
+    const done = batch.cooks.filter((id) => node(st, id).s === "done").length;
+    const word = s === "done" ? "shipped" : b.note === "question" ? "stands by · question" : b.note || STATES[s].label;
+    return { s, name: batch.label, ref: batch.epic ? batch.epic.ref : "", tip: `${batch.label}${batch.epic ? " " + batch.epic.ref : ""} · ${word} · ${n ? `${done}/${n} ${n === 1 ? "Cook" : "Cooks"} done` : "no Cook"}${held(b, t)}` };
+  },
+  // { s, name: "Cook 2.1", stories: "5 Stories", tip }
+  cook(br, st, id, t) {
+    const c = node(st, id), k = br.cooks[id];
+    const word = c.s === "todo" ? "to do" : c.s === "active" ? br.steps[c.step - 1] || "working"
+      : c.s === "wait" ? `stands by · ${c.note || "idle"}` : c.s === "done" ? "done" : c.note || "not done";
+    const stories = plural(k.stories.length, "Story", "Stories");
+    return { s: quiet(br, st, batchOf(br, id), c.s), name: k.label, stories, tip: `${k.label} · ${word} · ${stories}, ${plural(k.prs, "PR")}${held(c, t)}` };
+  },
+  // step 1, 2 or 3 of a Cook: { s, title: "Implement" | "Review 1/2" | "Review 2/2", tip }
+  step(br, st, id, k, t) {
+    const s = cookSteps(br, st, id)[k - 1], title = br.steps[k - 1], c = node(st, id);
+    const what = k === 1 ? STATES[s].label : (pairs(br)[k] || []).map((x) => { const b = node(st, `${id}/${x}`); return `${x} ${b.s === "todo" ? "to do" : b.note || STATES[b.s].label}`; }).join(", ");
+    return { s: quiet(br, st, batchOf(br, id), s), title, tip: `${br.cooks[id].label} · ${title} · ${what}${k === 1 && s !== "done" ? held(c, t) : ""}` };
+  },
+  // the Epic's one Ship: { s, title: "Ship", tip: "Epic 5 · Ship · 1 of 2 stacks shipped" }
+  ship(br, st, batch, t) {
+    const x = epicShip(br, st, batch), b = node(st, batch.id);
+    const what = !x.of ? "nothing to ship" : x.of === 1 ? (x.shipped ? "shipped" : x.s === "active" ? "shipping" : x.s === "wait" ? "ready to ship" : "to do") : `${x.shipped} of ${x.of} stacks shipped`;
+    return { s: quiet(br, st, batch, x.s), title: br.steps[3], tip: `${batch.label} · ${br.steps[3]} · ${what}${x.s === "active" || x.s === "wait" ? held(b, t) : ""}` };
+  },
+};
+
+// The count is of shipped Epics, so the title and the blue marks always agree
+function runTitle(br, st) {
+  const names = [...new Set(br.batches.map((b) => b.label))];
+  const shipped = names.filter((n) => br.batches.filter((b) => b.label === n).every((b) => epicState(br, st, b) === "done")).length;
+  const noun = br.batches.every((b) => b.epic) ? "Epic" : "batch";
+  return `${br.repos.join(" and ")} · ${plural(names.length, noun, noun === "Epic" ? "Epics" : "batches")} · Head Chef ${br.id} · ${shipped}/${names.length}`;
+}
+
+// what a view gets: helpers only, no state of its own
+const ui = {
+  STATES, dur, localTime, plural,
+  label: (s) => STATES[s].label,
+  mark(el, s) { if (el) el.setAttribute("data-st", s); },
+  steps: cookSteps,
+  ship: epicShip,
+  say,
+  pairs,
+  cooksOf: (br, batch) => batch.cooks.map((id) => ({ id, ...br.cooks[id] })),
+  epicName: (batch) => batch.label, // "Epic 3", as Pascal counts them; "Batch 1" without an Epic
+  epicRef: (batch) => (batch.epic ? batch.epic.ref : ""), // its ticket, such as #151
+};
+
+/*__BOARD__*/
+
+// ---------------------------------------------------------------- shell
+const S = { sel: DATA.brigades.length ? [DATA.brigades[DATA.brigades.length - 1].id] : [], t: 0, playing: false, last: 0, mounted: [] };
+const sel = () => S.sel.map((id) => BR[id]);
+const domain = () => [Math.min(...sel().map((b) => b.start)), Math.max(...sel().map((b) => b.end))];
+
+function legend() {
+  $("#legend").innerHTML = Object.entries(STATES).map(([k, v]) => `<li><span class="sw" data-st="${k}"></span>${v.label}</li>`).join("")
+    + `<li><span class="sw" data-st="quiet"></span>inside a shipped Epic</li>`;
+}
+
+function picker() {
+  const box = $("#pick");
+  for (const b of DATA.brigades) {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.textContent = b.id; btn.dataset.b = b.id;
+    btn.addEventListener("click", () => {
+      const on = S.sel.includes(b.id);
+      if (on && S.sel.length === 1) return; // one Head Chef at least
+      S.sel = on ? S.sel.filter((x) => x !== b.id) : DATA.brigades.map((x) => x.id).filter((x) => x === b.id || S.sel.includes(x));
+      mountAll(); seek(S.t);
+    });
+    box.append(btn);
+  }
+}
+
+
+function summary(br, st, t) {
+  if (t < br.start) return { text: `Starts in ${dur(br.start - t)}.`, you: "" };
+  const cooks = Object.keys(br.cooks).map((id) => (st[id] || {}).s || "todo");
+  const n = (s) => cooks.filter((x) => x === s).length;
+  const hc = st.hc || {};
+  if (br.final && t >= br.end) return { text: `Run ${br.final === "done" ? "over" : "stopped"}: ${n("done")} of ${cooks.length} Cooks done.`, you: "" };
+  const shipping = br.batches.filter((b) => (st[b.id] || {}).note === "shipping").map((b) => b.label);
+  const on = n("active") + n("wait");
+  return {
+    text: `${on} Cook${on === 1 ? "" : "s"} on the job: ${n("active")} working, ${n("wait")} standing by. ${n("done")} of ${cooks.length} done.${shipping.length ? ` Shipping ${shipping.join(" and ")}.` : ""}`,
+    you: hc.s === "you" ? `Waits on you for ${dur(t - hc.since)}${hc.note ? ": " + hc.note : ""}.` : "",
+  };
+}
+
+// one Head Chef's ticket and Cooks-on-the-job strip, above its board
+function head(br) {
+  const [a, b] = domain();
+  const W = 1000, H = 56, x = (t) => ((t - a) / (b - a || 1)) * W;
+  const n = Object.keys(br.cooks).length, peak = Math.max(1, ...br.busy.map((q) => q[1] + q[2]));
+  const y = (k) => H - 4 - (k / peak) * (H - 8); // scaled to the brigade's peak, so one Cook is visible
+  let dA = "", dW = "";
+  const pts = [[br.start, 0, 0], ...br.busy, [br.end, 0, 0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [t0, act, wt] = pts[i], t1 = pts[i + 1][0];
+    if (act) dA += `M${x(t0)},${y(0)}V${y(act)}H${x(t1)}V${y(0)}Z`;
+    if (wt) dW += `M${x(t0)},${y(act)}V${y(act + wt)}H${x(t1)}V${y(act)}Z`;
+  }
+  return `<div class="bline" data-b="${br.id}"><article class="ticket" aria-label="Head Chef ${br.id}">
+      <p class="t-title" data-title></p>
+      <p class="t-meta">Epics in run order, ${n} Cook${n === 1 ? "" : "s"}, at most ${peak} at once</p>
+      <ol class="rail">${br.batches.map((bt) => {
+        const face = `<span class="n">${bt.epic && bt.epic.n ? bt.epic.n : "B" + bt.n}</span><span class="ref">${bt.epic ? bt.epic.ref : "no Epic"}</span>`;
+        // a public ticket: the whole card opens it on GitHub
+        return `<li data-batch="${bt.id}">${bt.epic && bt.epic.url ? `<a class="card" href="${bt.epic.url}" target="_blank" rel="noopener" aria-label="${bt.label}, ticket ${bt.epic.ref} on GitHub">${face}</a>` : `<span class="card">${face}</span>`}</li>`;
+      }).join("")}</ol>
+      <p class="t-now" data-now></p><p class="t-you" data-you></p></article>
+    <p class="strip-label">Cooks on the job over time: green works, yellow stands by. Click to jump.</p>
+    <svg class="strip" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Cooks on the job over time for ${br.id}">
+      <path d="${dA}" fill="var(--active)"/><path d="${dW}" fill="var(--wait)"/><line class="cur" x1="0" x2="0" y1="0" y2="${H}" vector-effect="non-scaling-stroke"/></svg>
+    <div class="readout" data-read></div></div>`;
+}
+
+function strips() {
+  const [a, b] = domain();
+  for (const el of document.querySelectorAll(".bline")) {
+    const svg = el.querySelector("svg"), br = BR[el.dataset.b];
+    const at = (e) => { const r = svg.getBoundingClientRect(); return a + ((e.clientX - r.left) / r.width) * (b - a || 1); };
+    svg.addEventListener("click", (e) => seek(at(e)));
+    svg.addEventListener("pointermove", (e) => {
+      const t = at(e); let k = [0, 0, 0];
+      for (const p of br.busy) { if (p[0] > t) break; k = p; }
+      el.querySelector("[data-read]").textContent = `${localTime(t)} · ${k[1]} working, ${k[2]} standing by`;
+    });
+    svg.addEventListener("pointerleave", () => { el.querySelector("[data-read]").textContent = ""; });
+  }
+}
+
+function mountAll() {
+  for (const b of document.querySelectorAll("#pick button")) b.setAttribute("aria-pressed", String(S.sel.includes(b.dataset.b)));
+  const root = $("#views");
+  root.innerHTML = "";
+  S.mounted = [];
+  const v = BOARD;
+  const sec = document.createElement("section");
+  sec.id = v.id;
+  sec.setAttribute("aria-label", "Boards");
+  root.append(sec);
+  // every panel first, so each has its final width when its view lays out
+  const panels = sel().map((br) => {
+    const run = document.createElement("div");
+    run.className = "run";
+    run.innerHTML = head(br) + `<div class="panel" aria-label="Epics of Head Chef ${br.id}"><div class="draw"></div></div>`;
+    sec.append(run);
+    return run.querySelector(".panel");
+  });
+  for (const [i, br] of sel().entries()) {
+    const el = panels[i].querySelector(".draw");
+    try {
+      const m = v.mount(el, br, ui);
+      S.mounted.push({ v, br, paint: m.paint });
+    } catch (e) {
+      el.innerHTML = `<p class="err"></p>`; el.firstChild.textContent = String((e && e.message) || e);
+      console.error(v.id, e);
+    }
+  }
+  strips();
+}
+
+function paint() {
+  $("#clock").textContent = localTime(S.t);
+  const [a, b] = domain();
+  $("#t").value = String(Math.round(((S.t - a) / (b - a || 1)) * 1000));
+  const states = Object.fromEntries(sel().map((br) => [br.id, stateAt(br, S.t)]));
+  for (const el of document.querySelectorAll(".bline")) {
+    const br = BR[el.dataset.b], s = summary(br, states[br.id], S.t);
+    el.querySelector("[data-title]").textContent = runTitle(br, states[br.id]);
+    for (const li of el.querySelectorAll(".rail li")) {
+      const x = say.epic(br, states[br.id], br.batches.find((b) => b.id === li.dataset.batch), S.t);
+      li.setAttribute("data-st", x.s); li.title = x.tip;
+    }
+    el.querySelector("[data-now]").textContent = s.text;
+    el.querySelector("[data-you]").textContent = s.you;
+    const X = ((S.t - a) / (b - a || 1)) * 1000;
+    const cur = el.querySelector(".cur"); cur.setAttribute("x1", X); cur.setAttribute("x2", X);
+  }
+  for (const m of S.mounted) {
+    try { m.paint(states[m.br.id], S.t); }
+    catch (e) { console.error(m.v.id, e); }
+  }
+  history.replaceState(null, "", `#t=${Math.round(S.t)}&b=${S.sel.join(",")}`);
+}
+
+function seek(t) { const [a, b] = domain(); S.t = Math.min(b, Math.max(a, t)); paint(); }
+
+function changes() {
+  return [...new Set(sel().flatMap((b) => b.frames.map((f) => f[0])))].sort((x, y) => x - y);
+}
+
+function tick(now) {
+  if (!S.playing) return;
+  const dt = S.last ? (now - S.last) / 1000 : 0;
+  S.last = now;
+  const [, b] = domain();
+  seek(S.t + dt * Number($("#speed").value));
+  if (S.t >= b) { setPlaying(false); return; }
+  requestAnimationFrame(tick);
+}
+function setPlaying(on) {
+  S.playing = on; S.last = 0;
+  $("#play").textContent = on ? "❚❚" : "▶";
+  $("#play").setAttribute("aria-label", on ? "Pause" : "Play");
+  if (on) { const [a, b] = domain(); if (S.t >= b) S.t = a; requestAnimationFrame(tick); }
+}
+
+function init() {
+  legend(); picker();
+  if (!DATA.brigades.length) {
+    $("#views").textContent = "No Head Chef runs in this time window.";
+    document.querySelectorAll(".bar button, .bar select, .bar input").forEach((el) => { el.disabled = true; });
+    return;
+  }
+  const h = new URLSearchParams(location.hash.slice(1));
+  const want = (h.get("b") || "").split(",").filter((x) => BR[x]);
+  if (want.length) S.sel = want;
+  mountAll();
+  const [a, b] = domain();
+  const requested = h.has("t") ? Number(h.get("t")) : NaN;
+  seek(Number.isFinite(requested) ? requested : a + (b - a || 1) * 0.45);
+  $("#t").addEventListener("input", (e) => { const [a, b] = domain(); seek(a + (Number(e.target.value) / 1000) * (b - a || 1)); });
+  $("#play").addEventListener("click", () => setPlaying(!S.playing));
+  $("#prev").addEventListener("click", () => { const c = changes().filter((x) => x < S.t - 0.5); if (c.length) seek(c[c.length - 1]); });
+  $("#next").addEventListener("click", () => { const c = changes().find((x) => x > S.t + 0.5); if (c !== undefined) seek(c); });
+  $("#gen").textContent = `Data snapshot ${localTime(Date.parse(DATA.generated) / 1000)}, from T3 Code and GitHub, read-only.`;
+  // a view lays out once for its panel's width; a new width lays it out again
+  let w = innerWidth, wait = 0;
+  addEventListener("resize", () => { clearTimeout(wait); wait = setTimeout(() => { if (innerWidth !== w) { w = innerWidth; mountAll(); paint(); } }, 200); });
+}
+init();
+</script>
+</body>
+</html>
