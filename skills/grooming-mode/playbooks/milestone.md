@@ -1,56 +1,37 @@
 ---
-description: "CU2: group home-repo Epics without a Milestone into one Milestone with Epic Rank and justified blocked-by links."
+description: "CU2: assemble and refine eligible Epics into a Milestone with its own checkable outcome, then deliver one combined proposal."
 ---
 
-# CU2. Epics to a Milestone
+# CU2. Epics to ready Milestones
 
 ```
 Milestone progress:
-- [ ] 1. Scope containers
-- [ ] 2. Propose
-- [ ] 3. Package and hand off
+- [ ] 1. Scope eligible Epics
+- [ ] 2. Review Epics, then assemble, refine and review the Milestone
+- [ ] 3. Deliver the whole proposal
 ```
 
 ## Process
 
-1. **Scope containers.** Resolve the home repo and read its open Epics without
-   a Milestone with label-for-issues' filter. Read their bodies, Story states,
-   labels and dependencies as container context; `milestone` does not reverify Story code.
-   Leave an issue outside any Epic on the left-out list with "run grooming-mode ; epic first".
-   Leave an Epic already in another Milestone on the left-out list.
-   Done when all eligible Epics and left-out issues are accounted for
-2. **Propose.** Use SKILL.md's Proposal form and shared Epic order.
-   Number `M<N> · <outcome>` after the highest existing M number, closed Milestones
-   included. Apply label-for-issues' Dependencies rule and check Parallel.
-   Use each Story's recorded tier; flag an unsettled tier for approval.
-   Done when the Product Manager approves the complete proposal, or receives
-   the proposal as the read-only result
-3. **Package and hand off.** Follow the shared approval/apply/readback checklist.
-   Create the Milestone with its ranked description, assign it only to approved
-   home-repo Epics and apply approved dependencies and labels. Report its URL,
-   Epics by Rank, parallel work, left-out issues and remaining readiness gaps.
-   Finish with the shared `refine` prompt using the real Milestone URL.
-   Done when every write is read back and refinement has its target
-
-## Sequence
-
-```mermaid
-sequenceDiagram
-    accTitle: CU2 Epics to a Milestone
-    accDescr: Read eligible containers, propose a ranked Milestone, apply after approval and hand remaining gaps to refine.
-    actor PM as Product Manager
-    participant G as Grooming agent
-    participant GH as GitHub
-    Note over PM,GH: CU2. Epics to a Milestone<br>Step 1: Scope containers
-    PM->>G: Home repo and desired outcome
-    G->>GH: Read Epics without a Milestone and container context
-    GH-->>G: Eligible Epics, Story states and dependencies
-    Note over PM,GH: Step 2: Propose
-    G-->>PM: Ranked description, membership, links, labels and gaps
-    PM->>G: Approve exact actions
-    Note over PM,GH: Step 3: Package and hand off
-    G->>GH: Reread, create Milestone and apply approved actions
-    G->>GH: Verify membership, ranked description, links and labels
-    GH-->>G: Verified state or failed actions
-    G-->>PM: Results and new-conversation refine prompt
-```
+1. **Scope eligible Epics.** When continuing from `epic`, reuse its proposed
+   Epics, scope and verified evidence. When invoked directly, resolve the home
+   repo and inspect open Epics without a Milestone to identify candidate groups.
+   Each group needs at least two Epics serving one shared deliverable outcome.
+   An Epic joins at most one Milestone; ask when it fits competing groups.
+   Report unrelated Epics and issues outside any Epic as outside this grouping.
+   Read all Stories and current evidence for the selected Epics.
+   Done when all eligible Epics and left-out items are accounted for
+2. **Assemble and refine.** Complete the shared loop's refinement and
+   delegated reviews of each selected Epic with its Stories. Reuse those reviews
+   when continuing from `epic` with unchanged inputs.
+   If no group qualifies, explain why and deliver any refinements from `epic`.
+   Number each `M<N> · <outcome>` after the highest existing or drafted M number,
+   closed Milestones included.
+   Use the shared Epic order, justified blockers and recorded Story tiers.
+   Run steps 1–4 of the shared loop on the Milestone description and any affected Epics.
+   Check the joint outcome and boundaries as well as the readiness of its Epics.
+   Done when the proposed hierarchy meets the Definition of Ready or its missing input is named
+3. **Deliver.** Complete step 5 of the shared loop once, including any Epic and
+   Story changes from the same run. Report the Milestone URL when created, Epics
+   by Rank for each Milestone, outcome checks, failed actions and left-out items.
+   Done when shared delivery finishes
