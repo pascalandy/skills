@@ -73,10 +73,14 @@ Always run these forms:
    `gh api 'repos/{owner}/{repo}/stacks?pull_request=<bottom PR>' --jq '.[] | {number, prs: [.pull_requests[].number]}'`
    lists every PR bottom to top; no output means GitHub holds no stack
 3. **Change a layer.** Check out the layer that owns the change, found with `gh stack view --json`
-   or `git log --all -- <path>`, and commit there. Then run `gh stack rebase --upstack` and
-   `gh stack push`, or follow [Force pushes](#force-pushes). Done when the stack is consistent from
-   that layer up and step 2's check passes
-4. **Sync with the trunk.** Run `gh stack sync > /dev/null`. Done when stderr has no
+   or `git log --all -- <path>`, and commit there. Then run `gh stack rebase --upstack`, or
+   `gh stack rebase --upstack --no-trunk` when another worktree holds the trunk, as
+   `git worktree list` shows, and `gh stack push`, or follow [Force pushes](#force-pushes). Done
+   when the stack is consistent from that layer up and step 2's check passes
+4. **Sync with the trunk.** When another worktree holds the trunk, leave it alone, since `sync` and
+   `rebase` without `--no-trunk` can fast-forward it there: run `git fetch <remote>`, then, from
+   `<top>`, `git rebase --update-refs <remote>/<trunk> <top>`, check that the stack is consistent,
+   and run `gh stack push`. Otherwise run `gh stack sync > /dev/null`. Done when stderr has no
    `Sync aborted`, `git merge-base --is-ancestor <remote>/<trunk> <bottom>` succeeds, and step 2's
    check passes
 
