@@ -48,7 +48,7 @@ EOF
 mv watch.toml.tmp watch.toml"""
 
 
-def build(path: Path) -> FakeT3:
+def build(path: Path) -> None:
     """A Head Chef that registers two batches, launches one Chef and its Cook, which ships a PR."""
     db = FakeT3(path)
     db.project("p-home", "/home/example/projects")
@@ -130,7 +130,7 @@ def build(path: Path) -> FakeT3:
     )
     # talks about the run, but its threadId does not end with abcd: not its Head Chef
     db.thread("import:claudeAgent:0000-xyz9", "Head Chef abcd status reconciliation")
-    return db
+    db.con.close()  # tests read the file; an open connection warns under -W error
 
 
 def run_record(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
