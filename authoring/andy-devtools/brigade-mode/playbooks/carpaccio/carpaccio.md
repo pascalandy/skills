@@ -74,6 +74,8 @@ The Head Chef counts delivered batches over batches in scope. The Chef counts se
 
 Use the status emoji caused by a handoff. Delivery counts when the parent receives the message, not when the child sends it. Until receipt is confirmed, the sender keeps its live status, retries and reconciles; the parent never advances on an unreceived outcome.
 
+Send an answer or a relay with `t3_thread_send` `mode: "auto"` and a `clientRequestId` you reuse for each retry. `delivery: "steered"` means the message entered the running turn, not that the receiver acted on it. Treat `queued` as not yet received: read `t3_queue_list`, and once the receiver's turn is steerable, move it into the receiver's active run with `t3_queue_promote_to_steer`. Receipt counts when the receiver's reply acts on it. Watchdog wakes keep `mode: "queue"`.
+
 | Message | From → to | Effect |
 |---|---|---|
 | 🍽️ Stack ready | Cook → Chef | Cook freezes its stack; Chef validates |
