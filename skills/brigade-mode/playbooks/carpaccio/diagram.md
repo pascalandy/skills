@@ -92,7 +92,7 @@ sequenceDiagram
         alt Requirements and checks met#59; Chef confident after Pareto 90-10 review
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else Material uncertainty remains
-            C-->>H: Agent: 🍽️ Batch ready at x/x <-
+            C-->>H: Agent: 🍽️ Batch ready at x/x,<br>or below it only by queued_after_merge slots <-
             alt Requirements or specs settle a question
                 H->>C: Agent: Answers from requirements or specs ->
                 C-->>H: Agent: Merge rule again: 🔀 Batch 1 merging<br>or a new 🍽️ Batch ready <-
@@ -109,6 +109,11 @@ sequenceDiagram
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     Note over C,K: Next stack: Cook restacks on main<br>Same own diff keeps approval#59; changed diff needs review
+    opt After-merge slot waits for this round
+        C->>K: Agent: merged, close ->
+        C->>C: Confirm merged Cooks settled,<br>worktree from fresh origin/HEAD
+        C->>C: Launch 🍳 after-merge Cook<br>Steps 1 to 5 for its stack,<br>merge decision on its own heads
+    end
     C->>K: Agent: merged ->
     C-->>H: Agent: Batch merged, deploy result<br>No Head Chef count yet <-
     C->>C: Release yes: finish procedure<br>from main
