@@ -16,6 +16,7 @@ import subprocess
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from t3 import norm
@@ -29,6 +30,7 @@ ISSUE_FIELDS = (
     "title closedAt labels(first:10){nodes{name}} parent{number repository{nameWithOwner}} "
     "subIssues(first:100){totalCount nodes{number createdAt repository{nameWithOwner}}}"
 )
+ITEM_FIELDS = "__typename ... on PullRequest{mergedAt closedAt} ... on Issue{closedAt}"
 # Seconds from a GitHub fact, such as a merge, to the page that shows it.
 # The live service reads every open item sooner, so a page never shows a
 # state that the full replay of the same run contradicts later (#852)
@@ -54,6 +56,22 @@ def key(ref: Ref) -> str:
 def unkey(text: str) -> Ref:
     repo, n = text.rsplit("#", 1)
     return repo, int(n)
+
+
+def aliases(
+    prs: Iterable[int] = (), issues: Iterable[int] = (), items: Iterable[int] = ()
+) -> list[str]:
+    """Query fields for one repository's PRs, issues and 🙋 items, each under its alias."""
+    return (
+        [f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}" for n in prs]
+        + [f"i{n}: issue(number:{n}){{{ISSUE_FIELDS}}}" for n in issues]
+        + [f"x{n}: issueOrPullRequest(number:{n}){{{ITEM_FIELDS}}}" for n in items]
+    )
+
+
+def reduce_item(x: dict) -> dict:
+    """An issue or a PR a 🙋 line names: when it merged or closed."""
+    return {"merged": norm(x.get("mergedAt")), "closed": norm(x.get("closedAt"))}
 
 
 def reduce_pr(repo: str, p: dict) -> dict:
@@ -104,6 +122,8 @@ class Facts:
         self.items: dict[Ref, dict | None] = {}
         self.now: str | None = None  # facts a page shows after this time are hidden
         self.known: str | None = None  # facts GitHub had after this time are hidden
+        # when the first fact `now` hid shows: the live service recomputes then
+        self.upcoming: str | None = None
 
     # -- what a subclass supplies
     def fetch_repository(self, name: str) -> dict:
@@ -125,7 +145,7 @@ class Facts:
         `known` also hides what GitHub had after it, as a reader whose last
         read of GitHub was then sees it.
         """
-        self.now, self.known = now, known
+        self.now, self.known, self.upcoming = now, known, None
         return self
 
     def seen(self, time: str | None) -> str | None:
@@ -133,7 +153,10 @@ class Facts:
         if not time or (self.known is not None and time > self.known):
             return None
         shown = delayed(time)
-        return shown if self.now is None or shown <= self.now else None
+        if self.now is not None and shown > self.now:
+            self.upcoming = min(self.upcoming or shown, shown)
+            return None
+        return shown
 
     # -- questions
     def repository(self, name: str) -> str:
@@ -223,6 +246,14 @@ class Facts:
         par = i["parent"] if i else None
         return (par[0], par[1]) if par else None
 
+    def restore(self, data: dict[str, Any]) -> None:
+        """Take the facts of a `dump()`, such as a recording's."""
+        for name, info in data.get("repositories", {}).items():
+            self.repositories[name] = {"name": name, "public": info["public"]}
+        self.prs = {unkey(k): v for k, v in data.get("prs", {}).items()}
+        self.issues = {unkey(k): v for k, v in data.get("issues", {}).items()}
+        self.items = {unkey(k): v for k, v in data.get("items", {}).items()}
+
     def dump(self) -> dict:
         """The facts a recording holds, keyed by `repo#n`."""
         return {
@@ -257,28 +288,31 @@ class GitHub(Facts):
             missing_ok,
         )
         if not result.get("repository"):
-            raise ValueError(f"GitHub returned no repository for {repo}")
+            raise ReadError(
+                f"GitHub returned no repository for {repo}; check it with 'gh repo view {repo}'"
+            )
         return result["repository"]
 
     def gql(self, query: str, missing_ok: bool = False) -> dict:
         result = self.read(["api", "graphql", "-f", f"query={query}"])
-        if result.get("errors") and not (
-            missing_ok
-            and all(error.get("type") == "NOT_FOUND" for error in result["errors"])
+        errors = result.get("errors") or []
+        if errors and not (
+            missing_ok and all(error.get("type") == "NOT_FOUND" for error in errors)
         ):
-            raise ValueError(
-                "GitHub GraphQL: " + "; ".join(e["message"] for e in result["errors"])
+            words = "; ".join(str(e.get("message")) for e in errors)
+            raise ReadError(
+                f"GitHub GraphQL: {words}; rerun this command once GitHub answers",
+                temporary=any(e.get("type") == "RATE_LIMITED" for e in errors),
+                detail=f"GitHub GraphQL: {words}",
             )
-        return result["data"]
+        return result.get("data") or {}
 
     def fetch_prs(self, refs: list[Ref]) -> None:
         by_repo: dict[str, list[int]] = defaultdict(list)
         for repo, n in refs:
             by_repo[repo].append(n)
         for repo, ns in sorted(by_repo.items()):
-            body = " ".join(
-                f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}" for n in sorted(ns)
-            )
+            body = " ".join(aliases(prs=sorted(ns)))
             for v in self.repo_query(repo, body).values():
                 self.prs[(repo, v["number"])] = reduce_pr(repo, v)
 
@@ -291,12 +325,77 @@ class GitHub(Facts):
     def fetch_item(self, ref: Ref) -> dict | None:
         x = self.repo_query(
             ref[0],
-            f"issueOrPullRequest(number:{ref[1]}){{__typename ... on PullRequest{{mergedAt closedAt}} ... on Issue{{closedAt}}}}",
+            f"issueOrPullRequest(number:{ref[1]}){{{ITEM_FIELDS}}}",
             missing_ok=True,
         )["issueOrPullRequest"]
-        if not x:
-            return None
-        return {"merged": norm(x.get("mergedAt")), "closed": norm(x.get("closedAt"))}
+        return reduce_item(x) if x else None
+
+
+class Cached(GitHub):
+    """Live facts for the dashboard: a merged or closed item stays cached forever,
+    and `refresh` re-reads the open ones, one query per repository.
+
+    `path` keeps the cache across restarts, so a new version of the service
+    starts from it instead of reading every PR and issue again.
+    """
+
+    def __init__(
+        self, read: Callable[[list[str]], dict], path: Path | None = None
+    ) -> None:
+        super().__init__(read)
+        self.path, self.saved = path, ""
+        if path and path.is_file():
+            try:
+                self.saved = path.read_text(encoding="utf-8")
+                self.restore(json.loads(self.saved))
+            except (OSError, ValueError, KeyError):
+                self.prs, self.issues, self.items, self.saved = {}, {}, {}, ""
+
+    def save(self) -> None:
+        """Write the cache when it changed, atomically."""
+        if not self.path:
+            return
+        text = json.dumps(self.dump(), separators=(",", ":"))
+        if text == self.saved:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(self.path)
+        self.saved = text
+
+    def open_refs(self) -> dict[str, list[str]]:
+        """Each repository's open PRs, issues and 🙋 items, as query aliases."""
+        wanted: dict[str, list[str]] = defaultdict(list)
+        for (repo, n), p in self.prs.items():
+            if not (p["merged"] or p["closed"]):
+                wanted[repo] += aliases(prs=[n])
+        for (repo, n), i in self.issues.items():
+            if i and not i["closed"]:
+                wanted[repo] += aliases(issues=[n])
+        for (repo, n), x in self.items.items():
+            if x and not (x["merged"] or x["closed"]):
+                wanted[repo] += aliases(items=[n])
+        return dict(wanted)
+
+    def refresh(self, repos: Iterable[str] | None = None) -> int:
+        """Re-read the open items of `repos`, or of every repository; return the query count."""
+        only = None if repos is None else set(repos)
+        queries = 0
+        for repo, aliases in sorted(self.open_refs().items()):
+            if only is not None and repo not in only:
+                continue
+            found = self.repo_query(repo, " ".join(aliases), missing_ok=True)
+            queries += 1
+            for alias, v in found.items():
+                n = int(alias[1:])
+                if alias[0] == "p" and v:
+                    self.prs[(repo, n)] = reduce_pr(repo, v)
+                elif alias[0] == "i":
+                    self.issues[(repo, n)] = reduce_issue(v) if v else None
+                elif alias[0] == "x":
+                    self.items[(repo, n)] = reduce_item(v) if v else None
+        return queries
 
 
 class Recorded(Facts):
@@ -304,11 +403,7 @@ class Recorded(Facts):
 
     def __init__(self, data: dict[str, Any]) -> None:
         super().__init__()
-        for name, info in data.get("repositories", {}).items():
-            self.repositories[name] = {"name": name, "public": info["public"]}
-        self.prs = {unkey(k): v for k, v in data.get("prs", {}).items()}
-        self.issues = {unkey(k): v for k, v in data.get("issues", {}).items()}
-        self.items = {unkey(k): v for k, v in data.get("items", {}).items()}
+        self.restore(data)
 
     def fetch_repository(self, name: str) -> dict:
         raise KeyError(f"recording has no repository {name}")
@@ -324,11 +419,15 @@ class Recorded(Facts):
 
 
 class ReadError(Exception):
-    """A `gh` read failed; `temporary` says whether a retry may fix it."""
+    """A `gh` read failed; `temporary` says whether a retry may fix it, and
+    `detail` holds gh's own words, for a page that has no command to rerun."""
 
-    def __init__(self, message: str, temporary: bool = False) -> None:
+    def __init__(
+        self, message: str, temporary: bool = False, detail: str | None = None
+    ) -> None:
         super().__init__(message)
         self.temporary = temporary
+        self.detail = detail or message
 
 
 def gh_reader(timeout: float) -> Callable[[list[str]], dict]:
@@ -371,7 +470,13 @@ def gh_reader(timeout: float) -> Callable[[list[str]], dict]:
             raise ReadError(
                 f"GitHub read failed: {message}; run 'gh auth status', then rerun this command",
                 temporary=temporary,
+                detail=message,
             )
-        return json.loads(done.stdout)
+        try:
+            return json.loads(done.stdout)
+        except ValueError as error:
+            raise ReadError(
+                "GitHub answered with no JSON; rerun this command", temporary=True
+            ) from error
 
     return read

@@ -355,7 +355,6 @@ import bisect
 import math
 import time
 from collections import Counter, defaultdict
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import pairwise
@@ -371,15 +370,8 @@ import t3
 
 HERE = Path(__file__).resolve().parent
 RECORDINGS = HERE / "tests" / "recordings"
-POLL = 2.0  # seconds between two reads of PRAGMA data_version
-GITHUB_CADENCE = 60.0  # seconds between two reads of a repository's open items
-GITHUB_TIMEOUT = 20.0  # the live service's longest GitHub read
-# The oldest GitHub facts the live service may hold: a merge right after one
-# read waits for the next one, up to a poll late, and its timeout
-LAG = GITHUB_CADENCE + GITHUB_TIMEOUT + 2 * POLL
 SETTLE = 120.0  # oracle 2: a thread retitles only when it enters a phase or ends a turn
 EPSILON = 0.001
-GENERIC = {"info", "answer"}  # what classify() answers for a message no rule reads
 MONTREAL = ZoneInfo("America/Montreal")
 Points = list[tuple[float, str | None]]
 
@@ -446,8 +438,8 @@ def prefix_consistency(run: Run) -> dict:
     arrives; every node it shows must match the final replay at each instant
     of that window, and the final replay may show no state but todo on a node
     the page lacks. Each page knows GitHub as the live service does at
-    worst, LAG seconds late, and shows each fact github.DELAY after GitHub
-    had it, so a fact the service learns late still shows on time.
+    worst, pipeline.LAG seconds late, and shows each fact github.DELAY after
+    GitHub had it, so a fact the service learns late still shows on time.
     """
     seqs = sequences(run.rec)
     checked = status = detail = missing = 0
@@ -461,7 +453,7 @@ def prefix_consistency(run: Run) -> dict:
             continue  # the next sequence shares this instant: no page showed this one alone
         now = t_next - EPSILON
         started = time.perf_counter()
-        live = run.page(seq, now, LAG)
+        live = run.page(seq, now, pipeline.LAG)
         recompute.append(time.perf_counter() - started)
         if not live:
             continue  # no Head Chef yet: nothing drawn
@@ -734,27 +726,16 @@ def answers(run: Run) -> dict:
     return {"answers": dict(counts), "misses": misses}
 
 
-def p95(values: Iterable[float]) -> float:
-    ordered = sorted(values)
-    return ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)]
-
-
 def freshness(recompute: list[float]) -> dict:
     """Oracle 5 for T3: the p95 of a from-scratch recompute, plus the worst-case poll wait."""
-    return {"recompute": p95(recompute), "p95": p95(recompute) + POLL}
+    top = pipeline.p95(recompute) or 0.0
+    return {"recompute": top, "p95": top + pipeline.POLL}
 
 
 def coverage(run: Run) -> dict:
     """Oracle 6: messages whose leading symbol no rule reads, and unread watch.toml writes."""
-    unclassified = [
-        {"t": e["time"], "role": e["role"], "lead": e["detail"]["lead"]}
-        for e in run.events
-        if e["kind"] == "send"
-        and e["detail"].get("msg") in GENERIC
-        and e["detail"].get("lead")
-    ]
-    unread = [{"t": e["time"]} for e in run.events if e["kind"] == "watch_unread"]
-    return {"unclassified": unclassified, "unread": unread}
+    found = pipeline.unparsed(run.events)
+    return {"unclassified": found["messages"], "unread": found["watch"]}
 
 
 def report(rec: dict) -> dict:
@@ -788,16 +769,13 @@ def github_query(
 ) -> float:
     """Oracle 5 for GitHub: p95 seconds of one query that reads every tracked PR
     and issue of `repo`, the worst case of the live service's per-repository read."""
-    body = " ".join(
-        [f"p{n}: pullRequest(number:{n}){{{github.PR_FIELDS}}}" for n in prs]
-        + [f"i{n}: issue(number:{n}){{{github.ISSUE_FIELDS}}}" for n in issues]
-    )
+    body = " ".join(github.aliases(prs, issues))
     times = []
     for _ in range(rounds):
         started = time.perf_counter()
         gh.repo_query(repo, body, missing_ok=True)
         times.append(time.perf_counter() - started)
-    return p95(times)
+    return pipeline.p95(times) or 0.0
 
 
 def rows(r: dict) -> list[dict]:
@@ -838,7 +816,7 @@ def rows(r: dict) -> list[dict]:
         (
             5,
             "freshness, T3",
-            f"p95 {fr['p95']:.3f} s: recompute {fr['recompute']:.3f} s + {POLL:.0f} s poll",
+            f"p95 {fr['p95']:.3f} s: recompute {fr['recompute']:.3f} s + {pipeline.POLL:.0f} s poll",
             "< 5 s",
             fr["p95"] < 5,
         ),
@@ -849,11 +827,11 @@ def rows(r: dict) -> list[dict]:
             (
                 5,
                 "freshness, GitHub",
-                f"{github.DELAY + POLL:.1f} s: shown {github.DELAY:.0f} s after GitHub + {POLL:.0f} s poll; the service lags at most {LAG:.0f} s, with a p95 query of {g['p95']:.2f} s for {g['prs']} PRs and {g['issues']} issues",
+                f"{github.DELAY + pipeline.POLL:.1f} s: shown {github.DELAY:.0f} s after GitHub + {pipeline.POLL:.0f} s poll; the service lags at most {pipeline.LAG:.0f} s, with a p95 query of {g['p95']:.2f} s for {g['prs']} PRs and {g['issues']} issues",
                 "< 90 s",
-                github.DELAY + POLL < 90
-                and LAG < github.DELAY
-                and g["p95"] < GITHUB_TIMEOUT,
+                github.DELAY + pipeline.POLL < 90
+                and pipeline.LAG < github.DELAY
+                and g["p95"] < pipeline.GITHUB_TIMEOUT,
             )
         )
     out.append(

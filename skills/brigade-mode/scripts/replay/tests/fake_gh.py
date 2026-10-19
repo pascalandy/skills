@@ -1,6 +1,7 @@
 """A stand-in for `gh` that answers the replay's read-only queries from canned facts."""
 
 import json
+import os
 import re
 import sys
 
@@ -41,6 +42,16 @@ ISSUES = {
     (S, 4): issue("Epic 7 secret-thing PLANTED FREE TEXT", labels=["4-epic"]),
 }
 PRS = {
+    (W, 21): {
+        "number": 21,
+        "createdAt": "2026-01-01T00:01:00Z",
+        "mergedAt": None,
+        "closedAt": None,
+        "body": "Closes #11.",
+        "closingIssuesReferences": {
+            "nodes": [{"number": 11, "repository": {"nameWithOwner": W}}]
+        },
+    },
     (W, 20): {
         "number": 20,
         "createdAt": "2026-01-01T00:01:00Z",
@@ -50,10 +61,13 @@ PRS = {
         "closingIssuesReferences": {
             "nodes": [{"number": 10, "repository": {"nameWithOwner": W}}]
         },
-    }
+    },
 }
 
 args = sys.argv[1:]
+if os.environ.get("FAKE_GH_DOWN") and os.path.exists(os.environ["FAKE_GH_DOWN"]):
+    print("HTTP 502: Bad Gateway (https://api.github.com/graphql)", file=sys.stderr)
+    raise SystemExit(1)
 if args[:2] == ["repo", "view"]:
     if args[2] not in REPOS:
         print(
@@ -69,22 +83,27 @@ elif args[:2] == ["api", "graphql"]:
     assert m, query
     repo = f"{m.group(1)}/{m.group(2)}"
     data, missing = {}, False
-    for alias, n in re.findall(r"(p\d+): pullRequest\(number:(\d+)\)", query):
-        data[alias] = PRS[(repo, int(n))]
-    if m := re.search(r"\bissue\(number:(\d+)\)", query):
-        data["issue"] = ISSUES.get((repo, int(m.group(1))))
-        missing = data["issue"] is None
-    if m := re.search(r"issueOrPullRequest\(number:(\d+)\)", query):
-        pr = PRS.get((repo, int(m.group(1))))
-        data["issueOrPullRequest"] = (
-            {
-                "__typename": "PullRequest",
-                "mergedAt": pr["mergedAt"],
-                "closedAt": pr["closedAt"],
-            }
-            if pr
-            else None
-        )
+    # each field answers under its alias, such as `p20: pullRequest(number:20)`, or its name
+    for alias, field, n in re.findall(
+        r"(?:(\w+): )?(pullRequest|issueOrPullRequest|issue)\(number:(\d+)\)", query
+    ):
+        ref, name = (repo, int(n)), alias or field
+        if field == "pullRequest":
+            data[name] = PRS[ref]
+        elif field == "issue":
+            data[name] = ISSUES.get(ref)
+            missing = missing or data[name] is None
+        else:
+            pr = PRS.get(ref)
+            data[name] = (
+                {
+                    "__typename": "PullRequest",
+                    "mergedAt": pr["mergedAt"],
+                    "closedAt": pr["closedAt"],
+                }
+                if pr
+                else None
+            )
     body: dict[str, object] = {"data": {"repository": data}}
     if missing:
         body["errors"] = [

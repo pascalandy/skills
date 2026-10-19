@@ -36,11 +36,15 @@ create table projection_projects (project_id text primary key, workspace_root te
 
 
 class FakeT3:
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self, path: Path, start: datetime | None = None, wal: bool = False
+    ) -> None:
         self.path = path
         self.con = sqlite3.connect(path)
+        if wal:  # as T3 runs its database, so a reader never blocks a writer
+            self.con.execute("pragma journal_mode=wal")
         self.con.executescript(SCHEMA)
-        self.clock = datetime(2026, 1, 1, tzinfo=UTC)
+        self.clock = start or datetime(2026, 1, 1, tzinfo=UTC)
         self.ordinals: dict[str, int] = {}
         self.versions: dict[str, int] = {}
         self.items: dict[str, dict] = {}
