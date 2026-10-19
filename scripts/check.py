@@ -354,7 +354,7 @@ CHECKS = [
         "brigade-replay",
         *ruff(BRIGADE_REPLAY),
         pyright(BRIGADE_REPLAY, python="3.12"),
-        pytest(f"{BRIGADE_REPLAY}/tests", parallel=False, python="3.12"),
+        pytest(f"{BRIGADE_REPLAY}/tests", parallel=False),
     ),
     Check(
         "distill",
