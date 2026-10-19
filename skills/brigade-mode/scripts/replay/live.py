@@ -359,6 +359,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import board
 import github
 import pipeline
 import privacy
@@ -538,16 +539,20 @@ class Service:
             self.gh.upcoming is not None and pipeline.t3_time(now) >= self.gh.upcoming
         )
         moved = self.pending or refreshed or upcoming
+        # the page reaches its last T3 event, which T3 may stamp after this
+        # tick began, rounded up to the tenth as its frames are
+        last = self.follower.snap.time
+        horizon = board.tenth(max(now, statuses.ts(last) if last else now))
         # a failed T3 read leaves no snapshot to draw, and GitHub facts older
         # than the delay may miss a merge a later read finds: the last good
         # page stays, and its age grows
-        current = t3_ok and now - self.github_known <= github.DELAY
+        current = t3_ok and horizon - self.github_known <= github.DELAY
         if (
             current
             and now >= self.retry_at
             and (moved or now - self.computed >= CLOCK_EVERY)
         ):
-            self.compute(now, self.pending)
+            self.compute(now, horizon, self.pending)
         if current and not self.pending:
             self.state.read = now
         return None
@@ -558,20 +563,23 @@ class Service:
         message = getattr(error, "detail", None) or str(error) or type(error).__name__
         self.state.failures[source] = Failure(old.since if old else now, message)
 
-    def compute(self, now: float, fresh: bool) -> None:
-        """The page from scratch: the snapshot's runs through the replay's pipeline."""
+    def compute(self, now: float, horizon: float, fresh: bool) -> None:
+        """The page from scratch: the snapshot's runs through the replay's pipeline,
+        drawn up to `horizon`, the instant its last fact shows."""
         snap, heads = self.follower.snap, self.follower.heads
         disk = {h[-4:].lower(): t3.disk_plans(h[-4:].lower()) for h in heads}
         try:
-            self.gh.at(pipeline.t3_time(now))
+            self.gh.at(pipeline.t3_time(horizon))
             heads, events = pipeline.run_events(snap, self.gh, heads, disk)
-            data, private = pipeline.page_of(events, self.gh, heads, now)
+            data, private = pipeline.page_of(events, self.gh, heads, horizon)
             if privacy.leaks(data, private):
                 raise pipeline.PrivacyError("the privacy check refused the new data")
         except github.ReadError as error:
             self.retry_at = now + GITHUB_EVERY  # GitHub load stays one read per turn
+            self.pending = True  # the last good page is behind: its age grows
             return self.failed("github_new", now, error)
         except Exception as error:  # noqa: BLE001 - a bug on live data keeps the last good page
+            self.pending = True
             return self.failed("page", now, error)
         found = pipeline.unparsed(events)
         first = self.state.published.version == 0

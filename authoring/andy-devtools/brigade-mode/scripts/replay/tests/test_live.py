@@ -378,7 +378,7 @@ def test_data_age_counts_only_data_that_matches_t3(
         assert "HTTP 502" in state.failures["github_new"].message
         (tmp_path / "gh-down").unlink()
         service.tick(now + pipeline.POLL)  # GitHub gets one read per turn
-        assert state.published.version == 0
+        assert state.published.version == 0 and state.read is None
         service.tick(now + pipeline.GITHUB_EVERY)
         assert state.published.version == 1 and state.read is not None
         assert state.failures == {}
@@ -491,6 +491,9 @@ def test_a_github_outage_never_rewrites_what_the_page_showed(
         down.append(True)  # and the next read of open items fails
         shown: dict[int, tuple[float, list]] = {}
         for t in range(2, 120, 2):
+            if t == 84:  # T3 stamps an ask after this tick began, past the delay
+                db.clock = datetime.fromtimestamp(now + 85.5, UTC)
+                db.item(HC, "a1", "assistant_message", text="🙋 valide le plan")
             service.tick(now + t)
             p = state.published
             shown.setdefault(p.version, (now + t, p.data["brigades"][0]["frames"]))
@@ -501,7 +504,48 @@ def test_a_github_outage_never_rewrites_what_the_page_showed(
         final = state.published.data["brigades"][0]["frames"]
         assert oracles.state_at(final, now + 120)["cook-1.1"][2] == "shipped"
         for at, frames in shown.values():
-            assert oracles.state_at(frames, at) == oracles.state_at(final, at)
+            # every instant the page reached, up to its last frame
+            end = max([at, *(f[0] for f in frames)])
+            moments = {at, *(f[0] for f in frames + final if f[0] <= end)}
+            for t in moments:
+                assert oracles.state_at(frames, t) == oracles.state_at(final, t)
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_a_failed_build_lets_the_data_age_grow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    gh_read, renamed = github.gh_reader(10), []
+
+    def read(args: list[str]) -> dict:
+        if "issue(number:12)" in " ".join(args):
+            error = {"type": "RATE_LIMITED", "message": "API rate limit exceeded"}
+            return {"data": None, "errors": [error]}
+        answer = gh_read(args)
+        pr = ((answer.get("data") or {}).get("repository") or {}).get("p21")
+        if renamed and pr:  # PR 21 now also closes issue 12
+            nodes = pr["closingIssuesReferences"]["nodes"]
+            nodes.append({"number": 12, "repository": {"nameWithOwner": W}})
+        return answer
+
+    db = live_run(tmp_path)
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(read), 1, state)
+    try:
+        now = time.time()
+        service.tick(now)
+        assert state.published.version == 1 and state.read == now
+        renamed.append(True)
+        service.tick(now + pipeline.GITHUB_EVERY)  # no T3 change, a new issue to read
+        assert "rate limit" in state.failures["github_new"].message
+        service.tick(now + pipeline.GITHUB_EVERY + pipeline.POLL)
+        assert state.published.version == 1 and state.read == now
     finally:
         con.close()
         db.con.close()
