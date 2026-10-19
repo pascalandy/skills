@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import board
+import github
 import pipeline
 import pytest
 import t3
@@ -120,6 +121,16 @@ def test_replay_command_reads_a_recording(tmp_path: Path) -> None:
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout)["changes"] == [["write", str(out)]]
     assert "Head Chef" in out.read_text(encoding="utf-8")
+
+
+def test_a_merge_shows_85_seconds_after_github_had_it() -> None:
+    gh = Recorded(recording("0ba0")["github"])
+    ref, p = next((r, p) for r, p in sorted(gh.prs.items()) if p["merged"])
+    shown = board.R.ts(p["merged"]) + github.DELAY
+    before = gh.at(pipeline.t3_time(shown - 0.001)).pr(*ref)
+    assert before and before["merged"] is None
+    after = gh.at(pipeline.t3_time(shown)).pr(*ref)
+    assert after and board.R.ts(after["merged"]) == shown
 
 
 def test_no_frame_shows_before_its_fact() -> None:

@@ -585,7 +585,7 @@ def extract(
     """Every fact of the named Head Chefs' runs, in time order.
 
     `disk` maps a run's id4 to its live watch.toml files; `gh.at(time)` decides
-    which GitHub facts had happened.
+    which GitHub facts a page shows by then.
     """
     brigades = []
     for head in heads:
