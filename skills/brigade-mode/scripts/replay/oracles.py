@@ -351,6 +351,7 @@ def answer_failure(
 
 # <<< cli-block
 
+import bisect
 import math
 import time
 from collections import Counter, defaultdict
@@ -453,6 +454,7 @@ def prefix_consistency(run: Run) -> dict:
     examples: list[dict] = []
     recompute: list[float] = []
     final = run.final.get("frames", [])
+    changes = sorted({f[0] for f in final})  # every instant the final replay moves
     for i, (seq, t_n) in enumerate(seqs):
         t_next = seqs[i + 1][1] if i + 1 < len(seqs) else run.end + EPSILON
         if t_next <= t_n:
@@ -464,7 +466,13 @@ def prefix_consistency(run: Run) -> dict:
         if not live:
             continue  # no Head Chef yet: nothing drawn
         frames = live["frames"]
-        for t in sorted({t_n, now, *(f[0] for f in frames if t_n < f[0] < t_next)}):
+        # each instant either page moves, so a change only one side shows is checked
+        theirs_move = changes[
+            bisect.bisect_right(changes, t_n) : bisect.bisect_left(changes, t_next)
+        ]
+        for t in sorted(
+            {t_n, now, *theirs_move, *(f[0] for f in frames if t_n < f[0] < t_next)}
+        ):
             mine, theirs = state_at(frames, t), state_at(final, t)
             for node in theirs.keys() - mine.keys():
                 if (
@@ -578,13 +586,40 @@ def registries_and_merges(run: Run) -> dict:
     exactly once GitHub merged all its PRs; every slot a watch.toml on disk plans
     is registered in the transcript.
 
-    Each check reads the page at the tenth of a second it first shows a fact.
+    Its facts come from the recording, not from the extractor's events: the
+    watch.toml writes, launches and PR links T3 recorded, and GitHub's merge
+    times, which a page shows github.DELAY late. Each check reads the page at
+    the tenth of a second it first shows a fact.
     """
     final = run.final.get("frames", [])
+    registered: dict[str, float] = {}
     launched: dict[str, float] = {}
-    for e in run.events:
-        if e["kind"] == "launch":
-            launched.setdefault(run.slot(e["thread"]), statuses.ts(e["time"]))
+    linked: dict[str, float] = {}  # PR -> the first link, by any thread
+    owner: dict[str, tuple[float, str]] = {}  # PR -> the first Cook that links it
+    for tid, info in run.threads.items():
+        for item in run.snap.thread_items(tid):
+            when = t3.later(item["start"], item.get("seen"))
+            if when is None:
+                continue  # an item with no time shows nowhere
+            at = statuses.ts(when)
+            w = item.get("watch")
+            if w and info["role"] in ("head_chef", "chef"):
+                prefix = "chef-" if info["role"] == "head_chef" else "cook-"
+                for slot in {*(w.get("full") or {}), *(w.get("blocks") or {})}:
+                    if slot.startswith(prefix):
+                        registered[slot] = min(at, registered.get(slot, at))
+            if item.get("tool") == "launch" and item.get("child") in run.threads:
+                end = (
+                    t3.later(item["end"], item.get("endSeen")) if item["end"] else None
+                )
+                slot, t = run.slot(item["child"]), statuses.ts(end) if end else at
+                launched[slot] = min(t, launched.get(slot, t))
+            if item.get("tool") == "link":
+                pr = github.key((item["pr"][0], int(item["pr"][1])))
+                linked[pr] = min(at, linked.get(pr, at))
+                if info["role"] == "cook":
+                    first = (at, run.slot(tid))
+                    owner[pr] = min(first, owner.get(pr, first))
     checks, misses = 0, []
 
     def node_of(slot: str) -> str:
@@ -596,48 +631,32 @@ def registries_and_merges(run: Run) -> dict:
         if not ok:
             misses.append({"t": t, "node": node, "expected": what})
 
-    planned: set[str] = set()
-    for e in run.events:
-        d = e["detail"] or {}
-        if e["kind"] == "batch_register":
-            slots = [f"chef-{d['batch']}"]
-        elif e["kind"] == "cook_planned":
-            slots = list(d.get("slots") or [])
-        else:
-            continue
-        planned.update(slots)
-        t = board.tenth(statuses.ts(e["time"]))
-        for slot in slots:
-            if slot not in launched or launched[slot] > t:
-                state = state_at(final, t).get(node_of(slot))
-                expect(
-                    t,
-                    node_of(slot),
-                    bool(state) and state[0] in ("todo", "stopped"),
-                    "queued",
-                )
+    for slot, t in registered.items():
+        t = board.tenth(t)
+        if slot not in launched or launched[slot] > t:
+            state = state_at(final, t).get(node_of(slot))
+            expect(
+                t,
+                node_of(slot),
+                bool(state) and state[0] in ("todo", "stopped"),
+                "queued",
+            )
     for slot, t in launched.items():
         state = state_at(final, board.tenth(t)).get(node_of(slot))
         expect(t, node_of(slot), bool(state) and state[0] != "todo", "launched")
-    # PR facts, as the page received them: open and merge events per Cook slot
-    prs: dict[str, dict[str, float | None]] = defaultdict(dict)
-    for e in run.events:
-        if (
-            e["kind"] in ("pr_open", "pr_merge", "pr_close")
-            and run.threads.get(e["thread"], {}).get("role") == "cook"
-        ):
-            mine = prs[run.slot(e["thread"])]
-            if e["kind"] == "pr_open":
-                mine.setdefault(e["pr"], None)
-            elif e["kind"] == "pr_merge":
-                mine[e["pr"]] = statuses.ts(e["time"])
-            else:
-                mine.pop(e["pr"], None)
-    for slot, merged in prs.items():
-        times = [v for v in merged.values() if v is not None]
-        if not merged or len(times) < len(merged):
+    # each Cook's PRs as GitHub has them: None while one is open, a closed one left out
+    shown: dict[str, list[float | None]] = defaultdict(list)
+    for pr, (_, slot) in owner.items():
+        p = run.rec["github"]["prs"].get(pr)
+        if p and p["merged"]:
+            merged = statuses.ts(github.delayed(p["merged"]))
+            shown[slot].append(max(merged, linked[pr]))
+        elif p and not p["closed"]:
+            shown[slot].append(None)
+    for slot, times in shown.items():
+        if None in times:
             continue
-        shipped = max(times)
+        shipped = max(t for t in times if t is not None)
         after = state_at(final, board.tenth(shipped)).get(slot)
         before = state_at(final, shipped - EPSILON).get(slot)
         expect(shipped, slot, bool(after) and after[2] == "shipped", "shipped")
@@ -648,7 +667,7 @@ def registries_and_merges(run: Run) -> dict:
                 expect(
                     run.end,
                     slot,
-                    slot in planned,
+                    slot in registered,
                     f"registered, as {folder}/watch.toml plans",
                 )
     return {"checks": checks, "misses": misses}

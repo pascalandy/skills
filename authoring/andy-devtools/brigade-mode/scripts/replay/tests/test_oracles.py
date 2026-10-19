@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 import board
+import facts
 import github
 import oracles
 import pytest
@@ -43,6 +46,38 @@ def test_prefix_oracle_catches_a_github_fact_the_service_learns_late(
     report = oracles.report(t3.load_recording(RECORDINGS["0ba0"]))
     assert report["prefix"]["detail"] > 0
     assert not next(r for r in oracles.rows(report) if r["oracle"] == 1)["pass"]
+
+
+def test_prefix_oracle_catches_a_change_only_the_final_replay_shows() -> None:
+    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    frames = run.final["frames"]
+    (_, a), (_, b) = max(
+        (
+            pair
+            for pair in pairwise(oracles.sequences(run.rec))
+            if "hc" in oracles.state_at(frames, pair[0][1])
+        ),
+        key=lambda pair: pair[1][1] - pair[0][1],
+    )
+    state = oracles.state_at(frames, a)["hc"]
+    mid = (a + b) / 2  # red for a tenth of a second, inside one page's window
+    blip = [[mid, "hc", "you", *state[1:]], [mid + 0.1, "hc", *state]]
+    run.final["frames"] = sorted(frames + blip, key=lambda f: f[0])
+    assert oracles.prefix_consistency(run)["status"] > 0
+
+
+def test_registry_oracle_catches_an_extractor_that_drops_merges(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ev = facts.Brigade.ev
+
+    def no_merge(self: facts.Brigade, *args: Any, **kwargs: Any) -> None:
+        if args[3] != "pr_merge":  # time, role, thread, kind
+            ev(self, *args, **kwargs)
+
+    monkeypatch.setattr(facts.Brigade, "ev", no_merge)
+    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    assert oracles.registries_and_merges(run)["misses"]
 
 
 def test_oracles_command_writes_the_table(tmp_path: Path) -> None:
