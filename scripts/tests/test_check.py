@@ -380,6 +380,29 @@ def test_repository_dependency_changes_select_their_test_modules(
     ] == expected
 
 
+@pytest.mark.parametrize(
+    ("changed_path", "selected"),
+    [
+        ("authoring/andy-devtools/brigade-mode/playbooks/carpaccio/carpaccio.md", True),
+        ("authoring/andy-devtools/brigade-mode/references/model.py", True),
+        ("authoring/andy-devtools/headless/SKILL.md", False),
+        ("scripts/check.py", True),
+        (None, True),
+    ],
+    ids=["playbook", "model", "other-skill", "check-py", "no-origin-main"],
+)
+def test_brigade_carpaccio_runs_when_brigade_mode_changes(
+    routing_repo: Path, changed_path: str | None, selected: bool
+) -> None:
+    row = next(row for row in check.CHECKS if row.name == "brigade-carpaccio")
+    skill(routing_repo / "authoring/andy-devtools", "brigade-mode")
+    skill(routing_repo / "authoring/andy-devtools", "headless")
+    if changed_path:
+        publish_base(routing_repo, changed_path)
+
+    assert (check.in_scope([row]) == [row]) is selected
+
+
 @pytest.mark.parametrize("args", [("--list",), ("--only", "test-known"), ()])
 def test_unregistered_repository_test_fails_before_running_or_listing(
     routing_repo: Path,
