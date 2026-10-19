@@ -375,14 +375,16 @@ OWN_FILES = ("*.py", "page.html", "board.js")
 
 
 def own_files() -> dict[str, tuple[int, int]]:
-    """This service's code. A deploy that changes it stops the service, and
-    systemd starts the new code."""
+    """This service's code, and the model.py its statuses fold into. A deploy
+    that changes one stops the service, and systemd starts the new code."""
     found = {}
     try:
-        for pattern in OWN_FILES:
-            for path in sorted(HERE.glob(pattern)):
-                info = path.stat()
-                found[path.name] = (info.st_mtime_ns, info.st_size)
+        for path in [
+            *sorted(p for pattern in OWN_FILES for p in HERE.glob(pattern)),
+            statuses.MODEL,
+        ]:
+            info = path.stat()
+            found[str(path)] = (info.st_mtime_ns, info.st_size)
     except OSError:
         return {}  # a deploy is replacing the files: they changed
     return found
@@ -488,8 +490,9 @@ class Service:
         )
         self.gh, self.state = gh, state
         self.code = own_files()
-        self.github_at = -math.inf
+        self.github_at = -math.inf  # the last read of every open item, failed or not
         self.computed = -math.inf
+        self.retry_at = -math.inf  # a page that needs GitHub waits for its next turn
         self.pending = False  # T3 changed since the data last published
 
     def tick(self, now: float) -> str | None:
@@ -510,6 +513,8 @@ class Service:
         due = now - self.github_at >= GITHUB_EVERY
         refreshed = False
         if due or repos:
+            if due:
+                self.github_at = now  # a failed read waits its turn too
             try:
                 started = time.perf_counter()
                 queries = self.gh.refresh(None if due else repos)
@@ -518,13 +523,21 @@ class Service:
                     self.state.github_queries = (self.state.github_queries + [took])[
                         -LAGS:
                     ]
-                if due:
-                    self.github_at = now
                 self.state.github_read, refreshed = now, True
                 self.state.failures.pop("github", None)
             except github.ReadError as error:
                 self.failed("github", now, error)
-        if self.pending or refreshed or now - self.computed >= CLOCK_EVERY:
+        # a GitHub fact the last page hid until its time shows now
+        upcoming = (
+            self.gh.upcoming is not None and pipeline.t3_time(now) >= self.gh.upcoming
+        )
+        moved = self.pending or refreshed or upcoming
+        # a failed T3 read leaves no snapshot to draw: the last good page stays
+        if (
+            t3_ok
+            and now >= self.retry_at
+            and (moved or now - self.computed >= CLOCK_EVERY)
+        ):
             self.compute(now, self.pending)
         if t3_ok and not self.pending:
             self.state.read = now
@@ -541,11 +554,13 @@ class Service:
         snap, heads = self.follower.snap, self.follower.heads
         disk = {h[-4:].lower(): t3.disk_plans(h[-4:].lower()) for h in heads}
         try:
+            self.gh.at(pipeline.t3_time(now))
             heads, events = pipeline.run_events(snap, self.gh, heads, disk)
             data, private = pipeline.page_of(events, self.gh, heads, now)
             if privacy.leaks(data, private):
                 raise pipeline.PrivacyError("the privacy check refused the new data")
         except github.ReadError as error:
+            self.retry_at = now + GITHUB_EVERY  # GitHub load stays one read per turn
             return self.failed("github_new", now, error)
         except Exception as error:  # noqa: BLE001 - a bug on live data keeps the last good page
             return self.failed("page", now, error)
@@ -625,6 +640,15 @@ def handler(state: State) -> type[http.server.BaseHTTPRequestHandler]:
 
 
 def work(args: argparse.Namespace) -> dict:
+    if args.timeout > pipeline.GITHUB_TIMEOUT:
+        raise UsageError(
+            f"--timeout above {pipeline.GITHUB_TIMEOUT:.0f}s lets a GitHub read end after its facts must show; pass --timeout {pipeline.GITHUB_TIMEOUT:.0f}s or less"
+        )
+    cache = Path(args.cache).expanduser().resolve()
+    if {cache, cache.with_suffix(".tmp")} & t3.database_files(args.db):
+        raise UsageError(
+            f"--cache {cache} would overwrite T3's database; pass another --cache path"
+        )
     try:
         con = t3.connect(args.db, args.timeout)
     except t3.DatabaseError as error:
@@ -632,7 +656,6 @@ def work(args: argparse.Namespace) -> dict:
     # autocommit: a read transaction lives only inside Follower.read
     con.isolation_level = None
     state = State()
-    cache = Path(args.cache).expanduser()
     service = Service(
         con, github.Cached(github.gh_reader(args.timeout), cache), args.days, state
     )
@@ -673,8 +696,10 @@ they arrive, with an open end: it follows now and shows how old its data is.
 Every 2 s the service asks T3 whether its database changed, through a
 read-only connection that holds no read transaction between polls. GitHub's
 merged and closed items stay cached; open ones are read again in one query per
-repository every 60 s, or when T3 sees a linked PR change state. A read that
-fails keeps the last good data and says so on the page.
+repository every 60 s, or when T3 sees a linked PR change state. Like the
+replay, the page shows each GitHub fact 85 s after GitHub had it, which the
+service always knows by then. A read that fails keeps the last good data and
+says so on the page.
 
 GET /          the dashboard page
 GET /data.json the page data and its age; ?v=<version> omits unchanged data
@@ -703,7 +728,7 @@ examples:
         "--days",
         type=float,
         default=2.0,
-        help="show Head Chefs created in the last N days (default: %(default)s)",
+        help="show Head Chefs created in the last N days, and older ones not ended yet (default: %(default)s)",
     )
     parser.add_argument(
         "--cache",
@@ -713,8 +738,8 @@ examples:
     parser.add_argument(
         "--timeout",
         type=duration,
-        default=30.0,
-        help="timeout per GitHub read or database lock wait (default: 30s)",
+        default=pipeline.GITHUB_TIMEOUT,
+        help="timeout per GitHub read or database lock wait, at most 20s (default: 20s)",
     )
     return run_script(parser, work, argv, debug="LIVE_DEBUG")
 

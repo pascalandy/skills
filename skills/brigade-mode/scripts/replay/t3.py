@@ -868,23 +868,31 @@ def database_files(path: str | Path) -> set[Path]:
 
 
 def head_chefs(
-    con: sqlite3.Connection, since: str | None = None, only: Iterable[str] = ()
+    con: sqlite3.Connection,
+    since: str | None = None,
+    only: Iterable[str] = (),
+    unfinished: bool = False,
 ) -> list[str]:
     """Head Chef threads: titled `Head Chef <id4>` where id4 ends their own threadId.
 
     A thread that only talks about a run, such as "Head Chef 91c4 status
     reconciliation", carries another threadId and is not its Head Chef.
+    `unfinished` also keeps one created before `since` while its title does
+    not end the run with ⛳ or ⏹️, as the live page does.
     """
     wanted = {x.lower() for x in only}
     rows = con.execute(
         "select thread_id, title, created_at from orchestration_v2_projection_threads "
-        "where title like 'Head Chef %' and created_at >= ? order by created_at, thread_id",
-        (since or "",),
+        "where title like 'Head Chef %' order by created_at, thread_id"
     ).fetchall()
     return [
         tid
-        for tid, title, _ in rows
-        if head_chef_title(tid, parse_title(title))
+        for tid, title, created in rows
+        if head_chef_title(tid, parsed := parse_title(title))
+        and (
+            created >= (since or "")
+            or (unfinished and parsed and parsed["status"] not in ("⛳", "⏹️"))
+        )
         and (not wanted or tid[-4:].lower() in wanted)
     ]
 
@@ -939,7 +947,9 @@ class Follower:
     """
 
     con: sqlite3.Connection
-    since: Callable[[], str]  # Head Chefs created from then on, asked at each read
+    since: Callable[
+        [], str
+    ]  # Head Chefs created from then on or unfinished, asked at each read
     snap: Snapshot = field(default_factory=Snapshot)
     heads: list[str] = field(default_factory=list)
     members: set[str] = field(default_factory=set)
@@ -960,7 +970,9 @@ class Follower:
         try:
             return self._read()
         except BaseException:
-            self.reset()  # a half-applied read starts over from scratch next time
+            # a half-applied read starts over from scratch, at the next poll
+            self.reset()
+            self.version = None
             raise
         finally:
             self.con.execute("commit")
@@ -972,7 +984,7 @@ class Follower:
         ((upto,),) = self.con.execute(
             "select coalesce(max(sequence), 0) from orchestration_events"
         ).fetchall()
-        heads = head_chefs(self.con, self.since())
+        heads = head_chefs(self.con, self.since(), unfinished=True)
         if set(self.heads) - set(heads):
             self.reset()  # a run left the window: its threads leave memory too
         self.heads = heads

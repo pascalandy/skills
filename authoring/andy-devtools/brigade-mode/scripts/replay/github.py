@@ -122,6 +122,8 @@ class Facts:
         self.items: dict[Ref, dict | None] = {}
         self.now: str | None = None  # facts a page shows after this time are hidden
         self.known: str | None = None  # facts GitHub had after this time are hidden
+        # when the first fact `now` hid shows: the live service recomputes then
+        self.upcoming: str | None = None
 
     # -- what a subclass supplies
     def fetch_repository(self, name: str) -> dict:
@@ -143,7 +145,7 @@ class Facts:
         `known` also hides what GitHub had after it, as a reader whose last
         read of GitHub was then sees it.
         """
-        self.now, self.known = now, known
+        self.now, self.known, self.upcoming = now, known, None
         return self
 
     def seen(self, time: str | None) -> str | None:
@@ -151,7 +153,10 @@ class Facts:
         if not time or (self.known is not None and time > self.known):
             return None
         shown = delayed(time)
-        return shown if self.now is None or shown <= self.now else None
+        if self.now is not None and shown > self.now:
+            self.upcoming = min(self.upcoming or shown, shown)
+            return None
+        return shown
 
     # -- questions
     def repository(self, name: str) -> str:
@@ -283,19 +288,24 @@ class GitHub(Facts):
             missing_ok,
         )
         if not result.get("repository"):
-            raise ValueError(f"GitHub returned no repository for {repo}")
+            raise ReadError(
+                f"GitHub returned no repository for {repo}; check it with 'gh repo view {repo}'"
+            )
         return result["repository"]
 
     def gql(self, query: str, missing_ok: bool = False) -> dict:
         result = self.read(["api", "graphql", "-f", f"query={query}"])
-        if result.get("errors") and not (
-            missing_ok
-            and all(error.get("type") == "NOT_FOUND" for error in result["errors"])
+        errors = result.get("errors") or []
+        if errors and not (
+            missing_ok and all(error.get("type") == "NOT_FOUND" for error in errors)
         ):
-            raise ValueError(
-                "GitHub GraphQL: " + "; ".join(e["message"] for e in result["errors"])
+            words = "; ".join(str(e.get("message")) for e in errors)
+            raise ReadError(
+                f"GitHub GraphQL: {words}; rerun this command once GitHub answers",
+                temporary=any(e.get("type") == "RATE_LIMITED" for e in errors),
+                detail=f"GitHub GraphQL: {words}",
             )
-        return result["data"]
+        return result.get("data") or {}
 
     def fetch_prs(self, refs: list[Ref]) -> None:
         by_repo: dict[str, list[int]] = defaultdict(list)
@@ -462,6 +472,11 @@ def gh_reader(timeout: float) -> Callable[[list[str]], dict]:
                 temporary=temporary,
                 detail=message,
             )
-        return json.loads(done.stdout)
+        try:
+            return json.loads(done.stdout)
+        except ValueError as error:
+            raise ReadError(
+                "GitHub answered with no JSON; rerun this command", temporary=True
+            ) from error
 
     return read

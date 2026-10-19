@@ -7,6 +7,7 @@ import os
 import shutil
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -122,6 +123,25 @@ def test_follower_folds_what_load_reads(tmp_path: Path) -> None:
             W
         }  # a PR T3 saw change state: read its repository now
         assert not follower.changed()
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_an_older_run_shows_until_its_head_chef_ends_it(tmp_path: Path) -> None:
+    db = FakeT3(tmp_path / "t3.sqlite")
+    head_chef(db)  # created 2026-01-01, titled 🟢
+    con = t3.connect(db.path, 5)
+    try:
+        assert t3.head_chefs(con, "2026-06-01") == []
+        assert t3.head_chefs(con, "2026-06-01", unfinished=True) == [HC]
+        db.tool(
+            HC,
+            "rn2",
+            "t3_thread_update",
+            {"action": "rename", "title": "Head Chef abcd 1/1 ⛳ widget"},
+        )
+        assert t3.head_chefs(con, "2026-06-01", unfinished=True) == []
     finally:
         con.close()
         db.con.close()
@@ -320,7 +340,8 @@ def test_page_repaints_within_seconds_of_a_new_event(
         db.con.close()
 
 
-def test_service_stops_when_its_code_changes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("changed", ["scripts/replay/board.js", "references/model.py"])
+def test_service_stops_when_its_code_changes(tmp_path: Path, changed: str) -> None:
     app = tmp_path / "brigade-mode"  # the skill package, as a deploy installs it
     shutil.copytree(
         HERE.parents[2], app, ignore=shutil.ignore_patterns("tests", "__pycache__")
@@ -328,8 +349,8 @@ def test_service_stops_when_its_code_changes(tmp_path: Path) -> None:
     db = live_run(tmp_path)
     proc, _ = start(tmp_path, db, app / "scripts" / "replay" / "live.py")
     try:
-        board = app / "scripts" / "replay" / "board.js"
-        board.write_text(board.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        code = app / changed
+        code.write_text(code.read_text(encoding="utf-8") + "\n", encoding="utf-8")
         out, _ = proc.communicate(timeout=10)
         assert proc.returncode == 0
         assert json.loads(out.splitlines()[-1])["stopped"] == "its code changed"
@@ -349,16 +370,124 @@ def test_data_age_counts_only_data_that_matches_t3(
     state = live.State()
     service = live.Service(con, github.Cached(github.gh_reader(10)), 1, state)
     try:
+        now = time.time()
         (tmp_path / "gh-down").touch()  # the first page needs GitHub facts
-        service.tick(time.time())
+        service.tick(now)
         assert state.published.version == 0 and state.read is None
         assert "HTTP 502" in state.failures["github_new"].message
         (tmp_path / "gh-down").unlink()
-        service.tick(time.time())
+        service.tick(now + pipeline.POLL)  # GitHub gets one read per turn
+        assert state.published.version == 0
+        service.tick(now + pipeline.GITHUB_EVERY)
         assert state.published.version == 1 and state.read is not None
         assert state.failures == {}
     finally:
         con.close()
+        db.con.close()
+
+
+def test_a_failed_t3_read_keeps_the_last_page_and_reads_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    db = live_run(tmp_path)
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(github.gh_reader(10)), 1, state)
+    heads, broken = t3.head_chefs, [True]
+
+    def flaky(*args: object, **kwargs: object) -> list[str]:
+        if broken:
+            raise sqlite3.OperationalError("database disk image is malformed")
+        return heads(*args, **kwargs)  # type: ignore[arg-type]
+
+    try:
+        now = time.time()
+        service.tick(now)
+        first = state.published
+        assert first.data["brigades"]
+        monkeypatch.setattr(t3, "head_chefs", flaky)
+        db.item(HC, "a1", "assistant_message", text=ASK)
+        service.tick(now + 2)
+        service.tick(now + 2 + live.CLOCK_EVERY)
+        assert state.published is first and "malformed" in state.failures["t3"].message
+        assert not state.health(now + 2 + live.CLOCK_EVERY)[0]
+        broken.clear()
+        service.tick(now + 4 + live.CLOCK_EVERY)  # the failed read is read again
+        assert state.published.version == first.version + 1
+        assert state.published.data["brigades"] and "t3" not in state.failures
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_github_errors_wait_their_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    gh_read, reads, limited = github.gh_reader(10), [], []
+
+    def read(args: list[str]) -> dict:
+        reads.append(args)
+        if limited and args[:2] == ["api", "graphql"]:
+            error = {"type": "RATE_LIMITED", "message": "API rate limit exceeded"}
+            return {"data": None, "errors": [error]}
+        return gh_read(args)
+
+    db = live_run(tmp_path)
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(read), 1, state)
+    # a merge waits a whole turn, a poll and a timed-out read, still before it shows
+    assert pipeline.LAG < github.DELAY
+    try:
+        now = time.time()
+        service.tick(now)
+        assert state.published.version == 1
+        limited.append(True)
+        before = len(reads)
+        for t in range(int(pipeline.GITHUB_EVERY), 120, int(pipeline.POLL)):
+            assert service.tick(now + t) is None  # the service stays up
+        assert len(reads) == before + 1  # one failed read in 60 s, not one per poll
+        assert "rate limit" in state.failures["github"].message
+        service.tick(now + 120)
+        assert len(reads) == before + 2
+    finally:
+        con.close()
+        db.con.close()
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"), [("--cache", "t3.sqlite-wal"), ("--timeout", "30s")]
+)
+def test_live_refuses_settings_that_break_its_promises(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    db = live_run(tmp_path)  # its open writer keeps the -wal file
+    wal = tmp_path / "t3.sqlite-wal"
+    before = wal.read_bytes()
+    try:
+        done = subprocess.run(
+            [
+                sys.executable,
+                str(HERE.parent / "live.py"),
+                *("--db", str(db.path), "--port", str(free_port())),
+                flag,
+                str(tmp_path / value) if flag == "--cache" else value,
+            ],
+            capture_output=True,
+            text=True,
+            env={**os.environ, **fake_env(tmp_path)},
+            timeout=30,
+            check=False,
+        )
+        assert done.returncode == 2 and done.stdout == ""
+        assert wal.read_bytes() == before
+    finally:
         db.con.close()
 
 
