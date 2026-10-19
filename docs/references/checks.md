@@ -10,7 +10,7 @@ date_created: 2026-09-26
 date_updated: 2026-10-18
 ---
 
-`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand
+`just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand, to publish a release
 
 ## Sign off a PR
 
