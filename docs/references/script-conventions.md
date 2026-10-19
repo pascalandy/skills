@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-07
+date_updated: 2026-10-18
 ---
 
 Every CLI in `scripts/` follows this contract. A skill-local script follows it too, and its skill's own tests cover it
@@ -96,7 +96,9 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
-- `replay.py` in `brigade-mode`: no `--db -`; the T3 SQLite database is opened read-only from a file, not streamed through stdin
+- `replay.py`, `record.py` and `live.py` in `brigade-mode`: no `--db -`; the T3 SQLite database is opened read-only from a file, not streamed through stdin
+- `oracles.py` in `brigade-mode`: no `-` for a recording; each one is a gzipped file
+- `live.py` in `brigade-mode`: no `-o`; it serves its page over HTTP, and `--cache` names the one file it writes
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
 
