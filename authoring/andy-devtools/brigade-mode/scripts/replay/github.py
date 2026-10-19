@@ -58,6 +58,17 @@ def unkey(text: str) -> Ref:
     return repo, int(n)
 
 
+def aliases(
+    prs: Iterable[int] = (), issues: Iterable[int] = (), items: Iterable[int] = ()
+) -> list[str]:
+    """Query fields for one repository's PRs, issues and 🙋 items, each under its alias."""
+    return (
+        [f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}" for n in prs]
+        + [f"i{n}: issue(number:{n}){{{ISSUE_FIELDS}}}" for n in issues]
+        + [f"x{n}: issueOrPullRequest(number:{n}){{{ITEM_FIELDS}}}" for n in items]
+    )
+
+
 def reduce_item(x: dict) -> dict:
     """An issue or a PR a 🙋 line names: when it merged or closed."""
     return {"merged": norm(x.get("mergedAt")), "closed": norm(x.get("closedAt"))}
@@ -291,9 +302,7 @@ class GitHub(Facts):
         for repo, n in refs:
             by_repo[repo].append(n)
         for repo, ns in sorted(by_repo.items()):
-            body = " ".join(
-                f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}" for n in sorted(ns)
-            )
+            body = " ".join(aliases(prs=sorted(ns)))
             for v in self.repo_query(repo, body).values():
                 self.prs[(repo, v["number"])] = reduce_pr(repo, v)
 
@@ -350,15 +359,13 @@ class Cached(GitHub):
         wanted: dict[str, list[str]] = defaultdict(list)
         for (repo, n), p in self.prs.items():
             if not (p["merged"] or p["closed"]):
-                wanted[repo].append(f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}")
+                wanted[repo] += aliases(prs=[n])
         for (repo, n), i in self.issues.items():
             if i and not i["closed"]:
-                wanted[repo].append(f"i{n}: issue(number:{n}){{{ISSUE_FIELDS}}}")
+                wanted[repo] += aliases(issues=[n])
         for (repo, n), x in self.items.items():
             if x and not (x["merged"] or x["closed"]):
-                wanted[repo].append(
-                    f"x{n}: issueOrPullRequest(number:{n}){{{ITEM_FIELDS}}}"
-                )
+                wanted[repo] += aliases(items=[n])
         return dict(wanted)
 
     def refresh(self, repos: Iterable[str] | None = None) -> int:

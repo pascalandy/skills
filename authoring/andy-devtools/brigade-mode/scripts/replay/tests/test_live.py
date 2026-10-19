@@ -19,9 +19,11 @@ from typing import TYPE_CHECKING
 
 import github
 import live
+import pipeline
 import pytest
 import t3
 from fake_t3 import FakeT3
+from test_record import fake_env
 
 if TYPE_CHECKING:
     from playwright.sync_api import Browser
@@ -151,20 +153,6 @@ def test_no_read_transaction_stays_open_between_reads(tmp_path: Path) -> None:
         db.con.close()
 
 
-def fake_env(tmp_path: Path) -> dict[str, str]:
-    """A gh that answers from canned facts, down while tmp_path/gh-down exists."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir(exist_ok=True)
-    gh = bin_dir / "gh"
-    gh.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{HERE / "fake_gh.py"}" "$@"\n')
-    gh.chmod(0o755)
-    return {
-        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
-        "HOME": str(tmp_path),
-        "FAKE_GH_DOWN": str(tmp_path / "gh-down"),
-    }
-
-
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -182,7 +170,7 @@ def get(port: int, path: str) -> tuple[int, dict]:
 
 
 def start(tmp_path: Path, db: FakeT3, script: Path) -> tuple[subprocess.Popen, int]:
-    """live.py on the database copy, with a fake gh and an empty home: no real work folder."""
+    """live.py on the database copy, with the fake gh and an empty home."""
     env = {**os.environ, **fake_env(tmp_path)}
     port = free_port()
     proc = subprocess.Popen(
@@ -372,3 +360,9 @@ def test_data_age_counts_only_data_that_matches_t3(
     finally:
         con.close()
         db.con.close()
+
+
+def test_live_settings_cannot_close_the_page_script() -> None:
+    error = "</script><script>alert(1)</script>"  # an error string from T3 or gh
+    page = pipeline.render_page({"generated": "", "brigades": []}, {}, {"error": error})
+    assert error not in page and page.count("</script>") == 1

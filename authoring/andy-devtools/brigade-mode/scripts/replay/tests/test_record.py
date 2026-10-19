@@ -133,17 +133,23 @@ def build(path: Path) -> None:
     db.con.close()  # tests read the file; an open connection warns under -W error
 
 
-def run_record(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def fake_env(tmp_path: Path) -> dict[str, str]:
+    """A gh that answers from canned facts, down while tmp_path/gh-down exists,
+    and an empty home, so no real work folder is read."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     gh = bin_dir / "gh"
     gh.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{HERE / "fake_gh.py"}" "$@"\n')
     gh.chmod(0o755)
-    env = {
-        **os.environ,
+    return {
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "HOME": str(tmp_path),
+        "FAKE_GH_DOWN": str(tmp_path / "gh-down"),
     }
+
+
+def run_record(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, **fake_env(tmp_path)}
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         capture_output=True,

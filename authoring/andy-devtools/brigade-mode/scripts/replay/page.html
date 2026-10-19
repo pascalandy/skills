@@ -525,6 +525,7 @@ function init() {
   let w = innerWidth, wait = 0;
   addEventListener("resize", () => { clearTimeout(wait); wait = setTimeout(() => { if (innerWidth !== w && S.sel.length) { w = innerWidth; mountAll(); paint(); } }, 200); });
   if (LIVE) {
+    $("h1").textContent = document.title = "Brigade live";
     banner();
     setInterval(poll, LIVE.poll);
     setInterval(banner, 1000);

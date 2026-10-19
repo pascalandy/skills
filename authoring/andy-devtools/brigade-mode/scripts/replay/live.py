@@ -356,18 +356,17 @@ import math
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import github
 import pipeline
 import privacy
+import statuses
 import t3
 
 HERE = Path(__file__).resolve().parent
-POLL = 2.0  # seconds between two reads of PRAGMA data_version
-GITHUB_EVERY = 60.0  # seconds between two reads of a repository's open items
+POLL, GITHUB_EVERY = pipeline.POLL, pipeline.GITHUB_EVERY
 # with no new event the page still moves on: a Cook idles 120 s after its turn
 CLOCK_EVERY = 10.0
 PAGE_POLL_MS = 1000  # how often the page asks for new data
@@ -391,11 +390,6 @@ def own_files() -> dict[str, tuple[int, int]]:
 
 def clock(t: float) -> str:
     return time.strftime("%H:%M:%S", time.localtime(t))
-
-
-def p95(values: list[float]) -> float | None:
-    ordered = sorted(values)
-    return ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)] if ordered else None
 
 
 @dataclass
@@ -472,12 +466,12 @@ class State:
             "age": age,
             "unparsed": p.unparsed,
             "version": p.version,
-            "lag_p95": p95(self.lags),
+            "lag_p95": pipeline.p95(self.lags),
             "github": {
                 "age": None
                 if self.github_read is None
                 else round(now - self.github_read, 1),
-                "query_p95": p95(self.github_queries),
+                "query_p95": pipeline.p95(self.github_queries),
             },
             "errors": failure,
         }
@@ -569,17 +563,13 @@ class Service:
         self.state.failures.pop("github_new", None)
         self.pending = False
         if fresh and snap.time and not first:  # the first build reads GitHub cold
-            lag = time.time() - t3_seconds(snap.time)
+            lag = time.time() - statuses.ts(snap.time)
             self.state.lags = (self.state.lags + [lag])[-LAGS:]
         self.computed = now
         try:
             self.gh.save()
         except OSError as error:
             logging.getLogger(__name__).info("Cannot save the GitHub cache: %s", error)
-
-
-def t3_seconds(stamp: str) -> float:
-    return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
 
 
 def handler(state: State) -> type[http.server.BaseHTTPRequestHandler]:

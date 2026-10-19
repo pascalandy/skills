@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -14,6 +15,13 @@ import t3
 from github import Facts, Recorded, unkey
 
 HERE = Path(__file__).resolve().parent
+# The live service's cadence, which oracle 5 measures
+POLL = 2.0  # seconds between two reads of PRAGMA data_version
+GITHUB_EVERY = 60.0  # seconds between two reads of a repository's open items
+GITHUB_TIMEOUT = 20.0  # seconds a GitHub read may take before it fails
+# The oldest GitHub facts the live service may hold: a merge right after one
+# read waits for the next one, up to a poll late, and its timeout
+LAG = GITHUB_EVERY + GITHUB_TIMEOUT + 2 * POLL
 
 
 class PrivacyError(ValueError):
@@ -130,6 +138,11 @@ def recording_data(
     return data
 
 
+def p95(values: Iterable[float]) -> float | None:
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)] if ordered else None
+
+
 def t3_time(seconds: float) -> str:
     from datetime import UTC, datetime
 
@@ -156,5 +169,7 @@ def render_page(
     page = page.replace(
         "/*__BOARD__*/", (HERE / "board.js").read_text(encoding="utf-8")
     )
-    page = page.replace("/*__LIVE__*/null", json.dumps(live, separators=(",", ":")))
+    settings = json.dumps(live, ensure_ascii=False, separators=(",", ":"))
+    # the banner's error text comes from T3 and gh: no "</script>" may close the page's script
+    page = page.replace("/*__LIVE__*/null", settings.replace("<", "\\u003c"))
     return page.replace("/*__DATA__*/null", payload)
