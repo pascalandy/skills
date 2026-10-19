@@ -2,7 +2,7 @@
 
 For Pascal designing the route in VS Code. This illustrative sequence shows who owns each handoff: the Cook owns reviews and watches; the Chef owns validation and merging.
 
-A CU is a use case showing the process between Pascal and the threads. When an SOP step changes, update the process table in `carpaccio.md` and this diagram wherever they show that step. Agents executing SOPs do not read this file.
+A CU is a use case showing the process between Pascal and the threads. When an SOP step changes, update the process table in `carpaccio.md` and this diagram wherever they show that step. When a status rule changes, change [the status model](../../references/model.py) with it: `just check` runs the model on any change to brigade-mode. Agents executing SOPs do not read this file.
 
 ## Conventions
 
