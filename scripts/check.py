@@ -403,6 +403,12 @@ CHECKS = [
         pyright(HEADLESS),
         pytest(f"{HEADLESS}/tests"),
     ),
+    # carpaccio's status model; arancini and bisque have none
+    Check(
+        "brigade-carpaccio",
+        uv_run("authoring/andy-devtools/brigade-mode/references/model.py"),
+        pytest("authoring/andy-devtools/brigade-mode/references/tests"),
+    ),
     Check(
         "writing-for-agents",
         *ruff(f"{WRITING_FOR_AGENTS}/scripts"),
