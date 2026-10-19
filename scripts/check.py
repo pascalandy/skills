@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import re
 import shlex
 import subprocess
@@ -42,7 +43,8 @@ EXIT_CODES = exit_codes({0: "every selected check passed", 1: "a check failed"})
 
 RUFF = "ruff@0.16.9"
 PYRIGHT = "pyright@1.1.414"
-# The requires-python minimum of scripts/: a bug only an older Python shows fails here (#508)
+# The requires-python minimum of scripts/: a bug only an older Python shows fails here (#508).
+# A test suite whose scripts declare no minimum runs under it too
 PYTHON = "3.11"
 PYTEST = "9.1.1"
 XDIST = "pytest-xdist==3.8.0"
@@ -121,18 +123,53 @@ def pyright(path: str, *deps: str, python: str = PYTHON) -> Command:
     )
 
 
-def pytest(
-    path: str | tuple[str, ...],
-    *deps: str,
-    parallel: bool = True,
-    python: str | None = None,
-) -> Command:
-    # uv prefers a Python it manages, so once the root batch downloads 3.11, a
-    # check without python= runs under it too; a skill whose scripts need a
-    # newer Python passes their requires-python minimum
+# PEP 723's pattern for a script metadata block, and the >= minimum of its requires-python
+SCRIPT_BLOCK = re.compile(r"(?m)^# /// script$\s(?P<content>(^#(| .*)$\s)+)^# ///$")
+MINIMUM = re.compile(r"""(?m)^# requires-python\s*=\s*["'][^"']*>=\s*(\d+)\.(\d+)""")
+
+
+def declared_minimum(script: Path) -> tuple[int, int] | None:
+    block = SCRIPT_BLOCK.search(script.read_text(encoding="utf-8"))
+    minimum = block and MINIMUM.search(block["content"])
+    return (int(minimum[1]), int(minimum[2])) if minimum else None
+
+
+def requires_python(suite: str | tuple[str, ...]) -> str:
+    """The Python a test suite runs under: the highest requires-python minimum
+    its scripts declare, else PYTHON (#692).
+
+    A suite's scripts are the *.py files under the folder that holds its tests
+    folder. A subfolder with its own tests folder holds another suite, so its
+    scripts count there instead.
+    """
+    minimums: list[tuple[int, int]] = []
+    for each in suite if isinstance(suite, tuple) else (suite,):
+        path = Path(each)
+        tests = next((p for p in (path, *path.parents) if p.name == "tests"), None)
+        if tests is None:
+            continue
+        for folder, subfolders, files in os.walk(ROOT / tests.parent):
+            subfolders[:] = [
+                name for name in subfolders if not Path(folder, name, "tests").is_dir()
+            ]
+            for name in files:
+                if name.endswith(".py") and (
+                    found := declared_minimum(Path(folder, name))
+                ):
+                    minimums.append(found)
+    if not minimums:
+        return PYTHON
+    major, minor = max(minimums)
+    return f"{major}.{minor}"
+
+
+def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Command:
+    # uv prefers a Python it manages, so without --python a suite runs under
+    # whichever one a machine holds, and the verdict differs between machines
     return (
         "uvx",
-        *(("--python", python) if python else ()),
+        "--python",
+        requires_python(path),
         "--from",
         f"pytest@{PYTEST}",
         *with_deps(((XDIST,) if parallel else ()) + deps),
@@ -312,7 +349,7 @@ CHECKS = [
     Check(
         "distill",
         *ruff(f"{ANDY_MODE}/scripts/distill"),
-        pytest(f"{ANDY_MODE}/scripts/distill/tests", python="3.12"),
+        pytest(f"{ANDY_MODE}/scripts/distill/tests"),
     ),
     Check(
         "tavily",
@@ -325,14 +362,13 @@ CHECKS = [
             "httpx",
             "yt-dlp==2026.7.4",
             "rich",
-            python="3.12",
         ),
         # Its doc test checks the flags these files pass to transcript
         reads=("justfile", "authoring/verify-loops/verify-transcript/SKILL.md"),
     ),
     Check(
         "verify-transcript",
-        pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests", python="3.12"),
+        pytest(f"{VERIFY_TRANSCRIPT}/scripts/tests"),
     ),
     # The free features run the branch's transcript CLI, so a contract change
     # its verifier missed fails here; the paid real summary stays out of the default run
@@ -501,9 +537,7 @@ def in_scope(checks: list[Check]) -> list[Check]:
 
 def repo_batch(checks: list[Check]) -> Command:
     paths = tuple(check.test_path for check in checks if check.test_path)
-    return pytest(
-        paths, parallel=any(not check.cheap for check in checks), python=PYTHON
-    )
+    return pytest(paths, parallel=any(not check.cheap for check in checks))
 
 
 # pytest's summary line for a failed test, or for a test whose setup failed

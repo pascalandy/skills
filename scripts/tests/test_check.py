@@ -222,6 +222,56 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
     ]
 
 
+def script(path: Path, minimum: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'# /// script\n# requires-python = ">={minimum}"\n# ///\n', encoding="utf-8"
+    )
+
+
+def test_a_skill_suite_runs_under_the_highest_minimum_its_own_scripts_declare(
+    routing_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    scripts = routing_repo / "authoring/content/alpha/scripts"
+    (scripts / "tests").mkdir(parents=True)
+    script(scripts / "alpha.py", "3.12")
+    script(scripts / "lib/helper.py", "3.13")
+    (scripts / "nested/tests").mkdir(parents=True)
+    script(scripts / "nested/nested.py", "3.14")
+    checks = [
+        Check("alpha", check.pytest("authoring/content/alpha/scripts/tests")),
+        Check("nested", check.pytest("authoring/content/alpha/scripts/nested/tests")),
+    ]
+
+    assert verdict(
+        monkeypatch, capfd, checks, "--only", "alpha", "--only", "nested"
+    ) == (
+        0,
+        OK,
+        "",
+    )
+    assert [call[:2] for call in pytest_calls(routing_repo)] == [
+        ["--python", "3.13"],
+        ["--python", "3.14"],
+    ]
+
+
+@pytest.mark.parametrize("name", ["matt-mode", "poteto-mode", "verify-video-archive"])
+def test_a_skill_suite_whose_scripts_declare_no_minimum_runs_under_python_3_11(
+    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str], name: str
+) -> None:
+    code, stdout, stderr = verdict(
+        monkeypatch, capfd, check.CHECKS, "--only", name, "--list", "-v"
+    )
+
+    assert (code, stdout) == (0, f'{{"ok":true,"checks":["{name}"]}}\n')
+    assert [
+        line.split(" --from ")[0] for line in stderr.splitlines() if "pytest@" in line
+    ] == [f"{name}: uvx --python 3.11"]
+
+
 def test_cheap_project_rules_run_on_every_default_check_without_xdist(
     routing_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
