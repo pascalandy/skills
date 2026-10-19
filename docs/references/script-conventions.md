@@ -96,6 +96,7 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
+- `replay.py` in `brigade-mode`: no `--db -`; the T3 SQLite database is opened read-only from a file, not streamed through stdin
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
 - `transcript`: `--profile` names an inference profile, a provider, model, and effort, not an environment
 
