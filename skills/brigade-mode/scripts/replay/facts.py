@@ -166,11 +166,15 @@ class Brigade:
                             release=child.get("release"),
                         )
                 elif tool == "send":
+                    # a message moves no one until T3 delivered it: a pending
+                    # or failed send shows nothing
+                    if item["status"] != "completed" or end is None:
+                        continue
                     to = item.get("to")
                     trole = self.threads[to]["role"] if to in self.threads else "other"
                     msg = t3.classify(item, role, trole)
                     self.ev(
-                        t0,
+                        end,
                         role,
                         tid,
                         "send",

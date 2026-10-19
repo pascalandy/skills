@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import board
+import facts
 import github
 import pipeline
 import pytest
@@ -131,6 +132,24 @@ def test_a_merge_shows_85_seconds_after_github_had_it() -> None:
     assert before and before["merged"] is None
     after = gh.at(pipeline.t3_time(shown)).pr(*ref)
     assert after and board.R.ts(after["merged"]) == shown
+
+
+@pytest.mark.parametrize("status", ["failed", "inProgress"])
+def test_a_send_moves_no_one_until_t3_delivered_it(status: str) -> None:
+    rec = recording("0ba0")
+
+    def sends(records: list) -> list[dict]:
+        events = facts.extract(t3.fold(records), Recorded(rec["github"]), [rec["head"]])
+        return [e for e in events if e["kind"] == "send"]
+
+    assert sends(rec["records"])
+    undelivered = [
+        [*r[:4], {**r[4], "status": status}]
+        if r[2] == "item" and r[4] and r[4].get("tool") == "send"
+        else r
+        for r in rec["records"]
+    ]
+    assert sends(undelivered) == []
 
 
 def test_no_frame_shows_before_its_fact() -> None:
