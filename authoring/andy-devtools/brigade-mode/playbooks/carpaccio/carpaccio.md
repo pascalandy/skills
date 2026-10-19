@@ -223,7 +223,7 @@ Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
 PR fusionnées : <#<n>–#<n>, or aucune>
-Reste pour toi : <🙋 lines, or rien>
+Reste pour toi : <🙋 lines, then each external_gap machine with its cause and fix command, or rien>
 ```
 
 `📍` progress, Cook → Chef, at the end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`.

@@ -11,12 +11,17 @@ Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entr
    - After a restack, compare the stack's own diff. Then apply the approval rule in [Asking Pascal](../carpaccio.md#asking-pascal)
    - Use the project's merge procedure from the frozen Cook worktree. For a single PR, use its merge command. For a stack, follow 🧰 gh-stack Land through its Done, even when the project's procedure covers only a single PR. Then run the project's deploy. In skills, use `just merge` on the merged top branch for that deploy
    - Run the merge command bare, with no pipe or redirect, so its permission rule matches. Read the whole output, since exit 0 can hide a failed deploy
+   - Classify the deploy from that output. The gates below and step 4 use this one result:
+     - `complete`: it reached every machine
+     - `not_required`: the project requires no deploy for this merge
+     - `external_gap`: it missed only machines that no thread of the run uses, counting slots not launched yet, for a cause the run cannot repair, such as their credentials, and the repository's procedure does not require every machine for this stack, such as before it removes an old reader. Record each missed machine, its cause and its fix command
+     - `blocked`: any other miss
    - Check GitHub before retrying an uncertain merge
-   - If another stack remains, wait until GitHub confirms the merge and its deploy succeeded or was not required. Then ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
+   - If another stack remains, wait until GitHub confirms the merge and the deploy is `complete`, `not_required` or `external_gap`. Then ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
 
-   Done when GitHub shows `MERGED` for every PR of the approved stack and its deploy succeeded or was not required
-4. On failure, record landed PRs, send the Cook the cause and return its worktree for Fix. Tell the Head Chef if a previously ready batch lost readiness, so it withdraws its merge item. Report the partial outcome. Resume at step 1 after fresh `🍽️ Stack ready`. Done when each stack merged in order or the Head Chef has an unresolved blocker
-5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch merged` with deploy results. For `Release: yes`, follow the remaining repository release procedure from `main`; check its outcome before retrying an uncertain release and report a failure before closing. Done when all merge and release outcomes are recorded
+   Done when GitHub shows `MERGED` for every PR of the approved stack and its deploy is `complete`, `not_required` or `external_gap`
+4. On a failed merge or a `blocked` deploy, record landed PRs, send the Cook the cause and return its worktree for Fix. An `external_gap` is not a failure: continue. Tell the Head Chef if a previously ready batch lost readiness, so it withdraws its merge item. Report the partial outcome. Resume at step 1 after fresh `🍽️ Stack ready`. Done when each stack merged in order or the Head Chef has an unresolved blocker
+5. After the last stack, tell each Cook `merged` and send the Head Chef `Batch merged` with deploy results, naming each `external_gap` machine with its cause and fix command. For `Release: yes`, follow the remaining repository release procedure from `main`; check its outcome before retrying an uncertain release and report a failure before closing. Done when all merge and release outcomes are recorded
 
 If Pascal says Stop, follow [chef-run Stop](chef-run.md#stop). A frozen watch wake that brings a finding, such as a failed check, a review or comment, or a conflict, invalidates readiness until you return the worktree, the Cook triages it and sends fresh `🍽️ Stack ready`. Tell the Head Chef to withdraw a pending merge item. A wake reporting only passing checks preserves readiness.
 
