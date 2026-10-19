@@ -491,6 +491,10 @@ class Service:
         self.gh, self.state = gh, state
         self.code = own_files()
         self.github_at = -math.inf  # the last read of every open item, failed or not
+        # when the last read of every open item that succeeded started: a page
+        # shows a GitHub fact DELAY after it happened, so it may draw only
+        # while this read is at most DELAY old (#862)
+        self.github_known = -math.inf
         self.computed = -math.inf
         self.retry_at = -math.inf  # a page that needs GitHub waits for its next turn
         self.pending = False  # T3 changed since the data last published
@@ -524,6 +528,8 @@ class Service:
                         -LAGS:
                     ]
                 self.state.github_read, refreshed = now, True
+                if due:
+                    self.github_known = now
                 self.state.failures.pop("github", None)
             except github.ReadError as error:
                 self.failed("github", now, error)
@@ -532,14 +538,17 @@ class Service:
             self.gh.upcoming is not None and pipeline.t3_time(now) >= self.gh.upcoming
         )
         moved = self.pending or refreshed or upcoming
-        # a failed T3 read leaves no snapshot to draw: the last good page stays
+        # a failed T3 read leaves no snapshot to draw, and GitHub facts older
+        # than the delay may miss a merge a later read finds: the last good
+        # page stays, and its age grows
+        current = t3_ok and now - self.github_known <= github.DELAY
         if (
-            t3_ok
+            current
             and now >= self.retry_at
             and (moved or now - self.computed >= CLOCK_EVERY)
         ):
             self.compute(now, self.pending)
-        if t3_ok and not self.pending:
+        if current and not self.pending:
             self.state.read = now
         return None
 
@@ -698,8 +707,9 @@ read-only connection that holds no read transaction between polls. GitHub's
 merged and closed items stay cached; open ones are read again in one query per
 repository every 60 s, or when T3 sees a linked PR change state. Like the
 replay, the page shows each GitHub fact 85 s after GitHub had it, which the
-service always knows by then. A read that fails keeps the last good data and
-says so on the page.
+service knows by then. A read that fails keeps the last good data and says so
+on the page; once GitHub's open items have gone 85 s unread, the page stops
+moving and its age grows, so it never shows a state a later read contradicts.
 
 GET /          the dashboard page
 GET /data.json the page data and its age; ?v=<version> omits unchanged data

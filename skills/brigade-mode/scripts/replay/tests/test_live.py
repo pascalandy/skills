@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import github
 import live
+import oracles
 import pipeline
 import pytest
 import t3
@@ -456,6 +457,51 @@ def test_github_errors_wait_their_turn(
         assert "rate limit" in state.failures["github"].message
         service.tick(now + 120)
         assert len(reads) == before + 2
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_a_github_outage_never_rewrites_what_the_page_showed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    gh_read, down, merged = github.gh_reader(10), [], []
+
+    def read(args: list[str]) -> dict:
+        if down and args[:2] == ["api", "graphql"]:
+            error = {"type": "RATE_LIMITED", "message": "API rate limit exceeded"}
+            return {"data": None, "errors": [error]}
+        answer = gh_read(args)
+        pr = ((answer.get("data") or {}).get("repository") or {}).get("p21")
+        if merged and pr:
+            pr["mergedAt"] = pr["closedAt"] = merged[0]
+        return answer
+
+    db = live_run(tmp_path)
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(read), 1, state)
+    try:
+        now = time.time()
+        service.tick(now)
+        merged.append(pipeline.t3_time(now + 1))  # Pascal merges PR 21
+        down.append(True)  # and the next read of open items fails
+        shown: dict[int, tuple[float, list]] = {}
+        for t in range(2, 120, 2):
+            service.tick(now + t)
+            p = state.published
+            shown.setdefault(p.version, (now + t, p.data["brigades"][0]["frames"]))
+        assert state.read is not None and state.read <= now + github.DELAY
+        assert not state.health(now + 118)[0]
+        down.clear()
+        service.tick(now + 120)  # the read that finds the merge
+        final = state.published.data["brigades"][0]["frames"]
+        assert oracles.state_at(final, now + 120)["cook-1.1"][2] == "shipped"
+        for at, frames in shown.values():
+            assert oracles.state_at(frames, at) == oracles.state_at(final, at)
     finally:
         con.close()
         db.con.close()
