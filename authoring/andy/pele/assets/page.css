@@ -1,0 +1,39 @@
+.pele-page {
+  --gap: 1.5rem;
+  --gap-s: .5rem;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--pele-bg); color: var(--pele-fg); font: 16px/1.5 var(--font); }
+header, main { max-width: 1640px; margin: 0 auto; padding: 0 var(--gap); }
+main { padding-bottom: var(--gap); }
+header { padding-top: var(--gap); display: grid; gap: var(--gap-s); }
+h1 { margin: 0; font-size: 1.75rem; line-height: 1.2; }
+:focus-visible { outline: 3px solid var(--pele-accent); outline-offset: 2px; }
+.read { margin: 0; max-width: 70ch; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--gap-s) var(--gap); margin: 0; padding: 0;
+  list-style: none; font-size: .875rem; color: var(--pele-muted); }
+.legend li { display: flex; align-items: center; gap: .4rem; }
+.swatch { width: 1.6rem; height: 1rem; border-radius: 3px; }
+.swatch.phase { background: var(--note); border: 1px solid var(--note-border); }
+.swatch.yes { background: var(--yes); border: 1px solid var(--yes-border); }
+.swatch.no { border: 2px solid var(--no); }
+.swatch.decision { width: auto; height: auto; }
+.diagram { margin: var(--gap) 0 0; overflow-x: auto; }
+.diagram svg { display: block; }
+/* On a phone, the diagram keeps its size and scrolls sideways instead of shrinking its text */
+@media (max-width: 900px) { .diagram svg { max-width: none !important; } }
+
+.pele { --pele-font: var(--font); }
+.pele-lifeline { stroke: var(--lifeline); }
+.pele-note rect { fill: var(--note); stroke: var(--note-border); }
+.pele-note text { fill: var(--note-text); }
+.is-yes rect { fill: var(--yes); stroke: var(--yes-border); }
+.is-yes text { fill: var(--yes-text); }
+.pele-frame-break > rect:first-child { stroke: var(--no); stroke-width: 2; }
+.pele-frame-break > rect:nth-child(2) { fill: var(--no); stroke: var(--no); }
+.pele-frame-break .pele-frame-kind { fill: #303446; }
+.pele-frame-break .pele-frame-label { fill: var(--no-text); }
+.is-decision text { fill: var(--decision); }
+.pele-edge-label rect { display: none; }
+.pele-edge-label text { paint-order: stroke; stroke: var(--pele-bg); stroke-width: 4px; stroke-linejoin: round; }

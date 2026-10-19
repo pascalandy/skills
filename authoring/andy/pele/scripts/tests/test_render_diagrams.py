@@ -1,10 +1,9 @@
-"""Behavior tests for render_diagrams.py against a real pele install; pnpm downloads it once."""
+"""Behavior tests for render_diagrams.py against a real pele install."""
 
 from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,20 +11,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).parents[1] / "render_diagrams.py"
-THEME = Path(__file__).parents[2] / "assets/theme.css"
-PELE = "pele@1.6.0"
-
-
-@pytest.fixture(scope="session")
-def project(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A folder with pele installed, as a project that uses it would have."""
-    if shutil.which("pnpm") is None:
-        pytest.fail(
-            "pnpm not found; install it, then rerun: https://pnpm.io/installation"
-        )
-    folder = tmp_path_factory.mktemp("project")
-    subprocess.run(["pnpm", "add", PELE], cwd=folder, check=True, capture_output=True)
-    return folder
+THEME = Path(__file__).parents[2] / "assets/theme-dark.css"
 
 
 def run(

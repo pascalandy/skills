@@ -1,0 +1,23 @@
+.pele,
+.pele-page {
+  --pele-bg: #ffffff;
+  --pele-fg: #303446;
+  --pele-muted: #626880;
+  --pele-line: #303446;
+  --pele-surface: #ffffff;
+  --pele-border: #838ba7;
+  --pele-accent: #303446;
+  --lifeline: #838ba7;
+  --note: #f2d5cf;
+  --note-border: #ef9f76;
+  --note-text: #303446;
+  --yes: #a6d189;
+  --yes-border: #81c8be;
+  --yes-text: #303446;
+  --no: #e78284;
+  --no-text: #303446;
+  --decision: #303446;
+}
+.pele {
+  background: var(--pele-bg);
+}
