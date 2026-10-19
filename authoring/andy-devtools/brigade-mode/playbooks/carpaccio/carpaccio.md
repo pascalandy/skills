@@ -33,7 +33,7 @@ After renaming, read the title from T3. If the title is stale, retry the rename 
 
 Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. If T3 shows the pinned Head Chef failed and its Watchdog stopped, that failed row also needs Pascal's attention.
 
-Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
+Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live, including one that waits for a merge as [After-merge slots](#after-merge-slots) says. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
 
 | Status | Meaning | Final for |
 |---|---|---|
@@ -43,7 +43,7 @@ Every thread computes its status from its own facts and the last phases received
 | ❓ `<item>` | Head Chef waits on Pascal for an item in Asking Pascal | none |
 | 🔀 merging | Chef merges stacks and releases | none |
 | 🧹 closing | Chef or Cook runs retros and cleanup | none |
-| 🍽️ served | Cook handed up its stack, or finished after its stack merged; Chef has a ready batch at x/x | Cook, after closing |
+| 🍽️ served | Cook handed up its stack, or finished after its stack merged; Chef has a ready batch at x/x, or below it only by after-merge slots | Cook, after closing |
 | ⏸️ paused | Chef waits on Head Chef, or Cook waits on Chef | none |
 | ⛳ delivered | All in-scope slots and own deliverables are done | Head Chef, Chef |
 | ⏹️ stopped | Work closed without delivery after Stop, a cut or replacement | Head Chef, Chef, Cook |
@@ -55,8 +55,8 @@ Chef, in priority order:
 1. ⏸️ while waiting on the Head Chef for an answer other than merge approval
 2. ⏳ while any Cook builds or asks
 3. Once the batch stops, or all its in-scope stacks merge and its release is done, 🧹 until every Cook is final and settled and the Chef has closed; then ⛳ for a merged and released batch, otherwise ⏹️
-4. 🔀 after the merge rule in Decisions authorizes the frozen heads or the Head Chef relays Pascal's approval, through release
-5. 🍽️ when every Cook in its count has served and checks passed on the frozen heads
+4. 🔀 after the merge rule in Decisions authorizes the frozen heads or the Head Chef relays Pascal's approval, through release, or through the deploy of a round that after-merge slots wait for
+5. 🍽️ when every Cook in its count has served, merged in an earlier round or waits for this merge as [After-merge slots](#after-merge-slots) says, and checks passed on the frozen heads
 6. ⏳ while validating or working alone on a batch without PRs
 
 For a batch without PRs, finishing the Chef's own work satisfies its checks, merge and merged facts. A release is done when completed, not required or cut by Pascal.
@@ -70,6 +70,15 @@ Head Chef, in priority order:
 
 The Head Chef counts delivered batches over batches in scope. The Chef counts served Cooks over Cooks in scope. A Cook whose cards were all cut leaves the Chef's count; a cut batch leaves the Head Chef's count. A stopped thread keeps the count it had. A replaced thread leaves the tree when archived, and its replacement takes the slot. Only `⛳ Batch delivered` increments the Head Chef's numerator. The `Batch merged` notice does not.
 
+### After-merge slots
+
+A slot whose cards can start only after other stacks of its batch merge, such as a check on the merged program, waits as `queued_after_merge`. Align marks those cards in the Chef's Plan with a line `After merge: <cards>, after <cards>`. The Chef gives them their own slot and records the slots they wait for as `afterMerge = ["<b>.<c>"]` in `watch.toml`. The slot is live and counted, so ⛳ still needs x/x.
+
+- It names only stacks of its batch that wait for no merge themselves. A chain of waits goes to a later batch
+- The served stacks merge before it, in order, once every counted Cook that has not served is `queued_after_merge` and names only served stacks. A Cook that builds or asks, or any other unlaunched slot, holds the merge: every other counted Cook still serves before it
+- That round spends its approval. After its last merge and deploy, the Chef tells the merged Cooks `merged`, has them close and confirms they settled. Then it creates each waiting slot's worktree from a fresh `origin/HEAD` and launches its Cook, as [chef-run](sop/chef-run.md#run) steps 3 and 4 say. Its stack merges in a later round, on a merge decision for its own heads
+- `Batch merged` goes after the last round
+
 ## Messages
 
 Use the status emoji caused by a handoff. Delivery counts when the parent receives the message, not when the child sends it. Until receipt is confirmed, the sender keeps its live status, retries and reconciles; the parent never advances on an unreceived outcome.
@@ -79,7 +88,7 @@ Send an answer or a relay with `t3_thread_send` `mode: "auto"` and a `clientRequ
 | Message | From → to | Effect |
 |---|---|---|
 | 🍽️ Stack ready | Cook → Chef | Cook freezes its stack; Chef validates |
-| 🍽️ Batch ready | Chef → Head Chef | Chef waits at x/x for a merge decision |
+| 🍽️ Batch ready | Chef → Head Chef | Chef waits for a merge decision at x/x, or below it only by after-merge slots |
 | 🔀 Merge | Head Chef → Chef | Approves the frozen stack heads |
 | 🔀 Batch merging | Chef → Head Chef | Notifies a merge that the merge rule allows |
 | Batch merged, with deploy results | Chef → Head Chef | Records merge progress, without counting delivery |

@@ -394,20 +394,56 @@ COOK = {
     "cut_close": "🧹",  # its cards were cut, cleaning up; out of the count
     "cut_stopped": "⏹️",
     "queued": None,  # slot assigned, no thread running yet: not launched, or being relaunched
+    # never launched; starts once the served stacks it names, in its batch, merged and deployed
+    "queued_after_merge": None,
 }
 COOK_FINAL = {"done", "stopped", "cut_stopped"}
-COOK_IN = {"build", "ask", "served", "close", "done", "stopped", "queued"}
+COOK_IN = {
+    "build",
+    "ask",
+    "served",
+    "close",
+    "done",
+    "stopped",
+    "queued",
+    "queued_after_merge",
+}
+
+# The after-merge exception (#785): a slot that waits for the merge of served
+# stacks stays counted but does not hold that merge back. It never names another
+# waiting slot; the Plan sends such a chain to a later batch.
+AFTER_MERGE = {"queued_after_merge"}
 
 # ---------------------------------------------------------------- Chef ---
 # merged: every stack in scope merged; for a batch without PRs, its own work done.
 # released: the release done, not required, or cut by the PM.
 # checks, merge: passed or said for the frozen heads; true for a batch without PRs.
-CHEF_FACTS = ("question", "checks", "merge", "merged", "released", "closed", "stopped")
+# partial: a merge round merged and deployed the stacks waiting slots named and
+# spent its approval; other stacks of the batch have not merged.
+CHEF_FACTS = (
+    "question",
+    "checks",
+    "merge",
+    "merged",
+    "released",
+    "closed",
+    "stopped",
+    "partial",
+)
+
+
+def ready(f, kinds):
+    """Every counted slot served, merged in an earlier round or waits for this merge.
+
+    Only the first round has slots that wait: after it, each is a launch to make.
+    """
+    inscope = kinds & COOK_IN
+    waits = set() if f["partial"] else AFTER_MERGE
+    return "served" in inscope and inscope <= {"served", "done"} | waits
 
 
 def chef_status(f, kinds):
     """First line that applies wins."""
-    inscope = kinds & COOK_IN
     if f["question"]:
         return "⏸️"  # waits on the Head Chef
     if kinds & {"build", "ask"}:
@@ -418,8 +454,8 @@ def chef_status(f, kinds):
         return "⛳" if f["merged"] and f["released"] else "⏹️"
     if f["merge"]:
         return "🔀"  # merges, then releases
-    if inscope and inscope <= {"served"} and f["checks"]:
-        return "🍽️"  # batch ready, x/x
+    if ready(f, kinds) and f["checks"]:
+        return "🍽️"  # batch ready, x/x but for slots waiting for this merge
     return "⏳"  # validates or works alone
 
 
@@ -431,20 +467,32 @@ def chef_coherent(f, kinds):
         not f["merge"] or f["checks"],
         not f["closed"] or f["stopped"] or (f["merged"] and f["released"]),
         not f["closed"] or not f["question"],
-        # retro comes after the release, or after a stop
+        # retro comes after the release, after a stop, or after the merge round of its stack
         not (inscope & {"close", "done"})
         or f["stopped"]
-        or (f["merged"] and f["released"]),
+        or (f["merged"] and f["released"])
+        or f["partial"],
         # an in-scope Cook ends stopped only when the whole batch stops
         "stopped" not in inscope or f["stopped"],
         # a Cook whose stack merged ends 🍽️, even after a Stop
         "stopped" not in inscope or not (f["merged"] and f["released"]),
-        # merging needs every Cook served at the time; a fix sends one back to build
-        not f["merge"] or f["merged"] or inscope <= {"served", "build", "ask"},
+        # merging needs every Cook served at the time, but for slots waiting for this
+        # merge; a fix sends one back to build
+        not f["merge"]
+        or f["merged"]
+        or f["partial"]
+        or inscope <= {"served", "build", "ask"} | AFTER_MERGE,
+        # a round spends its approval: the next round needs one for its own heads,
+        # given once every Cook left has served
+        not (f["partial"] and f["merge"]) or ready(f, kinds),
+        # rounds end when every stack merged; a slot still waiting has no merged stack
+        not f["merged"] or not (f["partial"] or "queued_after_merge" in kinds),
         # no counted Cook, no merge to run (batch without PRs works alone)
         inscope or not f["merge"] or f["merged"],
-        # a Stop turns unlaunched slots into stopped ones; nothing merges with a slot unlaunched
-        "queued" not in kinds or not (f["stopped"] or f["merge"]),
+        # a Stop turns unlaunched slots into stopped ones; nothing merges with a slot
+        # unlaunched, but for slots waiting for this merge
+        not (kinds & {"queued", "queued_after_merge"}) or not f["stopped"],
+        "queued" not in kinds or not f["merge"],
     ]
     return all(rules)
 
@@ -465,8 +513,14 @@ def chef_properties(f, kinds, s):
     broken = []
     if s in {"⛳", "⏹️"} and not kinds <= COOK_FINAL:
         broken.append("C1 final over a live Cook")
-    if s in {"🍽️", "🔀", "⛳"} and x != y:
+    if s == "⛳" and x != y:
         broken.append("C2 x/x needed")
+    # only a slot waiting for this merge, before any round merged, stays unserved
+    waiting = set() if f["partial"] else {"queued_after_merge"}
+    if s in {"🍽️", "🔀"} and (kinds & COOK_IN) - {"served", "done"} - waiting:
+        broken.append(
+            "C7 ready or merges past a slot that does not wait for this merge"
+        )
     if s in {"🔀", "🧹"} and kinds & {"build", "ask"}:
         broken.append("C3 merges or closes while a Cook builds or asks")
     if "ask" in kinds and s not in {"⏳", "⏸️"}:
@@ -607,9 +661,108 @@ def counter_errors():
     cases = [
         (counter(["served", "served", "build"]), (2, 3)),
         (counter(["served", "cut_stopped"]), (1, 1)),
+        (counter(["served", "queued_after_merge"]), (1, 2)),
         (batch_counter(["⛳", "⛳", "⏹️cut", "🔀"]), (2, 3)),
     ]
     return [(actual, expected) for actual, expected in cases if actual != expected]
+
+
+# The acceptance cases of #785 by name: the true Chef facts, one phase per Cook
+# slot, then the Chef status, or None when the rules refuse the state.
+SCENARIOS = [
+    (
+        "a served stack merges before the slot that waits for it",
+        {"checks", "merge"},
+        ["served", "queued_after_merge"],
+        "🔀",
+    ),
+    (
+        "a batch is ready below x/x only by slots that wait for its merge",
+        {"checks"},
+        ["served", "queued_after_merge"],
+        "🍽️",
+    ),
+    (
+        "an ordinary queued slot refuses the merge",
+        {"checks", "merge"},
+        ["served", "queued"],
+        None,
+    ),
+    ("an ordinary queued slot holds readiness", {"checks"}, ["served", "queued"], "⏳"),
+    ("a building slot holds the merge", {"checks", "merge"}, ["served", "build"], "⏳"),
+    ("an asking slot holds the merge", {"checks", "merge"}, ["served", "ask"], "⏳"),
+    (
+        "two served stacks merge in one round before their waiting slots",
+        {"checks", "merge"},
+        ["served", "served", "queued_after_merge", "queued_after_merge"],
+        "🔀",
+    ),
+    (
+        "after the round, a waiting slot is a launch to make",
+        {"partial"},
+        ["done", "queued_after_merge"],
+        "⏳",
+    ),
+    (
+        "after the round, the merged Cook is done and the launched slot builds",
+        {"partial"},
+        ["done", "build"],
+        "⏳",
+    ),
+    (
+        "both launched slots build after the round",
+        {"partial"},
+        ["done", "done", "build", "build"],
+        "⏳",
+    ),
+    (
+        "the launched slot serves at new heads",
+        {"partial", "checks"},
+        ["done", "served"],
+        "🍽️",
+    ),
+    (
+        "the first round's approval never covers the launched slot",
+        {"partial", "checks", "merge"},
+        ["done", "build"],
+        None,
+    ),
+    (
+        "the second round merges on an approval of its own heads",
+        {"partial", "checks", "merge"},
+        ["done", "served"],
+        "🔀",
+    ),
+    (
+        "a slot waiting on a launched slot is a chain and holds the merge",
+        {"partial", "checks", "merge"},
+        ["done", "served", "queued_after_merge"],
+        None,
+    ),
+    (
+        "every stack merged leaves no slot waiting",
+        {"checks", "merge", "merged", "released", "closed"},
+        ["done", "queued_after_merge"],
+        None,
+    ),
+    (
+        "delivered once the second round merged and deployed",
+        {"checks", "merge", "merged", "released", "closed"},
+        ["done", "done"],
+        "⛳",
+    ),
+]
+
+
+def scenario_errors():
+    errors = []
+    for name, true, phases, expected in SCENARIOS:
+        f = {fact: fact in true for fact in CHEF_FACTS}
+        kinds = set(phases)
+        actual = chef_status(f, kinds) if chef_coherent(f, kinds) else None
+        if actual != expected:
+            errors.append((name, actual, expected))
+    return errors
 
 
 HC_ROWS, CHEF_COLS = (
@@ -635,8 +788,8 @@ def case(facts, kinds, status):
     return f"facts {true}, child kinds {', '.join(kinds) or 'none'}, status {status}"
 
 
-def problems(report, missing, count_errors):
-    """One message per broken property, unreachable status set and counter."""
+def problems(report, missing, count_errors, cases):
+    """One message per broken property, unreachable status set, counter and case."""
     groups = {}
     for role, prop, facts, kinds, status in report["broken"]:
         groups.setdefault((role, prop), []).append(case(facts, kinds, status))
@@ -649,6 +802,10 @@ def problems(report, missing, count_errors):
     errors += [
         f"counter gave {actual}, expected {expected}"
         for actual, expected in count_errors
+    ]
+    errors += [
+        f"case {name!r} gave {actual or 'refused'}, expected {expected or 'refused'}"
+        for name, actual, expected in cases
     ]
     return errors
 
@@ -663,7 +820,7 @@ def verify(_args: argparse.Namespace) -> dict[str, Any]:
         log.info("broken: %s %s: %s", role, prop, case(facts, kinds, status))
     log.info("\nChef x Cook\n%s", grid(CHEF_COLS, COOK_COLS, report["chef_cook"]))
     log.info("\nHead Chef x Chef\n%s", grid(HC_ROWS, CHEF_COLS, report["hc_chef"]))
-    errors = problems(report, missing, count_errors)
+    errors = problems(report, missing, count_errors, scenario_errors())
     if errors:
         raise ScriptError(*errors)
     return {}

@@ -49,19 +49,40 @@ def test_verbose_prints_the_counts_and_grids_on_stderr_only() -> None:
     assert "\nHead Chef x Chef\n| | ⏳ |" in result.stderr
 
 
-def test_a_broken_rule_fails_and_names_each_broken_property(tmp_path: Path) -> None:
-    copy = mutant(tmp_path, 'return "🔀"  # merges, then releases', 'return "⛳"')
-
-    result = run(model=copy)
-
+def broken(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """The failed answer's errors, cut to the name of each broken property or case."""
     assert (result.returncode, result.stdout) == (1, "")
     assert result.stderr.count("\n") == 1, "without --verbose, only the answer"
     errors = answer(result.stderr)["errors"]
     assert isinstance(errors, list)
-    assert [error.split(":")[0] for error in errors] == [
+    return [error.split(":")[0].split(" gave ")[0] for error in errors]
+
+
+def test_a_broken_rule_fails_and_names_each_broken_property(tmp_path: Path) -> None:
+    copy = mutant(tmp_path, 'return "🔀"  # merges, then releases', 'return "⛳"')
+
+    names = broken(run(model=copy))
+
+    assert [name for name in names if name.startswith("Chef ")] == [
         "Chef C1 final over a live Cook",
+        "Chef C2 x/x needed",
         "Chef C5 delivered without delivery",
-        "no Chef case reaches 🔀",
+    ]
+    assert "no Chef case reaches 🔀" in names
+
+
+def test_admitting_an_ordinary_queued_slot_breaks_the_after_merge_rule(
+    tmp_path: Path,
+) -> None:
+    copy = mutant(
+        tmp_path,
+        'AFTER_MERGE = {"queued_after_merge"}',
+        'AFTER_MERGE = {"queued_after_merge", "queued"}',
+    )
+
+    assert broken(run(model=copy)) == [
+        "Chef C7 ready or merges past a slot that does not wait for this merge",
+        "case 'an ordinary queued slot holds readiness'",
     ]
 
 
