@@ -581,14 +581,31 @@ def title_agreement(run: Run, window: float = SETTLE) -> dict:
     }
 
 
+def recorded_threads(run: Run) -> dict[str, tuple[str, str]]:
+    """Each thread of the run with its role and slot, from the launch calls T3
+    recorded and the titles they gave, not from the extractor's walk."""
+    found = {run.head: ("head_chef", "hc")}
+    for tid in run.snap.threads:
+        for item in run.snap.thread_items(tid):
+            title, child = item.get("title") or {}, item.get("child")
+            if item.get("tool") != "launch" or not child:
+                continue
+            b, c = title.get("b"), title.get("c")
+            if title.get("role") == "cook" and b is not None and c is not None:
+                found.setdefault(child, ("cook", f"cook-{b}.{c}"))
+            elif title.get("role") == "chef" and b is not None:
+                found.setdefault(child, ("chef", f"chef-{b}"))
+    return found
+
+
 def registries_and_merges(run: Run) -> dict:
     """Oracle 3: registered slots show queued until launched; a Cook shows shipped
     exactly once GitHub merged all its PRs; every slot a watch.toml on disk plans
     is registered in the transcript.
 
-    Its facts come from the recording, not from the extractor's events: the
-    watch.toml writes, launches and PR links T3 recorded, and GitHub's merge
-    times, which a page shows github.DELAY late. Each check reads the page at
+    Its facts come from the recording, not from the extractor: the threads
+    each launch named, the watch.toml writes, launches and PR links T3
+    recorded, and GitHub's merge times, which a page shows github.DELAY late. Each check reads the page at
     the tenth of a second it first shows a fact.
     """
     final = run.final.get("frames", [])
@@ -596,29 +613,30 @@ def registries_and_merges(run: Run) -> dict:
     launched: dict[str, float] = {}
     linked: dict[str, float] = {}  # PR -> the first link, by any thread
     owner: dict[str, tuple[float, str]] = {}  # PR -> the first Cook that links it
-    for tid, info in run.threads.items():
+    threads = recorded_threads(run)
+    for tid, (role, slot) in threads.items():
         for item in run.snap.thread_items(tid):
             when = t3.later(item["start"], item.get("seen"))
             if when is None:
                 continue  # an item with no time shows nowhere
             at = statuses.ts(when)
             w = item.get("watch")
-            if w and info["role"] in ("head_chef", "chef"):
-                prefix = "chef-" if info["role"] == "head_chef" else "cook-"
-                for slot in {*(w.get("full") or {}), *(w.get("blocks") or {})}:
-                    if slot.startswith(prefix):
-                        registered[slot] = min(at, registered.get(slot, at))
-            if item.get("tool") == "launch" and item.get("child") in run.threads:
+            if w and role in ("head_chef", "chef"):
+                prefix = "chef-" if role == "head_chef" else "cook-"
+                for name in {*(w.get("full") or {}), *(w.get("blocks") or {})}:
+                    if name.startswith(prefix):
+                        registered[name] = min(at, registered.get(name, at))
+            if item.get("tool") == "launch" and item.get("child") in threads:
                 end = (
                     t3.later(item["end"], item.get("endSeen")) if item["end"] else None
                 )
-                slot, t = run.slot(item["child"]), statuses.ts(end) if end else at
-                launched[slot] = min(t, launched.get(slot, t))
+                child, t = threads[item["child"]][1], statuses.ts(end) if end else at
+                launched[child] = min(t, launched.get(child, t))
             if item.get("tool") == "link":
                 pr = github.key((item["pr"][0], int(item["pr"][1])))
                 linked[pr] = min(at, linked.get(pr, at))
-                if info["role"] == "cook":
-                    first = (at, run.slot(tid))
+                if role == "cook":
+                    first = (at, slot)
                     owner[pr] = min(first, owner.get(pr, first))
     checks, misses = 0, []
 

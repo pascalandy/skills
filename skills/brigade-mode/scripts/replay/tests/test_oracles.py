@@ -80,6 +80,21 @@ def test_registry_oracle_catches_an_extractor_that_drops_merges(
     assert oracles.registries_and_merges(run)["misses"]
 
 
+def test_registry_oracle_catches_an_extractor_that_loses_its_cooks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    walk = facts.Brigade.walk
+
+    def lose_cooks(self: facts.Brigade) -> None:
+        walk(self)
+        for tid in [t for t, i in self.threads.items() if i["role"] == "cook"]:
+            del self.threads[tid]
+
+    monkeypatch.setattr(facts.Brigade, "walk", lose_cooks)
+    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    assert oracles.registries_and_merges(run)["misses"]
+
+
 def test_oracles_command_writes_the_table(tmp_path: Path) -> None:
     out = tmp_path / "oracles.md"
     done = subprocess.run(
