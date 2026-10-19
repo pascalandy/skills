@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import board
+import github
 import oracles
 import pytest
 import t3
@@ -33,6 +34,15 @@ def test_prefix_oracle_catches_a_replay_that_looks_ahead(
         monkeypatch.setattr(t3, "later", lambda fact, arrived: fact or arrived)
     report = oracles.report(t3.load_recording(RECORDINGS["0ba0"]))
     assert report["prefix"]["status"] > 0
+
+
+def test_prefix_oracle_catches_a_github_fact_the_service_learns_late(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(github, "DELAY", 0.0)  # merges show as GitHub stamps them
+    report = oracles.report(t3.load_recording(RECORDINGS["0ba0"]))
+    assert report["prefix"]["detail"] > 0
+    assert not next(r for r in oracles.rows(report) if r["oracle"] == 1)["pass"]
 
 
 def test_oracles_command_writes_the_table(tmp_path: Path) -> None:

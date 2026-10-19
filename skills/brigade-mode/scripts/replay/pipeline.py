@@ -80,12 +80,19 @@ def page_data(
 
 
 def recording_data(
-    recording: dict, upto: int | None = None, now: float | None = None
+    recording: dict,
+    upto: int | None = None,
+    now: float | None = None,
+    known: float | None = None,
 ) -> dict:
-    """Page data of a recording as the database stood at sequence `upto`."""
+    """Page data of a recording as the database stood at sequence `upto`,
+    with GitHub as a reader that last read it at `known` saw it."""
     snap = t3.fold(recording["records"], upto)
     gh = Recorded(recording["github"])
-    gh.at(None if now is None else t3_time(now))
+    gh.at(
+        None if now is None else t3_time(now),
+        None if known is None else t3_time(known),
+    )
     data, _ = page_data(snap, gh, [recording["head"]], {}, now)
     return data
 

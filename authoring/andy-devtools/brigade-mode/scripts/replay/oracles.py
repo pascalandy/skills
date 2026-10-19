@@ -372,6 +372,10 @@ HERE = Path(__file__).resolve().parent
 RECORDINGS = HERE / "tests" / "recordings"
 POLL = 2.0  # seconds between two reads of PRAGMA data_version
 GITHUB_CADENCE = 60.0  # seconds between two reads of a repository's open items
+GITHUB_TIMEOUT = 20.0  # the live service's longest GitHub read
+# The oldest GitHub facts the live service may hold: a merge right after one
+# read waits for the next one, up to a poll late, and its timeout
+LAG = GITHUB_CADENCE + GITHUB_TIMEOUT + 2 * POLL
 SETTLE = 120.0  # oracle 2: a thread retitles only when it enters a phase or ends a turn
 EPSILON = 0.001
 GENERIC = {"info", "answer"}  # what classify() answers for a message no rule reads
@@ -410,8 +414,9 @@ class Run:
         self.end = max(statuses.ts(r[1]) for r in self.rec["records"] if r[1])
         self.final = self.page(None, self.end)
 
-    def page(self, upto: int | None, now: float) -> dict:
-        data = pipeline.recording_data(self.rec, upto=upto, now=now)
+    def page(self, upto: int | None, now: float, lag: float | None = None) -> dict:
+        known = None if lag is None else now - lag
+        data = pipeline.recording_data(self.rec, upto=upto, now=now, known=known)
         return data["brigades"][0] if data["brigades"] else {}
 
     def deltas(self) -> list[dict]:
@@ -439,8 +444,9 @@ def prefix_consistency(run: Run) -> dict:
     The page as of sequence N holds from N's time until the next sequence
     arrives; every node it shows must match the final replay at each instant
     of that window, and the final replay may show no state but todo on a node
-    the page lacks. GitHub facts are those of each instant, so the oracle
-    tests the rules, and oracle 5 measures their delay.
+    the page lacks. Each page knows GitHub as the live service does at
+    worst, LAG seconds late, and shows each fact github.DELAY after GitHub
+    had it, so a fact the service learns late still shows on time.
     """
     seqs = sequences(run.rec)
     checked = status = detail = missing = 0
@@ -453,7 +459,7 @@ def prefix_consistency(run: Run) -> dict:
             continue  # the next sequence shares this instant: no page showed this one alone
         now = t_next - EPSILON
         started = time.perf_counter()
-        live = run.page(seq, now)
+        live = run.page(seq, now, LAG)
         recompute.append(time.perf_counter() - started)
         if not live:
             continue  # no Head Chef yet: nothing drawn
@@ -672,9 +678,10 @@ def answers(run: Run) -> dict:
                 owner = repo or main
                 if owner:
                     refs.add((owner, int(n)))
-    run.gh.at(None)
     for repo, n in sorted(refs):
-        x = run.gh.item(repo, n) or {}
+        run.gh.item(repo, n)  # a recording that lacks the item fails here
+        # his answer's own time, before the delay the page shows it with
+        x = run.gh.items[(repo, n)] or {}
         when: str | None = x.get("merged") or x.get("closed")
         if when:
             found.append((statuses.ts(when), "github"))
@@ -766,9 +773,9 @@ def rows(r: dict) -> list[dict]:
         (
             1,
             "prefix consistency",
-            f"{p['status']} status mismatches in {p['checked']} checks over {p['sequences']} sequences; {p['missing']} final-only states",
-            "0 and 0",
-            p["status"] == 0 and p["missing"] == 0,
+            f"{p['status']} status and {p['detail']} detail mismatches in {p['checked']} checks over {p['sequences']} sequences; {p['missing']} final-only states",
+            "0, 0 and 0",
+            p["status"] == 0 and p["detail"] == 0 and p["missing"] == 0,
         ),
         (
             2,
@@ -805,9 +812,11 @@ def rows(r: dict) -> list[dict]:
             (
                 5,
                 "freshness, GitHub",
-                f"{GITHUB_CADENCE + g['p95']:.1f} s: {GITHUB_CADENCE:.0f} s cadence + p95 query {g['p95']:.2f} s for {g['prs']} PRs and {g['issues']} issues",
+                f"{github.DELAY + POLL:.1f} s: shown {github.DELAY:.0f} s after GitHub + {POLL:.0f} s poll; the service lags at most {LAG:.0f} s, with a p95 query of {g['p95']:.2f} s for {g['prs']} PRs and {g['issues']} issues",
                 "< 90 s",
-                GITHUB_CADENCE + g["p95"] < 90,
+                github.DELAY + POLL < 90
+                and LAG < github.DELAY
+                and g["p95"] < GITHUB_TIMEOUT,
             )
         )
     out.append(
@@ -934,7 +943,8 @@ do not produce:
      shows shipped once GitHub merged all its PRs, watch.toml plans are registered
   4. answers after red: each answer to a Head Chef titled ❓ came after red
   5. freshness: from-scratch recompute p95 plus the 2 s poll; with --github, the
-     60 s cadence plus the p95 of one query per repository, read live
+     85 s GitHub delay plus the poll, once the 60 s cadence, a 20 s timeout and
+     the p95 of one live query per repository fit in the delay
   6. parser coverage: messages no rule reads, watch.toml writes left unread
 A row that misses its threshold fails the command.
 
