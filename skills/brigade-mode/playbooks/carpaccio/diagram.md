@@ -118,7 +118,15 @@ sequenceDiagram
     C-->>H: Agent: Batch merged, deploy result<br>No Head Chef count yet <-
     C->>C: Release yes: finish procedure<br>from main
     Note over H,K: Step 6: Closing
-    C->>C: Close Epic with child proof
+    rect rgba(239, 159, 118, 0.2)
+        alt All children closed, no reserve
+            C->>C: Close Epic with child proof
+        else All closed, body reserves closing for Pascal
+            C->>C: Keep Epic open, swap 1-wip-by-agent<br>for 1-ready-for-human
+        else A child stays open
+            C->>C: Neither, name the open children
+        end
+    end
     C->>K: Agent: Close, run enabled retros ->
     K->>K: 🧹 Retros, unwatch, report<br>🍽️ final after merge, then settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
