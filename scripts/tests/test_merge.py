@@ -105,6 +105,42 @@ def test_refuses_a_pr_that_cannot_merge_as_is_before_the_checks(
     assert github.main_subject() == "seed"
 
 
+def test_on_main_says_to_deploy_without_calling_github(github: Sandbox) -> None:
+    # A hook stays in the state until a gh call runs it, and "" matches every call
+    github.hook("", "exit 1")
+
+    result = subprocess.run(
+        [sys.executable, str(github.main / "scripts/merge.py")],
+        cwd=github.main,
+        env=github.env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["on main there is no PR to merge; to deploy main, run: just deploy"],
+    }
+    assert github.state()["hooks"] == {"": "exit 1"}
+    assert github.checks_run() == 0
+    assert github.deploys() == []
+
+
+def test_a_branch_without_a_pr_is_told_to_open_one(github: Sandbox) -> None:
+    result = github.run("merge.py")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert json.loads(result.stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["feature has no open PR; open one with: gh pr create --base main"],
+    }
+    assert github.checks_run() == 0
+    assert github.deploys() == []
+
+
 def test_refuses_a_branch_without_main_tip_before_the_checks(
     github: Sandbox,
 ) -> None:
