@@ -641,6 +641,10 @@ def work(args: argparse.Namespace) -> dict:
         .expanduser()
         .resolve()
     )
+    if output in t3.database_files(args.db):
+        raise UsageError(
+            f"--output {output} would overwrite T3's database; write the recording to another path"
+        )
     try:
         con = t3.connect(args.db, args.timeout)
     except t3.DatabaseError as error:

@@ -827,6 +827,14 @@ def connect(path: str | Path, timeout: float) -> sqlite3.Connection:
     return con
 
 
+def database_files(path: str | Path) -> set[Path]:
+    """T3's database and the files SQLite keeps beside it: no output may name one."""
+    source = Path(path).expanduser().resolve()
+    return {source} | {
+        source.with_name(source.name + end) for end in ("-wal", "-shm", "-journal")
+    }
+
+
 def head_chefs(
     con: sqlite3.Connection, since: str | None = None, only: Iterable[str] = ()
 ) -> list[str]:

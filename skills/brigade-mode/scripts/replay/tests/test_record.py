@@ -209,6 +209,19 @@ def test_unknown_brigade_is_a_usage_error(tmp_path: Path) -> None:
     assert "names 0 Head Chefs" in json.loads(done.stderr.splitlines()[-1])["errors"][0]
 
 
+@pytest.mark.parametrize("end", ["", "-wal"])
+def test_output_never_overwrites_the_database(tmp_path: Path, end: str) -> None:
+    db = tmp_path / "t3.sqlite"
+    build(db)
+    target = db.with_name(db.name + end)
+    target.touch()
+    before = target.read_bytes()
+    done = run_record(tmp_path, "--brigade", "abcd", "--db", str(db), "-o", str(target))
+    assert done.returncode == 2 and done.stdout == ""
+    assert "would overwrite T3's database" in done.stderr
+    assert target.read_bytes() == before
+
+
 def test_whitelist_refuses_free_text() -> None:
     assert t3.whitelist_errors([1, None, "item", "i1", {"thread": "x", "type": "a b"}])
     assert t3.whitelist_errors([1, None, "item", "i1", {"thread": "x", "text": "a"}])
