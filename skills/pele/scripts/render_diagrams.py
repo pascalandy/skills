@@ -10,7 +10,7 @@ current folder's project, or else the one in ~/.cache/pele ($XDG_CACHE_HOME/pele
 
 Without --output, checks that every diagram renders and writes nothing. With
 --output, also writes one SVG per diagram that renders, named after its input,
-and styled with the bundled assets/theme.css unless --no-theme is set. Two
+and styled with the bundled assets/theme-dark.css unless --no-theme is set. Two
 diagrams that would write one file fail the run before anything renders.
 
 Answers in one JSON line. A success prints {"ok":true,"pele":{...},"diagrams":[...]}
@@ -380,7 +380,7 @@ examples:
 EXIT_CODES = exit_codes(
     {1: "a diagram did not render, an input is unreadable, or node or pele is missing"}
 )
-THEME = Path(__file__).resolve().parent.parent / "assets/theme.css"
+THEME = Path(__file__).resolve().parent.parent / "assets/theme-dark.css"
 # The 603 bundled examples render in under a second, so this only stops a hung node
 TIMEOUT = 120
 
@@ -608,7 +608,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--no-theme",
         action="store_true",
-        help="keep pele's default colors instead of the bundled assets/theme.css",
+        help="keep pele's default colors instead of the bundled assets/theme-dark.css",
     )
     return run_script(parser, render, argv)
 

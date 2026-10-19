@@ -96,6 +96,7 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
+- `render_pages.py` in `pele`: no `-` for stdin; its pages and images take their names from the input file
 - `replay.py`, `record.py` and `live.py` in `brigade-mode`: no `--db -`; the T3 SQLite database is opened read-only from a file, not streamed through stdin
 - `oracles.py` in `brigade-mode`: no `-` for a recording; each one is a gzipped file
 - `live.py` in `brigade-mode`: no `-o`; it serves its page over HTTP, and `--cache` names the one file it writes

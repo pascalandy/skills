@@ -10,7 +10,7 @@ Pele is a new renderer, not Mermaid. It reads Mermaid syntax and draws the diagr
 
 Resolve bundled paths relative to this skill directory. `references/source/` holds the pele.run pages at the version that its [README](references/source/README.md) names. When the project uses a newer pele, read the live page at `https://pele.run/<page>.md`, such as `https://pele.run/api.md`.
 
-To draw a diagram, follow [Draw a diagram](#draw-a-diagram). To add pele to an app, go to [Pele in an app](#pele-in-an-app).
+To draw a diagram, follow [Draw a diagram](#draw-a-diagram). To hand a sequence diagram to a reader, such as a client, as web pages and images, go to [Pages and images](#pages-and-images). To add pele to an app, go to [Pele in an app](#pele-in-an-app).
 
 ## Draw a diagram
 
@@ -84,9 +84,23 @@ chromium --headless --screenshot=/tmp/pele/diagram.png --window-size=<width>,<he
 
 On macOS, use `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` in place of `chromium`. Read the screenshot. Check the labels, arrowheads, legend, contrast, and takeaway. An `ok` answer proves that the diagram renders with that pele version, not with Mermaid or another host's renderer.
 
+## Pages and images
+
+[scripts/render_pages.py](scripts/render_pages.py) turns a `.mmd` file that holds a sequence diagram into a light page, a dark page, and a JPEG of each page, 1920 pixels wide at twice the pixel density. It writes them beside the `.mmd` file. The pages are self-contained and in Canadian French. Each page draws the diagram in the reader's browser, so the labels fit the font that browser shows. The script needs the tools of [Render and verify](#render-and-verify) and a Chromium browser; when it finds no Chromium, its error gives the install command. Run the script with `--help` for the title and actor options.
+
+```bash
+uv run <this-skill-folder>/scripts/render_pages.py process.mmd --title "PROC_01 | Handle a request" --actor CLIENT
+```
+
+1. Run the script until it answers `{"ok":true,...}`
+2. Open each JPEG. Check the title, the legend, every participant, and the last message
+3. Write the command beside the diagram, such as in its notes, so the next run after a change gives the same pages
+
+To put a page online, use the `html-publish` skill.
+
 ## Theme
 
-[assets/theme.css](assets/theme.css) sets a black canvas, white text, and Catppuccin Frappe accents as pele variables. The script embeds this theme in each SVG. The embedded theme applies to every pele diagram on an HTML page. Before you put an SVG inline in a page, render it with `--no-theme`. In an app, add the theme to the page's CSS. [Theming](references/source/theming.md) lists every variable and class name.
+[assets/theme-dark.css](assets/theme-dark.css) sets a black canvas, white text, and Catppuccin Frappe accents as pele variables. [assets/theme-light.css](assets/theme-light.css) sets a white canvas and dark Frappe text. Each theme also holds the colors that [assets/page.css](assets/page.css) gives to notes, to notes that start with ✅, to `break` frames, and to messages that start with 🔷. `render_diagrams.py` embeds the dark theme in each SVG, and `render_pages.py` puts one theme in each page. The embedded theme applies to every pele diagram on an HTML page. Before you put an SVG inline in a page, render it with `--no-theme`. In an app, add a theme to the page's CSS. [Theming](references/source/theming.md) lists every variable and class name.
 
 ## Pele in an app
 

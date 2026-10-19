@@ -204,7 +204,7 @@ VIDEO_ARCHIVE = "authoring/verify-loops/verify-video-archive/scripts"
 TRANSCRIPT = "authoring/andy/transcript"
 VERIFY_TRANSCRIPT = "authoring/verify-loops/verify-transcript"
 HTML_MODE = "authoring/andy/html-mode/scripts"
-# Keep these pins equal to the dependencies of check_page.py
+# Keep these pins equal to the dependencies of check_page.py and pele's render_pages.py
 PLAYWRIGHT = "playwright==1.63.0"
 PILLOW = "pillow==12.3.0"
 IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
@@ -435,8 +435,8 @@ CHECKS = [
     Check(
         "pele",
         *ruff(PELE),
-        pyright(PELE, python="3.10"),
-        pytest(f"{PELE}/tests"),
+        pyright(PELE, PLAYWRIGHT, PILLOW, python="3.10"),
+        pytest(f"{PELE}/tests", PLAYWRIGHT, PILLOW),
     ),
 ]
 
