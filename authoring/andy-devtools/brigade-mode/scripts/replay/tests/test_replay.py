@@ -2,32 +2,25 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
 
+import board
+import facts
+import pipeline
 import pytest
+from github import Recorded
 
 SCRIPT = Path(__file__).resolve().parents[1] / "replay.py"
-
-
-@pytest.fixture
-def replay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    monkeypatch.syspath_prepend(str(SCRIPT.parent))
-    spec = importlib.util.spec_from_file_location("brigade_replay_command", SCRIPT)
-    assert spec and spec.loader
-    command = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(command)
-    return command
+HC, CHEF, COOK = "thread-hc-abcd", "mcp:chef-1", "mcp:cook-1"
+HEADS = {"abcd": HC}
 
 
 def fact(second: int, role: str, thread: str, kind: str, **fields: object) -> dict:
-    import facts
-
+    """One extractor fact of run abcd; threads are keyed by full threadId."""
     event: dict[str, object] = {key: None for key in facts.KEYS}
     event.update(
         time=f"2026-01-01T00:00:{second:02d}.000Z",
@@ -40,42 +33,45 @@ def fact(second: int, role: str, thread: str, kind: str, **fields: object) -> di
     return event
 
 
-@pytest.mark.parametrize(
-    "repo", ["example-owner/confidential-widget", "example-owner/replay"]
-)
-def test_private_run_keeps_epic_cook_and_story_count(
-    tmp_path: Path, replay: ModuleType, repo: str
-) -> None:
-    events = [
-        fact(0, "pascal", "hc", "pascal_msg", detail={"intent": "reply"}),
+def launches(repo: str | None = None) -> list[dict]:
+    return [
+        fact(0, "pascal", HC, "pascal_msg", detail={"intent": "reply"}),
         fact(
             1,
-            "head_chef",
-            "hc",
-            "batch_register",
-            detail={"batch": 1, "name": "Synthetic batch"},
+            "chef",
+            CHEF,
+            "launch",
+            parent=HC,
+            detail={
+                "label": "Chef 1",
+                "slot": "chef-1",
+                "repo": repo,
+                "release": False,
+            },
         ),
         fact(
             2,
-            "chef",
-            "chef-1",
-            "launch",
-            parent="hc",
-            detail={"label": "Chef 1", "repo": repo, "release": False},
-        ),
-        fact(
-            3,
             "cook",
-            "cook-1.1",
+            COOK,
             "launch",
-            parent="chef-1",
-            detail={"label": "Cook 1.1", "repo": repo},
+            parent=CHEF,
+            detail={"label": "Cook 1.1", "slot": "cook-1.1", "repo": repo},
         ),
-        fact(4, "cook", "cook-1.1", "run_start", detail={"run": "1"}),
+    ]
+
+
+@pytest.mark.parametrize(
+    "repo", ["example-owner/confidential-widget", "example-owner/replay"]
+)
+def test_private_run_keeps_epic_cook_and_story_count(tmp_path: Path, repo: str) -> None:
+    events = [
+        *launches(repo),
+        fact(1, "head_chef", HC, "batch_register", detail={"batch": 1}),
+        fact(4, "cook", COOK, "run_start", detail={"run": "1"}),
         fact(
             5,
             "github",
-            "chef-1",
+            CHEF,
             "story_scope",
             epic=repo + "#9",
             story=repo + "#10",
@@ -84,7 +80,7 @@ def test_private_run_keeps_epic_cook_and_story_count(
         fact(
             6,
             "github",
-            "cook-1.1",
+            COOK,
             "pr_open",
             epic=repo + "#9",
             story=repo + "#10",
@@ -93,27 +89,29 @@ def test_private_run_keeps_epic_cook_and_story_count(
         fact(
             7,
             "github",
-            "cook-1.1",
+            COOK,
             "pr_open",
             epic=repo + "#9",
             story=repo + "#11",
             pr=repo + "#21",
         ),
-        fact(9, "cook", "cook-1.1", "run_end", detail={"run": "1"}),
+        fact(9, "cook", COOK, "run_end", detail={"run": "1"}),
         fact(
             10,
             "cook",
-            "cook-1.1",
+            COOK,
             "send",
-            detail={"to": "chef-1", "msg": "stack_ready", "checks": "pass"},
+            detail={"to": CHEF, "msg": "stack_ready", "checks": "pass"},
         ),
-        fact(11, "head_chef", "hc", "ask_pascal", detail={"items": ["merge"]}),
-        fact(12, "chef", "chef-1", "send", detail={"to": "hc", "msg": "question"}),
+        fact(11, "head_chef", HC, "ask_pascal", detail={"items": ["merge"]}),
+        fact(12, "chef", CHEF, "send", detail={"to": HC, "msg": "question"}),
     ]
-    public, names = replay.repository_names({repo: {"visibility": "PRIVATE"}})
-    data = replay.board.build(events, public, {repo + "#9": 3}, names)
+    events.sort(key=lambda e: e["time"])
+    gh = Recorded({"repositories": {repo: {"public": False}}})
+    public, names = pipeline.repository_names(gh)
+    data = board.build(events, public, {repo + "#9": 3}, names, HEADS)
     output = tmp_path / "replay.html"
-    output.write_text(replay.render_page(data, {repo: names[repo]}), encoding="utf-8")
+    output.write_text(pipeline.render_page(data, {repo: names[repo]}), encoding="utf-8")
     page = output.read_text(encoding="utf-8")
     match = re.search(r"\bconst\s+DATA\s*=\s*", page)
     assert match
@@ -133,21 +131,8 @@ def test_private_run_keeps_epic_cook_and_story_count(
 @pytest.mark.parametrize(
     "outcome", ["failed", "cancelled", "interrupted", "errored", "launch_error"]
 )
-def test_failed_barrage_stops_until_a_later_attempt_completes(
-    replay: ModuleType, outcome: str
-) -> None:
-    events = [
-        fact(0, "pascal", "hc", "pascal_msg", detail={"intent": "reply"}),
-        fact(1, "chef", "chef-1", "launch", parent="hc", detail={"label": "Chef 1"}),
-        fact(
-            2,
-            "cook",
-            "cook-1.1",
-            "launch",
-            parent="chef-1",
-            detail={"label": "Cook 1.1"},
-        ),
-    ]
+def test_failed_barrage_stops_until_a_later_attempt_completes(outcome: str) -> None:
+    events = launches()
     for second, kind, round_, state in [
         (3, "delegate_start", 1, None),
         (
@@ -165,17 +150,17 @@ def test_failed_barrage_stops_until_a_later_attempt_completes(
             fact(
                 second,
                 "barrage",
-                f"barrage:cook-1.1:manic-1:r{round_}",
+                f"barrage:{COOK}:manic-1:r{round_}",
                 kind,
-                parent="cook-1.1",
+                parent=COOK,
                 detail={"sop": "manic-1", "round": round_, "state": state},
             )
         )
-    data = replay.board.build(events, set(), {}, {})
+    data = board.build(events, set(), {}, {}, HEADS)
     frames = [f for f in data["brigades"][0]["frames"] if f[1] == "cook-1.1/manic-1"]
-    assert [
-        f[2] for f in frames if f[0] == replay.board.R.ts("2026-01-01T00:00:04Z")
-    ] == ["stopped"]
+    assert [f[2] for f in frames if f[0] == board.R.ts("2026-01-01T00:00:04Z")] == [
+        "stopped"
+    ]
     assert frames[-1][2] == "done"
 
 
@@ -191,21 +176,19 @@ def test_failed_barrage_stops_until_a_later_attempt_completes(
         ".worktrees/topic",
     ],
 )
-def test_private_data_is_refused_before_embedding(
-    replay: ModuleType, value: str
-) -> None:
-    with pytest.raises(replay.ScriptError, match="Privacy check refused the data"):
-        replay.render_page(
+def test_private_data_is_refused_before_embedding(value: str) -> None:
+    with pytest.raises(pipeline.PrivacyError, match="Privacy check refused the data"):
+        pipeline.render_page(
             {"nested": [{"value": value}]},
             {"example-owner/confidential-widget": "private-A"},
         )
 
 
-def test_short_private_name_matches_whole_words_only(replay: ModuleType) -> None:
-    page = replay.render_page({"state": "todo"}, {"example-owner/do": "private-A"})
+def test_short_private_name_matches_whole_words_only() -> None:
+    page = pipeline.render_page({"state": "todo"}, {"example-owner/do": "private-A"})
     assert '"todo"' in page
-    with pytest.raises(replay.ScriptError, match="Privacy check refused the data"):
-        replay.render_page({"repo": "do#12"}, {"example-owner/do": "private-A"})
+    with pytest.raises(pipeline.PrivacyError, match="Privacy check refused the data"):
+        pipeline.render_page({"repo": "do#12"}, {"example-owner/do": "private-A"})
 
 
 @pytest.mark.parametrize(

@@ -2,7 +2,8 @@
 
 `GitHub` reads them live through a `gh` reader the command supplies;
 `Recorded` serves the facts a recording holds. Both answer through the same
-methods, and `at(time)` hides what had not happened yet at that time.
+methods. A page shows each fact DELAY seconds after GitHub had it, and
+`at(time)` hides what a page could not show yet at that time.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import shlex
 import subprocess
 from collections import defaultdict
 from collections.abc import Callable, Iterable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from t3 import norm
@@ -27,10 +29,22 @@ ISSUE_FIELDS = (
     "title closedAt labels(first:10){nodes{name}} parent{number repository{nameWithOwner}} "
     "subIssues(first:100){totalCount nodes{number createdAt repository{nameWithOwner}}}"
 )
+# Seconds from a GitHub fact, such as a merge, to the page that shows it.
+# The live service reads every open item sooner, so a page never shows a
+# state that the full replay of the same run contradicts later (#852)
+DELAY = 85.0
 BODY_REF = re.compile(
     r"\b(?:closes|fixes|resolves|refs?|part of)\s+(?:([\w.-]+/[\w.-]+))?#(\d+)",
     re.IGNORECASE,
 )
+
+
+def delayed(time: str) -> str:
+    """When a page shows a fact GitHub had at `time`, in norm()'s format."""
+    shown = datetime.fromisoformat(time) + timedelta(seconds=DELAY)
+    return (
+        shown.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    )
 
 
 def key(ref: Ref) -> str:
@@ -88,7 +102,7 @@ class Facts:
         self.prs: dict[Ref, dict] = {}
         self.issues: dict[Ref, dict | None] = {}  # None: no such issue
         self.items: dict[Ref, dict | None] = {}
-        self.now: str | None = None  # facts after this time are hidden
+        self.now: str | None = None  # facts a page shows after this time are hidden
 
     # -- what a subclass supplies
     def fetch_repository(self, name: str) -> dict:
@@ -105,12 +119,16 @@ class Facts:
 
     # -- time
     def at(self, now: str | None) -> Facts:
-        """The same facts as GitHub showed them at `now`; None shows everything."""
+        """The facts as a page shows them at `now`; None shows everything."""
         self.now = now
         return self
 
     def seen(self, time: str | None) -> str | None:
-        return time if time and (self.now is None or time <= self.now) else None
+        """When a page shows a fact GitHub had at `time`, or None before then."""
+        if not time:
+            return None
+        shown = delayed(time)
+        return shown if self.now is None or shown <= self.now else None
 
     # -- questions
     def repository(self, name: str) -> str:
@@ -131,9 +149,15 @@ class Facts:
     def pr(self, repo: str, n: int) -> dict | None:
         """A PR as of `now`, or None before it was opened."""
         p = self.prs[(repo, n)]
-        if self.seen(p["created"]) is None:
+        created = self.seen(p["created"])
+        if created is None:
             return None
-        return {**p, "merged": self.seen(p["merged"]), "closed": self.seen(p["closed"])}
+        return {
+            **p,
+            "created": created,
+            "merged": self.seen(p["merged"]),
+            "closed": self.seen(p["closed"]),
+        }
 
     def issue(self, repo: str, n: int) -> dict | None:
         """An issue as of `now`, or None when the number names no issue, such as
@@ -146,7 +170,7 @@ class Facts:
         return {
             **i,
             "closed": self.seen(i["closed"]),
-            "subs": [s for s in i["subs"] if self.seen(s[2])],
+            "subs": [[r, x, shown] for r, x, c in i["subs"] if (shown := self.seen(c))],
         }
 
     def item(self, repo: str, n: int) -> dict | None:

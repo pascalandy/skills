@@ -351,21 +351,13 @@ def answer_failure(
 
 # <<< cli-block
 
-import sqlite3
-import subprocess
 import tempfile
-from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import board
-import facts
-
-HERE = Path(__file__).resolve().parent
-LOCAL_PATH = re.compile(
-    r"/home/|/Users/|[A-Za-z]:[\\/]Users[\\/]|~[\\/]|\.worktrees",
-    re.IGNORECASE,
-)
+import github
+import pipeline
+import t3
 
 
 def since_date(value: str) -> str:
@@ -391,139 +383,51 @@ def brigade_id(value: str) -> str:
     return value.lower()
 
 
-def github_read(args: list[str], timeout: float) -> dict:
+def from_t3(args: argparse.Namespace) -> tuple[dict, dict[str, str]]:
+    """Page data of the Head Chef runs in T3, with live GitHub facts and work folders."""
     try:
-        done = subprocess.run(
-            ["gh", *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=timeout,
-            check=False,
-        )
-    except FileNotFoundError as error:
-        raise ScriptError(
-            "gh is missing; install it from https://cli.github.com and run 'gh auth login'"
-        ) from error
-    except subprocess.TimeoutExpired as error:
-        raise TemporaryError(
-            "GitHub timed out; retry with a larger --timeout"
-        ) from error
-    if done.returncode:
-        try:
-            partial = json.loads(done.stdout)
-        except ValueError:
-            partial = {}
-        if "data" in partial and partial.get("errors"):
-            return partial
-        message = done.stderr.strip()
-        logging.getLogger(__name__).debug("gh %s: %s", shlex.join(args), message)
-        temporary = re.search(
-            r"timeout|timed out|connection|TLS handshake|HTTP 5\d\d|rate limit",
-            message,
-            re.IGNORECASE,
-        )
-        failure = TemporaryError if temporary else ScriptError
-        raise failure(
-            f"GitHub read failed: {message}; run 'gh auth status', then rerun this command"
-        )
-    return json.loads(done.stdout)
-
-
-@contextmanager
-def database(path: str, timeout: float) -> Iterator[sqlite3.Connection]:
-    source = Path(path).expanduser().resolve()
+        con = t3.connect(args.db, args.timeout)
+    except t3.DatabaseError as error:
+        raise ScriptError(str(error)) from error
+    gh = github.GitHub(github.gh_reader(args.timeout))
     try:
-        con = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=timeout)
-    except sqlite3.OperationalError as error:
-        raise ScriptError(
-            f"Cannot open T3 database read-only: {source}; rerun with --db PATH pointing to statev2.sqlite"
+        heads = t3.head_chefs(con, args.since, args.brigade or [])
+        missing = set(args.brigade or []) - {h[-4:].lower() for h in heads}
+        if missing:
+            raise UsageError(
+                "Head Chef not found since --since: " + ", ".join(sorted(missing))
+            )
+        logging.getLogger(__name__).info("Reading %d Head Chef runs", len(heads))
+        snap, _ = t3.load(con, heads)
+        disk = {h[-4:].lower(): t3.disk_plans(h[-4:].lower()) for h in heads}
+        return pipeline.page_data(snap, gh, heads, disk)
+    except github.ReadError as error:
+        raise (TemporaryError if error.temporary else ScriptError)(
+            str(error)
         ) from error
-    try:
-        con.execute("pragma query_only=on")
-        con.execute("begin")
-        yield con
-    except sqlite3.OperationalError as error:
+    except t3.sqlite3.OperationalError as error:
         if "locked" in str(error).lower():
             raise TemporaryError("T3 database is busy; retry this command") from error
         raise ScriptError(
-            f"Cannot read T3 projections: {error}; rerun with --db PATH pointing to a T3 statev2.sqlite database"
+            f"Cannot read T3 events: {error}; rerun with --db PATH pointing to a T3 statev2.sqlite database"
         ) from error
     finally:
         con.close()
 
 
-def private_label(index: int) -> str:
-    letters = ""
-    while index >= 0:
-        index, remainder = divmod(index, 26)
-        letters = chr(ord("A") + remainder) + letters
-        index -= 1
-    return "private-" + letters
-
-
-def repository_names(
-    repositories: Mapping[str, Mapping],
-) -> tuple[set[str], dict[str, str]]:
-    public = {
-        repo
-        for repo, info in repositories.items()
-        if info.get("visibility") == "PUBLIC"
-    }
-    names = {
-        repo: private_label(i)
-        for i, repo in enumerate(sorted(set(repositories) - public))
-    }
-    counts = Counter(repo.rsplit("/", 1)[-1] for repo in public)
-    names.update(
-        {
-            repo: repo
-            if counts[repo.rsplit("/", 1)[-1]] > 1
-            else repo.rsplit("/", 1)[-1]
-            for repo in public
-        }
-    )
-    return public, names
-
-
-def render_page(data: dict, private: Mapping[str, str]) -> str:
-    names = {name for repo in private for name in (repo, repo.rsplit("/", 1)[-1])}
-    # whole names only: a private repository named "do" must not match "todo"
-    private_name = re.compile(
-        "|".join(rf"(?<![\w.-]){re.escape(name)}(?![\w.-])" for name in names)
-        or "(?!)",
-        re.IGNORECASE,
-    )
-
-    def strings(value: Any) -> Iterator[str]:
-        if isinstance(value, str):
-            yield value
-        elif isinstance(value, list):
-            for item in value:
-                yield from strings(item)
-        elif isinstance(value, dict):
-            for key, item in value.items():
-                yield key
-                yield from strings(item)
-
-    if any(
-        private_name.search(value)
-        or LOCAL_PATH.search(value)
-        or str(Path.home()).casefold() in value.casefold()
-        for value in strings(data)
-    ):
-        raise ScriptError(
-            "Privacy check refused the data; remove private repository names or local paths from the replay data, then rerun"
-        )
-
-    payload = json.dumps(
-        data, ensure_ascii=False, separators=(",", ":"), allow_nan=False
-    ).replace("<", "\\u003c")
-    page = (HERE / "page.html").read_text(encoding="utf-8")
-    page = page.replace(
-        "/*__BOARD__*/", (HERE / "board.js").read_text(encoding="utf-8")
-    )
-    return page.replace("/*__DATA__*/null", payload)
+def from_recordings(paths: list[str]) -> tuple[dict, dict[str, str]]:
+    """Page data of recorded runs; a recording already hides its private repositories."""
+    brigades, generated = [], ""
+    for path in paths:
+        try:
+            data = pipeline.recording_data(t3.load_recording(path))
+        except (OSError, ValueError) as error:
+            raise ScriptError(
+                f"Cannot read recording {path}: {error}; record it again with record.py"
+            ) from error
+        brigades += data["brigades"]
+        generated = max(generated, data["generated"])
+    return {"generated": generated, "brigades": brigades}, {}
 
 
 def work(args: argparse.Namespace) -> dict:
@@ -541,27 +445,11 @@ def work(args: argparse.Namespace) -> dict:
         raise UsageError(
             "--output would overwrite the T3 database; choose a separate HTML file"
         )
-    gh = facts.GitHub(lambda command: github_read(command, args.timeout))
-    with database(args.db, args.timeout) as con:
-        try:
-            threads = facts.discover(con, args.since, args.brigade or [])
-        except ValueError as error:
-            raise UsageError(str(error)) from error
-        logging.getLogger(__name__).info("Reading %d Head Chef runs", len(threads))
-        events = facts.extract(con, gh, threads)
-    refs = {event["epic"] for event in events if event["epic"]}
-    numbers = {}
-    for ref in sorted(refs):
-        repo, number = ref.split("#")
-        issue = gh.issue(repo, int(number))
-        match = re.match(r"\s*Epic\s+(\d+)", issue["title"])
-        numbers[ref] = int(match[1]) if match else None
-    repositories = {info["nameWithOwner"]: info for info in gh.repositories.values()}
-    public, names = repository_names(repositories)
-    data = board.build(events, public, numbers, names)
-    page = render_page(
-        data, {repo: names[repo] for repo in repositories if repo not in public}
-    )
+    data, private = from_recordings(args.recording) if args.recording else from_t3(args)
+    try:
+        page = pipeline.render_page(data, private)
+    except pipeline.PrivacyError as error:
+        raise ScriptError(str(error)) from error
     if not args.dry_run:
         try:
             output.parent.mkdir(parents=True, exist_ok=True)
@@ -597,6 +485,7 @@ examples:
   uv run scripts/replay/replay.py
   uv run scripts/replay/replay.py --brigade abcd
   uv run scripts/replay/replay.py --db snapshot.sqlite -o replay.html
+  uv run scripts/replay/replay.py --recording scripts/replay/tests/recordings/66ab.json.gz
   uv run scripts/replay/replay.py --dry-run""",
     )
     parser.add_argument(
@@ -618,6 +507,12 @@ examples:
         action="append",
         metavar="ID4",
         help="show only this Head Chef ID (repeatable)",
+    )
+    parser.add_argument(
+        "--recording",
+        action="append",
+        metavar="PATH",
+        help="replay a run recorded with record.py instead of reading T3 and GitHub (repeatable)",
     )
     parser.add_argument(
         "-o",

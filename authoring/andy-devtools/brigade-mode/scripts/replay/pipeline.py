@@ -1,0 +1,113 @@
+"""From a T3 snapshot and GitHub facts to the page: one path for the replay, the oracles and the live service."""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+
+import board
+import facts
+import privacy
+import t3
+from github import Facts, Recorded, unkey
+
+HERE = Path(__file__).resolve().parent
+
+
+class PrivacyError(ValueError):
+    """The page data names a private repository or holds a local path."""
+
+
+def private_label(index: int) -> str:
+    letters = ""
+    while index >= 0:
+        index, remainder = divmod(index, 26)
+        letters = chr(ord("A") + remainder) + letters
+        index -= 1
+    return "private-" + letters
+
+
+def repository_names(gh: Facts) -> tuple[set[str], dict[str, str]]:
+    """Public repositories, and the name the page shows for each repository.
+
+    A public one shows its short name, or owner/name when two share it; a
+    private one shows private-A, private-B..., in name order.
+    """
+    known = {info["name"]: info["public"] for info in gh.repositories.values()}
+    public = {repo for repo, is_public in known.items() if is_public}
+    names = {
+        repo: repo if repo.startswith("private-") else private_label(i)
+        for i, repo in enumerate(sorted(set(known) - public))
+    }
+    counts = Counter(repo.rsplit("/", 1)[-1] for repo in public)
+    names.update(
+        {
+            repo: repo
+            if counts[repo.rsplit("/", 1)[-1]] > 1
+            else repo.rsplit("/", 1)[-1]
+            for repo in public
+        }
+    )
+    return public, names
+
+
+def page_data(
+    snap: t3.Snapshot,
+    gh: Facts,
+    heads: Iterable[str],
+    disk: Mapping[str, dict] | None = None,
+    now: float | None = None,
+) -> tuple[dict, dict[str, str]]:
+    """The page data of each Head Chef run, and the private repositories it must hide.
+
+    A thread is a Head Chef once its title's id4 is its own threadId suffix;
+    before that, its run has nothing to draw.
+    """
+    heads = [h for h in heads if snap.head_chef_since(h)]
+    events = facts.extract(snap, gh, heads, dict(disk or {}))
+    numbers = {
+        ref: gh.epic_number(*unkey(ref))
+        for ref in sorted({e["epic"] for e in events if e["epic"]})
+    }
+    public, names = repository_names(gh)
+    data = board.build(
+        events, public, numbers, names, {h[-4:].lower(): h for h in heads}, now
+    )
+    private = {repo: names[repo] for repo in names if repo not in public}
+    return data, private
+
+
+def recording_data(
+    recording: dict, upto: int | None = None, now: float | None = None
+) -> dict:
+    """Page data of a recording as the database stood at sequence `upto`."""
+    snap = t3.fold(recording["records"], upto)
+    gh = Recorded(recording["github"])
+    gh.at(None if now is None else t3_time(now))
+    data, _ = page_data(snap, gh, [recording["head"]], {}, now)
+    return data
+
+
+def t3_time(seconds: float) -> str:
+    from datetime import UTC, datetime
+
+    stamp = datetime.fromtimestamp(seconds, UTC).isoformat(timespec="milliseconds")
+    return stamp.replace("+00:00", "Z")
+
+
+def render_page(data: dict, private: Mapping[str, str]) -> str:
+    """The self-contained page; refuses data that names a private repository or a local path."""
+    if privacy.leaks(data, private):
+        raise PrivacyError(
+            "Privacy check refused the data; remove private repository names or local paths from the replay data, then rerun"
+        )
+    payload = json.dumps(
+        data, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    ).replace("<", "\\u003c")
+    page = (HERE / "page.html").read_text(encoding="utf-8")
+    page = page.replace(
+        "/*__BOARD__*/", (HERE / "board.js").read_text(encoding="utf-8")
+    )
+    return page.replace("/*__DATA__*/null", payload)

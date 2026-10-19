@@ -13,6 +13,7 @@ import gzip
 import json
 import re
 import sqlite3
+import unicodedata
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -83,30 +84,46 @@ def parse_title(title: str | None) -> dict | None:
 
 
 # ---------------------------------------------------------------- messages ---
-HANDOFFS = [  # (pattern at a line start, kind, roles that may send it)
-    (r"^🍽️ stack ready", "stack_ready", {"cook"}),
-    (r"^🍽️ batch ready", "batch_ready", {"chef"}),
-    (r"^🔀 batch merging", "batch_merging", {"chef"}),
-    (r"^🔀 merge", "merge", {"head_chef"}),
-    (r"^batch merged", "batch_merged", {"chef"}),
-    (r"^⛳ batch delivered", "batch_delivered", {"chef"}),
-    (r"^⏹️ batch stopped", "batch_stopped", {"chef"}),
-    (r"^⏹️ stopped", "cook_stopped", {"cook"}),
-    (r"^⏹️ stop", "stop", {"head_chef", "chef"}),
-    (r"^⏹️ cut", "cut", {"head_chef", "chef"}),
-    (r"^⏹️ drop", "drop", {"head_chef"}),
-    (r"^⏳ rework", "rework", {"head_chef"}),
-    (r"^🍽️ hold", "hold", {"head_chef"}),
+# carpaccio's Messages table (playbooks/carpaccio/carpaccio.md): each prefix as
+# the table writes it, the kind it hands off, and the roles that may send it.
+# The contract test fails when the table drops one of these prefixes
+HANDOFFS = [
+    ("🍽️ Stack ready", "stack_ready", {"cook"}),
+    ("🍽️ Batch ready", "batch_ready", {"chef"}),
+    ("🔀 Batch merging", "batch_merging", {"chef"}),
+    ("🔀 Merge", "merge", {"head_chef"}),
+    ("Batch merged", "batch_merged", {"chef"}),
+    ("⛳ Batch delivered", "batch_delivered", {"chef"}),
+    ("⏹️ Batch stopped", "batch_stopped", {"chef"}),
+    ("⏹️ Stopped", "cook_stopped", {"cook"}),
+    ("⏹️ Stop", "stop", {"head_chef", "chef"}),
+    ("⏹️ Cut", "cut", {"head_chef", "chef"}),
+    ("⏹️ Drop", "drop", {"head_chef"}),
+    ("⏳ Rework", "rework", {"head_chef"}),
+    ("🍽️ Hold", "hold", {"head_chef"}),
 ]
-# Features of a message's first line, or of its whole text, that classify() reads
+# A Cook's stop report from runs before the table named none; matched, not required
+LEGACY_PREFIXES = {"⏹️ Stopped"}
+# First-line prefixes: the Watchdog's messages and 🙋 from the Messages table, 📍 from Report
 FIRST = [
-    ("watchdog", r"^🐕"),
-    ("pascal_card", r"^🙋"),
-    ("progress", r"^📍"),
+    ("watchdog", "🐕 Watchdog"),
+    ("pascal_card", "🙋"),
+    ("progress", "📍"),
 ]
 SENDER = re.compile(
-    r"^(?:🚥\s*)?(?:head )?(?:chef|cook) [\d.]+(?: \w{4})?\s*(?:→\s*[^·:,—-]*)?\s*[:·,—-]*\s*"
+    r"^(?:(?:🚥|🧑‍🍳)\s*)?(?:head )?(?:chef|cook) [\d.]+(?: \w{4})?\s*(?:→\s*[^·:,—-]*)?\s*[:·,—-]*\s*"
 )
+
+
+def leading_symbol(body: str) -> str | None:
+    """The pictograph a line opens with, such as ❓ or ⚠️; `#79` or a code span is text."""
+    lead = ""
+    for ch in body:
+        if unicodedata.category(ch) == "So" or (lead and ch in "\u200d\ufe0f"):
+            lead += ch
+        else:
+            break
+    return lead[:4] or None
 
 
 def signature(text: str) -> dict:
@@ -126,13 +143,13 @@ def signature(text: str) -> dict:
             )  # an example in a fence or a quote hands nothing off
     handoffs = []
     for ln in lines:
-        kinds = [kind for pat, kind, _ in HANDOFFS if re.search(pat, ln)]
+        kinds = [kind for prefix, kind, _ in HANDOFFS if ln.startswith(prefix.lower())]
         if kinds:
             handoffs.append(kinds)
     line = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
     low, full = line.lower(), (text or "").lower()
     body = SENDER.sub("", low)
-    first = [name for name, pat in FIRST if re.search(pat, low)]
+    first = [name for name, prefix in FIRST if low.startswith(prefix[0])]
     features = {
         "dish": line.startswith("🍽️"),
         "final": bool(
@@ -161,12 +178,12 @@ def signature(text: str) -> dict:
         "escalate": bool(re.search(r"question à pascal|asking pascal", full)),
     }
     first += [name for name, on in features.items() if on]
-    lead = re.match(r"[^\w\s(\[]+", body)
+    lead = leading_symbol(body)
     out: dict[str, Any] = {"first": sorted(first)}
     if handoffs:
         out["handoffs"] = handoffs
     if lead:
-        out["lead"] = lead.group(0).strip()[:4]
+        out["lead"] = lead
     step = re.search(r"\b([1-6])/6\b", line) if "progress" in first else None
     if step:
         out["step"] = int(step.group(1))
@@ -183,13 +200,28 @@ def checks_of(text: str) -> str:
     return m.group(1).lower() if m else "unstated"
 
 
+# Notices outside the Messages table, read by their leading symbol after any
+# sender header: a ❓ question its sender keeps working through, a ⚠️ incident,
+# a 📍 progress line or a note that opens with the sender's own status. None
+# hands off work, so no status reads them; any other leading symbol stays
+# "info", which the parser-coverage oracle counts as unclassified.
+NOTES = {"❓": "question_note", "⚠️": "incident", "📍": "progress_note"}
+
+
+def note(sig: dict, src: str) -> str:
+    lead = sig.get("lead")
+    if lead in NOTES:
+        return NOTES[lead]
+    return "status_note" if lead in STATUSES.get(src, ()) else "info"
+
+
 def classify(sig: dict, src: str, dst: str) -> str:
     """Message kind, per carpaccio's Messages table.
 
     A handoff counts on any line, since a Cook may put a 📍 line before its
     🍽️ Stack ready block. Most other kinds use the first line only."""
     for kinds in sig.get("handoffs", []):
-        for pat, kind, senders in HANDOFFS:
+        for _, kind, senders in HANDOFFS:
             if kind in kinds and src in senders:
                 return kind
     first = set(sig.get("first", []))
@@ -201,7 +233,7 @@ def classify(sig: dict, src: str, dst: str) -> str:
             return "cook_final"
         if "pause" in first:
             return "question"
-        return "info"
+        return note(sig, src)
     if src == "chef" and dst == "cook":
         if "restack" in first:
             return "restack"
@@ -213,12 +245,12 @@ def classify(sig: dict, src: str, dst: str) -> str:
             return "close_request"  # a card with nothing to merge closes on the Chef's word
         if "return" in first:
             return "return"
-        return "info"
+        return note(sig, src)
     if src == "chef" and dst == "head_chef":
-        return "question" if "pause" in first else "info"
+        return "question" if "pause" in first else note(sig, src)
     if src == "head_chef" and dst == "chef":
         return "escalated" if "escalate" in first else "answer"
-    return "info"
+    return note(sig, src)
 
 
 def ask_items(text: str) -> tuple[list[str], list[list[str]]]:
