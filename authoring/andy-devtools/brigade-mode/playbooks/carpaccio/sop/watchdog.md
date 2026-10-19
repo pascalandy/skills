@@ -106,7 +106,7 @@ Check these against the title and received phases in `watch.toml`. At rest means
 | F3 | Chef final while a Cook is not final |
 | F4 | A settled thread on a live status |
 | F5 | Chef 🍽️ while Head Chef is not ❓, outside a hold |
-| F6 | Chef 🍽️ below x/x, unless each slot missing from x is `queued_after_merge` and each slot its `afterMerge` names is on 🍽️ |
+| F6 | Chef 🍽️ below x/x, unless each slot missing from x is `queued_after_merge` and each slot its `afterMerge` names is on 🍽️ without a final report |
 | F7 | A child ⏸️ under an idle parent on ⏳ |
 | F8 | ❓ on a Chef or a Cook |
 | F9 | A failed or interrupted Chef or Cook past `max-wakes` × `watch-minutes` with a live title |

@@ -18,7 +18,7 @@ Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entr
      - `blocked`: any other miss
    - Check GitHub before retrying an uncertain merge
    - If another stack remains, wait until GitHub confirms the merge and the deploy is `complete`, `not_required` or `external_gap`. Then ask the next Cook to restack on `main` and return fresh `🍽️ Stack ready`
-   - After the round's last stack, launch the `queued_after_merge` slots that wait for it as [After-merge slots](../carpaccio.md#after-merge-slots) says, then return to [chef-run](chef-run.md#run) step 5
+   - When `queued_after_merge` slots wait for the round whose last stack just merged, launch them as [After-merge slots](../carpaccio.md#after-merge-slots) says, then return to [chef-run](chef-run.md#run) step 5 instead of step 5 below
 
    Done when GitHub shows `MERGED` for every PR of the approved stack and its deploy is `complete`, `not_required` or `external_gap`
 4. On a failed merge or a `blocked` deploy, record landed PRs, send the Cook the cause and return its worktree for Fix. An `external_gap` is not a failure: continue. Tell the Head Chef if a previously ready batch lost readiness, so it withdraws its merge item. Report the partial outcome. Resume at step 1 after fresh `🍽️ Stack ready`. Done when each stack merged in order or the Head Chef has an unresolved blocker

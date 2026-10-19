@@ -63,7 +63,7 @@ def test_a_broken_rule_fails_and_names_each_broken_property(tmp_path: Path) -> N
 
     names = broken(run(model=copy))
 
-    assert [name for name in names if name.startswith("Chef ")] == [
+    assert sorted(name for name in names if name.startswith("Chef ")) == [
         "Chef C1 final over a live Cook",
         "Chef C2 x/x needed",
         "Chef C5 delivered without delivery",
@@ -80,7 +80,7 @@ def test_admitting_an_ordinary_queued_slot_breaks_the_after_merge_rule(
         'AFTER_MERGE = {"queued_after_merge", "queued"}',
     )
 
-    assert broken(run(model=copy)) == [
+    assert sorted(broken(run(model=copy))) == [
         "Chef C7 ready or merges past a slot that does not wait for this merge",
         "case 'an ordinary queued slot holds readiness'",
     ]

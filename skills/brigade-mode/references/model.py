@@ -477,11 +477,14 @@ def chef_coherent(f, kinds):
         # a Cook whose stack merged ends 🍽️, even after a Stop
         "stopped" not in inscope or not (f["merged"] and f["released"]),
         # merging needs every Cook served at the time, but for slots waiting for this
-        # merge; a fix sends one back to build
+        # merge, which need a stack to wait for; a fix sends one back to build
         not f["merge"]
         or f["merged"]
         or f["partial"]
-        or inscope <= {"served", "build", "ask"} | AFTER_MERGE,
+        or (
+            inscope <= {"served", "build", "ask"} | AFTER_MERGE
+            and inscope - AFTER_MERGE
+        ),
         # a round spends its approval: the next round needs one for its own heads,
         # given once every Cook left has served
         not (f["partial"] and f["merge"]) or ready(f, kinds),
@@ -521,6 +524,8 @@ def chef_properties(f, kinds, s):
         broken.append(
             "C7 ready or merges past a slot that does not wait for this merge"
         )
+    if s in {"🍽️", "🔀"} and not f["merged"] and "served" not in kinds:
+        broken.append("C8 ready or merges with no served stack")
     if s in {"🔀", "🧹"} and kinds & {"build", "ask"}:
         broken.append("C3 merges or closes while a Cook builds or asks")
     if "ask" in kinds and s not in {"⏳", "⏸️"}:
@@ -681,6 +686,18 @@ SCENARIOS = [
         {"checks"},
         ["served", "queued_after_merge"],
         "🍽️",
+    ),
+    (
+        "waiting slots alone have no stack to merge",
+        {"checks", "merge"},
+        ["queued_after_merge"],
+        None,
+    ),
+    (
+        "waiting slots alone are not a ready batch",
+        {"checks"},
+        ["queued_after_merge"],
+        "⏳",
     ),
     (
         "an ordinary queued slot refuses the merge",
