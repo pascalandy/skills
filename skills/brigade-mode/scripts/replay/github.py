@@ -103,6 +103,7 @@ class Facts:
         self.issues: dict[Ref, dict | None] = {}  # None: no such issue
         self.items: dict[Ref, dict | None] = {}
         self.now: str | None = None  # facts a page shows after this time are hidden
+        self.known: str | None = None  # facts GitHub had after this time are hidden
 
     # -- what a subclass supplies
     def fetch_repository(self, name: str) -> dict:
@@ -118,14 +119,18 @@ class Facts:
         raise KeyError(ref)
 
     # -- time
-    def at(self, now: str | None) -> Facts:
-        """The facts as a page shows them at `now`; None shows everything."""
-        self.now = now
+    def at(self, now: str | None, known: str | None = None) -> Facts:
+        """The facts as a page shows them at `now`; None shows everything.
+
+        `known` also hides what GitHub had after it, as a reader whose last
+        read of GitHub was then sees it.
+        """
+        self.now, self.known = now, known
         return self
 
     def seen(self, time: str | None) -> str | None:
         """When a page shows a fact GitHub had at `time`, or None before then."""
-        if not time:
+        if not time or (self.known is not None and time > self.known):
             return None
         shown = delayed(time)
         return shown if self.now is None or shown <= self.now else None
