@@ -123,15 +123,18 @@ def pyright(path: str, *deps: str, python: str = PYTHON) -> Command:
     )
 
 
-# PEP 723's pattern for a script metadata block, and the >= minimum of its requires-python
+# PEP 723's pattern for a script metadata block, its requires-python line, and
+# each >= bound in that line
 SCRIPT_BLOCK = re.compile(r"(?m)^# /// script$\s(?P<content>(^#(| .*)$\s)+)^# ///$")
-MINIMUM = re.compile(r"""(?m)^# requires-python\s*=\s*["'][^"']*>=\s*(\d+)\.(\d+)""")
+REQUIRES_PYTHON = re.compile(r"""(?m)^#\s*requires-python\s*=\s*["']([^"']*)["']""")
+MINIMUM = re.compile(r">=\s*(\d+)\.(\d+)")
 
 
 def declared_minimum(script: Path) -> tuple[int, int] | None:
     block = SCRIPT_BLOCK.search(script.read_text(encoding="utf-8"))
-    minimum = block and MINIMUM.search(block["content"])
-    return (int(minimum[1]), int(minimum[2])) if minimum else None
+    spec = block and REQUIRES_PYTHON.search(block["content"])
+    bounds = MINIMUM.findall(spec[1]) if spec else []
+    return max(((int(major), int(minor)) for major, minor in bounds), default=None)
 
 
 def requires_python(suite: str | tuple[str, ...]) -> str:

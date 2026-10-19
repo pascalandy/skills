@@ -222,24 +222,32 @@ def test_selected_repository_modules_run_in_one_pytest_batch(
     ]
 
 
-def script(path: Path, minimum: str) -> None:
+def script(path: Path, requires: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        f'# /// script\n# requires-python = ">={minimum}"\n# ///\n', encoding="utf-8"
-    )
+    path.write_text(f"# /// script\n# {requires}\n# ///\n", encoding="utf-8")
 
 
+@pytest.mark.parametrize(
+    "requires",
+    [
+        'requires-python = ">=3.13"',
+        '  requires-python = ">=3.13"',
+        'requires-python = ">=3.13, >=3.11"',
+    ],
+    ids=["plain", "indented", "two-bounds"],
+)
 def test_a_skill_suite_runs_under_the_highest_minimum_its_own_scripts_declare(
     routing_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
     capfd: pytest.CaptureFixture[str],
+    requires: str,
 ) -> None:
     scripts = routing_repo / "authoring/content/alpha/scripts"
     (scripts / "tests").mkdir(parents=True)
-    script(scripts / "alpha.py", "3.12")
-    script(scripts / "lib/helper.py", "3.13")
+    script(scripts / "alpha.py", 'requires-python = ">=3.12"')
+    script(scripts / "lib/helper.py", requires)
     (scripts / "nested/tests").mkdir(parents=True)
-    script(scripts / "nested/nested.py", "3.14")
+    script(scripts / "nested/nested.py", 'requires-python = ">=3.14"')
     checks = [
         Check("alpha", check.pytest("authoring/content/alpha/scripts/tests")),
         Check("nested", check.pytest("authoring/content/alpha/scripts/nested/tests")),
