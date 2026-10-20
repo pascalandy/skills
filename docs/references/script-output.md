@@ -7,7 +7,7 @@ tags:
   - topic/scripts
   - status/stable
 date_created: 2026-10-04
-date_updated: 2026-10-07
+date_updated: 2026-10-20
 ---
 
 A script answers in one line of JSON, so an agent or another script knows the outcome from one read. The rule needs no Python, so a project in Bash or TypeScript can apply it as written.
@@ -39,8 +39,6 @@ A script tests the exit code, or pipes stdout to `jq -e .ok`:
 To read a failure's errors, merge the streams and keep the last line: `just check 2>&1 | tail -n1 | jq .errors`
 
 Read the answer as a JSON object: key order carries no meaning, so a reader never matches a prefix such as `{"ok":`. `answer_in()` and `changes_in()` in `scripts/_common.py` read it that way
-
-Behind rtk, a long answer is cut and ends with `[full output: rtk recall ID]`. Run that recall, or rerun the command as `rtk proxy <command>`, to read the whole line (decision 12)
 
 ## Keys
 
@@ -114,7 +112,7 @@ Decided on 2026-10-04, while planning #430
 9. **No `--json` flag, since JSON is the default. `--help` and `--version` stay text**, because they are documentation. `--version` prints one line, `<name> <version>`, the form tools read by convention. Pascal confirmed `--version` on 2026-10-07
 10. **Every recipe that runs a script carries `[no-exit-message]`.** Without it, `just` prints `error: Recipe '…' failed on line N` after the object, which is then no longer the last line
 11. **An agent reads the line; a script reads the exit code or `jq -e .ok`**, as [Read the answer](#read-the-answer) shows. A script never parses text, and an agent that hides the line is back to silence
-12. **rtk passes a short line through unchanged, and cuts a long one.** Checked on 2026-10-04 with short answers, on success and on failure. On 2026-10-07, rtk 0.49.0 cut the 714-byte answer of `rtk just check --list` to about 150 characters and added `[full output: rtk recall ID]`; [Read the answer](#read-the-answer) says how to recover the line. A script reads the exit code or `jq`, never rtk's output
+12. **Retired on 2026-10-20.** Output-filter handling no longer applies
 13. **The lock lives in `test_cli_contract.py`, not in a new check** (#492), because that test already lists every script
 14. **Rejected: a sentence in `AGENTS.md` that explains the silence** (the first proposal in #430), because it fixes one script in one repository. **Rejected: text in a terminal and JSON elsewhere**, because the agent and the human would see two different outputs
 15. **A script whose job is content writes the content to a file and answers with its path**, such as `{"ok":true,"file":"…"}`, so the line stays one line an agent reads whole. A script that streams events, such as a watcher, writes them to stderr and ends with its answer on stdout. Pascal decided on 2026-10-06 that skill scripts follow the rule too, these included (#494)

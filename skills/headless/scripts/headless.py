@@ -1398,8 +1398,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     own, extra = argv[:split], argv[split + 1 :]
 
     def work(args: argparse.Namespace) -> dict[str, Any]:
-        # The answer can run long, and output filters such as RTK cut long
-        # stdout, so the caller reads it whole from the answer file
+        # The answer can run long, so the caller reads it whole from the answer file
         return fields(launch(args, extra))
 
     # Flags after -- go to the child, so the parser reads only the launcher's own
