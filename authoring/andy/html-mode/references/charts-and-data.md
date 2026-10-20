@@ -1,6 +1,6 @@
 # Charts and data
 
-Choose the chart from the comparison the viewer needs to make.
+Choose the chart for the viewer's comparison.
 
 | Question | Form |
 | --- | --- |
@@ -12,10 +12,10 @@ Choose the chart from the comparison the viewer needs to make.
 | Flow magnitude | Sankey or weighted network |
 | Exact values | Table |
 
-Label units, time ranges, sources, and active filters. Make truncated or nonlinear scales explicit. Distinguish measurements, estimates, targets, forecasts, and illustrative values. Keep missing data visible as missing.
+Label units, time ranges, sources, and active filters. Identify truncated or nonlinear scales. Distinguish measurements, estimates, targets, forecasts, and illustrative values. Mark missing data.
 
-Keep category colors consistent and separate from status colors. Provide text cues or patterns where color carries meaning. Give dense data enough space to keep labels legible.
+Keep category colors consistent and separate from status colors. Where color carries meaning, add text or patterns. Keep dense-data labels legible.
 
-Tooltips add precision; essential values and conclusions stay available without hover. Filters, zooming, and linked views need visible state and a reset. Provide an accessible summary or table for pointer-driven charts.
+Keep essential values and conclusions available without hover. Tooltips add precision. Give filters, zoom, and linked views visible state and reset. For pointer-driven charts, provide an accessible summary or table.
 
-Verify displayed values against the source, including filtered views and reset. Use motion to explain changes between states only when it improves understanding.
+Verify values against the source, including filtered views and reset. Use motion only to clarify state changes.

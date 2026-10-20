@@ -84,10 +84,10 @@ A mode's routes run through that mode's SKILL.md.
   - `sms`: When the user wants to plan, build, or optimize SMS or MMS marketing — including welcome flows, abandoned cart texts, post-purchase, win-back, promotional sends, or transactional/auth SMS.
   - `social`: When the user wants help creating, scheduling, or optimizing social media content for LinkedIn, Twitter/X, Instagram, TikTok, Facebook, or other platforms, or wants to do social listening and engagement triage.
   - `video`: When the user wants to create, generate, or produce video content using AI tools or programmatic frameworks.
-- `html-mode`: Use when the user requests a standalone HTML artifact or HTML presentation, including shorthand such as 'plan; html'. Do not use for ordinary application code changes.
-  - `artifact`: Build a standalone HTML report, explainer, landing page, tool, or data story that no narrower playbook owns.
+- `html-mode`: Use for standalone HTML artifacts or HTML presentations, including shorthand such as 'plan; html'. Exclude ordinary application code changes.
+  - `artifact`: Build a standalone HTML report, explainer, landing page, tool, or data story without a narrower playbook.
   - `diagram`: Draw an HTML diagram that shows how components, events, states, or concepts relate.
-  - `interactive-page`: Build a page readers move through, such as a document turned into a guided reading page, or a journey with a map that follows the reading.
+  - `interactive-page`: Build pages readers move through, such as guided reading pages from documents or journeys with maps that follow reading.
   - `plan`: Turn a work plan into an HTML document that shows its commitments, order, owners, dependencies, and risks.
   - `prototype`: Build a polished HTML mockup or a working prototype of a bounded product flow.
   - `slides`: Build an HTML slide deck with reveal.js that tells one story a screen at a time.

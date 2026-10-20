@@ -4,11 +4,11 @@
 
 Source revision: [`2ac1dfecb0f2474e75260cb6d3c9b9d6d9b5062e`](https://github.com/plannotator/effective-html/tree/2ac1dfecb0f2474e75260cb6d3c9b9d6d9b5062e/skills), inspected on 2026-09-19.
 
-Copyright (c) 2026 plannotator. The original material is distributed under the [MIT license](LICENSE-effective-html.txt), reproduced alongside this attribution.
+Copyright (c) 2026 plannotator. Original material uses the [MIT license](LICENSE-effective-html.txt), reproduced here.
 
 ## Source mapping
 
-Paths in the first column are relative to the pinned upstream `skills/` directory.
+Upstream paths are relative to the pinned `skills/` directory.
 
 | Upstream source | Adapted destination |
 | --- | --- |
@@ -26,20 +26,20 @@ Paths in the first column are relative to the pinned upstream `skills/` director
 
 ## Slides
 
-The [slides playbook](../playbooks/slides.md) supersedes the retired `html-slides` package, whose metadata credited `claude-office-skills` and declared the MIT license. That package recorded no upstream URL or revision. The retained reveal.js concepts were rechecked against the current official documentation instead of carrying over its agent, model, or MCP metadata.
+The [slides playbook](../playbooks/slides.md) replaces retired `html-slides`, whose metadata credited `claude-office-skills` and declared the MIT license. That package recorded no upstream URL or revision. Retained reveal.js concepts were rechecked against current official documentation. Agent, model, and MCP metadata were omitted.
 
-The bundled [slides template](../assets/slides-template.html) loads [reveal.js 6.0.2](https://github.com/hakimel/reveal.js/releases/tag/6.0.2) from jsDelivr. reveal.js is copyright (c) 2011-2026 Hakim El Hattab and contributors and is distributed under the [MIT license](LICENSE-revealjs.txt).
+The [slides template](../assets/slides-template.html) loads [reveal.js 6.0.2](https://github.com/hakimel/reveal.js/releases/tag/6.0.2) from jsDelivr. reveal.js is copyright (c) 2011-2026 Hakim El Hattab and contributors, under the [MIT license](LICENSE-revealjs.txt).
 
 ## Adaptations
 
-- Replaced six registered skills with one discoverable entry point and plain playbooks, following the local `poteto-mode` structure
-- Consolidated shared build and verification rules and merged overlapping creative-direction guidance
-- Resolved conflicting typography guidance in favor of purpose-driven roles without mandatory font or color quotas
-- Kept user and project design constraints authoritative, including single-theme and motion policies
-- Replaced the upstream `tot` installation and public-sharing procedure with the active authorized delivery workflow; publishing constraints are checked before implementation
-- Omitted upstream per-skill agent metadata; automatic skill selection uses the shared description
-- Replaced the separate `html-slides` entry point with one reveal.js playbook and template owned by `html-mode`
+- Replaced six registered skills with one entry point and plain playbooks, per local `poteto-mode` structure
+- Combined shared build, verification, and overlapping creative-direction rules
+- Resolved conflicting typography guidance with purpose-driven roles, without font or color quotas
+- Kept user and project design constraints first, including single-theme and motion policies
+- Replaced upstream `tot` installation and public sharing with authorized delivery, checking publication constraints before implementation
+- Omitted upstream per-skill agent metadata. Automatic selection uses the shared description
+- Replaced separate `html-slides` with one reveal.js playbook and template in `html-mode`
 
 ## Further reading
 
-Plannotator's [HTML wireframes and prototypes for coding agents](https://docs.plannotator.ai/learn/code-context/html-wireframes-and-prototypes-for-coding-agents) is the further-reading link supplied by the upstream wireframe and prototype skills.
+Upstream wireframe and prototype skills link to Plannotator's [HTML wireframes and prototypes for coding agents](https://docs.plannotator.ai/learn/code-context/html-wireframes-and-prototypes-for-coding-agents).

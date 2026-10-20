@@ -1,49 +1,49 @@
 # Design direction
 
-Read when visual decisions remain open. Existing user and project decisions constrain the choices below.
+Read when visual decisions remain open.
 
 ## HTML communication defaults
 
-These defaults constrain the choices below for artifacts created through `html-mode`. Explicit user and project decisions take precedence.
+For `html-mode`, use these defaults unless user or project decisions override them.
 
-- Keep the layout dense and scannable, like a specification. Do not add a hero or decorative chrome such as cards or pills
-- Use true black (`#000`) for the background, white primary text, and dark gray only for secondary surfaces or accents
+- Keep layout dense and scannable, like a specification. No hero or decorative cards, pills, or other chrome
+- Use true black (`#000`) backgrounds, white primary text, and dark gray only for secondary surfaces or accents
 - Avoid marketing voice, em dashes, and light-gray subtitle lines above sections
 
 ## Pages for readers
 
-A page for readers outside the team, such as a client page built from a source document, replaces the communication defaults above with these:
+For readers outside the team, such as a client page from a source document, replace the defaults above:
 
-- Take the brand from the source: trace a raster logo with `potrace` and sample its colours; type never stands in for a logo
-- Open calm: one headline and one line, then the content. A second mark, such as a partner badge, goes in the footer
-- In a split layout, text on the left and the map or picture on the right
-- Explain step by step: the part being read lights up elsewhere on the page
-- Let a metaphor organize real information, such as a map of stages or a ticket that serves as a title. Cut a flourish that carries no information, such as a punch hole or a stamp
-- No purple accent. Light surfaces may read as paper; the dark palette follows the quality bar
-- Set tokens before components: two section spacings, one radius scale, two durations (`--t-quick` for hover, `--t-state` for a change of state) and one easing
+- Take branding from the source. Trace raster logos with `potrace` and sample their colours. Never replace a logo with type
+- Open with one headline and one line, then content. Put secondary marks, such as partner badges, in the footer
+- In split layouts, put text left and the map or picture right
+- As readers progress, highlight the current part elsewhere on the page
+- Organize real information with a metaphor, such as a stage map or ticket title. Remove decoration without information, such as punch holes or stamps
+- No purple accent. Light surfaces may resemble paper. For dark palettes, use the quality bar
+- Before components, set tokens for two section spacings, one radius scale, two durations, and one easing. Use `--t-quick` for hover and `--t-state` for state changes
 
 ## Choose a register
 
-Anchor the direction in the subject, audience, and purpose. Derive composition from the subject's materials, tools, notation, or working context.
+Choose direction from subject, audience, and purpose. Base composition on the subject's materials, tools, notation, or work context.
 
-- Workmanlike for operational plans, briefs, and tools. Use quiet hierarchy, precise spacing, and restrained treatment
-- Editorial for explainers, launches, research stories, and presentations that benefit from a stronger composition and deliberate pacing
-- Expressive when an immersive visual or interactive idea is itself part of the message
+- Workmanlike for operational plans, briefs, and tools. Use quiet hierarchy, precise spacing, and restrained styling
+- Editorial for explainers, launches, research stories, and presentations needing stronger composition and deliberate pacing
+- Expressive when an immersive visual or interaction is part of the message
 
-Keep wireframes low fidelity regardless of the subject. Scale treatment to the review question.
+Keep wireframes low fidelity. Match styling to the review question.
 
-Before CSS, record the visual premise, hierarchy, layout, color roles, type roles, density, and any interaction that carries meaning. Let the number of colors and fonts follow the brief. System fonts are valid; embed custom fonts only when their value justifies the weight and their license permits it.
+Before CSS, record visual premise, hierarchy, layout, color roles, type roles, density, and meaningful interaction. Use the brief to choose color and font counts. System fonts are valid. Embed custom fonts only when their value justifies their weight and their license permits it.
 
 ## Compose deliberately
 
-- Use a consistent type scale and readable prose measures around 65 characters; balance headings and give paragraphs breathing room
-- Use grid or flex gaps to space sibling groups and keep the cascade simple enough that component rules preserve the layout
+- Use a consistent type scale and prose lines around 65 characters. Balance headings and space paragraphs
+- Space sibling groups with grid or flex gaps. Keep the cascade simple so component rules preserve layout
 - Use tabular numerals where numbers align in columns
-- Let numbering, dividers, labels, and grouping express actual hierarchy or sequence
-- Write control labels that name their effect; errors explain the failure and the recovery action
+- Use numbering, dividers, labels, and grouping for actual hierarchy or sequence
+- Name effects in control labels. Explain failures and recovery in errors
 - Keep status colors distinct from decorative accents and pair them with another state cue
-- Concentrate editorial emphasis where it supports the argument, leaving surrounding content quieter
+- Emphasize the argument and keep surrounding content quieter
 
-If both themes are required, define palette tokens and let components consume them. Put OS-preference token overrides before explicit root `data-theme` overrides so manual selection wins in both directions. Verify both palettes. A project's single-theme policy needs no additional theme system.
+If both themes are required, define palette tokens for components. Put OS-preference overrides before explicit root `data-theme` overrides so manual selection wins both ways. Verify both palettes. For single-theme projects, add no theme system.
 
-Before delivery, check whether the composition supports this particular content. If it could be reused unchanged for a different subject because the content never influenced it, revise the hierarchy, notation, type, or interaction within the user's chosen style.
+Before delivery, check that content shaped the composition. If a different subject could reuse the design unchanged, revise hierarchy, notation, type, or interaction within the user's chosen style.
