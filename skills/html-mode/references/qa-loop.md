@@ -1,19 +1,19 @@
 # QA loop
 
-Read when a page goes through QA rounds. The level in `SKILL.md` sets how many rounds run.
+For QA rounds, use the count set by the level in `SKILL.md`.
 
-Commit and push only when the session authorizes them. If either is forbidden, build and check locally, then report QA blocked until a pushed commit is available. Keep the pushed-commit requirement.
+Commit and push only with session authorization. If either is forbidden, build and check locally. Report QA blocked until a pushed commit is available.
 
 ## Roles
 
-- **A** is the agent that builds the page, on the model the user picked for its thread
-- **B** is a QA agent: `claude-haiku-5-5` at `xhigh` effort, in its own top-level T3 thread, reading the repository without changing a tracked file
-- A launches every B as a new thread: `create_threads` for several at once, sharing A's checkout, each entry with `target: {providerInstanceId: "claudeAgent", model: "claude-haiku-5-5", options: {effort: "xhigh"}}`. B is a thread, never a subagent or a delegate. Before launching B, load the **t3-runtime** skill: its launch contract tells B whom to report to and when to settle. If those controls or settings are unavailable, ask the user to open the B sessions
-- A decides how many B to launch and what each covers
+- **A** builds the page with the user-selected model for its thread
+- **B** reviews the repository without changing tracked files, in a separate top-level T3 thread with `claude-haiku-5-5` at `xhigh` effort
+- A launches each B as a new thread. For several sharing A's checkout, use `create_threads` with each entry set to `target: {providerInstanceId: "claudeAgent", model: "claude-haiku-5-5", options: {effort: "xhigh"}}`. Never use a subagent or delegate for B. Before launching B, load **t3-runtime**. If controls or settings are unavailable, ask the user to open B sessions
+- A chooses B count and coverage
 
 ## Split the QA
 
-Give each B a distinct axis. Choose only axes the page needs:
+Give each B a distinct axis from those the page needs:
 
 - one section of the page
 - animations and motion, including reduced motion
@@ -26,14 +26,14 @@ Give each B a distinct axis. Choose only axes the page needs:
 
 Rules for every split:
 
-- Each B prefixes its finding IDs with its axis, such as `ANIM-004`, and keeps an ID from round to round
-- Every B tests the same pushed commit, served from a snapshot of git, never the working file A edits
-- One B at a time measures timings; two benches on one machine distort frame times
-- B finishes its round within its turn and never ends it while a background job runs
+- Prefix finding IDs with the axis, such as `ANIM-004`. Keep IDs across rounds
+- Every B tests the same pushed commit from a git snapshot, never A's working file
+- Only one B measures timings at a time. Concurrent benches on one machine distort frame times
+- B finishes each round within its turn, with no background job left running
 
 ## Brief for B
 
-Send it as the thread's first message. Later rounds send the commit, fixes and new focus areas. Machine checks cover sampled initial states; B checks its axis's interactions and states too.
+Send this brief first. For later rounds, send commit, fixes, and new focus areas. Beyond sampled initial states from machine checks, B tests its axis's interactions and states.
 
 ```md
 QA round 01 of <page path>, axis <axis>, ID prefix <PREFIX>. Test commit `<sha>`, pushed: serve `git show <sha>:<page path>` from a folder of yours, never the working file.
@@ -53,15 +53,15 @@ Write `~/.cache/<project>-qa/round-NN/<axis>.md`:
 
 ## A's round
 
-1. Run `check_page.py` on the round's page. Commit and push each change separately, then send the round with its SHA
-2. Wait for each B with `t3_thread_wait`, then read its findings file
-3. Fix each finding in its own commit, or dismiss it with a reason in the journal. Push fixes before B tests them
-4. Rerun `check_page.py` and inspect screenshots. Use `--baseline` when comparing with the previous round helps review. Have B verify final fixes on their pushed commit within the round
-5. Record the round, then continue until the level's count is reached. Report unresolved findings if the user stops early
+1. Run `check_page.py`. Commit and push each change separately. Send the round with its SHA
+2. Wait for each B with `t3_thread_wait`. Read its findings file
+3. Fix each finding in a separate commit, or dismiss with a journaled reason. Push fixes before B tests them
+4. Rerun `check_page.py` and inspect screenshots. Use `--baseline` if comparison with the previous round helps. Within the round, have B verify final fixes on their pushed commit
+5. Record each round until the level's count is reached. If the user stops early, report unresolved findings
 
 ## Journal
 
-Keep `QA.md` beside the page, in the project. It holds the decisions and one row per round:
+Keep decisions and one row per round in `QA.md` beside the page:
 
 ```md
 | Round | Commit tested | Findings | Fixed | Dismissed | Fix commits |
@@ -69,4 +69,4 @@ Keep `QA.md` beside the page, in the project. It holds the decisions and one row
 | 01 | a1b2c3d | 12 (ANIM-001 to ANIM-005, A11Y-001 to A11Y-007) | 11 | A11Y-004: inline link, exempt | e4f5a6b..c7d8e9f |
 ```
 
-Each dismissal and each decision left to the user gets a row with its reason. QA scripts and screenshots stay outside the repository.
+Give each dismissal and decision left to the user a row with its reason. Keep QA scripts and screenshots outside the repository.

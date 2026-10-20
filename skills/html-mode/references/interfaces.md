@@ -1,13 +1,13 @@
 # Interfaces and tools
 
-Read for calculators, editors, control panels, and tools whose main purpose is operation rather than a bounded product-flow review.
+Read for calculators, editors, control panels, and tools focused on operation, rather than product-flow review.
 
-Lead with current state and the next useful action. Organize around the task rather than the underlying data model.
+Lead with current state and next useful action. Organize by task, rather than data model.
 
-- Show feedback close to the action, including pending, success, empty, validation, and error states where relevant
+- Show feedback near the action, including relevant pending, success, empty, validation, and error states
 - Make selected filters, active modes, changed values, and unsaved work visible
-- Put summaries before detail when scanning matters, with an obvious path to the underlying evidence
-- Use explicit form labels, usable touch targets, and deliberate confirmation for consequential destructive actions
-- Preserve the primary task on narrow screens by reflowing secondary panels and containing wide data
+- When scanning matters, put summaries first with a clear path to evidence
+- Use explicit form labels, usable touch targets, and confirmation for consequential destructive actions
+- On narrow screens, preserve the primary task. Reflow secondary panels and contain wide data
 
-Exercise the important path end to end. For calculations and transformations, compare outputs against known inputs and expected results. For filters and editors, verify state changes and reset or recovery behavior.
+Test the main path end to end. For calculations and transformations, compare outputs with known inputs and expected results. For filters and editors, test state changes and reset or recovery.

@@ -1,69 +1,69 @@
 # Quality bar
 
-Read when building or reviewing a page for readers. Items marked _(checked)_ are sampled by `scripts/check_page.py`. Inspect screenshots and use QA for remaining states and limits below. Apply feature-specific items only when that feature exists.
+For pages readers use, apply items only when their features exist. `scripts/check_page.py` samples _(checked)_ items. Inspect screenshots. Use QA for remaining states and limits.
 
-The font-size and contrast checks omit form-field values and placeholders, which QA checks.
+QA checks form-field values and placeholders, which font-size and contrast checks omit.
 
-Run `uv run scripts/check_page.py --help` for the screens it covers: phones, tablets in both orientations, a laptop and a desktop.
+For covered screens, run `uv run scripts/check_page.py --help`: phones, tablets in both orientations, laptop, and desktop.
 
 ## Layout and reading
 
-- No sideways scroll on any screen _(checked)_, and no text cut off _(checked)_
-- Aim for 45 to 75 characters per line where width permits, about `40rem` at 17px. On narrow screens, fit text without sideways scroll
-- A tall tablet screen is filled by the composition, not a small block in its middle
-- The page ends with its last content: no dead scroll and no blank tail
+- No sideways scroll _(checked)_ or cut-off text _(checked)_ on any screen
+- Aim for 45 to 75 characters per line where width permits, about `40rem` at 17px
+- Fill tall tablet screens with the composition
+- End the page at its last content, without dead scroll or blank tail
 
 ## Type
 
-- Text on a phone is 12px or larger _(checked for CSS font sizes and SVG scaling; QA checks HTML transforms)_. Form fields use 16px so iOS does not zoom
-- Sizes in `rem`, so the browser's text size setting applies; container query thresholds in `rem` too
-- One scale: at most 8 sizes and 4 weights, line height 1.6 for text and 1.15 for titles
+- Phone text is at least 12px _(checked for CSS font sizes and SVG scaling; QA checks HTML transforms)_. Use 16px form fields to prevent iOS zoom
+- Use `rem` for sizes and container query thresholds to respect browser text size
+- Use one scale, at most 8 sizes and 4 weights. Line height 1.6 for text, 1.15 for titles
 - Headings `text-wrap: balance`, paragraphs `text-wrap: pretty`
 - French typography: non-breaking spaces before `:` `;` `!` `?`, inside `« »`, between a number and its unit, and within a brand name where needed
-- A long word fits its box at every width, without breaking mid-word
+- Fit long words at every width without mid-word breaks
 
 ## Colour and themes
 
 - Text contrast 4.5:1, or 3:1 from 24px or 18.66px bold _(checked, except SVG text and text over an image)_; graphics and focus rings 3:1
-- Colours written once as `light-dark()` tokens in `:root`, and still present in browsers without `light-dark()`
-- Dark mode is a designed palette: warm near-black surfaces, off-white text, accents lifted for contrast. A saturated block that reads well in light can glare in dark; give it a deeper shade
-- The theme switch changes every colour at once
-- Two `theme-color` metas, one per `prefers-color-scheme`, both set to the chosen theme by the switch
-- Printing is light, whatever the theme
+- Define colours once as `light-dark()` tokens in `:root`. Support browsers without `light-dark()`
+- Use warm near-black dark surfaces, off-white text, and lighter accents for contrast. Deepen saturated blocks that glare in dark mode
+- Switch every colour at once
+- Use two `theme-color` metas, one per `prefers-color-scheme`. The switch sets both to the chosen theme
+- Print in light, regardless of theme
 - Under `forced-colors: active`, state colours map to `Highlight`, `CanvasText` and `GrayText`
 
 ## Controls and touch
 
-- Hit areas of 44px on touch screens, except controls inside running text _(checked by sampled hit testing, including labels, padding and pseudo-elements)_
+- Use 44px touch hit areas, except controls inside running text _(checked by sampled hit testing, including labels, padding and pseudo-elements)_
 - Nothing covers a control _(checked at sampled target centres on touch screens; QA checks other states)_
-- Hover styles inside `@media (hover: hover)`; what hover reveals also shows on focus and on tap
+- Put hover styles inside `@media (hover: hover)`. Reveal hover content on focus and tap too
 - `touch-action: manipulation` on buttons tapped in quick succession
-- An inline control wraps with its sentence and stays inside its box
+- Inline controls wrap with their sentences inside their boxes
 
 ## Keyboard and screen readers
 
-- Visible focus on every stop, never hidden under a sticky bar _(checked for up to 60 stops on one screen per scheme; QA covers the rest)_
+- Show focus at every stop, never hidden by sticky bars _(checked for up to 60 stops on one screen per scheme; QA covers the rest)_
 - `aria-current="step"` on the current step of a journey, `aria-expanded` on what opens and closes
-- One announcement per change: focus moves to the new heading, or `aria-live` speaks, not both
+- Announce each change once, through focus on the new heading or `aria-live`, never both
 - Every section has a heading, every icon button a name, foreign text its `lang`
-- Copied text keeps its word spacing, and decorative glyphs stay out of it
+- Preserve copied word spacing and exclude decorative glyphs
 
 ## Motion
 
-- Under `prefers-reduced-motion: reduce`, the page shows its finished state and nothing keeps moving _(checked)_
+- Under `prefers-reduced-motion: reduce`, show the finished state with no continuing motion _(checked)_
 - No continuous drawing at rest _(checked for animation-frame callbacks and infinite CSS animations; QA checks timers, canvas and video)_; sampled scroll frames stay under 50ms _(checked)_
-- Native `scrollTo({ behavior: 'smooth' })` for jumps; a custom glide feels wrong to readers used to their browser
+- Use native `scrollTo({ behavior: 'smooth' })` for jumps
 
 ## Loading and head
 
-- Self-contained: no request to another host _(checked)_, fonts and images inline
-- The page stays hidden until its font loads, 400ms at most: no font swap and no layout shift
+- No requests to another host _(checked)_. Inline fonts and images
+- Hide the page until font load, 400ms at most. No font swap or layout shift
 - `<meta name="viewport" content="width=device-width, initial-scale=1">` without `viewport-fit=cover`, `color-scheme`, a title, a description, `og:` tags and an icon
-- Without JavaScript, a `<noscript>` block shows the title, a line and a link
+- Without JavaScript, show title, one line, and a link in `<noscript>`
 
 ## Robustness
 
-- Zoom, rotation and window resizes keep the line being read in place
-- A deep link lands on its target; Back and Forward restore the position; a page restored from the back-forward cache keeps its state
-- A tab hidden during an animation resumes without a visible jump
-- Printing from mid-page prints the whole page and returns to the same place
+- Keep the reading line in place through zoom, rotation, and window resize
+- Deep links reach their targets. Back and Forward restore position. Back-forward cache restores state
+- After hiding a tab during animation, resume without a visible jump
+- From mid-page, print the whole page and return to the same position
