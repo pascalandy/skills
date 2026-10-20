@@ -108,7 +108,7 @@ On success, stdout holds one JSON line:
 {"ok":true,"file":"/tmp/headless-codex-review-only.8gcz_axu/answer.md","model":"gpt-6-luna","effort":"medium","session":"01a0f7d4-cbcf-7162-869b-94b331ed56b0","changed":[]}
 ```
 
-`file` holds the child's answer in every mode. Read it with your file-reading tool, since an output filter such as RTK cuts long output. `model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed; outside Git it is `null`, because the launcher cannot check them. The answer file's folder also keeps `prompt.md` and the child's logs.
+`file` holds the child's answer in every mode. Read it with your file-reading tool to get the whole answer. `model` comes from the child's own output: cite it when the request names a reviewer. Claude lists the model that did the work first, then any helper model it used. `changed` lists the files the child changed; outside Git it is `null`, because the launcher cannot check them. The answer file's folder also keeps `prompt.md` and the child's logs.
 
 Read the whole answer before deciding the run succeeded. A one-line "no findings" without criteria is weak evidence: add the criteria and check results, then rerun.
 
