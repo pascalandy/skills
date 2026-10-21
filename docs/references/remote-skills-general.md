@@ -101,7 +101,7 @@ A mode's routes run through that mode's SKILL.md.
 - `concise`: Use when the user requests to be more concise.
 - `feel-me`: Use when explicitly invoked as `feel me`, `same page`, or `same foot`, or when the user says they want to be on the same page or aligned with the agent.
 - `frontend-design`: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
-- `graphviz`: Use when drawing, editing, or rendering a diagram with Graphviz or `dot`, such as a statechart.
+- `graphviz`: Use when drawing, editing, or rendering a Graphviz or `dot` diagram, or a statechart when the request names no other tool.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.

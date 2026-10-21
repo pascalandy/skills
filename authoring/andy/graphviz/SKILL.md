@@ -1,6 +1,6 @@
 ---
 name: "graphviz"
-description: "Use when drawing, editing, or rendering a diagram with Graphviz or `dot`, such as a statechart."
+description: "Use when drawing, editing, or rendering a Graphviz or `dot` diagram, or a statechart when the request names no other tool."
 kind: "general"
 ---
 
@@ -18,11 +18,11 @@ Set these attributes:
 
 - `splines=ortho` on the graph, for right-angle edges
 - `ordering=out` on the graph, to keep the branches in source order
-- `group=<lane>` on each node of a lane, to keep the lane in one straight column
+- `group=<lane>` on each node of a lane, to keep the edges in the lane straight
 
 `splines=ortho` has two limits. Use these workarounds:
 
-- With `splines=ortho`, Graphviz cannot place edge labels. Put each label in a `shape=plaintext` node on its edge. Give the label node the group of the node that the edge points to
+- With `splines=ortho`, Graphviz places edge labels badly. A label can sit far from its edge or across another line. Put each label in a `shape=plaintext` node on its edge. Give the label node the group of the node that the edge points to
 - Edges from a node with many branches can leave from different sides and cross. Under that node, add a junction point: a `shape=point` node with a width and height of 0.01. Give the junction point the group of that node. Draw each branch from the junction point
 
 An edge into a label node or a junction point has no arrowhead. Set `arrowhead=none` on that edge.
