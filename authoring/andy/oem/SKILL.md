@@ -62,6 +62,13 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Default to `pnpm` for JavaScript/TypeScript; use alternatives (like `bun`) only when already present in the project; never use `npm` or `yarn`
 - On macOS, pnpm owns global JavaScript and TypeScript CLI applications. Use the skill's pnpm update command even when an embedded guide recommends npm, npx, yarn, Bun installation or a self-updater. Bun may run existing scripts, but must not install or update global applications
 - Inside T3 Code, load `$t3-runtime` before orchestration, PR tracking, scheduling, or thread-history work
+- For a T3 Code request to delegate through Pi, use the `delegate_task` tool with `target.providerInstanceId="pi"` and one of these models:
+  - "Pi Opus" or "Pi Opus 5.5" selects `target.model="claude-code/claude-opus-5-5"`
+  - "Pi Sol" or "Pi Codex Sol" selects `target.model="openai-codex/gpt-6.1-sol"` unless I name another Sol version
+- Before a Pi delegation, confirm the model and supported levels with `orchestrator_capabilities`
+- If I request an effort level, pass that level as Pi's `target.options.thinking`
+- After `delegate_task` returns, verify the returned `providerInstanceId`, model, and options
+- If the Pi route fails, report the error without selecting native Claude, native Codex, or OpenRouter
 - Prefer `gh` for GitHub, `shellcheck` and `shfmt` for shell, `ruff`, `pyright`, and `bandit` for Python, and `biome` for JavaScript and TypeScript
 - Delete with `trash`, and only literal absolute paths that your own thread created or that the user, your brief or a skill you follow told you to delete, once nothing still writes to them. Never run `rm` on a path built from a variable: a variable from an earlier shell call may be unset or empty, and `set -u` stops only the unset case. If you are unsure a path is yours to delete, or `trash` is missing or fails, keep the files and report it. A skill's documented cleanup procedure, such as verify-skills' guarded `rm -r "$RUN"`, still applies to the paths it names
 - Run CI through project commands such as `just`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
