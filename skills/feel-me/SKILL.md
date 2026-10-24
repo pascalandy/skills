@@ -4,31 +4,30 @@ description: "Use when explicitly invoked as `feel me`, `same page`, or `same fo
 kind: "general"
 ---
 
-D'ABORD; Lis et comprends AGENTS.md et investigue le code et les documents. Ne modifie aucun fichier avant le "👍 Je n'ai plus de question."
+D'ABORD; L'agent lit et comprend AGENTS.md, puis investigue le code et les documents. L'agent ne modifie aucun fichier avant d'avoir écrit "👍 Je n'ai plus de question."
 
-ENSUITE; Dans tes mots, dis-moi quel est mon but et le problème que je veux résoudre afin que l'on s'assure que nous sommes bien alignés ensemble. Écris du point de vue utilisateur "je", non au "tu".
+ENSUITE; L'agent reformule le but de l'utilisateur et le problème que l'utilisateur veut résoudre, pour s'assurer que l'agent et l'utilisateur sont alignés. L'agent l'écrit à la première personne, comme l'utilisateur le dirait : « Je veux… »
 
-ENSUITE; Partage-moi une ou deux recommandations optimales par élément à réviser et assure-toi de demeurer $concise.
+ENSUITE; Pour chaque élément à réviser, l'agent propose une ou deux recommandations optimales et reste $concise.
 
-Quand tu me poses des **questions**, chaque question porte son FMO (*future mode of operation*, l'état proposé), puis un choix de réponses.
-Le CMO (*current mode of operation*, l'état actuel) vient après, comme référence que je consulte au besoin. Suis ces règles :
+L'agent pose ses **questions** à l'utilisateur selon le gabarit ci-dessous. Le FMO (*future mode of operation*) est l'état que l'agent propose. Le CMO (*current mode of operation*) est l'état actuel, une référence que l'utilisateur consulte au besoin. Règles :
 - Au plus 4 questions par ronde, classées par impact
-- Tranche toi-même les autres, comme un point cosmétique ou un statu quo, et annonce chaque choix en une ligne
-- Numérote les questions en continu d'un élément à l'autre, pour que je puisse répondre « 1a, 2b »
-- Pour chaque question, marque ta recommandation et dis en une ligne pourquoi elle compte
+- L'agent tranche lui-même les points mineurs, comme un détail cosmétique ou un statu quo, et annonce chaque choix en une ligne
+- Les questions sont numérotées en continu, pour que l'utilisateur puisse répondre « 1a, 2b »
+- Chaque question marque la recommandation de l'agent et dit en une ligne pourquoi elle compte
 
-Gabarit:
+Gabarit :
 
 ````md
 ### 1) 🙋 [Question]
-**FMO**: [Ce que tu suggères comme modification. Le FMO doit être actionnable par l'utilisateur. Code diff when relevant]. [Pourquoi c'est important]
-**CMO**: [Ce que nous avons maintenant]
+**FMO**: [Le changement que l'agent propose, que l'utilisateur peut appliquer, avec un diff de code au besoin]. [Pourquoi il compte]
+**CMO**: [L'état actuel]
 - a) … (🟢 recommandé)
 - b) …
 - c) …
 
-### 1) 🙋 [Question]
+### 2) 🙋 [Question]
 ````
 
-ENSUITE; Suite à mes réponses, intègre-les et repense l'ensemble de tes propositions jusqu'à ce que tu n'aies plus de questions. À chaque ronde, charge $2nd-pass avant de me répondre.
-- Si tu n'as plus de question, dis-moi explicitement : "👍 Je n'ai plus de question."
+ENSUITE; L'agent intègre les réponses de l'utilisateur et repense l'ensemble de ses propositions, jusqu'à ce que l'agent n'ait plus de question. À chaque ronde, l'agent charge $2nd-pass avant de répondre.
+- Quand l'agent n'a plus de question, l'agent l'écrit explicitement : "👍 Je n'ai plus de question."
