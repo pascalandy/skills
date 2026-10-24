@@ -1,15 +1,15 @@
 ---
 name: "git-local"
-description: "Use when a GitHub repository must be cloned or refreshed into the local cache instead of a manual `git clone`, such as when a request gives a GitHub URL or `owner/repo`, or when a task needs an external repository's code locally."
+description: "Use instead of `git clone` when a request gives a GitHub URL or `owner/repo`, or when a task needs the code of an external GitHub repository."
 kind: "dev"
 configuration-is-needed: true
 ---
 
-This skill replaces `git clone`: it puts a GitHub repository in the local `opensrc` cache and reports its path. Reading or analyzing the code belongs to the task that needs it, if any. Continue using `gh` for issues, pull requests, and repository metadata that do not require a local copy of the code.
+This skill replaces `git clone`. It puts a GitHub repository in the local `opensrc` cache and reports the path. Use `gh` for issues, pull requests, and repository metadata that do not need a local copy of the code.
 
 # Git Repo Local
 
-Use the local `opensrc` repository cache by default for GitHub repositories. Do not clone GitHub repositories anywhere outside this cache (no `/tmp`, no current working directory, no `gh repo clone` to its default path) unless the user explicitly asks for a throwaway checkout.
+Do not clone GitHub repositories anywhere outside this cache (no `/tmp`, no current working directory, no `gh repo clone` / `git clone` to a default path) unless the user explicitly asks for a throwaway checkout.
 
 ## Prerequisites
 
@@ -99,8 +99,9 @@ case "$(uname -s)" in
 esac
 ```
 
-7. Report the local path to the user. When the request names only a repository, the skill is done: stop without reading, summarizing, or asking what comes next
-8. When a task needs the code, use that path for `rg`, file reads, and references, and cite it in the findings
+7. Report the local path to the user
+8. If the request names only a repository, stop here. Do not read the code, summarize it, or ask for a next task
+9. If a task needs the code, search and read the code at that path
 
 ## Existing Checkout Rule
 
@@ -124,7 +125,6 @@ After resolving the local repo root, inspect the requested subdirectory inside i
 
 ## Do Not
 
-- Do not default to cloning GitHub repositories outside `$OPENSRC_HOME` (no `/tmp`, no current working directory, no `gh repo clone` / `git clone` to a default path)
 - Do not edit files inside the shared opensrc cache unless the user explicitly asks to modify that cached source
 - Do not delete or replace cached repositories unless the user asks for a refresh or repair
 - Do not modify the workspace's `.gitignore`, `tsconfig.json`, or `AGENTS.md` as part of fetching source
