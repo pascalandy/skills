@@ -4,36 +4,41 @@ description: "Use when explicitly invoked as `feel me`, `same page`, or `same fo
 kind: "general"
 ---
 
-D'ABORD; Lis et comprends AGENTS.md et investigue le code et les documents. Ne modifie aucun fichier avant le "👍 Je n'ai plus de question."
+D'ABORD; L'agent lit et comprend AGENTS.md, puis investigue le code et les documents. L'agent ne modifie aucun fichier avant d'avoir écrit "👍 Je n'ai plus de question."
 
-ENSUITE; Dans tes mots, dis-moi quel est mon but et le problème que je veux résoudre afin que l'on s'assure que nous sommes bien alignés ensemble.
+ENSUITE; L'agent reformule le but de l'utilisateur et le problème que l'utilisateur veut résoudre, pour s'assurer que l'agent et l'utilisateur sont alignés. L'agent l'écrit à la première personne, comme l'utilisateur le dirait : « Je veux… »
 
-ENSUITE; Partage-moi une ou deux recommandations optimales par élément à réviser et assure-toi de demeurer $concise.
+ENSUITE; Pour chaque élément à réviser, l'agent propose une ou deux recommandations $concise et optimales.
 
-Quand tu me poses des **questions**, chaque question porte son FMO (*future mode of operation*, l'état proposé), puis un choix de réponses. Le CMO (*current mode of operation*, l'état actuel) vient après, comme référence que je consulte au besoin. Suis ces règles :
-- Au plus 4 questions par ronde, classées par impact
-- Pose seulement les questions qui changent le livrable. Tranche toi-même les autres, comme un point cosmétique ou un statu quo, et annonce chaque choix en une ligne
-- Numérote les questions en continu d'un élément à l'autre, pour que je puisse répondre « 1a, 2b »
-- Pour chaque question, marque ta recommandation et dis en une ligne pourquoi elle compte
-- Pour un fait que je suis seul à connaître, comme une suppression voulue ou le chemin d'une sauvegarde, pose une question directe qui nomme la chose, en oui ou non si le fait est binaire, sans FMO, choix de réponses ni recommandation
-- Nomme chaque chose avec les mots que la conversation emploie déjà, et résume chaque ticket, PR ou fichier que la question cite, car je ne l'ai pas ouvert
+ENSUITE; L'agent tranche lui-même chaque choix que le code, les documents, les conventions du projet ou le but de l'utilisateur permettent de trancher, et annonce chaque décision en une ligne avec sa raison.
 
-Voici le format dans lequel me répondre dans le but de m'aider à prendre des décisions optimales :
+ENSUITE; Au besoin, l'agent pose ses **questions** à l'utilisateur selon le gabarit ci-dessous, seulement pour :
+- Le but ou ses priorités, quand ils restent ambigus
+- Une action difficile à défaire ou visible hors du projet, comme supprimer, publier ou dépenser
+- Un compromis entre des options de valeur comparable, que rien ne tranche
+
+Le FMO (*future mode of operation*) est l'état que l'agent propose. Le CMO (*current mode of operation*) est l'état actuel, une référence que l'utilisateur consulte au besoin. Règles :
+- Les décisions, puis les questions, vont de la plus importante à la moins importante. Quand l'agent a vu juste sur les premières, l'utilisateur peut lui faire confiance pour les suivantes
+- Au plus 4 questions par ronde
+- Les questions sont numérotées en continu, pour que l'utilisateur puisse répondre « 1a, 2b »
+- Chaque question marque la recommandation de l'agent et dit en une ligne pourquoi elle compte
+- Une question sans réponse prend la recommandation de l'agent, sauf pour une action difficile à défaire
+
+Gabarit :
 
 ````md
-### Titre élément
+### Décisions de l'agent
+- [Décision] : [raison en une ligne]
 
-1) 🙋 [Question]. **FMO**: [Ce que tu suggères comme modification. Le FMO doit être actionnable par l'utilisateur. Code diff when relevant]. [Pourquoi c'est important]
-   - a) … (🟢 recommandé)
-   - b) …
-   - c) …
+### 1) 🙋 [Question]
+**FMO**: [Le changement que l'agent propose, que l'utilisateur peut appliquer, avec un diff de code au besoin]. [Pourquoi il compte]
+**CMO**: [L'état actuel]
+- a) … (🟢 recommandé)
+- b) …
+- c) …
 
-**CMO**: [Ce que nous avons maintenant]
-
----
-
-2) 🙋 …
+### 2) 🙋 [Question]
 ````
 
-ENSUITE; Suite à mes réponses, intègre-les et repense l'ensemble de tes propositions jusqu'à ce que tu n'aies plus de questions. À chaque ronde, charge $2nd-pass avant de me répondre.
-- Si tu n'as plus de question, dis-moi explicitement : "👍 Je n'ai plus de question."
+ENSUITE; L'agent intègre les réponses de l'utilisateur et repense l'ensemble de ses propositions, jusqu'à ce que l'agent n'ait plus de question. À chaque ronde, l'agent charge $2nd-pass avant de répondre.
+- Quand l'agent n'a plus de question, il dit explicitement : "👍 Je n'ai plus de question."
