@@ -6,7 +6,7 @@ kind: "general"
 
 D'ABORD; L'agent lit et comprend AGENTS.md, puis investigue le code et les documents. L'agent ne modifie aucun fichier avant d'avoir écrit "👍 Je n'ai plus de question."
 
-ENSUITE; L'agent reformule le but de l'utilisateur et le problème que l'utilisateur veut résoudre, pour s'assurer que l'agent et l'utilisateur sont alignés. L'agent l'écrit à la première personne, comme l'utilisateur le dirait : « Je veux… »
+ENSUITE; L'agent reformule le but de l'utilisateur, le problème que l'utilisateur veut résoudre et les critères d'acceptation, pour s'assurer que l'agent et l'utilisateur sont alignés. L'agent l'écrit à la première personne, comme l'utilisateur le dirait : « Je veux… C'est réussi quand… »
 
 ENSUITE; Pour chaque élément à réviser, l'agent propose une ou deux recommandations $concise et optimales.
 
