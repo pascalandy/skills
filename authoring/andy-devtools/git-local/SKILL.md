@@ -1,11 +1,11 @@
 ---
 name: "git-local"
-description: "Use when a task requires inspecting or working across an external GitHub repository's code and cloning it into the local cache is more effective than browsing source files online or making repeated GitHub API queries."
+description: "Use when a GitHub repository must be cloned or refreshed into the local cache instead of a manual `git clone`, such as when a request gives a GitHub URL or `owner/repo`, or when a task needs an external repository's code locally."
 kind: "dev"
 configuration-is-needed: true
 ---
 
-For code-level analysis or implementation, prefer the local repository cache over browsing individual source files online or making repeated `gh` API queries. Continue using `gh` for issues, pull requests, and repository metadata that do not require a local copy of the code.
+This skill replaces `git clone`: it puts a GitHub repository in the local `opensrc` cache and reports its path. Reading or analyzing the code belongs to the task that needs it, if any. Continue using `gh` for issues, pull requests, and repository metadata that do not require a local copy of the code.
 
 # Git Repo Local
 
@@ -99,8 +99,8 @@ case "$(uname -s)" in
 esac
 ```
 
-7. Use that path for `rg`, file reads, analysis, and references.
-8. Tell the user the local path you used when reporting findings.
+7. Report the local path to the user. When the request names only a repository, the skill is done: stop without reading, summarizing, or asking what comes next
+8. When a task needs the code, use that path for `rg`, file reads, and references, and cite it in the findings
 
 ## Existing Checkout Rule
 
