@@ -6,24 +6,27 @@ kind: "dev"
 
 # Correct
 
-The user keeps correcting agents in this repository for the same mistakes. Change the repository so the next agent can't make them.
+The operator keeps correcting agents in this repo for the same mistakes. Change the repo so the next agent can't make them.
 
-Assume every contributor is an agent that sees only the files it opened, copies the nearest example, and takes the shortest path that compiles. Design the repository so a change that looks right from one file is right for the whole repository.
+Assume every contributor is an agent that sees only the files it opened, copies the nearest example, and takes the shortest path that compiles. Design the repo so a change that looks right from one file is right for the whole repo.
 
-## 1. Find the mistake classes
+## Find the mistake classes
 
-Read recent commits, reverts, review comments, agent instruction files, and comments that explain workarounds. Group the mistakes into classes. A class counts once it has happened twice. Done when each class lists two or more past occurrences.
+First, read recent commits, reverts, review comments, agent instruction files, and comments that explain workarounds. Group the mistakes into classes. A class counts once it has happened twice.
 
-## 2. Pick the mechanism for each class
+## Fix each class at the highest level that works
 
-For each class, pick the strongest mechanism that works from the ladder in poteto-mode's [Encode Lessons in Structure](../poteto-mode/principles/encode-lessons-in-structure.md) principle. Audit the existing tests with its [Test Behavior, Not Implementation](../poteto-mode/principles/test-behavior-not-implementation.md) principle. Done when each class has a mechanism and a reason no stronger one works.
+1. **Eliminate it with architecture.** Give each piece of state one owner and each task one supported way. Hide internals so the wrong import fails. Replace hand-synced lists with one source of truth. Delete old ways and dead code an agent would copy.
+2. **Enforce it with types so the bad state can't be written.** If bad code still compiles, add a lint or CI check whose error names the file, type, or function to use instead. If the pattern is already common, fail only when a change adds more.
+3. **Test the behavior.** Fix or delete any test that still passes when the behavior it checks breaks, or that fails when only the internals change.
+4. **Write docs or agent rules last, only for judgment calls.** Nothing fails when an agent skips them.
 
-## 3. Fix and prove
+## Fix and prove
 
-Fix the most frequent classes now, one commit each. Prove each new check fails on a real past mistake. Wire each check into the repository's check command, such as `just check`, and confirm it runs on changes to the files its mistake touches. An exception goes on the offending line with a reason, an expiry date, and a human's approval. Done when each new check fails on its past mistake and passes on the fixed tree.
+Then fix the most frequent classes now, one commit each. Prove each new check fails on a real past mistake. Run the same command locally and in CI. Exceptions go on the offending line with a reason, an expiry date, and a human's approval.
 
-## 4. Keep the rule table
+## Keep the rule table
 
-Keep a table in the repository's `AGENTS.md` that pairs each rule with what enforces it. When the user corrects you, fix the mistake and add its rule. If that rule is already in the table and nothing enforces it, the mistake is a repeat: fix it with the strongest mechanism in the same change. A judgment-call rule names its doc as its enforcement. Drop a rule once its mistake can't happen. Done when every rule in the table names its enforcement.
+Last, keep a table in the agent instruction file that pairs each rule with what enforces it. When the operator corrects you, fix the mistake and add the rule. If the rule was already there and nothing enforces it, that's a repeat, so fix it at the highest level in the same change. Drop a rule once its mistake can't happen.
 
-**Reply:** each class with its evidence, the mechanism you picked, and why a stronger one didn't work.
+**Reply:** each class with its evidence, the level you picked, and why a higher level didn't work.
