@@ -30,7 +30,14 @@ Sprint means a fixed period. Wave duplicates Blocked by. Use neither as a level.
 Assemble and refine Stories into Epics. Assemble and refine eligible Epics into Milestones.
 Use Rank and Blocked by to specify work order and dependencies.
 Grooming writes the plan only. When execution is requested, Brigade executes a ready target.
-Write in the conversation's language. Keep the glossary terms in English.
+Talk with the user in the conversation's language. Keep explanations in the Proposal in the user's language.
+Keep the glossary terms in English.
+
+Before you draft text for GitHub, load `asd-ste100`, the skill for Simplified Technical English, or STE.
+With its Write branch, draft each text for GitHub in English.
+This rule covers titles, Story and Epic bodies, Milestone descriptions, and comments.
+If you edit an existing issue body in another language, rewrite the full body in English.
+Preserve every fact and decision of that body. Use only English in the rewritten body.
 
 ## Pick the starting point
 
@@ -252,6 +259,12 @@ Approval includes substitution of their issue numbers.
   - Outcome checks
   - For each proposed Ready label, the review record that the Ready rule of label-for-issues requires
   - Unresolved input and affected items
+  - For each text for GitHub, its asd-ste100 result, with these parts:
+    - The `STE: Pass:` line
+    - Each kept finding and its reason
+    - The scope line
+
+Keep asd-ste100 results in Readiness only. The text on GitHub does not include these results.
 
 After approval, follow these three phases.
 
