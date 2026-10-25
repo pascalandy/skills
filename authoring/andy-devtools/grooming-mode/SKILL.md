@@ -190,7 +190,8 @@ Story draft names until creation. Approval includes substituting their issue num
 - **Comments:** exact text and target of every proposed comment
 - **Body edits and new Stories:** Story reference and exact before/after text per
   edit; title, body, labels and placement of each proposed new Story
-- **Readiness:** outcome checks; unresolved input and affected items
+- **Readiness:** outcome checks; for each proposed Ready label, the review record
+  label-for-issues' Ready rule asks for; unresolved input and affected items
 
 After approval:
 
