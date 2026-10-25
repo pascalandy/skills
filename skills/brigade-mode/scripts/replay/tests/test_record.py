@@ -51,8 +51,13 @@ mv watch.toml.tmp watch.toml"""
 def build(path: Path) -> None:
     """A Head Chef that registers two batches, launches one Chef and its Cook, which ships a PR."""
     db = FakeT3(path)
-    db.project("p-home", "/home/example/projects")
-    db.project("p-widget", "/home/example/projects/widget")
+    projects = path.parent / "projects"
+    (projects / "widget").mkdir(parents=True)
+    (projects / "widget" / ".git").write_text(
+        "gitdir: ../worktrees/widget\n", encoding="utf-8"
+    )
+    db.project("p-home", str(projects))
+    db.project("p-widget", str(projects / "widget"))
     db.thread(HC, "Kick off a brigade PLANTED FREE TEXT")
     db.run(HC, 1, "running")
     db.item(
@@ -182,6 +187,8 @@ def test_recording_keeps_the_run_and_drops_free_text(tmp_path: Path) -> None:
     assert set(data["github"]["repositories"]) == {"example-owner/widget", "private-A"}
 
     snap = t3.fold(data["records"])
+    assert "p-home" not in snap.projects
+    assert snap.projects["p-widget"] == "example-owner/widget"
     assert set(snap.threads) == {HC, CHEF, COOK}  # the import thread is no Head Chef
     assert snap.title(HC) == {
         "role": "head_chef",

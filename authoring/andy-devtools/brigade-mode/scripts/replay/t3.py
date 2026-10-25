@@ -821,12 +821,17 @@ def last_sequence(con: sqlite3.Connection) -> int:
 
 
 def project_repos(con: sqlite3.Connection) -> dict[str, str]:
-    """T3 projects -> the folder name of their workspace, a repository name."""
+    """Repository projects only; a desk such as ~/projects has no GitHub identity.
+
+    A checkout has a .git directory, and a linked worktree has a .git file.
+    Record the decision now so an offline recording needs no local workspace.
+    """
     return {
         pid: Path(root).name
         for pid, root in con.execute(
             "select project_id, workspace_root from projection_projects"
         ).fetchall()
+        if (Path(root) / ".git").exists()
     }
 
 
