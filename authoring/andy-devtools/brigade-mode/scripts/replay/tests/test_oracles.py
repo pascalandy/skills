@@ -48,7 +48,10 @@ def test_prefix_oracle_catches_a_github_fact_the_service_learns_late(
     assert not next(r for r in oracles.rows(report) if r["oracle"] == 1)["pass"]
 
 
-def test_prefix_oracle_catches_a_change_only_the_final_replay_shows() -> None:
+@pytest.mark.parametrize("changed", ["status", "stories"])
+def test_prefix_oracle_catches_a_change_only_the_final_replay_shows(
+    changed: str,
+) -> None:
     run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
     frames = run.final["frames"]
     (_, a), (_, b) = max(
@@ -59,11 +62,22 @@ def test_prefix_oracle_catches_a_change_only_the_final_replay_shows() -> None:
         ),
         key=lambda pair: pair[1][1] - pair[0][1],
     )
-    state = oracles.state_at(frames, a)["hc"]
     mid = (a + b) / 2  # red for a tenth of a second, inside one page's window
-    blip = [[mid, "hc", "you", *state[1:]], [mid + 0.1, "hc", *state]]
+    if changed == "status":
+        state = oracles.state_at(frames, a)["hc"]
+        blip = [[mid, "hc", "you", *state[1:]], [mid + 0.1, "hc", *state]]
+    else:
+        node = next(
+            slot for slot in run.final["cooks"] if slot in oracles.state_at(frames, mid)
+        )
+        state = oracles.state_at(frames, mid)[node]
+        count = oracles.story_counts_at(run.final, mid)[node]
+        blip = [
+            [mid, node, *state, None, count + 1],
+            [mid + 0.1, node, *state, None, count],
+        ]
     run.final["frames"] = sorted(frames + blip, key=lambda f: f[0])
-    assert oracles.prefix_consistency(run)["status"] > 0
+    assert oracles.prefix_consistency(run)[changed] > 0
 
 
 def test_registry_oracle_catches_an_extractor_that_drops_merges(

@@ -63,6 +63,23 @@ PRS = {
         },
     },
 }
+for pr in PRS.values():
+    pr["userContentEdits"] = {
+        "nodes": [{"editedAt": pr["createdAt"], "diff": pr["body"], "deletedAt": None}],
+        "pageInfo": {"hasNextPage": False, "endCursor": None},
+    }
+PRS[(W, 20)]["userContentEdits"]["nodes"] = [
+    {
+        "editedAt": "2026-01-01T00:01:01Z",
+        "diff": PRS[(W, 20)]["body"],
+        "deletedAt": None,
+    },
+    {
+        "editedAt": PRS[(W, 20)]["createdAt"],
+        "diff": "Closes #10. Refs example-owner/secret-thing#4",
+        "deletedAt": None,
+    },
+]
 
 args = sys.argv[1:]
 if os.environ.get("FAKE_GH_DOWN") and os.path.exists(os.environ["FAKE_GH_DOWN"]):

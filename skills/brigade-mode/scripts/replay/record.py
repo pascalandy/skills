@@ -439,6 +439,9 @@ class Recorder:
             p = self.gh.prs[(repo, n)]
             p["refs"] = [[self.resolve(r) or repo, x] for r, x in p["refs"]]
             issues += [(r, x) for r, x in p["refs"]]
+            for _, refs in p["refHistory"]:
+                refs[:] = [[self.resolve(r) or repo, n] for r, n in refs]
+                issues += [(r, n) for r, n in refs]
         seen: set[Ref] = set()
         while issues:
             ref = issues.pop(0)
@@ -567,7 +570,14 @@ class Recorder:
                 if name in labels
             },
             "prs": {
-                ref(k): {**v, "refs": [[repo(r), n] for r, n in v["refs"]]}
+                ref(k): {
+                    **v,
+                    "refs": [[repo(r), n] for r, n in v["refs"]],
+                    "refHistory": [
+                        [at, [[repo(r), n] for r, n in refs]]
+                        for at, refs in v["refHistory"]
+                    ],
+                }
                 for k, v in facts["prs"].items()
             },
             "issues": {
@@ -733,7 +743,7 @@ def work(args: argparse.Namespace) -> dict:
 
 GITHUB_KEYS = {
     "repositories": {"public"},
-    "prs": {"created", "merged", "closed", "refs"},
+    "prs": {"created", "merged", "closed", "refs", "refHistory"},
     "issues": {
         *("epic", "epicTitle", "epicLabel", "closed"),
         *("parent", "subCount", "subs"),

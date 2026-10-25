@@ -369,6 +369,16 @@ class Brigade:
             ]
             # the run knows a PR once a thread links it: an older PR's facts start there
             linked = meta["at"]
+            for at, refs in p["refHistory"]:
+                stories = gh.stories_of({"refs": refs})
+                self.ev(
+                    max(at, linked),
+                    "github",
+                    cook,
+                    "pr_refs",
+                    pr=pr,
+                    stories=[f"{r}#{n}" for r, n in stories] or [pr],
+                )
             for s, epic in targets:
                 e = f"{epic[0]}#{epic[1]}" if epic else None
                 loose = (not found) or None
@@ -462,28 +472,24 @@ class Brigade:
                                 ep,
                                 b,
                             )
-        # Unscoped PR Stories use the earliest batch-registration, Chef-launch, or PR-open time.
+        # A new reference enters unscoped work only when its revision becomes visible.
         cook_chef = {
             t: i["parent"] for t, i in self.threads.items() if i["role"] == "cook"
         }
         scoped = {e["story"] for e in self.events if e["kind"] == "story_scope"}
-        for e in sorted(
-            (e for e in self.events if e["kind"] == "pr_open"), key=lambda e: e["time"]
-        ):
+        references = [
+            {**e, "story": story}
+            for e in self.events
+            if e["kind"] == "pr_refs"
+            for story in e["detail"]["stories"]
+        ]
+        for e in sorted(references, key=lambda e: e["time"]):
             if e["story"] in scoped:
                 continue
             chef = cook_chef.get(e["thread"])
             bn = self.threads[chef]["b"] if chef else None
-            t_in = min(
-                x
-                for x in (
-                    regs[bn][0] if bn in regs else None,
-                    launches.get(chef or ""),
-                    e["time"],
-                )
-                if x
-            )
-            if (e["detail"] or {}).get("loose"):
+            t_in = e["time"]
+            if e["story"] == e["pr"]:
                 self.ev(
                     t_in,
                     "github",
@@ -500,22 +506,25 @@ class Brigade:
             scoped.add(e["story"])
         # A Cook owns from its launch the first Story of its batch that its brief names
         # and that has no PR yet; the others start at their first PR.
-        # A Story two briefs pick first stays unassigned
+        # The earliest launch claims it; simultaneous conflicting briefs leave it unassigned.
         pr_at: dict[str, str] = {}
-        for e in self.events:
-            if e["kind"] == "pr_open":
-                pr_at.setdefault(e["story"], e["time"])
-        by_chef = defaultdict(set)
+        for e in sorted(references, key=lambda e: e["time"]):
+            pr_at.setdefault(e["story"], e["time"])
+        by_chef = defaultdict(dict)
         for e in self.events:
             if e["kind"] == "story_scope" and e["thread"]:
-                by_chef[e["thread"]].add(e["story"])
+                by_chef[e["thread"]][e["story"]] = e["time"]
         firsts: dict[tuple[str, str], list[str]] = {}
         for tid, v in self.threads.items():
             if v["role"] != "cook":
                 continue
             chef = v["parent"]
-            scope = {int(st.rsplit("#", 1)[1]): st for st in by_chef.get(chef, ())}
             at = launches.get(tid) or ""
+            scope = {
+                int(st.rsplit("#", 1)[1]): st
+                for st, time in by_chef.get(chef, {}).items()
+                if time <= at
+            }
             first = next(
                 (
                     scope[n]
@@ -527,7 +536,8 @@ class Brigade:
             if first:
                 firsts.setdefault((chef, first), []).append(tid)
         for (chef, story), cooks in sorted(firsts.items()):
-            if len(cooks) == 1:
+            cooks.sort(key=lambda tid: launches[tid])
+            if len(cooks) == 1 or launches[cooks[0]] < launches[cooks[1]]:
                 self.ev(
                     launches.get(cooks[0]),
                     "github",

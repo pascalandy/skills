@@ -178,7 +178,7 @@ function stateAt(br, t) {
   for (const f of br.frames) {
     if (f[0] > t) break;
     const prev = st[f[1]];
-    st[f[1]] = { s: f[2], step: f[3], note: f[4], since: f[5] ?? (prev && prev.s === f[2] ? prev.since : f[0]) };
+    st[f[1]] = { s: f[2], step: f[3], note: f[4], stories: f[6], since: f[5] ?? (prev && prev.s === f[2] ? prev.since : f[0]) };
   }
   return st;
 }
@@ -258,7 +258,7 @@ const say = {
     const c = node(st, id), k = br.cooks[id];
     const word = c.s === "todo" ? "to do" : c.s === "active" ? br.steps[c.step - 1] || "working"
       : c.s === "wait" ? `stands by · ${c.note || "idle"}` : c.s === "done" ? "done" : c.note || "not done";
-    const stories = plural(k.stories.length, "Story", "Stories");
+    const stories = plural(c.stories ?? k.stories.length, "Story", "Stories");
     return { s: quiet(br, st, batchOf(br, id), c.s), name: k.label, stories, tip: `${k.label} · ${word} · ${stories}, ${plural(k.prs, "PR")}${held(c, t)}` };
   },
   // step 1, 2 or 3 of a Cook: { s, title: "Implement" | "Review 1/2" | "Review 2/2", tip }

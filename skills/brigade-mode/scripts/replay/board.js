@@ -152,9 +152,9 @@ const BOARD = {
         const tip = add(mg, "title");
         const mark = add(mg, "rect", { class: "f2m-cookmark", x: 0.5, y: y(i) - 11.5, width: 8, height: 8, rx: 2 });
         add(svg, "text", { class: "f2m-cook", x: LX, y: y(i) - 2 }, cw.name);
-        add(svg, "text", { class: "f2m-stories", x: LX, y: y(i) + 14 }, cw.stories);
+        const stories = add(svg, "text", { class: "f2m-stories", x: LX, y: y(i) + 14 }, cw.stories);
         const steps = xs.map((x, k) => icon(svg, k, x, y(i)));
-        return { id: cook.id, mark, tip, steps };
+        return { id: cook.id, mark, tip, steps, stories };
       });
       const ship = icon(svg, 3, xS, y(0));
       return { batch, tag, ship, rows };
@@ -171,6 +171,7 @@ const BOARD = {
             const cw = ui.say.cook(br, st, r.id, t);
             ui.mark(r.mark, cw.s);
             r.tip.textContent = cw.tip;
+            r.stories.textContent = cw.stories;
             r.steps.forEach((it, k) => paintIcon(it, ui.say.step(br, st, r.id, k + 1, t)));
           }
         }

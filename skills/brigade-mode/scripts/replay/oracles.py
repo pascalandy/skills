@@ -386,6 +386,19 @@ def state_at(frames: list[list], t: float) -> dict[str, tuple]:
     return out
 
 
+def story_counts_at(brigade: dict, t: float) -> dict[str, int]:
+    """The Story counts the Cook lines display at this instant."""
+    counts = {
+        slot: len(info["stories"]) for slot, info in brigade.get("cooks", {}).items()
+    }
+    for frame in brigade.get("frames", []):
+        if frame[0] > t:
+            break
+        if len(frame) > 6 and frame[1] in counts:
+            counts[frame[1]] = frame[6]
+    return counts
+
+
 @dataclass
 class Run:
     """One recording, its final replay, and the facts the oracles read."""
@@ -442,7 +455,7 @@ def prefix_consistency(run: Run) -> dict:
     GitHub had it, so a fact the service learns late still shows on time.
     """
     seqs = sequences(run.rec)
-    checked = status = detail = missing = 0
+    checked = status = detail = missing = stories = 0
     examples: list[dict] = []
     recompute: list[float] = []
     final = run.final.get("frames", [])
@@ -465,6 +478,20 @@ def prefix_consistency(run: Run) -> dict:
         for t in sorted(
             {t_n, now, *theirs_move, *(f[0] for f in frames if t_n < f[0] < t_next)}
         ):
+            mine_counts = story_counts_at(live, t)
+            final_counts = story_counts_at(run.final, t)
+            for slot in mine_counts.keys() | final_counts.keys():
+                if mine_counts.get(slot, 0) != final_counts.get(slot, 0):
+                    stories += 1
+                    examples.append(
+                        {
+                            "seq": seq,
+                            "t": t,
+                            "node": slot,
+                            "liveStories": mine_counts.get(slot, 0),
+                            "finalStories": final_counts.get(slot, 0),
+                        }
+                    )
             mine, theirs = state_at(frames, t), state_at(final, t)
             for node in theirs.keys() - mine.keys():
                 if (
@@ -486,6 +513,7 @@ def prefix_consistency(run: Run) -> dict:
         "status": status,
         "detail": detail,
         "missing": missing,
+        "stories": stories,
         "examples": examples[:10],
         "recompute": recompute,
     }
@@ -788,9 +816,12 @@ def rows(r: dict) -> list[dict]:
         (
             1,
             "prefix consistency",
-            f"{p['status']} status and {p['detail']} detail mismatches in {p['checked']} checks over {p['sequences']} sequences; {p['missing']} final-only states",
-            "0, 0 and 0",
-            p["status"] == 0 and p["detail"] == 0 and p["missing"] == 0,
+            f"{p['status']} status, {p['detail']} detail and {p['stories']} Story count mismatches in {p['checked']} checks over {p['sequences']} sequences; {p['missing']} final-only states",
+            "0, 0, 0 and 0",
+            p["status"] == 0
+            and p["detail"] == 0
+            and p["missing"] == 0
+            and p["stories"] == 0,
         ),
         (
             2,

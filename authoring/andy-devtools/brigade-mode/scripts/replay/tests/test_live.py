@@ -13,7 +13,6 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -242,31 +241,6 @@ def live_run(tmp_path: Path) -> FakeT3:
     head_chef(db)
     cook(db)
     return db
-
-
-@pytest.fixture
-def chromium() -> Iterator[Browser]:
-    sync_api = pytest.importorskip("playwright.sync_api")
-    executable = os.environ.get("CHECK_PAGE_BROWSER") or next(
-        (
-            p
-            for p in map(
-                shutil.which, ("chromium", "chromium-browser", "google-chrome")
-            )
-            if p
-        ),
-        None,
-    )
-    with sync_api.sync_playwright() as playwright:
-        try:
-            browser = playwright.chromium.launch(executable_path=executable)
-        except sync_api.Error as error:
-            first = str(error).strip().splitlines()[0]
-            pytest.skip(
-                f"Chromium is missing, so the live page was not opened: {first}; run: uv run --with playwright==1.63.0 playwright install chromium"
-            )
-        yield browser
-        browser.close()
 
 
 def test_page_repaints_within_seconds_of_a_new_event(
