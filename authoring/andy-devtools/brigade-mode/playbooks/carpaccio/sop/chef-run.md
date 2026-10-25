@@ -24,7 +24,7 @@ Work folder: <absolute path>
 
 ## Return or replace a Cook
 
-On each wake, reconstruct `watch.toml` from your recorded Cook state if the file is missing or unreadable. Check your Watchdog's schedule under [Schedule health](watchdog.md#schedule-health) only when that file has a current Cook slot. If it is unhealthy, delete any old schedule, cancel its task and re-arm your Watchdog.
+On each wake, reconstruct a missing or unreadable `watch.toml` from your thread's launch, report and replacement history, including the recorded Watchdog ids. Check your Watchdog's schedule under [Schedule health](watchdog.md#schedule-health) only when that file has a current Cook slot. If it is unhealthy, delete any old schedule, cancel its task and re-arm your Watchdog.
 
 On `🐕 Watchdog <id4>: <finding>`, act as its row in [Messages](../carpaccio.md#messages) says.
 

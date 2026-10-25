@@ -30,8 +30,11 @@ sequenceDiagram
     H->>H: Pin, register batches<br>❓ align only for an open question
     H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
-    C->>C: Arm Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
-    C->>C: Group disjoint files,<br>create worktrees
+    C->>C: Group disjoint files,<br>register Cook slots
+    opt Chef has a Cook slot
+        C->>C: Arm Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
+    end
+    C->>C: Create Cook worktrees
     opt Open PR outside the run changes a group's files or cited specs
         C-->>H: Agent: ⏸️ Overlap and default <-
         H->>C: Agent: Answer, then launch that group's Cook ->
@@ -131,7 +134,9 @@ sequenceDiagram
     K->>K: 🧹 Retros, unwatch, report<br>🍽️ final after merge, then settle
     C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
     C-->>H: Agent: ⛳ Batch delivered, report <-
-    C->>C: Delete Watchdog schedule<br>cancel task, remove work folder
+    opt Chef Watchdog exists
+        C->>C: Delete Watchdog schedule<br>cancel task if recorded<br>remove its work folder if present
+    end
     C->>C: Settle
     H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
@@ -142,4 +147,4 @@ sequenceDiagram
 
 At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns affected Cooks to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
 
-Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge or release already running finishes before each Chef follows Closing.
+Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone, keeps no Chef Watchdog and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge or release already running finishes before each Chef follows Closing.

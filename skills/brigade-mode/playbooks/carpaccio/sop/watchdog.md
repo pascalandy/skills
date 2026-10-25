@@ -83,7 +83,7 @@ Before a wake, reread the target's T3 state in the same tick. If it is now final
 
 Send `🐕 Watchdog <id4>: <finding> <slot> <threadId> · <one line of evidence>` to the parent. Use the stable `clientRequestId` derived in Files; mark the finding alerted only after delivery succeeds. The parent owns the repair. The Head Chef's Watchdog never substitutes for a PM decision.
 
-For each live Chef, read `watch.toml` in its Chef record's `workFolder`. Skip its Watchdog schedule check only when that file is readable and lists no current Cook slot. Otherwise find `🐕 Watchdog · Chef <b> <id4>` with `list_scheduled_tasks` in that Chef's project. When that schedule is unhealthy under [Schedule health](#schedule-health), alert the Head Chef once. The Head Chef asks that Chef to re-arm it. A Chef without a Cook slot stays watched through its Chef record.
+For each launched live Chef, read `watch.toml` in its Chef record's `workFolder`. Skip its Watchdog schedule check only when that file is readable and lists no current Cook slot. Otherwise find `🐕 Watchdog · Chef <b> <id4>` with `list_scheduled_tasks` in that Chef's project. When that schedule is unhealthy under [Schedule health](#schedule-health), alert the Head Chef once. The Head Chef asks that Chef to re-arm it. A Chef without a Cook slot stays watched through its Chef record.
 
 ## Schedule health
 
