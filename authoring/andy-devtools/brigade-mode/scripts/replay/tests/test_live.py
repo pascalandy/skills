@@ -40,8 +40,10 @@ YOU_RED = "rgb(208, 59, 59)"  # --you: red belongs to "waits on you" alone
 
 def head_chef(db: FakeT3) -> None:
     """A Head Chef that launched one Chef."""
-    db.project("p-home", "/home/example/projects")
-    db.project("p-widget", "/home/example/projects/widget")
+    projects = db.path.parent / "projects"
+    (projects / "widget" / ".git").mkdir(parents=True)
+    db.project("p-home", str(projects))
+    db.project("p-widget", str(projects / "widget"))
     db.thread(HC, "Kick off a brigade")
     db.run(HC, 1, "running")
     db.item(
@@ -382,6 +384,66 @@ def test_data_age_counts_only_data_that_matches_t3(
         service.tick(now + pipeline.GITHUB_EVERY)
         assert state.published.version == 1 and state.read is not None
         assert state.failures == {}
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_a_non_repository_project_does_not_stop_other_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    db = live_run(tmp_path)
+    # The Head Chef and a Chef share the desk; the Cook works in the repository.
+    db.tool(
+        HC,
+        "l1",
+        "t3_thread_launch",
+        {
+            "title": "🚥 Chef 1 abcd ⏳ widget",
+            "projectId": "p-home",
+            "message": "Batch: 1, Epic #9\nRelease: no",
+        },
+        {"threadId": CHEF},
+    )
+    other = "mcp:head-efgh"
+    db.thread(other, "Head Chef efgh 0/0 🟢 another run", "p-widget")
+    db.item(
+        other,
+        "u-other",
+        "user_message",
+        createdBy="user",
+        text="$brigade-mode ; carpaccio",
+    )
+    db.tool(
+        other,
+        "rn-other",
+        "t3_thread_update",
+        {"action": "rename", "title": "Head Chef efgh 0/0 🟢 another run"},
+    )
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(github.gh_reader(10)), 1, state)
+    try:
+        now = time.time()
+        service.tick(now)
+        assert state.health(now)[0], state.failures
+        first = state.published
+        assert len(first.data["brigades"]) == 2
+        brigade = next(b for b in first.data["brigades"] if b["id"] == "abcd")
+        assert (
+            brigade["batches"][0]["epic"]["url"] == f"https://github.com/{W}/issues/9"
+        )
+        db.item(other, "a-other", "assistant_message", text="🙋 valide le plan")
+        service.tick(now + pipeline.POLL)
+        assert state.health(now + pipeline.POLL)[0]
+        assert state.published.version > first.version
+        frames = next(b for b in state.published.data["brigades"] if b["id"] == "efgh")[
+            "frames"
+        ]
+        assert oracles.state_at(frames, now + pipeline.POLL)["hc"][0] == "you"
     finally:
         con.close()
         db.con.close()
