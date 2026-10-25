@@ -17,7 +17,7 @@ Milestone progress:
 
 ### 1. Scope eligible Epics
 
-Each group needs at least two Epics that serve one shared deliverable outcome.
+Each candidate group for a Milestone needs at least two Epics that serve one shared deliverable outcome.
 An Epic joins at most one Milestone.
 
 1. When you continue from `epic`, reuse its proposed Epics, scope, and verified evidence.

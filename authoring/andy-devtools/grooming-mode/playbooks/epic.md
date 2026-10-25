@@ -84,7 +84,7 @@ Done when every candidate has a proposed placement or disposition
 
 1. Apply the Grouping checks and the Definition of Ready to these Stories, Epics, and affected existing Milestones.
    Reuse current evidence.
-2. If at least two scoped open Epics without a Milestone share one deliverable outcome, continue with `milestone` in this conversation.
+2. If at least two scoped open Epics without a Milestone serve one deliverable outcome, continue with `milestone` in this conversation.
    Otherwise, state why no new Milestone is needed.
 
 Done when the hierarchy meets the Definition of Ready or its missing input is named

@@ -5,7 +5,7 @@ For cross-repo references, use `OWNER/REPO#N`.
 
 Title: `Epic <N> · <outcome in plain words>`
 
-Preserve the template headings without explanations of CMO and FMO in the body.
+Keep the headings "The problem (CMO)" and "The outcome (FMO)". Do not explain CMO or FMO in the body.
 
 ````md
 <grooming-mode>

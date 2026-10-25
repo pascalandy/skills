@@ -45,6 +45,6 @@ Done when the Definition of Ready holds or the exact required input is named
 
 1. Through [Approval, apply and readback](../SKILL.md#approval-apply-and-readback), deliver one proposal for all affected levels.
 2. Report actual references, readiness evidence, and remaining inputs or failed writes.
-   A further refusal resumes Resolve gaps on the same target.
+   A further refusal resumes the Resolve gaps section on the same target.
 
 Done when that procedure finishes

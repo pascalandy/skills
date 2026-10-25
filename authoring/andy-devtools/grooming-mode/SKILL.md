@@ -71,10 +71,10 @@ The plan is the candidate hierarchy in that proposal.
 The caller's workflow decides who scouts, drafts, asks, and reviews, and when.
 The Definition of Ready below states when work is ready.
 The WORK is done when each target meets the Definition of Ready or names its missing input.
+Every agent that drafts or reviews the WORK loads this skill.
 
 Under the caller's workflow, use these rules:
 
-- Before you draft or review the WORK, load this skill
 - Before you read the scope, ask the route's scope questions with the goal
 - In every run, deliver the proposal instead of transferring unfinished refinement to a new session
 - Before GitHub writes, wait for approval
@@ -85,11 +85,11 @@ Use `gh`, the GitHub CLI. The [installation instructions](https://cli.github.com
 
 The skill label-for-issues owns labels, Ready, native operations, filters, and pagination.
 Ready is the label state that identifies work ready for execution.
-The `4-epic` migration is the only write allowed before scope filters, even in read-only grooming.
-The Epic filters need that label.
+Step 4 of label-for-issues has a `4-epic` migration.
+That migration is the only write allowed before scope filters, even in read-only grooming.
+This exception exists because the Epic filters need that label.
 
 Issues stay in their repositories. Epics and Milestones, the containers for this plan, live in the home repo.
-The cross-repo reference rule includes bodies, tables, comments, dependencies, and handoffs.
 
 1. Before GitHub reads, confirm `gh --version` and `gh auth status`.
 2. Before you scope the work, load `label-for-issues` and its GitHub CLI reference.
@@ -99,7 +99,7 @@ The cross-repo reference rule includes bodies, tables, comments, dependencies, a
    2. Stop until that migration is resolved.
 5. Record the home repo and scoped repos.
 6. If the home repo is absent, ask for the home repo.
-7. For every cross-repo Story reference, use `OWNER/REPO#N`.
+7. For every cross-repo Story reference, use `OWNER/REPO#N`, also in bodies, tables, comments, dependencies, and handoffs.
 8. Read these fields for every scoped issue:
    - Body and comments
    - Labels and native parent
@@ -176,7 +176,7 @@ A `2-type:postmortem` Story takes its type from the title prefix:
 - Every other prefix gives task
 
 In every route, you may propose Story body edits.
-Preserve supported content and explicit product decisions. Draft only the changes that resolve a gap.
+Preserve supported content and explicit product decisions. Draft only the changes that are necessary to resolve a gap.
 
 1. Number new Epics after the highest `Epic N` title, including closed Epics.
    `Epic N · <outcome>` is a stable identifier. Never renumber existing Epics.
@@ -187,7 +187,7 @@ Preserve supported content and explicit product decisions. Draft only the change
 ## Grouping checks
 
 1. Test each parent with this question: if every child were completed, would the parent's outcome hold?
-2. Then check for these items:
+2. Then check for these conditions:
    - Missing integration work
    - Overlapping scope
    - Contradictory criteria
