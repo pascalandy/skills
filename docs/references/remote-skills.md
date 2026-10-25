@@ -137,8 +137,8 @@ A mode's routes run through that mode's SKILL.md.
   - `test-audit`: Audit tests, and production code that exists only for tests, keeping only tests that add real confidence.
   - `thermo-quality-review`: Run an unusually strict review of production code for structure, file size, branching, types, and layering.
 - `grooming-mode`: Use only when explicitly invoked as `grooming-mode`, with an optional route after `;`. Recognize dictated spellings such as `grooming mode`. Assemble and refine GitHub Stories, Epics and Milestones until ready.
-  - `epic`: CU1: verify backlog issues, assemble and refine Epics, then a Milestone when useful, before one final approval.
-  - `milestone`: CU2: assemble and refine eligible Epics into a Milestone with its own checkable outcome, then deliver one combined proposal.
+  - `epic`: CU1: before one final approval, verify backlog issues, then assemble and refine Epics and, when useful, a Milestone.
+  - `milestone`: CU2: assemble and refine eligible Epics into a Milestone that has its own checkable outcome, then deliver one combined proposal.
   - `refine`: CU3: refine an existing Epic or Milestone and its Stories until ready, including gaps returned by Brigade.
 - `matt-mode`: Use when the user invokes matt-mode to clarify requirements, discuss design, map decisions, or prepare implementation through specs and tickets.
   - `codebase-design`: Shared vocabulary for designing deep modules.

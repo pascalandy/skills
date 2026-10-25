@@ -4,6 +4,8 @@ description: "CU3: refine an existing Epic or Milestone and its Stories until re
 
 # CU3. Refine an existing target
 
+CU3 is the route to refine an existing Epic or Milestone and its Stories.
+
 ```
 Refine progress:
 - [ ] 1. Read the target and current evidence
@@ -13,24 +15,35 @@ Refine progress:
 
 ## Process
 
-1. **Read the target.** Resolve the home repo and Epic or Milestone reference.
-   Read its bodies, all Stories including closed ones, Rank, parents, blockers
-   and labels with full pagination. Reverify against the current default branch
-   and completion evidence; reuse unchanged evidence from this conversation.
-   Read a containing Milestone and sibling Epics when a change affects their
-   boundaries, outcome or Rank. Preserve membership outside the requested target
-   unless a product decision brings it into the proposal.
-   Done when the target and affected relationships have current evidence
-2. **Resolve gaps.** Apply the Grouping checks and the Definition of Ready.
-   Include supported gaps from any Brigade refusal. When this skill caused a gap,
-   propose a retrospective issue with the failing instruction and evidence;
-   create it only when issue creation is authorized.
-   Refine the containers themselves as well as
-   their Stories. Preserve supported content and target identity while correcting
-   contradictions, stale proposals and incomplete criteria.
-   Done when the Definition of Ready holds or the exact required input is named
-3. **Deliver.** Deliver one proposal for all affected levels through
-   [Approval, apply and readback](../SKILL.md#approval-apply-and-readback).
-   Report actual references, readiness evidence and remaining inputs or failed
-   writes. A further refusal resumes step 2 on the same target.
-   Done when that procedure finishes
+### 1. Read the target
+
+1. Resolve the home repo and the Epic or Milestone reference.
+2. Read these parts of the target, with full pagination:
+   - Its bodies
+   - All Stories, including closed Stories
+   - Rank, parents, blockers, and labels
+3. Reverify against the current default branch and completion evidence.
+   Reuse unchanged evidence from this conversation.
+4. When a change affects their boundaries, outcome, or Rank, read the containing Milestone and sibling Epics.
+   Preserve membership outside the requested target unless a product decision brings that membership into the proposal.
+
+Done when the target and affected relationships have current evidence
+
+### 2. Resolve gaps
+
+1. Apply the Grouping checks and the Definition of Ready.
+2. Include supported gaps from any Brigade refusal.
+3. When this skill caused a gap, propose a retrospective issue that states the failing instruction and evidence.
+4. Only when issue creation is authorized, create that retrospective issue.
+5. Refine the containers themselves as well as their Stories.
+   Preserve supported content and target identity while you correct contradictions, stale proposals, and incomplete criteria.
+
+Done when the Definition of Ready holds or the exact required input is named
+
+### 3. Deliver
+
+1. Through [Approval, apply and readback](../SKILL.md#approval-apply-and-readback), deliver one proposal for all affected levels.
+2. Report actual references, readiness evidence, and remaining inputs or failed writes.
+   A further refusal resumes phase 2 on the same target.
+
+Done when that procedure finishes

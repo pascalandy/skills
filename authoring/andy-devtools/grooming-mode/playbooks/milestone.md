@@ -1,8 +1,10 @@
 ---
-description: "CU2: assemble and refine eligible Epics into a Milestone with its own checkable outcome, then deliver one combined proposal."
+description: "CU2: assemble and refine eligible Epics into a Milestone that has its own checkable outcome, then deliver one combined proposal."
 ---
 
 # CU2. Epics to ready Milestones
+
+CU2 is the route from eligible Epics to ready Milestones.
 
 ```
 Milestone progress:
@@ -13,27 +15,39 @@ Milestone progress:
 
 ## Process
 
-1. **Scope eligible Epics.** When continuing from `epic`, reuse its proposed
-   Epics, scope and verified evidence. When invoked directly, resolve the home
-   repo and inspect open Epics without a Milestone to identify candidate groups.
-   Each group needs at least two Epics serving one shared deliverable outcome.
-   An Epic joins at most one Milestone; when it fits competing groups, record
-   that choice as unresolved input.
-   Report unrelated Epics and issues outside any Epic as outside this grouping.
-   Read all Stories and current evidence for the selected Epics.
-   Done when all eligible Epics and left-out items are accounted for
-2. **Assemble and check.** Check each selected Epic with its Stories against the
-   Grouping checks and the Definition of Ready, reusing `epic`'s results when
-   their inputs are unchanged.
-   If no group qualifies, explain why and deliver any refinements from `epic`.
-   Number each `M<N> · <outcome>` after the highest existing or drafted M number,
-   closed Milestones included.
-   Use the shared Epic order, justified blockers and recorded Story tiers.
-   Apply the same checks to the Milestone description and any affected Epics.
-   Done when the proposed hierarchy meets the Definition of Ready or its missing input is named
-3. **Deliver.** Deliver one proposal through
-   [Approval, apply and readback](../SKILL.md#approval-apply-and-readback),
-   including any Epic and Story changes from the same run. Report the Milestone URL
-   when created, Epics by Rank for each Milestone, outcome checks, failed actions
-   and left-out items.
-   Done when that procedure finishes
+### 1. Scope eligible Epics
+
+1. When you continue from `epic`, reuse its proposed Epics, scope, and verified evidence.
+2. When this route starts directly, resolve the home repo.
+3. For a direct start, inspect open Epics without a Milestone to identify candidate groups.
+   Each group needs at least two Epics that serve one shared deliverable outcome.
+   An Epic joins at most one Milestone.
+4. When an Epic fits competing groups, record that choice as unresolved input.
+5. Report unrelated Epics and issues outside any Epic as outside this grouping.
+6. Read all Stories and current evidence for the selected Epics.
+
+Done when all eligible Epics and left-out items are accounted for
+
+### 2. Assemble and check
+
+1. Check each selected Epic and its Stories against the Grouping checks and the Definition of Ready.
+   When their inputs are unchanged, reuse the results from `epic`.
+2. If no group qualifies, explain why.
+3. If no group qualifies, deliver any refinements from `epic`.
+4. Number each `M<N> · <outcome>` after the highest existing or drafted M number, including closed Milestones.
+5. Use the shared Epic order, justified blockers, and recorded Story tiers.
+6. Apply the same checks to the Milestone description and any affected Epics.
+
+Done when the proposed hierarchy meets the Definition of Ready or its missing input is named
+
+### 3. Deliver
+
+1. Through [Approval, apply and readback](../SKILL.md#approval-apply-and-readback), deliver one proposal.
+   Include any Epic and Story changes from the same run.
+2. Report these details:
+   - The Milestone URL when created
+   - Epics by Rank for each Milestone
+   - Outcome checks
+   - Failed actions and left-out items
+
+Done when that procedure finishes
