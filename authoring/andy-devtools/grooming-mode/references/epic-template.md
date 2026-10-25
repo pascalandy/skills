@@ -1,37 +1,39 @@
 # Epic template
 
 Every Story entry stands alone. Keep the same order as native sub-issue Rank.
-Cross-repo references use `OWNER/REPO#N`.
+For cross-repo references, use `OWNER/REPO#N`.
 
 Title: `Epic <N> · <outcome in plain words>`
+
+Keep the headings "The problem (CMO)" and "The outcome (FMO)". Do not explain CMO or FMO in the body.
 
 ````md
 <grooming-mode>
 
 ## The problem (CMO)
 
-<What goes wrong today, with observed frequency and cost; state what is unknown>
+<Describe what goes wrong today. State its observed frequency and cost. State what remains unknown.>
 
 REF: #<issue>, OWNER/REPO#<issue>
 
 ## The outcome (FMO)
 
-<What is true once the Epic is done>
+<Describe what is true once the Epic is done.>
 
 ## Stories
 
-1. **<problem in plain words>** (#<number>) · <text | code + tests>
-   - **Today:** <current behavior and evidence>
-   - **After:** <result once the Story is done>
-2. **<problem in plain words>** (OWNER/REPO#<number>) · <text | code + tests>
-   - **Today:** <current behavior and evidence>
-   - **After:** <result once the Story is done>
+1. **<State the problem in plain words.>** (#<number>) · <text | code + tests>
+   - **Today:** <Describe current behavior and evidence.>
+   - **After:** <Describe the result once the Story is done.>
+2. **<State the problem in plain words.>** (OWNER/REPO#<number>) · <text | code + tests>
+   - **Today:** <Describe current behavior and evidence.>
+   - **After:** <Describe the result once the Story is done.>
 
 ## Done when
 
-<Observable result, the command, scenario or artifact that checks it, and the
-Stories that cover it. Name any joint check that individual Story checks miss>
-Every Story has a documented disposition and the outcome has delivery evidence.
+<State the observable result. Name the command, scenario, or artifact that checks the result.
+Name the Stories that cover the result. Name any joint check that the individual Story checks miss.>
+Every Story has a documented disposition. The outcome has delivery evidence.
 
 ## 👨🏻‍🍳 For the agent
 
@@ -40,14 +42,18 @@ Every Story has a documented disposition and the outcome has delivery evidence.
 
 ### Out of this Epic
 
-- <Neighboring work and its numbered Epic or issue reference>
+- <Name neighboring work and its numbered Epic or issue reference.>
 
-<Technical evidence, file conflicts, native blocked-by rationale, uncertainty,
-approaches considered and related PRs>
+<Give these details:
+- Technical evidence
+- File conflicts
+- Reasons for native blocked-by relationships
+- Uncertainty
+- Approaches considered and related PRs>
 
 </details>
 
-<The signature the user sets>
+<Use the signature that the user sets.>
 
 </grooming-mode>
 ````

@@ -5,7 +5,7 @@ Title: `M<N> · <outcome in plain words>`
 ```md
 ## Outcome
 
-<The result this group of Epics makes possible>
+<Describe the result that this group of Epics makes possible.>
 
 ## Epics by Rank
 
@@ -14,13 +14,13 @@ Title: `M<N> · <outcome in plain words>`
 
 ## Done when
 
-<Observable joint result, the command, scenario or artifact that checks it,
-and the Epics that cover it. Closing all Epics alone is not this check>
+<State the observable joint result. Name the command, scenario, or artifact that checks the result.
+Name the Epics that cover the result. Closing all Epics alone is not this check.>
 
 ## Boundaries and dependencies
 
-<Excluded neighboring outcomes; cross-Epic prerequisites or justified parallel
-work. Name unresolved product decisions rather than treating them as settled>
+<Name excluded neighboring outcomes. State prerequisites across Epics or justified parallel work.
+Name unresolved product decisions instead of treating those decisions as settled.>
 
-<The signature the user sets>
+<Use the signature that the user sets.>
 ```
