@@ -9,9 +9,9 @@ Apply [Statuses, Messages and Decisions](../carpaccio.md#statuses) at phase entr
 3. Merge one stack at a time:
    - Show 🔀. Check that the frozen Cook worktree is clean and pushed, and that GitHub holds the approved heads
    - After a restack, run any signoff the merge step assigns you on each new head, as step 1 says, then compare the stack's own diff. Apply the approval rule in [Asking Pascal](../carpaccio.md#asking-pascal)
-   - Use the project's merge procedure from the frozen Cook worktree. For a single PR, use its merge command. For a stack, follow 🧰 gh-stack Land through its Done, even when the project's procedure covers only a single PR. Then run the project's deploy. In skills, use `just merge` on the merged top branch for that deploy
-   - Run the merge command bare, with no pipe or redirect, so its permission rule matches. Read the whole output, since exit 0 can hide a failed deploy
-   - Classify the deploy from that output. The gates below and step 4 use this one result:
+   - Use the project's merge procedure from the frozen Cook worktree. For a single PR, even in a one-layer stack, use its merge command. If that command refuses a PR in a GitHub stack, follow 🧰 gh-stack Land. For a stack of two or more PRs, follow 🧰 gh-stack Land through its Done, even when the project's procedure covers only a single PR. When the project's merge command already deployed, use that result. Otherwise run its required deploy once, from the checkout its procedure specifies
+   - Run each merge or deploy command bare, with no pipe or redirect, so its permission rule matches. Read each command's whole output, since exit 0 can hide a failed deploy
+   - Classify the deploy from the output of the command that ran it. The gates below and step 4 use this one result:
      - `complete`: it reached every machine
      - `not_required`: the project requires no deploy for this merge
      - `external_gap`: it missed only machines that no thread of the run uses, counting slots not launched yet, for a cause the run cannot repair, such as their credentials, and the repository's procedure does not require every machine for this stack, such as before it removes an old reader. Record each missed machine, its cause and its fix command
