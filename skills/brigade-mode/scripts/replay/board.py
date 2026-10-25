@@ -66,7 +66,11 @@ class Board:
         step: int | None = None,
         since: float | None = None,
     ) -> None:
-        """Frames stay in time order; a wait that began earlier carries its start in `since`."""
+        """Frames are [t, node, state, step, note, since?, stories?] in time order.
+
+        Only Cook lines carry stories; an absent since is None before that count.
+        since preserves the original start of a wait that began before its frame.
+        """
         count = (
             self.story_counts[node]
             if node.startswith("cook-") and "/" not in node

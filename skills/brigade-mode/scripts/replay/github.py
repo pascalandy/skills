@@ -81,6 +81,8 @@ def reduce_item(x: dict) -> dict:
 
 
 def reduce_pr(repo: str, p: dict) -> dict:
+    # Snapshot refs retain untimed native links for recording facts and older
+    # reduced recordings. Only refHistory dates references for Story counts.
     refs = [
         [c["repository"]["nameWithOwner"], c["number"]]
         for c in p["closingIssuesReferences"]["nodes"]
@@ -112,8 +114,6 @@ def reduce_pr(repo: str, p: dict) -> dict:
         ]
         for at, body in bodies
     ]
-    # Only body revisions can date a reference. Untimed native closing links
-    # remain in the recorded snapshot, without backdating them into counts.
     history = [[at, [list(ref) for ref in revision]] for at, revision in history]
     return {
         "created": norm(p["createdAt"]),
@@ -385,9 +385,10 @@ class GitHub(Facts):
 
 
 class Cached(GitHub):
-    """Live facts: check PR edit times and refresh changed bodies and open issues.
+    """Live facts for linked PRs and open issues.
 
-    Terminal PRs still accept body edits, so their reference history stays live.
+    Refresh reads open PRs in full and checks terminal PR edit times before
+    rereading changed bodies. follow drops PRs no followed run links.
 
     `path` keeps the cache across restarts, so a new version of the service
     starts from it instead of reading every PR and issue again.

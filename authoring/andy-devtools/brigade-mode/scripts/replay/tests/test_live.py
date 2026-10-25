@@ -367,7 +367,7 @@ def test_data_age_counts_only_data_that_matches_t3(
     "revision",
     ["normal", "empty", "deleted", "typo", "typo-connection", "typo-timeout"],
 )
-def test_a_non_repository_project_does_not_stop_other_runs(
+def test_desk_projects_and_body_revisions_do_not_stop_other_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, revision: str
 ) -> None:
     for name, value in fake_env(tmp_path).items():

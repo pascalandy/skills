@@ -388,9 +388,7 @@ def state_at(frames: list[list], t: float) -> dict[str, tuple]:
 
 def story_counts_at(brigade: dict, t: float) -> dict[str, int]:
     """The Story counts the Cook lines display at this instant."""
-    counts = {
-        slot: len(info["stories"]) for slot, info in brigade.get("cooks", {}).items()
-    }
+    counts = dict.fromkeys(brigade.get("cooks", {}), 0)
     for frame in brigade.get("frames", []):
         if frame[0] > t:
             break

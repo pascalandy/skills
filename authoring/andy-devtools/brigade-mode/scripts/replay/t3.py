@@ -821,10 +821,10 @@ def last_sequence(con: sqlite3.Connection) -> int:
 
 
 def project_repos(con: sqlite3.Connection) -> dict[str, str]:
-    """Repository projects only; a desk such as ~/projects has no GitHub identity.
+    """Map repository projects to workspace folder names as GitHub name guesses.
 
-    A checkout has a .git directory, and a linked worktree has a .git file.
-    Record the decision now so an offline recording needs no local workspace.
+    Check today's .git directory or linked-worktree file; moved/deleted roots
+    count as desks. Offline recordings retain this decision without local disk.
     """
     return {
         pid: Path(root).name

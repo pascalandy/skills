@@ -383,9 +383,8 @@ class Recorder:
             try:
                 self.names[name] = self.gh.repository(name)
             except github.RepositoryMissing:
-                self.names[name] = (
-                    None  # a folder that is no GitHub repository, such as ~/projects
-                )
+                # A typo, renamed checkout or private repository GitHub cannot show.
+                self.names[name] = None
         return self.names[name]
 
     def main_repo(self) -> str | None:

@@ -172,7 +172,7 @@ const dur = (s) => { const m = Math.max(0, Math.floor(s / 60)); return m >= 60 ?
 const localTime = (t) => new Date(t * 1000).toLocaleString("en-CA", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 
 // state of every node at t: { id: { s, step, note, since, stories } }; since = when this state began
-// (a frame's sixth field when the wait began before its frame, such as a question asked again)
+// Frame positions are documented in board.py's Board.set; stories is present on Cook lines only
 function stateAt(br, t) {
   const st = {};
   for (const f of br.frames) {
@@ -258,7 +258,7 @@ const say = {
     const c = node(st, id), k = br.cooks[id];
     const word = c.s === "todo" ? "to do" : c.s === "active" ? br.steps[c.step - 1] || "working"
       : c.s === "wait" ? `stands by · ${c.note || "idle"}` : c.s === "done" ? "done" : c.note || "not done";
-    const stories = plural(c.stories ?? k.stories.length, "Story", "Stories");
+    const stories = plural(c.stories ?? 0, "Story", "Stories");
     return { s: quiet(br, st, batchOf(br, id), c.s), name: k.label, stories, tip: `${k.label} · ${word} · ${stories}, ${plural(k.prs, "PR")}${held(c, t)}` };
   },
   // step 1, 2 or 3 of a Cook: { s, title: "Implement" | "Review 1/2" | "Review 2/2", tip }

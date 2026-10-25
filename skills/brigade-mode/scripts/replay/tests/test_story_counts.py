@@ -56,12 +56,7 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
                 pipeline.t3_time(now + 2) if phase else None
             )
             pr["closingIssuesReferences"]["nodes"] = [
-                {"number": n, "repository": {"nameWithOwner": W}}
-                for n in (
-                    [10, 11] if original else [],
-                    [11] if after == 1 else [10, 11],
-                    [10],
-                )[phase]
+                {"number": n, "repository": {"nameWithOwner": W}} for n in [10, 11]
             ]
             pr["userContentEdits"] = {
                 "nodes": [
@@ -174,6 +169,30 @@ def test_optional_reference_lookup_preserves_genuine_read_errors(
     # A repository used as the source of a PR is always a strict lookup.
     with pytest.raises(github.ReadError):
         gh.load_prs([ref])
+
+
+def test_timeline_start_does_not_show_final_story_counts(
+    tmp_path: Path, chromium: Browser
+) -> None:
+    recording = Path(__file__).parent / "recordings" / "0ba0.json.gz"
+    brigade = pipeline.recording_data(t3.load_recording(recording))["brigades"][0]
+    artifact = tmp_path / "replay.html"
+    artifact.write_text(
+        pipeline.render_page({"generated": "", "brigades": [brigade]}, {}),
+        encoding="utf-8",
+    )
+    page = chromium.new_page()
+    try:
+        page.goto(artifact.as_uri())
+        page.evaluate("at => seek(at, false)", brigade["start"])
+        assert page.locator(".f2m-stories").all_text_contents() == ["0 Stories"] * len(
+            brigade["cooks"]
+        )
+        assert oracles.story_counts_at(brigade, brigade["start"]) == {
+            slot: 0 for slot in brigade["cooks"]
+        }
+    finally:
+        page.close()
 
 
 def test_recorded_reassignment_moves_the_count_and_metadata() -> None:

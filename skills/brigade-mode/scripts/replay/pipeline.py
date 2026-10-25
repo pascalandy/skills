@@ -17,7 +17,7 @@ from github import Facts, Recorded, unkey
 HERE = Path(__file__).resolve().parent
 # The live service's cadence, which oracle 5 measures
 POLL = 2.0  # seconds between two reads of PRAGMA data_version
-GITHUB_EVERY = 60.0  # seconds between two reads of a repository's open items
+GITHUB_EVERY = 60.0  # seconds between GitHub refreshes of followed-run facts
 GITHUB_TIMEOUT = 20.0  # seconds a GitHub read may take before it fails
 # The oldest GitHub facts the live service may hold: a merge right after one
 # read waits for the next one, up to a poll late, and its timeout
