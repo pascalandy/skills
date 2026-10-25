@@ -68,7 +68,8 @@ class Board:
     ) -> None:
         """Frames are [t, node, state, step, note, since?, stories?] in time order.
 
-        Only Cook lines carry stories; an absent since is None before that count.
+        Only Cook lines carry stories. Without since, index 5 holds None so
+        stories stays at index 6.
         since preserves the original start of a wait that began before its frame.
         """
         count = (
