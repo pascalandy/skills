@@ -90,7 +90,7 @@ For each live Chef, find `🐕 Watchdog · Chef <b> <id4>` with `list_scheduled_
 A Watchdog schedule is unhealthy when one of these is true:
 
 - `list_scheduled_tasks` shows it missing or disabled
-- Its `lastRunStatus` is failed
+- Its `lastRunStatus` is failed, or `recentRuns[0]` of its `boundThreadId`, read as below, has status failed
 - Its last run is older than twice `watch-minutes`
 
 To read the last run, call `t3_thread_read` on the schedule's `boundThreadId` with `limit: 1, runLimit: 1`. Inspect `recentRuns[0]`, which is newest even though `items` starts at the oldest. Use `completedAt` for a completed run and `requestedAt` for a running or queued one. When `lastRunStatus` is never, use the initial `nextRunAt` minus `watch-minutes` as the time of that last run.
