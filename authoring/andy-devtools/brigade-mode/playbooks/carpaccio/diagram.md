@@ -84,7 +84,7 @@ sequenceDiagram
     K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
-    opt Reopened finding, missing criterion evidence<br>or frozen watch finding
+    opt Reopened finding, missing criterion evidence,<br>failed or missing required status, or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end

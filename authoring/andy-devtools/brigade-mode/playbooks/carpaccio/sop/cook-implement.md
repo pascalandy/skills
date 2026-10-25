@@ -26,12 +26,12 @@ For `Release: yes`, add the repository's required release content, such as `CHAN
 
 ## Ready
 
-1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. Send `🍽️ Stack ready` to the Chef with the template in [Report](../carpaccio.md#report). Keep 🍳 until the Chef receives that message. Then show 🍽️. Done when the Chef has the readiness report and your title shows 🍽️
+1. Confirm a clean, pushed checkout and review completion, or the fast-track skips. On each final head, post every status the repository asks the PR owner to post, such as with `just signoff`. If a required status fails on a layer the Plan forbids you to change, ask the Chef before Ready. Record a signoff assigned to the merge step for the Chef to run under the project's merge procedure. Send `🍽️ Stack ready` to the Chef with the template in [Report](../carpaccio.md#report). Keep 🍳 until the Chef receives that message. Then show 🍽️. Done when the Chef has the readiness report and your title shows 🍽️
 2. Freeze the worktree:
    - Make no commit, checkout, restack or push until the Chef says `merged`, requests a restack or returns it for Fix
    - Forward watch wakes to the Chef. Distinguish findings from wakes reporting only passing checks
    - On a restack request, compare the stack's own diff with its approved diff
-   - If only the base changed and the new heads pass checks, push and send refreshed heads in `🍽️ Stack ready`. Keep 🍽️ and the approval
+   - If only the base changed, push and repeat step 1's owner-status posting on every new head. Once checks pass, apart from a signoff assigned to the merge step, send refreshed heads in `🍽️ Stack ready` following step 1. Keep 🍽️ and the approval
    - If the stack's own diff changed or checks fail, show 🍳, tell the Chef readiness is withdrawn and enter Fix
    - If the Chef returns the worktree for another finding, enter Fix
 
