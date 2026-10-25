@@ -82,7 +82,8 @@ def reduce_item(x: dict) -> dict:
 
 def reduce_pr(repo: str, p: dict) -> dict:
     # Keep snapshot refs, including untimed native links, for the recorder.
-    # New PR counts use refHistory; see Facts.pr for reduced recordings.
+    # Story counts read refHistory, written here even for unedited PRs.
+    # Facts.pr handles reduced recordings without it.
     refs = [
         [c["repository"]["nameWithOwner"], c["number"]]
         for c in p["closingIssuesReferences"]["nodes"]
