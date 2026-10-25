@@ -86,7 +86,8 @@ Technical details, evidence, approaches considered, blast radius, non-functional
 Before publishing:
 
 1. For each finding, search the target repository's open issues. If one already reports the problem, draft a comment on it instead of a new issue.
-2. If the repository is public, remove session IDs, absolute local paths, hostnames, private repo or project names, and any conversation content that isn't about the finding.
-3. Run the `2nd-pass` skill on the drafts.
+2. Prove each command, flag or message the proposed fix names on the cases it will meet, not only the session's. Use the tool's source at a named revision or a throwaway run. Say in the details how you proved it and what stays unproven.
+3. If the repository is public, remove session IDs, absolute local paths, hostnames, private repo or project names, and any conversation content that isn't about the finding.
+4. Run the `2nd-pass` skill on the drafts.
 
 Then publish with labels `1-needs-triage` and `2-type:postmortem` (or `2-type:task` where the repository lacks it), read each issue back, and return the links. Each issue links the session's PR when one exists, except when a public issue would link a private repository.
