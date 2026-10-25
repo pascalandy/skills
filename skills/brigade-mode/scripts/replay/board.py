@@ -55,7 +55,7 @@ class Board:
         )
         self.current = {}  # slot -> the threadId that holds it now
         self.settled = False
-        self.story_sources = defaultdict(dict)
+        self.story_counts = defaultdict(int)
 
     def set(
         self,
@@ -68,7 +68,7 @@ class Board:
     ) -> None:
         """Frames stay in time order; a wait that began earlier carries its start in `since`."""
         count = (
-            len(set().union(*self.story_sources[node].values()))
+            self.story_counts[node]
             if node.startswith("cook-") and "/" not in node
             else None
         )
@@ -224,8 +224,8 @@ class Board:
             self.step[s] = max(1, min(d["step"] + 1, 6))  # 📍 k/6 ends step k
             self.paint_cook(t, s)
         elif k == "stories":
-            s = self.slot(d["th"])
-            self.story_sources[s][d["source"]] = set(d["stories"])
+            s = d["slot"]
+            self.story_counts[s] = len(d["stories"])
             state, step, note, since, _ = self.cur.get(s, ("todo", 0, None, None, 0))
             self.set(t, s, state, note, step, since)
 
@@ -293,19 +293,16 @@ def shape(
     def slot_of(thread: str | None) -> str | None:
         return b.threads.get(thread or "", {}).get("slot")
 
+    for s, stories in b.cook_stories().items():
+        cooks[s]["stories"] = stories
     for p in b.prs.values():
         s = slot_of(p.get("cook"))
         if (
             s in cooks
             and not p.get("closed")
-            and not b.stories.get(p["story"], {}).get("pre")
+            and any(not b.stories.get(story, {}).get("pre") for story in p["stories"])
         ):
-            cooks[s]["stories"].add(p["story"])
             cooks[s]["prs"].add(p["pr"])
-    for st, info in b.stories.items():
-        s = slot_of(info.get("cook"))
-        if s in cooks and not info.get("pre"):
-            cooks[s]["stories"].add(st)
     batches = []
     for n in sorted(set(b.batches) | {c["batch"] for c in cooks.values()}):
         stories = sorted(
@@ -365,33 +362,6 @@ def progress_events(events: list[dict], bid: str) -> list[dict]:
         and (e["detail"] or {}).get("msg") == "progress"
         and (e["detail"] or {}).get("step")
     ]
-
-
-def story_events(events: list[dict], bid: str) -> list[dict]:
-    """Count each Cook's brief and PR references at their own event times."""
-    out, closed, pre = [], set(), set()
-    for e in events:
-        if e["brigade"] != bid:
-            continue
-        k, detail = e["kind"], e["detail"] or {}
-        if k == "story_scope" and detail.get("state_at_scope") == "closed":
-            pre.add(e["story"])
-        elif k in ("story_assign", "pr_refs", "pr_close"):
-            if k == "pr_close":
-                closed.add(e["pr"])
-            stories = [e["story"]] if k == "story_assign" else detail.get("stories", [])
-            if k != "story_assign" and e["pr"] in closed:
-                stories = []
-            out.append(
-                {
-                    "t": R.ts(e["time"]),
-                    "k": "stories",
-                    "th": e["thread"],
-                    "source": "brief" if k == "story_assign" else e["pr"],
-                    "stories": [s for s in stories if s not in pre],
-                }
-            )
-    return out
 
 
 def turns(deltas: list[dict], b: R.Brigade, now: float) -> list[dict]:
@@ -454,10 +424,7 @@ def build(
             else lambda x: names[x.split("#")[0]] + "#" + x.split("#")[1]
         )
         ds = sorted(
-            by_b[bid]
-            + progress_events(events, bid)
-            + turns(by_b[bid], b, now)
-            + story_events(events, bid),
+            by_b[bid] + progress_events(events, bid) + turns(by_b[bid], b, now),
             key=lambda d: d["t"],
         )  # stable within a time
         if not ds:

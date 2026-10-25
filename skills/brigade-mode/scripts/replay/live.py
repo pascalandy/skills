@@ -511,6 +511,11 @@ class Service:
                 repos = self.follower.read()
                 fresh = self.follower.snap.time != before  # a followed run changed
             self.pending = self.pending or fresh
+            self.gh.follow(
+                tuple(item["pr"])
+                for item in self.follower.snap.items.values()
+                if item.get("tool") == "link"
+            )
             self.state.failures.pop("t3", None)
             t3_ok = True
         except Exception as error:  # noqa: BLE001 - any read failure keeps the last good data

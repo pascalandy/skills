@@ -363,8 +363,9 @@ def test_data_age_counts_only_data_that_matches_t3(
         db.con.close()
 
 
+@pytest.mark.parametrize("revision", ["normal", "empty", "deleted"])
 def test_a_non_repository_project_does_not_stop_other_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, revision: str
 ) -> None:
     for name, value in fake_env(tmp_path).items():
         monkeypatch.setenv(name, value)
@@ -399,7 +400,31 @@ def test_a_non_repository_project_does_not_stop_other_runs(
     con = t3.connect(db.path, 5)
     con.isolation_level = None
     state = live.State()
-    service = live.Service(con, github.Cached(github.gh_reader(10)), 1, state)
+    reader = github.gh_reader(10)
+
+    def read(args: list[str]) -> dict:
+        answer = reader(args)
+        pr = ((answer.get("data") or {}).get("repository") or {}).get("p21")
+        if pr and revision != "normal":
+            initial = pr["userContentEdits"]["nodes"][0]
+            pr["userContentEdits"]["nodes"] = [
+                {
+                    "editedAt": "2026-01-01T00:01:02Z",
+                    "diff": pr["body"],
+                    "deletedAt": None,
+                },
+                {
+                    "editedAt": "2026-01-01T00:01:01Z",
+                    "diff": None,
+                    "deletedAt": "2026-01-01T00:01:03Z"
+                    if revision == "deleted"
+                    else None,
+                },
+                initial,
+            ]
+        return answer
+
+    service = live.Service(con, github.Cached(read), 1, state)
     try:
         now = time.time()
         service.tick(now)
@@ -418,6 +443,38 @@ def test_a_non_repository_project_does_not_stop_other_runs(
             "frames"
         ]
         assert oracles.state_at(frames, now + pipeline.POLL)["hc"][0] == "you"
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_an_unused_cached_pr_cannot_block_followed_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    db = live_run(tmp_path)
+    cache = tmp_path / "github.json"
+    old = "2025-01-01T00:00:00.000Z"
+    stale = github.Cached(github.gh_reader(10), cache)
+    stale.prs[("example-owner/deleted-repository", 1)] = {
+        "created": old,
+        "merged": old,
+        "closed": old,
+        "refs": [],
+        "refHistory": [[old, []]],
+    }
+    stale.save()
+    con = t3.connect(db.path, 5)
+    con.isolation_level = None
+    state = live.State()
+    service = live.Service(con, github.Cached(github.gh_reader(10), cache), 1, state)
+    try:
+        now = time.time()
+        service.tick(now)
+        assert state.health(now)[0], state.failures
+        assert len(state.published.data["brigades"]) == 1
+        assert set(json.loads(cache.read_text())["prs"]) == {f"{W}#21"}
     finally:
         con.close()
         db.con.close()
@@ -566,6 +623,11 @@ def test_a_failed_build_lets_the_data_age_grow(
         if renamed and pr:  # PR 21 now also closes issue 12
             nodes = pr["closingIssuesReferences"]["nodes"]
             nodes.append({"number": 12, "repository": {"nameWithOwner": W}})
+            pr["body"] += " Closes #12."
+            pr["lastEditedAt"] = renamed[0]
+            pr["userContentEdits"]["nodes"].insert(
+                0, {"editedAt": renamed[0], "diff": pr["body"], "deletedAt": None}
+            )
         return answer
 
     db = live_run(tmp_path)
@@ -577,11 +639,17 @@ def test_a_failed_build_lets_the_data_age_grow(
         now = time.time()
         service.tick(now)
         assert state.published.version == 1 and state.read == now
-        renamed.append(True)
-        service.tick(now + pipeline.GITHUB_EVERY)  # no T3 change, a new issue to read
+        renamed.append(pipeline.t3_time(now + 1))
+        service.tick(now + pipeline.GITHUB_EVERY)  # the edit is known but not shown yet
+        last_good, read_at = state.published, state.read
+        service.tick(now + github.DELAY + 2)  # the new reference becomes visible
         assert "rate limit" in state.failures["github_new"].message
-        service.tick(now + pipeline.GITHUB_EVERY + pipeline.POLL)
-        assert state.published.version == 1 and state.read == now
+        service.tick(now + github.DELAY + 4)
+        assert state.published is last_good and state.read == read_at
+        assert (
+            state.health(now + github.DELAY + 4)[1]["age"]
+            > state.health(now + github.DELAY + 2)[1]["age"]
+        )
     finally:
         con.close()
         db.con.close()

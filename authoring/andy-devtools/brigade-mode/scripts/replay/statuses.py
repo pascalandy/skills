@@ -52,7 +52,7 @@ class Brigade:
         self.owning, self.own_since = False, 0.0
         self.closed = False  # HC settled itself after every batch went final
         self.settled_at: float | None = None
-        self.prs = {}  # (pr, story) -> ownership, scope and PR lifecycle timestamps
+        self.prs = {}  # pr -> owner, current Story references and lifecycle timestamps
         self.release_end = {}  # chef -> time its release command ended
         self.active = {}  # key -> open run count
         self.started = False  # the Head Chef exists once Pascal's first message arrives
@@ -82,6 +82,23 @@ class Brigade:
         return [self.cook[c] for c in self.chef_cooks[chef] if c in self.cook] + [
             "queued"
         ] * len(planned)
+
+    def cook_stories(self) -> dict[str, set[str]]:
+        """One Story set per Cook slot, shared by metadata and count frames."""
+        out = {i["slot"]: set() for i in self.threads.values() if i["role"] == "cook"}
+        for story, info in self.stories.items():
+            cook = self.threads.get(info.get("cook"), {}).get("slot")
+            if cook in out and not info.get("pre"):
+                out[cook].add(story)
+        for pr in self.prs.values():
+            cook = self.threads.get(pr["cook"], {}).get("slot")
+            if cook in out and not pr.get("closed"):
+                out[cook].update(
+                    story
+                    for story in pr["stories"]
+                    if not self.stories.get(story, {}).get("pre")
+                )
+        return out
 
     def chef_facts(self, chef: str, now: float) -> dict:
         f = dict(self.chef[chef]["f"])
@@ -191,14 +208,29 @@ def replay(
     brigades: dict[str, Brigade] = {}
     deltas = []
     last = {}
+    last_stories = {}
 
-    def emit(b: Brigade, t: float) -> None:
+    def emit(b: Brigade, t: float, stories_changed: bool) -> None:
         snap = b.snapshot(t)
         for k, s in snap.items():
             key = (b.id4, k)
             if last.get(key) != s:
                 last[key] = s
                 deltas.append({"t": t, "b": b.id4, "k": "status", "th": k, "v": s})
+        if stories_changed:
+            for slot, stories in b.cook_stories().items():
+                key = (b.id4, slot)
+                if last_stories.get(key) != stories:
+                    last_stories[key] = set(stories)
+                    deltas.append(
+                        {
+                            "t": t,
+                            "b": b.id4,
+                            "k": "stories",
+                            "slot": slot,
+                            "stories": sorted(stories),
+                        }
+                    )
 
     for e in events:
         t = ts(e["time"])
@@ -207,7 +239,19 @@ def replay(
             brigades[bid] = Brigade(bid, heads[bid])
         b = brigades[bid]
         apply(b, e, t, deltas)
-        emit(b, t)
+        emit(
+            b,
+            t,
+            e["kind"]
+            in {
+                "launch",
+                "story_scope",
+                "story_assign",
+                "pr_open",
+                "pr_refs",
+                "pr_close",
+            },
+        )
         if b.settled_at is not None:  # after the final status it closes
             deltas.append({"t": b.settled_at, "b": b.id4, "k": "settled"})
             b.settled_at = None
@@ -446,27 +490,20 @@ def apply(b: Brigade, e: dict, t: float, deltas: list[dict]) -> None:
                 b.chef[to]["cut"] = True
             elif msg == "rework":
                 f["checks"] = f["merge"] = False
-    elif kind in ("pr_open", "pr_merge", "pr_close"):
+    elif kind in ("pr_open", "pr_merge", "pr_close", "pr_refs"):
         p = b.prs.setdefault(
-            (e["pr"], e["story"]),
+            e["pr"],
             {
                 "pr": e["pr"],
                 "cook": th,
                 "chef": b.threads.get(th, {}).get("parent"),
-                "story": e["story"],
-                "epic": e["epic"],
+                "stories": {},
             },
         )
-        if kind == "pr_open":
+        if kind == "pr_refs":
+            p["stories"] = dict(d.get("stories") or {})
+        elif kind == "pr_open":
             p["open"] = t
-            if e["story"] not in b.stories:
-                bn = b.threads[p["chef"]]["b"] if p["chef"] in b.threads else None
-                b.stories[e["story"]] = {
-                    "epic": e["epic"],
-                    "batch": bn,
-                    "chef": p["chef"],
-                    "pre": False,
-                }
         elif kind == "pr_merge":
             p["merged"] = t
             ch = p["chef"]
@@ -485,19 +522,25 @@ def apply(b: Brigade, e: dict, t: float, deltas: list[dict]) -> None:
                     }
                 )
 
-        else:
+        elif kind == "pr_close":
             p["closed"] = t
-        deltas.append(
-            {
-                "t": t,
-                "b": b.id4,
-                "k": kind,
-                "th": th,
-                "pr": e["pr"],
-                "story": e["story"],
-                "epic": e["epic"],
-            }
-        )
+        for story, epic in p["stories"].items():
+            bn = b.threads.get(p["chef"], {}).get("b")
+            b.stories.setdefault(
+                story, {"epic": epic, "batch": bn, "chef": p["chef"], "pre": False}
+            )
+        if kind != "pr_refs":
+            deltas.append(
+                {
+                    "t": t,
+                    "b": b.id4,
+                    "k": kind,
+                    "th": th,
+                    "pr": e["pr"],
+                    "story": e["story"],
+                    "epic": e["epic"],
+                }
+            )
     elif kind == "release_done" and th in b.chef:
         if b.chef_facts(th, t)["merged"]:
             b.release_end.setdefault(th, t)

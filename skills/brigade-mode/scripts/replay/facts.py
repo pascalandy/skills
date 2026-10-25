@@ -362,42 +362,46 @@ class Brigade:
                 continue  # not opened yet
             cook = meta["by"]
             pr = f"{repo}#{n}"
-            found = gh.stories_of(p)
-            # one row per Story the PR closes or names; a PR without an issue is its own Story
-            targets = [(f"{r}#{x}", gh.epic_of(r, x)) for r, x in found] or [
-                (pr, gh.epic_ref(p))
-            ]
             # the run knows a PR once a thread links it: an older PR's facts start there
             linked = meta["at"]
-            for at, refs in p["refHistory"]:
-                stories = gh.stories_of({"refs": refs})
+            self.ev(max(p["created"], linked), "github", cook, "pr_open", pr=pr)
+            terminal = p["merged"] or p["closed"]
+            revisions = [(at, refs) for at, refs in p["refHistory"]]
+            if terminal:
+                revisions.append((terminal, None))
+            current, named = [], False
+            for at, refs in sorted(
+                revisions, key=lambda revision: (revision[0], revision[1] is None)
+            ):
+                if refs is not None:
+                    current = refs
+                found = gh.stories_of({"refs": current})
+                named = named or bool(found)
+                stories = {f"{r}#{n}": gh.epic_of(r, n) for r, n in found}
+                # An unfinished stub is not an extra Story. A merged PR with
+                # no Story reference so far becomes its own Story then.
+                if not stories and not named and p["merged"] and at >= p["merged"]:
+                    stories = {pr: gh.epic_ref({"refs": current})}
                 self.ev(
                     max(at, linked),
                     "github",
                     cook,
                     "pr_refs",
                     pr=pr,
-                    stories=[f"{r}#{n}" for r, n in stories] or [pr],
+                    revision=at,
+                    stories={
+                        s: f"{ep[0]}#{ep[1]}" if ep else None
+                        for s, ep in stories.items()
+                    },
                 )
-            for s, epic in targets:
-                e = f"{epic[0]}#{epic[1]}" if epic else None
-                loose = (not found) or None
+            if terminal:
                 self.ev(
-                    max(p["created"], linked),
+                    max(terminal, linked),
                     "github",
                     cook,
-                    "pr_open",
-                    epic=e,
-                    story=s,
+                    "pr_merge" if p["merged"] else "pr_close",
                     pr=pr,
-                    loose=loose,
                 )
-                if p["merged"]:
-                    at = max(p["merged"], linked)
-                    self.ev(at, "github", cook, "pr_merge", epic=e, story=s, pr=pr)
-                elif p["closed"]:
-                    at = max(p["closed"], linked)
-                    self.ev(at, "github", cook, "pr_close", epic=e, story=s, pr=pr)
         # Pascal may answer a 🙋 item on GitHub: merging or closing the PR it names.
         main_repo = self.main_repo()
         for e in list(self.events):
@@ -478,10 +482,10 @@ class Brigade:
         }
         scoped = {e["story"] for e in self.events if e["kind"] == "story_scope"}
         references = [
-            {**e, "story": story}
+            {**e, "story": story, "epic": epic}
             for e in self.events
             if e["kind"] == "pr_refs"
-            for story in e["detail"]["stories"]
+            for story, epic in e["detail"]["stories"].items()
         ]
         for e in sorted(references, key=lambda e: e["time"]):
             if e["story"] in scoped:
@@ -646,6 +650,7 @@ def extract(
             ORDER.get(event["kind"], 50),
             event["kind"],
             event["thread"],
+            (event["detail"] or {}).get("revision", ""),
             json.dumps(event["detail"], ensure_ascii=False, sort_keys=True),
         )
     )

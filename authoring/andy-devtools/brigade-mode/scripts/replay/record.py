@@ -743,7 +743,7 @@ def work(args: argparse.Namespace) -> dict:
 
 GITHUB_KEYS = {
     "repositories": {"public"},
-    "prs": {"created", "merged", "closed", "refs", "refHistory"},
+    "prs": {"created", "merged", "closed", "edited", "refs", "refHistory"},
     "issues": {
         *("epic", "epicTitle", "epicLabel", "closed"),
         *("parent", "subCount", "subs"),

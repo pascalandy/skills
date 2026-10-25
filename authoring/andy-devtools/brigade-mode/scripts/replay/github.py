@@ -24,7 +24,7 @@ from t3 import norm
 Ref = tuple[str, int]
 EDIT_FIELDS = "pageInfo{hasNextPage endCursor} nodes{editedAt diff deletedAt}"
 PR_FIELDS = (
-    "number createdAt mergedAt closedAt body "
+    "number createdAt mergedAt closedAt lastEditedAt body "
     "closingIssuesReferences(first:100){nodes{number repository{nameWithOwner}}}"
     f" userContentEdits(first:100){{{EDIT_FIELDS}}}"
 )
@@ -61,13 +61,17 @@ def unkey(text: str) -> Ref:
 
 
 def aliases(
-    prs: Iterable[int] = (), issues: Iterable[int] = (), items: Iterable[int] = ()
+    prs: Iterable[int] = (),
+    issues: Iterable[int] = (),
+    items: Iterable[int] = (),
+    edited: Iterable[int] = (),
 ) -> list[str]:
     """Query fields for one repository's PRs, issues and 🙋 items, each under its alias."""
     return (
         [f"p{n}: pullRequest(number:{n}){{{PR_FIELDS}}}" for n in prs]
         + [f"i{n}: issue(number:{n}){{{ISSUE_FIELDS}}}" for n in issues]
         + [f"x{n}: issueOrPullRequest(number:{n}){{{ITEM_FIELDS}}}" for n in items]
+        + [f"e{n}: pullRequest(number:{n}){{number lastEditedAt}}" for n in edited]
     )
 
 
@@ -87,13 +91,18 @@ def reduce_pr(repo: str, p: dict) -> dict:
     ]
     unique = list(dict.fromkeys(tuple(r) for r in refs))
     edits = p["userContentEdits"]["nodes"]
-    if any(e.get("deletedAt") or e.get("diff") is None for e in edits):
-        raise ReadError(
-            "GitHub PR body history is deleted or unreadable; restore its edit history before replaying"
-        )
-    bodies = sorted([(norm(e["editedAt"]), e["diff"]) for e in edits])
+    # A non-deleted null diff is an empty body. A deleted revision supplies
+    # no new reference fact, so the previous readable revision stays in force.
+    bodies = sorted(
+        [
+            (norm(e["editedAt"]), e["diff"] or "")
+            for e in edits
+            if not e.get("deletedAt")
+        ]
+    )
     if not bodies:
-        bodies = [(norm(p["createdAt"]), p["body"] or "")]
+        at = max((e["editedAt"] for e in edits), default=p["createdAt"])
+        bodies = [(norm(at), p["body"] or "")]
     history = [
         [
             at,
@@ -103,13 +112,14 @@ def reduce_pr(repo: str, p: dict) -> dict:
         ]
         for at, body in bodies
     ]
-    # Only body revisions can date a reference. Native closing links stay in
-    # the lifecycle summary; backdating them into counts would rewrite history.
+    # Only body revisions can date a reference. Untimed native closing links
+    # remain in the recorded snapshot, without backdating them into counts.
     history = [[at, [list(ref) for ref in revision]] for at, revision in history]
     return {
         "created": norm(p["createdAt"]),
         "merged": norm(p["mergedAt"]),
         "closed": norm(p["closedAt"]),
+        "edited": norm(p.get("lastEditedAt")),
         "refs": [list(r) for r in unique],
         "refHistory": history,
     }
@@ -372,7 +382,7 @@ class GitHub(Facts):
 
 
 class Cached(GitHub):
-    """Live facts: refresh PR bodies and open issues, one query per repository.
+    """Live facts: check PR edit times and refresh changed bodies and open issues.
 
     Terminal PRs still accept body edits, so their reference history stays live.
 
@@ -385,6 +395,8 @@ class Cached(GitHub):
     ) -> None:
         super().__init__(read)
         self.path, self.saved = path, ""
+        self.used_issues: set[Ref] | None = None
+        self.used_items: set[Ref] | None = None
         if path and path.is_file():
             try:
                 self.saved = path.read_text(encoding="utf-8")
@@ -396,6 +408,14 @@ class Cached(GitHub):
 
     def save(self) -> None:
         """Write the cache when it changed, atomically."""
+        if self.used_issues is not None:
+            self.issues = {
+                r: value for r, value in self.issues.items() if r in self.used_issues
+            }
+        if self.used_items is not None:
+            self.items = {
+                r: value for r, value in self.items.items() if r in self.used_items
+            }
         if not self.path:
             return
         text = json.dumps(self.dump(), separators=(",", ":"))
@@ -407,11 +427,33 @@ class Cached(GitHub):
         tmp.replace(self.path)
         self.saved = text
 
-    def open_refs(self) -> dict[str, list[str]]:
+    def follow(self, refs: Iterable[Ref]) -> None:
+        """Keep only PRs linked by the runs the service still follows."""
+        wanted = set(refs)
+        self.prs = {ref: p for ref, p in self.prs.items() if ref in wanted}
+
+    def at(self, now: str | None, known: str | None = None) -> Cached:
+        self.used_issues, self.used_items = set(), set()
+        super().at(now, known)
+        return self
+
+    def issue(self, repo: str, n: int) -> dict | None:
+        if self.used_issues is not None:
+            self.used_issues.add((repo, n))
+        return super().issue(repo, n)
+
+    def item(self, repo: str, n: int) -> dict | None:
+        if self.used_items is not None:
+            self.used_items.add((repo, n))
+        return super().item(repo, n)
+
+    def refresh_fields(self) -> dict[str, list[str]]:
         """Each repository's PRs and open issues/🙋 items, as query aliases."""
         wanted: dict[str, list[str]] = defaultdict(list)
-        for repo, n in self.prs:
-            wanted[repo] += aliases(prs=[n])
+        for (repo, n), p in self.prs.items():
+            wanted[repo] += (
+                aliases(edited=[n]) if p["merged"] or p["closed"] else aliases(prs=[n])
+            )
         for (repo, n), i in self.issues.items():
             if i and not i["closed"]:
                 wanted[repo] += aliases(issues=[n])
@@ -424,19 +466,35 @@ class Cached(GitHub):
         """Refresh `repos`, or every repository; return the query count."""
         only = None if repos is None else set(repos)
         queries = 0
-        for repo, aliases in sorted(self.open_refs().items()):
+        for repo, fields in sorted(self.refresh_fields().items()):
             if only is not None and repo not in only:
                 continue
-            found = self.repo_query(repo, " ".join(aliases), missing_ok=True)
+            found = self.repo_query(repo, " ".join(fields), missing_ok=True)
             queries += 1
+            changed = []
             for alias, v in found.items():
                 n = int(alias[1:])
                 if alias[0] == "p" and v:
                     self.prs[(repo, n)] = self.reduce_pr(repo, v)
+                elif alias[0] == "e" and v:
+                    p = self.prs[(repo, n)]
+                    edited = norm(v.get("lastEditedAt"))
+                    previous = (
+                        p["edited"]
+                        if "edited" in p
+                        else max(
+                            (at for at, _ in p["refHistory"]), default=p["created"]
+                        )
+                    )
+                    if edited != previous:
+                        changed.append((repo, n))
                 elif alias[0] == "i":
                     self.issues[(repo, n)] = reduce_issue(v) if v else None
                 elif alias[0] == "x":
                     self.items[(repo, n)] = reduce_item(v) if v else None
+            if changed:
+                self.fetch_prs(changed)
+                queries += 1
         return queries
 
 

@@ -64,6 +64,7 @@ PRS = {
     },
 }
 for pr in PRS.values():
+    pr["lastEditedAt"] = pr["createdAt"]
     pr["userContentEdits"] = {
         "nodes": [{"editedAt": pr["createdAt"], "diff": pr["body"], "deletedAt": None}],
         "pageInfo": {"hasNextPage": False, "endCursor": None},

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         ("closed #10. Resolves #11.", "Closes #11.", 2, 1, True),
         # A native link has no edit timestamp until a body revision names it.
         ("Closes #11.", "Closes #10. Closes #11.", 1, 2, False),
+        ("", "Closes #11.", 1, 1, False),
     ],
 )
 def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
@@ -49,7 +50,11 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
     def read(args: list[str]) -> dict:
         result = reader(args)
         repository = (result.get("data") or {}).get("repository") or {}
-        pr = repository.get("p21") or repository.get("pullRequest")
+        pr = (
+            repository.get("p21")
+            or repository.get("e21")
+            or repository.get("pullRequest")
+        )
         if pr:
             pr["body"] = (original, edited, "Closes #10.")[phase]
             pr["mergedAt"] = pr["closedAt"] = (
@@ -57,7 +62,11 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
             )
             pr["closingIssuesReferences"]["nodes"] = [
                 {"number": n, "repository": {"nameWithOwner": W}}
-                for n in ([10, 11], [11] if after == 1 else [10, 11], [10])[phase]
+                for n in (
+                    [10, 11] if original else [],
+                    [11] if after == 1 else [10, 11],
+                    [10],
+                )[phase]
             ]
             pr["userContentEdits"] = {
                 "nodes": [
@@ -76,6 +85,7 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
                 ],
                 "pageInfo": {"hasNextPage": False, "endCursor": None},
             }
+            pr["lastEditedAt"] = pr["userContentEdits"]["nodes"][0]["editedAt"]
             if paginated and phase:
                 edits = pr["userContentEdits"]
                 if "after:" in " ".join(args):
@@ -140,6 +150,46 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
         later = page(gh, now + 240)
         assert oracles.story_counts_at(later, now + 120)["cook-1.1"] == after
         assert oracles.story_counts_at(later, now + 240)["cook-1.1"] == 2
+    finally:
+        con.close()
+        db.con.close()
+
+
+def test_recorded_reassignment_moves_the_count_and_metadata() -> None:
+    recording = Path(__file__).parent / "recordings" / "0ba0.json.gz"
+    brigade = pipeline.recording_data(t3.load_recording(recording))["brigades"][0]
+    before = oracles.story_counts_at(
+        brigade, 1792367596.0
+    )  # 2026-10-18 19:53:16 Montreal
+    after = oracles.story_counts_at(brigade, 1792367598.0)
+    assert (before["cook-2.1"], before["cook-3.1"]) == (3, 0)
+    assert (after["cook-2.1"], after["cook-3.1"]) == (2, 1)
+    final = oracles.story_counts_at(brigade, brigade["end"])
+    assert (final["cook-2.1"], final["cook-3.1"]) == (2, 3)
+    assert final == {
+        slot: len(info["stories"]) for slot, info in brigade["cooks"].items()
+    }
+
+
+def test_existing_pr_keeps_revision_order_when_history_arrives_at_one_link(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in fake_env(tmp_path).items():
+        monkeypatch.setenv(name, value)
+    db = live_run(tmp_path)
+    con = t3.connect(db.path, 5)
+    try:
+        snap, _ = t3.load(con, [HC])
+        gh = github.Cached(github.gh_reader(10))
+        gh.load_prs([(W, 21)])
+        gh.prs[(W, 21)]["refHistory"] = [
+            ["2026-01-01T00:01:00.000Z", [[W, 11]]],
+            ["2026-01-01T00:01:01.000Z", [[W, 10], [W, 11]]],
+        ]
+        data, _ = pipeline.page_data(snap, gh, [HC], now=time.time())
+        brigade = data["brigades"][0]
+        assert oracles.story_counts_at(brigade, brigade["end"])["cook-1.1"] == 2
+        assert len(brigade["cooks"]["cook-1.1"]["stories"]) == 2
     finally:
         con.close()
         db.con.close()
