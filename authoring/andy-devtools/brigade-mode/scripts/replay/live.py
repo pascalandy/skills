@@ -511,6 +511,11 @@ class Service:
                 repos = self.follower.read()
                 fresh = self.follower.snap.time != before  # a followed run changed
             self.pending = self.pending or fresh
+            self.gh.follow(
+                tuple(item["pr"])
+                for item in self.follower.snap.items.values()
+                if item.get("tool") == "link"
+            )
             self.state.failures.pop("t3", None)
             t3_ok = True
         except Exception as error:  # noqa: BLE001 - any read failure keeps the last good data
@@ -711,13 +716,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         epilog="""The page is the replay's, built by the same extractor from T3's events as
 they arrive, with an open end: it follows now and shows how old its data is.
 Every 2 s the service asks T3 whether its database changed, through a
-read-only connection that holds no read transaction between polls. GitHub's
-merged and closed items stay cached; open ones are read again in one query per
-repository every 60 s, or when T3 sees a linked PR change state. Like the
-replay, the page shows each GitHub fact 85 s after GitHub had it, which the
-service knows by then. A read that fails keeps the last good data and says so
-on the page; once GitHub's open items have gone 85 s unread, the page stops
-moving and its age grows, so it never shows a state a later read contradicts.
+read-only connection that holds no read transaction between polls. Every 60 s,
+or when T3 sees a linked PR change state, it refreshes GitHub facts for the
+followed runs. Merged and closed PRs get an edit-time check; changed bodies
+are read again, which can require another query. Successful builds drop unused
+cache dependencies. Like the replay, the page shows each GitHub fact 85 s
+after GitHub had it, which the service knows by then. A read that fails keeps
+the last good data and says so on the page; once GitHub's tracked facts have
+gone 85 s unread, the page stops moving and its age grows, so it never shows
+a state a later read contradicts.
 
 GET /          the dashboard page
 GET /data.json the page data and its age; ?v=<version> omits unchanged data

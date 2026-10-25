@@ -362,32 +362,46 @@ class Brigade:
                 continue  # not opened yet
             cook = meta["by"]
             pr = f"{repo}#{n}"
-            found = gh.stories_of(p)
-            # one row per Story the PR closes or names; a PR without an issue is its own Story
-            targets = [(f"{r}#{x}", gh.epic_of(r, x)) for r, x in found] or [
-                (pr, gh.epic_ref(p))
-            ]
             # the run knows a PR once a thread links it: an older PR's facts start there
             linked = meta["at"]
-            for s, epic in targets:
-                e = f"{epic[0]}#{epic[1]}" if epic else None
-                loose = (not found) or None
+            self.ev(max(p["created"], linked), "github", cook, "pr_open", pr=pr)
+            terminal = p["merged"] or p["closed"]
+            revisions = [(at, refs) for at, refs in p["refHistory"]]
+            if terminal:
+                revisions.append((terminal, None))
+            current, named = [], False
+            for at, refs in sorted(
+                revisions, key=lambda revision: (revision[0], revision[1] is None)
+            ):
+                if refs is not None:
+                    current = refs
+                found = gh.stories_of(current)
+                named = named or bool(found)
+                stories = {f"{r}#{n}": gh.epic_of(r, n) for r, n in found}
+                # An unfinished stub is not an extra Story. A merged PR with
+                # no Story reference so far becomes its own Story then.
+                if not stories and not named and p["merged"] and at >= p["merged"]:
+                    stories = {pr: gh.epic_ref(current)}
                 self.ev(
-                    max(p["created"], linked),
+                    max(at, linked),
                     "github",
                     cook,
-                    "pr_open",
-                    epic=e,
-                    story=s,
+                    "pr_refs",
                     pr=pr,
-                    loose=loose,
+                    revision=at,
+                    stories={
+                        s: f"{ep[0]}#{ep[1]}" if ep else None
+                        for s, ep in stories.items()
+                    },
                 )
-                if p["merged"]:
-                    at = max(p["merged"], linked)
-                    self.ev(at, "github", cook, "pr_merge", epic=e, story=s, pr=pr)
-                elif p["closed"]:
-                    at = max(p["closed"], linked)
-                    self.ev(at, "github", cook, "pr_close", epic=e, story=s, pr=pr)
+            if terminal:
+                self.ev(
+                    max(terminal, linked),
+                    "github",
+                    cook,
+                    "pr_merge" if p["merged"] else "pr_close",
+                    pr=pr,
+                )
         # Pascal may answer a 🙋 item on GitHub: merging or closing the PR it names.
         main_repo = self.main_repo()
         for e in list(self.events):
@@ -462,28 +476,24 @@ class Brigade:
                                 ep,
                                 b,
                             )
-        # Unscoped PR Stories use the earliest batch-registration, Chef-launch, or PR-open time.
+        # A new reference enters unscoped work only when its revision becomes visible.
         cook_chef = {
             t: i["parent"] for t, i in self.threads.items() if i["role"] == "cook"
         }
         scoped = {e["story"] for e in self.events if e["kind"] == "story_scope"}
-        for e in sorted(
-            (e for e in self.events if e["kind"] == "pr_open"), key=lambda e: e["time"]
-        ):
+        references = [
+            {**e, "story": story, "epic": epic}
+            for e in self.events
+            if e["kind"] == "pr_refs"
+            for story, epic in e["detail"]["stories"].items()
+        ]
+        for e in sorted(references, key=lambda e: e["time"]):
             if e["story"] in scoped:
                 continue
             chef = cook_chef.get(e["thread"])
             bn = self.threads[chef]["b"] if chef else None
-            t_in = min(
-                x
-                for x in (
-                    regs[bn][0] if bn in regs else None,
-                    launches.get(chef or ""),
-                    e["time"],
-                )
-                if x
-            )
-            if (e["detail"] or {}).get("loose"):
+            t_in = e["time"]
+            if e["story"] == e["pr"]:
                 self.ev(
                     t_in,
                     "github",
@@ -500,22 +510,25 @@ class Brigade:
             scoped.add(e["story"])
         # A Cook owns from its launch the first Story of its batch that its brief names
         # and that has no PR yet; the others start at their first PR.
-        # A Story two briefs pick first stays unassigned
+        # The earliest launch claims it; simultaneous conflicting briefs leave it unassigned.
         pr_at: dict[str, str] = {}
-        for e in self.events:
-            if e["kind"] == "pr_open":
-                pr_at.setdefault(e["story"], e["time"])
-        by_chef = defaultdict(set)
+        for e in sorted(references, key=lambda e: e["time"]):
+            pr_at.setdefault(e["story"], e["time"])
+        by_chef = defaultdict(dict)
         for e in self.events:
             if e["kind"] == "story_scope" and e["thread"]:
-                by_chef[e["thread"]].add(e["story"])
+                by_chef[e["thread"]][e["story"]] = e["time"]
         firsts: dict[tuple[str, str], list[str]] = {}
         for tid, v in self.threads.items():
             if v["role"] != "cook":
                 continue
             chef = v["parent"]
-            scope = {int(st.rsplit("#", 1)[1]): st for st in by_chef.get(chef, ())}
             at = launches.get(tid) or ""
+            scope = {
+                int(st.rsplit("#", 1)[1]): st
+                for st, time in by_chef.get(chef, {}).items()
+                if time <= at
+            }
             first = next(
                 (
                     scope[n]
@@ -527,7 +540,8 @@ class Brigade:
             if first:
                 firsts.setdefault((chef, first), []).append(tid)
         for (chef, story), cooks in sorted(firsts.items()):
-            if len(cooks) == 1:
+            cooks.sort(key=lambda tid: launches[tid])
+            if len(cooks) == 1 or launches[cooks[0]] < launches[cooks[1]]:
                 self.ev(
                     launches.get(cooks[0]),
                     "github",
@@ -636,6 +650,7 @@ def extract(
             ORDER.get(event["kind"], 50),
             event["kind"],
             event["thread"],
+            (event["detail"] or {}).get("revision", ""),
             json.dumps(event["detail"], ensure_ascii=False, sort_keys=True),
         )
     )

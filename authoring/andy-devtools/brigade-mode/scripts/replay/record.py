@@ -382,12 +382,9 @@ class Recorder:
         if name not in self.names:
             try:
                 self.names[name] = self.gh.repository(name)
-            except github.ReadError as error:
-                if error.temporary:
-                    raise
-                self.names[name] = (
-                    None  # a folder that is no GitHub repository, such as ~/projects
-                )
+            except github.RepositoryMissing:
+                # A typo, renamed checkout or private repository GitHub cannot show.
+                self.names[name] = None
         return self.names[name]
 
     def main_repo(self) -> str | None:
@@ -408,9 +405,8 @@ class Recorder:
         for item in self.snap.items.values():
             tool = item.get("tool")
             if tool == "link":
-                repo = self.resolve(item["pr"][0])
-                if repo:
-                    prs.append((repo, item["pr"][1]))
+                repo = self.gh.repository(item["pr"][0])
+                prs.append((repo, item["pr"][1]))
             elif tool == "launch" and item.get("batch"):
                 home = self.resolve(item["batch"].get("repo")) or self.resolve(
                     self.snap.projects.get(item.get("project") or "")
@@ -437,8 +433,15 @@ class Recorder:
         self.gh.load_prs(prs)
         for repo, n in prs:
             p = self.gh.prs[(repo, n)]
-            p["refs"] = [[self.resolve(r) or repo, x] for r, x in p["refs"]]
+            p["refs"] = [
+                [resolved, x] for r, x in p["refs"] if (resolved := self.resolve(r))
+            ]
             issues += [(r, x) for r, x in p["refs"]]
+            for _, refs in p["refHistory"]:
+                refs[:] = [
+                    [resolved, n] for r, n in refs if (resolved := self.resolve(r))
+                ]
+                issues += [(r, n) for r, n in refs]
         seen: set[Ref] = set()
         while issues:
             ref = issues.pop(0)
@@ -567,7 +570,14 @@ class Recorder:
                 if name in labels
             },
             "prs": {
-                ref(k): {**v, "refs": [[repo(r), n] for r, n in v["refs"]]}
+                ref(k): {
+                    **v,
+                    "refs": [[repo(r), n] for r, n in v["refs"]],
+                    "refHistory": [
+                        [at, [[repo(r), n] for r, n in refs]]
+                        for at, refs in v["refHistory"]
+                    ],
+                }
                 for k, v in facts["prs"].items()
             },
             "issues": {
@@ -733,7 +743,7 @@ def work(args: argparse.Namespace) -> dict:
 
 GITHUB_KEYS = {
     "repositories": {"public"},
-    "prs": {"created", "merged", "closed", "refs"},
+    "prs": {"created", "merged", "closed", "edited", "refs", "refHistory"},
     "issues": {
         *("epic", "epicTitle", "epicLabel", "closed"),
         *("parent", "subCount", "subs"),

@@ -55,6 +55,7 @@ class Board:
         )
         self.current = {}  # slot -> the threadId that holds it now
         self.settled = False
+        self.story_counts = defaultdict(int)
 
     def set(
         self,
@@ -65,12 +66,29 @@ class Board:
         step: int | None = None,
         since: float | None = None,
     ) -> None:
-        """Frames stay in time order; a wait that began earlier carries its start in `since`."""
-        v = (state, step, note, since)
+        """Frames are [t, node, state, step, note, since?, stories?] in time order.
+
+        Only Cook lines carry stories. Without since, index 5 holds None so
+        stories stays at index 6.
+        since preserves the original start of a wait that began before its frame.
+        """
+        count = (
+            self.story_counts[node]
+            if node.startswith("cook-") and "/" not in node
+            else None
+        )
+        v = (state, step, note, since, count)
         if self.cur.get(node) != v:
             self.cur[node] = v
             self.frames.append(
-                [tenth(t), node, state, step, note] + ([tenth(since)] if since else [])
+                [tenth(t), node, state, step, note]
+                + (
+                    [tenth(since) if since else None, count]
+                    if count is not None
+                    else [tenth(since)]
+                    if since
+                    else []
+                )
             )
 
     def paint_cook(self, t: float, s: str) -> None:
@@ -210,6 +228,11 @@ class Board:
             s = self.slot(d["th"])
             self.step[s] = max(1, min(d["step"] + 1, 6))  # 📍 k/6 ends step k
             self.paint_cook(t, s)
+        elif k == "stories":
+            s = d["slot"]
+            self.story_counts[s] = len(d["stories"])
+            state, step, note, since, _ = self.cur.get(s, ("todo", 0, None, None, 0))
+            self.set(t, s, state, note, step, since)
 
     def skip_barrages(self, t: float, s: str) -> None:
         for (
@@ -228,7 +251,7 @@ class Board:
                     "stopped",
                     "cut" if info.get("cut") else "not started",
                 )
-        for node, (state, step, note, _) in list(self.cur.items()):
+        for node, (state, step, note, _, _) in list(self.cur.items()):
             if state == "todo" and not node.startswith(("batch-", "story:")):
                 self.set(
                     t,
@@ -275,19 +298,21 @@ def shape(
     def slot_of(thread: str | None) -> str | None:
         return b.threads.get(thread or "", {}).get("slot")
 
+    for s, stories in b.cook_stories().items():
+        cooks[s]["stories"] = stories
     for p in b.prs.values():
         s = slot_of(p.get("cook"))
         if (
             s in cooks
             and not p.get("closed")
-            and not b.stories.get(p["story"], {}).get("pre")
+            and (
+                not p["stories"]
+                or any(
+                    not b.stories.get(story, {}).get("pre") for story in p["stories"]
+                )
+            )
         ):
-            cooks[s]["stories"].add(p["story"])
             cooks[s]["prs"].add(p["pr"])
-    for st, info in b.stories.items():
-        s = slot_of(info.get("cook"))
-        if s in cooks and not info.get("pre"):
-            cooks[s]["stories"].add(st)
     batches = []
     for n in sorted(set(b.batches) | {c["batch"] for c in cooks.values()}):
         stories = sorted(
