@@ -196,7 +196,7 @@ Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMP
 
 ## Model selection
 
-The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects each barrage's table from `config.toml`. The Head Chef and each Chef select `[watchdog]` for their own Watchdog.
+The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects each barrage's table from `config.toml`. The Head Chef and each Chef with Cook slots select `[watchdog]` for their own Watchdog.
 
 1. Read your selection with `t3_thread_configuration`. For a thread, choose `chef-on-claude` or `chef-on-codex` from the launching role's provider; for a barrage, choose `cook-on-claude` or `cook-on-codex` from the Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise resolve `instance` to a live provider instance in `orchestrator_capabilities`. Done when the provider and model exist
 2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Send an option only when the catalog entry of the model lists it. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the barrage rule. Done when the catalog supports each option, every barrage uses the other provider and every Watchdog uses its parent's provider
