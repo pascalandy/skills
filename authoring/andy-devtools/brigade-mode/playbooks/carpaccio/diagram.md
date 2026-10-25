@@ -82,7 +82,7 @@ sequenceDiagram
     Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
     Note over H,K: Step 5: Validation and merge
     K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
-    K->>K: Freeze, forward watch wakes
+    K->>K: Freeze, forward watch findings only
     C->>C: Read rejections,<br>check cross-Cook conflicts
     opt Reopened finding, missing criterion evidence,<br>failed or missing required status, or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
