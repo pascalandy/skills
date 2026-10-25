@@ -9,7 +9,7 @@ Epic progress:
 - [ ] 1. Scope
 - [ ] 2. Verify and prioritize
 - [ ] 3. Assemble Epics
-- [ ] 4. Refine and delegate Epic reviews, then assess a Milestone
+- [ ] 4. Check the hierarchy, then assess a Milestone
 - [ ] 5. Deliver the whole proposal
 ```
 
@@ -47,16 +47,17 @@ Epic progress:
    A possible future rewrite does not justify a wait for work that can ship now.
    Check Parallel against the full graph. Draft native Story Rank and matching
    Epic body order, including closed Stories.
-   Note candidate Milestones now. Ask about unclear product intent before it
-   changes grouping or criteria; keep independent work moving.
+   Note candidate Milestones now. Record unclear product intent that could change
+   grouping or criteria as unresolved input, with the items it affects.
    Done when every candidate has a proposed placement or disposition
-4. **Refine and group.** Run steps 1–4 of the shared refinement loop on these
-   Stories, Epics and affected existing Milestones. Reuse current evidence.
+4. **Check and group.** Apply the Grouping checks and the Definition of Ready to
+   these Stories, Epics and affected existing Milestones, reusing current evidence.
    If at least two scoped open Epics without a Milestone support one shared
    deliverable outcome, continue with the `milestone` playbook in this conversation.
    Otherwise state why no new Milestone is needed.
    Done when the hierarchy meets the Definition of Ready or its missing input is named
-5. **Deliver.** Complete step 5 of the shared loop once for the whole hierarchy.
+5. **Deliver.** Deliver one proposal for the whole hierarchy through
+   [Approval, apply and readback](../SKILL.md#approval-apply-and-readback).
    If `milestone` handled delivery, return its result. Report URLs, membership, readiness evidence,
    cleanup, failed actions and left-out issues.
-   Done when shared delivery finishes
+   Done when that procedure finishes

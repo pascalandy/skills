@@ -7,7 +7,7 @@ description: "CU2: assemble and refine eligible Epics into a Milestone with its 
 ```
 Milestone progress:
 - [ ] 1. Scope eligible Epics
-- [ ] 2. Review Epics, then assemble, refine and review the Milestone
+- [ ] 2. Assemble and check the Milestone
 - [ ] 3. Deliver the whole proposal
 ```
 
@@ -17,21 +17,23 @@ Milestone progress:
    Epics, scope and verified evidence. When invoked directly, resolve the home
    repo and inspect open Epics without a Milestone to identify candidate groups.
    Each group needs at least two Epics serving one shared deliverable outcome.
-   An Epic joins at most one Milestone; ask when it fits competing groups.
+   An Epic joins at most one Milestone; when it fits competing groups, record
+   that choice as unresolved input.
    Report unrelated Epics and issues outside any Epic as outside this grouping.
    Read all Stories and current evidence for the selected Epics.
    Done when all eligible Epics and left-out items are accounted for
-2. **Assemble and refine.** Complete the shared loop's refinement and
-   delegated reviews of each selected Epic with its Stories. Reuse those reviews
-   when continuing from `epic` with unchanged inputs.
+2. **Assemble and check.** Check each selected Epic with its Stories against the
+   Grouping checks and the Definition of Ready, reusing `epic`'s results when
+   their inputs are unchanged.
    If no group qualifies, explain why and deliver any refinements from `epic`.
    Number each `M<N> · <outcome>` after the highest existing or drafted M number,
    closed Milestones included.
    Use the shared Epic order, justified blockers and recorded Story tiers.
-   Run steps 1–4 of the shared loop on the Milestone description and any affected Epics.
-   Check the joint outcome and boundaries as well as the readiness of its Epics.
+   Apply the same checks to the Milestone description and any affected Epics.
    Done when the proposed hierarchy meets the Definition of Ready or its missing input is named
-3. **Deliver.** Complete step 5 of the shared loop once, including any Epic and
-   Story changes from the same run. Report the Milestone URL when created, Epics
-   by Rank for each Milestone, outcome checks, failed actions and left-out items.
-   Done when shared delivery finishes
+3. **Deliver.** Deliver one proposal through
+   [Approval, apply and readback](../SKILL.md#approval-apply-and-readback),
+   including any Epic and Story changes from the same run. Report the Milestone URL
+   when created, Epics by Rank for each Milestone, outcome checks, failed actions
+   and left-out items.
+   Done when that procedure finishes
