@@ -48,7 +48,7 @@ When a Chef cannot continue, inspect the old thread and PRs before retrying or r
 
 1. Stop the old Chef and its Watchdog:
    - Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it
-   - Find its Watchdog childThreadId in the old Chef's watch file or the schedule's boundThreadId
+   - Find any existing Watchdog childThreadId in the old Chef's watch file or the schedule's boundThreadId. For an old Chef without a Cook slot, skip the remaining Watchdog steps when no Watchdog exists; still stop one that exists
    - Delete any Watchdog schedule by title and bound threadId. If deletion fails, send its exact childThreadId `delete your schedule` and wait
    - Stop the Watchdog childThreadId with `t3_thread_interrupt` because its task belongs to the old Chef. List its queued runs with `t3_queue_list`, then cancel them with `t3_queue_cancel`
    - Before launching a replacement, verify that no Watchdog schedule, active run or queued turn remains. If the Watchdog cannot be stopped, escalate `❓ fault`
@@ -61,13 +61,13 @@ When a Chef cannot continue, inspect the old thread and PRs before retrying or r
    - Launch a new Chef in the same project and slot at ⏳ with that state and the replacement procedure in [chef-run](chef-run.md#return-or-replace-a-cook)
    - Update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId atomically
 
-   Done when the new Chef's Watchdog is armed, its PRs are linked and watched, and each Cook reports to the new Chef
+   Done when the new Chef's PRs are linked and watched, each Cook reports to it, and its Watchdog is armed if it has a current Cook slot. A new Chef without a Cook slot skips Watchdog arming
 
 3. Archive the old thread. Ignore a late report from it. Done when the sidebar has one Chef for the slot
 
 ## Split a batch
 
-Split card groups without adding or cutting cards or required deliverables. Set the old Chef's `replacedBy = "split"` in `watch.toml`, then stop its Watchdog with the schedule deletion, childThreadId interruption and queued-run cancellation in Replace a Chef before interrupting and archiving the old Chef at ⏹️. Preserve its Cooks' worktrees and branch heads, and remove its batch slot from the count. Register the successor batches as current or queued slots in `watch.toml`, then assign every card and Cook to exactly one successor. A Cook whose cards move to another owner closes at ⏹️. Launch successors under the one live batch per repository rule. The first Chef adopts its assigned live Cooks with the replacement message. Cooks assigned to a queued successor close at ⏹️ with their work preserved; that successor relaunches them in the same worktrees. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
+Split card groups without adding or cutting cards or required deliverables. Set the old Chef's `replacedBy = "split"` in `watch.toml`, then stop any existing Watchdog with the conditional cleanup in Replace a Chef before interrupting and archiving the old Chef at ⏹️. Preserve its Cooks' worktrees and branch heads, and remove its batch slot from the count. Register the successor batches as current or queued slots in `watch.toml`, then assign every card and Cook to exactly one successor. A Cook whose cards move to another owner closes at ⏹️. Launch successors under the one live batch per repository rule. The first Chef adopts its assigned live Cooks with the replacement message. Cooks assigned to a queued successor close at ⏹️ with their work preserved; that successor relaunches them in the same worktrees. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
 
 ## Status, added work and Stop
 
