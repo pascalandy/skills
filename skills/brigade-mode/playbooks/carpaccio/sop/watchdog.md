@@ -24,7 +24,7 @@ Rules: <rules.md path>
 
 The parent writes `watch.toml` atomically after each launch, received report, status or subject change, hold change, scope change and replacement. It records its own threadId, projectId, subject and, when it has a Watchdog, its taskId, childThreadId, scheduledTaskId and arming time. Each `[[slots]]` record has a logical slot, threadId, projectId, last received phase, hold flag, final report received flag, optional `replacedBy` and, for a slot that waits for a merge, `afterMerge`. A slot registered before its launch has `threadId = ""` and `lastReceivedPhase = "queued"`, or `"queued_after_merge"` with `afterMerge` naming the slots whose merge it waits for, as [After-merge slots](../carpaccio.md#after-merge-slots) says. It stays live and counted, but the tick makes no thread or schedule lookup for it until the parent writes its threadId into that record at launch. If Stop or a cut ends it before launch, the parent sets `lastReceivedPhase = "⏹️"` and `reportReceived = true`; it has no thread to settle. A `🍽️ Stack ready` report is a phase report, not a final report. The Head Chef's file has its own `head-chef` record plus Chef records; a Chef's file has Cook records. The Head Chef marks its own record's `reportReceived` after sending the final report to Pascal. On replacement, retain the old record with `replacedBy` and append one new current record for the same logical slot without it. A split uses `replacedBy = "split"` on the old record and new slots for the successors. Ignore late messages from the old threadId; watch only current records.
 
-Use these field names. Add batch metadata to the parent file as needed; omit Watchdog ids and arming time when no Watchdog is armed, `replacedBy` until replacement and `afterMerge` on a slot that waits for no merge:
+Use these field names. Add batch metadata to the parent file as needed; omit `replacedBy` until replacement and `afterMerge` on a slot that waits for no merge:
 
 ```toml
 parentThreadId = "<full threadId>"
@@ -83,7 +83,7 @@ Before a wake, reread the target's T3 state in the same tick. If it is now final
 
 Send `🐕 Watchdog <id4>: <finding> <slot> <threadId> · <one line of evidence>` to the parent. Use the stable `clientRequestId` derived in Files; mark the finding alerted only after delivery succeeds. The parent owns the repair. The Head Chef's Watchdog never substitutes for a PM decision.
 
-For each live Chef, read its `watch.toml`. When it has a current Cook slot, find `🐕 Watchdog · Chef <b> <id4>` with `list_scheduled_tasks` in that Chef's project. When that schedule is unhealthy under [Schedule health](#schedule-health), alert the Head Chef once. The Head Chef asks that Chef to re-arm it. A Chef without a Cook slot stays watched through its Chef record; skip its Watchdog schedule check.
+For each live Chef, read `watch.toml` in its Chef record's `workFolder`. Skip its Watchdog schedule check only when that file is readable and lists no current Cook slot. Otherwise find `🐕 Watchdog · Chef <b> <id4>` with `list_scheduled_tasks` in that Chef's project. When that schedule is unhealthy under [Schedule health](#schedule-health), alert the Head Chef once. The Head Chef asks that Chef to re-arm it. A Chef without a Cook slot stays watched through its Chef record.
 
 ## Schedule health
 
