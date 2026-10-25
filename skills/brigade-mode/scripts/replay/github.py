@@ -326,10 +326,7 @@ class GitHub(Facts):
                 ["repo", "view", name, "--json", "nameWithOwner,visibility"]
             )
         except ReadError as error:
-            if (
-                not error.temporary
-                and "Could not resolve to a Repository" in error.detail
-            ):
+            if "Could not resolve to a Repository" in error.detail:
                 raise RepositoryMissing(str(error), detail=error.detail) from error
             raise
         return {

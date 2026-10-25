@@ -363,7 +363,10 @@ def test_data_age_counts_only_data_that_matches_t3(
         db.con.close()
 
 
-@pytest.mark.parametrize("revision", ["normal", "empty", "deleted", "typo"])
+@pytest.mark.parametrize(
+    "revision",
+    ["normal", "empty", "deleted", "typo", "typo-connection", "typo-timeout"],
+)
 def test_a_non_repository_project_does_not_stop_other_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, revision: str
 ) -> None:
@@ -407,10 +410,15 @@ def test_a_non_repository_project_does_not_stop_other_runs(
         pr = ((answer.get("data") or {}).get("repository") or {}).get("p21")
         if pr and revision != "normal":
             initial = pr["userContentEdits"]["nodes"][0]
-            if revision == "typo":
+            if revision.startswith("typo"):
+                repository = {
+                    "typo": "no-such-repo",
+                    "typo-connection": "db-connection",
+                    "typo-timeout": "request-timeout",
+                }[revision]
                 initial = {
                     **initial,
-                    "diff": "Closes typo-owner/no-such-repo#1. Closes #11.",
+                    "diff": f"Closes typo-owner/{repository}#1. Closes #11.",
                 }
             pr["userContentEdits"]["nodes"] = [
                 {
