@@ -134,6 +134,7 @@ sequenceDiagram
     C->>C: Delete Watchdog schedule<br>cancel task, remove work folder
     C->>C: Settle
     H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs
+    H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
     H->>U: Agent: ⛳ x/y batches done, report <-
     H->>H: Delete Watchdog schedule<br>cancel task, remove work folders<br>Prune worktree records
     H->>H: Settle and unpin
