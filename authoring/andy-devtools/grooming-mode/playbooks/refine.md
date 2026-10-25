@@ -17,6 +17,8 @@ Refine progress:
 
 ### 1. Read the target
 
+Without a product decision that brings membership outside the requested target into the proposal, preserve that membership.
+
 1. Resolve the home repo and the Epic or Milestone reference.
 2. Read these parts of the target, with full pagination:
    - Its bodies
@@ -24,8 +26,7 @@ Refine progress:
    - Rank, parents, blockers, and labels
 3. Reverify against the current default branch and completion evidence.
    Reuse unchanged evidence from this conversation.
-4. When a change affects their boundaries, outcome, or Rank, read the containing Milestone and sibling Epics.
-   Preserve membership outside the requested target unless a product decision brings that membership into the proposal.
+4. When a change affects the boundaries, outcome, or Rank of the containing Milestone or sibling Epics, read those containers.
 
 Done when the target and affected relationships have current evidence
 
@@ -44,6 +45,6 @@ Done when the Definition of Ready holds or the exact required input is named
 
 1. Through [Approval, apply and readback](../SKILL.md#approval-apply-and-readback), deliver one proposal for all affected levels.
 2. Report actual references, readiness evidence, and remaining inputs or failed writes.
-   A further refusal resumes phase 2 on the same target.
+   A further refusal resumes Resolve gaps on the same target.
 
 Done when that procedure finishes

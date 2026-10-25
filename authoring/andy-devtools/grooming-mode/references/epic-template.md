@@ -5,6 +5,8 @@ For cross-repo references, use `OWNER/REPO#N`.
 
 Title: `Epic <N> · <outcome in plain words>`
 
+Preserve the template headings without explanations of CMO and FMO in the body.
+
 ````md
 <grooming-mode>
 
@@ -20,10 +22,10 @@ REF: #<issue>, OWNER/REPO#<issue>
 
 ## Stories
 
-1. **<State the problem in plain words.>** (#<number>) · <Use text, or code + tests.>
+1. **<State the problem in plain words.>** (#<number>) · <text | code + tests>
    - **Today:** <Describe current behavior and evidence.>
    - **After:** <Describe the result once the Story is done.>
-2. **<State the problem in plain words.>** (OWNER/REPO#<number>) · <Use text, or code + tests.>
+2. **<State the problem in plain words.>** (OWNER/REPO#<number>) · <text | code + tests>
    - **Today:** <Describe current behavior and evidence.>
    - **After:** <Describe the result once the Story is done.>
 

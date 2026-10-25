@@ -23,19 +23,20 @@ Prepare a plan for GitHub work. The Glossary defines the levels and terms in thi
 | Parallel | No blocked-by path connects two elements in either direction | absence of a dependency path | If A blocks B and B blocks C, A and C are dependent. |
 | Home repo | The repository that the Product Manager names | home of Epics and Milestones | A Milestone exists only in its own repo. |
 | Grooming | Assembly and refinement of the backlog until ready | | Scrum calls Grooming backlog refinement. |
-| Brigade | The skill that executes ready work. Its Head Chef forms batches, one dish per batch with one or more PRs, and serves by Rank. | | Grooming creates no batch. |
+| Brigade | The skill that executes ready work. Its Head Chef is the Brigade thread that the user talks to. Batches are parts of the plan. The Head Chef forms batches, one dish per batch with one or more PRs, and serves by Rank. | | Grooming creates no batch. |
 
 Sprint means a fixed period. Wave duplicates Blocked by. Use neither as a level.
 
 Assemble and refine Stories into Epics. Assemble and refine eligible Epics into Milestones.
 Use Rank and Blocked by to specify work order and dependencies.
 Grooming writes the plan only. When execution is requested, Brigade executes a ready target.
-Talk with the user in the conversation's language. Keep explanations in the Proposal in the user's language.
+Talk with the user in the conversation's language. Keep explanations in the Proposal in the conversation's language.
 Keep the glossary terms in English.
 
 Before you draft text for GitHub, load `asd-ste100`, the skill for Simplified Technical English, or STE.
 With its Write branch, draft each text for GitHub in English.
 This rule covers titles, Story and Epic bodies, Milestone descriptions, and comments.
+Keep required title forms, such as `Epic N · <outcome>` and the type prefix of a Story title.
 If you edit an existing issue body in another language, rewrite the full body in English.
 Preserve every fact and decision of that body. Use only English in the rewritten body.
 
@@ -46,8 +47,10 @@ Preserve every fact and decision of that body. Use only English in the rewritten
 3. Select the starting point from the request.
    Bare `grooming-mode` selects `epic`.
    An explicit name selects the starting point, with or without `;`, such as `grooming mode refine`.
-   If the name is unknown, including `sprint`, show this table and run nothing.
    When its grouping condition holds, `epic` continues into `milestone`.
+4. If the name is unknown, including `sprint`, use these steps:
+   1. Show this table.
+   2. Run nothing.
 
 | Route | Use when |
 |---|---|
@@ -55,20 +58,23 @@ Preserve every fact and decision of that body. Use only English in the rewritten
 | [milestone](playbooks/milestone.md) | Assemble and refine a Milestone from eligible Epics. |
 | [refine](playbooks/refine.md) | Refine an existing Epic or Milestone, including its Stories. |
 
-4. After this file, read the selected playbook.
-5. Before you draft an Epic body, read the [Epic template](references/epic-template.md).
-6. Before you draft a Milestone description, read the [Milestone template](references/milestone-template.md).
+5. After this file, read the selected playbook.
+6. Before you draft an Epic body, read the [Epic template](references/epic-template.md).
+7. Before you draft a Milestone description, read the [Milestone template](references/milestone-template.md).
 
 When you change routing, use [routing cases](references/routing-cases.md).
 
 ## Under a workflow
 
-This skill defines the WORK, the complete proposal, and its checks. The plan is the candidate hierarchy in that proposal.
+This skill defines the WORK and its checks. The WORK is the complete proposal.
+The plan is the candidate hierarchy in that proposal.
 The caller's workflow decides who scouts, drafts, asks, and reviews, and when.
 The Definition of Ready below states when work is ready.
+The WORK is done when each target meets the Definition of Ready or names its missing input.
 
-- Every agent that drafts or reviews the WORK loads this skill
-- The WORK is done when each target meets the Definition of Ready or names its missing input
+Under the caller's workflow, use these rules:
+
+- Before you draft or review the WORK, load this skill
 - Before you read the scope, ask the route's scope questions with the goal
 - In every run, deliver the proposal instead of transferring unfinished refinement to a new session
 - Before GitHub writes, wait for approval
@@ -77,30 +83,33 @@ The Definition of Ready below states when work is ready.
 
 Use `gh`, the GitHub CLI. The [installation instructions](https://cli.github.com/) explain how to install `gh`.
 
+The skill label-for-issues owns labels, Ready, native operations, filters, and pagination.
+Ready is the label state that identifies work ready for execution.
+The `4-epic` migration is the only write allowed before scope filters, even in read-only grooming.
+The Epic filters need that label.
+
+Issues stay in their repositories. Epics and Milestones, the containers for this plan, live in the home repo.
+The cross-repo reference rule includes bodies, tables, comments, dependencies, and handoffs.
+
 1. Before GitHub reads, confirm `gh --version` and `gh auth status`.
 2. Before you scope the work, load `label-for-issues` and its GitHub CLI reference.
-   That skill owns labels, Ready, native operations, filters, and pagination.
-   Ready is the label state that identifies work ready for execution.
 3. Before scope filters, run Step 4 of label-for-issues.
-   Its `4-epic` migration is the only write allowed at this point, even in read-only grooming.
-   The Epic filters need that label.
-4. If another label migration is pending, propose that migration.
-5. If another label migration is pending, stop until that migration is resolved.
-6. Record the home repo and scoped repos.
-   Issues stay in their repositories. Epics and Milestones, the containers for this plan, live in the home repo.
-7. If the home repo is absent, ask for the home repo.
-8. For every cross-repo Story reference, use `OWNER/REPO#N`.
-   This rule includes bodies, tables, comments, dependencies, and handoffs.
-9. Read these fields for every scoped issue:
+4. If another label migration is pending, use these steps:
+   1. Propose that migration.
+   2. Stop until that migration is resolved.
+5. Record the home repo and scoped repos.
+6. If the home repo is absent, ask for the home repo.
+7. For every cross-repo Story reference, use `OWNER/REPO#N`.
+8. Read these fields for every scoped issue:
    - Body and comments
    - Labels and native parent
    - Relationships
    - State and closing reason
-10. Count every relationship against its `totalCount`.
-11. For incomplete lists, paginate with label-for-issues.
-12. Follow linked reports, reproductions, and Product Manager decisions that affect the outcome.
-13. Check container summaries against those sources.
-14. For completion evidence and corrections to closing reasons, read closed issues that the scoped set references.
+9. Count every relationship against its `totalCount`.
+10. For incomplete lists, paginate with label-for-issues.
+11. Follow linked reports, reproductions, and Product Manager decisions that affect the outcome.
+12. Check container summaries against those sources.
+13. For completion evidence and corrections to closing reasons, read closed issues that the scoped set references.
     For `epic`, include closed Stories of its open Epics.
 
 For every route, verify each Story against its default branch.
@@ -126,7 +135,7 @@ Assign one of these verdicts from the evidence:
 | Verdict | Evidence required | Disposition |
 |---|---|---|
 | Holds | The problem or requested outcome still needs work in current files | Place the issue. |
-| Fixed | A merged PR or a default-branch commit solves the issue | Close the issue as completed. Cite the change. |
+| Fixed | A merged PR or a default-branch commit solves the issue. Cite that change. | Close the issue as completed. Cite the change. |
 | Gone | The problem no longer occurs or never did, without a fix to cite. The evidence shows why. | Close the issue as not planned. Cite the proof. |
 | Stale fix | The problem still needs work, but the proposed fix quotes text that changed | Place the issue. Refine the stale text against current evidence. |
 
@@ -147,13 +156,18 @@ For a closed-completed issue, distinguish code work from non-code work:
 An approved grooming sets each Story's `3-pty:p1`, `p2`, or `p3` label from its P1, P2, or P3 tier.
 Each Epic takes the priority of its highest-priority Story.
 The tier replaces established priority, including `p0`.
+Left-out issues keep their labels.
 
-1. Limit P1 to three Stories per proposal.
-2. Only when this skill's Definition of Ready holds, propose a Ready label.
-3. To select the Ready state, use label-for-issues.
-4. If sources establish outcome fit, place issues with missing criteria provisionally.
-5. Then resolve their gaps or name the missing input in the proposal.
-   Left-out issues keep their labels.
+Use these rules for labels:
+
+- Limit P1 to three Stories per proposal
+- Only when this skill's Definition of Ready holds, propose a Ready label
+- To select the Ready state, use label-for-issues
+
+For issues with missing criteria, use these steps:
+
+1. If their sources establish outcome fit, place the issues provisionally.
+2. For provisionally placed issues, resolve their gaps or name the missing input in the proposal.
 
 A `2-type:postmortem` Story takes its type from the title prefix:
 
@@ -162,7 +176,7 @@ A `2-type:postmortem` Story takes its type from the title prefix:
 - Every other prefix gives task
 
 In every route, you may propose Story body edits.
-Preserve supported content and explicit product decisions. To resolve a gap, draft only the necessary changes.
+Preserve supported content and explicit product decisions. Draft only the changes that resolve a gap.
 
 1. Number new Epics after the highest `Epic N` title, including closed Epics.
    `Epic N · <outcome>` is a stable identifier. Never renumber existing Epics.
@@ -173,7 +187,7 @@ Preserve supported content and explicit product decisions. To resolve a gap, dra
 ## Grouping checks
 
 1. Test each parent with this question: if every child were completed, would the parent's outcome hold?
-2. Then check for these gaps:
+2. Then check for these items:
    - Missing integration work
    - Overlapping scope
    - Contradictory criteria
@@ -262,7 +276,7 @@ Approval includes substitution of their issue numbers.
   - For each text for GitHub, its asd-ste100 result, with these parts:
     - The `STE: Pass:` line
     - Each kept finding and its reason
-    - The scope line
+  - The asd-ste100 scope line, once for all results
 
 Keep asd-ste100 results in Readiness only. The text on GitHub does not include these results.
 
@@ -273,10 +287,10 @@ After approval, follow these three phases.
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
-4. Leave out dependent actions too.
+4. Put dependent actions on the left-out list too.
    These actions include parent Ready labels and outcomes that rely on the changed item.
 5. Return that scope to refinement.
-6. Leave issues that arrive after approval out for the next grooming, with "arrived after approval" as their reason.
+6. Put issues that arrive after approval on the left-out list for the next grooming with the reason "arrived after approval".
 
 Done when the unchanged approved actions and left-out actions are explicit
 
@@ -307,8 +321,8 @@ Done when each approved action is applied or reported as failed
    Include agreement between native Rank and body Rank.
    Each scoped issue must be placed, closed, or left out with its reason.
 3. Within approval, correct discrepancies.
-4. Reread until every applied action matches.
-5. Until every applied action matches, repeat steps 3 and 4.
-6. Report anything that needs approval.
+4. Reread the corrected actions.
+5. Repeat steps 3 and 4 until every applied action matches or needs approval.
+6. Report each action that needs approval.
 
 Done when every write is verified or reported failed

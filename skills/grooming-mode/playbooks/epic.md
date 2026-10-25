@@ -16,6 +16,7 @@ Epic progress:
 ```
 
 ## Process
+
 ### 1. Scope
 
 1. Resolve the home repo and scoped repos.
@@ -44,11 +45,11 @@ The default scope contains these items from each repo:
 
 For another requested set, such as a label, use that set plus open Epics and their Stories.
 
-1. Inspect native parents.
-   Stories of closed Epics must remain visible. Sub-tasks follow the placement of their non-Epic parent.
+1. To keep Stories of closed Epics visible and to place Sub-tasks with their non-Epic parent, inspect native parents.
 2. Before you propose changes to Milestone outcomes or Rank, read affected existing Milestones and their members.
 
 Done when every candidate and affected container is read and counted
+
 ### 2. Verify and prioritize
 
 1. Apply the shared verdicts against current code and merged changes.
@@ -62,6 +63,7 @@ Done when every candidate and affected container is read and counted
 8. List cleanup.
 
 Done when every issue has a verdict from evidence, a tier, or a precise left-out reason
+
 ### 3. Assemble Epics
 
 1. By outcome, place every actionable issue into exactly one Epic.
@@ -77,15 +79,16 @@ Done when every issue has a verdict from evidence, a tier, or a precise left-out
    Include the affected items.
 
 Done when every candidate has a proposed placement or disposition
+
 ### 4. Check and group
 
 1. Apply the Grouping checks and the Definition of Ready to these Stories, Epics, and affected existing Milestones.
    Reuse current evidence.
-2. If at least two scoped open Epics without a Milestone support one shared deliverable outcome, continue with `milestone`.
-   Continue in this conversation.
+2. If at least two scoped open Epics without a Milestone share one deliverable outcome, continue with `milestone` in this conversation.
    Otherwise, state why no new Milestone is needed.
 
 Done when the hierarchy meets the Definition of Ready or its missing input is named
+
 ### 5. Deliver
 
 1. Through [Approval, apply and readback](../SKILL.md#approval-apply-and-readback), deliver one proposal for the whole hierarchy.

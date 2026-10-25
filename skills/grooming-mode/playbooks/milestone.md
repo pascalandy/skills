@@ -17,14 +17,16 @@ Milestone progress:
 
 ### 1. Scope eligible Epics
 
+Each group needs at least two Epics that serve one shared deliverable outcome.
+An Epic joins at most one Milestone.
+
 1. When you continue from `epic`, reuse its proposed Epics, scope, and verified evidence.
-2. When this route starts directly, resolve the home repo.
-3. For a direct start, inspect open Epics without a Milestone to identify candidate groups.
-   Each group needs at least two Epics that serve one shared deliverable outcome.
-   An Epic joins at most one Milestone.
-4. When an Epic fits competing groups, record that choice as unresolved input.
-5. Report unrelated Epics and issues outside any Epic as outside this grouping.
-6. Read all Stories and current evidence for the selected Epics.
+2. When this route starts directly, use these steps:
+   1. Resolve the home repo.
+   2. Inspect open Epics without a Milestone to identify candidate groups.
+3. When an Epic fits competing groups, record that choice as unresolved input.
+4. Report unrelated Epics and issues outside any Epic as outside this grouping.
+5. Read all Stories and current evidence for the selected Epics.
 
 Done when all eligible Epics and left-out items are accounted for
 
@@ -32,11 +34,12 @@ Done when all eligible Epics and left-out items are accounted for
 
 1. Check each selected Epic and its Stories against the Grouping checks and the Definition of Ready.
    When their inputs are unchanged, reuse the results from `epic`.
-2. If no group qualifies, explain why.
-3. If no group qualifies, deliver any refinements from `epic`.
-4. Number each `M<N> · <outcome>` after the highest existing or drafted M number, including closed Milestones.
-5. Use the shared Epic order, justified blockers, and recorded Story tiers.
-6. Apply the same checks to the Milestone description and any affected Epics.
+2. If no group qualifies, use these steps:
+   1. Explain why.
+   2. Deliver any refinements from `epic`.
+3. Number each `M<N> · <outcome>` after the highest existing or drafted M number, including closed Milestones.
+4. Use the shared Epic order, justified blockers, and recorded Story tiers.
+5. Apply the same checks to the Milestone description and any affected Epics.
 
 Done when the proposed hierarchy meets the Definition of Ready or its missing input is named
 
