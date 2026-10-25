@@ -67,7 +67,6 @@ for pr in PRS.values():
     pr["lastEditedAt"] = pr["createdAt"]
     pr["userContentEdits"] = {
         "nodes": [{"editedAt": pr["createdAt"], "diff": pr["body"], "deletedAt": None}],
-        "pageInfo": {"hasNextPage": False, "endCursor": None},
     }
 PRS[(W, 20)]["userContentEdits"]["nodes"] = [
     {
@@ -77,7 +76,7 @@ PRS[(W, 20)]["userContentEdits"]["nodes"] = [
     },
     {
         "editedAt": PRS[(W, 20)]["createdAt"],
-        "diff": "Closes #10. Refs example-owner/secret-thing#4",
+        "diff": "Closes #10. Refs example-owner/secret-thing#4. Refs typo-owner/no-such-repo#1",
         "deletedAt": None,
     },
 ]

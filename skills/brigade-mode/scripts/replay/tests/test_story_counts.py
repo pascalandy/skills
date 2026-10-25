@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.parametrize(
-    "original, edited, before, after, paginated",
+    "original, edited, before, after",
     [
-        ("closed #10. Resolves #11.", "Closes #11.", 2, 1, False),
-        ("closed #10. Resolves #11.", "Closes #11.", 2, 1, True),
+        ("closed #10. Resolves #11.", "Closes #11.", 2, 1),
         # A native link has no edit timestamp until a body revision names it.
-        ("Closes #11.", "Closes #10. Closes #11.", 1, 2, False),
-        ("", "Closes #11.", 1, 1, False),
+        ("Closes #11.", "Closes #10. Closes #11.", 1, 2),
+        ("", "Closes #11.", 1, 1),
+        ("Closes typo-owner/no-such-repo#1. Closes #11.", "Closes #11.", 1, 1),
     ],
 )
 def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
@@ -37,7 +37,6 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
     edited: str,
     before: int,
     after: int,
-    paginated: bool,
 ) -> None:
     for name, value in fake_env(tmp_path).items():
         monkeypatch.setenv(name, value)
@@ -50,11 +49,7 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
     def read(args: list[str]) -> dict:
         result = reader(args)
         repository = (result.get("data") or {}).get("repository") or {}
-        pr = (
-            repository.get("p21")
-            or repository.get("e21")
-            or repository.get("pullRequest")
-        )
+        pr = repository.get("p21") or repository.get("e21")
         if pr:
             pr["body"] = (original, edited, "Closes #10.")[phase]
             pr["mergedAt"] = pr["closedAt"] = (
@@ -83,16 +78,8 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
                     *([{"editedAt": edited_at, "diff": edited}] if phase else []),
                     {"editedAt": pr["createdAt"], "diff": original},
                 ],
-                "pageInfo": {"hasNextPage": False, "endCursor": None},
             }
             pr["lastEditedAt"] = pr["userContentEdits"]["nodes"][0]["editedAt"]
-            if paginated and phase:
-                edits = pr["userContentEdits"]
-                if "after:" in " ".join(args):
-                    edits["nodes"] = edits["nodes"][1:]
-                else:
-                    edits["nodes"] = edits["nodes"][:1]
-                    edits["pageInfo"] = {"hasNextPage": True, "endCursor": "older"}
         return result
 
     con = t3.connect(db.path, 5)
@@ -108,6 +95,8 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
 
         shown = page(gh, now)
         assert oracles.story_counts_at(shown, now)["cook-1.1"] == before
+        if not original:
+            assert shown["cooks"]["cook-1.1"]["prs"] == 1
         phase = 1
         gh.refresh()
         final = page(gh, now + 120)
@@ -153,6 +142,38 @@ def test_an_edit_and_a_legacy_cache_keep_the_counts_already_shown(
     finally:
         con.close()
         db.con.close()
+
+
+@pytest.mark.parametrize(
+    "message, temporary, missing",
+    [
+        (
+            "GraphQL: Could not resolve to a Repository with the name 'missing'.",
+            False,
+            True,
+        ),
+        ("HTTP 401: Bad credentials", False, False),
+        ("HTTP 502: Bad Gateway", True, False),
+    ],
+)
+def test_optional_reference_lookup_preserves_genuine_read_errors(
+    message: str, temporary: bool, missing: bool
+) -> None:
+    def read(args: list[str]) -> dict:
+        assert args[:2] == ["repo", "view"]
+        raise github.ReadError(message, temporary=temporary)
+
+    gh = github.GitHub(read)
+    ref = ("example-owner/missing", 1)
+    if missing:
+        assert gh.issue(*ref) is None
+        assert github.Recorded(gh.dump()).stories_of([ref]) == []
+    else:
+        with pytest.raises(github.ReadError):
+            gh.issue(*ref)
+    # A repository used as the source of a PR is always a strict lookup.
+    with pytest.raises(github.ReadError):
+        gh.load_prs([ref])
 
 
 def test_recorded_reassignment_moves_the_count_and_metadata() -> None:

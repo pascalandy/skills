@@ -375,13 +375,13 @@ class Brigade:
             ):
                 if refs is not None:
                     current = refs
-                found = gh.stories_of({"refs": current})
+                found = gh.stories_of(current)
                 named = named or bool(found)
                 stories = {f"{r}#{n}": gh.epic_of(r, n) for r, n in found}
                 # An unfinished stub is not an extra Story. A merged PR with
                 # no Story reference so far becomes its own Story then.
                 if not stories and not named and p["merged"] and at >= p["merged"]:
-                    stories = {pr: gh.epic_ref({"refs": current})}
+                    stories = {pr: gh.epic_ref(current)}
                 self.ev(
                     max(at, linked),
                     "github",

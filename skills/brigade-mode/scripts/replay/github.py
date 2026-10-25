@@ -22,7 +22,7 @@ from typing import Any
 from t3 import norm
 
 Ref = tuple[str, int]
-EDIT_FIELDS = "pageInfo{hasNextPage endCursor} nodes{editedAt diff deletedAt}"
+EDIT_FIELDS = "nodes{editedAt diff deletedAt}"
 PR_FIELDS = (
     "number createdAt mergedAt closedAt lastEditedAt body "
     "closingIssuesReferences(first:100){nodes{number repository{nameWithOwner}}}"
@@ -228,9 +228,12 @@ class Facts:
 
     def issue(self, repo: str, n: int) -> dict | None:
         """An issue as of `now`, or None when the number names no issue, such as
-        a bare `#720` that a batch name meant for another repository."""
+        a bare `#720` meant for another repository or an unresolvable body target."""
         if (repo, n) not in self.issues:
-            self.issues[(repo, n)] = self.fetch_issue((repo, n))
+            try:
+                self.issues[(repo, n)] = self.fetch_issue((repo, n))
+            except RepositoryMissing:
+                self.issues[(repo, n)] = None
         i = self.issues[(repo, n)]
         if i is None:
             return None
@@ -270,12 +273,16 @@ class Facts:
             key=lambda s: s["number"],
         )
 
-    def stories_of(self, p: dict) -> list[Ref]:
+    def stories_of(self, refs: Iterable[Ref]) -> list[Ref]:
         """Issues a PR closes or names; an Epic is not a Story."""
-        return [(r, n) for r, n in p["refs"] if not self.is_epic(r, n)]
+        return [
+            (r, n)
+            for r, n in refs
+            if self.issue(r, n) is not None and not self.is_epic(r, n)
+        ]
 
-    def epic_ref(self, p: dict) -> Ref | None:
-        for r, n in p["refs"]:
+    def epic_ref(self, refs: Iterable[Ref]) -> Ref | None:
+        for r, n in refs:
             if self.is_epic(r, n):
                 return r, n
         return None
@@ -314,7 +321,17 @@ class GitHub(Facts):
         self.read = read
 
     def fetch_repository(self, name: str) -> dict:
-        info = self.read(["repo", "view", name, "--json", "nameWithOwner,visibility"])
+        try:
+            info = self.read(
+                ["repo", "view", name, "--json", "nameWithOwner,visibility"]
+            )
+        except ReadError as error:
+            if (
+                not error.temporary
+                and "Could not resolve to a Repository" in error.detail
+            ):
+                raise RepositoryMissing(str(error), detail=error.detail) from error
+            raise
         return {
             "name": info["nameWithOwner"],
             "public": info.get("visibility") == "PUBLIC",
@@ -353,18 +370,7 @@ class GitHub(Facts):
         for repo, ns in sorted(by_repo.items()):
             body = " ".join(aliases(prs=sorted(ns)))
             for v in self.repo_query(repo, body).values():
-                self.prs[(repo, v["number"])] = self.reduce_pr(repo, v)
-
-    def reduce_pr(self, repo: str, value: dict) -> dict:
-        """Read every body revision before reducing it to timed references."""
-        edits = value["userContentEdits"]
-        nodes = list(edits["nodes"])
-        while edits["pageInfo"]["hasNextPage"]:
-            cursor = json.dumps(edits["pageInfo"]["endCursor"])
-            field = f"pullRequest(number:{value['number']}){{userContentEdits(first:100,after:{cursor}){{{EDIT_FIELDS}}}}}"
-            edits = self.repo_query(repo, field)["pullRequest"]["userContentEdits"]
-            nodes.extend(edits["nodes"])
-        return reduce_pr(repo, {**value, "userContentEdits": {"nodes": nodes}})
+                self.prs[(repo, v["number"])] = reduce_pr(repo, v)
 
     def fetch_issue(self, ref: Ref) -> dict | None:
         d = self.repo_query(
@@ -402,7 +408,11 @@ class Cached(GitHub):
                 self.saved = path.read_text(encoding="utf-8")
                 self.restore(json.loads(self.saved))
                 # Older closed PRs were cached forever without reference history (#888).
-                self.prs = {ref: p for ref, p in self.prs.items() if "refHistory" in p}
+                self.prs = {
+                    ref: p
+                    for ref, p in self.prs.items()
+                    if "refHistory" in p and "edited" in p
+                }
             except (OSError, ValueError, KeyError):
                 self.prs, self.issues, self.items, self.saved = {}, {}, {}, ""
 
@@ -475,18 +485,11 @@ class Cached(GitHub):
             for alias, v in found.items():
                 n = int(alias[1:])
                 if alias[0] == "p" and v:
-                    self.prs[(repo, n)] = self.reduce_pr(repo, v)
+                    self.prs[(repo, n)] = reduce_pr(repo, v)
                 elif alias[0] == "e" and v:
                     p = self.prs[(repo, n)]
                     edited = norm(v.get("lastEditedAt"))
-                    previous = (
-                        p["edited"]
-                        if "edited" in p
-                        else max(
-                            (at for at, _ in p["refHistory"]), default=p["created"]
-                        )
-                    )
-                    if edited != previous:
+                    if edited != p["edited"]:
                         changed.append((repo, n))
                 elif alias[0] == "i":
                     self.issues[(repo, n)] = reduce_issue(v) if v else None
@@ -528,6 +531,10 @@ class ReadError(Exception):
         super().__init__(message)
         self.temporary = temporary
         self.detail = detail or message
+
+
+class RepositoryMissing(ReadError):
+    """The repository lookup explicitly reports that the name cannot be resolved."""
 
 
 def gh_reader(timeout: float) -> Callable[[list[str]], dict]:

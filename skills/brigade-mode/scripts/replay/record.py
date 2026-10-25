@@ -382,9 +382,7 @@ class Recorder:
         if name not in self.names:
             try:
                 self.names[name] = self.gh.repository(name)
-            except github.ReadError as error:
-                if error.temporary:
-                    raise
+            except github.RepositoryMissing:
                 self.names[name] = (
                     None  # a folder that is no GitHub repository, such as ~/projects
                 )
@@ -408,9 +406,8 @@ class Recorder:
         for item in self.snap.items.values():
             tool = item.get("tool")
             if tool == "link":
-                repo = self.resolve(item["pr"][0])
-                if repo:
-                    prs.append((repo, item["pr"][1]))
+                repo = self.gh.repository(item["pr"][0])
+                prs.append((repo, item["pr"][1]))
             elif tool == "launch" and item.get("batch"):
                 home = self.resolve(item["batch"].get("repo")) or self.resolve(
                     self.snap.projects.get(item.get("project") or "")
@@ -437,10 +434,14 @@ class Recorder:
         self.gh.load_prs(prs)
         for repo, n in prs:
             p = self.gh.prs[(repo, n)]
-            p["refs"] = [[self.resolve(r) or repo, x] for r, x in p["refs"]]
+            p["refs"] = [
+                [resolved, x] for r, x in p["refs"] if (resolved := self.resolve(r))
+            ]
             issues += [(r, x) for r, x in p["refs"]]
             for _, refs in p["refHistory"]:
-                refs[:] = [[self.resolve(r) or repo, n] for r, n in refs]
+                refs[:] = [
+                    [resolved, n] for r, n in refs if (resolved := self.resolve(r))
+                ]
                 issues += [(r, n) for r, n in refs]
         seen: set[Ref] = set()
         while issues:

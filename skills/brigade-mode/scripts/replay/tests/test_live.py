@@ -363,7 +363,7 @@ def test_data_age_counts_only_data_that_matches_t3(
         db.con.close()
 
 
-@pytest.mark.parametrize("revision", ["normal", "empty", "deleted"])
+@pytest.mark.parametrize("revision", ["normal", "empty", "deleted", "typo"])
 def test_a_non_repository_project_does_not_stop_other_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, revision: str
 ) -> None:
@@ -407,6 +407,11 @@ def test_a_non_repository_project_does_not_stop_other_runs(
         pr = ((answer.get("data") or {}).get("repository") or {}).get("p21")
         if pr and revision != "normal":
             initial = pr["userContentEdits"]["nodes"][0]
+            if revision == "typo":
+                initial = {
+                    **initial,
+                    "diff": "Closes typo-owner/no-such-repo#1. Closes #11.",
+                }
             pr["userContentEdits"]["nodes"] = [
                 {
                     "editedAt": "2026-01-01T00:01:02Z",
@@ -435,6 +440,7 @@ def test_a_non_repository_project_does_not_stop_other_runs(
         assert (
             brigade["batches"][0]["epic"]["url"] == f"https://github.com/{W}/issues/9"
         )
+        assert brigade["cooks"]["cook-1.1"]["stories"] == ["#11"]
         db.item(other, "a-other", "assistant_message", text="🙋 valide le plan")
         service.tick(now + pipeline.POLL)
         assert state.health(now + pipeline.POLL)[0]
@@ -463,6 +469,7 @@ def test_an_unused_cached_pr_cannot_block_followed_runs(
         "closed": old,
         "refs": [],
         "refHistory": [[old, []]],
+        "edited": old,
     }
     stale.save()
     con = t3.connect(db.path, 5)

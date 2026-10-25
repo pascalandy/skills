@@ -300,7 +300,12 @@ def shape(
         if (
             s in cooks
             and not p.get("closed")
-            and any(not b.stories.get(story, {}).get("pre") for story in p["stories"])
+            and (
+                not p["stories"]
+                or any(
+                    not b.stories.get(story, {}).get("pre") for story in p["stories"]
+                )
+            )
         ):
             cooks[s]["prs"].add(p["pr"])
     batches = []

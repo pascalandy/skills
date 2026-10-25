@@ -537,8 +537,6 @@ def apply(b: Brigade, e: dict, t: float, deltas: list[dict]) -> None:
                     "k": kind,
                     "th": th,
                     "pr": e["pr"],
-                    "story": e["story"],
-                    "epic": e["epic"],
                 }
             )
     elif kind == "release_done" and th in b.chef:

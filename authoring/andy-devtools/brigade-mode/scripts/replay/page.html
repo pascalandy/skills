@@ -171,7 +171,7 @@ const $ = (s) => document.querySelector(s);
 const dur = (s) => { const m = Math.max(0, Math.floor(s / 60)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`; };
 const localTime = (t) => new Date(t * 1000).toLocaleString("en-CA", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 
-// state of every node at t: { id: { s, step, note, since } }; since = when this state began
+// state of every node at t: { id: { s, step, note, since, stories } }; since = when this state began
 // (a frame's sixth field when the wait began before its frame, such as a question asked again)
 function stateAt(br, t) {
   const st = {};

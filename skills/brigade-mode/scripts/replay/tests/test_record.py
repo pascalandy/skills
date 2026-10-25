@@ -213,6 +213,7 @@ def test_recording_keeps_the_run_and_drops_free_text(tmp_path: Path) -> None:
     assert ["private-A", 4] in data["github"]["prs"]["example-owner/widget#20"][
         "refHistory"
     ][0][1]
+    assert "example-owner/widget#1" not in data["github"]["issues"]
     assert data["github"]["issues"]["example-owner/widget#9"]["epic"] == 3
 
 
