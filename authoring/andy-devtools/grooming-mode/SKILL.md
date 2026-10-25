@@ -7,7 +7,8 @@ kind: "dev"
 # Grooming mode
 
 Assemble and refine Story → Epic → Milestone with Rank and Blocked by.
-Own the refinement at every level in the same conversation.
+Grooming writes the plan only; Brigade executes a ready target when execution
+is requested.
 Write in the conversation's language; keep the glossary terms in English.
 
 ## Pick the starting point
@@ -17,8 +18,7 @@ voice-to-text spellings that sound like grooming-mode, including "grooming mode"
 Bare `grooming-mode` selects `epic`. An explicit name selects the starting point,
 with or without `;`, such as `grooming mode refine`.
 An unknown name, including `sprint`, shows this table and runs nothing.
-Every route uses the shared refinement loop and one final approval for the
-whole proposal. `epic` continues into `milestone` when its grouping condition holds.
+`epic` continues into `milestone` when its grouping condition holds.
 
 | Route | Use when |
 |---|---|
@@ -31,6 +31,19 @@ read the [Epic template](references/epic-template.md). Before drafting
 a Milestone description, read the
 [Milestone template](references/milestone-template.md).
 Use [routing cases](references/routing-cases.md) when changing routing.
+
+## Under a workflow
+
+This skill defines the WORK and its checks. The caller's workflow decides who
+scouts, drafts, asks and reviews, and when.
+
+- The WORK is the complete proposal; the plan is its candidate hierarchy
+- Every agent that drafts or reviews the WORK loads this skill
+- The WORK is done when each target meets the Definition of Ready or names its
+  missing input
+- Ask the route's scope questions with the goal, before reading the scope
+- Every run delivers its proposal instead of handing unfinished refinement to a
+  new session; GitHub writes wait for approval
 
 ## Glossary
 
@@ -54,8 +67,7 @@ Sprint means a fixed period; Wave duplicates Blocked by. Use neither as a level.
 ## Shared scope and evidence
 
 Requires `gh` ([install](https://cli.github.com/)); confirm `gh --version`
-and `gh auth status` before GitHub reads. Confirm delegation is available for
-the review checkpoints; report a missing capability before refining.
+and `gh auth status` before GitHub reads.
 Load `label-for-issues` and its
 GitHub CLI reference before scoping. It owns labels, Ready, native operations,
 filters and pagination. Run its Step 4 before scope filters. Its `4-epic`
@@ -110,7 +122,7 @@ The tier replaces established priority, including `p0`.
 Limit P1 to three Stories per proposal. Propose a Ready label only when this
 skill's Definition of Ready holds; use label-for-issues to select the state.
 Place issues with missing criteria provisionally when their sources establish
-outcome fit, then resolve their gaps through the shared loop.
+outcome fit, then resolve their gaps or name the missing input in the proposal.
 Left-out issues keep their labels. A `2-type:postmortem` Story takes bug for a
 `fix` title prefix, feature for `feat`, and task for every other prefix.
 
@@ -122,88 +134,34 @@ Number new Epics after the highest `Epic N` title, closed ones included.
 Order Epics by prerequisites, then highest Story priority, then lowest issue number.
 Use that order to direct file-conflict links; use `Epic N` for new Epics until creation.
 
-## Refine the hierarchy
+## Grouping checks
 
-Run this loop on the proposed hierarchy before seeking approval to write it.
+Test each parent with one question: if every child were completed, would its
+outcome hold? Then look for missing integration work, overlapping scope,
+contradictory criteria and dependencies across Epics, and check the full
+dependency graph for cycles and unjustified waits. Propose a missing Story
+explicitly instead of hiding its work in a container summary.
 
-```
-Refinement progress:
-- [ ] 1. Draft from evidence
-- [ ] 2. Challenge the grouping
-- [ ] 3. Resolve and propagate
-- [ ] 4. Delegate Epic reviews, then Milestone reviews
-- [ ] 5. Deliver the whole proposal
-```
-
-1. **Draft from evidence.** For each open Story, establish the goal, acceptance
-   rules and concrete examples that distinguish success from failure. Cite their
-   source or the Product Manager's decision. Refine each Epic's outcome, boundaries
-   and Done when. For a Milestone, define its shared outcome and its own Done when.
-   Name the command, observable behavior or artifact that will check each outcome.
-   Done when every level has a proposed check or a precise unresolved input
-2. **Challenge the grouping.** If every child were completed, would its parent's
-   outcome hold? Check missing integration work, overlapping scope, contradictory
-   criteria and dependencies across Epics. Propose missing Stories explicitly;
-   do not hide their work in a container summary. Check the full dependency graph
-   for cycles and unjustified waits.
-   Done when each finding has evidence and a disposition
-3. **Resolve and propagate.** Investigate facts, delegating bounded scouting when
-   useful. Ask the Product
-   Manager as soon as a missing decision could change scope, acceptance, grouping
-   or delivery order. Give the recommendation, alternatives and affected items.
-   Decide routine, reversible implementation details yourself. A missing answer
-   stays open; continue independent work without marking the affected hierarchy
-   ready. After an answer or correction, update affected Story bodies, membership,
-   parent outcomes, Rank, dependencies and priorities. Recheck only what changed.
-   Done when the content is reviewable or the required input is named
-4. **Delegate the reviews.** Delegate one review per refined Epic with all its
-   Stories once no pending decision can change its membership or criteria.
-   Review independent Epics meanwhile. Resolve findings before finalizing their
-   Milestone grouping. Then delegate a separate review of each refined Milestone's
-   joint outcome, coverage, boundaries, Rank and cross-Epic dependencies.
-   Give each reviewer the draft, original issue evidence, current code references,
-   relevant neighboring scope and the Definition of Ready. Request a verdict with
-   evidenced blockers, separating optional suggestions.
-
-   In T3 Code, load `t3-runtime`, discover available models and use `delegate_task`
-   for these child tasks. Prefer another model family when available.
-   Keep each task ID and read its completed result. In
-   another host, use its native delegation. If delegation is unavailable, report
-   that missing prerequisite and keep the affected target unready.
-
-   Check findings against sources; fix valid blockers and justify rejections.
-   Verify accepted corrections against their requested results; that review stays
-   current for the corrected scope. Other changes to membership, outcomes, criteria,
-   Rank or dependencies invalidate reviews covering those inputs. Re-review only
-   stale scopes, including affected parents, with prior findings and responses.
-   Keep product decisions with the Product Manager and GitHub writes with the owner.
-   Done when required reviews are current and supported blockers resolved, or
-   the missing capability or product input is reported with the target unready
-5. **Deliver.** Present the complete hierarchy and all proposed writes together.
-   Apply the shared approval and readback procedure once for that proposal.
-   Report readiness separately from application failures and missing inputs.
-   Hand a ready target and its evidence to Brigade only when execution is requested.
-   A refusal returns to this loop on the same target; resolve its supported gaps
-   without asking the Product Manager to launch another refinement session.
-   If the skill caused the gap, propose a retrospective issue with the failing
-   instruction and evidence; create it only when issue creation is authorized.
-   Done when the result is verified, delivered read-only, or blocked on named input
+After a product answer or correction, update the affected Story bodies,
+membership, parent outcomes, Rank, dependencies and priorities, then recheck
+only what changed.
 
 ## Definition of Ready
 
 Readiness means the work is specified and checked; completion requires the outcome
-evidence after delivery. A scheduled prerequisite can remain open if its effect
-on execution order is explicit. An Epic and its Stories need their current delegated
-review; a Milestone also needs its separate review.
+evidence after delivery. A check is a named command, observable behavior or
+artifact. A scheduled prerequisite can remain open if its effect on execution
+order is explicit.
 
-- **Story:** satisfies label-for-issues' Ready rule, with acceptance examples and
-  a named way to check them in its own body
+- **Story:** satisfies label-for-issues' Ready rule, with its goal, acceptance
+  rules, examples that distinguish success from failure and a check for them in
+  its own body; the proposal cites the source or Product Manager decision behind each
 - **Epic:** open Stories are ready; every closed Story has a documented disposition;
-  Story Rank and justified blockers agree with its body; its boundaries and
-  checkable Done when are covered by those Stories, with no unresolved decision
+  Story Rank and justified blockers agree with its body; its outcome, boundaries
+  and checkable Done when are covered by those Stories, with no unresolved decision
 - **Milestone:** each Epic is ready or proven complete; Epic Rank and justified
-  blockers agree with its description; its own checkable Done when and boundaries
-  are covered by those Epics, with no unresolved decision
+  blockers agree with its description; its shared outcome, own checkable Done when
+  and boundaries are covered by those Epics, with no unresolved decision
 
 ## Approval, apply and readback
 
@@ -232,8 +190,7 @@ Story draft names until creation. Approval includes substituting their issue num
 - **Comments:** exact text and target of every proposed comment
 - **Body edits and new Stories:** Story reference and exact before/after text per
   edit; title, body, labels and placement of each proposed new Story
-- **Readiness:** outcome checks; each review's task ID, model, date, scope, verdict
-  and findings' dispositions; unresolved input and affected items
+- **Readiness:** outcome checks; unresolved input and affected items
 
 After approval:
 
@@ -241,7 +198,7 @@ After approval:
    evidence and membership.
    Put an action whose scope, evidence or membership changed on the left-out list.
    Leave out dependent actions too, including parent Ready labels and outcomes
-   that rely on the changed item. Return that scope to refinement and review.
+   that rely on the changed item. Return that scope to refinement.
    Leave issues arriving after approval out for the next grooming, with the reason
    that they arrived after approval.
    Done when the unchanged approved actions and left-out actions are explicit
