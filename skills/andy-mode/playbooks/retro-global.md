@@ -85,7 +85,7 @@ Technical details, evidence, approaches considered, blast radius, non-functional
 
 Before publishing:
 
-1. For each finding, search the target repository's open issues. If one already reports the problem, draft a comment on it instead of a new issue.
+1. For each finding, search the target repository's open and closed issues (`gh issue list -R <owner/repo> --state all --limit 1000 --search "<topic> in:title"`). Narrow the search if it reaches the limit. If an open issue already reports the problem, draft a comment on it instead of a new issue. Read closed issues' closure reasons and decisions. Keep a finding already refused as not planned, nogo or wontfix in the report with a link to that issue, without republishing it. If a fix from an issue closed as completed regressed, publish a new issue that links the old one.
 2. Prove each command, flag or message the proposed fix names on the cases it will meet, not only the session's. Use the tool's source at a named revision or a throwaway run. Say in the details how you proved it and what stays unproven.
 3. If the repository is public, remove session IDs, absolute local paths, hostnames, private repo or project names, and any conversation content that isn't about the finding.
 4. Run the `2nd-pass` skill on the drafts.

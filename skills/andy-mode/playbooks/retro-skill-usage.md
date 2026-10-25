@@ -83,7 +83,7 @@ Technical details, evidence, approaches considered, blast radius, non-functional
 
 Before publishing:
 
-1. For each finding, search open issues (`gh issue list -R pascalandy/skills --search "<skill> in:title"`). If one already reports the problem, draft a comment on it instead of a new issue.
+1. For each finding, search open and closed issues (`gh issue list -R pascalandy/skills --state all --limit 1000 --search "<skill> in:title"`). Narrow the search if it reaches the limit. If an open issue already reports the problem, draft a comment on it instead of a new issue. Read closed issues' closure reasons and decisions. Keep a finding already refused as not planned, nogo or wontfix in the report with a link to that issue, without republishing it. If a fix from an issue closed as completed regressed, publish a new issue that links the old one.
 2. Prove each command, flag or message the proposed fix names on the cases it will meet, not only the session's. Use the tool's source at a named revision or a throwaway run. Say in the details how you proved it and what stays unproven.
 3. The repo is public: remove session IDs, local paths other than the skill's repository-relative authoring path, hostnames, private repo or project names, and any conversation content that isn't about the skill.
 4. Run the `2nd-pass` skill on the drafts. A draft passes when the end user can say what broke and what the fix changes without opening the details.
