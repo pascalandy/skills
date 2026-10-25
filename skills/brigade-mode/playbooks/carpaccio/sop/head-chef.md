@@ -4,8 +4,9 @@ Keep the batch registry in `watch.toml` in your work folder: batch number, name,
 
 ## Align
 
-1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md#arm) after pinning. Show `❓ align` while you wait for Pascal's answers. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
-2. Agree on requirements and split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../carpaccio.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan, and each card that can start only after other cards merge, as [After-merge slots](../carpaccio.md#after-merge-slots) says. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
+1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md#arm) after pinning. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
+2. Write the goal and the problem in Pascal's words and each card's acceptance criteria, then split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../carpaccio.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan, and each card that can start only after other cards merge, as [After-merge slots](../carpaccio.md#after-merge-slots) says. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
+3. Send the Align plan from [Report](../carpaccio.md#report), then go to Launch in the same turn. Show `❓ align` only for a question that the plan, the issues and the agreed requirements leave open, and meanwhile launch the batches that do not depend on its answer. Done when each batch that waits on no open question is launched or queued under Launch
 
 ## Launch
 
@@ -18,7 +19,7 @@ Run batches in parallel or in series, as [Decisions](../carpaccio.md#decisions) 
 $brigade-mode ; carpaccio ; chef-run
 Role: Chef <b> <id4>. Report only to Head Chef, threadId <full threadId>, with t3_thread_send.
 Batch: <b>, <name>, repository <absolute clone path>
-Plan: <cards, requirements, threat model and dependencies>
+Plan: <goal, cards with acceptance criteria, threat model and dependencies>
 Release: <yes/no, per Decisions>
 Fast track: <yes/no>
 Rules: <rules.md path, plus additions>

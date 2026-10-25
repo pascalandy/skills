@@ -21,13 +21,13 @@ sequenceDiagram
     participant C as Chef 1
     participant K as Cook 1.1
     Note over U,K: CU1. Batches under one Head Chef<br>Step 0: Align
-    rect rgba(140, 170, 238, 0.18)
-        loop Until agreement
-            U->>H: USER: Plan and requirements ->
-            H->>U: Agent: Batches, choices from Decisions <-
-        end
+    U->>H: USER: Plan and requirements ->
+    H->>U: Agent: Goal, batches with acceptance criteria,<br>choices from Decisions <-
+    opt A question the plan leaves open
+        H->>U: Agent: 🙋 align, batches that do not wait on it launch <-
+        U->>H: USER: Answer ->
     end
-    H->>H: Pin, register batches<br>❓ align → 🟢
+    H->>H: Pin, register batches<br>❓ align only for an open question
     H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
     C->>C: Arm Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
@@ -84,20 +84,20 @@ sequenceDiagram
     K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch wakes
     C->>C: Read rejections,<br>check cross-Cook conflicts
-    opt Reopened finding or frozen watch finding
+    opt Reopened finding, missing criterion evidence<br>or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
     rect rgba(239, 159, 118, 0.2)
-        alt Requirements and checks met#59; Chef confident after Pareto 90-10 review
+        alt Every merge gate holds#59; Pareto verdict challenged with sparring
             C-->>H: Agent: 🔀 Batch 1 merging <-
-        else Material uncertainty remains
+        else A gate fails
             C-->>H: Agent: 🍽️ Batch ready at x/x,<br>or below it only by queued_after_merge slots <-
             alt Requirements or specs settle a question
                 H->>C: Agent: Answers from requirements or specs ->
                 C-->>H: Agent: Merge rule again: 🔀 Batch 1 merging<br>or a new 🍽️ Batch ready <-
-            else Open uncertainty
-                H->>U: Agent: 🙋 merge PR 35–36 URL ? reason and recommendation <-
+            else Gate still open
+                H->>U: Agent: 🙋 merge PR 35–36 URL ? failed gate and recommendation <-
                 U->>H: USER: Merge ->
                 H->>C: Agent: 🔀 Merge ->
             end
