@@ -109,7 +109,7 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 | Choice | Rule | Decides |
 |---|---|---|
 | Parallel or serial | If the groups touch disjoint files and have no dependency, run them in parallel. If you have a doubt, run them in series. Stay within `max-parallel` and `max-cooks`. Never run two batches of one repository at the same time | Head Chef for batches, Chef for Cooks |
-| Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. If the requirements and required checks are met and you can explain why the remaining risk does not change the result, state your confidence, evidence and low-impact remainder in the Report, then merge with `🔀 Batch merging`. If a material uncertainty remains after you try to resolve it, send `🍽️ Batch ready` with your recommendation; the Head Chef answers what the agreed requirements or specs settle and asks Pascal one `🙋 merge` question only for the rest | Chef |
+| Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. Merge with `🔀 Batch merging` only when all of these gates hold: required checks pass on the frozen heads; every acceptance criterion of the cards it merges has its evidence; reverting the batch's PRs alone would undo the work, with no data migration, data deletion, or change to secrets, auth or billing; the merge deploys nothing that reaches the public, such as a site or a live service, while a deploy to Pascal's machines does not count and a required release follows the Release row; and your Pareto verdict, challenged with 🧰 andy-mode ; sparring, is that the remaining risk cannot change the result. State your confidence, evidence and low-impact remainder in the Report. If a gate still fails after you try to resolve it, send `🍽️ Batch ready` with that gate and your recommendation; the Head Chef answers what the agreed requirements or specs settle and asks Pascal one `🙋 merge` question only for the rest | Chef |
 | Release | If the `AGENTS.md` or release doc of the repository requires a release after a merge, release. Otherwise, do not release | Head Chef, at Align |
 | Docs | Put the doc change of a card in the layer of that card. Open a top docs PR only for docs that no card owns | Cook |
 | Another machine, such as macOS | Run the check with 🧰 fleet, from the machine of the run. For a macOS check, use the mini if fleet's `repos.toml` marks the repository `mini = true` and the mini has the tools. Otherwise, run the macOS check on the mbp. Name the machine in the report. Do not skip it because it is on another machine. Record in your Detail the host, the worktree and folder you create there, the tested head, and that checkout's `git worktree list --porcelain` before you add yours. Before your final report, remove that worktree with `git worktree remove` without `--force`, then the folder you created there as Work folders says, and check that neither path exists. If a step fails, stop, keep what remains, and report the remaining paths to the Chef with the reason. Leave any checkout you did not create. If a required check remains unconfirmed at Ready, name the check, its exact command and the blocker; the Chef asks Pascal before merging. For an optional check, the Chef explains why its absence cannot change the result | Cook; Chef reads the output |
@@ -121,8 +121,8 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 
 Only these items produce ❓. For one item, label the title `align`, `merge <b>`, `scope`, `reserved action`, `fact`, `fault <what>`, `held batch <b>` or `card <card>`. For two or more items, label it `<n> for you`.
 
-1. Align: requirements and batches, or work added during the run. Never ask Pascal a choice that a Decisions row covers
-2. Merge with a material uncertainty that the Chef cannot resolve under Decisions
+1. Align: a question that the plan, the issues and the agreed requirements leave open, at Align or for work added during the run. Never ask Pascal a choice that a Decisions row covers
+2. Merge when a gate of the merge rule in Decisions fails and the agreed requirements do not settle it
 3. Scope cut of a card, batch or required deliverable
 4. Reserved action: deleting data, leaving the agreed repositories or force-pushing a branch the run did not create
 5. Fact only Pascal knows, such as diagnose's one question when Align did not answer it
@@ -130,7 +130,7 @@ Only these items produce ❓. For one item, label the title `align`, `merge <b>`
 7. Held batch once nothing else in the run can progress
 8. Pascal-owned card ready, per Decisions
 
-Each item is one line in Canadian French, starting with `🙋` and carrying any link needed to answer it, such as `🙋 merge #122–#129 <URL> sans test macOS requis ? Confiance incertaine ; je recommande d'attendre` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the material uncertainty and the Chef's recommendation. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
+Each item is one line in Canadian French, starting with `🙋` and carrying any link needed to answer it, such as `🙋 merge #122–#129 <URL> sans test macOS requis ? Confiance incertaine ; je recommande d'attendre` or `🙋 choisir les looks M07-T1 : <URL>`. A merge line names the failed gate in one line and the Chef's recommendation. Use no option menu, long status block, protocol name or cache path. Put the open items as the last lines of each ❓ turn. Post them again when they change. Pascal's reply decides the item it names. If exactly one merge item is open, `oui` or `merge` approves it. If several items are open and the reply names none, ask which item in one line. Keep an unanswered merge batch at 🍽️.
 
 Approval binds to the frozen heads and the stack's own diff. A restack that changes only its base keeps approval and the Cook 🍽️ when checks pass on the new heads. A change to its own diff needs a new merge decision. Stop voids an unused approval. Before you retry a launch, merge, deploy or release, look in T3, GitHub or the deploy output to see if that action already occurred.
 
@@ -182,7 +182,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 - A comment posted through Pascal's account does not wake the Cook's watch; the Chef also sends it to the Cook with `t3_thread_send`
 - A question climbs the chain with the sender's default. Each level answers from its context or escalates. A Chef unable to resolve a batch problem asks the Head Chef to decide, split the work again or relaunch the Chef
 - When Pascal writes to a Chef or Cook directly, that thread acts on the message and tells its parent so the status tree stays current
-- Keep going without Pascal within the agreed repositories and their PRs and issues. The run may push and open or update PRs and issues, and force-push its own branches with `--force-with-lease`. Merge deploys and retro issues in Pascal's repositories are allowed
+- Keep going without Pascal within the agreed repositories and their PRs and issues. The run may push and open or update PRs and issues, and force-push its own branches with `--force-with-lease`. Merge deploys under the merge rule in Decisions and retro issues in Pascal's repositories are allowed
 - Escalate before deleting data, changing anything outside that scope or force-pushing a branch the run did not create. Deleting a merged branch whose tip matches its recorded PR head preserves the merged work
 - If a skill is missing, find it in https://raw.githubusercontent.com/pascalandy/skills/refs/heads/main/docs/references/remote-skills.md
 
@@ -204,7 +204,7 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 ## Report
 
-Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a message in its own thread that starts with `Detail · <role and id>`, such as `Detail · Cook 1.2 7f3a`. Name the frozen heads it covers. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
+Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a message in its own thread that starts with `Detail · <role and id>`, such as `Detail · Cook 1.2 7f3a`. Name the frozen heads it covers. A Cook gives each acceptance criterion of its cards with its evidence. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
 
 A Report message uses only its field set below. It has a maximum of 8 lines and 1200 characters, plus its `🙋` lines.
 
@@ -227,7 +227,17 @@ Detail: <Cook threadId>
 
 `🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
 
-Head Chef → Pascal, in Canadian French. At Align, show the batch plan and end with the open `🙋` lines. For a later ask, send only those lines. Any other unrequested message to Pascal before the final report is a notice. A notice has at most 3 lines: the outcome, the PR range and the next step. It has no table or `<details>`. For the final report, use this template:
+Head Chef → Pascal, in Canadian French. At Align, send the Align plan below, then any open `🙋` lines. Repeat the `Lot` block for each batch in launch order, with one line per acceptance criterion, and omit an empty line. The Align plan has no line limit. For a later ask, send only the `🙋` lines.
+
+```text
+Je veux <goal>, pour régler <problem>
+Lot <b> · <repository> · après <batches, or aucun> · release <oui/non>
+- <card> : <acceptance criterion> → <evidence that will prove it>
+Après fusion : <cards>, après <cards>
+Pour toi : <Pascal-owned cards>
+```
+
+Any other unrequested message to Pascal before the final report is a notice. A notice has at most 3 lines: the outcome, the PR range and the next step. It has no table or `<details>`. For the final report, use this template:
 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>

@@ -14,7 +14,7 @@ Report to the Head Chef with `t3_thread_send`. Keep each Cook's threadId, worktr
 $brigade-mode ; carpaccio ; cook-implement
 Role: Cook <b>.<c> <id4>. Report only to Chef <b>, threadId <full threadId>, with t3_thread_send.
 Worktree: <absolute path>, branch <branch>, base <trunk>
-Plan: <assigned cards, requirements and batch threat model>
+Plan: <goal, assigned cards with acceptance criteria, and batch threat model>
 Ownership: <your files; other Cooks' groups requiring Chef approval>
 Release: <yes/no; required release content and which Cook owns it>
 Fast track: <yes/no>
