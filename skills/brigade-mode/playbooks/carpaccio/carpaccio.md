@@ -225,7 +225,7 @@ Confidence: <level, evidence and remaining risk>
 Detail: <Cook threadId>
 ```
 
-`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result and Detail threadId. Give the PR range only for a partial outcome.
+`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give the PR range only for a partial outcome.
 
 Head Chef → Pascal, in Canadian French. At Align, send the Align plan below, then any open `🙋` lines. Repeat the `Lot` block for each batch in launch order, with one line per acceptance criterion, and omit an empty line. The Align plan has no line limit. For a later ask, send only the `🙋` lines.
 
@@ -242,7 +242,7 @@ Any other unrequested message to Pascal before the final report is a notice. A n
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
 PR fusionnées : <#<n>–#<n>, or aucune>
-Reste pour toi : <🙋 lines, then each external_gap machine with its cause and fix command, or rien>
+Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 
 `📍` progress, Cook → Chef, at the end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`.
