@@ -137,7 +137,7 @@ sequenceDiagram
     opt Chef Watchdog exists
         C->>C: Delete Watchdog schedule<br>cancel task if recorded<br>remove its work folder if present
     end
-    C->>C: Settle
+    C->>C: Remove own work folder<br>settle
     H->>H: Count only delivered batches<br>Next batches, retros, settle Chefs
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
     H->>U: Agent: ⛳ x/y batches done, report <-
