@@ -27,7 +27,7 @@ the check. Success answers {"ok":true}; a failure names each agent that missed
 a skill or could not list them.
 
 examples:
-  just skills-discover --profile mac
+  just skills-discover
   just skills-discover --profile om1 --agent codex --timeout 2m"""
 
 EXIT_CODES = exit_codes(
@@ -313,6 +313,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 # Native discovery is a separate post-install proof. File hashes alone cannot
 # establish that an agent actually loaded a skill.
 def main(argv: list[str] | None = None) -> int:
+    from install_skills import HOST_PROFILE
+
     parser = Parser(
         prog="just skills-discover",
         description=__doc__,
@@ -321,9 +323,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--profile",
-        required=True,
+        default=HOST_PROFILE,
         choices=("mac", "om1"),
-        help="the install profile whose targets to check",
+        help=f"the install profile whose targets to check (default: {HOST_PROFILE}, from the OS)",
     )
     parser.add_argument(
         "--agent",
