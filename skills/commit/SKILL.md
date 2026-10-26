@@ -65,6 +65,8 @@ Examples:
 
 Write the body for non-trivial commits. Optional fields, when useful: `File(s) changed:` for multi-file or non-obvious commits, and `Nature of changes:` when the type needs clarification.
 
+When the repository's `AGENTS.md` or its recent `git log` uses another format, such as Conventional Commits, follow that format instead.
+
 ## Style
 
 - Subject in the imperative mood, under 72 characters, naming what changed
