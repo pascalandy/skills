@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from _cli import Parser, ScriptError, exit_codes, run_script
-from _common import run, run_git
+from _common import replay, run, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -509,7 +509,7 @@ def failure(check: Check, verbose: bool) -> Failure | None:
             if verbose:
                 return Failure("")
             print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
-            sys.stderr.write(result.stdout)
+            replay(result.stdout)
             return Failure(result.stdout)
     return None
 
@@ -633,6 +633,9 @@ def verdict(args: argparse.Namespace) -> dict[str, Any]:
                 f"{check.name} failed{result.cause}; rerun: just check --only {check.name}"
             )
 
+    if args.verbose:
+        # A later passing child can also leave its streamed output unterminated.
+        print(file=sys.stderr)
     if failed:
         raise ScriptError(*failed)
     return {}
