@@ -6,7 +6,11 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
+from conftest import skill
 
 GIT = Path(shutil.which("git") or "/usr/bin/git").parent
 
@@ -54,6 +58,29 @@ def fake_opencode(binary: Path, location: Path) -> None:
         encoding="utf-8",
     )
     binary.chmod(0o755)
+
+
+@pytest.mark.parametrize("profile", [None, "om1", "mac"])
+def test_profile_defaults_to_the_os_and_an_explicit_profile_wins(
+    sandbox: tuple[Path, Path], tmp_path: Path, profile: str | None
+) -> None:
+    repo, home = sandbox
+    skill(repo / "authoring/content", "apple-mail")
+    installed = skill(home / ".config/opencode/skills", "alpha")
+    binary = tmp_path / "bin/opencode"
+    binary.parent.mkdir()
+    fake_opencode(binary, installed / "SKILL.md")
+
+    args = ("--profile", profile) if profile else ()
+    result = run(home, binary, *args, "--agent", "opencode")
+
+    selected = profile or ("mac" if sys.platform == "darwin" else "om1")
+    if selected == "mac":
+        assert errors(result) == [
+            "opencode did not load apple-mail; run just install-skills --profile mac, then rerun"
+        ]
+    else:
+        assert (result.returncode, result.stdout, result.stderr) == (0, OK, "")
 
 
 def test_native_opencode_discovery_matches_the_installed_copy(
