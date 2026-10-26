@@ -111,7 +111,7 @@ fct_trello_actions() {
       --data-urlencode "since=$since" \
       --data-urlencode "before=$before" \
       --data-urlencode "limit=1000")" || return 1
-    count="$(printf '%s\n' "$page" | jq 'length')" || return 1
+    count="$(printf '%s\n' "$page" | jq -e 'length')" || return 1
     [ "$count" -gt 0 ] || break
     printf '%s\n' "$page" | jq -c '.[]' || return 1
     before="$(printf '%s\n' "$page" | jq -r 'last.id')" || return 1
