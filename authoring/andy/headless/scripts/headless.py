@@ -624,7 +624,7 @@ def claude_command(request: Request, run: Path) -> list[str]:
     # the system prompt so the slash command stays at the start, where it expands
     review = (
         [
-            f"/review {request.effort} {' '.join(request.review)}",
+            f"/review {request.effort} --max-findings default {' '.join(request.review)}",
             "--append-system-prompt",
             RULES["review-only"].format(cwd=request.cwd),
         ]

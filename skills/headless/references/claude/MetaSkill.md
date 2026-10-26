@@ -16,15 +16,15 @@ Each mode passes `--model` and `--effort` from the `[claude]` table of [config.t
 | --- | --- | --- |
 | `--review-only` | `claude -p` reads the prompt on stdin. The prompt starts with a review-only rule | `--disallowedTools Edit,Write,NotebookEdit` removes file-editing tools. The later change check catches an edit through Bash |
 | `--review-fix` | The same command. The rule allows edits in `--cwd` | Nothing. Read `git diff` yourself |
-| `--code-review` | `claude -p "/review <effort> <range>"` with empty stdin. The review-only rule arrives through `--append-system-prompt`, so `/review` starts the prompt | The same tool removal and change check as `--review-only` |
+| `--code-review` | `claude -p "/review <effort> --max-findings default <range>"` with empty stdin. The review-only rule arrives through `--append-system-prompt`, so `/review` starts the prompt | The same tool removal and change check as `--review-only` |
 
-`--base BRANCH` becomes `BRANCH...HEAD`. It requires shared history with `HEAD` and no staged or unstaged tracked changes. `--commit SHA` becomes `SHA^..SHA` and requires a parent, which a root commit or shallow boundary may lack. These ranges follow the [code review documentation](https://code.claude.com/docs/en/code-review#review-a-diff-locally). Claude Code documents no target for uncommitted changes alone, so `--uncommitted` stays with Codex.
+`--base BRANCH` becomes `BRANCH...HEAD`. It requires shared history with `HEAD` and no staged or unstaged tracked changes. `--commit SHA` becomes `SHA^..SHA` and requires a parent, which a root commit or shallow boundary may lack. These ranges follow the [code review documentation](https://code.claude.com/docs/en/code-review-local#choose-what-to-review). Claude Code documents no target for uncommitted changes alone, so `--uncommitted` stays with Codex.
 
-The launcher types the effort because `/review` otherwise reuses the last level typed in any session. Custom skills can replace `/code-review` but leave `/review` intact. The alias needs Claude Code 2.1.223 or later. Older versions use `/review` for GitHub pull requests.
+The launcher types the effort because `/review` otherwise reuses the last level typed in any session. It passes [`--max-findings default`](https://code.claude.com/docs/en/code-review-local#tune-effort-and-arguments) to use the review's usual finding limit instead of a remembered override. This flag needs Claude Code 2.1.288 or later. Custom skills can replace `/code-review` but leave `/review` intact.
 
 The `disableBundledSkills` setting turns off the bundled review. If the answer contains no findings, check that setting and any `skillOverrides` entry for `code-review`. To ask about a finding, run the launcher with `claude --review-only --resume SESSION --prompt-file FILE`, using the printed session.
 
-A local review counts toward subscription usage or bills tokens with an API key. `/code-review ultra` starts a cloud review billed as usage credits. `--comment` posts findings to the pull request. The launcher generates only the local `/review <effort> <range>` form.
+A local review counts toward subscription usage or bills tokens with an API key. `/code-review ultra` starts a cloud review billed as usage credits. `--comment` posts findings to the pull request. The launcher generates only the local `/review <effort> --max-findings default <range>` form.
 
 ## Models
 
