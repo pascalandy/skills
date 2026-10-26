@@ -10,7 +10,7 @@ Manage Trello boards, lists, and cards.
 
 ## Usage
 
-All commands use curl to hit Trello REST API. Run **Setup**, the resolver and the requested recipe in one shell invocation so their variables remain available. In an interactive terminal, wrap that whole sequence in one subshell `( ... )` so an error exits only the sequence.
+All commands use curl to hit Trello REST API. Run **Setup**, the resolver and the requested recipe in one shell invocation so their variables remain available. In an interactive terminal, run that whole sequence in a child Bash shell: start with `/bin/bash <<'SH'`, paste the blocks, then close with `SH` on its own line. An error exits only that child shell.
 
 Use the read recipes by default. This board is shared: obtain the user's approval for the specific change before running any write recipe below. Keep board data and credentials out of public issues, PRs and logs; publish only aggregate verification counts.
 
@@ -100,7 +100,7 @@ Run **Setup** and the resolver first. Set `since` to the requested ISO 8601 date
 
 ```bash
 set -o pipefail
-since='2026-10-01T00:00:00Z' # Replace with the requested start date
+since='2026-10-01T00:00:00Z'
 fct_trello_actions() {
   local action_filter="$1" before='' page
   while :; do
@@ -129,9 +129,7 @@ fct_trello_actions 'updateCard:idList,updateCard:closed,createCard' | jq -r '
 
 ### Find decisions waiting for an answer
 
-In one shell invocation, run **Setup** and the resolver. From the read recipes above, prepare `lists_json` and `open_cards`, set `since`, define `fct_trello_actions`, and assign `comments_json`. Skip the TSV print commands and the separate activity query when only decisions are requested.
-
-`Besoin de décision` is the decision label; `décision requise` is the text convention in a card's name, description or comments. The query finds open cards with either marker and prints their name, last activity and clickable `https://trello.com/c/<shortLink>` link. Inspect those cards' comments before stating which decisions remain unanswered: a marker alone does not prove that a decision is still pending, and `comments_json` covers only the chosen date window. Widen `since` when necessary.
+Run both read recipes above. `Besoin de décision` is the decision label; `décision requise` is the text convention in a card's name, description or comments. The query finds open cards with either marker and prints their name, last activity and clickable `https://trello.com/c/<shortLink>` link. Inspect those cards' comments before stating which decisions remain unanswered: a marker alone does not prove that a decision is still pending, and `comments_json` covers only the chosen date window. Widen `since` when necessary.
 
 ```bash
 [ -n "${open_cards:-}" ] && [ -n "${comments_json:-}" ] || { printf '%s\n' 'Run the open-card and comment recipes in this same shell first' >&2; exit 1; }
@@ -236,7 +234,7 @@ Here's instructions if it's not already done.
 
 1. Get your API key: https://trello.com/app-key
 2. Generate token (click "Token" link on that page)
-3. With `chezmoi` installed and the keyring entries configured, export and validate the environment variables before running any recipe:
+3. With `chezmoi` installed and the keyring entries configured, export and validate the environment variables before running any recipe. For interactive use, follow the child-shell rule in **Usage**:
 
 ```bash
 TRELLO_API_KEY="$(chezmoi secret keyring get --service=TRELLO_API_KEY --user=api_key)" || exit 1
