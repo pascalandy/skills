@@ -365,13 +365,13 @@ def owned_skills() -> set[str]:
 
 
 def owned_private(root: Path | None) -> set[str]:
-    """Package names the private clone's history ever added under authoring/, so
+    """Package names the private repository's history ever added under authoring/, so
     deleting one there, or moving it to skill_archived/, removes its installed
     copies. A name only ever added elsewhere, such as a skill_archived/ package
-    another tool installs, stays untouched. A private tree that is not a clone
-    owns nothing."""
+    another tool installs, stays untouched. A private tree without its own .git
+    entry, even one inside another repository, owns nothing."""
     root = root or PRIVATE
-    if root.is_symlink() or not (root / ".git").is_dir():
+    if root.is_symlink() or not (root / ".git").exists():
         return set()
 
     def git(*args: str) -> bytes:

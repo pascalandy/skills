@@ -304,32 +304,66 @@ def test_private_skill_promotes_to_public_without_flags(
     assert run(repo, home, "--check").returncode == 0
 
 
-def test_private_skill_deleted_in_its_clone_leaves_every_target(
-    sandbox: tuple[Path, Path],
+@pytest.mark.parametrize("worktree", [False, True], ids=["clone", "worktree"])
+def test_private_skill_deleted_in_its_repository_leaves_every_target(
+    sandbox: tuple[Path, Path], worktree: bool
 ) -> None:
     repo, home = sandbox
     private = repo.parent / "skills-private"
     subprocess.run(["git", "init", "-q", str(private)], check=True)
-    retired = skill(private / "authoring/content", "retired")
+    skill(private / "authoring/content", "retired")
     outer = skill(private / "authoring/content", "outer")
     # A nested reference with its own SKILL.md is part of outer, not a skill.
     skill(outer / "references", "nested")
     commit(private)
-    assert run(repo, home).returncode == 0
+    if worktree:
+        checkout = repo.parent / "private-worktree"
+        subprocess.run(
+            ["git", "worktree", "add", "-q", "--detach", str(checkout)],
+            cwd=private,
+            check=True,
+        )
+        private = checkout
+    private_args = ("--private-root", str(private))
+    assert run(repo, home, *private_args).returncode == 0
     nested = skill(home / ".claude/skills", "nested")
     subprocess.run(
         ["git", "rm", "-qr", "authoring/content/retired"], cwd=private, check=True
     )
     commit(private)
 
-    result = run(repo, home)
+    preview = run(repo, home, *private_args, "--dry-run")
+    result = run(repo, home, *private_args)
 
     assert result.returncode == 0, result.stderr
-    assert not retired.exists()
+    assert result.stdout == preview.stdout
+    assert [(a["kind"], a["target"], a["name"]) for a in report(result)] == [
+        ("remove", target, "retired") for target in MAC
+    ]
+    assert not (private / "authoring/content/retired").exists()
     assert not any((home / target / "retired").exists() for target in MAC)
     assert all((home / target / "outer/SKILL.md").is_file() for target in MAC)
     assert (nested / "SKILL.md").is_file()
-    assert run(repo, home, "--check").returncode == 0
+    assert run(repo, home, *private_args, "--check").returncode == 0
+
+
+def test_a_private_tree_inside_a_repository_does_not_inherit_its_history(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    private = repo / "unversioned-private"
+    historical = skill(private / "authoring/content", "foreign")
+    commit(repo)
+    shutil.rmtree(historical)
+    commit(repo)
+    skill(private / "authoring/content", "secret")
+    foreign = skill(home / ".claude/skills", "foreign")
+
+    result = run(repo, home, "--private-root", str(private))
+
+    assert result.returncode == 0, result.stderr
+    assert {a["name"] for a in report(result)} == {"alpha", "secret"}
+    assert (foreign / "SKILL.md").read_text(encoding="utf-8") == "# foreign\n\nold\n"
 
 
 def test_archived_private_packages_never_install_and_archiving_one_retires_it(
