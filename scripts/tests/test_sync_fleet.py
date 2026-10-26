@@ -735,26 +735,46 @@ exit "$code"
     ]
 
 
+@pytest.mark.parametrize("hook", [False, True])
 def test_a_broken_registry_keeps_the_private_pull_in_the_report(
-    fleet: tuple[Path, Path, Path],
+    fleet: tuple[Path, Path, Path], hook: bool
 ) -> None:
     """The old code failed here: the error dropped the pull it had made."""
     hub, homes, bin_dir = fleet
     host = socket.gethostname().split(".")[0]
+    before = git(private(hub), "rev-parse", "HEAD")
     work = hub.parent / "private-pr"
     git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(work))
     (work / REGISTRY).parent.mkdir(parents=True)
     (work / REGISTRY).write_text("[machines.broken\n")
     git(work, "add", "-f", REGISTRY)
+    if hook:
+        duplicate = "authoring/duplicate/fleet.toml"
+        (work / duplicate).parent.mkdir(parents=True)
+        (work / duplicate).write_text(entries("remote"))
+        git(work, "add", "-f", duplicate)
     commit(work)
     git(work, "push", "-q", "origin", "main")
 
-    result = run(hub, homes, bin_dir, "--others")
+    result = run(
+        hub, homes, bin_dir, *(("--hook", "post-merge") if hook else ("--others",))
+    )
 
     assert (result.returncode, result.stdout) == (1, "")
     answer = json.loads(result.stderr.splitlines()[-1])
-    assert "fleet.toml is not valid TOML" in answer["errors"][0]
-    assert answer["changes"] == [["sync", host, git(hub, "rev-parse", "HEAD")[:7]]]
+    assert ("2 fleet registries" if hook else "fleet.toml is not valid TOML") in answer[
+        "errors"
+    ][0]
+    expected = (
+        [
+            "pull",
+            "skills-private",
+            f"{before[:7]}..{git(work, 'rev-parse', 'HEAD')[:7]}",
+        ]
+        if hook
+        else ["sync", host, git(hub, "rev-parse", "HEAD")[:7]]
+    )
+    assert answer["changes"] == [expected]
     assert git(private(hub), "rev-parse", "HEAD") == git(work, "rev-parse", "HEAD")
 
 
@@ -937,6 +957,95 @@ def test_a_hook_fails_in_a_main_checkout_without_the_registry(
     assert (elsewhere.returncode, elsewhere.stdout, elsewhere.stderr) == (0, OK, "")
 
 
+@pytest.mark.parametrize("event", [("post-merge",), ("post-rewrite", "rebase")])
+@pytest.mark.parametrize("advance", [False, True])
+def test_a_pull_hook_installs_the_updated_private_clone_without_waiting_for_peers(
+    fleet: tuple[Path, Path, Path], event: tuple[str, ...], advance: bool
+) -> None:
+    hub, homes, bin_dir = fleet
+    peer = machine(homes, "remote", hub.parent / "skills.git")
+    before = git(peer, "rev-parse", "HEAD")
+    register(hub, "remote")
+    target = change(hub)
+    work = hub.parent / "private-pr"
+    git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(work))
+    (work / "authoring/content/secret/SKILL.md").write_text("updated private skill\n")
+    commit(work)
+    git(work, "push", "-q", "origin", "main")
+    private_target = git(work, "rev-parse", "HEAD")
+    peer_private_target = private_target
+    if advance:
+        (work / "authoring/content/secret/SKILL.md").write_text("newer private skill\n")
+        commit(work)
+        peer_private_target = git(work, "rev-parse", "HEAD")
+        real_git = shutil.which("git")
+        assert real_git is not None
+        executable = shlex.quote(real_git)
+        seen = shlex.quote(str(hub.parent / "seen-fetch"))
+        wrapper = bin_dir / "git"
+        wrapper.write_text(f"""#!/bin/sh
+if [ "$PWD" = {shlex.quote(str(private(hub)))} ] && [ "$1" = fetch ] && [ ! -e {seen} ]; then
+    {executable} "$@" || exit
+    touch {seen}
+    {executable} -C {shlex.quote(str(work))} push -q origin main || exit
+    exit 0
+fi
+exec {executable} "$@"
+""")
+        wrapper.chmod(0o755)
+    home = hub.parent / "hub-home"
+    fleet_log = home / ".local/state/skills-sync/fleet.log"
+    # A peer stays blocked until after git's hook returns. Bound its lifetime
+    # even if the hook regresses into waiting for that peer.
+    gate = """if [ "$host" = remote ]; then
+    attempts=0
+    while [ ! -e "$FLEET_HOMES/release" ] && [ "$attempts" -lt 100 ]; do
+        sleep 0.1
+        attempts=$((attempts + 1))
+    done
+    if [ ! -e "$FLEET_HOMES/release" ]; then
+        touch "$FLEET_HOMES/timed-out"
+    fi
+fi
+"""
+    ssh = bin_dir / "ssh"
+    ssh.write_text(
+        ssh.read_text().replace(
+            'cd "$FLEET_HOMES/$host"', gate + 'cd "$FLEET_HOMES/$host"'
+        )
+    )
+    try:
+        result = run(hub, homes, bin_dir, "--hook", *event)
+        assert (result.returncode, result.stderr) == (0, "")
+        assert (
+            home / ".claude/skills/secret/SKILL.md"
+        ).read_text() == "updated private skill\n"
+        assert (home / ".claude/skills/alpha/SKILL.md").read_text() == (
+            hub / "skills/alpha/SKILL.md"
+        ).read_text()
+        assert git(private(hub), "rev-parse", "HEAD") == private_target
+        assert git(peer, "rev-parse", "HEAD") == before
+        assert not (homes / "timed-out").exists()
+    finally:
+        (homes / "release").touch()
+        deadline = time.monotonic() + 60
+        while "remote: synced" not in (
+            fleet_log.read_text() if fleet_log.exists() else ""
+        ):
+            assert time.monotonic() < deadline, "background sync did not finish"
+            time.sleep(0.2)
+    assert git(peer, "rev-parse", "HEAD") == target
+    assert (
+        git(hub.parent / "skills-private.git", "rev-parse", "main")
+        == peer_private_target
+    )
+    assert git(private(peer), "rev-parse", "HEAD") == peer_private_target
+    assert git(private(hub), "rev-parse", "HEAD") == private_target
+    assert (
+        home / ".claude/skills/secret/SKILL.md"
+    ).read_text() == "updated private skill\n"
+
+
 def test_a_worktree_syncs_with_the_main_checkouts_registry_and_skips_hooks(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -955,6 +1064,26 @@ def test_a_worktree_syncs_with_the_main_checkouts_registry_and_skips_hooks(
     assert json.loads(result.stderr)["errors"][0].startswith("down offline: ")
     assert (pushing.returncode, pushing.stdout, pushing.stderr) == (0, OK, "")
     assert not fleet_log.exists()
+
+
+def test_a_pull_hook_keeps_installed_skills_when_the_private_pull_is_refused(
+    fleet: tuple[Path, Path, Path],
+) -> None:
+    hub, homes, bin_dir = fleet
+    register(hub, "down")
+    home = hub.parent / "hub-home"
+    kept = home / ".claude/skills/secret/SKILL.md"
+    kept.parent.mkdir(parents=True)
+    kept.write_text("installed revision\n")
+    (private(hub) / "authoring/content/secret/SKILL.md").write_text("local edit\n")
+
+    result = run(hub, homes, bin_dir, "--hook", "post-merge")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    assert "has uncommitted edits" in json.loads(result.stderr)["errors"][0]
+    assert kept.read_text() == "installed revision\n"
+    assert not (home / "just.log").exists()
+    assert not (home / ".local/state/skills-sync/fleet.log").exists()
 
 
 def test_brings_the_machine_it_runs_on_to_github_main(

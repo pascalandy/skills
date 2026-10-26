@@ -67,7 +67,8 @@ path = "projects/skills"
 Run `lefthook install` once in each machine's main checkout. On `main` in a checkout that has the private clone:
 
 - A commit installs this machine at once. The other machines wait for GitHub: pushing `main` starts a background job that waits for the push to land, then syncs them
-- A pull that brings commits installs this machine, then syncs the other machines in the background. A pull with nothing new fires no hook
+- A pull that brings commits pulls this machine's private clone before installing, then syncs the other machines in the background. If the private pull fails, the hook reports its cause and skips the install and the other machines' sync. A pull with nothing new fires no hook
+- The pull hook owns this machine's private pull and install together. Its background peer sync leaves that clone at the installed revision, even if another private commit reaches GitHub meanwhile
 - Worktrees, other branches, and checkouts without the private clone skip all of it. A main checkout whose private clone lacks the registry fails the hook instead, so a pre-push stops the push until the registry is back. A machine a sync reaches runs its merge with hooks off, so it never starts another sync
 
 Background runs never make git wait on a sleeping laptop. They log to `~/.local/state/skills-sync/fleet.log` and send a desktop notification, `notify-send` on Linux or Notification Center on macOS, only when a machine needs you or fails; an offline machine waits for the next sync

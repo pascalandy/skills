@@ -726,8 +726,8 @@ def hook(event: list[str]) -> dict[str, Any]:
 
     Lefthook runs this in every checkout; it acts only in a main checkout that
     has the private clone, never in a worktree. A pull that brings commits
-    installs here and syncs the other machines. A commit installs here; the
-    other machines sync once a push lands it on GitHub. Without the registry,
+    pulls the private clone, installs here, and syncs the other machines. A
+    commit installs here; peers sync once a push lands it on GitHub. Without the registry,
     an event that would act fails, since the fleet would stop syncing unseen;
     a pre-push then stops the push.
     """
@@ -752,12 +752,18 @@ def hook(event: list[str]) -> dict[str, Any]:
         name == "post-rewrite" and rest[:1] != ["rebase"]
     ):
         return {}
-    registry()
+    pulled = sync_private.sync(timeout=TIMEOUT) if name != "post-commit" else []
+    try:
+        registry()
+    except ScriptError as error:
+        if pulled:
+            error.report["changes"] = pulled
+        raise
     installed = call([sys.executable, str(INSTALLER)])
     if name != "post-commit":
-        background()
+        background("--from-pull-hook")
     lines = (installed.stderr + installed.stdout).splitlines()
-    changes = changes_in(lines)
+    changes = pulled + changes_in(lines)
     report = {"changes": changes} if changes else {}
     if installed.returncode:
         raise ScriptError(
@@ -788,7 +794,13 @@ def sync(args: argparse.Namespace) -> dict[str, Any]:
         source = github_main()
         # This machine pulls its private clone first, even when it is not
         # selected, so a registry change merged on GitHub applies to this run.
-        pulled = sync_private.sync(timeout=args.timeout) if mode == "apply" else []
+        # A pull hook owns its coordinator's pull/install pair. Its peer job
+        # must not pull a later private revision without installing it here.
+        pulled = (
+            sync_private.sync(timeout=args.timeout)
+            if mode == "apply" and not args.from_pull_hook
+            else []
+        )
         # A preview stops, without the network, where a sync would on this
         # machine's private clone: off main, with edits, or with commits its
         # origin/main lacks
@@ -885,6 +897,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--others", action="store_true", help="skip the machine this runs on"
     )
+    parser.add_argument("--from-pull-hook", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--notify",
         action="store_true",
