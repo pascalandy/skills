@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import shlex
+import shutil
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,14 +22,95 @@ def github(tmp_path: Path) -> Sandbox:
     return Sandbox(tmp_path, "signoff.py")
 
 
-def test_signs_off_the_pushed_head_after_the_checks(github: Sandbox) -> None:
+@pytest.mark.parametrize("quota", [False, True], ids=["normal", "temp-quota"])
+def test_signs_off_the_pushed_head_after_the_checks(
+    github: Sandbox, tmp_path: Path, quota: bool
+) -> None:
+    check = github.work / "scripts/check.py"
+    # Exercise real pytest capture and tmp_path, which the normal fake check
+    # does not need. Temporary test repositories must not inherit a parent.
+    check.write_text(
+        "import pathlib, subprocess, sys, tempfile\n"
+        "with tempfile.TemporaryDirectory() as folder:\n"
+        "    probe = pathlib.Path(folder) / 'test_scratch.py'\n"
+        "    probe.write_text('''import socket, subprocess\n"
+        "def test_check_scratch_is_outside_git_and_supports_sockets(tmp_path):\n"
+        "    assert subprocess.run(['git', 'rev-parse', '--git-dir'], cwd=tmp_path, capture_output=True).returncode != 0\n"
+        "    with socket.socket(socket.AF_UNIX) as sock:\n"
+        "        sock.bind(str(tmp_path / 'socket'))\n"
+        "''')\n"
+        "    result = subprocess.run([sys.executable, '-m', 'pytest', '-q', str(probe)], cwd=folder, timeout=30, capture_output=True, text=True)\n"
+        "    if result.returncode:\n"
+        "        sys.stderr.write(result.stdout + result.stderr)\n"
+        "        sys.exit(result.returncode)\n" + check.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    github.git("add", "scripts/check.py")
+    github.git("commit", "-qm", "exercise check scratch space")
+    github.git("push", "-q", "origin", "feature")
     head = github.git("rev-parse", "HEAD")
+    if quota:
+        startup = tmp_path / "startup"
+        startup.mkdir()
+        blocked = tmp_path / "full-temp"
+        (startup / "sitecustomize.py").write_text(
+            "import errno, os, sys, tempfile\n"
+            "from pathlib import Path\n"
+            "tempfile.tempdir = os.environ['TMPDIR']\n"
+            "def reject(event, args):\n"
+            "    if event in ('tempfile.mkdtemp', 'tempfile.mkstemp') "
+            f"and Path(args[0]).is_relative_to({str(blocked)!r}):\n"
+            "        raise OSError(errno.EDQUOT, 'Disk quota exceeded', args[0])\n"
+            "sys.addaudithook(reject)\n",
+            encoding="utf-8",
+        )
+        github.env["PYTHONPATH"] = str(startup)
+        github.env.update(TMPDIR=str(blocked), TMP=str(blocked), TEMP=str(blocked))
+
+    with tempfile.TemporaryDirectory(prefix="t-", dir="/var/tmp") as normal:
+        if not quota:
+            github.env.update(TMPDIR=normal, TMP=normal, TEMP=normal)
+        result = github.run("signoff.py")
+
+    assert (result.returncode, result.stdout) == (0, signed(head)), result.stderr
+    assert github.statuses() == {head: "success"}
+    assert github.checked() == [github.git("rev-parse", "HEAD^{tree}")]
+    assert github.git("status", "--porcelain") == ""
+    assert github.git("worktree", "list", "--porcelain").count("worktree ") == 2
+
+
+def test_failed_worktree_add_names_the_destination_and_limits_git_output(
+    github: Sandbox, tmp_path: Path
+) -> None:
+    attempted = tmp_path / "attempted"
+    real_git = shutil.which("git")
+    shim = tmp_path / "bin/git"
+    shim.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        "args = sys.argv[1:]\n"
+        "if 'worktree' in args and 'add' in args:\n"
+        f"    Path({str(attempted)!r}).write_text(args[-2])\n"
+        "    print('\\n'.join(f'error: unable to write file {i}' "
+        "for i in range(100)), file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        f"os.execv({real_git!r}, [{real_git!r}, *args])\n",
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
 
     result = github.run("signoff.py")
 
-    assert (result.returncode, result.stdout) == (0, signed(head))
-    assert github.statuses() == {head: "success"}
-    assert github.checked() == [github.git("rev-parse", "HEAD^{tree}")]
+    assert (result.returncode, result.stdout) == (1, "")
+    error = json.loads(result.stderr)["errors"][0]
+    assert "git worktree add failed" in error
+    assert attempted.read_text(encoding="utf-8") in error
+    assert "error: unable to write file 0" in error
+    assert "error: unable to write file 99" not in error
+    assert len(error.splitlines()) <= 10
+    assert github.statuses() == {}
+    assert github.checks_run() == 0
 
 
 def test_a_signed_off_head_needs_no_new_run(github: Sandbox) -> None:
