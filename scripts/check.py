@@ -17,7 +17,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from _cli import Parser, ScriptError, exit_codes, run_script
 from _common import run, run_git
@@ -471,22 +471,34 @@ def validate_repo_tests(checks: list[Check]) -> None:
         raise ScriptError(f"test check registry is incomplete; {details}")
 
 
-def failure(check: Check, verbose: bool) -> str | None:
-    """Run one check: None when it passes, else the failing command's output.
+class Failure(NamedTuple):
+    output: str
+    cause: str = ""
 
-    Verbose runs stream each command's output to stderr and return "" on a
-    failure; quiet runs replay the failing command's output there.
+
+def failure(check: Check, verbose: bool) -> Failure | None:
+    """Run one check: None when it passes, else its output and launch failure.
+
+    Verbose runs stream each command's output to stderr and return empty output
+    on a failure; quiet runs replay the failing command's output there.
     """
     for command in check.commands:
         log.info("==> %s: %s", check.name, shlex.join(command))
         started = time.monotonic()
-        result = run(
-            command,
-            cwd=ROOT,
-            stdout=sys.stderr if verbose else subprocess.PIPE,
-            stderr=None if verbose else subprocess.STDOUT,
-            text=True,
-        )
+        try:
+            result = run(
+                command,
+                cwd=ROOT,
+                stdout=sys.stderr if verbose else subprocess.PIPE,
+                stderr=None if verbose else subprocess.STDOUT,
+                text=True,
+            )
+        except OSError as exc:
+            return Failure(
+                "",
+                f": {command[0]} could not start: {exc}; "
+                "check the tool is installed and executable",
+            )
         log.debug(
             "%s: exited %d after %.1fs",
             check.name,
@@ -495,10 +507,10 @@ def failure(check: Check, verbose: bool) -> str | None:
         )
         if result.returncode != 0:
             if verbose:
-                return ""
+                return Failure("")
             print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
             sys.stderr.write(result.stdout)
-            return result.stdout
+            return Failure(result.stdout)
     return None
 
 
@@ -605,15 +617,21 @@ def verdict(args: argparse.Namespace) -> dict[str, Any]:
                 continue
             ran_repo_tests = True
             batch = Check("repository-tests", repo_batch(repo_tests))
-            output = failure(batch, args.verbose)
-            if output is not None:
+            result = failure(batch, args.verbose)
+            if result is not None:
                 rerun = " ".join(
-                    f"--only {test.name}" for test in failed_tests(output, repo_tests)
+                    f"--only {test.name}"
+                    for test in failed_tests(result.output, repo_tests)
                 )
-                failed.append(f"repository-tests failed; rerun: just check {rerun}")
+                failed.append(
+                    f"repository-tests failed{result.cause}; rerun: just check {rerun}"
+                )
             continue
-        if failure(check, args.verbose) is not None:
-            failed.append(f"{check.name} failed; rerun: just check --only {check.name}")
+        result = failure(check, args.verbose)
+        if result is not None:
+            failed.append(
+                f"{check.name} failed{result.cause}; rerun: just check --only {check.name}"
+            )
 
     if failed:
         raise ScriptError(*failed)
