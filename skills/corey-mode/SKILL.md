@@ -10,6 +10,8 @@ Corey-mode does marketing work with Corey Haines' playbooks, from strategy to th
 
 ## Pick the route
 
+If the request neither contains the word `marketing` nor invokes `corey-mode`, open with `Route: none` and handle the request without reading a playbook. Stop routing here.
+
 A request can name its route, as in `marketing ; cro`. Compare names with case, spaces, hyphens, and underscores ignored.
 
 - **A name matches.** Run that route.

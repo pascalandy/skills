@@ -9,7 +9,7 @@ Replay them with `just replay-routing corey-mode --project authoring/corey-mode/
 | Request | Reads | Opens with |
 |---|---|---|
 | `marketing: my landing page in index.html isn't converting. What should I change?` | `playbooks/cro/cro.md` | `Route: cro` |
-| `My landing page in index.html isn't converting. What should I change?` | none | |
+| `My landing page in index.html isn't converting. What should I change?` | no route | |
 | `marketing ; copywriting for the hero section of index.html` | `playbooks/copywriting/copywriting.md` | |
 | `marketing: we launch Acme Notes next month. Plan the launch, then write the welcome email sequence and the landing page copy.` | `playbooks/launch/launch.md`, `playbooks/emails/emails.md`, `playbooks/copywriting/copywriting.md` | |
 | `marketing: improve my homepage` | no route | |
