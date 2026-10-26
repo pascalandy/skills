@@ -439,6 +439,18 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
         ),
         *[
             (
+                (
+                    f"Use only when a request contains message{separator}{quote}Help! Please{quote} "
+                    "or the user mentions `widget`."
+                ),
+                True,
+                True,
+            )
+            for separator in ("=", "= ", ":", ": ", "—", "–", "/")
+            for quote in ('"', "'")
+        ],
+        *[
+            (
                 f"Use only when explicitly invoked as `ship it{punctuation} now`.",
                 False,
                 False,
