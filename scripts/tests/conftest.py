@@ -10,6 +10,12 @@ from pathlib import Path
 
 import pytest
 
+# A git hook or rebase can point inherited git calls at the starting repository.
+# Clear that environment before any test creates or changes a scratch repository.
+for key in list(os.environ):
+    if key.startswith("GIT_"):
+        del os.environ[key]
+
 SCRIPTS = Path(__file__).parent.parent
 # A child given a scratch HOME, in a terminal without the XDG variables, would
 # make mise's shims, such as uv, read ~/.config/mise/config.toml as an untrusted

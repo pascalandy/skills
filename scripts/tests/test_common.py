@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import signal
 import subprocess
+import sys
 import time
 from collections.abc import Callable, Mapping
 from contextlib import redirect_stderr, redirect_stdout
@@ -25,6 +27,49 @@ from _cli import (
     run_script,
 )
 from _common import stop
+
+
+def test_test_helpers_drop_inherited_git_variables_before_running_git(
+    tmp_path: Path,
+) -> None:
+    caller, scratch = tmp_path / "caller", tmp_path / "scratch"
+    for repo in (caller, scratch):
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    program = """\
+import json, os, subprocess, sys
+sys.path.insert(0, sys.argv[1])
+import conftest
+print(json.dumps({
+    "git_root": subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"], text=True
+    ).strip(),
+    "git_variables": sorted(key for key in os.environ if key.startswith("GIT_")),
+    "other_variable": os.environ["GH_TEST_SENTINEL"],
+}))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(Path(__file__).parent)],
+        check=False,
+        cwd=scratch,
+        env=os.environ
+        | {
+            "GIT_DIR": str(caller / ".git"),
+            "GIT_WORK_TREE": str(caller),
+            "GIT_INDEX_FILE": str(caller / ".git/index"),
+            "GIT_TEST_SENTINEL": "inherited",
+            "GH_TEST_SENTINEL": "preserved",
+        },
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "git_root": str(scratch.resolve()),
+        "git_variables": [],
+        "other_variable": "preserved",
+    }
 
 
 def broken(_: argparse.Namespace) -> dict[str, Any]:
