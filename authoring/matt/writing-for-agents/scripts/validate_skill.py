@@ -394,8 +394,18 @@ CONTENTS_SEARCH_LINES = 25
 NAME_CHARS_RE = re.compile(r"[a-z0-9-]+")
 XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 # A description that limits firing to an invocation must use the BP_21 form
-INVOKE_ONLY_RE = re.compile(r"use only when\b.*\b(?:invok|mention)", re.IGNORECASE)
-INVOKE_FORM_RE = re.compile(r"Use only when explicitly invoked as `[^`]+`")
+INVOKE_ONLY_RE = re.compile(
+    r"(?:use only when\b.*\b(?:invok|mention)"
+    r"|use when\b.*\bexplicitly requests\s+\S+"
+    r"|only on explicit invocation\b|explicit invocation only\b)",
+    re.IGNORECASE,
+)
+INVOKE_FORM_RE = re.compile(
+    r"Use only when explicitly invoked as `[^`]+`", re.IGNORECASE
+)
+AUTOMATIC_PROHIBITION_RE = re.compile(
+    r"(?:Never|Do not) run automatically[.!?]?", re.IGNORECASE
+)
 ACTOR_RE = re.compile(r"\bthe user\b", re.IGNORECASE)
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")
 BLOCK_INDICATORS = {">", "|", ">-", "|-", ">+", "|+"}
@@ -403,6 +413,13 @@ QUOTED_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'")
 COMMENT_RE = re.compile(r"(?:^|\s+)#.*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
+SENTENCE_PART_RE = re.compile(
+    r"\\.|(?<!`)(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)"
+    r'|(?<![^\s(\[{=:—–/])"(?:[^"\\]|\\.)*"'
+    r"|(?<![^\s(\[{=:—–/])'(?:[^'\\]|\\.|(?<=\w)'(?=\w))*'(?!\w)"
+    r"|“[^”]*”|‘(?:[^’]|(?<=\w)’(?=\w))*’(?!\w)"
+    r"|(?P<end>[.!?])\s+"
+)
 # Inline links and reference definitions; a bare target may hold one level of parentheses
 DESTINATION = r"(?:<(?P<angle>[^<>\n]*)>|(?P<bare>(?:[^()\s]|\([^()\s]*\))+))"
 LINK_RE = re.compile(
@@ -573,6 +590,19 @@ def check_name(skill: Path, skill_md: Path, fields: dict[str, Field]) -> list[Fi
     ]
 
 
+def description_sentences(value: str) -> list[str]:
+    """Split prose sentences while keeping quoted text and inline code intact."""
+    value = " ".join(value.split())
+    sentences: list[str] = []
+    start = 0
+    for part in SENTENCE_PART_RE.finditer(value):
+        if part.lastgroup == "end":
+            sentences.append(value[start : part.start() + 1])
+            start = part.end()
+    sentences.append(value[start:])
+    return sentences
+
+
 def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]:
     field = fields.get("description")
     if field is None or not field.value:
@@ -606,8 +636,12 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
                 f"description contains the XML tag '{tag.group(0)}'",
             )
         )
-    invocation = field.value.partition(". ")[0]
-    if INVOKE_ONLY_RE.match(invocation):
+    # Trigger wording is in sentence one; standalone prohibitions can occur later
+    sentences = description_sentences(field.value)
+    invocation = sentences[0]
+    if INVOKE_ONLY_RE.match(invocation) or any(
+        AUTOMATIC_PROHIBITION_RE.fullmatch(sentence) for sentence in sentences
+    ):
         if not INVOKE_FORM_RE.match(invocation):
             findings.append(
                 Finding(
