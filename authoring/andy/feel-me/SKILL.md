@@ -23,6 +23,7 @@ Le FMO (*future mode of operation*) est l'état que l'agent propose. Le CMO (*cu
 - Les questions sont numérotées en continu, pour que l'utilisateur puisse répondre « 1a, 2b »
 - Chaque question marque la recommandation de l'agent et dit en une ligne pourquoi elle compte
 - L'utilisateur voit seulement la conversation. L'agent décrit chaque issue, Epic ou PR par ce qu'elle fait, dit si elle existe déjà, et met son numéro au plus entre parenthèses
+- Quand la proposition relie plusieurs parties dont dépend une question, l'agent montre d'abord un diagramme Mermaid rendu de l'état proposé. Les questions nomment ses boîtes. Pour un fait que seul l'utilisateur connaît ou un changement sans parties liées, aucun diagramme. L'agent rend le diagramme dans un dossier temporaire hors du projet. Seul ce rendu échappe au gel avant le 👍
 - Une question sans réponse prend la recommandation de l'agent, sauf pour une action difficile à défaire
 
 Gabarit :
