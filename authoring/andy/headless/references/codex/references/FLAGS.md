@@ -31,7 +31,7 @@ This table reflects `codex exec --help` in installed Codex CLI 0.159.0. Before y
 | `-h`, `--help` | Show command help |
 | `-V`, `--version` | Show the CLI version |
 
-For `--review-only` and `--review-fix`, `scripts/headless.py` already passes `-C`, `-m`, `-c model_reasoning_effort`, `--dangerously-bypass-approvals-and-sandbox`, `-o`, and the prompt as `-`. For `--code-review`, the launcher runs `codex exec review` from `--cwd` because that subcommand has no `-C` or `-s`. The launcher passes the sandbox, approval, `review_model`, and diff flags after your flags. Your flags cannot override them. Pass other flags after `--`. For a sandboxed run, call `codex exec -s read-only` yourself.
+For `--review-only` and `--review-fix`, `scripts/headless.py` already passes `-C`, `-m`, `-c model_reasoning_effort`, `--dangerously-bypass-approvals-and-sandbox`, `-o`, and the prompt as `-`. For `--code-review`, the launcher runs `codex exec review` from `--cwd` because that subcommand has no `-C` or `-s`. The launcher passes the sandbox, approval, `review_model`, and diff flags after your flags. Your flags cannot override them. Pass other flags after `--`. For a sandboxed run, use the [manual read-only command](../MetaSkill.md).
 
 Add `--strict-config` to reject unrecognized configuration keys.
 
