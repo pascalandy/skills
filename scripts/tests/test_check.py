@@ -61,6 +61,31 @@ def test_only_runs_the_named_checks_and_success_answers_ok(
     assert verdict(monkeypatch, capfd, checks, "--only", "fine") == (0, OK, "")
 
 
+def test_a_missing_tool_keeps_prior_failures_and_runs_later_checks(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    missing = str(root / "absent-tool")
+    code, stdout, stderr = verdict(
+        monkeypatch,
+        capfd,
+        [
+            Check("broken", (sys.executable, "-c", "raise SystemExit(1)")),
+            Check("missing", (missing,)),
+            Check("later", MARK),
+        ],
+    )
+
+    assert (code, stdout) == (1, "")
+    errors = json.loads(stderr.splitlines()[-1])["errors"]
+    assert len(errors) == 2
+    assert errors[0] == "broken failed; rerun: just check --only broken"
+    assert errors[1].startswith(f"missing failed: {missing} could not start:")
+    assert errors[1].endswith(
+        "; check the tool is installed and executable; rerun: just check --only missing"
+    )
+    assert (root / "ran").exists(), "a missing tool must not stop later checks"
+
+
 def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_for_the_answer(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
