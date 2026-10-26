@@ -360,61 +360,107 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
     )
 
 
-def test_invoke_by_a_word(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    good = skill(
-        tmp_path,
-        folder="good",
-        name="good",
-        description='"Use only when explicitly invoked as `good`. Help the user learn Python."',
-    )
-    bare = skill(
-        tmp_path,
-        folder="bare",
-        name="bare",
-        description='"Use only when explicitly invoked as bare."',
-    )
-    actor = skill(
-        tmp_path,
-        folder="actor",
-        name="actor",
-        description='"Use only when the user invokes `actor`."',
-    )
-    mention = skill(
-        tmp_path,
-        folder="mention",
-        name="mention",
-        description='"Use only when the user mentions `mention`."',
-    )
-    by_user = skill(
-        tmp_path,
-        folder="by-user",
-        name="by-user",
-        description='"Use only when explicitly invoked as `by-user` by the user."',
-    )
-    model = skill(
-        tmp_path,
-        folder="model",
-        name="model",
-        description='"Use when the user asks to fill a PDF form."',
-    )
-    restricted = skill(
-        tmp_path,
-        folder="restricted",
-        name="restricted",
-        description='"Use only when debugging tests. Help the user invoke a failing test."',
-    )
+@pytest.mark.parametrize(
+    ("description", "form_warning", "actor_warning"),
+    [
+        ("Use only when explicitly invoked as `widget`.", False, False),
+        ("USE  only WHEN explicitly  INVOKED as `widget`.", False, False),
+        (
+            "Use only when explicitly invoked as `widget`. Help the user learn Python.",
+            False,
+            False,
+        ),
+        ("Use only when explicitly invoked as widget.", True, False),
+        ("Use only when explicitly invoked as `widget` by the user.", False, True),
+        *[
+            (f"Use only when the user {verb} `widget`.", True, True)
+            for verb in (
+                "invoke",
+                "invokes",
+                "invoked",
+                "mention",
+                "mentions",
+                "mentioned",
+            )
+        ],
+        ("USE  ONLY when the  USER MENTIONS `widget`.", True, True),
+        ("Use when the user explicitly requests widget.", True, True),
+        ("Use when explicitly requests `widget`.", True, False),
+        ("USE when the USER explicitly  REQUESTS widget.", True, True),
+        ("Only on explicit invocation of `widget`.", True, False),
+        ("ONLY  ON explicit INVOCATION of `widget`.", True, False),
+        ("Explicit invocation only.", True, False),
+        ("EXPLICIT  invocation ONLY.", True, False),
+        ("Never run automatically.", True, False),
+        ("Do not run automatically.", True, False),
+        ("NEVER  RUN automatically.", True, False),
+        ("DO  NOT run AUTOMATICALLY.", True, False),
+        ("Use for widget tasks. Never run automatically.", True, False),
+        ("Use for widget tasks. Do not run automatically.", True, False),
+        (
+            "Use when the user explicitly requests Tavily. Never run automatically.",
+            True,
+            True,
+        ),
+        (
+            "Use for widget tasks. Never run automatically. Help the user learn Python.",
+            True,
+            False,
+        ),
+        (
+            (
+                "Use only when a request contains the word marketing, or invokes corey-mode, "
+                "to run Corey Haines' marketing playbooks."
+            ),
+            True,
+            False,
+        ),
+        ("Use when the user asks to fill a PDF form.", False, False),
+        (
+            "Use only when debugging tests. Help the user invoke a failing test.",
+            False,
+            False,
+        ),
+        (
+            "Use only when debugging tests.  Help the user mentions a test.",
+            False,
+            False,
+        ),
+        ("Use only when debugging tests! Help the user invoke a test.", False, False),
+        ("Use only when debugging tests? Help the user invoke a test.", False, False),
+        (
+            "Use for widget tasks. Explain why tests never run automatically.",
+            False,
+            False,
+        ),
+        (
+            "Use for widget tasks. Explain why tests do not run automatically.",
+            False,
+            False,
+        ),
+        ("Use when the user explicitly requests.", False, False),
+    ],
+)
+def test_invoke_by_a_word(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    description: str,
+    form_warning: bool,
+    actor_warning: bool,
+) -> None:
+    root = skill(tmp_path, description=json.dumps(description))
     actor_message = "names an actor, 'the user'; a delegated prompt would be refused"
     form = (
         "start with 'Use only when explicitly invoked as `word`', the word in backticks"
     )
-    assert run(capsys, good, bare, actor, mention, by_user, model, restricted) == (
-        1,
-        [
-            f"{bare}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
-            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: names an actor, 'the user'; a delegated prompt would be refused",
-            f"{actor}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
-            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
-            f"{mention}/SKILL.md:3: warning: BP_21 Invoke by a word: {form}",
-            f"{by_user}/SKILL.md:3: warning: BP_21 Invoke by a word: {actor_message}",
-        ],
+    expected = sorted(
+        f"{root}/SKILL.md:3: warning: BP_21 Invoke by a word: {message}"
+        for message, wanted in ((form, form_warning), (actor_message, actor_warning))
+        if wanted
     )
+    assert run(capsys, root) == (int(bool(expected)), expected)
+    assert run(capsys, "--errors-only", root) == (0, [])
+    assert validator.main(["--errors-only", "-v", str(root)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == '{"ok":true}\n'
+    assert captured.err == "".join(f"{line}\n" for line in expected)

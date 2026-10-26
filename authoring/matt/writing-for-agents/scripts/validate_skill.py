@@ -394,8 +394,18 @@ CONTENTS_SEARCH_LINES = 25
 NAME_CHARS_RE = re.compile(r"[a-z0-9-]+")
 XML_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 # A description that limits firing to an invocation must use the BP_21 form
-INVOKE_ONLY_RE = re.compile(r"use only when\b.*\b(?:invok|mention)", re.IGNORECASE)
-INVOKE_FORM_RE = re.compile(r"Use only when explicitly invoked as `[^`]+`")
+INVOKE_ONLY_RE = re.compile(
+    r"(?:use only when\b.*\b(?:invoke[sd]?|mention(?:s|ed)?)\b"
+    r"|use when\b.*\bexplicitly requests\s+\S+"
+    r"|only on explicit invocation\b|explicit invocation only\b)",
+    re.IGNORECASE,
+)
+INVOKE_FORM_RE = re.compile(
+    r"Use only when explicitly invoked as `[^`]+`", re.IGNORECASE
+)
+AUTOMATIC_PROHIBITION_RE = re.compile(
+    r"(?:Never|Do not) run automatically[.!?]?", re.IGNORECASE
+)
 ACTOR_RE = re.compile(r"\bthe user\b", re.IGNORECASE)
 KEY_RE = re.compile(r"(?P<key>[A-Za-z0-9_-]+):\s*(?P<value>.*)")
 BLOCK_INDICATORS = {">", "|", ">-", "|-", ">+", "|+"}
@@ -606,8 +616,11 @@ def check_description(skill_md: Path, fields: dict[str, Field]) -> list[Finding]
                 f"description contains the XML tag '{tag.group(0)}'",
             )
         )
-    invocation = field.value.partition(". ")[0]
-    if INVOKE_ONLY_RE.match(invocation):
+    sentences = re.split(r"(?<=[.!?])\s+", " ".join(field.value.split()))
+    invocation = sentences[0]
+    if INVOKE_ONLY_RE.match(invocation) or any(
+        AUTOMATIC_PROHIBITION_RE.fullmatch(sentence) for sentence in sentences
+    ):
         if not INVOKE_FORM_RE.match(invocation):
             findings.append(
                 Finding(
