@@ -165,14 +165,18 @@ unshared() {
 }
 # A count other than 0, or a failed comparison, may come from a stale or
 # missing origin/main, so only then does it fetch and count again; it prints
-# nothing when it cannot count, and "fetch-failed" when the fetch fails; git's
-# reason stays out, since it can quote a token from the remote URL. The fetch
+# nothing when it cannot count, and a fixed category when the fetch fails;
+# git's reason stays out, since it can quote a token from the remote URL. The fetch
 # leaves FETCH_HEAD alone, since scripts/sync_private.py merges it. Lines that
 # hold a path use printf, which prints a backslash as is
 ahead() {
     count=$(unshared) && [ "$count" = 0 ] && { echo 0; return; }
-    git -C "$private" fetch -q --no-write-fetch-head origin main >/dev/null 2>&1 || {
-        echo fetch-failed
+    diagnostic=$(git -C "$private" fetch -q --no-write-fetch-head origin main 2>&1) || {
+        if printf '%s\n' "$diagnostic" | grep -Ei -- "$1" >/dev/null; then
+            echo key-refused
+        else
+            echo fetch-failed
+        fi
         return
     }
     unshared
@@ -191,8 +195,10 @@ step() {
     elif [ -n "$(git -C "$private" status --porcelain)" ]; then
         printf '%s\n' "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
     else
-        count=$(ahead)
-        if [ "$count" = fetch-failed ]; then
+        count=$(ahead "$2")
+        if [ "$count" = key-refused ]; then
+            printf '%s\n' "private-needs $private could not fetch origin main to compare; $3; run git -C $private fetch origin main on this machine to see why, then retry"
+        elif [ "$count" = fetch-failed ]; then
             printf '%s\n' "private-needs $private could not fetch origin main to compare; run git -C $private fetch origin main on this machine to see why, then retry"
         elif [ -z "$count" ]; then
             printf '%s\n' "private-needs $private cannot compare with origin/main; fetch it, then rerun"
@@ -538,7 +544,13 @@ def installed(machine: Machine, source: Source, mode: str) -> Outcome | list[str
 
 
 def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
-    code, lines = remote(machine, INSPECT, machine.path)
+    code, lines = remote(
+        machine,
+        INSPECT,
+        machine.path,
+        sync_private.SSH_KEY_REFUSAL,
+        sync_private.SSH_KEY_FIX,
+    )
     if code or not lines or not lines[-1].startswith("checkout "):
         return failure(machine.name, code, lines)
     _, branch, head, state = lines[-1].split()

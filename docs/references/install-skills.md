@@ -36,6 +36,7 @@ Private skills live in the private repository `pascalandy/skills-private`, clone
 - The repository is the source of truth. Change a private skill in a worktree of `skills-private` and open a PR there, never in the clone. After the merge, run `just sync-fleet` from this checkout
 - `scripts/sync_private.py` manages the clone; `just sync` and `just sync-fleet` run it. It clones a missing folder, then fast-forwards `main` to GitHub's. A folder that is not a clone, a clone off `main`, one with uncommitted edits, or one with commits GitHub lacks stops it with exit 1, untouched: it never commits or pushes
 - Worktrees of this repository share the main checkout's clone, since it sits beside the main checkout
+- The private sync names a refused SSH key and asks you to unlock the SSH agent or load the key. It treats network failures as temporary. Fleet inspection also reports key refusals when its comparison needs a private fetch. Every clone or fetch failure includes a command to inspect it locally, without copying Git's output into the report
 
 ## Sync machines
 

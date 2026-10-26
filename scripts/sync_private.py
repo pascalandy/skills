@@ -64,6 +64,12 @@ def last_line(result: subprocess.CompletedProcess[str]) -> str:
     return lines[-1] if lines else f"git exited {result.returncode}"
 
 
+# Also sent to fleet inspection before an older remote checkout is updated.
+# This expression works in both Python and the remote shell's grep -E.
+SSH_KEY_REFUSAL = r"permission denied *\([^)]*publickey[^)]*\)"
+SSH_KEY_FIX = "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun"
+
+
 def failed(
     what: str, result: subprocess.CompletedProcess[str], fix: str, look: str
 ) -> ScriptError:
@@ -71,6 +77,8 @@ def failed(
     git's own words stay out, since they can quote a token from the remote URL;
     `look` is the command that shows them on this machine."""
     hint = f"run {look} on this machine to see why"
+    if re.search(SSH_KEY_REFUSAL, result.stderr, re.IGNORECASE):
+        return ScriptError(f"{what}; {SSH_KEY_FIX}; {hint}")
     if is_network_failure(result.stderr):
         return TemporaryError(f"{what}; {hint}")
     return ScriptError(f"{what}; {fix}; {hint}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -268,3 +269,60 @@ def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
             f"you can read it; run git clone {url} {clone} on this machine to see why"
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("stderr", "code", "fix"),
+    [
+        (
+            "git@github.com: Permission denied (publickey).\nSECRET remote URL\n",
+            1,
+            "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun",
+        ),
+        (
+            "git@github.com: Permission denied (publickey,password).\nSECRET remote URL\n",
+            1,
+            "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun",
+        ),
+        (
+            "ssh: connect to host github.com port 22: Connection timed out\nSECRET remote URL\n",
+            75,
+            "",
+        ),
+        ("fatal: unknown failure\nSECRET remote URL\n", 1, "origin"),
+    ],
+)
+def test_a_failed_private_fetch_names_the_cause_without_echoing_git_output(
+    machines: tuple[Path, Path, Path], tmp_path: Path, stderr: str, code: int, fix: str
+) -> None:
+    one, _, _ = machines
+    assert run(one).returncode == 0
+    clone = private(one)
+    refused = tmp_path / "refused-ssh"
+    refused.write_text(f"#!/bin/sh\nprintf '%s' {shlex.quote(stderr)} >&2\nexit 255\n")
+    git(
+        clone,
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:pascalandy/skills-private.git",
+    )
+    git(clone, "config", "core.sshCommand", f"sh {shlex.quote(str(refused))}")
+    git(clone, "config", "ssh.variant", "ssh")
+
+    result = run(one)
+
+    assert (result.returncode, result.stdout) == (code, "")
+    answer = json.loads(result.stderr.splitlines()[-1])
+    [error] = answer["errors"]
+    expected_fix = f"check the origin remote in {clone}" if fix == "origin" else fix
+    assert error == "; ".join(
+        part
+        for part in (
+            "could not fetch the private repository",
+            expected_fix,
+            f"run git -C {clone} fetch origin main on this machine to see why",
+        )
+        if part
+    )
+    assert all(line not in result.stderr for line in stderr.splitlines())

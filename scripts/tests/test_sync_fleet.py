@@ -699,6 +699,53 @@ def test_a_failed_sync_fetch_keeps_the_remote_token_out_of_the_report(
     ]
 
 
+@pytest.mark.parametrize("tracking", ["missing", "stale"])
+@pytest.mark.parametrize("refused_key", [False, True])
+def test_inspection_fetch_identifies_a_refused_key_without_git_output(
+    fleet: tuple[Path, Path, Path], tracking: str, refused_key: bool
+) -> None:
+    hub, homes, bin_dir = fleet
+    if tracking == "stale":
+        clone = stale_remote(fleet)
+    else:
+        checkout = machine(homes, "remote", hub.parent / "skills.git")
+        register(hub, "remote")
+        assert run(hub, homes, bin_dir).returncode == 0
+        clone = private(checkout)
+        git(clone, "update-ref", "-d", "refs/remotes/origin/main")
+    stderr = (
+        "git@github.com: Permission denied (publickey).\nSECRET remote URL\n"
+        if refused_key
+        else "fatal: unknown fetch failure\nSECRET remote URL\n"
+    )
+    refused = hub.parent / "refused-ssh"
+    refused.write_text(f"#!/bin/sh\nprintf '%s' {shlex.quote(stderr)} >&2\nexit 255\n")
+    git(
+        clone,
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:pascalandy/skills-private.git",
+    )
+    git(clone, "config", "core.sshCommand", f"sh {shlex.quote(str(refused))}")
+    git(clone, "config", "ssh.variant", "ssh")
+
+    result = run(hub, homes, bin_dir, "--others", "--debug")
+
+    assert (result.returncode, result.stdout) == (1, "")
+    [error] = json.loads(result.stderr.splitlines()[-1])["errors"]
+    assert "could not fetch origin main to compare" in error
+    assert f"run git -C {clone} fetch origin main" in error
+    if refused_key:
+        assert (
+            "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun"
+            in error
+        )
+    else:
+        assert "GitHub refused" not in error
+    assert all(line not in result.stderr for line in stderr.splitlines())
+
+
 def test_check_reports_private_edits_made_after_the_inspection(
     fleet: tuple[Path, Path, Path],
 ) -> None:
