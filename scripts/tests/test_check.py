@@ -206,6 +206,9 @@ def routing_repo(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "from pathlib import Path\n"
         "with Path('pytest-calls').open('a', encoding='utf-8') as log:\n"
         "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "with Path('child-environments').open('a', encoding='utf-8') as log:\n"
+        "    log.write(json.dumps({k: v for k, v in os.environ.items() "
+        "if k.startswith('GIT_') or k == 'CHECK_KEEP'}) + '\\n')\n"
         "if os.environ.get('FAKE_PYTEST_EXIT'):\n"
         "    print(os.environ.get('FAKE_PYTEST_OUTPUT', 'batch boom'))\n"
         "    raise SystemExit(1)\n",
@@ -245,6 +248,71 @@ def pytest_calls(root: Path) -> list[list[str]]:
         json.loads(line)
         for line in (root / "pytest-calls").read_text(encoding="utf-8").splitlines()
     ]
+
+
+@pytest.mark.parametrize("runner", ["pytest", "bun"])
+@pytest.mark.parametrize("no_replace", [None, "1"])
+def test_suites_drop_inherited_git_context_but_keep_exact_history_and_validators_index(
+    routing_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    runner: str,
+    no_replace: str | None,
+) -> None:
+    index = routing_repo / "alternate-index"
+    (routing_repo / "staged-only.txt").write_text("staged\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "staged-only.txt"],
+        cwd=routing_repo,
+        env={**os.environ, "GIT_INDEX_FILE": str(index)},
+        check=True,
+    )
+    inherited = {
+        "GIT_DIR": str(routing_repo / ".git"),
+        "GIT_INDEX_FILE": str(index),
+        "GIT_AUTHOR_NAME": "inherited author",
+        "GIT_TEST_SENTINEL": "inherited",
+    }
+    for name, value in inherited.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("GIT_NO_REPLACE_OBJECTS", raising=False)
+    if no_replace is not None:
+        inherited["GIT_NO_REPLACE_OBJECTS"] = no_replace
+        monkeypatch.setenv("GIT_NO_REPLACE_OBJECTS", no_replace)
+    monkeypatch.setenv("CHECK_KEEP", "kept")
+    if runner == "bun":
+        shutil.copyfile(routing_repo / "bin/uvx", routing_repo / "bin/pnpm")
+        (routing_repo / "bin/pnpm").chmod(0o755)
+        row = next(row for row in check.CHECKS if row.name == "poteto-mode-ts")
+        suite = next(command for command in row.commands if command[-1] == "test")
+    else:
+        suite = check.pytest("scripts/tests")
+    validator = (
+        sys.executable,
+        "-c",
+        (
+            "import pathlib, subprocess; pathlib.Path('staged-files').write_text("
+            "subprocess.check_output(['git', 'ls-files', '--cached'], text=True))"
+        ),
+    )
+
+    assert verdict(
+        monkeypatch,
+        capfd,
+        [Check("validator", validator), Check("suite", suite)],
+        "--sweep",
+    ) == (0, OK, "")
+    assert (routing_repo / "staged-files").read_text(
+        encoding="utf-8"
+    ) == "staged-only.txt\n"
+    expected = {"CHECK_KEEP": "kept"}
+    if no_replace is not None:
+        expected["GIT_NO_REPLACE_OBJECTS"] = no_replace
+    assert (
+        json.loads((routing_repo / "child-environments").read_text(encoding="utf-8"))
+        == expected
+    )
+    assert all(os.environ[name] == value for name, value in inherited.items())
 
 
 def test_selected_html_mode_installs_its_pinned_browser_before_other_commands(

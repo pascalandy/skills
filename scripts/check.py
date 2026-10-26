@@ -57,6 +57,10 @@ log = logging.getLogger("check")
 Command = tuple[str, ...]
 
 
+class Suite(tuple[str, ...]):
+    """A test command whose fixtures must not inherit the caller's Git context."""
+
+
 class Check:
     """A named step whose commands run from the repository root and stop at the first failure.
 
@@ -178,24 +182,26 @@ def requires_python(suite: str | tuple[str, ...]) -> str:
     return f"{major}.{minor}"
 
 
-def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Command:
+def pytest(path: str | tuple[str, ...], *deps: str, parallel: bool = True) -> Suite:
     # uv prefers a Python it manages, so without --python a suite runs under
     # whichever one a machine holds, and the verdict differs between machines
-    return (
-        "uvx",
-        "--python",
-        requires_python(path),
-        "--from",
-        f"pytest@{PYTEST}",
-        *with_deps(((XDIST,) if parallel else ()) + deps),
-        "pytest",
-        "-W",
-        "error",
-        # The rerun reads the FAILED and ERROR summary lines, whatever PYTEST_ADDOPTS says
-        "-r",
-        "fE",
-        *(("-n", "auto") if parallel else ()),
-        *(path if isinstance(path, tuple) else (path,)),
+    return Suite(
+        (
+            "uvx",
+            "--python",
+            requires_python(path),
+            "--from",
+            f"pytest@{PYTEST}",
+            *with_deps(((XDIST,) if parallel else ()) + deps),
+            "pytest",
+            "-W",
+            "error",
+            # The rerun reads the FAILED and ERROR summary lines, whatever PYTEST_ADDOPTS says
+            "-r",
+            "fE",
+            *(("-n", "auto") if parallel else ()),
+            *(path if isinstance(path, tuple) else (path,)),
+        )
     )
 
 
@@ -417,7 +423,7 @@ CHECKS = [
     Check(
         "poteto-mode-ts",
         bun("install", POTETO_MODE, "--frozen-lockfile"),
-        bun("run", POTETO_MODE, "test"),
+        Suite(bun("run", POTETO_MODE, "test")),
         bun("run", POTETO_MODE, "typecheck"),
     ),
     Check(
@@ -512,6 +518,15 @@ def failure(check: Check, verbose: bool) -> Failure | None:
                 stdout=sys.stderr if verbose else subprocess.PIPE,
                 stderr=None if verbose else subprocess.STDOUT,
                 text=True,
+                # Test suites create repositories; a hook's Git context must not
+                # redirect their git calls. Validators may need GIT_INDEX_FILE.
+                env={
+                    k: v
+                    for k, v in os.environ.items()
+                    if not k.startswith("GIT_") or k == "GIT_NO_REPLACE_OBJECTS"
+                }
+                if isinstance(command, Suite)
+                else None,
             )
         except OSError as exc:
             return Failure(
