@@ -78,7 +78,7 @@ A failure, after a SKILL.md quoted its `name` with single quotes. stderr replays
 ```console
 $ just check --only frontmatter
 ==> frontmatter: uv run scripts/check_frontmatter.py
-{"ok":false,"errors":["authoring/andy-devtools/code-review-mode/SKILL.md:2: name uses single quotes; use double quotes"]}
+{"ok":false,"errors":["authoring/andy/code-review-mode/SKILL.md:2: name uses single quotes; use double quotes"]}
 {"ok":false,"errors":["frontmatter failed; rerun: just check --only frontmatter"]}
 ```
 
@@ -86,10 +86,10 @@ A change, after a pasted cli block went stale. The diagnostic line names the cha
 
 ```console
 $ uv run scripts/check_cli_block.py
-update	authoring/andy-devtools/headless/scripts/headless.py
+update	authoring/andy/headless/scripts/headless.py
 {"ok":false,"errors":["1 pasted cli block differs from scripts/_cli.py; run: uv run scripts/check_cli_block.py --fix"]}
 $ uv run scripts/check_cli_block.py --fix
-{"ok":true,"changes":[["update","authoring/andy-devtools/headless/scripts/headless.py"]]}
+{"ok":true,"changes":[["update","authoring/andy/headless/scripts/headless.py"]]}
 ```
 
 ## How this repository does it

@@ -228,9 +228,9 @@ PILLOW = "pillow==12.3.0"
 IMAGE_CREATOR = "authoring/andy/image-creator/scripts"
 PELE = "authoring/andy/pele/scripts"
 POTETO_MODE = "authoring/poteto/poteto-mode/scripts"
-HEADLESS = "authoring/andy-devtools/headless/scripts"
+HEADLESS = "authoring/andy/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
-BRIGADE_REPLAY = "authoring/andy-devtools/brigade-mode/scripts/replay"
+BRIGADE_REPLAY = "authoring/andy/brigade-mode/scripts/replay"
 COREY_MODE = "authoring/corey-mode/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
 # Every compiled skill, so a new skill is validated without a new row
@@ -442,8 +442,8 @@ CHECKS = [
     # carpaccio's status model; arancini and bisque have none
     Check(
         "brigade-carpaccio",
-        uv_run("authoring/andy-devtools/brigade-mode/references/model.py"),
-        pytest("authoring/andy-devtools/brigade-mode/references/tests"),
+        uv_run("authoring/andy/brigade-mode/references/model.py"),
+        pytest("authoring/andy/brigade-mode/references/tests"),
     ),
     Check(
         "writing-for-agents",
