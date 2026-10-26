@@ -44,13 +44,13 @@ Supprimer les patterns n'est que la moitié du travail. Une écriture stérile e
 
 ### Style
 
-13. **Abus du tiret cadratin** Éviter le tiret cadratin complètement. Utiliser seulement des points ou des virgules (pas de parenthèses, pas de tiret demi-cadratin, pas de trait d'union en guise de tiret). Le tiret cadratin est une marque d'IA, et se rabattre sur les parenthèses ne fait que troquer une marque pour une autre. Si une idée a besoin d'être séparée, terminer la phrase ou utiliser une virgule.
+13. **Tiret de réplique** Par défaut, ouvrir chaque réplique de dialogue par un tiret cadratin : « — Viens. » Dans la prose hors dialogue, remplacer le tiret d’incise par un point ou une virgule.
 14. **Abus des deux-points** Les deux-points sont corrects avant une liste ou un exemple. Pas comme connecteur en milieu de phrase. "Si tu viens de l'automatisation traditionnelle : au lieu d'enregistrer des gestionnaires d'événements, tu décris des conditions" n'apporte rien avec les deux-points. Réécrire pour que l'idée tienne seule, sans structure de comparaison. "Décrire quand l'ordonnanceur doit se déclencher fonctionne mieux en langage clair." Même sens, sans béquille de ponctuation.
 15. **Abus du gras** Mettre en gras avec parcimonie, jamais chaque nom propre ou acronyme.
 16. **Listes à en-tête intégré (Inline-header lists)** Le signe révélateur : une étiquette en gras suivie de deux-points qui répète la ligne : "**Performance :** La performance s'est améliorée...". Convertir en prose. Une amorce en gras qui se termine par un point, nomme l'élément, et est suivie d'un détail vraiment nouveau ("**Schéma en TypeScript.** Les tables vivent dans un seul fichier.") est acceptable, ce n'est pas un tic.
 17. **Titres en casse de titre** Utiliser la casse de phrase.
 18. **Émojis décoratifs** Retirer des titres et des puces.
-19. **Guillemets courbes** Remplacer par des guillemets droits "expression".
+19. **Guillemets et apostrophes** Par défaut, utiliser les guillemets français « » et l’apostrophe typographique ’ : « C’est prêt. »
 
 ### Artéfacts de communication
 
