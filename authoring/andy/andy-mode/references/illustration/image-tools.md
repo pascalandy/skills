@@ -6,14 +6,17 @@
 2. Otherwise, use the default tool below
 3. If a user-selected tool is unavailable, explain the limitation and ask before switching tools
 
-## `$imagegen` (default)
+## `image-creator` (default)
 
-Codex `$imagegen` is the default image tool.
+The `image-creator` skill is the default image tool in every harness, through the Codex plan.
 
-- Invoke `$imagegen` before generating or editing an image
-- Follow the loaded `$imagegen` skill instructions
-- Let `$imagegen` select its underlying model rather than naming or calling one directly
-- Generate or edit one image per invocation
-- Include every user-provided reference image needed for the requested result
+- Load `image-creator` before generating or editing an image, and follow its steps
+- Use the Codex plan backend (`--backend plan`); select OpenRouter only when the user explicitly requests that backend or GPT Image 2.5, as `image-creator` documents
+- Pass `--aspect 16:9`, the filled prompt template through `--prompt-file`, and a `.png` output path through `--out`
+- Run one command per planned illustration; inspect every file in the answer's `files` and keep the candidate that passes the QA checklist
+- Write candidates to a scratch folder outside the export destination, using a fresh output stem for each retry. Preserve the originals and copy the kept candidate to the filename required by step 5 of the illustration playbook
+- Pass every user-provided reference image needed for the result with `edit --image`, repeating `--image` in the supplied order. If required references exceed the plan's input limit, report the limitation instead of dropping them or changing backend
 
-If `$imagegen` is unavailable and the user did not select another tool, report the limitation rather than silently choosing a replacement.
+The plan backend runs `codex exec`, which needs network access and writes under the Codex home. If a sandbox blocks these, follow the harness's permission workflow; if access remains unavailable, report the permission limitation and stop. A sandbox denial does not establish that `plan.ready` is false.
+
+If `image-creator` is unavailable, report the limitation and stop. When the plan backend applies and `doctor` reports `plan.ready: false`, report its `detail` and stop; this does not authorize a paid fallback.
