@@ -14,6 +14,7 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 - Les conventions du dépôt réservent `-` aux entrées lues en flux. Les fichiers ouverts sur place, comme SQLite, prennent un chemin, sans exception propre à brigade-mode (#807)
 - Le playbook multi-PR écrit le plan. Une pile construite dans la session suit Feature ou Refactoring avec `gh-stack`. Une demande mixte attend le go puis suit la méthode nommée dans le plan, en gardant la priorité d'un playbook qui possède la topologie (#804)
 - Un document borné sans changement de code et sans playbook dédié suit `technical-writing` et `unslop`. Les plans multi-PR gardent leur playbook, les docs d'une PR de code restent dans Feature, les conceptions et RFC dans `how` ou `architect`, et les efforts transversaux dans `figure-it-out` (#897)
+- L'issue GitHub est le plan multi-PR, publié avant le go avec un tableau des étapes et un court prompt d'implémentation. Le fichier local reste une copie pour `check-plan.mjs`. Les cases d'exécution font citer l'étape dans chaque PR et noter l'état réel après fusion ou ajout à la pile, avec un responsable des fusions après livraison (#924)
 
 ## Synchro du 15 octobre 2026
 

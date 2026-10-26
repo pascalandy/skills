@@ -11,10 +11,10 @@ Read [agent runtime](../references/agent-runtime.md) before delegating, resuming
 1. When the change is one or two files with an obvious approach, skip the plan. Say so and stop.
 2. Settle open questions by prototype before you write. Run `playbooks/prototype.md` for each. Keep the branch, the SHA, and the screenshots for Appendix A. Ask the operator only about a product or preference call that no run can settle. Give options (the **Never Block on the Human** principle).
 3. Explore in available subagents with bounded briefs and supported model choices per the agent-runtime reference (the **Guard the Context Window** principle). Each returns file pointers, conventions, test commands, and entry points. No inlined dumps.
-4. Copy the skeleton below into the plan file and fill every placeholder. Unless the operator names a path, write the file under the resolved durable state directory's `docs/`. Keep every heading and every sub-block in the order shown. One section per PR. One PR is one change with its own evidence (the **Sequence Work into Verifiable Units** principle). Name the execution playbook in **How to read this**. For a stack one agent builds in this session, choose Feature or Refactoring with `gh-stack`. For an autonomous run, pick between `playbooks/autopilot-full.md` and `playbooks/autopilot-stack.md` per the rule at the end of `playbooks/autopilot-stack.md`. A standing program takes `playbooks/orchestrate.md`.
+4. Create one tracking GitHub issue as the canonical plan when you deliver it, before the operator's go and the first PR. Fill the skeleton below in that issue, keeping every heading and sub-block in order, with one section per PR. Include a short implementation prompt and a step table with each step's deliverable, location, and state. Each PR body names `Part of #N · Step X of Y`. Update the issue first when the plan changes, then regenerate the local copy. Update step state after each merge or stack append. Record an append as `appended/ready` and record `merged` only after an actual merge. The local plan file is only a copy for `scripts/check-plan.mjs`. Unless the operator names a path, keep it under the resolved durable state directory's `docs/`. One PR is one change with its own evidence (the **Sequence Work into Verifiable Units** principle). Name the execution playbook in **How to read this**. For a stack one agent builds in this session, choose Feature or Refactoring with `gh-stack`. For an autonomous run, pick between `playbooks/autopilot-full.md` and `playbooks/autopilot-stack.md` per the rule at the end of `playbooks/autopilot-stack.md`. A standing program takes `playbooks/orchestrate.md`.
 5. Write under `/technical-writing` in full, then `/unslop`. The body is one Diátaxis mode, how-to. Appendices hold explanation and reference. Each heading states the task or the finding. No long dashes. No mid-sentence colons.
 6. Run `node <skill-dir>/scripts/check-plan.mjs -v <plan.md>`, where `<skill-dir>` is poteto-mode's folder. Fix each plan line its `errors` name and rerun until it answers `{"ok":true}` (the **Encode Lessons in Structure** principle). `-v` adds each PR section's box counts on stderr.
-7. Hand back. Post the plan path and the script's output, then stop. Execution starts on the operator's explicit go, under the execution playbook the plan names.
+7. Hand back. Post the tracking issue URL, a short implementation prompt, and the script's output. For an unmerged stack, name who updates the issue after later actual merges. Then stop. Execution starts on the operator's explicit go, under the execution playbook the issue names.
 
 **Verification.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked (the **prove-it-works** principle skill). That sentence is the verification rule. Every verification block opens with it. The live block is mandatory. Ten verification lanes at the PR head drive the real surface through an available driver, per the **swarm** skill. Each lane is one box with a concrete scenario, the screenshot it saves, and its pass predicate. One lane is the **Regression lane against trunk.** It runs the same load-bearing scenario on trunk and head. If trunk does not have the feature, the lane records that fact and gates the behavior the diff adds plus the end state the user waits for instead of inventing a trunk result. The perf gate is dual-sided. Trunk and head must both produce the named metric. If trunk lacks the feature, also isolate the work the diff adds and set an absolute budget for that work plus the end-to-end state the user waits for. Do not claim a ratio between unlike scenarios. The perf block names the metric, the interleaved probe, the trunk baseline measured first, and the rule with the number that fails. A PR that changes an interaction is review-gated. The operator reviews it in chat with screenshots and a video before merge. A PR that changes no interaction writes `**Review gate.** None. <PR id> is not review-gated.` and no boxes under it.
 
@@ -31,14 +31,22 @@ One box is one unit of work. Every box names the evidence that checks it. A nest
 
 The program runs poteto-mode's `playbooks/<execution playbook>.md`. <Who merges, and which PR ids are the operator's items that stop at merge-ready.>
 
+The canonical plan is the tracking issue `<URL>`. <Short implementation prompt.>
+
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+## Steps
+
+| Step | Deliverable | Location | State |
+| --- | --- | --- | --- |
+| <X of Y> | <What this step gives> | <Repository or machine and PR id> | <Current state> |
 
 ## Program checklist
 
 ### Arm the program
 
 - [ ] State the protocol and this plan to the operator, then stop. Start execution only on her explicit go.
-- [ ] On her go, write `goal.md` with this exact text. "<The plan path, the PR ids in order, the verification rule, who merges, and the done condition.>"
+- [ ] On her go, write `goal.md` with this exact text. "<The tracking issue URL, the PR ids in order, the verification rule, who merges, and the done condition.>"
 - [ ] Read these at program start. Re-read them at every tick.
   - [ ] poteto-mode's `playbooks/<execution playbook>.md`
   - [ ] the swarm skill's `SKILL.md`
@@ -62,6 +70,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [ ] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
 - [ ] Open the PR ready, never draft, with `origin pr create --status open --base <base-branch>` or `gh pr create --base <base-branch>` according to the resolved forge. A stack child targets its parent branch.
+- [ ] Include `Part of #<N> · Step <X> of <Y>` in the PR body, naming the tracking issue and step.
 - [ ] Run the repo's lint and typecheck once before the PR-facing push. Push with hooks on.
 - [ ] Remove redundant abstractions, dead code, and debug leftovers before each commit; load `no-comments` before review when the diff changes source code.
 - [ ] Triage comments from review agents present on the PR per `../references/review-bot-triage.md`.
@@ -72,6 +81,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] At the merge-ready head SHA, run the swarm per the **swarm** skill. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. One audit lane that reads the diff and the receipts and distrusts the PR body.
 - [ ] Clean only when every lane is `PASS`. Findings go back to the owner. A new head gets a fresh swarm and a fresh verdict.
 - [ ] <For Feature or Refactoring, name who lands the stack under the repository's merge procedure. For a named program, use its playbook's merge or append rule, with the patch-id rule from `playbooks/shipping.md`.>
+- [ ] After each merge or stack append, update the step's actual state in the tracking issue, then regenerate the local copy. Record `appended/ready` for an append and `merged` only after an actual merge.
 
 ### Boot recipe, for every live lane
 
@@ -139,6 +149,7 @@ Each live lane runs at the PR head in an isolated workspace or verified remote e
 
 ## Close the program
 
+- [ ] For an unmerged stack, name who updates the canonical issue after later actual merges in the handback.
 - [ ] Every box above is checked with its evidence.
 - [ ] Reply to the operator with the report the execution playbook names.
 
@@ -159,4 +170,4 @@ Each live lane runs at the PR head in an isolated workspace or verified remote e
 <Docs to read before editing. Which PRs get the **how** and **interrogate** skills. The trail per the **show-me-your-work** skill.>
 ````
 
-**Reply:** the plan path, the PR ids with their dependencies and the review-gated set, what the prototypes proved and what stays unproven, and the check script's output.
+**Reply:** the tracking issue URL and a short implementation prompt, the PR ids with their dependencies and the review-gated set, what the prototypes proved and what stays unproven, the check script's output, and the owner of later actual-merge updates for an unmerged stack.
