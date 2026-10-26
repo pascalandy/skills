@@ -832,7 +832,7 @@ def test_claude_code_review_types_review_with_the_effort_and_a_range(env, repo):
     assert [run["model"], run["effort"]] == ["claude-opus-5-5", "xhigh"]
     [call] = calls(env)
     argv = call["argv"]
-    assert argv[:2] == ["-p", "/review xhigh main...HEAD"]
+    assert argv[:2] == ["-p", "/review xhigh --max-findings default main...HEAD"]
     assert call["stdin"] == ""
     assert argv[argv.index("--disallowedTools") + 1] == "Edit,Write,NotebookEdit"
     rule = argv[argv.index("--append-system-prompt") + 1]
@@ -860,7 +860,7 @@ def test_claude_code_review_compares_a_commit_with_its_parent(env, repo):
 
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
-    assert call["argv"][1] == "/review low HEAD^..HEAD"
+    assert call["argv"][1] == "/review low --max-findings default HEAD^..HEAD"
 
 
 @pytest.mark.parametrize("state", ["unstaged", "staged", "staged, then undone"])
