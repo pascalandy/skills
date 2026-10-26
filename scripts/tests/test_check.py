@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -244,6 +245,46 @@ def pytest_calls(root: Path) -> list[list[str]]:
         json.loads(line)
         for line in (root / "pytest-calls").read_text(encoding="utf-8").splitlines()
     ]
+
+
+def test_selected_html_mode_installs_its_pinned_browser_before_other_commands(
+    routing_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    shutil.copyfile(routing_repo / "bin/uvx", routing_repo / "bin/uv")
+    (routing_repo / "bin/uv").chmod(0o755)
+    html = next(row for row in check.CHECKS if row.name == "html-mode")
+
+    assert verdict(monkeypatch, capfd, [html], "--only", "html-mode") == (0, OK, "")
+    assert pytest_calls(routing_repo)[0] == [
+        "--from",
+        check.PLAYWRIGHT,
+        "playwright",
+        "install",
+        "chromium-headless-shell",
+    ]
+
+
+@pytest.mark.parametrize("args", [(), ("--only", "other"), ("--list",)])
+def test_unselected_or_listed_html_mode_runs_no_browser_install(
+    routing_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    args: tuple[str, ...],
+) -> None:
+    skill(routing_repo / "authoring/andy", "html-mode")
+    html = next(row for row in check.CHECKS if row.name == "html-mode")
+    publish_base(routing_repo, "notes.txt")
+
+    code, stdout, stderr = verdict(
+        monkeypatch, capfd, [html, Check("other", MARK)], *args
+    )
+
+    assert (code, stderr) == (0, "")
+    assert json.loads(stdout)["ok"] is True
+    assert not (routing_repo / "pytest-calls").exists()
+    assert (routing_repo / "ran").exists() is (args != ("--list",))
 
 
 def publish_base(root: Path, path: str) -> None:
