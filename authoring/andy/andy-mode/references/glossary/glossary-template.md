@@ -37,7 +37,7 @@ It does not serve to:
 - `Relations` sections describe the conceptual model
 - `Definitions` sections describe the local meaning of terms
 - terms under Avoid are not normative aliases
-- `0o0o` markers flag unresolved terminology ambiguities
+- `tk` markers flag unresolved terminology ambiguities
 
 ---
 

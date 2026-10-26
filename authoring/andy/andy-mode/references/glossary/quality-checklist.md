@@ -49,16 +49,16 @@ Use this checklist before returning a generated or revised glossary.
 - avoid-lists capture real wording risks
 - aliases are not treated as accepted synonyms by default
 - selected terms pass the conceptual validation in `../../playbooks/glossary.md`, or their
-  unresolved boundaries are explicit with `0o0o`
+  unresolved boundaries are explicit with `tk`
 
 ---
 
 ## Ambiguities
 
-- real unresolved terminology ambiguities use `0o0o`
-- `0o0o` entries describe terminology issues, not project follow-ups
+- real unresolved terminology ambiguities use `tk`, per `$oem` Definitions
+- `tk` entries describe terminology issues, not project follow-ups
 - existing `0o0o` markers are preserved unless the user explicitly asks to resolve them
-- if no unresolved terminology ambiguity exists, no empty `0o0o` section or "none identified" placeholder
+- if no unresolved terminology ambiguity exists, no empty `tk` section or "none identified" placeholder
 
 ---
 
