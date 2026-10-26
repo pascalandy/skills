@@ -86,7 +86,7 @@ Each entry links a principle's file and says when it applies.
 
 **Just do it.** Complete authorized work using the available tools. Follow the active session and repository rules for external writes, messages, and irreversible actions.
 
-**Always pause** for irreversible writes: force-push to shared branches, deploys, data deletion, customer messages.
+**Always pause** for irreversible writes: force-push to shared branches, deploys to production or to systems other people use, data deletion, customer messages. A merge the user authorized, whose documented repository step only syncs the user's own machines, such as `just merge` in pascalandy/skills, follows that repository's rules. Without that authorization, ask once.
 
 **Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going. Under that grant, decide each call it covers, act on it, and report it, with no offer. For a call only the user can make, apply a default, report it with its reasoning, and say in plain words what the user could ask for instead. Never hand the user a shorthand token to type back. Gates the user named and the Always-pause list still need the user.
 
