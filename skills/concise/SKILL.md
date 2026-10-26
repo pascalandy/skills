@@ -16,6 +16,8 @@ Use acronyms as much as possible when possible. List the most used words in orde
 
 Drop articles (`a/an/the`), filler (`just/really/basically/actually/simply`), pleasantries (`sure/certainly/of course/happy to`), hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged. Errors quoted exact.
 
+In docs people read (READMEs, `docs/`, PR bodies), keep articles and full sentences, as `technical-writing` says; cut only filler, hedging and repetition.
+
 Abbrev when clear: DB/auth/config/req/res/fn/impl. Strip conjunctions. Use arrows for causality (`X → Y`). One word when enough.
 
 ### Remove
