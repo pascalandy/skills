@@ -250,10 +250,14 @@ def pytest_calls(root: Path) -> list[list[str]]:
     ]
 
 
-def test_pytest_drops_inherited_git_context_but_a_validator_keeps_its_staged_index(
+@pytest.mark.parametrize("runner", ["pytest", "bun"])
+@pytest.mark.parametrize("no_replace", [None, "1"])
+def test_suites_drop_inherited_git_context_but_keep_exact_history_and_validators_index(
     routing_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
     capfd: pytest.CaptureFixture[str],
+    runner: str,
+    no_replace: str | None,
 ) -> None:
     index = routing_repo / "alternate-index"
     (routing_repo / "staged-only.txt").write_text("staged\n", encoding="utf-8")
@@ -271,7 +275,18 @@ def test_pytest_drops_inherited_git_context_but_a_validator_keeps_its_staged_ind
     }
     for name, value in inherited.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.delenv("GIT_NO_REPLACE_OBJECTS", raising=False)
+    if no_replace is not None:
+        inherited["GIT_NO_REPLACE_OBJECTS"] = no_replace
+        monkeypatch.setenv("GIT_NO_REPLACE_OBJECTS", no_replace)
     monkeypatch.setenv("CHECK_KEEP", "kept")
+    if runner == "bun":
+        shutil.copyfile(routing_repo / "bin/uvx", routing_repo / "bin/pnpm")
+        (routing_repo / "bin/pnpm").chmod(0o755)
+        row = next(row for row in check.CHECKS if row.name == "poteto-mode-ts")
+        suite = next(command for command in row.commands if command[-1] == "test")
+    else:
+        suite = check.pytest("scripts/tests")
     validator = (
         sys.executable,
         "-c",
@@ -284,15 +299,19 @@ def test_pytest_drops_inherited_git_context_but_a_validator_keeps_its_staged_ind
     assert verdict(
         monkeypatch,
         capfd,
-        [Check("validator", validator), Check("suite", check.pytest("scripts/tests"))],
+        [Check("validator", validator), Check("suite", suite)],
         "--sweep",
     ) == (0, OK, "")
     assert (routing_repo / "staged-files").read_text(
         encoding="utf-8"
     ) == "staged-only.txt\n"
-    assert json.loads(
-        (routing_repo / "child-environments").read_text(encoding="utf-8")
-    ) == {"CHECK_KEEP": "kept"}
+    expected = {"CHECK_KEEP": "kept"}
+    if no_replace is not None:
+        expected["GIT_NO_REPLACE_OBJECTS"] = no_replace
+    assert (
+        json.loads((routing_repo / "child-environments").read_text(encoding="utf-8"))
+        == expected
+    )
     assert all(os.environ[name] == value for name, value in inherited.items())
 
 
