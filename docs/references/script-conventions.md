@@ -65,7 +65,7 @@ Add a row's flags only when the script has the matching behavior.
 | asks for confirmation | `-y`, `--yes`; `--no-input`: never prompt, and a missing value exits 2 naming the flag |
 | has a safety check worth overriding | `-f`, `--force`, separate from `--yes` |
 | calls networks or APIs, or takes locks | exit `75` for a temporary, safe-to-retry failure; `--timeout <duration>` with a default |
-| reads or writes files | `-` as a filename for stdin; `-o`, `--output <file>`. Content goes to a file the answer names, never to stdout, which holds only the answer |
+| reads or writes files | `-` as a filename for stdin only for streamed input, such as text or JSON. Files opened in place, such as SQLite databases, take paths only. For output, `-o`, `--output <file>`. Content goes to a file the answer names, never to stdout, which holds only the answer |
 | has subcommands | `<name> help <cmd>`, `<name> <cmd> --help`, and `<name> <cmd> -h` print the same text; global flags work before and after the subcommand; an unknown subcommand exits 2 and suggests the closest match; subcommands need their full name |
 | reads config files | `-c`, `--config <path>`; precedence: flag, env, project, `~/.config/<name>/`, system |
 | has named environments | `--profile <name>` |
@@ -97,7 +97,6 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`
 - `render_pages.py` in `pele`: no `-` for stdin; its pages and images take their names from the input file
-- `replay.py`, `record.py` and `live.py` in `brigade-mode`: no `--db -`; the T3 SQLite database is opened read-only from a file, not streamed through stdin
 - `oracles.py` in `brigade-mode`: no `-` for a recording; each one is a gzipped file
 - `live.py` in `brigade-mode`: no `-o`; it serves its page over HTTP, and `--cache` names the one file it writes
 - `run_evals.py` in `writing-for-agents`: no `-o` or `-`; a run writes a folder per scenario and agent under `--output-dir`
