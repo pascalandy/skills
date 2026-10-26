@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from _cli import Parser, ScriptError, exit_codes, run_script
-from _common import run, run_git
+from _common import replay, run, run_git
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -507,9 +507,11 @@ def failure(check: Check, verbose: bool) -> Failure | None:
         )
         if result.returncode != 0:
             if verbose:
+                # Child output is streamed, so finish its line before the verdict.
+                print(file=sys.stderr)
                 return Failure("")
             print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
-            sys.stderr.write(result.stdout)
+            replay(result.stdout)
             return Failure(result.stdout)
     return None
 

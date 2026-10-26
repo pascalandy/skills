@@ -96,6 +96,28 @@ def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_for_the_answer(
     assert stderr.endswith("child says hi\n")
 
 
+@pytest.mark.parametrize("args", [(), ("--verbose",)], ids=["quiet", "verbose"])
+def test_a_failed_checks_unterminated_output_leaves_the_answer_on_its_own_line(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    args: tuple[str, ...],
+) -> None:
+    broken = (
+        sys.executable,
+        "-c",
+        "import sys; sys.stdout.write('fatal: broken'); raise SystemExit(1)",
+    )
+    code, stdout, stderr = verdict(monkeypatch, capfd, [Check("broken", broken)], *args)
+
+    assert (code, stdout) == (1, "")
+    assert json.loads(stderr.splitlines()[-1]) == {
+        "ok": False,
+        "errors": ["broken failed; rerun: just check --only broken"],
+    }
+    assert "fatal: broken\n" in stderr
+
+
 def test_list_answers_the_names_and_verbose_adds_commands_on_stderr(
     root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
