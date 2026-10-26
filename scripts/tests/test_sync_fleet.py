@@ -275,7 +275,7 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
             "has uncommitted edits; move them to a worktree of skills-private "
             "and open a PR, then rerun",
         ),
-        stopped("feature", "is not on main; switch it to main, then rerun"),
+        stopped("feature", "is on feature; switch it to main, then rerun"),
         stopped(
             "unshared",
             "has 1 commit its origin/main lacks; open a PR from a worktree of "
@@ -758,6 +758,52 @@ def test_a_broken_registry_keeps_the_private_pull_in_the_report(
     assert git(private(hub), "rev-parse", "HEAD") == git(work, "rev-parse", "HEAD")
 
 
+@pytest.mark.parametrize("mode", ["--check", "--dry-run"])
+def test_check_refuses_a_clean_private_branch_changed_after_inspection(
+    fleet: tuple[Path, Path, Path], mode: str
+) -> None:
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    register(hub, "remote")
+    assert run(hub, homes, bin_dir).returncode == 0
+    clone = private(checkout)
+    head = git(clone, "rev-parse", "HEAD")
+    # The first guard saw main. Switch branches before CHECK reads the clone.
+    late = """payload=$(cat)
+HOME="$FLEET_HOMES/$host" SHELL=/bin/sh /bin/sh -c "$*" <<EOF
+$payload
+EOF
+code=$?
+case "$payload" in
+    *private-needs*) git -C "$FLEET_HOMES/$host/projects/skills-private" switch -q -c feature ;;
+esac
+exit "$code"
+"""
+    ssh = bin_dir / "ssh"
+    ssh.write_text(
+        ssh.read_text().replace(
+            'HOME="$FLEET_HOMES/$host" SHELL=/bin/sh exec /bin/sh -c "$*"', late
+        )
+    )
+
+    result = run(hub, homes, bin_dir, mode)
+
+    assert git(clone, "rev-parse", "HEAD") == head
+    assert git(clone, "status", "--porcelain") == ""
+    assert (result.returncode, result.stdout) == (1, "")
+    status = "drift" if mode == "--check" else "needs-you"
+    fix = "" if mode == "--check" else "fix it on remote, then "
+    assert json.loads(result.stderr)["errors"] == [
+        (
+            f"remote {status}: {clone} is on feature; switch it to main, then rerun; "
+            f"{fix}rerun just sync-fleet remote"
+        )
+    ]
+    assert (
+        homes / "remote/just.log"
+    ).read_text() == "install-skills\ninstall-skills --dry-run\n"
+
+
 def test_check_answers_ok_when_converged_and_names_each_difference(
     fleet: tuple[Path, Path, Path],
 ) -> None:
@@ -777,9 +823,12 @@ def test_check_answers_ok_when_converged_and_names_each_difference(
     off_main = run(hub, homes, bin_dir, "--check", "onbranch", "detached")
     assert (off_main.returncode, off_main.stdout) == (1, "")
     assert sorted(json.loads(off_main.stderr)["errors"]) == [
-        f"{name} drift: {private(checkout)} is not on main; switch it to main, "
+        f"{name} drift: {private(checkout)} is on {branch}; switch it to main, "
         f"then rerun; rerun just sync-fleet {name}"
-        for name, checkout in (("detached", detached), ("onbranch", onbranch))
+        for name, checkout, branch in (
+            ("detached", detached, "a detached HEAD"),
+            ("onbranch", onbranch, "feature"),
+        )
     ]
     change(hub)
     assert run(hub, homes, bin_dir, "synced").returncode == 0
