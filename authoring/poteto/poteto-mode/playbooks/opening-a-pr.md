@@ -16,7 +16,7 @@ Invoked at the end of every other playbook.
 
 **Titles.** Read the repository's title rule first: in `AGENTS.md`, `CLAUDE.md`, or `CONTRIBUTING.md`, or as a clear convention in its recent merged PR titles. When it has one, follow it instead of the rules below. Otherwise use Conventional Commits in the form `type(scope): subject`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, or `perf` as the type. Use the changed area, such as `pstack` or `poteto-mode`, as the scope. Keep the subject short and imperative. Name a real symbol when one carries the change. For example, `fix(pstack): retarget opening-a-pr babysit trigger`. Do not add a trailing period.
 
-**Descriptions.** The PR body is a briefing, not the lab notebook. A reviewer who has the diff should learn why the change exists, what is out of scope, and how you proved the change works. The squash commit body is the PR body. If the body would make the squash commit longer than about 40 lines, cut the body.
+**Descriptions.** The PR body is a briefing, not the lab notebook. A reviewer who has the diff should learn why the change exists, what is out of scope, and how you proved the change works. If the body runs past about 40 lines, cut it.
 
 Read the user's description format in the request or their instructions first. Otherwise check the repository's `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, PR template, or a clear convention in recent merged PR bodies. Follow that format when one exists. Otherwise use these sections in order. Drop a section when it has nothing to say.
 

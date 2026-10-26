@@ -9,6 +9,7 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 - Les noms et mécanismes propres à Cursor sont retirés : `Task`, `subagent_type`, `poteto-agent`, `/setup-pstack` et ses règles `.mdc`
 - Les principes vivent dans `principles/`, sans frontmatter. L'index de `SKILL.md` dit quand chacun s'applique, et le corps du fichier porte la règle
 - Le parseur de `watch-pr` garde les identifiants de Bugbot et de Cursor que GitHub transmet. Ce sont des données de protocole, pas des consignes
+- La limite d'environ 40 lignes du corps d'une PR dans `opening-a-pr.md` tient à son rôle de briefing. Elle ne suppose pas que le commit squash reprend ce corps, car chaque dépôt règle le contenu du message
 
 ## Synchro du 15 octobre 2026
 
