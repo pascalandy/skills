@@ -21,7 +21,8 @@ merges in its `AGENTS.md`, then take the first case that matches:
 - **The parts touch the same lines, or cannot land apart:** one PR, no stack
 - **The project merges by pushing a head to its trunk, such as `git push origin <branch>:main`:**
   a [plain stack](#plain-stack), since GitHub refuses to retarget a PR in a native stack, so the
-  push would leave it open
+  push would leave it open. When the project's land steps run `gh stack unstack` first, use a
+  [native stack](#native-stack), which [Land](#land) unstacks before the push
 - **Otherwise:** a [native stack](#native-stack)
 
 Plan the layers before writing code: one concern per layer, foundations at the bottom, each change
