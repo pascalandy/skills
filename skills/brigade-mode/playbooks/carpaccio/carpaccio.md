@@ -175,6 +175,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 
 - One PR per verifiable unit, in one stack per Cook and repository with 🧰 gh-stack, even for independent cards. Assign each PR to `pr-assignee`
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
+- Before a reviewer probe patches an installed dependency, the reviewer asks the Cook for a package copy. The Cook copies it into a separate private scratch directory for each reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged. Add this requirement to every reviewer's brief
 - While a delegate reads your worktree directly, such as a Verify run that must see uncommitted changes, leave its files, index and checked-out commit unchanged until `task_status` shows that every such delegate has finished or been cancelled. A delegate that reads its own detached worktree does not freeze yours
 - Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from the trunk, use the layer whose change made it wrong
 - The Cook follows the repository's `AGENTS.md` procedure first; 🧰 poteto-mode fills what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to the Chef
