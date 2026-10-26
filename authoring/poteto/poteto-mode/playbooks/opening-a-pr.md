@@ -18,6 +18,8 @@ Invoked at the end of every other playbook.
 
 **Descriptions.** The PR body is a briefing, not the lab notebook. A reviewer who has the diff should learn why the change exists, what is out of scope, and how you proved the change works. If the body runs past about 40 lines, cut it.
 
+In PR descriptions and commit bodies, use a closing keyword only on its own line, for an issue that the PR closes, such as `Closes #N`. Keep closing keywords out of narratives. Write `Issue #145 was closed by hand` instead of `closed #145`.
+
 Read the user's description format in the request or their instructions first. Otherwise check the repository's `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, PR template, or a clear convention in recent merged PR bodies. Follow that format when one exists. Otherwise use these sections in order. Drop a section when it has nothing to say.
 
 - `## Why`. State the intent and approach in one or two short paragraphs. Do not list SHAs or rebase genealogy. Do not add a "based on main" preamble.
