@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -320,6 +321,167 @@ def test_sends_github_main_and_leaves_the_rest_untouched(
     assert any(error.startswith("down offline:") for error in errors)
     assert f"behind: move\t{before[:7]}\t{head[:7]}" in log
     assert "behind: add\t~/.claude/skills/secret" in log
+
+
+@pytest.mark.parametrize(
+    ("at_target", "tracking"),
+    [
+        (False, "stale"),
+        (True, "stale"),
+        (True, "ahead"),
+        (True, "diverged"),
+        (True, "missing"),
+        (False, "locked"),
+        (True, "current-locked"),
+        (True, "raced"),
+        (False, "race-created"),
+        (False, "race-deleted"),
+        (False, "race-changed"),
+        (False, "denied"),
+        (False, "private-failed"),
+        (True, "private-failed"),
+        (False, "install-failed"),
+        (True, "install-failed"),
+    ],
+)
+def test_apply_advances_origin_main_without_rewinding_it(
+    fleet: tuple[Path, Path, Path], at_target: bool, tracking: str
+) -> None:
+    hub, homes, bin_dir = fleet
+    checkout = machine(homes, "remote", hub.parent / "skills.git")
+    before = git(checkout, "rev-parse", "HEAD")
+    middle = change(hub, "middle.txt") if tracking.startswith("race-") else before
+    target = change(hub)
+    register(hub, "remote")
+    git(checkout, "fetch", "-q", "--refmap=", "origin", "main")
+    if at_target:
+        git(checkout, "merge", "-q", "--ff-only", "FETCH_HEAD")
+    expected = target
+    if tracking in ("ahead", "diverged", "raced"):
+        base = target if tracking == "ahead" else before
+        if tracking == "raced":
+            base = target
+        git(checkout, "switch", "-q", "--detach", base)
+        expected = change(checkout, "future.txt", push=False)
+        git(checkout, "switch", "-q", "main")
+        if tracking == "raced":
+            (homes / "remote/race-ref").write_text(expected)
+            real_git = shutil.which("git")
+            assert real_git is not None
+            executable = shlex.quote(real_git)
+            wrapper = bin_dir / "git"
+            wrapper.write_text(f"""#!/bin/sh
+if [ "$1" = update-ref ] && [ "$2" = refs/remotes/origin/main ] && [ -f "$HOME/race-ref" ]; then
+    {executable} update-ref refs/remotes/origin/main "$(cat "$HOME/race-ref")" || exit
+    mv "$HOME/race-ref" "$HOME/raced-ref"
+fi
+exec {executable} "$@"
+""")
+            wrapper.chmod(0o755)
+        else:
+            git(checkout, "update-ref", "refs/remotes/origin/main", expected)
+    elif tracking == "missing":
+        git(checkout, "update-ref", "-d", "refs/remotes/origin/main")
+    elif tracking.startswith("race-"):
+        expected = "" if tracking == "race-deleted" else middle
+        if tracking == "race-created":
+            git(checkout, "update-ref", "-d", "refs/remotes/origin/main")
+        (homes / "remote/race-ref").touch()
+        executable = shlex.quote(str(shutil.which("git")))
+        update = (
+            "-d refs/remotes/origin/main"
+            if tracking == "race-deleted"
+            else f"refs/remotes/origin/main {middle}"
+        )
+        wrapper = bin_dir / "git"
+        wrapper.write_text(f"""#!/bin/sh
+if [ "$1" = update-ref ] && [ "$2" = refs/remotes/origin/main ] && [ -f "$HOME/race-ref" ]; then
+    {executable} update-ref {update} || exit
+    mv "$HOME/race-ref" "$HOME/raced-ref"
+fi
+exec {executable} "$@"
+""")
+        wrapper.chmod(0o755)
+    elif tracking in ("locked", "current-locked"):
+        if tracking == "current-locked":
+            git(checkout, "update-ref", "refs/remotes/origin/main", target)
+        else:
+            expected = before
+        (checkout / ".git/refs/remotes/origin/main.lock").touch()
+    elif tracking == "denied":
+        expected = before
+        executable = shlex.quote(str(shutil.which("git")))
+        wrapper = bin_dir / "git"
+        wrapper.write_text(f"""#!/bin/sh
+if [ "$1" = update-ref ] && [ "$2" = refs/remotes/origin/main ] && [ "$HOME" = "{homes / "remote"}" ]; then
+    echo 'fatal: cannot lock ref refs/remotes/origin/main: Permission denied' >&2
+    exit 128
+fi
+exec {executable} "$@"
+""")
+        wrapper.chmod(0o755)
+    elif tracking == "private-failed":
+        git(
+            checkout.parent,
+            "clone",
+            "-q",
+            str(hub.parent / "skills-private.git"),
+            "skills-private",
+        )
+        refused = hub.parent / "refused-ssh"
+        refused.write_text(
+            "#!/bin/sh\necho 'Permission denied (publickey).' >&2\nexit 255\n"
+        )
+        git(
+            private(checkout),
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:pascalandy/skills-private.git",
+        )
+        git(
+            private(checkout),
+            "config",
+            "core.sshCommand",
+            f"sh {shlex.quote(str(refused))}",
+        )
+        git(private(checkout), "config", "ssh.variant", "ssh")
+    elif tracking == "install-failed":
+        (homes / "remote/.config").write_text("file ancestor\n")
+
+    result = run(hub, homes, bin_dir)
+
+    if tracking in ("locked", "denied") or tracking.startswith("race-"):
+        assert (result.returncode, result.stdout) == (
+            1 if tracking == "denied" else 75,
+            "",
+        )
+        assert "could not advance origin/main" in json.loads(result.stderr)["errors"][0]
+        assert f"git -C {checkout} fetch origin main" in result.stderr
+    elif tracking in ("private-failed", "install-failed"):
+        assert (result.returncode, result.stdout) == (1, "")
+        assert (
+            "could not fetch the private repository"
+            if tracking == "private-failed"
+            else "has a file ancestor"
+        ) in result.stderr
+    else:
+        assert (result.returncode, result.stderr) == (0, "")
+    assert git(checkout, "rev-parse", "main") == target
+    tracked = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", "origin/main"],
+        cwd=checkout,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert tracked.stdout.strip() == expected
+    if tracking in ("private-failed", "install-failed"):
+        assert not (homes / "remote/.claude/skills/secret/SKILL.md").exists()
+    else:
+        assert (homes / "remote/.claude/skills/secret/SKILL.md").is_file()
+    if tracking == "raced" or tracking.startswith("race-"):
+        assert (homes / "remote/raced-ref").is_file()
 
 
 def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(

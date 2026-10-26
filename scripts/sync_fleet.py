@@ -226,8 +226,28 @@ step() {
         }
         printf '{"ok":true,"changes":[["move","%.7s","%.7s"]]}\\n' "$now" "$3"
     fi
+    ref_code=0
+    tracked=$(git rev-parse -q --verify refs/remotes/origin/main) || tracked=
+    if [ "$tracked" != "$3" ] &&
+        { [ -z "$tracked" ] || git merge-base --is-ancestor "$tracked" "$3"; }; then
+        ref_error=$(LC_ALL=C git update-ref refs/remotes/origin/main "$3" "$tracked" 2>&1) || {
+            current=$(git rev-parse -q --verify refs/remotes/origin/main) || current=
+            if ! git merge-base --is-ancestor "$3" "$current" 2>/dev/null; then
+                ref_code=12
+                if [ "$current" != "$tracked" ]; then
+                    ref_code=75
+                else
+                    case "$ref_error" in *.lock*'File exists'*) ref_code=75 ;; esac
+                fi
+            fi
+        }
+    fi
     uv run --quiet scripts/sync_private.py 2>&1 || return
-    just install-skills 2>&1
+    just install-skills 2>&1 || return
+    if [ "$ref_code" -ne 0 ]; then
+        printf '%s\n' "could not advance origin/main; run git -C $HOME/$1 fetch origin main to inspect its ref or lock, then rerun just sync-fleet"
+        return "$ref_code"
+    fi
 }
 """
 # Prints the private clone's state as sync_private.state() reports it, then
