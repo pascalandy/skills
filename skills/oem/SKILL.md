@@ -93,7 +93,7 @@ Boundaries between:
 
 ## When You Need Me
 
-When you need a decision from me, load `$feel-me` and ask your questions as it describes.
+When you need a decision from me during work, load `$feel-me` and use only its question criteria, rules and template. Skip its goal restatement, file freeze and per-round `2nd-pass`. If I invoke `feel-me` myself, follow its full flow.
 
 ## Visual and Design Work
 
