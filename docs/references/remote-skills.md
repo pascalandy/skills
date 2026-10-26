@@ -177,15 +177,20 @@ A mode's routes run through that mode's SKILL.md.
 
 - `architect`: Use when the user invokes `architect` or requests software architecture design.
 - `automate-me`: Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow.
+- `babysit-pr`: Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR.
 - `blast-radius`: Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust.
 - `coding-eng-laws`: Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned.
 - `coding-language`: Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code.
 - `coding-standard`: Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior.
 - `commit`: Use when creating atomic git commits, staging logical changes, splitting commits, or formatting commit messages.
 - `correct`: Use only when explicitly invoked as `correct`.
+- `council`: Trigger this if the user says 'council'.
 - `create-formal-verification-skill`: Use only when explicitly invoked as `create-formal-verification-skill`.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
 - `diagnose`: Use for any request to debug, find the root cause, or explain why something fails or got slower: incidents, latency jumps, error spikes, crashes, memory leaks, hangs and timeouts, regressions after a deploy or flag change. Load it before reading code. Also use when a verify-loop run fails, or when a claimed cause, repro, or fix needs checking against facts.
+- `file-pr`: File a concise pull request. Use when the user asks to file, open, or create a PR.
+- `full-send`: Trigger this if the user says 'full send'.
+- `full-stop`: Trigger this if the user says 'full stop'.
 - `gh-stack`: Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.
 - `git-local`: Use instead of `git clone` when a request gives a GitHub URL or `owner/repo`, or when a task needs the code of an external GitHub repository.
 - `grill-for-unknowns`: Use when a complex implementation plan has material unknowns that require evidence from source or authoritative documentation before implementation. Do not use for ordinary idea stress tests or work with settled acceptance criteria.
@@ -194,7 +199,11 @@ A mode's routes run through that mode's SKILL.md.
 - `interrogate`: Use when the user asks for an adversarial or multi-model review, wants code or a plan stress-tested, or asks to uncover blind spots.
 - `json-config-schema`: Use when creating, reviewing, changing, versioning, or validating the JSON Schema of a JSON config file.
 - `label-for-issues`: Use when triaging GitHub issues, managing issue labels or decision comments, creating issues or PRs, or starting work on an issue.
+- `leaving-pr-comments`: Use whenever leaving comments on GitHub.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
+- `modernize`: For getting old prs up to date. Use when asked to rebase a pr or "modernize".
+- `sol-loop`: Use when the user says 'sol loop' or 'better call sol'.
+- `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
 - `verify-transcript`: Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check.
 - `verify-video-archive`: Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery.
