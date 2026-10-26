@@ -45,7 +45,7 @@ For `Release: yes`, add the repository's required release content, such as `CHAN
 
 ## Stop
 
-1. Show 🧹. Cancel running delegates with `task_cancel` and wait for cancellation to complete; unwatch every PR with `unwatch_pull_request`. Remove each cancelled barrage's detached worktree and work folder once it has stopped. Done when no delegate can still access them and no watch remains
+1. Show 🧹. Cancel running delegates with `task_cancel` and wait for cancellation to complete; unwatch every PR with `unwatch_pull_request`. Once each cancelled delegate has stopped, clean up its worktree, any T3 branch and temporary folders as [Work folders](../carpaccio.md#work-folders) says. Done when no delegate can still access them and no watch remains
 2. Stop on a clean, pushed checkout; report your branches and heads to the Chef. If your stack merged, close at 🍽️; otherwise close at ⏹️. Settle with 🧰 t3-runtime. Done when the Chef received the preserved work and you are settled
 
 ## Closing
