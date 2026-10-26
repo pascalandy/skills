@@ -38,7 +38,7 @@ The agent reads what you gave it, asks only what blocks the work, and keeps your
 concise
 ```
 
-The agent switches to note form: no filler, no pleasantries, short words, and arrows for cause and effect. The meaning stays the same. Use it when you want the facts fast. For a text that other people will read, use `write-with-clarity` instead.
+In chat and text for agents, the style is telegraphic: no filler, no pleasantries, and arrows for cause and effect. In documents for people, the agent keeps articles and complete sentences. To work on clarity too, you can choose `andy-mode ; write-with-clarity`.
 
 ## Check a text before you send it with `2nd-pass`
 
@@ -50,4 +50,4 @@ The agent reviews the text against what you asked for. It lists concrete mistake
 
 **Pitfall:** "make it better" gives the agent nothing to aim at. Say who reads the text and what they should do after reading it: "My director reads this in two minutes and approves the budget."
 
-Next: [Do marketing with `corey-mode`](./05-marketing.md).
+Next: [Do marketing with `corey-mode`](./06-marketing.md).

@@ -22,11 +22,21 @@ The interview finds the questions your audience will ask. The deck answers them.
 andy-mode ; sparring. Restaurant owners will pay for monthly bookkeeping by text message.
 ```
 
-If the idea survives, plan the launch, then write the emails:
+If the idea survives:
 
 ```text
 marketing ; launch. Plan the launch of bookkeeping by text message.
+
+feel-me
 ```
+
+Answer the questions, then read the proposals. When the agent has no questions left and the plan fits:
+
+```text
+go
+```
+
+After the launch plan:
 
 ```text
 marketing ; emails. Write the announcement sequence from that launch plan.

@@ -70,8 +70,8 @@ Some skills stand alone: `feel-me`, `brainstorm`, `grilling`, `research`, `unslo
 grill me on my plan to open a second location next spring
 ```
 
-"Grill me" is enough to start `grilling`. Pages 3 and 4 show the others.
+"Grill me" is enough to start `grilling`. Pages 2, 4, and 5 show the others.
 
 **Pitfall:** don't list several skills in one request, as in "use sparring, then storytelling, then copywriting". Give the goal and let the mode pick. Name a route only when you want a specific one, and run the next step after you read the first result.
 
-Next: [Think before the agent acts](./03-think-first.md).
+Next: [Think before the agent acts](./04-think-first.md).

@@ -1,20 +1,6 @@
 # Think before the agent acts
 
-A vague request gets a vague answer, and a rushed decision costs more than the minutes it saved. In this page you use four skills and two `andy-mode` routes. They make the agent understand the goal first, or make your own thinking sharper before you decide.
-
-## Agree before doing with `feel-me`
-
-```text
-I want to move my team's weekly status report from email to a shared dashboard.
-
-feel-me
-```
-
-The agent changes nothing yet. It restates your goal and the problem in its own words. Each question about a decision carries the FMO, the change it suggests, then the choices, and last the CMO, how things work today, for reference.
-
-For the dashboard, you decide who uses it, what it shows, and who updates it. The agent asks at most four questions per round. Each decision comes with lettered choices and its recommendation marked 🟢. For a fact only you know, such as how many people read the report today, it asks a direct question, with no FMO, choices, or recommendation. When the fact is a plain yes or no, so is the question. You can reply "1a, 2b, 3a, 4: about 40".
-
-It applies your answers, rethinks its proposals, and asks again until nothing is left to decide. Then it says "👍 Je n'ai plus de question.", French for "I have no questions left". Read its proposals, and say `go` only when they're right.
+`feel-me` aligns the agent on a task to carry out. The following tools help you collect ideas or examine a decision before you commit.
 
 ## Drop your ideas with `brainstorm`
 
@@ -58,6 +44,6 @@ research how bakeries in Montreal price custom cakes. Cite your sources.
 
 The agent follows each claim back to the source that owns it, such as a business's own website or an official page, and cites it. Open at least one source to check the answer instead of trusting it.
 
-**Pitfall:** don't write "agree on it and do it" in one request. `feel-me` stops before doing on purpose, so you can catch a wrong idea while it's still cheap. Say `go` once its proposals are right.
+**Pitfall:** `feel-me` and `grilling` do different jobs. `feel-me` leads to execution after you say `go`. `grilling` tests an idea without carrying it out.
 
-Next: [Write and edit with the agent](./04-write.md).
+Next: [Write and edit with the agent](./05-write.md).
