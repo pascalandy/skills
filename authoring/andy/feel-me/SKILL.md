@@ -22,6 +22,7 @@ Le FMO (*future mode of operation*) est l'état que l'agent propose. Le CMO (*cu
 - Au plus 4 questions par ronde
 - Les questions sont numérotées en continu, pour que l'utilisateur puisse répondre « 1a, 2b »
 - Chaque question marque la recommandation de l'agent et dit en une ligne pourquoi elle compte
+- L'utilisateur voit seulement la conversation. L'agent décrit chaque issue, Epic ou PR par ce qu'elle fait, dit si elle existe déjà, et met son numéro au plus entre parenthèses
 - Une question sans réponse prend la recommandation de l'agent, sauf pour une action difficile à défaire
 
 Gabarit :
