@@ -52,7 +52,7 @@ A delegate can bind a schedule to its own thread with `bindToCurrentThread: true
 
 ## Done and settled
 
-Turn completion never settles a thread. An open linked pull request or a pin keeps T3 from settling one on its own. So each thread settles itself:
+T3 can settle a thread when its turn ends, even with an open pull request linked through `link_pull_request`. A settled thread can lose its background jobs. When you end a turn to wait, rely on a delivered message to resume, with no background job still needed. Each thread still settles itself:
 
 1. **Check.** The thread owes no review, fix, reply, or report, and holds no schedule. Done when nothing is owed
 2. **Settle.** Call `t3_thread_organize` action `settle` on yourself. Done when the call returns `settlesWhenTurnEnds: true`
