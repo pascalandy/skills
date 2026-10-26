@@ -111,7 +111,19 @@ def ruff(path: str) -> tuple[Command, Command]:
     )
 
 
-def pyright(path: str, *deps: str, python: str = PYTHON) -> Command:
+def pyright(path: str, *deps: str, python: str | None = None) -> Command:
+    if python is None:
+        target = ROOT / path
+        scripts = target.rglob("*.py") if target.is_dir() else (target,)
+        minimum = max(
+            (
+                found
+                for script in scripts
+                if script.is_file() and (found := declared_minimum(script))
+            ),
+            default=None,
+        )
+        python = f"{minimum[0]}.{minimum[1]}" if minimum else PYTHON
     return (
         "uvx",
         *with_deps((f"pytest=={PYTEST}", *deps)),
@@ -353,7 +365,7 @@ CHECKS = [
     Check(
         "brigade-replay",
         *ruff(BRIGADE_REPLAY),
-        pyright(BRIGADE_REPLAY, PLAYWRIGHT, python="3.12"),
+        pyright(BRIGADE_REPLAY, PLAYWRIGHT),
         # test_live.py drives the live page in Chromium through Playwright
         pytest(f"{BRIGADE_REPLAY}/tests", PLAYWRIGHT, parallel=False),
         # test_page.py opens a recorded page with html-mode's checker (#808)
@@ -422,7 +434,7 @@ CHECKS = [
     Check(
         "writing-for-agents",
         *ruff(f"{WRITING_FOR_AGENTS}/scripts"),
-        pyright(f"{WRITING_FOR_AGENTS}/scripts", python="3.10"),
+        pyright(f"{WRITING_FOR_AGENTS}/scripts"),
         pytest(f"{WRITING_FOR_AGENTS}/scripts/tests"),
         uv_run(f"{WRITING_FOR_AGENTS}/scripts/validate_skill.py", WRITING_FOR_AGENTS),
     ),
@@ -435,7 +447,7 @@ CHECKS = [
     Check(
         "pele",
         *ruff(PELE),
-        pyright(PELE, PLAYWRIGHT, PILLOW, python="3.10"),
+        pyright(PELE, PLAYWRIGHT, PILLOW),
         pytest(f"{PELE}/tests", PLAYWRIGHT, PILLOW),
     ),
 ]
