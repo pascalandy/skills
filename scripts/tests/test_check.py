@@ -93,29 +93,51 @@ def test_verbose_streams_each_command_on_stderr_and_keeps_stdout_for_the_answer(
 
     assert (code, stdout) == (0, OK)
     assert stderr.startswith("==> talk: ")
-    assert stderr.endswith("child says hi\n")
+    assert "child says hi\n" in stderr
 
 
-@pytest.mark.parametrize("args", [(), ("--verbose",)], ids=["quiet", "verbose"])
+@pytest.mark.parametrize(
+    ("args", "tail"),
+    [((), False), (("--verbose",), False), (("--verbose",), True)],
+    ids=["quiet", "verbose", "verbose-passing-tail"],
+)
 def test_a_failed_checks_unterminated_output_leaves_the_answer_on_its_own_line(
     root: Path,
     monkeypatch: pytest.MonkeyPatch,
     capfd: pytest.CaptureFixture[str],
     args: tuple[str, ...],
+    tail: bool,
 ) -> None:
     broken = (
         sys.executable,
         "-c",
         "import sys; sys.stdout.write('fatal: broken'); raise SystemExit(1)",
     )
-    code, stdout, stderr = verdict(monkeypatch, capfd, [Check("broken", broken)], *args)
+    checks = [Check("broken", broken)]
+    if tail:
+        checks.append(
+            Check("passing", (sys.executable, "-c", "print('passing tail', end='')"))
+        )
+    code, stdout, stderr = verdict(monkeypatch, capfd, checks, *args)
 
     assert (code, stdout) == (1, "")
     assert json.loads(stderr.splitlines()[-1]) == {
         "ok": False,
         "errors": ["broken failed; rerun: just check --only broken"],
     }
-    assert "fatal: broken\n" in stderr
+    assert "fatal: broken" in stderr
+
+
+def test_a_successful_verbose_run_keeps_its_answer_after_an_unterminated_child(
+    root: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    passing = (sys.executable, "-c", "print('passing tail', end='')")
+    code, stdout, stderr = verdict(
+        monkeypatch, capfd, [Check("passing", passing)], "-v"
+    )
+
+    assert (code, stdout) == (0, OK)
+    assert stderr.endswith("passing tail\n")
 
 
 def test_list_answers_the_names_and_verbose_adds_commands_on_stderr(

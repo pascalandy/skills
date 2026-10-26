@@ -38,7 +38,7 @@ A script tests the exit code, or pipes stdout to `jq -e .ok`:
 
 To read a failure's errors, merge the streams and keep the last line: `just check 2>&1 | tail -n1 | jq .errors`
 
-`just check` ends a failed child's output with a newline before its verdict, including when `--verbose` streams that output. A child that prints no final newline cannot join its diagnostic to the JSON answer
+`just check` ends child output with a newline before its verdict, including when `--verbose` streams that output. This also covers a passing child after an earlier failure. A child that prints no final newline cannot join its diagnostic to the JSON answer
 
 Read the answer as a JSON object: key order carries no meaning, so a reader never matches a prefix such as `{"ok":`. `answer_in()` and `changes_in()` in `scripts/_common.py` read it that way
 

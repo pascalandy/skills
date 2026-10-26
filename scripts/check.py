@@ -507,8 +507,6 @@ def failure(check: Check, verbose: bool) -> Failure | None:
         )
         if result.returncode != 0:
             if verbose:
-                # Child output is streamed, so finish its line before the verdict.
-                print(file=sys.stderr)
                 return Failure("")
             print(f"==> {check.name}: {shlex.join(command)}", file=sys.stderr)
             replay(result.stdout)
@@ -635,6 +633,9 @@ def verdict(args: argparse.Namespace) -> dict[str, Any]:
                 f"{check.name} failed{result.cause}; rerun: just check --only {check.name}"
             )
 
+    if args.verbose:
+        # A later passing child can also leave its streamed output unterminated.
+        print(file=sys.stderr)
     if failed:
         raise ScriptError(*failed)
     return {}
