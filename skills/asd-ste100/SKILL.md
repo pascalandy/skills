@@ -7,6 +7,7 @@ kind: "general"
 # ASD-STE100
 
 Make an English spec, GitHub issue, or idea readable in one pass by a person or an agent.
+When the user asks for this skill on a text in another language, apply the same checklist to that language and name the language in the Scope line.
 Use the writing rules of Issue 9, adapted to software work.
 The checklist guides writing and sets the acceptance criteria for a review.
 
