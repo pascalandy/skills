@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-# A git hook or rebase can point inherited git calls at the starting repository.
-# Clear that environment before any test creates or changes a scratch repository.
+# Inherited Git context can send scratch git calls to the starting repository.
+# Preserve signoff's replace-ref guard while dropping that context (#936).
 for key in list(os.environ):
-    if key.startswith("GIT_"):
+    if key.startswith("GIT_") and key != "GIT_NO_REPLACE_OBJECTS":
         del os.environ[key]
 
 SCRIPTS = Path(__file__).parent.parent
