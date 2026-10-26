@@ -29,6 +29,21 @@ from _cli import (
 from _common import stop
 
 
+@pytest.mark.parametrize(
+    ("message", "retryable"),
+    [
+        ("dial tcp 140.82.114.6:443: i/o timeout", True),
+        ("connection timed out", True),
+        ("HTTP 401: Bad credentials", False),
+        ("repository not found", False),
+        ("Permission denied (publickey)", False),
+        ("timeout while validating configuration", False),
+    ],
+)
+def test_only_network_failures_are_retryable(message: str, retryable: bool) -> None:
+    assert _common.is_network_failure(message) is retryable
+
+
 @pytest.mark.parametrize("no_replace_objects", [None, "1"])
 def test_test_helpers_preserve_only_the_inherited_git_replace_guard(
     tmp_path: Path, no_replace_objects: str | None

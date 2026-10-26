@@ -29,6 +29,7 @@ NETWORK_FAILURE = re.compile(
     r"|failed to connect"
     r"|connection (refused|timed out|reset|closed)"
     r"|operation timed out"
+    r"|i/o timeout"
     r"|network is unreachable"
     r"|no route to host"
     r"|host is down"
