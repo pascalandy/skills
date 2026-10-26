@@ -107,7 +107,7 @@ A mode's routes run through that mode's SKILL.md.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.
 - `image-creator`: Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter.
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
-- `oem`: Load at the start of every session, before the first reply. Shared definitions and conventions for every task.
+- `oem`: Load at the start of every interactive session, before the first reply. A headless run bound to an output schema starts on its task instead. Shared definitions and conventions for every task.
 - `pele`: Use when a request names pele or pele.run, or a project depends on the `pele` npm package: writing, rendering, or theming its diagrams, or calling its API.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `sharpen`: Use only when explicitly invoked as `sharpen`.

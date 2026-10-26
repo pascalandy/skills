@@ -1,6 +1,6 @@
 ---
 name: "oem"
-description: "Load at the start of every session, before the first reply. Shared definitions and conventions for every task."
+description: "Load at the start of every interactive session, before the first reply. A headless run bound to an output schema starts on its task instead. Shared definitions and conventions for every task."
 kind: "general"
 ---
 
