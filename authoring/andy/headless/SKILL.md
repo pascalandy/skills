@@ -61,7 +61,7 @@ The child gets the same access, with every tool. It may edit files in `--cwd` to
 For `--review-only` and `--review-fix`, the launcher runs `codex exec` without a sandbox. If the request asks for a sandboxed fixer, run `codex exec` yourself. Use the `model` and `reasoning-level` from the config's `[codex]` table. For example, `-s workspace-write` keeps `.git` read-only and blocks network access. After the child exits, run the checks it could not run offline. Then commit its changes:
 
 ```bash
-codex exec -C /absolute/path/to/repo -s workspace-write -m <model> \
+codex exec -C /absolute/path/to/repo -s workspace-write -c approval_policy="never" -m <model> \
   -c model_reasoning_effort="<reasoning-level>" -o /tmp/fix.a1B2c3/answer.md - < /tmp/fix.a1B2c3/prompt.md
 ```
 
