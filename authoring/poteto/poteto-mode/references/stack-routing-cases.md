@@ -8,4 +8,4 @@
 | A selected playbook owns stack topology or landing | Follow that playbook and load `gh-stack` only when it delegates there |
 | Build a two-PR stack | Run Feature or Refactoring with `gh-stack` |
 | Write the plan of a six-PR migration | Run `playbooks/multi-phase-plan.md` and deliver the plan |
-| Write a multi-PR plan, then build its stack | Plan with `playbooks/multi-phase-plan.md`, then implement under Feature or Refactoring with `gh-stack` |
+| Write a multi-PR plan, then build its stack | Plan with `playbooks/multi-phase-plan.md`, then execute on the operator's explicit go under the plan's named method. A single-session build uses Feature or Refactoring with `gh-stack`; a named topology-owning run keeps its playbook |
