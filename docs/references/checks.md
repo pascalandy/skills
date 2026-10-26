@@ -26,7 +26,7 @@ Push the branch, then run `just signoff`. It records the pushed HEAD, runs `just
 | A check failed | Fix it, commit, push, then `just signoff` |
 | Refused: the branch on GitHub moved during the checks | `just signoff` again |
 | Pushed more commits | `just signoff` again |
-| Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again |
+| Stacked PRs | Check out each layer and run `just signoff`; a restack changes every layer's HEAD, so sign off each again. If `main` moves during the merge, follow the bounded retry in [Land a stack](#land-a-stack) |
 | Did this commit get signed off? | `gh signoff status` |
 | Merge blocked on `signoff` | For a PR that targets `main` and is not part of a GitHub stack, `just merge` signs off the PR head, then merges it. For stacked PRs, follow [Land a stack](#land-a-stack). Never merge with `gh pr merge --admin` to skip the gate |
 | Want a run on the other system | Follow step 2 of [Land a stack](#land-a-stack). GitHub Actions runs only to publish a release, as [Manual CI workflow](#manual-ci-workflow) says |
@@ -66,6 +66,8 @@ A stack lands with these steps, not with `just merge` on each layer, which refus
 3. Run `gh stack merge <stack> --yes --squash`, then `just deploy` from the main checkout
 4. During the deploy, a machine may still run an older `main`. `just sync-fleet --check` fails on an installer that answers no JSON line. A stack that changes what one script reads from another keeps reading the old form too, so older machines keep syncing
 5. After the deploy, `just sync-fleet --check` must answer `{"ok":true}` with every machine on the new `main`. Then one PR removes the old form's reader and its test, as #492 did
+
+If `gh stack merge` refuses with `Base branch was modified` because `main` moved, run `git fetch origin`. Check out the bottom layer and run `git merge --no-ff --no-edit origin/main`. Then, bottom to top, check out each higher layer and run `git merge --no-ff --no-edit <layer below>`. Resolve any conflicts before continuing. Push each layer with `git push origin <layer>`, then check out each layer and run `just signoff` again. When step 2 applies, repeat its proofs with the new top and stack base SHAs, including a new `check_remote.py` receipt in the top PR. Run `gh stack merge <stack> --yes --squash` one more time. A second refusal stops the landing: report its cause. After a successful merge, continue with step 3's deploy from the main checkout
 
 ## The signoff rule
 
