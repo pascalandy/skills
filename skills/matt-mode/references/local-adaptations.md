@@ -24,6 +24,8 @@ For `to-tickets`, honor an explicit destination; otherwise, default to GitHub us
 
 Read [workspace conventions](workspace.md) before the first artifact write or when resuming a map. Interpret upstream `/setup-matt-pocock-skills` references as resolving those conventions. No setup command or installation is required to start. Prefer the supplied destination and existing configuration. The local fallback is a tracker adapter, not a different specification format.
 
+For `handoff`, save outside the current workspace in a task cache or state directory that survives a reboot, and return its absolute path. This replaces the upstream OS temporary-directory destination.
+
 Use the complete upstream spec and ticket templates, with these adaptations:
 
 - In the spec's Problem Statement, restate the user's goal and the problem in your own words
