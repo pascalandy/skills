@@ -392,6 +392,51 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
             True,
             True,
         ),
+        (
+            "Use only when a request contains 'Don't! Please' or the user mentions `widget`.",
+            True,
+            True,
+        ),
+        (
+            "Use only when a request contains “Help! Please” or the user mentions `widget`.",
+            True,
+            True,
+        ),
+        (
+            "Use only when a request contains ‘Don’t? Please’ or the user mentions `widget`.",
+            True,
+            True,
+        ),
+        (
+            "Use only when `diagnose`'s repro fails. Help the user invoke other agents' checks.",
+            False,
+            False,
+        ),
+        (
+            "Use for `diagnose`'s repro checks. Never run automatically. Reads other agents' notes.",
+            True,
+            False,
+        ),
+        (
+            r"Use only when debugging the \` character. Help the user invoke \`widget\`.",
+            False,
+            False,
+        ),
+        (
+            "Use only when debugging the `` character. Help the user invoke `widget`.",
+            False,
+            False,
+        ),
+        (
+            'Use only when checking 12" boards. Help the user invoke "sample" tests.',
+            False,
+            False,
+        ),
+        (
+            'Use only when a request contains "Help! Please". Help the user invoke a failing test.',
+            False,
+            False,
+        ),
         *[
             (
                 f"Use only when explicitly invoked as `ship it{punctuation} now`.",
@@ -476,7 +521,7 @@ def test_invoke_by_a_word(
     form_warning: bool,
     actor_warning: bool,
 ) -> None:
-    root = skill(tmp_path, description=json.dumps(description))
+    root = skill(tmp_path, description=json.dumps(description, ensure_ascii=False))
     actor_message = "names an actor, 'the user'; a delegated prompt would be refused"
     form = (
         "start with 'Use only when explicitly invoked as `word`', the word in backticks"

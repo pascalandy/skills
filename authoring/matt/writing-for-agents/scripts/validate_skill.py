@@ -414,8 +414,11 @@ COMMENT_RE = re.compile(r"(?:^|\s+)#.*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
 SENTENCE_PART_RE = re.compile(
-    rf'{INLINE_CODE_RE.pattern}|"(?:[^"\\]|\\.)*"'
-    r"|(?<!\w)'(?:[^'\\]|\\.)*'(?!\w)|(?P<end>[.!?])\s+"
+    r"\\.|(?<!`)(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)"
+    r'|(?<![^\s(\[{])"(?:[^"\\]|\\.)*"'
+    r"|(?<![^\s(\[{])'(?:[^'\\]|\\.|(?<=\w)'(?=\w))*'(?!\w)"
+    r"|“[^”]*”|‘(?:[^’]|(?<=\w)’(?=\w))*’(?!\w)"
+    r"|(?P<end>[.!?])\s+"
 )
 # Inline links and reference definitions; a bare target may hold one level of parentheses
 DESTINATION = r"(?:<(?P<angle>[^<>\n]*)>|(?P<bare>(?:[^()\s]|\([^()\s]*\))+))"
