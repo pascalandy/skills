@@ -13,7 +13,7 @@ When a rule makes a sentence worse, fix the sentence another way or leave it alo
 
 The codebase is the word list. Write the real symbol, file, flag, or command name, not a synonym or a description of it.
 
-Define a named pattern at first use. Propose an addition to `unslop`'s abstract-metaphor rule in your reply, with the offending term, its replacement, and the diff. Leave that skill unchanged.
+Define a named pattern at first use. When you replace an invented metaphor that `unslop`'s abstract-metaphor rule does not list yet, propose the term, its replacement, and the diff in your reply. Leave that skill unchanged.
 
 ## Pick the mode first (Diátaxis)
 
