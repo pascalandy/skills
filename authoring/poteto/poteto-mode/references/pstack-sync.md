@@ -15,6 +15,7 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 - Le playbook multi-PR écrit le plan. Une pile construite dans la session suit Feature ou Refactoring avec `gh-stack`. Une demande mixte attend le go puis suit la méthode nommée dans le plan, en gardant la priorité d'un playbook qui possède la topologie (#804)
 - Un document borné sans changement de code et sans playbook dédié suit `technical-writing` et `unslop`. Les plans multi-PR gardent leur playbook, les docs d'une PR de code restent dans Feature, les conceptions et RFC dans `how` ou `architect`, et les efforts transversaux dans `figure-it-out` (#897)
 - L'issue GitHub est le plan multi-PR, publié avant le go avec un tableau des étapes et un court prompt d'implémentation. Le fichier local reste une copie pour `check-plan.mjs`. Les cases d'exécution font citer l'étape dans chaque PR et noter l'état réel après fusion ou ajout à la pile, en nommant qui met l'issue à jour après les fusions suivant la livraison (#924)
+- Un déploiement de config, de texte ou un retrait d'outil sans PR qui change une interaction ou un chemin mesuré remplace le squelette et `check-plan.mjs` par une liste avec preuve par fichier nommé pour chaque machine ou dépôt. Elle garde les cases de suivi de l'issue et des étapes de PR. Dès qu'une PR touche ces comportements, toutes gardent le squelette complet (#911)
 
 ## Synchro du 15 octobre 2026
 
