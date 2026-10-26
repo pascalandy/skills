@@ -108,6 +108,54 @@ def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> Non
     assert (converged.returncode, converged.stdout, converged.stderr) == (0, OK, "")
 
 
+def test_install_avoids_unwritable_default_temporary_folder(
+    sandbox: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, home = sandbox
+    startup = tmp_path / "startup"
+    startup.mkdir()
+    (startup / "sitecustomize.py").write_text(
+        "import errno, sys, tempfile\n"
+        "from pathlib import Path\n"
+        f"tempfile.tempdir = {str(tmp_path / 'full-temp')!r}\n"
+        "def reject(event, args):\n"
+        "    if event in ('tempfile.mkdtemp', 'tempfile.mkstemp') "
+        "and Path(args[0]).is_relative_to(tempfile.tempdir):\n"
+        "        raise OSError(errno.EDQUOT, 'Disk quota exceeded', args[0])\n"
+        "sys.addaudithook(reject)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PYTHONPATH", str(startup))
+    skill(repo / "authoring/content", "alpha", "new")
+
+    preview = run(repo, home, "--dry-run")
+    applied = run(repo, home)
+
+    assert preview.returncode == 0, preview.stderr
+    assert (applied.returncode, applied.stdout, applied.stderr) == (
+        0,
+        preview.stdout,
+        "",
+    )
+    assert all(
+        (home / target / "alpha/SKILL.md").read_text(encoding="utf-8")
+        == "# alpha\n\nnew\n"
+        for target in MAC
+    )
+    checked = run(repo, home, "--check")
+    assert (checked.returncode, checked.stdout, checked.stderr) == (0, OK, "")
+    assert subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout == (
+        " M authoring/content/alpha/SKILL.md\n M skills/alpha/SKILL.md\n"
+        "?? docs/references/skill-count.md\n"
+    )
+
+
 # Applies like the CLI, but pauses after staging its sources until `resume`
 # exists, so a newer apply can start while this older one is in flight.
 PAUSED_APPLY = """

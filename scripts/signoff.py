@@ -163,7 +163,8 @@ def signed_off(sha: str, timeout: float) -> bool:
 def worktree_at(sha: str) -> Iterator[Path]:
     """A temporary worktree at `sha`, so nothing done in this checkout during the
     checks changes what they test."""
-    with tempfile.TemporaryDirectory(prefix="signoff-") as parent:
+    common = ROOT / git("rev-parse", "--git-common-dir")
+    with tempfile.TemporaryDirectory(prefix="signoff-", dir=common) as parent:
         path = Path(parent) / "checkout"
         try:
             added = run_here(
@@ -177,7 +178,14 @@ def worktree_at(sha: str) -> Iterator[Path]:
                 sha,
             )
             if added.returncode:
-                raise ScriptError(f"git worktree add failed: {added.stderr.strip()}")
+                lines = added.stderr.strip().splitlines()
+                reason = "\n".join(lines[:7])
+                if len(lines) > 7:
+                    reason += f"\n... {len(lines) - 7} more lines omitted"
+                raise ScriptError(
+                    f"git worktree add failed in {path}:\n{reason}\n"
+                    f"check free space and write access in {common}, then rerun: just signoff"
+                )
             yield path
         finally:
             run_here("worktree", "remove", "--force", str(path))
@@ -188,11 +196,21 @@ def check_and_sign(sha: str, timeout: float) -> None:
     GitHub still holds it."""
     name = branch()
     log.info("run just check on %s", sha[:7])
-    with worktree_at(sha) as checkout:
+    # Checks create temporary repositories and Unix sockets. Keep their temp
+    # folder outside Git, and short enough for macOS's socket path limit.
+    with (
+        worktree_at(sha) as checkout,
+        tempfile.TemporaryDirectory(prefix="sf-", dir="/var/tmp") as temporary,
+    ):
         # Its stdout holds only its {"ok":true}, which would read as this
         # script's verdict; a failure's output and verdict stay on stderr
         check = (sys.executable, str(checkout / "scripts/check.py"))
-        checked = run(check, cwd=checkout, env=EXACT, stdout=subprocess.DEVNULL)
+        checked = run(
+            check,
+            cwd=checkout,
+            env=EXACT | {"TMPDIR": temporary, "TMP": temporary, "TEMP": temporary},
+            stdout=subprocess.DEVNULL,
+        )
     if checked.returncode:
         raise ScriptError(f"just check failed on {sha[:7]}; nothing was signed off")
     if remote_tip(name, timeout) != sha:

@@ -538,11 +538,16 @@ def execute(
                 shutil.rmtree(destination)
 
 
+def git_common_dir() -> Path:
+    """Repository state shared by worktrees, outside the source and agent folders."""
+    common = os.fsdecode(compile_skills.git("rev-parse", "--git-common-dir"))
+    return ROOT / common.strip()
+
+
 def install_lock() -> Path:
     """One lock per repository, shared by its worktrees and outside the home,
     so a run that fails validation still writes nothing there."""
-    common = os.fsdecode(compile_skills.git("rev-parse", "--git-common-dir"))
-    return ROOT / common.strip() / "install-skills.lock"
+    return git_common_dir() / "install-skills.lock"
 
 
 def prune(folder: Path) -> str | None:
@@ -635,7 +640,9 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
     # write nothing and do not wait.
     with (
         nullcontext() if preview else exclusive(install_lock(), args.timeout),
-        tempfile.TemporaryDirectory(prefix=".install-skills-source-") as temporary,
+        tempfile.TemporaryDirectory(
+            prefix=".install-skills-source-", dir=git_common_dir()
+        ) as temporary,
     ):
         stage = Path(temporary)
         sources = skill_sources(stage / "skills", args.private_root, args.profile)
