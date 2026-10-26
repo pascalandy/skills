@@ -81,7 +81,7 @@ If `gh stack merge` refuses with `Base branch was modified` because `main` moved
 
 Keep `just check` CI-safe: it needs `uv` and `pnpm`, no secrets or private packages, and uses the network only to download tools, such as the Bun that `pnpm dlx` runs for poteto-mode's TypeScript tests. To add a check, add a row to `CHECKS` in `scripts/check.py`. Script tests follow [[script-conventions]]
 
-The selected `html-mode` check first installs the Chromium headless shell required by its Playwright pin in the user's browser cache. Playwright reuses an installed build. An unselected check and `--list` run no install command
+The selected `html-mode` check first installs the Chromium headless shell required by its Playwright pin in the user's browser cache. Playwright reuses an installed build and removes cached builds that no installed Playwright references. An unselected check and `--list` run no install command
 
 A skill check whose commands name a path under `authoring/` belongs to the package holding that path. `just check` selects it when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them selects it too. The direct repository validators always run. When git cannot compare with `origin/main`, every check runs. `--only NAME` runs a named check regardless of changed paths. `--sweep` runs every check, including unrelated suites, for release or diagnosis. `--verbose` names each skipped check
 
