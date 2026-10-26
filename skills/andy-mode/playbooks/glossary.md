@@ -39,7 +39,7 @@ In planning mode:
 - do not create files
 - challenge assumptions before endorsing the structure
 - identify decisions still required
-- flag unresolved terminology issues with `0o0o`
+- flag unresolved terminology issues with `tk`
 - end with a clear recommendation
 
 ### Production mode
@@ -87,7 +87,7 @@ For skill glossaries:
 
 For all glossary types:
 
-- **0o0o** exposes unresolved terminology ambiguities
+- **tk** exposes unresolved terminology ambiguities
 - a good definition answers: "What does this term mean here?"
 
 ---
@@ -115,7 +115,7 @@ Apply these rules while planning or producing a glossary:
 
 - **Simplicity first:** include only terms that carry project-level meaning. Do not pad the glossary with generic programming concepts, status items, or decorative aliases.
 - **Surgical changes:** when revising, change only terms, relations, structure, and avoid-lists needed for the requested glossary objective.
-- **Surface conflicts, don't average them:** choose one canonical form when evidence supports it; move weaker variants to **Avoid** or flag unresolved ambiguity with `0o0o`. Do not normalize by blending competing terms.
+- **Surface conflicts, don't average them:** choose one canonical form when evidence supports it; move weaker variants to **Avoid** or flag unresolved ambiguity with `tk`. Do not normalize by blending competing terms.
 - **Read before you write:** read all supplied sources and the existing glossary structure before adding canonical terms, groups, or relations.
 - **Match project conventions:** preserve official domains, actor names, taxonomy, language, heading style, and numbered file conventions unless the user asks to redesign them.
 - **Fail loud:** do not silently resolve uncertain vocabulary, delete `0o0o`, or redefine official terminology without evidence.
@@ -178,7 +178,7 @@ date_updated: <YYYY-MM-DD>
 Use **Global conceptual model**, not **Global domain**. The global section is the
 conceptual overview of the model; it is not necessarily a domain.
 
-Add `## 0o0o Unresolved terminology` only when at least one real unresolved
+Add `## tk Unresolved terminology` only when at least one real unresolved
 terminology ambiguity exists. Do not add empty unresolved sections, placeholders,
 or "No active unresolved terminology ambiguities" sentences.
 
@@ -225,7 +225,7 @@ In this mode:
 - do not force labels such as `Def.`, `Project note`, `Distinct from`, or `Avoid`
   on every entry
 - do not use decorative bold for canonical terms
-- do not add empty `0o0o` sections or "none identified" placeholders
+- do not add empty `tk` sections or "none identified" placeholders
 
 A skill glossary should read like a compact operating reference. If a label does
 not improve use, omit it.
@@ -273,7 +273,7 @@ When building from source material:
 7. write high-level relations before definitions
 8. write concise definitions
 9. validate conceptual boundaries as described below
-10. flag unresolved terminology ambiguities with `0o0o`
+10. flag unresolved terminology ambiguities with `tk`
 11. validate consistency and revise
 
 Include terms such as:
@@ -313,7 +313,7 @@ as hypothetical. Code may provide evidence, but is never required.
 
 If a case exposes a contradiction, propose a clarification consistent with the
 source hierarchy. Apply supported refinements in production mode; flag unresolved
-choices with `0o0o` and preserve existing markers under the ambiguity rules.
+choices with `tk` and preserve existing markers under the ambiguity rules.
 
 Stop when the selected boundaries hold or their uncertainty is explicit. Keep
 only examples that help explain a distinction in the glossary. Do not turn this
@@ -405,17 +405,12 @@ Rules:
 
 ## Ambiguities
 
-Flag unresolved terminology ambiguities with `0o0o`.
-
-`0o0o` is the project marker for unresolved vocabulary decisions. It is chosen
-because the string is unique enough to grep cleanly and visually distinct from
-other status markers (`TODO`, `TBD`, `FIXME`) used for delivery follow-ups.
-Preserve it; do not silently translate it to a different marker.
+Flag unresolved terminology ambiguities with `tk`, as defined in `$oem` under Definitions.
 
 Use this format:
 
 ```md
-- 0o0o <Term or family of terms>
+- tk <Term or family of terms>
   - Ambiguity : what is being conflated
   - Recommendation : proposed canonical form
   - Impact : documents, sections, decisions, or responsibilities affected
@@ -510,8 +505,8 @@ Before finalizing, check:
 - the glossary does not track project status
 - terms to avoid are useful, not decorative
 - official actors or domains are not redefined against their source document
-- real unresolved terminology ambiguities are flagged with `0o0o`
-- no empty `0o0o` section or "none identified" placeholder is present
+- real unresolved terminology ambiguities are flagged with `tk`
+- no empty `tk` section or "none identified" placeholder is present
 - the document is scannable by expert readers
 - Markdown headings are clean and stable
 
@@ -545,14 +540,14 @@ Avoid by default:
 - `Global conceptual model` is not a domain. It is the project-wide conceptual map.
 - `Relations` are not expanded definitions. They are model-level links.
 - `Definitions` are not tutorials. They are canonical meanings.
-- `0o0o` marks terminology ambiguity or unresolved vocabulary decisions.
-- If there is no real `0o0o`, omit the unresolved terminology section entirely.
+- `tk` marks terminology ambiguity or unresolved vocabulary decisions.
+- If there is no real `tk`, omit the unresolved terminology section entirely.
 - A glossary is not a status register, task list, RAID log, or delivery tracker.
 - If a project has an existing PBS, capability map, actor model, or architecture
   taxonomy, preserve that structure unless the user asks to redesign it.
 - Do not create files when the user only asked to plan.
 - Do not ask for confirmation when enough context exists to make a useful best
-  effort; use `0o0o` for unresolved terminology ambiguity.
+  effort; use `tk` for unresolved terminology ambiguity.
 - Do not flatten all terms into one list when the project has official domains or
   natural conceptual families.
 - Do not force project/domain structure onto skill glossaries.

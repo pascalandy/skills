@@ -177,7 +177,7 @@ When deriving from an existing artifact:
    taxonomies
 4. convert project-specific examples into placeholders when building a template
 5. keep only rules that generalize to glossary quality
-6. move unresolved terminology issues to `0o0o` instead of smoothing them over
+6. move unresolved terminology issues to `tk`, per `$oem` Definitions, instead of smoothing them over
 7. do not backfill missing sections just for symmetry
 
 The goal is to reuse the ACv4 shape: conceptual families, relations,

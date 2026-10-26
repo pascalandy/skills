@@ -25,9 +25,9 @@ A trimmed excerpt showing the expected format on a PKI domain:
   - Distinct from : Root CA, Sub-CA certificate, intermediate CA
   - Avoid : intermediate CA, issuing CA, sub-ca, issuing-ca
 
-## 0o0o Unresolved terminology
+## tk Unresolved terminology
 
-- 0o0o Key rotation
+- tk Key rotation
   - Ambiguity : conflated with certificate renewal
   - Recommendation : reserve "key rotation" for planned cryptographic key replacement; use "renewal" for certificates
   - Impact : CP/CPS, lifecycle docs, runbooks
@@ -41,5 +41,5 @@ What this example shows:
   `Distinct from` line.
 - The `Avoid` line catches casual variants (`root-ca`, `intermediate CA`) that
   would otherwise become accepted aliases.
-- `0o0o` flags a real terminology conflict (key rotation vs certificate renewal),
+- `tk`, per `$oem` Definitions, flags a real terminology conflict (key rotation vs certificate renewal),
   not a delivery follow-up.

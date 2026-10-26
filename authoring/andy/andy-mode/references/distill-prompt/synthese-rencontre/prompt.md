@@ -6,7 +6,7 @@ description: >
   des suivis, des requis, des modifications, des besoins d'affaires, des besoins
   techniques ou des points d'attention. Produit uniquement en français canadien une
   synthèse structurée, un courriel de suivi client, une liste d'actions et/ou une
-  extraction de requis, avec des flags `0o0o` pour la validation utilisateur.
+  extraction de requis, avec des flags `tk` pour la validation utilisateur.
 ---
 
 # Synthèse de rencontre
@@ -21,7 +21,7 @@ Le skill doit aider à produire rapidement :
 2. un courriel de suivi client ;
 3. une liste d'actions et de suivis ;
 4. une extraction des requis, besoins et points d'attention ;
-5. des flags de revue utilisateur avec `0o0o`.
+5. des flags de revue utilisateur avec `tk`.
 
 Rester agnostique : ne jamais mentionner de fournisseur ou d'outil IA dans le livrable.
 
@@ -61,7 +61,7 @@ Règles générales :
 - Ne pas inventer d'information.
 - Utiliser l'information disponible.
 - Utiliser des placeholders pour les informations manquantes non critiques.
-- Utiliser `0o0o **VALIDATION À FAIRE:**` pour les éléments qui méritent une revue humaine.
+- Utiliser `tk **VALIDATION À FAIRE:**` pour les éléments qui méritent une revue humaine.
 - Rédiger uniquement en français canadien, sauf si l'utilisateur demande explicitement une traduction dans une autre langue.
 - Utiliser les conventions du français canadien : courriel, rencontre, suivi, échéance, à faire, fin de semaine si pertinent.
 - Éviter les tournures trop franco-françaises, les anglicismes inutiles et le vocabulaire corporatif lourd.
@@ -88,7 +88,7 @@ Sortie :
 2. actions et suivis ;
 3. requis / besoins / points d'attention détectés ;
 4. courriel de suivi client ;
-5. flags `0o0o` intégrés dans les livrables quand une validation est nécessaire.
+5. flags `tk` intégrés dans les livrables quand une validation est nécessaire.
 
 ### 4.2 Mode synthèse courriel
 
@@ -102,7 +102,7 @@ Sortie :
 
 1. synthèse condensée ;
 2. courriel client ;
-3. flags `0o0o` si nécessaire.
+3. flags `tk` si nécessaire.
 
 ### 4.3 Mode courriel seulement
 
@@ -116,7 +116,7 @@ Déclencheurs :
 Sortie :
 
 1. courriel prêt à envoyer ou marqué comme nécessitant une revue ;
-2. flags `0o0o` directement dans le livrable si nécessaire.
+2. flags `tk` directement dans le livrable si nécessaire.
 
 ### 4.4 Mode actions seulement
 
@@ -134,7 +134,7 @@ Sortie :
 2. actions G24 ;
 3. responsables ;
 4. échéances ;
-5. flags `0o0o` si une validation est nécessaire.
+5. flags `tk` si une validation est nécessaire.
 
 ### 4.5 Mode requis seulement
 
@@ -154,7 +154,7 @@ Sortie :
 3. contexte ;
 4. critère de succès si identifiable ;
 5. priorité et complexité si raisonnablement estimables ;
-6. flags `0o0o` si une validation est nécessaire.
+6. flags `tk` si une validation est nécessaire.
 
 ## 5. Format — Synthèse de rencontre complète
 
@@ -226,13 +226,13 @@ Utiliser cette structure pour le mode par défaut.
 
 ### 6.1 Règle de statut
 
-Si le courriel contient au moins un flag `0o0o`, indiquer :
+Si le courriel contient au moins un flag `tk`, indiquer :
 
 ```markdown
 **Statut :** Revue requise avant envoi
 ```
 
-Si le courriel ne contient aucun flag `0o0o`, indiquer :
+Si le courriel ne contient aucun flag `tk`, indiquer :
 
 ```markdown
 **Statut :** Prêt à envoyer
@@ -312,7 +312,7 @@ Si une action a une information critique incertaine, utiliser le flag dans la ce
 Exemple :
 
 ```markdown
-| Envoyer les accès | 0o0o **VALIDATION À FAIRE:** le responsable n'est pas confirmé. | Vendredi | À faire |
+| Envoyer les accès | tk **VALIDATION À FAIRE:** le responsable n'est pas confirmé. | Vendredi | À faire |
 ```
 
 ## 8. Format — Requis seulement
@@ -390,7 +390,7 @@ Quand un requis est de type Technique et concerne Zoho, préciser le sous-type p
 | Moyenne | Amélioration importante, attendue pour la phase en cours |
 | Basse | Nice-to-have, peut attendre une phase ultérieure |
 
-Si la complexité ou la priorité est estimée plutôt que confirmée, ajouter un flag `0o0o`.
+Si la complexité ou la priorité est estimée plutôt que confirmée, ajouter un flag `tk`.
 
 ## 9. Règles d'extraction
 
@@ -431,7 +431,7 @@ Chaque action doit être concrète et vérifiable.
 | « On va... », « On s'occupe de... » | G24 si le contexte indique l'équipe G24 |
 | « Alexandre va... » | Alexandre |
 | « [Nom] s'en occupe » | [Nom] |
-| Non spécifié | Flag `0o0o` si critique |
+| Non spécifié | Flag `tk` si critique |
 
 ### 9.4 Échéances
 
@@ -461,25 +461,27 @@ Repérer notamment :
 
 Ne pas limiter les requis aux aspects techniques. Inclure aussi les besoins métier, fonctionnels, de documentation et de formation.
 
-## 10. Flags de revue utilisateur avec `0o0o`
+## 10. Flags de revue utilisateur avec `tk`
 
 ### 10.1 Objectif
 
-Permettre à l'utilisateur de faire `CTRL+F` sur `0o0o` et de retrouver rapidement les points qui méritent une revue.
+Permettre à l'utilisateur de faire `CTRL+F` sur `tk` et de retrouver rapidement les points qui méritent une revue.
 
 ### 10.2 Format canonique
+
+Suivre la définition de `tk` dans `$oem`, section Definitions.
 
 Utiliser exactement ce format :
 
 ```markdown
-0o0o **VALIDATION À FAIRE:** [élément à valider]
+tk **VALIDATION À FAIRE:** [élément à valider]
 ```
 
 Ne pas utiliser de variante comme `À valider`, `Validation`, `Review`, etc.
 
 ### 10.3 Quand utiliser le flag
 
-Utiliser `0o0o` quand :
+Utiliser `tk` quand :
 
 - une information est déduite mais non confirmée ;
 - le responsable d'une action est incertain ;
@@ -508,14 +510,14 @@ Préférer :
 
 ```markdown
 **Échéance :**
-0o0o **VALIDATION À FAIRE:** l'échéance n'a pas été confirmée.
+tk **VALIDATION À FAIRE:** l'échéance n'a pas été confirmée.
 ```
 
 Éviter :
 
 ```markdown
 **Échéance :** [Échéance à définir]
-0o0o **VALIDATION À FAIRE:** l'échéance n'a pas été confirmée.
+tk **VALIDATION À FAIRE:** l'échéance n'a pas été confirmée.
 ```
 
 ### 10.6 Flags dans tous les livrables
@@ -527,7 +529,7 @@ Les flags peuvent apparaître dans tous les livrables, y compris :
 - requis ;
 - courriel client.
 
-Si un courriel client contient au moins un flag `0o0o`, son statut doit être `Revue requise avant envoi`.
+Si un courriel client contient au moins un flag `tk`, son statut doit être `Revue requise avant envoi`.
 
 ## 11. Placeholders obligatoires
 
@@ -543,7 +545,7 @@ Utiliser les placeholders pour les informations manquantes non critiques.
 | Requis flou non critique | `[À préciser]` |
 | Faisabilité incertaine non critique | `[À valider techniquement]` |
 
-Pour une information critique, utiliser plutôt `0o0o **VALIDATION À FAIRE:**`.
+Pour une information critique, utiliser plutôt `tk **VALIDATION À FAIRE:**`.
 
 ## 12. Simplification du jargon
 
@@ -591,6 +593,6 @@ Avant de finaliser, vérifier :
 - Les échéances critiques sont indiquées ou flaggées.
 - Les requis sont séparés des simples idées.
 - Les besoins ne sont pas limités aux aspects techniques.
-- Les flags utilisent exactement `0o0o **VALIDATION À FAIRE:**`.
-- Si le courriel contient un flag `0o0o`, le statut est `Revue requise avant envoi`.
+- Les flags utilisent exactement `tk **VALIDATION À FAIRE:**`.
+- Si le courriel contient un flag `tk`, le statut est `Revue requise avant envoi`.
 - Aucune mention d'un fournisseur ou d'un outil IA n'est présente dans le livrable.

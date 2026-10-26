@@ -39,7 +39,7 @@ Il ne sert pas à :
 - les sections `Relations` décrivent le modèle conceptuel
 - les sections `Définitions` décrivent le sens local des termes
 - les formes sous Éviter ne sont pas des alias normatifs
-- les marqueurs `0o0o` signalent des ambiguïtés terminologiques à trancher
+- les marqueurs `tk` signalent des ambiguïtés terminologiques à trancher
 - les noms officiels d’acteurs, rôles, systèmes, domaines ou taxonomies sont
   conservés dans leur forme source
 

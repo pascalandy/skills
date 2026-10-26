@@ -80,6 +80,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - AFK: away from keyboard
 - HITL: human in the loop
 - harness: Pi, Codex, OpenCode, Grok, Claude Code
+- `tk`: the agent's review flag, written plain, with no brackets or parentheses. `0o0o` is Pascal's own flag: preserve it, never add it
 
 Boundaries between:
 
