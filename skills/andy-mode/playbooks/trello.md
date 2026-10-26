@@ -102,7 +102,7 @@ Run **Setup** and the resolver first. Set `since` to the requested ISO 8601 date
 set -o pipefail
 since='2026-10-01T00:00:00Z'
 fct_trello_actions() {
-  local action_filter="$1" before='' page
+  local action_filter="$1" before='' page count
   while :; do
     page="$(curl --fail --silent --show-error --get "https://api.trello.com/1/boards/${board_id}/actions" \
       --data-urlencode "key=$TRELLO_API_KEY" \
@@ -111,7 +111,8 @@ fct_trello_actions() {
       --data-urlencode "since=$since" \
       --data-urlencode "before=$before" \
       --data-urlencode "limit=1000")" || return 1
-    [ "$(printf '%s\n' "$page" | jq 'length')" -gt 0 ] || break
+    count="$(printf '%s\n' "$page" | jq 'length')" || return 1
+    [ "$count" -gt 0 ] || break
     printf '%s\n' "$page" | jq -c '.[]' || return 1
     before="$(printf '%s\n' "$page" | jq -r 'last.id')" || return 1
   done
