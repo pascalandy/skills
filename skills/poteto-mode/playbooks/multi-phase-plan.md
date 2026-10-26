@@ -135,7 +135,7 @@ Each live lane runs at the PR head in an isolated workspace or verified remote e
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Applicable review-agent findings triaged, or no review agent configured.
 - [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] <The owner squash-merges its own PR, or the root appends it to the base-branch stack and the operator lands it bottom-up.>
+- [ ] <The landing rule recorded under Verdict and merge for this PR.>
 
 ## Close the program
 
