@@ -372,8 +372,8 @@ stays empty and the last line of stderr names each broken property under
 parent-child grids on stderr.
 
 examples:
-  uv run authoring/andy-devtools/brigade-mode/references/model.py
-  uv run authoring/andy-devtools/brigade-mode/references/model.py --verbose
+  uv run authoring/andy/brigade-mode/references/model.py
+  uv run authoring/andy/brigade-mode/references/model.py --verbose
   just check --only brigade-carpaccio"""
 
 EXIT_CODES = exit_codes(

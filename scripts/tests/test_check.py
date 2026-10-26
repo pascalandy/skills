@@ -592,9 +592,9 @@ def test_repository_dependency_changes_select_their_test_modules(
 @pytest.mark.parametrize(
     ("changed_path", "selected"),
     [
-        ("authoring/andy-devtools/brigade-mode/playbooks/carpaccio/carpaccio.md", True),
-        ("authoring/andy-devtools/brigade-mode/references/model.py", True),
-        ("authoring/andy-devtools/headless/SKILL.md", False),
+        ("authoring/andy/brigade-mode/playbooks/carpaccio/carpaccio.md", True),
+        ("authoring/andy/brigade-mode/references/model.py", True),
+        ("authoring/andy/headless/SKILL.md", False),
         ("scripts/check.py", True),
         (None, True),
     ],
@@ -604,8 +604,8 @@ def test_brigade_carpaccio_runs_when_brigade_mode_changes(
     routing_repo: Path, changed_path: str | None, selected: bool
 ) -> None:
     row = next(row for row in check.CHECKS if row.name == "brigade-carpaccio")
-    skill(routing_repo / "authoring/andy-devtools", "brigade-mode")
-    skill(routing_repo / "authoring/andy-devtools", "headless")
+    skill(routing_repo / "authoring/andy", "brigade-mode")
+    skill(routing_repo / "authoring/andy", "headless")
     if changed_path:
         publish_base(routing_repo, changed_path)
 

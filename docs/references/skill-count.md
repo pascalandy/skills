@@ -7,8 +7,7 @@ description: How many skills authoring/ holds, by category and kind
 
 | Category | General | Dev | Unknown | Total |
 |---|---|---|---|---|
-| andy | 16 | 0 | 0 | 16 |
-| andy-devtools | 1 | 13 | 0 | 14 |
+| andy | 17 | 13 | 0 | 30 |
 | matt | 5 | 2 | 0 | 7 |
 | poteto | 2 | 24 | 0 | 26 |
 | verify-loops | 0 | 3 | 0 | 3 |
