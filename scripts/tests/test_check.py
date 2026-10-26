@@ -318,12 +318,11 @@ def test_pyright_targets_the_highest_declared_minimum_under_its_path(
     assert command[-1] == path
 
 
-def test_the_shared_cli_block_keeps_its_explicit_python_3_10_floor(
-    root: Path,
-) -> None:
-    script(root / "scripts/_cli.py", 'requires-python = ">=3.13"')
-
-    command = check.pyright("scripts/_cli.py", python="3.10")
+def test_the_typecheck_row_keeps_the_shared_cli_blocks_python_3_10_floor() -> None:
+    row = next(row for row in check.CHECKS if row.name == "typecheck")
+    command = next(
+        command for command in row.commands if command[-1] == "scripts/_cli.py"
+    )
 
     assert command[command.index("--pythonversion") + 1] == "3.10"
 
