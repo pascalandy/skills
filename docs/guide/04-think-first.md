@@ -1,4 +1,4 @@
-# Think before the agent acts
+# Think before you decide
 
 `feel-me` aligns the agent on a task to carry out. The following tools help you collect ideas or examine a decision before you commit.
 
