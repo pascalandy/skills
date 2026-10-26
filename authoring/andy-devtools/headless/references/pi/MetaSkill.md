@@ -16,6 +16,15 @@ With terminal stdin and stdout, plain `pi` opens the TUI. Redirecting either str
 
 For a complete review run, prepare an absolute prompt-file path that defines the scope, criteria, and expected findings. Take `provider`, `model`, and `reasoning-level` from the `[pi]` table of [config.toml](../../config.toml), unless the request names others, and pass them as `--model <provider>/<model>` and `--thinking <reasoning-level>`. Several providers serve one model, so the provider picks the account that pays. Before running, confirm the pair with `pi --list-models <model>` and check provider authentication. Pi [clamps thinking to supported levels](https://pi.dev/docs/latest/cli#models); `--thinking` requests a level but does not prove the provider uses it.
 
+For Opus 5.5 paid through OpenRouter, check the connection and model before using the review recipe below:
+
+```bash
+pi auth check --provider openrouter --json
+pi --list-models openrouter/anthropic/claude-opus-5.5
+```
+
+Require the `status` field to be `ready` and a row for that provider and model. In the recipe, set `model="openrouter/anthropic/claude-opus-5.5"` and set `thinking` from the request or `[pi]` as usual. The `claude-code` provider uses the Claude Code connection; selecting the OpenRouter provider keeps the review on OpenRouter. If either check fails, report it instead of selecting another provider. Warnings about other models in `--list-models` do not invalidate a matching OpenRouter row. The authentication check alone does not prove that a live request will work.
+
 ```bash
 repo="/absolute/path/to/repository"
 prompt_file="/absolute/path/to/reviewer-prompt.md"
@@ -29,7 +38,7 @@ review_status=0
   pi --print \
     --model "$model" \
     --thinking "$thinking" \
-    --no-session --no-extensions --no-approve \
+    --no-session --no-extensions --no-mcp --no-approve \
     --tools read,grep,find,ls \
     < "$prompt_file" \
     > "$review_dir/result.md" \
@@ -44,13 +53,13 @@ printf 'Exit status: %s\nReview files: %s\n' \
   "$review_status" "$review_dir"
 ```
 
-`result.md` contains the final assistant text; Pi exits 0 when that text is empty, so the recipe checks for it. `--no-approve` ignores the reviewed repository's trust-gated settings, extensions, and skills, which print mode otherwise loads when a saved trust decision or `defaultProjectTrust: "always"` allows them. Print mode alone does not restrict tools: this allowlist excludes shell execution and edits. Supply a diff in the prompt file when needed; this tool set cannot run tests or obtain a diff through Bash.
+`result.md` contains the final assistant text; Pi exits 0 when that text is empty, so the recipe checks for it. `--no-approve` ignores the reviewed repository's trust-gated settings, extensions, and skills, which print mode otherwise loads when a saved trust decision or `defaultProjectTrust: "always"` allows them. Print mode alone does not restrict tools: the built-in allowlist excludes shell execution and edits, and `--no-mcp` excludes MCP tools. Supply a diff in the prompt file when needed; this tool set cannot run tests or obtain a diff through Bash.
 
 For an event stream, select `--mode json`:
 
 ```bash
 pi --mode json --model "$model" --thinking "$thinking" \
-  --no-session --no-extensions --no-approve --tools read,grep,find,ls \
+  --no-session --no-extensions --no-mcp --no-approve --tools read,grep,find,ls \
   "Review this diff and inspect related files" \
   < diff.patch > events.jsonl 2> review.stderr.log
 ```
@@ -67,8 +76,9 @@ pi --mode json --model "$model" --thinking "$thinking" \
 | `--append-system-prompt <text-or-file>` | Add instructions |
 | `--prompt-template <path>` | Load a prompt template |
 | `--no-tools` | Disable tools |
-| `--tools <names>` | Allow only the named tools |
+| `--tools <names>` | Allow named tools; use `--no-mcp` to exclude MCP tools |
 | `--no-extensions` | Disable extension discovery |
+| `--no-mcp` | Disable MCP servers and their tools |
 
 Prefer explicit session IDs over latest-session selection when runs overlap.
 
