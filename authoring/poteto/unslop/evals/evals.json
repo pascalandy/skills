@@ -18,7 +18,7 @@
     "files": ["evals/fixtures/brouillon.md"],
     "expected_behavior": [
       "Reads references/french.md before editing",
-      "Writes the result in French with « » quotes and ’ apostrophes by default, and keeps the two dialogue dashes",
+      "Writes French with ’ for every prose apostrophe, converts the direct quotation in the second dialogue line to « », and keeps both dialogue dashes",
       "Removes the prose em dash while preserving the dialogue and every fact",
       "Removes moment charnière, témoignage, Afin de, favoriser, fait office de, mettant en lumière, Il est important de noter, Selon des rapports du secteur, paysage, and J'espère que ça aide",
       "Keeps Tidewater, version 2.4, the export command, and synchronisation 40 % plus rapide"
