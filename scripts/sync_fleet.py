@@ -186,8 +186,8 @@ step() {
     fi
     if [ ! -e "$private" ]; then
         :
-    elif [ "$(git -C "$private" symbolic-ref --short -q HEAD)" != main ]; then
-        printf '%s\n' "private-needs $private is not on main; switch it to main, then rerun"
+    elif branch=$(git -C "$private" symbolic-ref --short -q HEAD); [ "$branch" != main ]; then
+        printf '%s\n' "private-needs $private is on ${branch:-a detached HEAD}; switch it to main, then rerun"
     elif [ -n "$(git -C "$private" status --porcelain)" ]; then
         printf '%s\n' "private-needs $private has uncommitted edits; move them to a worktree of skills-private and open a PR, then rerun"
     else
@@ -250,8 +250,8 @@ step() {
     fi
 }
 """
-# Prints the private clone's state as sync_private.state() reports it, then
-# the installer's preview, from which installed() finds the drift.
+# Prints a private-branch refusal and the clone's state, then the installer's
+# preview, from which installed() finds the drift.
 CHECK = """
 step() {
     enter "$1" || return
@@ -260,6 +260,10 @@ step() {
     elif [ ! -e "$private" ]; then
         echo "private - missing"
     else
+        branch=$(git -C "$private" symbolic-ref --short -q HEAD) || branch=
+        if [ "$branch" != main ]; then
+            printf '%s\n' "private-needs $private is on ${branch:-a detached HEAD}; switch it to main, then rerun"
+        fi
         head=$(git -C "$private" rev-parse -q --verify HEAD) || head=-
         if [ -n "$(git -C "$private" status --porcelain)" ]; then
             echo "private $head dirty"
@@ -508,13 +512,19 @@ def waiting(changes: list[list[str]]) -> list[str]:
     ]
 
 
-def installed(machine: Machine, source: Source) -> Outcome | list[str]:
+def installed(machine: Machine, source: Source, mode: str) -> Outcome | list[str]:
     """Run the CHECK step: what differs on the machine, from its private clone
     to each install target; an Outcome when it fails."""
     code, lines = remote(machine, CHECK, machine.path)
     if code:
         return failure(machine.name, code, lines)
-    problems: list[str] = []
+    problems = [
+        line.removeprefix("private-needs ")
+        for line in lines
+        if line.startswith("private-needs ")
+    ]
+    if problems and mode == "preview":
+        return Outcome(machine.name, "needs-you", "; ".join(problems))
     for line in lines:
         if line.startswith("private ") and len(fields := line.split()) == 3:
             problems.extend(private_problems(fields[1], fields[2], source.private))
@@ -550,12 +560,14 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
     if mode == "check":
         if behind:
             problems.append(f"checkout is behind GitHub at {head[:7]}")
-        found = installed(machine, source)
+        found = installed(machine, source, mode)
         if isinstance(found, Outcome):
             return found
         problems += found
         status = "drift" if problems else "converged"
-        return Outcome(machine.name, status, "; ".join(problems) or status)
+        return Outcome(
+            machine.name, status, "; ".join(dict.fromkeys(problems)) or status
+        )
     if problems:
         return Outcome(machine.name, "needs-you", "; ".join(problems))
     if mode == "preview":
@@ -568,7 +580,7 @@ def sync_machine(machine: Machine, source: Source, mode: str) -> Outcome:
             )
         # At GitHub's main already, a sync would still pull the
         # private clone and install what differs
-        pending = installed(machine, source)
+        pending = installed(machine, source, mode)
         if isinstance(pending, Outcome):
             return pending
         detail = "; ".join(pending) or f"ready; already at {head[:7]}"
