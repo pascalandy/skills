@@ -17,6 +17,6 @@ The `image-creator` skill is the default image tool in every harness, through th
 - Write candidates to a scratch folder outside the export destination, using a fresh output stem for each retry. Preserve the originals and copy the kept candidate to the filename required by step 5 of the illustration playbook
 - Pass every user-provided reference image needed for the result with `edit --image`, repeating `--image` in the supplied order. If required references exceed the plan's input limit, report the limitation instead of dropping them or changing backend
 
-The plan CLI needs network access and writes under the Codex home. If a sandbox blocks these, follow the harness's permission workflow; if access remains unavailable, report the permission limitation and stop. A sandbox denial does not establish that the plan is disconnected.
+The plan backend runs `codex exec`, which needs network access and writes under the Codex home. If a sandbox blocks these, follow the harness's permission workflow; if access remains unavailable, report the permission limitation and stop. A sandbox denial does not establish that `plan.ready` is false.
 
-If `image-creator` is unavailable, report the limitation and stop. When the plan backend applies and `doctor` reports that the plan is not connected, report the limitation and stop; this does not authorize a paid fallback.
+If `image-creator` is unavailable, report the limitation and stop. When the plan backend applies and `doctor` reports `plan.ready: false`, report its `detail` and stop; this does not authorize a paid fallback.
