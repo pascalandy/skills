@@ -297,6 +297,37 @@ def script(path: Path, requires: str) -> None:
 
 
 @pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("scripts", "3.13"),
+        ("scripts/alpha.py", "3.10"),
+        ("scripts/undeclared", "3.11"),
+    ],
+    ids=["highest-in-folder", "single-file", "no-minimum"],
+)
+def test_pyright_targets_the_highest_declared_minimum_under_its_path(
+    root: Path, path: str, expected: str
+) -> None:
+    script(root / "scripts/alpha.py", 'requires-python = ">=3.10"')
+    script(root / "scripts/nested/helper.py", 'requires-python = ">=3.12, >=3.13"')
+    script(root / "scripts/undeclared/helper.py", 'requires-python = "~=3.10"')
+
+    command = check.pyright(path)
+
+    assert command[command.index("--pythonversion") + 1] == expected
+    assert command[-1] == path
+
+
+def test_the_typecheck_row_keeps_the_shared_cli_blocks_python_3_10_floor() -> None:
+    row = next(row for row in check.CHECKS if row.name == "typecheck")
+    command = next(
+        command for command in row.commands if command[-1] == "scripts/_cli.py"
+    )
+
+    assert command[command.index("--pythonversion") + 1] == "3.10"
+
+
+@pytest.mark.parametrize(
     "requires",
     [
         'requires-python = ">=3.13"',
