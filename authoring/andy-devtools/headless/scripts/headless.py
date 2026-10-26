@@ -3,11 +3,12 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Run Codex, Claude Code, or Grok Build as a child agent that reviews
-read-only, reviews and fixes, or runs the CLI's own code review, then answer in
-one JSON line with the file that holds the child's answer, the model that ran,
-its effort and session, and the files it changed. One command shape per run
-keeps headless use deterministic."""
+"""Run Codex, Claude Code, or Grok Build as a child agent.
+
+The child can review only, review and fix, or run the CLI's own code review.
+The script answers in one JSON line with the answer file, model, effort,
+session, and changed files. One command form keeps headless use deterministic.
+"""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -396,9 +397,9 @@ GROK_EDIT_TOOLS = "search_replace,write,edit,hashline_edit,apply_patch"
 
 EXIT_CODES = exit_codes(
     {
-        1: "the child failed, gave no answer, was denied a tool, or changed the "
-        "checkout under --review-only or --code-review; or the config is invalid",
-        TEMPORARY: "a login check timed out; rerun",
+        1: "child failure, empty answer, denied tool, changed checkout under "
+        "--review-only or --code-review, or invalid config",
+        TEMPORARY: "login check timed out. Rerun the command",
     }
 )
 
@@ -411,11 +412,11 @@ examples:
   headless.py grok --code-review --uncommitted --cwd ~/projects/app
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
 
-Without a CLI name, the launcher runs the config's harness, and --code-review
-runs Codex. Flags after -- go to the child CLI unchanged, except sandbox-bypass
-flags under --code-review. On success, stdout holds one JSON line: ok, file,
-the path of the answer, then model, effort, session, and changed. The answer
-file's folder also keeps the prompt and the child's logs."""
+Without a CLI name, the launcher runs the config's harness. Under
+--code-review, it runs Codex. Flags after -- reach the child CLI unchanged,
+except sandbox-bypass flags under --code-review. On success, stdout holds
+one JSON line with ok, file, model, effort, session, and changed. The file
+field names the answer file. Its folder also holds the prompt and child logs."""
 
 
 @dataclass(frozen=True)
@@ -1301,7 +1302,7 @@ def build_parser() -> Parser:
         "target",
         nargs="?",
         choices=sorted(RUNNERS),
-        help="child CLI to run (default: harness in the config; codex for --code-review)",
+        help="child CLI to run. Default: config harness, or Codex for --code-review",
     )
     access = parser.add_mutually_exclusive_group(required=True)
     access.add_argument(
@@ -1309,8 +1310,8 @@ def build_parser() -> Parser:
         dest="mode",
         action="store_const",
         const="review-only",
-        help="report findings; the run fails if the checkout changed, "
-        "and Claude and Grok run without their file-editing tools",
+        help="report findings. The run fails if the checkout changes. "
+        "Claude Code and Grok run without file-editing tools",
     )
     access.add_argument(
         "--review-fix",
@@ -1324,22 +1325,22 @@ def build_parser() -> Parser:
         dest="mode",
         action="store_const",
         const="code-review",
-        help="run the CLI's own reviewer read-only: codex exec review, or the "
-        "/review of Claude Code or Grok; the run fails if the checkout changed",
+        help="run the CLI's own reviewer read-only: codex exec review, or "
+        "/review in Claude Code or Grok. The run fails if the checkout changes",
     )
     parser.add_argument(
         "--prompt-file",
         metavar="FILE",
-        help="the task for the child; - reads stdin. Required by --review-only and "
-        "--review-fix; with codex --code-review, custom review instructions in place "
-        "of a diff to review",
+        help="task for the child. Use - to read stdin. Required by --review-only "
+        "and --review-fix. Under codex --code-review, custom review instructions "
+        "replace the diff",
     )
     diff = parser.add_mutually_exclusive_group()
     diff.add_argument(
         "--base",
         metavar="BRANCH",
-        help="with --code-review: review the changes against BRANCH; grok "
-        "takes only origin/main, or origin/master without it",
+        help="with --code-review, review changes against BRANCH. Grok accepts "
+        "only origin/main, or origin/master when origin/main is missing",
     )
     diff.add_argument(
         "--uncommitted",
@@ -1371,13 +1372,13 @@ def build_parser() -> Parser:
     )
     parser.add_argument(
         "--model",
-        help="model for the child; codex --code-review passes it as review_model too "
-        "(default: model in the config)",
+        help="model for the child. Codex --code-review also passes it as "
+        "review_model (default: model in the config)",
     )
     parser.add_argument(
         "--effort",
-        help="reasoning level, passed to codex as model_reasoning_effort, "
-        "to claude as --effort, and to grok as --reasoning-effort "
+        help="reasoning level. Codex gets model_reasoning_effort, Claude Code "
+        "gets --effort, and Grok gets --reasoning-effort "
         "(default: reasoning-level in the config)",
     )
     parser.add_argument(

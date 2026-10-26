@@ -1,12 +1,35 @@
 # Maintain the headless skill
 
-Update documentation without installing or upgrading CLIs or invoking billable model runs by default.
+Update documentation without installing or upgrading CLIs by default. Do not invoke billable model runs by default.
 
-1. Read the affected CLI's installed help and official source below. Record version differences instead of claiming universal behavior
-2. Keep Codex, Claude, and Grok flags in `scripts/headless.py`, every harness's default model and reasoning level in `config.toml`, other CLIs' flags and examples in their reference, and definitions in the glossary. Leave delegation policy to the calling workflow
-3. Remove superseded recipes and stale model or local-agent lists. Discover availability at runtime instead of maintaining a second catalog
-4. Check routing from SKILL.md, relative links, stdin handling, permissions, output separation, and exit status. Use parser or stub checks for shell examples; run live model calls only when behavioral evidence needs them and the task authorizes them. After a Codex, Claude Code, or Grok update, run `just check --only headless`, then one live `--effort low` review per CLI and one `--code-review --effort low` run per CLI, `--uncommitted` for Codex and Grok and `--base <branch>` for Claude, and confirm the `model` each run answers with
-5. Run repository validators and regenerate distributed skills according to the repository's AGENTS.md. Commit source and generated output together
+1. Read the affected CLI's installed help and official source below
+2. Record version differences instead of claiming universal behavior
+3. Keep Codex, Claude, and Grok flags in `scripts/headless.py`
+4. Keep each CLI's default model and reasoning level in `config.toml`
+5. Keep other CLIs' flags and examples in their references
+6. Keep definitions in the glossary
+7. Leave delegation policy to the calling workflow
+8. Remove superseded recipes and stale model or local-agent lists
+9. Discover availability at runtime instead of maintaining a second catalog
+10. Check these parts of the procedure:
+    - Routing from `SKILL.md`
+    - Relative links
+    - Standard input handling
+    - Permissions
+    - Output separation
+    - Exit status
+11. Use parser or stub checks for shell examples
+
+COST: Run a live model call only when the task authorizes it and behavioral evidence needs it. A live call can consume plan quota or API credit.
+
+12. After a Codex, Claude Code, or Grok update, run `just check --only headless`
+13. For each updated CLI, run one live `--effort low` review
+14. For each updated CLI, run one `--code-review --effort low` review
+15. For the code review, use `--uncommitted` with Codex or Grok and `--base <branch>` with Claude
+16. Confirm the `model` that answers each live review
+17. Run the repository validators according to its `AGENTS.md`
+18. Regenerate distributed skills according to its `AGENTS.md`
+19. Commit source and generated output together
 
 | Reference | Local checks | Official source |
 | --- | --- | --- |
