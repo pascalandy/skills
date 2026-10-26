@@ -512,6 +512,11 @@ def failure(check: Check, verbose: bool) -> Failure | None:
                 stdout=sys.stderr if verbose else subprocess.PIPE,
                 stderr=None if verbose else subprocess.STDOUT,
                 text=True,
+                # Test suites create repositories; a hook's Git context must not
+                # redirect their git calls. Validators may need GIT_INDEX_FILE.
+                env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+                if "pytest" in command
+                else None,
             )
         except OSError as exc:
             return Failure(
