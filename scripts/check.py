@@ -333,6 +333,14 @@ CHECKS = [
     ),
     Check(
         "html-mode",
+        (
+            "uvx",
+            "--from",
+            PLAYWRIGHT,
+            "playwright",
+            "install",
+            "chromium-headless-shell",
+        ),
         uv_run(f"{HTML_MODE}/check_html_mode.py"),
         *ruff(f"{HTML_MODE}/check_page.py"),
         *ruff(f"{HTML_MODE}/tests"),
