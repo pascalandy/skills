@@ -364,6 +364,11 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
     ("description", "form_warning", "actor_warning"),
     [
         ("Use only when explicitly invoked as `widget`.", False, False),
+        (
+            "Use only when explicitly invoked as `widget`. Never run automatically.",
+            False,
+            False,
+        ),
         ("USE  only WHEN explicitly  INVOKED as `widget`.", False, False),
         (
             "Use only when explicitly invoked as `widget`. Help the user learn Python.",
@@ -372,6 +377,29 @@ def test_command_exits_with_the_error_status(tmp_path: Path) -> None:
         ),
         ("Use only when explicitly invoked as widget.", True, False),
         ("Use only when explicitly invoked as `widget` by the user.", False, True),
+        ("Use only when invoking `widget`.", True, False),
+        ("Use only when mentioning `widget`.", True, False),
+        *[
+            (
+                f'Use only when a request contains "Help{punctuation} Please" or the user mentions `widget`.',
+                True,
+                True,
+            )
+            for punctuation in ("!", "?", ".")
+        ],
+        (
+            "Use only when a request contains 'Help! Please' or the user mentions `widget`.",
+            True,
+            True,
+        ),
+        *[
+            (
+                f"Use only when explicitly invoked as `ship it{punctuation} now`.",
+                False,
+                False,
+            )
+            for punctuation in ("!", "?", ".")
+        ],
         *[
             (f"Use only when the user {verb} `widget`.", True, True)
             for verb in (
