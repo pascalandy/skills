@@ -42,6 +42,8 @@ This step is complete when every surviving branch changes the agent's process an
 
 Prefer the first structure that keeps routing predictable.
 
+Only the root is named `SKILL.md`. Use `MetaSkill.md` for internal executable branches when recursive scanners would otherwise register competing skills. Use ordinary Markdown files for reference-only topics or operations.
+
 ### Conditional references
 
 Use this for a small set of branches whose selection table fits cleanly in `SKILL.md`:
@@ -50,15 +52,29 @@ Use this for a small set of branches whose selection table fits cleanly in `SKIL
 skill-name/
 ├── SKILL.md
 └── references/
-    ├── branch-a.md
-    └── branch-b.md
+    ├── branch-a/
+    │   ├── MetaSkill.md
+    │   └── references/
+    └── branch-b/
+        └── MetaSkill.md
 ```
 
-The root owns the route and points directly to each reference. Do not add a `ROUTER.md` that repeats the same table.
+The root owns the route and links each branch directly, including branches with their own supporting files. For example, four language branches fit in `SKILL.md`:
+
+```markdown
+| Request | Load |
+|---|---|
+| Bash or shell scripts | [Bash](references/Bash/MetaSkill.md) |
+| Python with uv | [Python](references/Python/MetaSkill.md) |
+| TypeScript or JavaScript-with-types | [TypeScript](references/TypeScript/MetaSkill.md) |
+| Starlette or ASGI apps | [Starlette](references/Starlette/MetaSkill.md) |
+```
+
+Keep this table in the root without a `ROUTER.md` that repeats it.
 
 ### Routed collection
 
-Use this when the routing decision is substantial enough to obscure the root contract or when branches need their own disclosed files:
+Use this when the routing decision is substantial enough to obscure the root contract, such as seven lenses with composition notes in `coding-eng-laws`:
 
 ```text
 skill-name/
@@ -71,8 +87,6 @@ skill-name/
     └── branch-b/
         └── MetaSkill.md
 ```
-
-Only the root is named `SKILL.md`. Use `MetaSkill.md` for internal executable branches when recursive scanners would otherwise register competing skills. Use ordinary Markdown files for reference-only topics or operations.
 
 This step is complete when no shallower structure provides equally clear routing and progressive disclosure.
 
@@ -97,7 +111,19 @@ This step is complete when the root can route a naive request without loading ir
 
 Put branch-specific definitions, procedure, evidence rules, examples, and output constraints together. Use relative bundled paths and tell the agent when to read them.
 
-For a routed collection, keep routing decisions in one place. The root points to `references/ROUTER.md`; the router points to branches; a branch does not restate the full routing table.
+For a routed collection, keep routing decisions in one place. The root points to `references/ROUTER.md`; the router links branches with Markdown targets and names their starting folder on the first line after frontmatter. A branch does not restate the full routing table. For example, `references/ROUTER.md` starts:
+
+```markdown
+---
+description: "Select the branch for the request."
+---
+Resolve targets from `references/`, the folder containing this `ROUTER.md`.
+
+| Request | Load |
+|---|---|
+| Branch A's problem | [Branch A](branch-a/MetaSkill.md) |
+| Branch B's problem | [Branch B](branch-b/MetaSkill.md) |
+```
 
 Keep internal branches invisible to skill scanners. Do not make them independently invocable unless they have a genuinely separate trigger and deserve the additional discovery cost.
 
@@ -126,4 +152,4 @@ The meta-skill is complete when a user can invoke one name, describe the desired
 
 ## Portability
 
-Follow repository policy for source and applied paths. Inside generated skills, resolve files relative to the loaded `SKILL.md` or `MetaSkill.md`. Do not hardcode an assistant home, assume a particular agent harness, or require subagents unless the skill's actual job needs them.
+Follow repository policy for source and applied paths. Inside generated skills, resolve files relative to the document containing the link, including `SKILL.md`, `MetaSkill.md`, or `ROUTER.md`. Do not hardcode an assistant home, assume a particular agent harness, or require subagents unless the skill's actual job needs them.
