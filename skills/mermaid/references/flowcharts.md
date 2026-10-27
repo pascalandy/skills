@@ -410,7 +410,7 @@ flowchart TD
 5. **Start and end nodes** - Use stadium/pill shapes to mark entry/exit
 6. **Group related steps** - Use subgraphs for logical groupings
 7. **Color code** - Use colors to highlight different types of actions
-8. **Minimize crossing lines** - Reorganize for clarity
+8. **Minimize crossing lines** - Reorganize for clarity, keep meaningful return edges, and check the rendered result
 9. **Keep it focused** - One process per diagram
 
 ## Common Patterns
