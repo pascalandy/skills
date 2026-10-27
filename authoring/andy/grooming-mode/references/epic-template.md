@@ -3,7 +3,7 @@
 Every Story entry stands alone. Keep the same order as native sub-issue Rank.
 For cross-repo references, use `OWNER/REPO#N`.
 The Stories section holds only its ordered list, without other elements alongside it.
-Nested Today and After details may contain code blocks or quotes.
+Keep code blocks and quotes within nested Today and After details.
 
 Title: `Epic <N> · <outcome in plain words>`
 

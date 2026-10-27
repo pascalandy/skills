@@ -347,6 +347,8 @@ def test_noncanonical_repo_names_the_canonical_issue(tmp_path: Path) -> None:
     )
     assert "canonical" in answer["errors"][0]
     assert REF in answer["errors"][0]
+    assert "plan's repo" in answer["errors"][0]
+    assert "restoring access" not in answer["errors"][0]
     assert "differences" not in answer
 
 

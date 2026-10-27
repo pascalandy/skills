@@ -286,7 +286,9 @@ After approval, follow these three phases.
 
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
-   Before any phase 2 GitHub write, record each plan issue's parent, complete
+   Read the [readback format](references/readback.md) to identify the issues to record,
+   including the previous and new parents of every moved issue.
+   Before any phase 2 GitHub write, record each included issue's parent, complete
    native sub-issue order, labels, blockers including closed issues, and state.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
 4. Put dependent actions on the left-out list too.

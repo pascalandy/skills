@@ -37,7 +37,7 @@ supplies actual values only. Approved new issue numbers may be resolved after cr
 The example shows the format, not current GitHub values. The file has only the
 `issues` array, which is nonempty. Each row has exactly these seven required keys:
 
-- `repo` and positive integer `number` identify the issue
+- `repo` uses GitHub's canonical `OWNER/REPO` spelling, and `number` is a positive integer
 - `parent` is a canonical `OWNER/REPO#N` reference or `null` for no parent
 - `stories` contains all native sub-issue references in order, including closed
   issues. For an Epic these are Stories; for another issue these are its Sub-tasks.
@@ -55,7 +55,8 @@ with the standard library HTML parser. Under its single Stories heading, each
 direct ordered-list entry must contain exactly one parenthesized `(#N)` or
 `(OWNER/REPO#N)` reference. Nested detail lists do not add Stories.
 The entries must equal native order. Missing or unreadable sections, ambiguous
-references or link targets, multiple lists, and code blocks outside nested details fail.
+references or link targets, multiple lists, and code blocks or quotes outside
+nested details fail.
 The section holds only that ordered list, without other elements alongside it.
 Nested details may contain code blocks or quotes.
 GitHub renders Markdown, comments, and fences. The script does not reinterpret them.

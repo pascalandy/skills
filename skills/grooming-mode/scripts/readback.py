@@ -490,14 +490,15 @@ def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str
         if not isinstance(item, dict):
             raise TypeError("missing issue")
         canonical = url_ref(item["url"])
-        if canonical != issue.ref:
-            raise ValueError(
-                f"expected {issue.ref}, received {canonical}; use the canonical issue reference"
-            )
     except (ValueError, KeyError, TypeError, AttributeError) as error:
         raise ScriptError(
             f"{issue.ref}: unreadable GitHub response: {error}; rerun readback after restoring access"
         ) from error
+    if canonical != issue.ref:
+        raise ScriptError(
+            f"{issue.ref}: GitHub returned canonical {canonical}; check the approved "
+            "plan's repo spelling and issue number, then rerun readback"
+        )
     return item
 
 
