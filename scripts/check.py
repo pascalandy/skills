@@ -372,6 +372,13 @@ CHECKS = [
         reads=("authoring/andy/2nd-pass",),
     ),
     Check(
+        "grooming-mode",
+        *ruff("authoring/andy/grooming-mode/scripts"),
+        pyright("authoring/andy/grooming-mode/scripts/readback.py"),
+        # Keep process pressure bounded for this small subprocess-heavy suite
+        pytest("authoring/andy/grooming-mode/scripts/tests", parallel=False),
+    ),
+    Check(
         "corey-mode",
         *ruff(COREY_MODE),
         pyright(COREY_MODE),

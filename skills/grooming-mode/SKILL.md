@@ -286,6 +286,8 @@ After approval, follow these three phases.
 
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
+   Before any phase 2 GitHub write, record the preserved values of every issue the
+   [readback format](references/readback.md) includes.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
 4. Put dependent actions on the left-out list too.
    These actions include parent Ready labels and outcomes that rely on the changed item.
@@ -295,6 +297,9 @@ After approval, follow these three phases.
 Done when the unchanged approved actions and left-out actions are explicit
 
 ### 2. Apply the approved actions
+
+Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/));
+confirm `uv --version` before writing the plan for readback.
 
 1. Apply those actions with the reconciliation and native commands of label-for-issues.
    New actions need a new proposal.
@@ -307,22 +312,33 @@ Done when the unchanged approved actions and left-out actions are explicit
 5. Reconcile membership, native Story Rank, dependencies, labels, and cleanup.
 6. Attach a Milestone only to its approved home-repo Epics.
 7. If a write fails, suspend actions that depend on that write.
-8. Only after supporting body and relationship writes pass readback, apply Ready labels.
+8. Only after supporting body and relationship writes pass a direct reread, apply Ready labels.
    Otherwise, report the affected hierarchy as unready and report any unsupported existing Ready label.
 9. On a timeout, reread before a retry.
-10. After that readback, retry only missing operations.
+10. After that reread, retry only missing operations.
+11. Write the plan file in this run's own working folder as the
+    [readback format](references/readback.md) describes, and record its absolute path.
 
-Done when each approved action is applied or reported as failed
+Done when each approved action is applied or reported as failed, and the plan file
+exists unless no row could be resolved
 
 ### 3. Verify the writes
 
-1. Read back with the filters and paginated relations of label-for-issues.
-2. Compare every field and action in Proposal with GitHub.
-   Include agreement between native Rank and body Rank.
+1. If the plan file exists, from this skill's folder run
+   `uv run scripts/readback.py <absolute-plan-path>` and read its verdict.
+   Otherwise, report the script's comparisons as not run.
+   For its input and failure format, use the
+   [readback format](references/readback.md).
+2. With the filters and paginated relations of label-for-issues, compare the
+   remaining fields and actions in Proposal with GitHub.
    Each scoped issue must be placed, closed, or left out with its reason.
 3. Within approval, correct discrepancies.
-4. Reread the corrected actions.
+   Phase 2 step 8 still governs Ready labels.
+4. Resolve any newly created issue numbers as the readback format describes,
+   rerun the script once the plan file exists, and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
+   Report affected hierarchies as unready and identify unsupported Ready labels.
 
-Done when every write is verified or reported failed
+Done when the script confirms the issue fields and every other write is verified,
+or each failed or unperformed comparison or read is explicitly reported
