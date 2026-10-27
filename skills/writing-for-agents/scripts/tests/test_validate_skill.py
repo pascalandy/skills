@@ -240,6 +240,121 @@ def test_warnings_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> No
     )
 
 
+@pytest.mark.parametrize(
+    ("source", "target", "destination", "level"),
+    [
+        (
+            "playbooks/alpha/alpha.md",
+            "sop/check.md",
+            "playbooks/alpha/sop/check.md",
+            None,
+        ),
+        (
+            "playbooks/alpha/alpha.md",
+            "./sop/../sop/check.md#steps",
+            "playbooks/alpha/sop/check.md",
+            None,
+        ),
+        (
+            "playbooks/alpha/alpha.md",
+            "sop%2Fcheck.md?raw=1#steps",
+            "playbooks/alpha/sop/check.md",
+            None,
+        ),
+        (
+            "playbooks/alpha/alpha.md",
+            "../beta/check.md",
+            "playbooks/beta/check.md",
+            "warning",
+        ),
+        (
+            "playbooks/alpha/alpha.md",
+            "../alpha-extra/check.md",
+            "playbooks/alpha-extra/check.md",
+            "warning",
+        ),
+        (
+            "playbooks/alpha/alpha.md",
+            "../../references/check.md",
+            "references/check.md",
+            "warning",
+        ),
+        (
+            "playbooks/alpha/intro.md",
+            "sop/check.md",
+            "playbooks/alpha/sop/check.md",
+            "warning",
+        ),
+        (
+            "references/alpha/alpha.md",
+            "check.md",
+            "references/alpha/check.md",
+            "warning",
+        ),
+        (
+            "playbooks/alpha/nested/alpha.md",
+            "check.md",
+            "playbooks/alpha/nested/check.md",
+            "warning",
+        ),
+        ("playbooks/alpha/alpha.md", "sop/missing.md", None, "error"),
+        ("playbooks/alpha/alpha.md", "../beta/missing.md", None, "error"),
+    ],
+)
+def test_folder_route_link_scope(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    source: str,
+    target: str,
+    destination: str | None,
+    level: str | None,
+) -> None:
+    files = {source: f"Read [check]({target}).\n"}
+    if destination is not None:
+        files[destination] = "# Check\n"
+    root = skill(tmp_path, f"Read [entry]({source}).\n", files=files)
+
+    expected = []
+    if level == "error":
+        expected = [
+            f"{root}/{source}:1: error: BP_12 Links resolve: link to missing file '{target}'"
+        ]
+    elif level == "warning":
+        expected = [
+            f"{root}/{source}:1: warning: BP_01 Progressive disclosure: links to reference file '{target}'; link it from SKILL.md instead"
+        ]
+    assert run(capsys, root) == (int(level is not None), expected)
+
+
+@pytest.mark.parametrize("inside", [True, False])
+def test_folder_route_link_uses_resolved_destination(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], inside: bool
+) -> None:
+    source = "playbooks/alpha/alpha.md"
+    root = skill(
+        tmp_path,
+        f"Read [entry]({source}).\n",
+        files={
+            source: "Read [check](sop/link.md).\n",
+            "playbooks/alpha/check.md": "# Local\n",
+            "references/check.md": "# Shared\n",
+        },
+    )
+    link = root / "playbooks/alpha/sop/link.md"
+    link.parent.mkdir()
+    link.symlink_to(
+        root / ("playbooks/alpha/check.md" if inside else "references/check.md")
+    )
+    expected = (
+        []
+        if inside
+        else [
+            f"{root}/{source}:1: warning: BP_01 Progressive disclosure: links to reference file 'sop/link.md'; link it from SKILL.md instead"
+        ]
+    )
+    assert run(capsys, root) == (int(not inside), expected)
+
+
 def test_errors_only_leaves_warnings_to_verbose(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
