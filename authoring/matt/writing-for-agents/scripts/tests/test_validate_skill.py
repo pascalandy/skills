@@ -380,12 +380,64 @@ def test_errors_only_leaves_warnings_to_verbose(
     assert capsys.readouterr().err == f"{warning}\n"
 
 
+@pytest.mark.parametrize(
+    ("heading", "warns"),
+    [
+        ("## Contents", False),
+        ("## Table of contents", False),
+        ("**Contents**", False),
+        ("**Table of contents**", False),
+        ("## Sommaire", False),
+        ("**Sommaire**", False),
+        ("## Table des matières", False),
+        ("**Table des matières**", False),
+        ("# SOMMAIRE", False),
+        ("## Contenu", True),
+        ("", True),
+    ],
+)
 def test_contents_list_satisfies_bp_16(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], heading: str, warns: bool
 ) -> None:
-    reference = "# Long\n\n## Contents\n\n- [Part](#part)\n" + "text\n" * 100
+    reference = f"# Long\n\n{heading}\n\n- [Part](#part)\n" + "text\n" * 100
     root = skill(tmp_path, "Read [long](long.md).\n", files={"long.md": reference})
-    assert run(capsys, root) == (0, [])
+    expected = (
+        []
+        if not warns
+        else [
+            f"{root}/long.md:1: warning: BP_16 Contents list: 105 lines and no Contents list; ask the user before adding one"
+        ]
+    )
+    assert run(capsys, root) == (int(warns), expected)
+
+
+@pytest.mark.parametrize(
+    ("length", "heading_line", "warns"),
+    [(100, None, False), (101, None, True), (101, 25, False), (101, 26, True)],
+)
+def test_contents_list_thresholds(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    length: int,
+    heading_line: int | None,
+    warns: bool,
+) -> None:
+    lines = ["text"] * length
+    if heading_line is not None:
+        lines[heading_line - 1] = "## Sommaire"
+    root = skill(
+        tmp_path,
+        "Read [long](long.md).\n",
+        files={"long.md": "\n".join(lines) + "\n"},
+    )
+    expected = (
+        []
+        if not warns
+        else [
+            f"{root}/long.md:1: warning: BP_16 Contents list: 101 lines and no Contents list; ask the user before adding one"
+        ]
+    )
+    assert run(capsys, root) == (int(warns), expected)
 
 
 def test_folder_without_skill_md_is_a_usage_error(

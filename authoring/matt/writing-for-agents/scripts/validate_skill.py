@@ -441,7 +441,8 @@ DATED_RE = re.compile(
 )
 HEADING_RE = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*)")
 CONTENTS_RE = re.compile(
-    r"^\s*(?:#{1,6}\s*|\*\*)?(?:table of )?contents\b", re.IGNORECASE
+    r"^\s*(?:#{1,6}\s*|\*\*)?(?:(?:table of )?contents|sommaire|table des matières)\b",
+    re.IGNORECASE,
 )
 
 Level = Literal["error", "warning"]
