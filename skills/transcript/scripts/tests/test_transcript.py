@@ -124,11 +124,29 @@ class TestListModels:
         assert code == 0
         assert json.loads(stdout)["models"] == [
             "gpt-6-astra",
-            "gpt-5.6-sol",
+            "gpt-6.1-sol",
         ]
 
 
 class TestProfiles:
+    def test_configured_profiles_keep_the_preference_order_and_default(self) -> None:
+        stdout, stderr, code = run_script("list", "profiles")
+
+        assert code == 0
+        assert stderr == ""
+        payload = json.loads(stdout)
+        assert payload["default"] == "opus"
+        assert [
+            (profile["name"], profile["provider"], profile["model"], profile["effort"])
+            for profile in payload["profiles"]
+        ] == [
+            ("opus", "claude", "claude-opus-5-5", "xhigh"),
+            ("astra", "codex", "gpt-6-astra", "low"),
+            ("sol", "codex", "gpt-6.1-sol", "xhigh"),
+            ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
+            ("sonnet", "claude", "claude-sonnet-5-5", "xhigh"),
+        ]
+
     def test_profile_discovery_lists_the_ordered_inference_choices(
         self, monkeypatch, capsys
     ) -> None:
@@ -169,30 +187,31 @@ class TestProfiles:
     @pytest.mark.parametrize(
         "profile,expected",
         [
-            ("sol", ("codex", "gpt-5.6-sol", "medium")),
+            ("opus", ("claude", "claude-opus-5-5", "xhigh")),
+            ("astra", ("codex", "gpt-6-astra", "low")),
+            ("sol", ("codex", "gpt-6.1-sol", "xhigh")),
             ("glm", ("openrouter", "z-ai/glm-5.3-flash", "medium")),
-            ("sonnet", ("claude", "claude-sonnet-5-5", "medium")),
+            ("sonnet", ("claude", "claude-sonnet-5-5", "xhigh")),
         ],
     )
     def test_named_profile_resolves_the_complete_target(
         self, profile, expected
     ) -> None:
-        import transcript
-
-        args = transcript.parse_args(
-            [
-                "run",
-                "youtube",
-                "--url",
-                "https://youtu.be/abc",
-                "--profile",
-                profile,
-            ]
+        stdout, stderr, code = run_script(
+            "run",
+            "youtube",
+            "--url",
+            "https://youtu.be/abc",
+            "--profile",
+            profile,
+            "--dry-run",
         )
 
-        plan = transcript.resolve_run_plan(args)
-        assert plan.profile == profile
-        assert (plan.provider, plan.model, plan.effort) == expected
+        assert code == 0
+        assert stderr == ""
+        summary = json.loads(stdout)["summary"]
+        assert summary["profile"] == profile
+        assert (summary["provider"], summary["model"], summary["effort"]) == expected
 
     def test_low_level_override_requires_the_complete_target(self) -> None:
         _stdout, stderr, code = run_script(
@@ -236,7 +255,7 @@ class TestPureDiscovery:
 
 
 class TestRunPlan:
-    def test_youtube_default_is_claude_opus_high(self) -> None:
+    def test_youtube_default_is_claude_opus_xhigh(self) -> None:
         import transcript
 
         args = transcript.parse_args(
@@ -248,10 +267,10 @@ class TestRunPlan:
         assert plan.provider == "claude"
         assert plan.profile == "opus"
         assert plan.model == "claude-opus-5-5"
-        assert plan.effort == "high"
+        assert plan.effort == "xhigh"
         assert plan.preview is False
 
-    def test_zoom_default_is_claude_opus_high(self) -> None:
+    def test_zoom_default_is_claude_opus_xhigh(self) -> None:
         import transcript
 
         args = transcript.parse_args(["run", "zoom", "--latest"])
@@ -261,7 +280,7 @@ class TestRunPlan:
         assert plan.provider == "claude"
         assert plan.profile == "opus"
         assert plan.model == "claude-opus-5-5"
-        assert plan.effort == "high"
+        assert plan.effort == "xhigh"
         assert plan.preview is False
 
     def test_preview_is_opt_in(self) -> None:
@@ -554,7 +573,7 @@ class TestProgressReporting:
                 ["run", "youtube", "--url", "https://youtu.be/abc"],
                 (
                     "Run: source=YouTube | profile=opus | provider=claude | "
-                    "model=claude-opus-5-5 | effort=high | prompt=follow_along_note"
+                    "model=claude-opus-5-5 | effort=xhigh | prompt=follow_along_note"
                 ),
             ),
             (

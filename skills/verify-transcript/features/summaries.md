@@ -29,7 +29,7 @@ Preconditions:
 - **Discovery.** Run the default `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify`. Require all three providers and all bundled prompts
 - **Plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.dry-run-summary`. Require the `glm` profile, OpenRouter, `z-ai/glm-5.3-flash`, `medium`, and `summary_with_quotes`
 - **Transcript only.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature dry-runs.transcript-only`. Require `summary.enabled: false` and null provider, model, effort, and prompt values for both sources
-- **Zoom plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run`. Require the `opus` profile, Claude, `claude-opus-5-5`, `high`, and `synthese-rencontre`
+- **Zoom plan.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature zoom.dry-run`. Require the `opus` profile, Claude, `claude-opus-5-5`, `xhigh`, and `synthese-rencontre`
 - **Real summary.** Run `uv run "$VERIFY_DIR/scripts/verify_transcript.py" verify --feature youtube.real-summary --allow-paid`. Require a `sonnet` model on the metadata's summary line, non-empty Markdown, and `Summary status: succeeded` in metadata
 
 ## Gotchas

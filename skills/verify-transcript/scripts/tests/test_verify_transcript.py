@@ -596,7 +596,7 @@ def metadata(*, upload: str, model: str = "claude-sonnet-5-5") -> str:
     url = verify_transcript.CANONICAL_YOUTUBE_URL
     return (
         f"Source: {url}\nSummary status: succeeded\n"
-        f"Claude: {model} (reasoning: medium)\n{upload}\n"
+        f"Claude: {model} (reasoning: xhigh)\n{upload}\n"
     )
 
 
@@ -701,7 +701,7 @@ def test_dry_run_validator_requires_no_output(tmp_path: Path):
             "profile": "opus",
             "provider": "claude",
             "model": "claude-opus-5-5",
-            "effort": "high",
+            "effort": "xhigh",
             "prompt": "synthese-rencontre",
         },
         "output_dir": str(plan.output_dir),

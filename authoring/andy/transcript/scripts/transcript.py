@@ -591,12 +591,12 @@ class InferenceProfile:
 
 
 INFERENCE_PROFILES = {
-    "opus": InferenceProfile(PROVIDER_CLAUDE, "claude-opus-5-5", "high"),
+    "opus": InferenceProfile(PROVIDER_CLAUDE, "claude-opus-5-5", "xhigh"),
     "astra": InferenceProfile(PROVIDER_CODEX, "gpt-6-astra", "low"),
-    "sol": InferenceProfile(PROVIDER_CODEX, "gpt-5.6-sol", "medium"),
+    "sol": InferenceProfile(PROVIDER_CODEX, "gpt-6.1-sol", "xhigh"),
     "glm": InferenceProfile(PROVIDER_OPENROUTER, "z-ai/glm-5.3-flash", "medium"),
     # The README's Test videos rule runs every paid test on this profile
-    "sonnet": InferenceProfile(PROVIDER_CLAUDE, "claude-sonnet-5-5", "medium"),
+    "sonnet": InferenceProfile(PROVIDER_CLAUDE, "claude-sonnet-5-5", "xhigh"),
 }
 DEFAULT_PROFILE = "opus"
 DEFAULT_PROVIDER = INFERENCE_PROFILES[DEFAULT_PROFILE].provider

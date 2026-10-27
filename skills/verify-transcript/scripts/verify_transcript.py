@@ -1491,7 +1491,7 @@ def _validate_dry_run(
         _require(
             summary.get("model") == "claude-opus-5-5", "Zoom summary model is invalid"
         )
-        _require(summary.get("effort") == "high", "Zoom summary effort is invalid")
+        _require(summary.get("effort") == "xhigh", "Zoom summary effort is invalid")
         _require(
             summary.get("prompt") == "synthese-rencontre",
             "Zoom summary prompt is invalid",
