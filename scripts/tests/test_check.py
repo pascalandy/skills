@@ -194,6 +194,176 @@ def test_a_skill_check_runs_only_when_the_change_touches_its_skill(
 
 
 @pytest.fixture
+def evals_repo(root: Path) -> Path:
+    """A private repository using the real scenario loader and no agent CLIs."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    runner = "authoring/matt/writing-for-agents/scripts/run_evals.py"
+    target = root / runner
+    target.parent.mkdir(parents=True)
+    shutil.copyfile(Path(check.__file__).resolve().parent.parent / runner, target)
+    for name in ("alpha", "beta"):
+        package = skill(root / "authoring/content", name)
+        (package / "evals").mkdir()
+        (package / "evals/evals.json").write_text(
+            json.dumps([{"query": "Go.", "setup": ["touch setup-must-not-run"]}]),
+            encoding="utf-8",
+        )
+    publish_base(root, "notes.txt")
+    return root
+
+
+def test_evals_check_uses_the_real_loader_without_prerequisites_or_execution(
+    evals_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    path = evals_repo / "authoring/content/alpha/evals/evals.json"
+    path.write_text(
+        json.dumps([{"query": "Valid."}, {"query": "Bad.", "setup": "copy a fixture"}]),
+        encoding="utf-8",
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("validation must not probe CLIs or start any process")
+
+    monkeypatch.setattr(shutil, "which", forbidden)
+    monkeypatch.setattr(subprocess.Popen, "__init__", forbidden)
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    before = set(evals_repo.rglob("*"))
+    code, stdout, stderr = verdict(
+        monkeypatch, capfd, [Check("evals")], "--only", "evals"
+    )
+
+    assert (code, stdout) == (1, "")
+    errors = json.loads(stderr.splitlines()[-1])["errors"]
+    assert "scenario 2" in str(errors) and str(path) in str(errors)
+    assert "setup must be a list of shell commands" in str(errors)
+    assert set(evals_repo.rglob("*")) == before
+
+    path.write_text(json.dumps([{"query": "Go.", "setup": ["touch forbidden"]}]))
+    assert verdict(monkeypatch, capfd, [Check("evals")], "--only", "evals") == (
+        0,
+        OK,
+        "",
+    )
+    assert set(evals_repo.rglob("*")) == before
+
+
+@pytest.mark.parametrize(
+    "case", ["utf8", "latin1", "missing", "syntax", "missing-loader"]
+)
+def test_evals_failures_preserve_prior_errors_and_run_later_checks(
+    evals_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    case: str,
+) -> None:
+    alpha = evals_repo / "authoring/content/alpha/evals/evals.json"
+    beta = evals_repo / "authoring/content/beta/evals/evals.json"
+    alpha.write_bytes(
+        json.dumps([{"query": "café"}], ensure_ascii=False).encode(
+            "latin1" if case == "latin1" else "utf8"
+        )
+    )
+    beta.write_text('[{"query":"Go.","setup":"prose"}]', encoding="utf-8")
+    runner = evals_repo / check.EVAL_RUNNER
+    if case == "missing":
+        runner.unlink()
+    elif case == "syntax":
+        runner.write_text("invalid Python!\n", encoding="utf-8")
+    elif case == "missing-loader":
+        runner.write_text(
+            runner.read_text(encoding="utf-8").replace(
+                "def load_scenarios(", "def absent_scenarios(", 1
+            ),
+            encoding="utf-8",
+        )
+    code, stdout, stderr = verdict(
+        monkeypatch,
+        capfd,
+        [Check("before", FAIL), Check("evals"), Check("after", MARK)],
+        "--sweep",
+    )
+
+    assert (code, stdout) == (1, "")
+    errors = json.loads(stderr.splitlines()[-1])["errors"]
+    assert "before failed; rerun: just check --only before" in errors
+    assert (evals_repo / "ran").is_file()
+    if case in ("utf8", "latin1"):
+        assert str(beta) in str(errors)
+        assert (str(alpha) in str(errors)) is (case == "latin1")
+    else:
+        assert check.EVAL_RUNNER in str(errors)
+
+
+@pytest.mark.parametrize(
+    ("change", "args", "expected"),
+    [
+        ("fixture", (), ("alpha",)),
+        ("unrelated", (), ()),
+        ("runner", (), ("alpha", "beta")),
+        ("sweep", ("--sweep",), ("alpha", "beta", "new-skill")),
+        ("only", ("--only", "evals"), ("alpha", "beta")),
+        ("deleted", (), ()),
+        ("renamed", (), ("renamed",)),
+    ],
+)
+def test_evals_routing_reads_changed_inputs_and_discovers_all_when_requested(
+    evals_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    change: str,
+    args: tuple[str, ...],
+    expected: tuple[str, ...],
+) -> None:
+    authoring = evals_repo / "authoring/content"
+    for name in ("alpha", "beta"):
+        (authoring / name / "evals/evals.json").write_text(
+            json.dumps([{"query": "Go.", "setup": "prose"}]), encoding="utf-8"
+        )
+    commit(evals_repo)
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+        cwd=evals_repo,
+        check=True,
+    )
+    if change == "fixture":
+        (authoring / "alpha/evals/fixture.txt").write_text(
+            "changed\n", encoding="utf-8"
+        )
+    elif change == "runner":
+        runner = evals_repo / "authoring/matt/writing-for-agents/scripts/run_evals.py"
+        runner.write_text(
+            runner.read_text(encoding="utf-8") + "\n# changed\n", encoding="utf-8"
+        )
+    elif change == "sweep":
+        target = skill(authoring, "new-skill") / "evals"
+        target.mkdir()
+        (target / "evals.json").write_text('[{"query":"Go.","setup":"prose"}]')
+    elif change == "deleted":
+        (authoring / "alpha/evals/evals.json").unlink()
+    elif change == "renamed":
+        (authoring / "alpha").rename(authoring / "renamed")
+    else:
+        (evals_repo / "notes.txt").write_text("changed\n", encoding="utf-8")
+
+    code, stdout, stderr = verdict(monkeypatch, capfd, [Check("evals")], *args)
+
+    assert (code, stdout) == ((1, "") if expected else (0, OK)), stderr
+    if expected:
+        errors = json.loads(stderr.splitlines()[-1])["errors"]
+        for name in expected:
+            assert str(authoring / name / "evals/evals.json") in str(errors)
+        for name in {"alpha", "beta", "renamed", "new-skill"} - set(expected):
+            assert str(authoring / name / "evals/evals.json") not in str(errors)
+
+
+def test_evals_registry_row_follows_writing_for_agents() -> None:
+    names = [row.name for row in check.CHECKS]
+    assert names.index("evals") == names.index("writing-for-agents") + 1
+
+
+@pytest.fixture
 def routing_repo(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     tests = root / "scripts/tests"
     tests.mkdir(parents=True)
