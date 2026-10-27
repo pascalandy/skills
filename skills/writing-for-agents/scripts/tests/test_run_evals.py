@@ -490,9 +490,11 @@ def session_seed(
 
 
 PUBLISH_SESSIONS = (
-    'mkdir -p "$HOME/.codex/sessions"; '
-    'cp -R "$FAKE_SESSION_SEED/$(basename "$(dirname "$PWD")")/." '
-    '"$HOME/.codex/sessions/"'
+    'seed="$FAKE_SESSION_SEED/$(basename "$(dirname "$PWD")")"; '
+    'for file in "$seed"/*/*/*/*.jsonl; do '
+    'target="$HOME/.codex/sessions/${file#"$seed/"}"; '
+    'mkdir -p "$(dirname "$target")" && cp "$file" "$target" || exit 1; '
+    "done"
 )
 
 
