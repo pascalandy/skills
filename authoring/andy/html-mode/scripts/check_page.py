@@ -458,20 +458,22 @@ AUDIT_JS = (
   const chainOf = (el) => { const chain = []; for (let e = el; e; e = e.parentElement) chain.push(e); return chain; };
   const locationOf = (el) => {
     const path = [];
+    let nearestId = null;
     for (let e = el; e; e = e.parentElement) {
       const tag = e.localName;
-      if (e.id) {
-        const id = '#' + CSS.escape(e.id);
+      const id = e.id ? '#' + CSS.escape(e.id) : '';
+      if (id && !nearestId) nearestId = id;
+      if (id && document.querySelectorAll(id).length === 1) {
         path.unshift(tag + id);
-        return `${path.join(' > ')} (nearest id ${id})`;
+        return `${path.join(' > ')} (nearest id ${nearestId})`;
       }
       let index = 1;
       for (let sibling = e.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
         if (sibling.localName === tag) index += 1;
       }
-      path.unshift(e.parentElement ? `${tag}:nth-of-type(${index})` : tag);
+      path.unshift(e.parentElement ? `${tag}${id}:nth-of-type(${index})` : tag + id);
     }
-    return `${path.join(' > ')} (nearest id none)`;
+    return `${path.join(' > ')} (nearest id ${nearestId || 'none'})`;
   };
   const small = new Set();
   const pale = new Set();

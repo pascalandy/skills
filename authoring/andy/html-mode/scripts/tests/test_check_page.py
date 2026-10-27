@@ -251,19 +251,25 @@ def test_each_defect_is_reported_with_its_check(
 
 @pytest.mark.usefixtures("browser_ready")
 @pytest.mark.parametrize("all_findings", (False, True))
+@pytest.mark.parametrize("duplicate_ids", (False, True), ids=("unique", "duplicate"))
 def test_contrast_inventory_keeps_each_element_and_the_short_remainder(
-    tmp_path: Path, all_findings: bool
+    tmp_path: Path, all_findings: bool, duplicate_ids: bool
 ) -> None:
     page = tmp_path / "contrast.html"
-    page.write_text(
+    html = (
         '<!doctype html><meta name="viewport" content="width=device-width">'
         "<style>body { background: white; color: #999; font: 16px/1.5 sans-serif; }</style>"
         '<section id="frame-a"><p id="own">Repeated</p><p>Repeated</p>'
         "<p>Third</p><p>Fourth</p></section>"
         '<section id="frame-b"><p>Repeated</p><p>Repeated</p>'
-        "<p>Seventh</p><p>Eighth</p></section>",
-        encoding="utf-8",
+        "<p>Seventh</p><p>Eighth</p></section>"
     )
+    if duplicate_ids:
+        frame = (
+            '<section id="frame">' + '<p id="sample">Repeated</p>' * 4 + "</section>"
+        )
+        html = html.split("<section", 1)[0] + frame * 2
+    page.write_text(html, encoding="utf-8")
     result = subprocess.run(
         [
             "uv",
@@ -302,6 +308,14 @@ def test_contrast_inventory_keeps_each_element_and_the_short_remainder(
         "section#frame-b > p:nth-of-type(3) (nearest id #frame-b)",
         "section#frame-b > p:nth-of-type(4) (nearest id #frame-b)",
     ]
+    if duplicate_ids:
+        locations = [
+            "html > body:nth-of-type(1) > "
+            f"section#frame:nth-of-type({frame}) > "
+            f"p#sample:nth-of-type({paragraph}) (nearest id #sample)"
+            for frame in (1, 2)
+            for paragraph in range(1, 5)
+        ]
     for finding, location in zip(findings, locations, strict=False):
         assert f"desktop/light: contrast: {location}:" in finding
         assert " at 2.85:1, needs 4.5:1;" in finding
