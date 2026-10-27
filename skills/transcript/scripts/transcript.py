@@ -1135,6 +1135,7 @@ def run_ytdlp(
         str(ARC_ADAPTER_PATH),
         "--cookies-from-browser",
         f"chrome:{ARC_BROWSER_PROFILE}",
+        "--no-update",
         *args,
         url,
     ]
@@ -1169,6 +1170,7 @@ def run_ytdlp(
             *YTDLP_MODULE_COMMAND,
             "--cookies-from-browser",
             "chrome",
+            "--no-update",
             *args,
             url,
         ]
@@ -1193,7 +1195,7 @@ def run_ytdlp(
     )
     log.debug(f"{authenticated_label} attempt: {authenticated_diagnostic}")
     anonymous = run_child(
-        [*YTDLP_MODULE_COMMAND, *args, url],
+        [*YTDLP_MODULE_COMMAND, "--no-update", *args, url],
         timeout=budget.remaining("yt-dlp anonymous fallback", SUMMARY_ATTEMPT_TIMEOUT),
     )
     if anonymous.returncode == 0:
