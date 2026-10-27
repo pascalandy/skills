@@ -4,6 +4,7 @@ import json
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -46,13 +47,25 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def run_python(*args: str) -> subprocess.CompletedProcess[str]:
+    # A tiny RLIMIT must never publish a truncated shared interpreter .pyc file.
+    with tempfile.TemporaryDirectory(prefix="corey-cli-") as cache:
+        return subprocess.run(
+            [sys.executable, "-B", "-X", f"pycache_prefix={cache}", *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=False,
+        )
+
+
 def run(
     *args: str, file_size_limit: int | None = None
 ) -> subprocess.CompletedProcess[str]:
-    command = [sys.executable, str(SCRIPT), *args]
+    command = [str(SCRIPT), *args]
     if file_size_limit is not None:
         command = [
-            sys.executable,
             "-c",
             (
                 "import resource, runpy, signal, sys; "
@@ -63,14 +76,7 @@ def run(
             str(SCRIPT),
             *args,
         ]
-    return subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=30,
-        check=False,
-    )
+    return run_python(*command)
 
 
 @pytest.fixture
@@ -234,26 +240,18 @@ os.replace = interrupt
 raise SystemExit(module["main"](sys.argv[3:]))
 """
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            launcher,
-            str(SCRIPT),
-            str(int(interruption)),
-            "update",
-            "--upstream",
-            str(upstream),
-            "--revision",
-            SHA,
-            "--package",
-            str(package),
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=30,
-        check=False,
+    result = run_python(
+        "-c",
+        launcher,
+        str(SCRIPT),
+        str(int(interruption)),
+        "update",
+        "--upstream",
+        str(upstream),
+        "--revision",
+        SHA,
+        "--package",
+        str(package),
     )
 
     assert failure(result, code=128 + interruption) == {
