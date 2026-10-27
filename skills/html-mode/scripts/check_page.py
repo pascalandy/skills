@@ -456,6 +456,23 @@ AUDIT_JS = (
     return sourceOver(content, premultiply(canvasColour)).slice(0, 3);
   };
   const chainOf = (el) => { const chain = []; for (let e = el; e; e = e.parentElement) chain.push(e); return chain; };
+  const locationOf = (el) => {
+    const path = [];
+    for (let e = el; e; e = e.parentElement) {
+      const tag = e.localName;
+      if (e.id) {
+        const id = '#' + CSS.escape(e.id);
+        path.unshift(tag + id);
+        return `${path.join(' > ')} (nearest id ${id})`;
+      }
+      let index = 1;
+      for (let sibling = e.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+        if (sibling.localName === tag) index += 1;
+      }
+      path.unshift(e.parentElement ? `${tag}:nth-of-type(${index})` : tag);
+    }
+    return `${path.join(' > ')} (nearest id none)`;
+  };
   const small = new Set();
   const pale = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -486,7 +503,7 @@ AUDIT_JS = (
     const bold = Number(style.fontWeight) >= 700;
     const need = size >= 24 || (bold && size >= 18.66) ? 3 : 4.5;
     const r = ratio(ink, bg);
-    if (r < need - 0.005) pale.add(`"${label}" at ${r.toFixed(2)}:1, needs ${need}:1`);
+    if (r < need - 0.005) pale.add(`${locationOf(el)}: "${label}" at ${r.toFixed(2)}:1, needs ${need}:1`);
   }
   out.smallText = [...small];
   out.contrast = [...pale];
@@ -608,20 +625,28 @@ class Run:
     """One page checked in one browser; findings accumulate as error messages."""
 
     def __init__(
-        self, browser: Browser, browser_name: str, url: str, evidence: Path
+        self,
+        browser: Browser,
+        browser_name: str,
+        url: str,
+        evidence: Path,
+        *,
+        all_findings: bool = False,
     ) -> None:
         self.browser = browser
         self.browser_name = browser_name
         self.url = url
         self.evidence = evidence
+        self.all_findings = all_findings
         self.errors: list[str] = []
         self.metrics: dict[str, Any] = {}
         self.host = urlparse(url).hostname
 
     def report(self, where: str, check: str, items: Sequence[str], fix: str) -> None:
-        for item in items[:SHOWN_PER_CHECK]:
+        shown = items if self.all_findings else items[:SHOWN_PER_CHECK]
+        for item in shown:
             self.errors.append(f"{where}: {check}: {item}; {fix}")
-        if len(items) > SHOWN_PER_CHECK:
+        if not self.all_findings and len(items) > SHOWN_PER_CHECK:
             self.errors.append(
                 f"{where}: {check}: {len(items) - SHOWN_PER_CHECK} more like these; {fix}"
             )
@@ -948,7 +973,7 @@ def work(args: argparse.Namespace) -> dict[str, Any]:
     evidence = evidence_dir(args.target, args.output_dir)
     with sync_playwright() as playwright:
         browser = launch(playwright, args.browser)
-        run = Run(browser, args.browser, url, evidence)
+        run = Run(browser, args.browser, url, evidence, all_findings=args.all)
         try:
             for screen in screens:
                 for scheme in schemes:
@@ -989,6 +1014,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         exit_codes=EXIT_CODES,
     )
     parser.add_argument("target", help="the page: an HTML file or an http(s) URL")
+    parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        help="list every finding (default: five per check and screen, then the remainder)",
+    )
     parser.add_argument(
         "-s",
         "--screen",

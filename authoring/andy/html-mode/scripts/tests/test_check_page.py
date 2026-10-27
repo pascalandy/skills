@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -246,6 +247,90 @@ def test_each_defect_is_reported_with_its_check(
     assert "targets: button.small" in errors
     assert 'targets: input "Offscreen choice" hit area under 44px' in errors
     assert answer["evidence"] == str(evidence.resolve())
+
+
+@pytest.mark.usefixtures("browser_ready")
+@pytest.mark.parametrize("all_findings", (False, True))
+def test_contrast_inventory_keeps_each_element_and_the_short_remainder(
+    tmp_path: Path, all_findings: bool
+) -> None:
+    page = tmp_path / "contrast.html"
+    page.write_text(
+        '<!doctype html><meta name="viewport" content="width=device-width">'
+        "<style>body { background: white; color: #999; font: 16px/1.5 sans-serif; }</style>"
+        '<section id="frame-a"><p id="own">Repeated</p><p>Repeated</p>'
+        "<p>Third</p><p>Fourth</p></section>"
+        '<section id="frame-b"><p>Repeated</p><p>Repeated</p>'
+        "<p>Seventh</p><p>Eighth</p></section>",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            str(Path(check_page.__file__)),
+            str(page),
+            "--screen",
+            "desktop",
+            "--scheme",
+            "light",
+            "--output-dir",
+            str(tmp_path / "evidence"),
+            *(["--all"] if all_findings else []),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=90,
+        check=False,
+    )
+    assert result.returncode == 1, result.stderr
+    assert result.stdout == ""
+    answer = json.loads(result.stderr.splitlines()[-1])
+    assert answer["ok"] is False
+    errors = answer["errors"]
+    assert isinstance(errors, list) and all(isinstance(e, str) for e in errors)
+    findings = [e for e in errors if "more like these" not in e]
+    assert len(findings) == (8 if all_findings else 5), errors
+    locations = [
+        "p#own (nearest id #own)",
+        "section#frame-a > p:nth-of-type(2) (nearest id #frame-a)",
+        "section#frame-a > p:nth-of-type(3) (nearest id #frame-a)",
+        "section#frame-a > p:nth-of-type(4) (nearest id #frame-a)",
+        "section#frame-b > p:nth-of-type(1) (nearest id #frame-b)",
+        "section#frame-b > p:nth-of-type(2) (nearest id #frame-b)",
+        "section#frame-b > p:nth-of-type(3) (nearest id #frame-b)",
+        "section#frame-b > p:nth-of-type(4) (nearest id #frame-b)",
+    ]
+    for finding, location in zip(findings, locations, strict=False):
+        assert f"desktop/light: contrast: {location}:" in finding
+        assert " at 2.85:1, needs 4.5:1;" in finding
+    if all_findings:
+        assert len(errors) == 8
+    else:
+        assert len(errors) == 6
+        assert "3 more like these" in errors[-1]
+
+
+@pytest.mark.usefixtures("browser_ready")
+def test_contrast_without_any_id_has_distinct_dom_paths(tmp_path: Path) -> None:
+    page = tmp_path / "no-id.html"
+    page.write_text(
+        "<!doctype html><style>body { background: white; color: #999; }</style>"
+        "<p>Repeated</p><p>Repeated</p>",
+        encoding="utf-8",
+    )
+    with check_page.sync_playwright() as playwright:
+        browser = check_page.launch(playwright, "chromium")
+        try:
+            run = check_page.Run(browser, "chromium", page.as_uri(), tmp_path)
+            run.audit(check_page.BY_NAME["desktop"], "light")
+        finally:
+            browser.close()
+    assert len(run.errors) == 2
+    for index, finding in enumerate(run.errors, 1):
+        assert f"html > body:nth-of-type(1) > p:nth-of-type({index})" in finding
+        assert '(nearest id none): "Repeated" at 2.85:1, needs 4.5:1;' in finding
 
 
 @pytest.mark.usefixtures("browser_ready")
