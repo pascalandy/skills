@@ -33,6 +33,7 @@ Before: "Worker reads cache / worker doesn't retry."
 After: "The worker reads the cache. The worker does not retry."
 Edge cases:
 - A command can omit "you". A list can use fragments that fit its introductory sentence.
+- A table cell can be a fragment that fits its column header. A fixed label, such as "Done when", can introduce a fragment that completes that label.
 - Repeat "the" when one shared article could make two things look like one.
 - "With" can name a tool, companion, or relationship. If two readings fit, name the relationship explicitly.
 
