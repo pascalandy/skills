@@ -596,7 +596,7 @@ def metadata(*, upload: str, model: str = "claude-sonnet-5-5") -> str:
     url = verify_transcript.CANONICAL_YOUTUBE_URL
     return (
         f"Source: {url}\nSummary status: succeeded\n"
-        f"Claude: {model} (reasoning: medium)\n{upload}\n"
+        f"Claude: {model} (reasoning: xhigh)\n{upload}\n"
     )
 
 
