@@ -11,7 +11,7 @@ Read [agent runtime](../references/agent-runtime.md) before delegating, resuming
 1. When the change is one or two files with an obvious approach, skip the plan. Say so and stop.
 2. Settle open questions by prototype before you write. Run `playbooks/prototype.md` for each. Keep the branch, the SHA, and the screenshots for Appendix A. Ask the operator only about a product or preference call that no run can settle. Give options (the **Never Block on the Human** principle).
 3. Explore in available subagents with bounded briefs and supported model choices per the agent-runtime reference (the **Guard the Context Window** principle). Each returns file pointers, conventions, test commands, and entry points. No inlined dumps.
-4. Copy the skeleton below into the plan file and fill every placeholder. Unless the operator names a path, write the file under the resolved durable state directory's `docs/`. Keep every heading and every sub-block in the order shown. One section per PR. One PR is one change with its own evidence (the **Sequence Work into Verifiable Units** principle). Name the execution playbook in **How to read this**. Pick between `playbooks/autopilot-full.md` and `playbooks/autopilot-stack.md` per the rule at the end of `playbooks/autopilot-stack.md`. A standing program takes `playbooks/orchestrate.md`.
+4. Copy the skeleton below into the plan file and fill every placeholder. Unless the operator names a path, write the file under the resolved durable state directory's `docs/`. Keep every heading and every sub-block in the order shown. One section per PR. One PR is one change with its own evidence (the **Sequence Work into Verifiable Units** principle). Name the execution playbook in **How to read this**. For a stack one agent builds in this session, choose Feature or Refactoring with `gh-stack`. For an autonomous run, pick between `playbooks/autopilot-full.md` and `playbooks/autopilot-stack.md` per the rule at the end of `playbooks/autopilot-stack.md`. A standing program takes `playbooks/orchestrate.md`.
 5. Write under `/technical-writing` in full, then `/unslop`. The body is one Diátaxis mode, how-to. Appendices hold explanation and reference. Each heading states the task or the finding. No long dashes. No mid-sentence colons.
 6. Run `node <skill-dir>/scripts/check-plan.mjs -v <plan.md>`, where `<skill-dir>` is poteto-mode's folder. Fix each plan line its `errors` name and rerun until it answers `{"ok":true}` (the **Encode Lessons in Structure** principle). `-v` adds each PR section's box counts on stderr.
 7. Hand back. Post the plan path and the script's output, then stop. Execution starts on the operator's explicit go, under the execution playbook the plan names.
@@ -51,7 +51,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 ### Spawn owners
 
-- [ ] Spawn one owner per PR with the full lifecycle the execution playbook names.
+- [ ] Under Feature or Refactoring, the session agent owns every PR and is the sole `gh-stack` writer. For a named program, follow its playbook's owner lifecycle.
 - [ ] Follow this dependency graph. Start dependent work only after its parent merges, or base it on the parent branch when the execution playbook stacks.
   - [ ] <PR id> and <PR id> are independent and first. Both branch from `main`.
   - [ ] <PR id> after <PR id>.
@@ -71,7 +71,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [ ] At the merge-ready head SHA, run the swarm per the **swarm** skill. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. One audit lane that reads the diff and the receipts and distrusts the PR body.
 - [ ] Clean only when every lane is `PASS`. Findings go back to the owner. A new head gets a fresh swarm and a fresh verdict.
-- [ ] <The merge or append rule from the execution playbook, with the patch-id rule from `playbooks/shipping.md`.>
+- [ ] <For Feature or Refactoring, name who lands the stack under the repository's merge procedure. For a named program, use its playbook's merge or append rule, with the patch-id rule from `playbooks/shipping.md`.>
 
 ### Boot recipe, for every live lane
 
@@ -135,7 +135,7 @@ Each live lane runs at the PR head in an isolated workspace or verified remote e
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Applicable review-agent findings triaged, or no review agent configured.
 - [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] <The owner squash-merges its own PR, or the root appends it to the base-branch stack and the operator lands it bottom-up.>
+- [ ] <The landing rule recorded under Verdict and merge for this PR.>
 
 ## Close the program
 
