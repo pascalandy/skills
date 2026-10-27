@@ -84,6 +84,8 @@ chromium --headless --screenshot=/tmp/pele/diagram.png --window-size=<width>,<he
 
 On macOS, use `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` in place of `chromium`. Read the screenshot. Check the labels, arrowheads, legend, contrast, and takeaway. An `ok` answer proves that the diagram renders with that pele version, not with Mermaid or another host's renderer.
 
+When the screenshot is taller than about 2000 px, use [ImageMagick 7](https://imagemagick.org/script/download.php) (`magick --version`) to cut it into slices. From the screenshot's folder (`/tmp/pele` in the example above), run `magick diagram.png -crop x1400 +repage slice-%02d.png`, then read each slice. ImageMagick only cuts the PNG that Chromium drew, so pele's colors stay intact.
+
 ## Pages and images
 
 [scripts/render_pages.py](scripts/render_pages.py) turns a `.mmd` file that holds a sequence diagram into a light page, a dark page, and a JPEG of each page, 1920 pixels wide at twice the pixel density. It writes them beside the `.mmd` file. The pages are self-contained and in Canadian French. Each page draws the diagram in the reader's browser, so the labels fit the font that browser shows. The script needs the tools of [Render and verify](#render-and-verify) and a Chromium browser; when it finds no Chromium, its error gives the install command. Run the script with `--help` for the title and actor options.
