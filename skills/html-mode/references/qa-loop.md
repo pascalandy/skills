@@ -38,7 +38,7 @@ Send this brief first. For later rounds, send commit, fixes, and new focus areas
 ```md
 QA round 01 of <page path>, axis <axis>, ID prefix <PREFIX>. Test commit `<sha>`, pushed: serve `git show <sha>:<page path>` from a folder of yours, never the working file.
 
-The page: <one line on its content, audience and level>. Machine-check result: <pass, unavailable checks, or retained third-party contrast findings under Workflow step 5 in SKILL.md>. Review the retained findings under that rule and test beyond the recorded machine checks.
+The page: <one line on its content, audience and level>. Machine-check result: <pass, unavailable checks, or retained third-party contrast findings>. If findings are retained, review them under Workflow step 5 in html-mode's SKILL.md. Test beyond the recorded machine checks.
 
 Rules:
 - Change no tracked file; put scripts, videos and screenshots in `~/.cache/<project>-qa/round-NN/`
