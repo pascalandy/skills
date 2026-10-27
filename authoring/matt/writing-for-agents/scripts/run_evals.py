@@ -359,7 +359,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import BinaryIO
 
@@ -793,6 +793,103 @@ def claude_answer(events: Path) -> str:
     return answer
 
 
+def codex_children(folder: Path, started: datetime) -> str:
+    """Keep the root's descendant rollouts, including grandchildren, as raw bytes.
+
+    Include the preceding UTC day for stores dated by local time. Keep the floor
+    anchored to the CLI start across midnight. Each rollout's first session_meta wins.
+    """
+    root = None
+    with (folder / "events.jsonl").open(encoding="utf-8", errors="replace") as events:
+        for line in events:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict) and event.get("type") == "thread.started":
+                root = event.get("thread_id")
+                break
+    if not isinstance(root, str) or not root:
+        raise ScriptError(
+            "missing root thread.started in events.jsonl; "
+            "inspect that transcript before grading this Codex run"
+        )
+
+    sessions = CODEX_HOME / "sessions"
+    first_day = (started.astimezone(timezone.utc) - timedelta(days=1)).strftime(
+        "%Y/%m/%d"
+    )
+    index: dict[str, tuple[str, Path]] = {}
+    try:
+        for day in sorted(sessions.glob("*/*/*")):
+            date = day.relative_to(sessions).as_posix()
+            if not re.fullmatch(r"\d{4}/\d{2}/\d{2}", date) or date < first_day:
+                continue
+            for path in sorted(day.rglob("rollout-*.jsonl")):
+                meta = None
+                with path.open(encoding="utf-8") as stream:
+                    for line in stream:
+                        try:
+                            entry = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if (
+                            isinstance(entry, dict)
+                            and entry.get("type") == "session_meta"
+                        ):
+                            meta = entry
+                            break
+                if meta is None:
+                    continue
+                payload = meta.get("payload")
+                if not isinstance(payload, dict):
+                    continue
+                session = payload.get("id")
+                parent = payload.get("parent_thread_id")
+                if not isinstance(parent, str) or not parent:
+                    parent = payload
+                    for key in (
+                        "source",
+                        "subagent",
+                        "thread_spawn",
+                        "parent_thread_id",
+                    ):
+                        parent = parent.get(key) if isinstance(parent, dict) else None
+                if isinstance(session, str) and isinstance(parent, str) and parent:
+                    index[session] = (parent, path)
+    except (OSError, UnicodeError) as error:
+        raise ScriptError(
+            f"cannot read Codex sessions in {sessions}: {error}; "
+            "inspect the session store before grading this run"
+        ) from error
+
+    descendants: dict[str, list[tuple[str, Path]]] = {}
+    for session, (parent, path) in index.items():
+        descendants.setdefault(parent, []).append((session, path))
+    pending, seen, copied = [root], {root}, 0
+    while pending:
+        for session, path in descendants.get(pending.pop(), []):
+            if session in seen:
+                continue
+            seen.add(session)
+            pending.append(session)
+            target = folder / "children" / path.name
+            try:
+                target.parent.mkdir(exist_ok=True)
+                shutil.copyfile(path, target)
+            except OSError as error:
+                raise ScriptError(
+                    f"cannot copy descendant {path} to {target}: {error}; "
+                    "preserve the source and fix the destination before grading"
+                ) from error
+            copied += 1
+    return (
+        f"copied {copied} descendant sessions for {root}"
+        if copied
+        else f"no descendant sessions found for {root}"
+    )
+
+
 def execute(
     run: Run,
     plan: Plan,
@@ -839,6 +936,7 @@ def execute(
     command, stdin = agent_command(run, work, hide)
     (folder / "command.txt").write_text(shlex.join(command) + "\n", encoding="utf-8")
     log.info("%s started", run.name)
+    started = datetime.now(timezone.utc)
     with (
         (folder / "events.jsonl").open("wb") as events,
         (folder / "stderr.log").open("wb") as errors,
@@ -848,6 +946,14 @@ def execute(
         (folder / "answer.md").write_text(
             claude_answer(folder / "events.jsonl"), encoding="utf-8"
         )
+    else:
+        try:
+            collected = codex_children(folder, started)
+        except ScriptError as error:
+            collected = str(error)
+            status = f"{status}; child collection failed: {collected}"
+        with (folder / "stderr.log").open("a", encoding="utf-8") as errors:
+            errors.write(f"Codex children: {collected}\n")
     logged = subprocess.run(
         ["git", "-C", str(work), "log", "--all", "--stat", "--format=--- %h %s%n%b"],
         capture_output=True,

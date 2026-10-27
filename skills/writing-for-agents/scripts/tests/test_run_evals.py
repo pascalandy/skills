@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -9,7 +10,9 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -33,6 +36,9 @@ mkdir -p "$report"
 printf '%s\\n' "$@" > "$report/argv"
 cat > "$report/stdin"
 cat .agents/skills/demo/SKILL.md > "$report/demo" 2>/dev/null || echo absent > "$report/demo"
+if [ "${FAKE_NO_ROOT:-}" != 1 ]; then
+  printf '{"type":"thread.started","thread_id":"%s"}\\n' "$(basename "$(dirname "$PWD")")"
+fi
 eval "${FAKE_ACTION:-true}"
 out="" prev=""
 for arg in "$@"; do [ "$prev" = -o ] && out=$arg; prev=$arg; done
@@ -136,6 +142,8 @@ def lab(tmp_path: Path) -> Lab:
         "GITHUB_TOKEN": "user-token",
     }
     env.pop("RUN_EVALS_PARENT", None)
+    # The runner must never discover the invoking agent's real session store
+    env.pop("CODEX_HOME", None)
     return Lab(
         skills / "demo", ref, before, home, reports, env, tmp_path / "out", tmp_path
     )
@@ -452,6 +460,183 @@ def test_codex_hides_copies_under_codex_home(lab: Lab):
     argv = report(lab, "s2-codex", "argv").splitlines()
     hidden = next(arg for arg in argv if arg.startswith("skills.config="))
     assert str(home / "skills" / "demo" / "SKILL.md") in hidden
+
+
+def session_seed(
+    lab: Lab,
+    root: str,
+    name: str,
+    session: str,
+    parent: str,
+    *,
+    nested: bool = False,
+    day: str | None = None,
+) -> Path:
+    """Private rollout bytes the fake CLI publishes after its root event."""
+    payload: dict[str, object] = {"id": session, "parent_thread_id": parent}
+    if nested:
+        payload = {
+            "id": session,
+            "source": {"subagent": {"thread_spawn": {"parent_thread_id": parent}}},
+        }
+    day = day or datetime.now(timezone.utc).strftime("%Y/%m/%d")
+    path = lab.tmp / "seed" / root / day / f"rollout-{name}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        json.dumps({"type": "session_meta", "payload": payload}).encode()
+        + b'\r\n{"type":"response_item","text":"caf\xc3\xa9"}\n'
+    )
+    return path
+
+
+PUBLISH_SESSIONS = (
+    'mkdir -p "$HOME/.codex/sessions"; '
+    'cp -R "$FAKE_SESSION_SEED/$(basename "$(dirname "$PWD")")/." '
+    '"$HOME/.codex/sessions/"'
+)
+
+
+@pytest.mark.parametrize("grandchild_first", [True, False])
+def test_codex_keeps_only_its_descendants_byte_for_byte(
+    lab: Lab, grandchild_first: bool
+) -> None:
+    child = session_seed(
+        lab, "s1-codex", "z" if grandchild_first else "a", "child", "s1-codex"
+    )
+    grandchild = session_seed(
+        lab,
+        "s1-codex",
+        "a" if grandchild_first else "z",
+        "grandchild",
+        "child",
+        nested=True,
+    )
+    grandchild.write_bytes(b'{"type":"event_msg"}\n' + grandchild.read_bytes())
+    second = session_seed(lab, "s2-codex", "second", "other-child", "s2-codex")
+    unrelated = session_seed(lab, "s1-codex", "unrelated", "stranger", "elsewhere")
+    # A later metadata line and a later root event must not change either identity
+    with unrelated.open("ab") as stream:
+        stream.write(
+            b'{"type":"session_meta","payload":{"id":"wrong","parent_thread_id":"s1-codex"}}\n'
+        )
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--jobs",
+        "2",
+        FAKE_SESSION_SEED=str(lab.tmp / "seed"),
+        FAKE_ACTION=PUBLISH_SESSIONS
+        + '; echo \'{"type":"thread.started","thread_id":"elsewhere"}\'',
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert answer(result)["ok"] is True
+    for root, expected in (("s1-codex", [child, grandchild]), ("s2-codex", [second])):
+        copied = lab.out / root / "children"
+        assert {p.name: p.read_bytes() for p in copied.iterdir()} == {
+            p.name: p.read_bytes() for p in expected
+        }
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_codex_collects_descendants_even_after_agent_failure(
+    lab: Lab, failed: bool
+) -> None:
+    child = session_seed(lab, "s2-codex", "child", "child", "s2-codex", nested=True)
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        FAKE_SESSION_SEED=str(lab.tmp / "seed"),
+        FAKE_ACTION=PUBLISH_SESSIONS + ("; exit 9" if failed else ""),
+    )
+
+    assert result.returncode == (1 if failed else 0), result.stderr
+    assert answer(result)["ok"] is (not failed)
+    assert (
+        lab.out / "s2-codex" / "children" / child.name
+    ).read_bytes() == child.read_bytes()
+    if failed:
+        assert "s2-codex\texit 9" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("case", "exit_code", "diagnostic"),
+    [
+        ("no-child", 0, "no descendant sessions"),
+        ("missing-root", 1, "missing root thread.started"),
+        ("copy-failure", 1, "cannot copy descendant"),
+    ],
+)
+def test_codex_collection_diagnostics_distinguish_absence_and_failure(
+    lab: Lab, case: str, exit_code: int, diagnostic: str
+) -> None:
+    if case == "copy-failure":
+        session_seed(lab, "s2-codex", "child", "child", "s2-codex")
+        action = PUBLISH_SESSIONS + '; echo collision > "$(dirname "$PWD")/children"'
+    else:
+        action = "true"
+    result = run(
+        lab,
+        "--ref",
+        lab.ref,
+        "--output-dir",
+        str(lab.out),
+        "--agent",
+        "codex",
+        "--scenario",
+        "2",
+        FAKE_SESSION_SEED=str(lab.tmp / "seed"),
+        FAKE_ACTION=action,
+        FAKE_NO_ROOT="1" if case == "missing-root" else "0",
+    )
+
+    assert result.returncode == exit_code, result.stderr
+    assert answer(result)["ok"] is (exit_code == 0)
+    assert diagnostic in (lab.out / "s2-codex" / "stderr.log").read_text(
+        encoding="utf-8"
+    )
+    if case != "copy-failure":
+        assert not (lab.out / "s2-codex" / "children").exists()
+
+
+@pytest.mark.parametrize("hour", [1, 23])
+def test_codex_date_floor_keeps_start_and_previous_local_day(
+    lab: Lab, monkeypatch: pytest.MonkeyPatch, hour: int
+) -> None:
+    spec = importlib.util.spec_from_file_location("eval_runner", RUNNER)
+    assert spec is not None and spec.loader is not None
+    runner: ModuleType = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, runner)
+    spec.loader.exec_module(runner)
+    monkeypatch.setattr(runner, "CODEX_HOME", lab.home / ".codex")
+    child = session_seed(lab, "root", "child", "child", "root", day="2026/10/25")
+    grandchild = session_seed(
+        lab, "root", "grandchild", "grandchild", "child", day="2026/10/26", nested=True
+    )
+    session_seed(lab, "root", "old", "old", "root", day="2026/10/23")
+    shutil.copytree(lab.tmp / "seed" / "root", lab.home / ".codex" / "sessions")
+    folder = lab.out / "midnight"
+    write(folder / "events.jsonl", '{"type":"thread.started","thread_id":"root"}\n')
+
+    # At 01:00 UTC a Montreal-dated store can still use the previous day
+    started = datetime(2026, 10, 26 if hour == 1 else 25, hour, tzinfo=timezone.utc)
+    runner.codex_children(folder, started)
+
+    assert {p.name: p.read_bytes() for p in (folder / "children").iterdir()} == {
+        p.name: p.read_bytes() for p in (child, grandchild)
+    }
 
 
 def test_a_skill_at_the_repository_root_installs(tmp_path: Path, lab: Lab):
