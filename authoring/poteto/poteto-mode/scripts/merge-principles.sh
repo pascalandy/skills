@@ -39,12 +39,12 @@ fct_cleanup() {
 fct_on_error() {
 	trap - ERR
 	[[ "$DEBUG" != 1 ]] || printf 'Failed at line %s: %s\n' "$1" "$2" >&2
-	fct_die "Preview failed; run $SCRIPT_NAME --debug --help and check paths, Git objects and output permissions"
+	fct_die "Preview failed; rerun the same command with --debug, then check paths, Git objects and output permissions"
 }
 
 fct_on_signal() {
 	trap '' INT TERM
-	fct_die "Preview interrupted; rerun $SCRIPT_NAME --help" "$1"
+	fct_die "Preview interrupted; rerun the same command" "$1"
 }
 
 fct_usage() {

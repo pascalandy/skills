@@ -391,8 +391,7 @@ def test_wrong_input_layout_is_not_a_clean_preview(
     )
     assert expected in " ".join(data["errors"])
     assert "file" not in data and not report.exists()
-    calls = Path(offline["GIT_CALLS"])
-    assert not calls.exists() or "merge-file" not in calls.read_text(encoding="utf-8")
+    assert "merge-file" not in Path(offline["GIT_CALLS"]).read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("args", [("--output=",), ("--output", ""), ("-o", "")])
@@ -435,18 +434,19 @@ def test_relative_local_root_ignores_cdpath(
 def test_git_without_offline_flag_fails_before_reading_refs(
     tmp_path: Path,
     offline: dict[str, str],
+    comparison: tuple,
 ) -> None:
+    local, upstream, _, valid = comparison
     wrapper = tmp_path / "bin" / "git"
     wrapper.write_text(
         '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >>"$GIT_CALLS"\nexit 129\n',
         encoding="utf-8",
     )
-    result = run(tmp_path, tmp_path, "base", "head", offline)
+    result = run(local, upstream, valid, valid, offline)
     assert result.returncode == 1
     data = answer(result)
     assert "--no-lazy-fetch support" in " ".join(data["errors"])
     assert "file" not in data
-    assert (
-        Path(offline["GIT_CALLS"]).read_text(encoding="utf-8")
-        == "--no-lazy-fetch --version\n"
-    )
+    calls = Path(offline["GIT_CALLS"]).read_text(encoding="utf-8")
+    commands = {arg for call in calls.splitlines() for arg in shlex.split(call)}
+    assert not commands.intersection({"rev-parse", "ls-tree", "show", "merge-file"})
