@@ -55,7 +55,8 @@ Preview principles from the local WORKING TREE against two upstream Git commits.
 Reads authoring/poteto/poteto-mode/principles/*.md and the separate
 authoring/poteto/principle-prove-it-works/SKILL.md. Upstream principles live at
 pstack/skills/principle-*/SKILL.md. Frontmatter is removed from skill files.
-Requires Bash, Git, jq and awk. No network, version guessing or source writes.
+Requires Bash, Git with --no-lazy-fetch support, jq and awk.
+No network, version guessing or source writes.
 
 Options:
   -h, --help           Show help, even alongside invalid arguments
@@ -65,6 +66,12 @@ Options:
 
 The report contains records {path,state,conflict_blocks}, then bodies {path,body}.
 States: clean, conflict, new-upstream, local-only. Bodies retain diff3 markers.
+Clean means no textual conflict; the body may still remove local text. Compare
+every body with its local source before adopting changes, including prior cuts
+left out of the sync ledger. This preview does not approve or apply any change.
+New-upstream means present at head and absent locally; local-only means present
+locally and absent at head. These include deletions on the missing side. Renames
+appear as separate local-only and new-upstream records.
 The final JSON answer names the completed report under file. On failure stdout
 is empty and the last stderr line is {"ok":false,"errors":[...]}.
 
@@ -88,6 +95,7 @@ fct_parse_arguments() {
 			;;
 		--output=*)
 			OUTPUT="${1#*=}"
+			[[ -n "$OUTPUT" ]] || fct_die "Missing output path; run $SCRIPT_NAME --help" 2
 			shift
 			;;
 		-v | --verbose)
@@ -121,7 +129,7 @@ fct_parse_arguments() {
 
 fct_git() {
 	env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR \
-		GIT_NO_LAZY_FETCH=1 GIT_OPTIONAL_LOCKS=0 git "$@"
+		GIT_OPTIONAL_LOCKS=0 git --no-lazy-fetch "$@"
 }
 
 fct_strip_frontmatter() {
@@ -135,20 +143,31 @@ fct_strip_frontmatter() {
 }
 
 fct_execute_this() {
-	local root upstream base head ref name path source state blocks total=0 file
-	root="$(cd "${POSITIONAL_ARGS[0]}" && pwd -P)" || fct_die "Invalid local root ${POSITIONAL_ARGS[0]}; run $SCRIPT_NAME --help" 2
+	local root upstream base head ref name path source state blocks total=0 file output_parent
+	root="$(CDPATH='' cd -- "${POSITIONAL_ARGS[0]}" && pwd -P)" || fct_die "Invalid local root ${POSITIONAL_ARGS[0]}; run $SCRIPT_NAME --help" 2
+	[[ -d "$root/authoring/poteto/poteto-mode/principles" ]] ||
+		fct_die "Local root lacks authoring/poteto/poteto-mode/principles; pass the source repository root to $SCRIPT_NAME" 2
 	upstream="${POSITIONAL_ARGS[1]}"
 	# Resolve both commits before listing files, merging or creating any report
 	base="$(fct_git -C "$upstream" rev-parse --verify --end-of-options "${POSITIONAL_ARGS[2]}^{commit}" 2>/dev/null)" ||
 		fct_die "Unknown upstream base ref ${POSITIONAL_ARGS[2]}; supply an existing local commit to $SCRIPT_NAME" 2
 	head="$(fct_git -C "$upstream" rev-parse --verify --end-of-options "${POSITIONAL_ARGS[3]}^{commit}" 2>/dev/null)" ||
 		fct_die "Unknown upstream head ref ${POSITIONAL_ARGS[3]}; supply an existing local commit to $SCRIPT_NAME" 2
+	if [[ -n "$OUTPUT" ]]; then
+		output_parent="${OUTPUT%/*}"
+		[[ "$OUTPUT" == */* ]] || output_parent=.
+		[[ -n "$output_parent" ]] || output_parent=/
+		[[ ! -e "$OUTPUT" && ! -L "$OUTPUT" && -d "$output_parent" && -w "$output_parent" ]] ||
+			fct_die "Cannot create report $OUTPUT; choose a new writable path with $SCRIPT_NAME --output" 2
+	fi
 	TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/merge-principles.XXXXXXXX")"
 	: >"$TMP_DIR/names"
 	: >"$TMP_DIR/records"
 	: >"$TMP_DIR/bodies"
 	for ref in "$base" "$head"; do
 		fct_git -C "$upstream" ls-tree -r --name-only "$ref" -- pstack/skills >"$TMP_DIR/$ref.paths"
+		[[ -s "$TMP_DIR/$ref.paths" ]] ||
+			fct_die "Upstream ref $ref has no pstack/skills content; pass a local pstack checkout to $SCRIPT_NAME" 2
 		sed -n 's@^pstack/skills/principle-\([^/]*\)/SKILL.md$@\1@p' "$TMP_DIR/$ref.paths" >>"$TMP_DIR/names"
 	done
 	for file in "$root"/authoring/poteto/poteto-mode/principles/*.md; do
@@ -234,6 +253,8 @@ fct_main() {
 	fi
 	fct_parse_arguments "$@"
 	command -v git >/dev/null 2>&1 || fct_die "Missing Git; install it with brew install git or your system package manager"
+	git --no-lazy-fetch --version >/dev/null 2>&1 ||
+		fct_die "Git lacks --no-lazy-fetch support; install a Git release supporting that option before running $SCRIPT_NAME"
 	fct_execute_this
 	fct_answer 0
 }

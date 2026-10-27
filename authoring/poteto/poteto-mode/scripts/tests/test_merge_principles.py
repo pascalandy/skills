@@ -84,8 +84,9 @@ def offline(tmp_path: Path) -> dict[str, str]:
     wrapper.write_text(
         "#!/usr/bin/env bash\n"
         'printf "%s\\n" "$*" >>"$GIT_CALLS"\n'
-        'args=("$@")\n[[ "${1:-}" != -C ]] || shift 2\n'
-        'case "${1:-}" in rev-parse|ls-tree|show|merge-file) ;; *) exit 90;; esac\n'
+        'args=("$@")\n[[ "${1:-}" != --no-lazy-fetch ]] || shift\n'
+        '[[ "${1:-}" != -C ]] || shift 2\n'
+        'case "${1:-}" in --version|rev-parse|ls-tree|show|merge-file) ;; *) exit 90;; esac\n'
         f'exec {shlex.quote(GIT)} "${{args[@]}}"\n',
         encoding="utf-8",
     )
@@ -233,6 +234,7 @@ def test_additions_are_success_and_local_reads_working_tree(
 ) -> None:
     local, upstream = tmp_path / "local", tmp_path / "upstream"
     init(local)
+    (local / PRINCIPLES).mkdir(parents=True)
     path = PRINCIPLES / "sample.md"
     if state == "local-only":
         write(local, path, "Committed old body.\n")
@@ -240,6 +242,7 @@ def test_additions_are_success_and_local_reads_working_tree(
     if state == "local-only":
         write(local, path, "Working tree body.\n")
     init(upstream)
+    write(upstream, Path("pstack/skills/README.md"), "Principle skills.\n")
     base = commit(upstream)
     if state == "new-upstream":
         write(
@@ -305,3 +308,145 @@ def test_help_wins_and_usage_errors_are_json(
     result = run(tmp_path, tmp_path, "base", "head", offline, "--typo")
     assert result.returncode == 2
     assert answer(result)["help"] == "merge-principles.sh --help"
+
+
+@pytest.fixture
+def comparison(tmp_path: Path) -> tuple[Path, Path, str, str]:
+    local, upstream = tmp_path / "local", tmp_path / "upstream"
+    init(local)
+    write(local, PRINCIPLES / "sample.md", "Sample body.\n")
+    commit(local)
+    init(upstream)
+    write(upstream, Path("README.md"), "Not the pstack layout.\n")
+    wrong = commit(upstream)
+    write(upstream, Path("pstack/skills/principle-sample/SKILL.md"), "Sample body.\n")
+    valid = commit(upstream)
+    return local, upstream, wrong, valid
+
+
+@pytest.mark.parametrize(
+    "kind", ["existing", "symlink", "dangling", "device", "stream", "missing-parent"]
+)
+def test_report_destination_requires_a_new_regular_file(
+    tmp_path: Path,
+    offline: dict[str, str],
+    comparison: tuple,
+    kind: str,
+) -> None:
+    local, upstream, _, valid = comparison
+    sentinel = tmp_path / "sentinel.json"
+    sentinel.write_text("Preserve me.\n", encoding="utf-8")
+    destination = tmp_path / "report.json"
+    if kind == "existing":
+        destination = sentinel
+    elif kind in ("symlink", "dangling"):
+        destination.symlink_to(
+            sentinel if kind == "symlink" else tmp_path / "not-created"
+        )
+    elif kind == "device":
+        destination = Path("/dev/null")
+    elif kind == "stream":
+        destination = Path("/dev/stdout")
+    else:
+        destination = tmp_path / "missing-parent" / "report.json"
+    before = snapshot(local), snapshot(upstream)
+    result = run(local, upstream, valid, valid, offline, "--output", str(destination))
+    assert result.returncode == 2
+    data = answer(result)
+    assert "file" not in data and str(destination) in " ".join(data["errors"])
+    assert sentinel.read_text(encoding="utf-8") == "Preserve me.\n"
+    assert not (tmp_path / "not-created").exists()
+    assert "merge-file" not in Path(offline["GIT_CALLS"]).read_text(encoding="utf-8")
+    assert before == (snapshot(local), snapshot(upstream))
+
+
+@pytest.mark.parametrize("missing", ["local", "base", "head"])
+def test_wrong_input_layout_is_not_a_clean_preview(
+    tmp_path: Path,
+    offline: dict[str, str],
+    comparison: tuple,
+    missing: str,
+) -> None:
+    local, upstream, wrong, valid = comparison
+    root = local
+    if missing == "local":
+        root = tmp_path / "wrong-root"
+        root.mkdir()
+    report = tmp_path / "must-not-exist.json"
+    result = run(
+        root,
+        upstream,
+        wrong if missing == "base" else valid,
+        wrong if missing == "head" else valid,
+        offline,
+        "--output",
+        str(report),
+    )
+    assert result.returncode == 2
+    data = answer(result)
+    expected = (
+        "authoring/poteto/poteto-mode/principles"
+        if missing == "local"
+        else "pstack/skills"
+    )
+    assert expected in " ".join(data["errors"])
+    assert "file" not in data and not report.exists()
+    calls = Path(offline["GIT_CALLS"])
+    assert not calls.exists() or "merge-file" not in calls.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("args", [("--output=",), ("--output", ""), ("-o", "")])
+def test_empty_output_forms_are_the_same_usage_error(
+    offline: dict[str, str],
+    comparison: tuple,
+    args: tuple[str, ...],
+) -> None:
+    local, upstream, _, valid = comparison
+    result = run(local, upstream, valid, valid, offline, *args)
+    assert result.returncode == 2
+    assert answer(result)["errors"] == [
+        "Missing output path; run merge-principles.sh --help"
+    ]
+
+
+def test_relative_local_root_ignores_cdpath(
+    tmp_path: Path,
+    offline: dict[str, str],
+    comparison: tuple,
+) -> None:
+    _, upstream, _, valid = comparison
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "local", str(upstream), valid, valid],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        cwd=tmp_path,
+        env={**offline, "CDPATH": str(tmp_path)},
+    )
+    assert result.returncode == 0
+    report = json.loads(Path(answer(result)["file"]).read_text(encoding="utf-8"))
+    assert report["records"] == [
+        {"path": str(PRINCIPLES / "sample.md"), "state": "clean", "conflict_blocks": 0}
+    ]
+
+
+def test_git_without_offline_flag_fails_before_reading_refs(
+    tmp_path: Path,
+    offline: dict[str, str],
+) -> None:
+    wrapper = tmp_path / "bin" / "git"
+    wrapper.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >>"$GIT_CALLS"\nexit 129\n',
+        encoding="utf-8",
+    )
+    result = run(tmp_path, tmp_path, "base", "head", offline)
+    assert result.returncode == 1
+    data = answer(result)
+    assert "--no-lazy-fetch support" in " ".join(data["errors"])
+    assert "file" not in data
+    assert (
+        Path(offline["GIT_CALLS"]).read_text(encoding="utf-8")
+        == "--no-lazy-fetch --version\n"
+    )
