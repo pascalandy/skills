@@ -52,4 +52,4 @@ Two more routes sketch screens for an app or a website: `wireframe` for a rough 
 
 **Pitfall:** ask for one page per request. A summary, a deck, and a diagram in one request get three rushed results. Ask for the summary, review it, then ask for the deck.
 
-Next: [Recipes and pitfalls](./07-recipes-and-pitfalls.md).
+Next: [Recipes and pitfalls](./08-recipes-and-pitfalls.md).

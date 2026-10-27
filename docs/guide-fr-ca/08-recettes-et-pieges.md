@@ -28,6 +28,14 @@ marketing ; launch. Lancement de la tenue de livres par texto.
 feel-me
 ```
 
+Réponds aux questions, puis lis les propositions. Quand l'agent n'a plus de question et que le plan te convient :
+
+```text
+go
+```
+
+Après le plan de lancement :
+
 ```text
 marketing ; emails. La séquence d'annonce, à partir du plan de lancement.
 ```

@@ -47,4 +47,4 @@ To fix it, try these in order:
 
 **Pitfall:** don't trust an answer that never names a skill. Ask the agent "Which skill did you open, and what is its first step?" An agent that read the skill can answer. An agent that guessed can't.
 
-Next: [Name a mode, then the task](./02-modes.md).
+Next: [Aim for consensus, then say go](./02-consensus-then-go.md).

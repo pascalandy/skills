@@ -32,7 +32,7 @@ L'agent garde ta voix et ne pose que les questions qui bloquent. Dans un récit 
 concise
 ```
 
-Style télégraphique : pas de remplissage, pas de politesses, des flèches pour les causes. C'est pour toi. Pour un texte que d'autres liront, prends `write-with-clarity`.
+Dans la conversation et les textes pour agents, le style est télégraphique : pas de remplissage, pas de politesses, des flèches pour les causes. Dans les documents pour des personnes, l'agent garde les articles et les phrases complètes. Pour travailler aussi la clarté d'un texte, tu peux choisir `andy-mode ; write-with-clarity`.
 
 ## Vérifie avant d'envoyer avec `2nd-pass`
 

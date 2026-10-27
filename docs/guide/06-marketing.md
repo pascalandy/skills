@@ -59,4 +59,4 @@ A few routes connect to outside tools, such as ad platforms or analytics. In a c
 
 **Pitfall:** the word "marketing" starts `corey-mode`, even in a sentence about something else. To keep another skill in charge, name it: `andy-mode ; storytelling. Tell my marketing career story.` When a request names another mode, that mode keeps the task.
 
-Next: [Turn your work into something to show](./06-show.md).
+Next: [Turn your work into something to show](./07-show.md).
