@@ -473,9 +473,9 @@ def validate_package(root: Path, errors: list[str]) -> tuple[int, int, str | Non
         errors.append(
             "routing: reveal.js CDN exception must preserve the shared default"
         )
-    if "[slides playbook](slides.md)" not in artifact_text:
+    if "For HTML presentations, use `playbooks/slides.md`." not in artifact_text:
         errors.append("routing: generic artifact playbook does not defer to slides.md")
-    if "[slides playbook](../playbooks/slides.md)" not in documents_text:
+    if "For HTML presentations, use `playbooks/slides.md`." not in documents_text:
         errors.append("routing: document reference does not defer to slides.md")
 
     pin_match = PIN_RE.search(playbook_text)

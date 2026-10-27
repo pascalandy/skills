@@ -1,6 +1,6 @@
 # Documents and presentations
 
-For HTML presentations, use the [slides playbook](../playbooks/slides.md). Use the rules below for scrolling documents.
+For HTML presentations, use `playbooks/slides.md`. Use the rules below for scrolling documents.
 
 ## Documents
 
