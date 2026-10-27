@@ -303,6 +303,36 @@ def captured(code: int, stdout: str = "", stderr: str = ""):
     return verify_transcript.CapturedProcess((), code, stdout, stderr, 0.1, False)
 
 
+@pytest.mark.parametrize("extra_command", ["", "unexpected"])
+def test_run_help_accepts_file_and_still_rejects_unexpected_commands(extra_command):
+    text = (
+        "positional arguments:\n"
+        "    youtube  YouTube audio\n"
+        "    zoom  Zoom recording\n"
+        "    file  Local audio file\n"
+    )
+    if extra_command:
+        text += f"    {extra_command}  Unsupported command\n"
+    text += (
+        "\noptions:\n  --help\n  --verbose\n  --debug\n"
+        "  --no-color\n  --no-progress\n"
+    )
+    commands = (
+        verify_transcript.CommandPlan("run-help", ("run", "--help")),
+        verify_transcript.CommandPlan("version", ("--version",)),
+    )
+    captures = (
+        (captured(0, text), {"text": text}),
+        (captured(0, "transcript 1.0.0\n"), {"text": "transcript 1.0.0\n"}),
+    )
+    if extra_command:
+        with pytest.raises(AssertionError, match="run-help choices changed"):
+            verify_transcript._validate_help_version(commands, captures)
+    else:
+        observed = verify_transcript._validate_help_version(commands, captures)
+        assert observed["help"]["run-help"]["choices"] == ["file", "youtube", "zoom"]
+
+
 def test_an_answer_is_one_json_line_on_the_stream_its_exit_code_names():
     by_exit = verify_transcript.OutputExpectation("answer", (0, 1))
     failure = '{"ok":false,"errors":["boom; fix: run this"]}\n'

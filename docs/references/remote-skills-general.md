@@ -112,7 +112,7 @@ A mode's routes run through that mode's SKILL.md.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `sharpen`: Use only when explicitly invoked as `sharpen`.
 - `tavily`: Use only when explicitly invoked as `tavily`.
-- `transcript`: Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording.
+- `transcript`: Use when the user invokes `transcript` or asks to transcribe a YouTube video, Zoom recording, or local audio file.
 - `unslop`: Use when communicating directly with the user or writing and editing documents.
 - `writing-for-agents`: Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read.
 - `writing-great-skills`: Use when creating, modifying, evaluating a skill.

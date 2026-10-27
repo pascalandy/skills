@@ -45,6 +45,7 @@ COMMANDS: dict[tuple[str, ...], dict[int, str]] = {
     ("run",): transcript.EXIT_CODES,
     ("run", "youtube"): transcript.EXIT_CODES,
     ("run", "zoom"): transcript.EXIT_CODES,
+    ("run", "file"): transcript.EXIT_CODES,
     ("list",): transcript.LIST_EXIT_CODES,
     ("list", "prompts"): transcript.LIST_EXIT_CODES,
     ("list", "profiles"): transcript.LIST_EXIT_CODES,
