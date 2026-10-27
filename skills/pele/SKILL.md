@@ -84,7 +84,7 @@ chromium --headless --screenshot=/tmp/pele/diagram.png --window-size=<width>,<he
 
 On macOS, use `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` in place of `chromium`. Read the screenshot. Check the labels, arrowheads, legend, contrast, and takeaway. An `ok` answer proves that the diagram renders with that pele version, not with Mermaid or another host's renderer.
 
-When the screenshot is taller than about 2000 px, cut it into slices with `magick diagram.png -crop x1400 +repage slice-%02d.png`, then read each slice. ImageMagick only cuts the PNG that Chromium drew, so pele's colors stay intact.
+When the screenshot is taller than about 2000 px, use [ImageMagick 7](https://imagemagick.org/script/download.php) (`magick --version`) to cut it into slices. From the screenshot's folder (`/tmp/pele` in the example above), run `magick diagram.png -crop x1400 +repage slice-%02d.png`, then read each slice. ImageMagick only cuts the PNG that Chromium drew, so pele's colors stay intact.
 
 ## Pages and images
 
