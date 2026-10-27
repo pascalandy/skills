@@ -218,16 +218,13 @@ def test_pages_each_connection_past_100(tmp_path: Path, field: str) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == '{"ok":true}\n'
-    assert (
-        len((tmp_path / "requests.jsonl").read_text(encoding="utf-8").splitlines()) == 2
-    )
     requests = [
         json.loads(line)
         for line in (tmp_path / "requests.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
-    assert [request["variables"].get("after") for request in requests] == [None, "next"]
+    assert [request["variables"]["after"] for request in requests] == [None, "next"]
 
 
 def test_native_order_is_not_a_set(tmp_path: Path) -> None:
