@@ -8,25 +8,25 @@ Copyright (c) 2026 plannotator. Original material uses the [MIT license](LICENSE
 
 ## Source mapping
 
-Upstream paths are relative to the pinned `skills/` directory.
+Upstream paths are relative to the pinned `skills/` directory. Adapted paths are relative to the `html-mode` root.
 
 | Upstream source | Adapted destination |
 | --- | --- |
-| `html/SKILL.md` | [Shared workflow](../SKILL.md) and [artifact](../playbooks/artifact.md) |
-| `html-wireframe/SKILL.md` | [Wireframe](../playbooks/wireframe.md) |
-| `html-prototype/SKILL.md` | [Prototype and mockup](../playbooks/prototype.md) |
-| `html-plan/SKILL.md` | [Plan](../playbooks/plan.md) |
-| `html-diagram/SKILL.md` | [Diagram](../playbooks/diagram.md) |
-| `design-artifact/SKILL.md` | [Design](design.md) and shared verification |
-| `html/references/creative-direction.md` | [Design](design.md) |
-| `html/references/documents-and-presentations.md` | [Documents and presentations](documents-and-presentations.md) |
-| `html/references/interfaces.md` | [Interfaces](interfaces.md) |
-| `html/references/diagrams.md` | [Diagram techniques](diagram-techniques.md) |
-| `html/references/charts-and-data.md` | [Charts and data](charts-and-data.md) |
+| `html/SKILL.md` | Shared workflow in `SKILL.md` and `playbooks/artifact.md` |
+| `html-wireframe/SKILL.md` | Wireframe in `playbooks/wireframe.md` |
+| `html-prototype/SKILL.md` | Prototype and mockup in `playbooks/prototype.md` |
+| `html-plan/SKILL.md` | Plan in `playbooks/plan.md` |
+| `html-diagram/SKILL.md` | Diagram in `playbooks/diagram.md` |
+| `design-artifact/SKILL.md` | Design in `references/design.md` and shared verification |
+| `html/references/creative-direction.md` | Design in `references/design.md` |
+| `html/references/documents-and-presentations.md` | Documents and presentations in `references/documents-and-presentations.md` |
+| `html/references/interfaces.md` | Interfaces in `references/interfaces.md` |
+| `html/references/diagrams.md` | Diagram techniques in `references/diagram-techniques.md` |
+| `html/references/charts-and-data.md` | Charts and data in `references/charts-and-data.md` |
 
 ## Slides
 
-The [slides playbook](../playbooks/slides.md) replaces retired `html-slides`, whose metadata credited `claude-office-skills` and declared the MIT license. That package recorded no upstream URL or revision. Retained reveal.js concepts were rechecked against current official documentation. Agent, model, and MCP metadata were omitted.
+The slides playbook, `playbooks/slides.md`, replaces retired `html-slides`, whose metadata credited `claude-office-skills` and declared the MIT license. That package recorded no upstream URL or revision. Retained reveal.js concepts were rechecked against current official documentation. Agent, model, and MCP metadata were omitted.
 
 The [slides template](../assets/slides-template.html) loads [reveal.js 6.0.2](https://github.com/hakimel/reveal.js/releases/tag/6.0.2) from jsDelivr. reveal.js is copyright (c) 2011-2026 Hakim El Hattab and contributors, under the [MIT license](LICENSE-revealjs.txt).
 

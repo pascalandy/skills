@@ -25,11 +25,11 @@ Resolve bundled paths from this directory. Read files only when their conditions
 | --- | --- |
 | What content belongs here, and how should navigation or layout work? | [Wireframe](playbooks/wireframe.md) |
 | How should a product look or a bounded flow behave? | [Prototype](playbooks/prototype.md), static mockup or working prototype |
-| What work happens in what order, with which commitments? | [Plan](playbooks/plan.md) |
-| How do components, events, states, or concepts relate? | [Diagram](playbooks/diagram.md) |
+| What work happens in what order, with which commitments? | [Plan](playbooks/plan.md). Read [document guidance](references/documents-and-presentations.md) with the source plan |
+| How do components, events, states, or concepts relate? | [Diagram](playbooks/diagram.md). Read [diagram techniques](references/diagram-techniques.md) for notation and rendering |
 | How should an HTML presentation tell a story one screen at a time? | [Slides](playbooks/slides.md) |
 | How do readers use a page, such as a document turned into a guided reading page? | [Interactive page](playbooks/interactive-page.md) |
-| A report, explainer, landing page, tool, data story, or mixed artifact without a narrower playbook | [Artifact](playbooks/artifact.md) |
+| A report, explainer, landing page, tool, data story, or mixed artifact without a narrower playbook | [Artifact](playbooks/artifact.md). For reports, briefs, explainers, and comparisons, read [documents and presentations](references/documents-and-presentations.md). For calculators, editors, and tools, read [interfaces](references/interfaces.md). For relational diagrams, read [diagram techniques](references/diagram-techniques.md) |
 
 For quantitative content, read [charts and data](references/charts-and-data.md).
 

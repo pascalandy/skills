@@ -10,7 +10,7 @@
 | How can something change? | State |
 | What contains or owns what? | Hierarchy or boundary map |
 | How do alternatives compare? | Matrix or aligned comparison |
-| How much or how often? | Quantitative chart; read [charts and data](charts-and-data.md) |
+| How much or how often? | Quantitative chart; read `references/charts-and-data.md` |
 
 If one picture has too many questions, use coordinated views. Use HTML/CSS for reflowing labels and aligned regions. Use SVG for crisp relationships and annotations, Canvas for dense or frequently changing graphics. Use WebGL only when spatial scale or three-dimensional content justifies it. Any drawing medium can have semantic HTML controls.
 
