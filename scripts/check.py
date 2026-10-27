@@ -418,7 +418,7 @@ CHECKS = [
     ),
     Check(
         "poteto-mode",
-        pytest(f"{POTETO_MODE}/tests/test_worktree_audit.py"),
+        pytest(f"{POTETO_MODE}/tests"),
     ),
     Check(
         "poteto-mode-ts",

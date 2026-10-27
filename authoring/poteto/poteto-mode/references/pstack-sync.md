@@ -21,6 +21,10 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 
 Base v0.15.0 (`71ed0d1`), tête examinée `99743e9`, après v0.15.25.
 
+Pour préparer une synchro des principes, lancer `scripts/merge-principles.sh --help` depuis le dossier du skill. La racine locale à passer est celle du dépôt source qui contient `authoring/`. Git avec l’option `--no-lazy-fetch`, jq et awk doivent être installés. Le script prévisualise les corps à comparer sans appliquer la fusion (#732).
+
+Un état `clean` indique seulement une fusion textuelle sans conflit. Lire les changements de chaque corps avant de les reprendre, notamment les coupes classées dans « Laissés » ci-dessous. L’aperçu ne change ni la base enregistrée ni les décisions de cette note.
+
 Pris :
 
 - L'étiquette de preuve sur chaque affirmation (#341) et la règle d'autonomie complète (#414)
