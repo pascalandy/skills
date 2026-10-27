@@ -473,16 +473,16 @@ def rewrite_links(
     return LINK.sub(replace, text)
 
 
-def check_snapshot_revision(upstream: Path, revision: str) -> None:
-    """Match the selected snapshot to its opensrc registry and sidecar commit."""
+def snapshot_revision(upstream: Path) -> str:
+    """Read the sidecar commit for the selected registered opensrc snapshot."""
     snapshot = upstream.resolve()
     cache = next(
         (parent for parent in snapshot.parents if (parent / "sources.json").is_file()),
         None,
     )
     remedy = (
-        "pass --upstream the snapshot recorded in the cache's sources.json and "
-        "--revision its commitSha from the adjacent sync-state.json"
+        "use the snapshot recorded in sources.json and its commitSha from the "
+        f"adjacent sync-state.json; {REGENERATE}"
     )
     if cache is None:
         raise ScriptError(f"{upstream}: cannot locate opensrc sources.json; {remedy}")
@@ -510,15 +510,11 @@ def check_snapshot_revision(upstream: Path, revision: str) -> None:
         raise ScriptError(
             f"{cache}: cannot read snapshot revision: {error}; {remedy}"
         ) from error
-    if recorded != revision:
-        raise ScriptError(
-            f"snapshot revision {recorded} does not match --revision {revision}; {remedy}"
-        )
+    return recorded
 
 
 def render(upstream: Path, revision: str) -> Plan:
     files = upstream_files(upstream)
-    check_snapshot_revision(upstream, revision)
     target_of = {
         source: dest for source in files if (dest := destination(source)) is not None
     }
@@ -634,6 +630,11 @@ def update(
     package: Path, upstream: Path, revision: str, dry_run: bool
 ) -> list[list[str]]:
     plan = render(upstream, revision)
+    recorded = snapshot_revision(upstream)
+    if recorded != revision:
+        raise ScriptError(
+            f"snapshot revision {recorded} does not match --revision {revision}; {REGENERATE}"
+        )
     log.info("rendered %d files from %s at %s", len(plan), upstream, revision)
     lock = read_lock(package)
     files = {dest: item.content for dest, item in plan.items()}
@@ -736,14 +737,20 @@ def check(package: Path, upstream: Path | None) -> None:
                 links.append(f"broken link in {relative}: {target}")
     if upstream is not None:
         revision = lock.revision
-        plan = render(upstream, revision)
-        log.info("rebuilt %d files from %s at %s", len(plan), upstream, revision)
-        if lock_document(plan, revision) != (package / LOCK).read_bytes():
-            stale.append(f"{LOCK} differs from a fresh render of {upstream}")
-        for dest, item in sorted(plan.items()):
-            path = package / dest
-            if not path.is_file() or path.read_bytes() != item.content:
-                stale.append(f"differs from upstream: {dest}")
+        recorded = snapshot_revision(upstream)
+        if recorded != revision:
+            stale.append(
+                f"snapshot revision {recorded} differs from lock revision {revision}"
+            )
+        else:
+            plan = render(upstream, revision)
+            log.info("rebuilt %d files from %s at %s", len(plan), upstream, revision)
+            if lock_document(plan, revision) != (package / LOCK).read_bytes():
+                stale.append(f"{LOCK} differs from a fresh render of {upstream}")
+            for dest, item in sorted(plan.items()):
+                path = package / dest
+                if not path.is_file() or path.read_bytes() != item.content:
+                    stale.append(f"differs from upstream: {dest}")
     problems = [f"{problem}; {REGENERATE}" for problem in stale]
     problems += [f"{problem}; {ONE_ROW}" for problem in check_routes(package)]
     problems += links
