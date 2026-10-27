@@ -32,6 +32,7 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `command.doctor` | `diagnostics.youtube`, `diagnostics.zoom` |
 | `command.youtube` | `youtube.dry-run-summary` |
 | `command.zoom` | `zoom.dry-run` |
+| `command.file` | `interface.help-version` for discovery; upload and source preservation use deterministic transcript tests |
 | `command.prompts` | `configuration.prompts` |
 | `command.profiles` | `configuration.profiles` |
 | `command.models` | `configuration.models` |

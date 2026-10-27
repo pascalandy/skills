@@ -2158,6 +2158,110 @@ class TestYouTubeAuthenticationOrder:
             )
 
 
+class TestFilePipeline:
+    @pytest.mark.parametrize("http_status", [200, 500])
+    def test_successful_file_pipeline(
+        self, http_status, tmp_path, monkeypatch, capsys
+    ) -> None:
+        from datetime import UTC, datetime
+
+        import httpx
+        import transcript
+
+        class FrozenClock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 10, 27, 12, 34, 56, tzinfo=UTC)
+
+            def astimezone(self, tz=None):
+                return self
+
+        monkeypatch.setattr(transcript, "datetime", FrozenClock)
+        monkeypatch.setattr(
+            transcript, "get_api_key_from_keyring", lambda *_args: "dummy-key"
+        )
+        audio = tmp_path / "Entrevue à Montréal.m4a"
+        payload = b"local-audio" * 20_000
+        audio.write_bytes(payload)
+        exports = tmp_path / "exports"
+        uploads = []
+
+        def post(url, *, params, headers, content, timeout):
+            assert not isinstance(content, bytes)
+            chunks = list(content)
+            assert max(map(len, chunks)) <= 64 * 1024
+            assert b"".join(chunks) == payload
+            assert headers["Content-Type"] == "audio/mp4"
+            assert headers["Content-Length"] == str(len(payload))
+            assert headers["Authorization"] == "Token dummy-key"
+            uploads.append(len(chunks))
+            return httpx.Response(
+                http_status,
+                json=deepgram_response("Bonjour Montréal"),
+                request=httpx.Request("POST", url),
+            )
+
+        monkeypatch.setattr(transcript.httpx, "post", post)
+        for suffix in ("", "-2", "-3"):
+            code = transcript.main(
+                [
+                    "run",
+                    "file",
+                    "--path",
+                    str(audio),
+                    "--no-summary",
+                    "--output-dir",
+                    str(exports),
+                ]
+            )
+            out, err = capsys.readouterr()
+            folder = exports / f"2026_10_27_12h34_56-Entrevue à Montréal{suffix}"
+            assert folder.is_dir()
+            assert audio.read_bytes() == payload
+            meta = (folder / "meta.txt").read_text(encoding="utf-8")
+            assert f"Source: {audio}" in meta
+            assert "Summary status: skipped" in meta
+            if http_status == 200:
+                assert code == 0
+                assert err == f"{folder}\n"
+                result = json.loads(out)
+                assert result["ok"] is True
+                assert {Path(path).name for path in result["files"]} == {
+                    "meta.txt",
+                    "raw_transcript.txt",
+                    "raw_sentences.txt",
+                    "raw_transcript.json",
+                }
+                assert (folder / "raw_transcript.txt").read_text(
+                    encoding="utf-8"
+                ) == "Bonjour Montréal"
+                assert (folder / "raw_sentences.txt").read_text(
+                    encoding="utf-8"
+                ) == "[1s - 2s] Bonjour Montréal"
+                assert json.loads(
+                    (folder / "raw_transcript.json").read_text(encoding="utf-8")
+                ) == [
+                    {
+                        "sentences": [
+                            {"start": 1.0, "end": 2.0, "text": "Bonjour Montréal"}
+                        ]
+                    }
+                ]
+                assert "Transcript status: complete" in meta
+            else:
+                assert code == 1
+                assert out == ""
+                result = json.loads(err.splitlines()[-1])
+                assert result["ok"] is False
+                assert result["files"] == [str(folder / "meta.txt")]
+                assert "500" in result["errors"][0]
+                assert "Transcript status: failed" in meta
+            assert {path.name for path in folder.iterdir()} == {
+                Path(path).name for path in result["files"]
+            }
+        assert uploads == [4, 4, 4]
+
+
 class TestPipelines:
     def _isolate_external_boundaries(self, transcript, monkeypatch) -> None:
         monkeypatch.setattr(transcript, "validate_env", lambda *_args: "secret")

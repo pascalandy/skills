@@ -1,6 +1,6 @@
 # Transcript CLI
 
-`scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos or Zoom recordings with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free `claude` or `pi` process.
+`scripts/transcript.py` is the executable boundary for `transcript`. It transcribes YouTube videos, Zoom recordings, or local audio files with Deepgram and can create a Markdown summary through a named inference profile and an ephemeral, tool-free `claude` or `pi` process.
 
 The CLI uses subcommands, validates source input before execution, answers each command in one JSON line, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/references/script-conventions.md` of the `pascalandy/skills` repository.
 
@@ -32,6 +32,7 @@ The argument parser is the only list of commands, options, defaults, and exit co
 uv run <skill_dir>/scripts/transcript.py --help
 uv run <skill_dir>/scripts/transcript.py help run youtube
 uv run <skill_dir>/scripts/transcript.py run zoom --help
+uv run <skill_dir>/scripts/transcript.py run file --help
 ```
 
 ## Manage inference profiles
@@ -55,6 +56,12 @@ The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, s
 A YouTube run rejects an invalid URL before reading credentials, starting network work, or creating an output directory.
 
 For Zoom, `--path` accepts a folder name under `~/Documents/Zoom` or a full folder path. It rejects an audio-file path. The CLI resolves the folder and verifies that it contains an `.m4a` file before reading credentials or creating output.
+
+For local audio, `run file --path` accepts a non-empty file, including paths with spaces and accents. It resolves the absolute path before reading credentials or creating output. Deepgram receives the source bytes through the existing chunked upload. The source stays intact after success or failure. M4A uses `audio/mp4`.
+
+```bash
+uv run <skill_dir>/scripts/transcript.py run file --path "Entrevue à Montréal.m4a" --no-summary
+```
 
 Finder and preview are opt-in. A normal run has no GUI side effect and does not render the generated Markdown.
 
@@ -87,11 +94,12 @@ Discovery never reads credentials or starts network work. `doctor` checks local 
 
 ```bash
 uv run <skill_dir>/scripts/transcript.py doctor --source youtube
+uv run <skill_dir>/scripts/transcript.py doctor --source file --no-summary
 ```
 
 Each check has a `pass`, `warn`, or `fail` status, which `-v` lists. Each failed check is one error with its fix, and exits `1`. A `warn` check, such as a missing `pi`, needs nothing for the default profile, so it never fails `doctor`. No output contains the Deepgram credential.
 
-For a run with changed source or summary settings, inspect the plan first with `--dry-run`. Dry-run source validation is real and read-only. It checks a YouTube URL or resolves Zoom media, but it does not read secrets, call an API, or create files.
+For a run with changed source or summary settings, inspect the plan first with `--dry-run`. Dry-run source validation is real and read-only. It checks a YouTube URL, resolves Zoom media, or validates a local file, without secrets, API calls, or file creation. `doctor --source file --no-summary` checks only the Deepgram credential.
 
 ## Output
 
@@ -162,6 +170,8 @@ The Zoom files use the folder name as their base:
 ```
 
 Zoom files appear in the same order. Name collisions receive `-2`, `-3`, and later suffixes.
+
+A local file run creates `<timestamp>-<filename-without-extension>` under the output parent, with `-2`, `-3`, and later suffixes for collisions. It uses the generic `meta.txt` and `raw_*` names. Its metadata records the absolute source path. An enabled summary uses the selected bundled prompt, as for YouTube.
 
 The metadata holds the title, date, and source from the moment the folder appears. Each stage rewrites it, so it always shows how far the run got:
 

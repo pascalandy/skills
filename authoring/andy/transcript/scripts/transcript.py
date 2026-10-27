@@ -648,7 +648,7 @@ SUMMARY_OPTIONS = frozenset(
 )
 
 
-SourceKind = Literal["youtube", "zoom"]
+SourceKind = Literal["youtube", "zoom", "file"]
 TranscriptKind = Literal["plain", "timestamped"]
 YtDlpAuthMode = Literal["normal", "arc-required"]
 YtDlpMethod = Literal["anonymous", "arc", "chrome"]
@@ -898,7 +898,9 @@ class ExecutionReporter:
 
     def run_configuration(self, plan: RunPlan, prompt: PromptSpec | None) -> None:
         """Log the resolved run choices before any slow external work."""
-        source = "YouTube" if plan.source_kind == "youtube" else "Zoom"
+        source = {"youtube": "YouTube", "zoom": "Zoom", "file": "Local file"}[
+            plan.source_kind
+        ]
         if not plan.summarize:
             log.info(
                 f"Run: source={source} | provider=none | model=none | effort=none | "
@@ -2118,7 +2120,7 @@ def build_parser() -> TranscriptParser:
         prog=PROG,
         exit_codes=EXIT_CODES,
         description=(
-            "Transcribe YouTube or Zoom audio with Deepgram and optionally "
+            "Transcribe YouTube, Zoom, or local audio with Deepgram and optionally "
             "summarize it. Each command answers in one JSON line. The README next "
             "to this script covers setup and output."
         ),
@@ -2142,7 +2144,7 @@ def build_parser() -> TranscriptParser:
     run_parser = _command_parser(
         commands,
         "run",
-        help_text="Transcribe a YouTube video or Zoom recording",
+        help_text="Transcribe a YouTube video, Zoom recording, or local audio file",
         description="Choose one source. Source-specific help lists the run options.",
         epilog="""examples:
   transcript run youtube --url "https://youtu.be/dQw4w9WgXcQ"
@@ -2211,6 +2213,25 @@ def build_parser() -> TranscriptParser:
         zoom,
         output_default=ZOOM_EXPORT_DIR,
         prompt_default=f"{ZOOM_DEFAULT_PROMPT_NAME} from distill-prompt",
+    )
+
+    file_source = _command_parser(
+        sources,
+        "file",
+        help_text="Transcribe a local audio file",
+        description="Upload an existing audio file to Deepgram; keep the source intact.",
+        epilog="""examples:
+  transcript run file --path "entrevue.m4a" --no-summary
+  transcript run file --path "entrevue.m4a" --no-summary --dry-run
+  transcript run file --path "audio.mp3" --prompt short_summary""",
+        codes=EXIT_CODES,
+    )
+    file_source.add_argument(
+        "--path", required=True, metavar="PATH", help="Local, non-empty audio file"
+    )
+    file_source.set_defaults(url=None, zoom=False, zoom_custom_path=None)
+    _add_run_options(
+        file_source, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT
     )
 
     list_parser = _command_parser(
@@ -2292,7 +2313,7 @@ def build_parser() -> TranscriptParser:
     )
     doctor.add_argument(
         "--source",
-        choices=("all", "youtube", "zoom"),
+        choices=("all", "youtube", "zoom", "file"),
         default="all",
         help="Limit source-specific checks (default: all)",
     )
@@ -2350,6 +2371,8 @@ def parse_args(
     if args.source == "zoom":
         args.zoom_export_path = args.output_dir
         args.output_dir = None
+    elif args.source == "file":
+        args.zoom_export_path = None
     else:
         args.zoom_export_path = None
         if not args.urls:
@@ -2411,9 +2434,7 @@ def parse_args(
 
 def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
     """Resolve provider defaults and validate them before any mutation."""
-    source_kind: SourceKind = (
-        "zoom" if args.zoom or args.zoom_custom_path else "youtube"
-    )
+    source_kind: SourceKind = args.source
     if args.provider is not None:
         profile_name = None
         provider = args.provider
@@ -2525,6 +2546,9 @@ def _dry_run_plan(
             if args.queued
             else {"kind": "youtube", "url": args.url}
         )
+        output_dir = (args.output_dir or OUTPUT_DIR).expanduser()
+    elif plan.source_kind == "file":
+        source = {"kind": "file", "path": str(args.resolved_file_audio)}
         output_dir = (args.output_dir or OUTPUT_DIR).expanduser()
     else:
         source = {
@@ -2737,6 +2761,29 @@ def _validate_source_selection(plan: RunPlan, args: argparse.Namespace) -> None:
             )
         return
 
+    if plan.source_kind == "file":
+        replacement = ("--path", "/path/to/audio.m4a")
+        if not args.path.strip():
+            raise SourceCLIError("run file requires a non-empty --path", replacement)
+        try:
+            audio_path = Path(args.path).expanduser().resolve()
+            if not audio_path.is_file():
+                raise SourceCLIError(
+                    f"run file requires an existing audio file: {audio_path}",
+                    replacement,
+                )
+            if audio_path.stat().st_size == 0:
+                raise SourceCLIError(
+                    f"run file requires a non-empty audio file: {audio_path}",
+                    replacement,
+                )
+        except OSError as error:
+            raise SourceCLIError(
+                f"run file could not read the audio path: {error}", replacement
+            ) from error
+        args.resolved_file_audio = audio_path
+        return
+
     meeting_dir = (
         find_latest_zoom_meeting()
         if args.zoom
@@ -2753,7 +2800,16 @@ def _acquire_source(
     budget: RunBudget,
     reporter: ExecutionReporter,
 ) -> SourceAsset:
-    """Resolve the Zoom recording, or download YouTube audio into `audio_dir`."""
+    """Reuse local audio, or download YouTube audio into `audio_dir`."""
+    if plan.source_kind == "file":
+        audio_path = args.resolved_file_audio
+        return SourceAsset(
+            kind="file",
+            title=audio_path.stem,
+            source=str(audio_path),
+            audio_path=audio_path,
+            video_id="file",
+        )
     if plan.source_kind == "zoom":
         with reporter.step("Zoom audio") as step:
             meeting_dir = args.resolved_zoom_meeting
@@ -2797,6 +2853,9 @@ def _create_result_folder(
         output_root = args.output_dir.expanduser() if args.output_dir else OUTPUT_DIR
         date_formatted = started.strftime("%Y_%m_%d_%Hh%M")
         base_name = f"{date_formatted}_{clean_title(asset.title)}_{asset.video_id}"
+    elif plan.source_kind == "file":
+        output_root = (args.output_dir or OUTPUT_DIR).expanduser()
+        base_name = f"{started.strftime('%Y_%m_%d_%Hh%M_%S')}-{asset.audio_path.stem}"
     else:
         if asset.meeting_dir is None:
             raise RuntimeError("Zoom source is missing its meeting directory")

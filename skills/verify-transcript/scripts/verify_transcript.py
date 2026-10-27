@@ -521,7 +521,7 @@ HELP_CONTRACTS = (
     HelpContract(
         "run-help",
         ("run", "--help"),
-        frozenset({"youtube", "zoom"}),
+        frozenset({"youtube", "zoom", "file"}),
         GLOBAL_OPTIONS,
     ),
     HelpContract(
@@ -535,6 +535,12 @@ HELP_CONTRACTS = (
         ("run", "zoom", "--help"),
         frozenset(),
         RUN_OPTIONS | {"--latest", "--path"},
+    ),
+    HelpContract(
+        "file-help",
+        ("run", "file", "--help"),
+        frozenset(),
+        RUN_OPTIONS | {"--path"},
     ),
     HelpContract(
         "list-help",
@@ -604,6 +610,7 @@ PUBLIC_SURFACES = (
         ("youtube.dry-run-summary",),
     ),
     PublicSurface("command.zoom", "command", "zoom", ("zoom.dry-run",)),
+    PublicSurface("command.file", "command", "file", ("interface.help-version",)),
     PublicSurface(
         "command.prompts",
         "command",

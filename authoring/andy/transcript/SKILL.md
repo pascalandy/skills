@@ -1,6 +1,6 @@
 ---
 name: "transcript"
-description: "Use when the user invokes `transcript` or asks to transcribe a YouTube video or Zoom recording."
+description: "Use when the user invokes `transcript` or asks to transcribe a YouTube video, Zoom recording, or local audio file."
 kind: "general"
 configuration-is-needed: true
 api-key: "deepgram"
@@ -8,7 +8,7 @@ api-key: "deepgram"
 
 # Transcript
 
-Transcribe YouTube or Zoom audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
+Transcribe YouTube, Zoom, or local audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
 
 Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
 
@@ -26,6 +26,9 @@ uv run <skill_dir>/scripts/transcript.py run zoom --latest
 
 # Specific Zoom meeting folder
 uv run <skill_dir>/scripts/transcript.py run zoom --path "<folder-name-or-full-path>"
+
+# Local audio, keeping the source file intact
+uv run <skill_dir>/scripts/transcript.py run file --path "<audio-file>" --no-summary
 ```
 
 Pass `--profile` only when the user selects a profile; `list profiles` marks the default.
@@ -48,7 +51,7 @@ To update or create a profile, edit the `INFERENCE_PROFILES` registry in `script
 
 For Zoom, `--path` names the meeting folder, not its `audio*.m4a` file. A plain folder name resolves under `~/Documents/Zoom`.
 
-`help run youtube` and `help run zoom` list every run option and its default. Add an option only when the request calls for it. `--provider`, `--model`, and `--effort` form an advanced custom target for diagnostics only. `--open` and `--preview` are opt-in, so a normal run has no GUI side effect.
+`help run youtube`, `help run zoom`, and `help run file` list every run option and its default. Add an option only when the request calls for it. `--provider`, `--model`, and `--effort` form an advanced custom target for diagnostics only. `--open` and `--preview` are opt-in, so a normal run has no GUI side effect.
 
 ## Change a prompt
 
@@ -65,6 +68,7 @@ For an unfamiliar machine or after a preflight failure, run:
 ```bash
 uv run <skill_dir>/scripts/transcript.py doctor --source youtube
 uv run <skill_dir>/scripts/transcript.py doctor --source zoom
+uv run <skill_dir>/scripts/transcript.py doctor --source file --no-summary
 ```
 
 `doctor` checks local dependencies and credentials without calling Deepgram, a summary model, or another paid API.

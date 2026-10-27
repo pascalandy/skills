@@ -31,6 +31,7 @@ class TestCommandTree:
             (("run", "--help"), "youtube"),
             (("run", "youtube", "--help"), "--url URL"),
             (("run", "zoom", "--help"), "--latest"),
+            (("run", "file", "--help"), "--path PATH"),
             (("list", "--help"), "prompts"),
             (("list", "prompts", "--help"), "--no-color"),
             (("list", "models", "--help"), "--provider"),
@@ -173,6 +174,84 @@ class TestDiscovery:
 
 
 class TestDryRun:
+    def test_local_audio_plan_is_absolute_and_has_no_execution_side_effects(
+        self, monkeypatch, tmp_path, capsys
+    ) -> None:
+        import transcript
+
+        audio = tmp_path / "Entrevue à Montréal.m4a"
+        audio.write_bytes(b"audio")
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "outputs"
+        before = set(tmp_path.rglob("*"))
+        monkeypatch.setattr(
+            transcript,
+            "get_api_key_from_keyring",
+            lambda *_args: pytest.fail("dry-run read a secret"),
+        )
+
+        assert (
+            transcript.main(
+                [
+                    "run",
+                    "file",
+                    "--path",
+                    audio.name,
+                    "--no-summary",
+                    "--dry-run",
+                    "--output-dir",
+                    str(output),
+                ]
+            )
+            == 0
+        )
+
+        out, err = capsys.readouterr()
+        assert err == ""
+        assert len(out.splitlines()) == 1
+        plan = json.loads(out)
+        assert plan["ok"] is True
+        assert plan["source"] == {"kind": "file", "path": str(audio)}
+        assert plan["summary"]["enabled"] is False
+        assert set(tmp_path.rglob("*")) == before
+        assert audio.read_bytes() == b"audio"
+
+    @pytest.mark.parametrize(
+        "kind", ["missing", "directory", "empty", "blank", "omitted"]
+    )
+    def test_invalid_local_audio_fails_before_preflight(
+        self, kind, monkeypatch, tmp_path, capsys
+    ) -> None:
+        import transcript
+
+        audio = tmp_path / "audio.m4a"
+        if kind == "directory":
+            audio.mkdir()
+        elif kind == "empty":
+            audio.touch()
+        selection = (
+            []
+            if kind == "omitted"
+            else ["--path", "" if kind == "blank" else str(audio)]
+        )
+        monkeypatch.setattr(
+            transcript,
+            "get_api_key_from_keyring",
+            lambda *_args: pytest.fail("invalid source read a secret"),
+        )
+
+        assert (
+            transcript.main(["run", "file", *selection, "--no-summary", "--dry-run"])
+            == 2
+        )
+
+        out, err = capsys.readouterr()
+        assert out == ""
+        result = json.loads(err)
+        assert result["ok"] is False
+        assert result["help"] == "transcript run file --help"
+        assert "--path" in result["errors"][0]
+
     def test_a_dry_run_answers_its_plan_without_preflight(
         self, monkeypatch, capsys
     ) -> None:
@@ -218,6 +297,36 @@ class TestDryRun:
 
 
 class TestDoctor:
+    def test_file_without_summary_only_checks_deepgram(
+        self, monkeypatch, tmp_path, capsys
+    ) -> None:
+        import transcript
+
+        monkeypatch.setenv("PATH", str(tmp_path))
+        monkeypatch.setattr(transcript, "ZOOM_ROOT", tmp_path / "missing-zoom")
+        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-arc")
+        monkeypatch.setattr(
+            transcript, "CHROME_BROWSER_PROFILE", tmp_path / "missing-chrome"
+        )
+        reads = []
+        monkeypatch.setattr(
+            transcript,
+            "get_api_key_from_keyring",
+            lambda *_args: reads.append("deepgram") or "dummy-key",
+        )
+
+        assert (
+            transcript.main(["doctor", "--source", "file", "--no-summary", "-v"]) == 0
+        )
+
+        out, err = capsys.readouterr()
+        assert out == '{"ok":true}\n'
+        assert reads == ["deepgram"]
+        assert "[PASS] deepgram_credential:" in err
+        assert err.count("[PASS]") == 1
+        assert "dummy-key" not in err
+        assert not list(tmp_path.iterdir())
+
     def test_doctor_checks_never_expose_deepgram_key(
         self, monkeypatch, tmp_path
     ) -> None:
