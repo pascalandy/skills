@@ -561,10 +561,14 @@ def body_stories(body: str, repo: str) -> list[str] | None:
             continue
         if refs and re.match(r"^\s+- \*\*(Today|After):\*\* ", line):
             continue
+        entry = re.fullmatch(r"[0-9]+\. \*\*(.+)", line.strip())
+        if entry is None:
+            return None
+        title, _, suffix = entry[1].partition("**")
         match = re.fullmatch(
-            rf"[0-9]+\. .+\(({REFERENCE}|#[1-9][0-9]*)\) · .+", line.strip()
+            rf" \(({REFERENCE}|#[1-9][0-9]*)\) · (?:text|code \+ tests)", suffix
         )
-        if match is None:
+        if not title.strip() or match is None:
             return None
         ref = match[1]
         refs.append(repo + ref if ref.startswith("#") else ref)

@@ -252,6 +252,14 @@ def test_native_order_is_not_a_set(tmp_path: Path) -> None:
         ("No Stories section", None),
         ("## Stories\n1. Missing reference\n", None),
         ("## Stories\n## Stories\n", None),
+        (
+            "## Stories\n1. **Unexpected Story** (#999) · code + tests (#1) · text\n2. **Two** (other/project#2) · text\n",
+            None,
+        ),
+        (
+            "## Stories\n1. **Unexpected Story** (#999) · **Extra title** (#1) · text\n2. **Two** (other/project#2) · text\n",
+            None,
+        ),
     ],
 )
 def test_epic_body_agrees_with_native_order(
