@@ -334,11 +334,13 @@ CHECKS = [
         "scripts/install_skills.py",
     ),
     repo_test("sync_private", "scripts/sync_private.py"),
+    repo_test("check_mermaid_sequence", "scripts/check_mermaid_sequence.py"),
     # Optional local linters stay off so every machine agrees
     Check(
         "workflows",
         ("uvx", "--from", ACTIONLINT, "actionlint", "-shellcheck=", "-pyflakes="),
     ),
+    Check("mermaid-sequence", uv_run("scripts/check_mermaid_sequence.py")),
     Check(
         "html-mode",
         (

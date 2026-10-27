@@ -82,6 +82,12 @@ signoff *args:
 check-frontmatter *args:
     @uv run --quiet scripts/check_frontmatter.py "$@"
 
+# Check Mermaid sequence text for unescaped semicolons and hashes
+[group('checks')]
+[no-exit-message]
+check-mermaid-sequence *args:
+    @uv run --quiet scripts/check_mermaid_sequence.py "$@"
+
 # Scan staged changes for secrets
 [group('checks')]
 gitleaks-staged:

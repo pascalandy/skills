@@ -31,6 +31,7 @@ ENTRIES = {
     "scripts/check.py": "just check",
     "scripts/check_cli_block.py": "scripts/check_cli_block.py",
     "scripts/check_frontmatter.py": "just check-frontmatter",
+    "scripts/check_mermaid_sequence.py": "just check-mermaid-sequence",
     "scripts/discover_skills.py": "just skills-discover",
     "scripts/compile_skills.py": "just compile-skills",
     "scripts/install_skills.py": "just install-skills",
