@@ -24,7 +24,7 @@ For covered screens, run `uv run scripts/check_page.py --help`: phones, tablets 
 
 ## Colour and themes
 
-- Text contrast 4.5:1, or 3:1 from 24px or 18.66px bold _(checked, except SVG text and text over an image)_; graphics and focus rings 3:1
+- Text contrast 4.5:1, or 3:1 from 24px or 18.66px bold _(checked, except SVG text and text over an image)_; graphics and focus rings 3:1. For third-party reproductions, apply [Workflow step 5](../SKILL.md#workflow)
 - Define colours once as `light-dark()` tokens in `:root`. Support browsers without `light-dark()`
 - Use warm near-black dark surfaces, off-white text, and lighter accents for contrast. Deepen saturated blocks that glare in dark mode
 - Switch every colour at once
