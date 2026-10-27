@@ -260,6 +260,18 @@ def test_native_order_is_not_a_set(tmp_path: Path) -> None:
             "## Stories\n1. **Unexpected Story** (#999) · **Extra title** (#1) · text\n2. **Two** (other/project#2) · text\n",
             None,
         ),
+        (
+            "```md\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n```\n",
+            None,
+        ),
+        (
+            "~~~md\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n~~~\n",
+            None,
+        ),
+        (
+            "```md\n## Stories\n1. **Example** (#999) · text\n```\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n",
+            ["pascalandy/skills#1", "other/project#2"],
+        ),
     ],
 )
 def test_epic_body_agrees_with_native_order(

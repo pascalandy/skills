@@ -551,7 +551,26 @@ def relation(
 
 def body_stories(body: str, repo: str) -> list[str] | None:
     """Read the numbered entries in the Epic template's single Stories section."""
-    sections = re.split(r"(?m)^## Stories\s*$", body)
+    lines: list[str] = []
+    fence = ""
+    for line in body.splitlines():
+        marker = re.fullmatch(r" {0,3}(`{3,}|~{3,})(.*)", line)
+        if fence:
+            if (
+                marker
+                and marker[1][0] == fence[0]
+                and len(marker[1]) >= len(fence)
+                and not marker[2].strip()
+            ):
+                fence = ""
+            continue
+        if marker:
+            fence = marker[1]
+            continue
+        lines.append(line)
+    if fence:
+        return None
+    sections = re.split(r"(?m)^## Stories\s*$", "\n".join(lines))
     if len(sections) != 2:
         return None
     section = re.split(r"(?m)^#{1,2} ", sections[1], maxsplit=1)[0]

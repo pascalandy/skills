@@ -54,6 +54,8 @@ Indented `Today` and `After` bullets belong to a preceding Story entry.
 Other nonblank content makes the section unreadable.
 The body references must equal the native order. A missing or unreadable section
 fails, including when the expected list is empty.
+Headings in backtick or tilde code fences are examples, not body sections.
+An unclosed fence makes the body unreadable.
 
 From the skill folder, run:
 
