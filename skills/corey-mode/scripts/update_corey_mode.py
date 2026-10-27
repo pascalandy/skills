@@ -352,6 +352,7 @@ def answer_failure(
 
 import hashlib
 import posixpath
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -568,6 +569,23 @@ def owned(package: Path, lock: Locked | None) -> set[PurePosixPath]:
     return paths
 
 
+def atomic_write(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    finally:
+        try:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def update(
     package: Path, upstream: Path, revision: str, dry_run: bool
 ) -> list[list[str]]:
@@ -589,8 +607,7 @@ def update(
                 continue
             change = ["update" if path.exists() else "add", str(dest)]
             if not dry_run:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(content)
+                atomic_write(path, content)
             changes.append(change)
         if not dry_run and (package / PLAYBOOKS).is_dir():
             for folder in sorted((package / PLAYBOOKS).rglob("*"), reverse=True):
