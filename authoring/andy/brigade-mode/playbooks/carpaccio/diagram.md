@@ -6,7 +6,7 @@ A CU is a use case showing the process between Pascal and the threads. When an S
 
 ## Conventions
 
-Each step starts with its number and name. Chat messages start with `USER:` or `Agent:` and end with `->` or `<-` for their direction. Self-arrows show local actions and delegate calls; barrages are absent from the sidebar, so they have no participant. Settle is a T3 action. Blue boxes show loops, green boxes parallel work and orange boxes alternatives. `PR 35` and `PR 36` are examples. Write semicolons as `#59;` inside Mermaid labels and omit comment markers inside messages.
+Each step starts with its number and name. Chat messages start with `USER:` or `Agent:` and end with `->` or `<-` for their direction. Self-arrows show local actions and delegate calls; barrages are absent from the sidebar, so they have no participant. Settle is a T3 action. Blue boxes show loops, green boxes parallel work and orange boxes alternatives. `PR 35` and `PR 36` are examples. In sequence labels, including message and note text, write `;` as `#59;` and `#` as `#35;`. A bare `;` ends the statement, and a bare `#` drops the remaining text without an error.
 
 ## Sequence
 

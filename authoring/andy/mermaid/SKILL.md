@@ -62,6 +62,7 @@ Show the conclusion beneath the diagram. Label illustrative data as fictional. E
 - Quote flowchart labels containing spaces or punctuation: `api["API (public)"]`. Other diagram grammars have their own quoting rules
 - Keep stable, short IDs separate from display labels
 - In sequences, dashed lines are commonly used for returns; arrow appearance alone does not enforce synchronous behavior. Balance activation and deactivation across the whole source, including alternatives
+- In sequence message and note text, write `;` as `#59;` and `#` as `#35;`. A bare `;` ends the statement, and a bare `#` drops the remaining text without an error
 - In ERDs, solid `--` means identifying and dotted `..` means non-identifying. Supported key markers are `PK`, `FK`, `UK`; combine them with commas
 - In flowcharts, an external link to a subgraph's internal node can cause its local direction to be ignored
 - Use text as well as color for distinctions. Avoid emojis unless they belong to an explicit notation with a tested renderer
