@@ -121,14 +121,14 @@
       "html": "<p dir=\"auto\"><code class=\"notranslate\">markdown</code></p>\n<h2 dir=\"auto\">Stories</h2>\n<ol dir=\"auto\">\n<li><strong>Unexpected Story</strong> (<a title=\"Stack #999\" href=\"https://github.com/pascalandy/skills/stack/999\">#999</a>) · text</li>\n</ol>\n<pre class=\"notranslate\"><code class=\"notranslate\">## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n</code></pre>"
     },
     {
-      "name": "body-11",
-      "markdown": "```md\n``` \n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
+      "name": "nbsp-closing-suffix",
+      "markdown": "```md\n```\u00a0\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
       "stories": [
         "pascalandy/skills#1",
         "other/project#2"
       ],
       "actual": null,
-      "html": "<div class=\"highlight highlight-text-md\" dir=\"auto\"><pre class=\"notranslate\"><span class=\"pl-s\">```</span><span class=\"pl-en\"> </span><span class=\"pl-c1\"></span>\n<span class=\"pl-c1\">## Stories</span>\n<span class=\"pl-c1\">1. **One** (#1) · code + tests</span>\n<span class=\"pl-c1\">2. **Two** (other/project#2) · text</span></pre></div>"
+      "html": "<div class=\"highlight highlight-text-md\" dir=\"auto\"><pre class=\"notranslate\"><span class=\"pl-s\">```</span><span class=\"pl-en\">\u00a0</span><span class=\"pl-c1\"></span>\n<span class=\"pl-c1\">## Stories</span>\n<span class=\"pl-c1\">1. **One** (#1) · code + tests</span>\n<span class=\"pl-c1\">2. **Two** (other/project#2) · text</span></pre></div>"
     },
     {
       "name": "body-12",
@@ -248,6 +248,50 @@
         "other/project#2"
       ],
       "actual": null
+    },
+    {
+      "name": "nested-today-code",
+      "markdown": "## Stories\n\n1. **One** (#1) · code + tests\n   - **Today:** crash:\n     ```text\n     Traceback: error\n     ```\n   - **After:** fixed\n",
+      "stories": [
+        "pascalandy/skills#1"
+      ],
+      "actual": [
+        "pascalandy/skills#1"
+      ],
+      "html": "<h2 dir=\"auto\">Stories</h2>\n<ol dir=\"auto\">\n<li><strong>One</strong> (<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"5590976522\" data-permission-text=\"Title is private\" data-url=\"https://github.com/pascalandy/skills/issues/1\" data-hovercard-type=\"issue\" data-hovercard-url=\"/pascalandy/skills/issues/1/hovercard\" href=\"https://github.com/pascalandy/skills/issues/1\">#1</a>) · code + tests\n<ul dir=\"auto\">\n<li><strong>Today:</strong> crash:\n<pre lang=\"text\" class=\"notranslate\"><code class=\"notranslate\">Traceback: error\n</code></pre>\n</li>\n<li><strong>After:</strong> fixed</li>\n</ul>\n</li>\n</ol>"
+    },
+    {
+      "name": "nested-today-quote",
+      "markdown": "## Stories\n\n1. **One** (#1) · code + tests\n   - **Today:**\n     > error\n   - **After:** fixed\n",
+      "stories": [
+        "pascalandy/skills#1"
+      ],
+      "actual": [
+        "pascalandy/skills#1"
+      ],
+      "html": "<h2 dir=\"auto\">Stories</h2>\n<ol dir=\"auto\">\n<li><strong>One</strong> (<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"5590976522\" data-permission-text=\"Title is private\" data-url=\"https://github.com/pascalandy/skills/issues/1\" data-hovercard-type=\"issue\" data-hovercard-url=\"/pascalandy/skills/issues/1/hovercard\" href=\"https://github.com/pascalandy/skills/issues/1\">#1</a>) · code + tests\n<ul dir=\"auto\">\n<li><strong>Today:</strong>\n<blockquote>\n<p dir=\"auto\">error</p>\n</blockquote>\n</li>\n<li><strong>After:</strong> fixed</li>\n</ul>\n</li>\n</ol>"
+    },
+    {
+      "name": "top-level-entry-code",
+      "markdown": "## Stories\n\n1. **One** (#1) · code + tests\n\n   ```text\n   error\n   ```\n",
+      "stories": [
+        "pascalandy/skills#1"
+      ],
+      "actual": null,
+      "html": "<h2 dir=\"auto\">Stories</h2>\n<ol dir=\"auto\">\n<li>\n<p dir=\"auto\"><strong>One</strong> (<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"5590976522\" data-permission-text=\"Title is private\" data-url=\"https://github.com/pascalandy/skills/issues/1\" data-hovercard-type=\"issue\" data-hovercard-url=\"/pascalandy/skills/issues/1/hovercard\" href=\"https://github.com/pascalandy/skills/issues/1\">#1</a>) · code + tests</p>\n<pre lang=\"text\" class=\"notranslate\"><code class=\"notranslate\">error\n</code></pre>\n</li>\n</ol>"
+    },
+    {
+      "name": "existing-cross-repo-anchor",
+      "markdown": "## Stories\n\n1. **One** (#1) · code + tests\n2. **External** (cli/cli#14827) · text\n",
+      "stories": [
+        "pascalandy/skills#1",
+        "cli/cli#14827"
+      ],
+      "actual": [
+        "pascalandy/skills#1",
+        "cli/cli#14827"
+      ],
+      "html": "<h2 dir=\"auto\">Stories</h2>\n<ol dir=\"auto\">\n<li><strong>One</strong> (<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"5590976522\" data-permission-text=\"Title is private\" data-url=\"https://github.com/pascalandy/skills/issues/1\" data-hovercard-type=\"issue\" data-hovercard-url=\"/pascalandy/skills/issues/1/hovercard\" href=\"https://github.com/pascalandy/skills/issues/1\">#1</a>) · code + tests</li>\n<li><strong>External</strong> (<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"6050700549\" data-permission-text=\"Title is private\" data-url=\"https://github.com/cli/cli/issues/14827\" data-hovercard-type=\"issue\" data-hovercard-url=\"/cli/cli/issues/14827/hovercard\" href=\"https://github.com/cli/cli/issues/14827\">cli/cli#14827</a>) · text</li>\n</ol>"
     }
   ]
 }

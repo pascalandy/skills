@@ -3,7 +3,8 @@
 Use this format when phase 2 writes `approved-plan.json` in the run's own folder.
 Record its absolute path. Include each issue whose
 parent, native order, labels, blockers, or state the approved actions preserve or
-change, including affected Epics. Resolve new issue numbers before writing the file.
+change, including affected Epics. When an issue's parent changes, include its
+previous and new parents. Resolve new issue numbers before writing the file.
 Take changed values from the approved proposal. Take other preserved values from
 the phase 1 recheck, before any phase 2 GitHub write. A read made after a write
 supplies actual values only. Approved new issue numbers may be resolved after creation.
@@ -54,7 +55,9 @@ with the standard library HTML parser. Under its single Stories heading, each
 direct ordered-list entry must contain exactly one parenthesized `(#N)` or
 `(OWNER/REPO#N)` reference. Nested detail lists do not add Stories.
 The entries must equal native order. Missing or unreadable sections, ambiguous
-references or link targets, multiple lists, and code blocks within the section fail.
+references or link targets, multiple lists, and code blocks outside nested details fail.
+The section holds only that ordered list, without other elements alongside it.
+Nested details may contain code blocks or quotes.
 GitHub renders Markdown, comments, and fences. The script does not reinterpret them.
 Preserve closed Epic bodies. Report their discrepancies as failed comparisons;
 a discrepancy does not authorize a body edit.

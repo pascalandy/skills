@@ -487,11 +487,13 @@ def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str
         if response.get("errors"):
             raise ValueError(f"GraphQL errors: {json.dumps(response['errors'])}")
         item = response["data"]["repository"]["issue"]
-        if (
-            not isinstance(item, dict)
-            or url_ref(item["url"]).lower() != issue.ref.lower()
-        ):
-            raise ValueError("missing or unexpected issue")
+        if not isinstance(item, dict):
+            raise TypeError("missing issue")
+        canonical = url_ref(item["url"])
+        if canonical != issue.ref:
+            raise ValueError(
+                f"expected {issue.ref}, received {canonical}; use the canonical issue reference"
+            )
     except (ValueError, KeyError, TypeError, AttributeError) as error:
         raise ScriptError(
             f"{issue.ref}: unreadable GitHub response: {error}; rerun readback after restoring access"
@@ -581,7 +583,7 @@ class StoriesHTML(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in OPAQUE_TAGS:
-            self.invalid |= self.section
+            self.invalid |= self.section and len(self.lists) < 2
             self.opaque += 1
         elif not self.opaque:
             if tag in ("h1", "h2"):
@@ -744,7 +746,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 75: "read timeout, safe to retry",
             }
         ),
-        epilog="Examples:\n  uv run scripts/readback.py approved-plan.json\n  uv run scripts/readback.py - --timeout 2m < approved-plan.json",
+        epilog="Examples:\n  uv run scripts/readback.py /absolute/run-folder/approved-plan.json\n  uv run scripts/readback.py - --timeout 2m < /absolute/run-folder/approved-plan.json",
     )
     parser.add_argument(
         "plan",

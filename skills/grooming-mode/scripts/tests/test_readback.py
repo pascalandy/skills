@@ -339,6 +339,17 @@ def test_failed_or_partial_github_reads_fail(tmp_path: Path, payload: Any) -> No
     assert REF in answer["errors"][0]
 
 
+def test_noncanonical_repo_names_the_canonical_issue(tmp_path: Path) -> None:
+    approved = plan()
+    approved["issues"][0]["repo"] = "PascalAndy/skills"
+    answer = failure(
+        run(tmp_path, approved, {"PascalAndy/skills#335": response(issue())})
+    )
+    assert "canonical" in answer["errors"][0]
+    assert REF in answer["errors"][0]
+    assert "differences" not in answer
+
+
 def test_timeout_is_safe_to_retry(tmp_path: Path) -> None:
     answer = failure(
         run(tmp_path, plan(), {REF: {"delay": 1}}, "--timeout", "0.05s"), 75

@@ -286,7 +286,8 @@ After approval, follow these three phases.
 
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
-   Record preserved issue fields before any phase 2 GitHub write.
+   Before any phase 2 GitHub write, record each plan issue's parent, complete
+   native sub-issue order, labels, blockers including closed issues, and state.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
 4. Put dependent actions on the left-out list too.
    These actions include parent Ready labels and outcomes that rely on the changed item.
@@ -332,6 +333,8 @@ Done when each approved action is applied or reported as failed and the plan fil
    remaining fields and actions in Proposal with GitHub.
    Each scoped issue must be placed, closed, or left out with its reason.
 3. Within approval, correct discrepancies.
+   Keep phase 2's Ready-withholding rule during corrections.
+   Correct supporting writes before applying a withheld Ready label.
 4. Rerun the script on the same plan and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
