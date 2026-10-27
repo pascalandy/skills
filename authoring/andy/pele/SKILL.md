@@ -61,6 +61,7 @@ A diagram computes nothing: no critical path, causal inference, or statistics. W
 
 - Keep short, stable IDs apart from display labels. Quote each label that holds punctuation: `api["API (public)"]`
 - Use text as well as color for each distinction
+- In a sequence diagram, keep the label of a message from a participant to itself at two lines or fewer: pele 1.6.0 draws a third line over the next frame or message. Remove this limit when pele fixes the height calculation
 - Label made-up data as made-up. Below the diagram, say what the diagram cannot establish
 
 ## Render and verify
