@@ -217,7 +217,16 @@ class TestDryRun:
         assert audio.read_bytes() == b"audio"
 
     @pytest.mark.parametrize(
-        "kind", ["missing", "directory", "empty", "blank", "omitted"]
+        "kind",
+        [
+            "missing",
+            "directory",
+            "empty",
+            "blank",
+            "omitted",
+            "unknown-home",
+            "symlink-loop",
+        ],
     )
     def test_invalid_local_audio_fails_before_preflight(
         self, kind, monkeypatch, tmp_path, capsys
@@ -229,10 +238,17 @@ class TestDryRun:
             audio.mkdir()
         elif kind == "empty":
             audio.touch()
+        elif kind == "symlink-loop":
+            audio.symlink_to(audio)
+        path_text = (
+            "~__transcript_missing_user_efc1__/audio.m4a"
+            if kind == "unknown-home"
+            else str(audio)
+        )
         selection = (
             []
             if kind == "omitted"
-            else ["--path", "" if kind == "blank" else str(audio)]
+            else ["--path", "" if kind == "blank" else path_text]
         )
         monkeypatch.setattr(
             transcript,
@@ -240,17 +256,17 @@ class TestDryRun:
             lambda *_args: pytest.fail("invalid source read a secret"),
         )
 
-        assert (
-            transcript.main(["run", "file", *selection, "--no-summary", "--dry-run"])
-            == 2
-        )
+        assert transcript.main(["run", "file", *selection, "--no-summary"]) == 2
 
         out, err = capsys.readouterr()
         assert out == ""
         result = json.loads(err)
         assert result["ok"] is False
         assert result["help"] == "transcript run file --help"
-        assert "--path" in result["errors"][0]
+        if kind == "omitted":
+            assert result["errors"] == ["the following arguments are required: --path"]
+        else:
+            assert result["errors"][0].startswith("run file ")
 
     def test_a_dry_run_answers_its_plan_without_preflight(
         self, monkeypatch, capsys

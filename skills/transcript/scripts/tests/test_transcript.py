@@ -2159,9 +2159,23 @@ class TestYouTubeAuthenticationOrder:
 
 
 class TestFilePipeline:
-    @pytest.mark.parametrize("http_status", [200, 500])
+    @pytest.mark.parametrize(
+        "http_status,file_name",
+        [
+            (200, "Entrevue à Montréal.m4a"),
+            (500, "Entrevue à Montréal.m4a"),
+            (200, "é" * 117 + "a.m4a"),
+            (200, "é" * 119 + ".m4a"),
+        ],
+        ids=[
+            "normal-success",
+            "http-failure",
+            "collision-239-bytes",
+            "first-run-242-bytes",
+        ],
+    )
     def test_successful_file_pipeline(
-        self, http_status, tmp_path, monkeypatch, capsys
+        self, http_status, file_name, tmp_path, monkeypatch, capsys
     ) -> None:
         from datetime import UTC, datetime
 
@@ -2180,7 +2194,7 @@ class TestFilePipeline:
         monkeypatch.setattr(
             transcript, "get_api_key_from_keyring", lambda *_args: "dummy-key"
         )
-        audio = tmp_path / "Entrevue à Montréal.m4a"
+        audio = tmp_path / file_name
         payload = b"local-audio" * 20_000
         audio.write_bytes(payload)
         exports = tmp_path / "exports"
@@ -2202,6 +2216,7 @@ class TestFilePipeline:
             )
 
         monkeypatch.setattr(transcript.httpx, "post", post)
+        base_name = ""
         for suffix in ("", "-2", "-3"):
             code = transcript.main(
                 [
@@ -2215,7 +2230,22 @@ class TestFilePipeline:
                 ]
             )
             out, err = capsys.readouterr()
-            folder = exports / f"2026_10_27_12h34_56-Entrevue à Montréal{suffix}"
+            assert code == (0 if http_status == 200 else 1), err
+            result = json.loads(out if http_status == 200 else err.splitlines()[-1])
+            folder = Path(result["files"][0]).parent
+            assert folder.parent == exports
+            if not suffix:
+                base_name = folder.name
+                prefix = "2026_10_27_12h34_56-"
+                assert base_name.startswith(prefix)
+                output_stem = base_name[len(prefix) :]
+                assert output_stem and audio.stem.startswith(output_stem)
+                if file_name == "Entrevue à Montréal.m4a":
+                    assert output_stem == "Entrevue à Montréal"
+                else:
+                    assert len(audio.name.encode("utf-8")) in {239, 242}
+            assert folder.name == f"{base_name}{suffix}"
+            assert len(folder.name.encode("utf-8")) <= 255
             assert folder.is_dir()
             assert audio.read_bytes() == payload
             meta = (folder / "meta.txt").read_text(encoding="utf-8")
@@ -2224,7 +2254,6 @@ class TestFilePipeline:
             if http_status == 200:
                 assert code == 0
                 assert err == f"{folder}\n"
-                result = json.loads(out)
                 assert result["ok"] is True
                 assert {Path(path).name for path in result["files"]} == {
                     "meta.txt",
@@ -2251,7 +2280,6 @@ class TestFilePipeline:
             else:
                 assert code == 1
                 assert out == ""
-                result = json.loads(err.splitlines()[-1])
                 assert result["ok"] is False
                 assert result["files"] == [str(folder / "meta.txt")]
                 assert "500" in result["errors"][0]
@@ -2260,6 +2288,7 @@ class TestFilePipeline:
                 Path(path).name for path in result["files"]
             }
         assert uploads == [4, 4, 4]
+        assert len(base_name.encode("utf-8")) <= 255 - len("-999")
 
 
 class TestPipelines:

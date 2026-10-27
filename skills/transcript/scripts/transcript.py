@@ -7,7 +7,7 @@
 #     "rich",
 # ]
 # ///
-"""Transcribe YouTube or Zoom audio with Deepgram and optionally summarize it."""
+"""Transcribe YouTube, Zoom, or local audio with Deepgram and optionally summarize it."""
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
 import argparse
@@ -2251,7 +2251,7 @@ def build_parser() -> TranscriptParser:
     prompts = _command_parser(
         resources,
         "prompts",
-        help_text="List bundled YouTube prompts",
+        help_text="List bundled transcript prompts",
         description="List bundled prompt names and their transcript input type.",
         epilog="""examples:
   transcript list prompts
@@ -2777,7 +2777,7 @@ def _validate_source_selection(plan: RunPlan, args: argparse.Namespace) -> None:
                     f"run file requires a non-empty audio file: {audio_path}",
                     replacement,
                 )
-        except OSError as error:
+        except (OSError, RuntimeError) as error:
             raise SourceCLIError(
                 f"run file could not read the audio path: {error}", replacement
             ) from error
@@ -2855,7 +2855,13 @@ def _create_result_folder(
         base_name = f"{date_formatted}_{clean_title(asset.title)}_{asset.video_id}"
     elif plan.source_kind == "file":
         output_root = (args.output_dir or OUTPUT_DIR).expanduser()
-        base_name = f"{started.strftime('%Y_%m_%d_%Hh%M_%S')}-{asset.audio_path.stem}"
+        prefix = f"{started.strftime('%Y_%m_%d_%Hh%M_%S')}-"
+        # Leave room for make_unique_dir's largest suffix within a 255-byte component.
+        stem_budget = 255 - len(prefix.encode("utf-8")) - len("-999")
+        stem = asset.audio_path.stem.encode("utf-8")[:stem_budget].decode(
+            "utf-8", errors="ignore"
+        )
+        base_name = f"{prefix}{stem}"
     else:
         if asset.meeting_dir is None:
             raise RuntimeError("Zoom source is missing its meeting directory")

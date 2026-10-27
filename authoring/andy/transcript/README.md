@@ -171,7 +171,7 @@ The Zoom files use the folder name as their base:
 
 Zoom files appear in the same order. Name collisions receive `-2`, `-3`, and later suffixes.
 
-A local file run creates `<timestamp>-<filename-without-extension>` under the output parent, with `-2`, `-3`, and later suffixes for collisions. It uses the generic `meta.txt` and `raw_*` names. Its metadata records the absolute source path. An enabled summary uses the selected bundled prompt, as for YouTube.
+A local file run creates `<timestamp>-<filename-without-extension>` under the output parent, with `-2`, `-3`, and later suffixes for collisions. Long stems are shortened at a UTF8 character boundary to fit a 255-byte directory component, reserving room for `-999`. It uses the generic `meta.txt` and `raw_*` names. Its metadata keeps the complete absolute source path. An enabled summary uses the selected bundled prompt, as for YouTube.
 
 The metadata holds the title, date, and source from the moment the folder appears. Each stage rewrites it, so it always shows how far the run got:
 
@@ -241,6 +241,7 @@ uv run <skill_dir>/scripts/transcript.py --help
 uv run <skill_dir>/scripts/transcript.py run youtube --help
 uv run <skill_dir>/scripts/transcript.py run zoom --help
 uv run <skill_dir>/scripts/transcript.py list prompts
+uv run <skill_dir>/scripts/transcript.py run file --help
 uv run <skill_dir>/scripts/transcript.py list profiles
 uv run <skill_dir>/scripts/transcript.py list models --provider claude
 uv run <skill_dir>/scripts/transcript.py list models --provider codex
