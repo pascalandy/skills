@@ -81,7 +81,29 @@ def run(
 
 @pytest.fixture
 def upstream(tmp_path: Path) -> Path:
-    root = tmp_path / "upstream"
+    cache = tmp_path / "opensrc"
+    relative = "repos/github.com/coreyhaines31/marketingskills/main"
+    root = cache / relative
+    write(
+        cache / "sources.json",
+        json.dumps(
+            {
+                "repos": [
+                    {
+                        "name": "github.com/coreyhaines31/marketingskills",
+                        "path": relative,
+                        "version": "main",
+                    }
+                ]
+            }
+        ),
+    )
+    write(
+        cache / "sync-state.json",
+        json.dumps(
+            {"repos": {"github.com/coreyhaines31/marketingskills": {"commitSha": SHA}}}
+        ),
+    )
     write(root / "LICENSE", "MIT License\n")
     write(root / "README.md", "# Marketing Skills\n")
     write(root / "tools/REGISTRY.md", "# Registry\n")
@@ -267,6 +289,101 @@ def test_update_rerun_changes_nothing(upstream: Path, package: Path) -> None:
     result = update(upstream, package)
 
     assert (result.returncode, result.stdout, result.stderr) == (0, '{"ok":true}\n', "")
+
+
+@pytest.mark.parametrize("matches", [True, False])
+def test_update_requires_the_recorded_snapshot_revision(
+    upstream: Path, package: Path, matches: bool
+) -> None:
+    update(upstream, package)
+    before = {name: (package / name).read_bytes() for name in files(package)}
+    recorded = "d" * 40
+    revision = recorded if matches else SHA
+    write(
+        upstream.parents[4] / "sync-state.json",
+        json.dumps(
+            {
+                "repos": {
+                    "github.com/coreyhaines31/marketingskills": {"commitSha": recorded}
+                }
+            }
+        ),
+    )
+    write(upstream / "skills/alpha/SKILL.md", ALPHA + "\nRevised snapshot.\n")
+    if not matches:
+        (upstream / "skills/beta/SKILL.md").unlink()
+
+    result = update(upstream, package, "--revision", revision)
+
+    if matches:
+        assert success(result)["changes"] == [
+            ["update", "playbooks/alpha/alpha.md"],
+            ["update", "upstream-lock.json"],
+        ]
+        assert (package / "playbooks/alpha/alpha.md").read_text() == (
+            ALPHA_RENDERED.replace(SHA, recorded) + "\nRevised snapshot.\n"
+        )
+        assert (
+            json.loads((package / "upstream-lock.json").read_text())["revision"]
+            == recorded
+        )
+    else:
+        [error] = failure(result)["errors"]
+        assert (
+            f"snapshot revision {recorded} does not match --revision {revision}"
+            in error
+        )
+        assert {
+            name: (package / name).read_bytes() for name in files(package)
+        } == before
+
+
+def test_check_reports_a_different_snapshot_with_a_valid_update_command(
+    upstream: Path, package: Path
+) -> None:
+    update(upstream, package)
+    write(package / "playbooks/beta/beta.md", "local edit\n")
+    write(
+        upstream.parents[4] / "sync-state.json",
+        json.dumps(
+            {
+                "repos": {
+                    "github.com/coreyhaines31/marketingskills": {"commitSha": "d" * 40}
+                }
+            }
+        ),
+    )
+
+    result = run("check", "--upstream", str(upstream), "--package", str(package))
+
+    assert failure(result)["errors"] == [
+        "changed: playbooks/beta/beta.md" + REGENERATE,
+        f"snapshot revision {'d' * 40} differs from lock revision {SHA}" + REGENERATE,
+    ]
+
+
+@pytest.mark.parametrize("damage", ["missing-state", "invalid-state", "wrong-path"])
+def test_update_requires_snapshot_metadata_before_changing_the_package(
+    upstream: Path, package: Path, damage: str
+) -> None:
+    update(upstream, package)
+    before = {name: (package / name).read_bytes() for name in files(package)}
+    cache = upstream.parents[4]
+    if damage == "missing-state":
+        (cache / "sync-state.json").unlink()
+    elif damage == "invalid-state":
+        write(cache / "sync-state.json", "{")
+    else:
+        sources = json.loads((cache / "sources.json").read_text())
+        sources["repos"][0]["path"] += "/another-snapshot"
+        write(cache / "sources.json", json.dumps(sources))
+    write(upstream / "skills/alpha/SKILL.md", "# Changed upstream\n")
+
+    result = update(upstream, package)
+
+    [error] = failure(result)["errors"]
+    assert "cannot read snapshot revision" in error
+    assert {name: (package / name).read_bytes() for name in files(package)} == before
 
 
 def test_dry_run_answers_the_changes_and_writes_nothing(
