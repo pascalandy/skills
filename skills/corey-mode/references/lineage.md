@@ -18,7 +18,7 @@ Upstream `tools/`, `evals/`, the README, `AGENTS.md`, `VERSIONS.md`, and the plu
 
 ## Refresh from upstream
 
-The source is the opensrc snapshot of `coreyhaines31/marketingskills`. Its revision comes from the cache's `sync-state.json`. The importer requires `--upstream` to match that repository's path in `sources.json`. Before changing the package, it reads the adjacent `sync-state.json` and rejects a `--revision` that differs from the recorded `commitSha`. Missing or invalid cache metadata stops the import. `check --upstream` also compares the snapshot revision with the lock.
+The source is the opensrc snapshot of `coreyhaines31/marketingskills`. Its revision comes from the cache's `sync-state.json`. The importer requires `--upstream` to match that repository's path in `sources.json`. Before changing the package, it reads the adjacent `sync-state.json` and rejects a `--revision` that differs from the recorded `commitSha`. Missing or invalid cache metadata stops `update` and `check --upstream`.
 
 1. Load `git-local` and follow its workflow for `coreyhaines31/marketingskills`. Keep its validated `OPENSRC_HOME` and `OPENSRC_ROOT` in the same shell for the commands below
 2. Confirm `jq --version`. If it is missing, stop and give the user `mise use -g jq` on Linux or `brew install jq` on macOS
@@ -48,4 +48,4 @@ just check
 
 `check` fails with `playbook without a route` when upstream adds a skill, and with `route without a playbook` when it removes one. Add or remove the row in `SKILL.md`, reading the new playbook's description for tie-breakers against its neighbors. Then replay the [routing cases](routing-cases.md).
 
-Offline, `check` compares every generated file with the lock, requires one route per playbook, rejects a nested `SKILL.md`, and resolves the links in handwritten files. With `--upstream`, it also rebuilds every file from that folder and compares bytes. Neither proves how an agent routes a request.
+Offline, `check` compares every generated file with the lock, requires one route per playbook, rejects a nested `SKILL.md`, and resolves the links in handwritten files. With `--upstream`, it rebuilds every file from that folder and compares bytes when the snapshot revision matches the lock. On a revision mismatch, it skips rebuilding and reports the mismatch alongside package diagnostics. Neither proves how an agent routes a request.
