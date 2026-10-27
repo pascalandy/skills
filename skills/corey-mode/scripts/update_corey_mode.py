@@ -473,8 +473,52 @@ def rewrite_links(
     return LINK.sub(replace, text)
 
 
+def check_snapshot_revision(upstream: Path, revision: str) -> None:
+    """Match the selected snapshot to its opensrc registry and sidecar commit."""
+    snapshot = upstream.resolve()
+    cache = next(
+        (parent for parent in snapshot.parents if (parent / "sources.json").is_file()),
+        None,
+    )
+    remedy = (
+        "pass --upstream the snapshot recorded in the cache's sources.json and "
+        "--revision its commitSha from the adjacent sync-state.json"
+    )
+    if cache is None:
+        raise ScriptError(f"{upstream}: cannot locate opensrc sources.json; {remedy}")
+    name = REPOSITORY.removeprefix("https://")
+    try:
+        sources = json.loads((cache / "sources.json").read_text(encoding="utf-8"))
+        entries = sources["repos"]
+        if not isinstance(entries, list):
+            raise TypeError("sources.json repos must be an array")
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("name") != name:
+                continue
+            path = entry.get("path")
+            if isinstance(path, str) and (cache / path).resolve() == snapshot:
+                break
+        else:
+            raise ValueError(f"sources.json does not record {upstream} as {name}")
+        state = json.loads((cache / "sync-state.json").read_text(encoding="utf-8"))
+        recorded = state["repos"][name]["commitSha"]
+        if not isinstance(recorded, str) or not FULL_SHA.fullmatch(recorded):
+            raise ValueError(
+                "sync-state.json commitSha must be a full 40-character SHA"
+            )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ScriptError(
+            f"{cache}: cannot read snapshot revision: {error}; {remedy}"
+        ) from error
+    if recorded != revision:
+        raise ScriptError(
+            f"snapshot revision {recorded} does not match --revision {revision}; {remedy}"
+        )
+
+
 def render(upstream: Path, revision: str) -> Plan:
     files = upstream_files(upstream)
+    check_snapshot_revision(upstream, revision)
     target_of = {
         source: dest for source in files if (dest := destination(source)) is not None
     }

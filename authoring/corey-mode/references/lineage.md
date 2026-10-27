@@ -18,7 +18,7 @@ Upstream `tools/`, `evals/`, the README, `AGENTS.md`, `VERSIONS.md`, and the plu
 
 ## Refresh from upstream
 
-The source is the opensrc snapshot of `coreyhaines31/marketingskills`. Its revision comes from the cache's `sync-state.json`.
+The source is the opensrc snapshot of `coreyhaines31/marketingskills`. Its revision comes from the cache's `sync-state.json`. The importer requires `--upstream` to match that repository's path in `sources.json`. Before changing the package, it reads the adjacent `sync-state.json` and rejects a `--revision` that differs from the recorded `commitSha`. Missing or invalid cache metadata stops the import. `check --upstream` also compares the snapshot revision with the lock.
 
 1. Load `git-local` and follow its workflow for `coreyhaines31/marketingskills`. Keep its validated `OPENSRC_HOME` and `OPENSRC_ROOT` in the same shell for the commands below
 2. Confirm `jq --version`. If it is missing, stop and give the user `mise use -g jq` on Linux or `brew install jq` on macOS
