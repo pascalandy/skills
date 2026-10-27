@@ -7,7 +7,7 @@ tags:
   - topic/ci
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-18
+date_updated: 2026-10-27
 ---
 
 `just check` is the routine verdict, and it runs on your machine. `just signoff` posts a passing result to GitHub as a green `signoff` commit status, and `main` merges a PR only when its head commit carries one. `just merge` signs off a PR head when needed, squash-merges exactly that commit, then runs `just deploy`. Commit hooks run a fast subset before each commit. GitHub Actions runs `just check --sweep` only when started by hand, to publish a release
@@ -84,6 +84,8 @@ Keep `just check` CI-safe: it needs `uv` and `pnpm`, no secrets or private packa
 The selected `html-mode` check first installs the Chromium headless shell required by its Playwright pin in the user's browser cache. Playwright reuses an installed build and removes cached builds that no installed Playwright references. An unselected check and `--list` run no install command
 
 A skill check whose commands name a path under `authoring/` belongs to the package holding that path. `just check` selects it when the branch, compared with `origin/main`, or the working tree changes a file in that package, or changes `scripts/check.py`, which pins the tools. A check that reads files outside its package lists them in `reads=`, and a change to them selects it too. The direct repository validators always run. When git cannot compare with `origin/main`, every check runs. `--only NAME` runs a named check regardless of changed paths. `--sweep` runs every check, including unrelated suites, for release or diagnosis. `--verbose` names each skipped check
+
+The `evals` check validates authoring scenarios with `run_evals.load_scenarios(evals_dir, [])`. Changes under a skill's `evals/`, including fixtures, select its existing `evals.json`. A runner change, `--sweep`, or `--only evals` validates all discovered files. Deleted files are skipped; renamed files are read at their destination. Validation runs no setup or agent and needs no agent CLI or credentials
 
 A skill check's pytest suite runs under the highest `>=X.Y` bound in its scripts' PEP 723 `requires-python`, or under Python 3.11 when none has one; another operator, such as `~=`, counts as none. Its scripts are the `.py` files under the folder that holds its `tests` folder, except those in a subfolder with its own `tests` folder, which holds another suite. To move a suite to a newer Python, raise a script's `>=` bound; `just check --list --verbose` shows the `--python` of each suite
 

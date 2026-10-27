@@ -1,7 +1,9 @@
 [
   {
     "skills": ["unslop"],
-    "setup": "In an empty folder, copy evals/fixtures/draft.md to draft.md and run the query from that folder",
+    "setup": [
+      "cp \"$EVALS/fixtures/draft.md\" draft.md"
+    ],
     "query": "Clean up draft.md so it reads like a person wrote it. Keep every fact. Edit the file in place.",
     "files": ["evals/fixtures/draft.md"],
     "expected_behavior": [
@@ -13,7 +15,9 @@
   },
   {
     "skills": ["unslop"],
-    "setup": "In an empty folder, copy evals/fixtures/brouillon.md to brouillon.md and run the query from that folder",
+    "setup": [
+      "cp \"$EVALS/fixtures/brouillon.md\" brouillon.md"
+    ],
     "query": "Nettoie brouillon.md pour qu'il sonne écrit par une personne. Garde tous les faits. Modifie le fichier directement.",
     "files": ["evals/fixtures/brouillon.md"],
     "expected_behavior": [
@@ -26,7 +30,10 @@
   },
   {
     "skills": ["unslop"],
-    "setup": "In an empty folder, copy evals/fixtures/agents-md.md to AGENTS.md and evals/fixtures/transcription.md to transcription.md, then run the query from that folder",
+    "setup": [
+      "cp \"$EVALS/fixtures/agents-md.md\" AGENTS.md",
+      "cp \"$EVALS/fixtures/transcription.md\" transcription.md"
+    ],
     "query": "Nettoie transcription.md pour enlever les tics d'IA. Modifie le fichier directement.",
     "files": ["evals/fixtures/agents-md.md", "evals/fixtures/transcription.md"],
     "expected_behavior": [
