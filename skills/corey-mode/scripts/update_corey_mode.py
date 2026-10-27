@@ -578,13 +578,12 @@ def atomic_write(path: Path, content: bytes) -> None:
             handle.write(content)
         os.chmod(temporary, 0o644)
         os.replace(temporary, path)
-    except OSError:
+    finally:
         try:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
         except OSError:
             pass
-        raise
 
 
 def update(

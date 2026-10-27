@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -211,6 +212,55 @@ def test_update_keeps_each_playbook_whole_when_a_write_fails(
             name: (package / name).read_bytes() for name in files(package)
         } == before
     assert files(package) == set(before)
+
+
+@pytest.mark.parametrize(
+    ("interruption", "error"),
+    [(signal.SIGINT, "interrupted"), (signal.SIGTERM, "terminated")],
+)
+def test_interrupted_update_removes_its_temporary_file(
+    upstream: Path, package: Path, interruption: int, error: str
+) -> None:
+    update(upstream, package)
+    before = {name: (package / name).read_bytes() for name in files(package)}
+    write(upstream / "LICENSE", "Replacement license\n")
+    # Deliver a real signal after the temporary write, before its atomic publish.
+    launcher = """
+import os, runpy, sys
+module = runpy.run_path(sys.argv[1])
+def interrupt(source, destination):
+    os.kill(os.getpid(), int(sys.argv[2]))
+os.replace = interrupt
+raise SystemExit(module["main"](sys.argv[3:]))
+"""
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            launcher,
+            str(SCRIPT),
+            str(int(interruption)),
+            "update",
+            "--upstream",
+            str(upstream),
+            "--revision",
+            SHA,
+            "--package",
+            str(package),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+
+    assert failure(result, code=128 + interruption) == {
+        "ok": False,
+        "errors": [error],
+    }
+    assert {name: (package / name).read_bytes() for name in files(package)} == before
 
 
 def test_update_rerun_changes_nothing(upstream: Path, package: Path) -> None:
