@@ -692,6 +692,12 @@ def check_document(
     skill: Path, path: Path, prose: list[Prose], is_skill_md: bool
 ) -> list[Finding]:
     findings: list[Finding] = []
+    relative = path.relative_to(skill).parts
+    is_route_entry = (
+        len(relative) == 3
+        and relative[0] == "playbooks"
+        and relative[2] == f"{relative[1]}.md"
+    )
     for line, target in link_targets(prose):
         if "\\" in target:
             findings.append(
@@ -718,7 +724,10 @@ def check_document(
                 )
             )
         elif (
-            not is_skill_md and resolved.suffix == ".md" and resolved.name != "SKILL.md"
+            not is_skill_md
+            and resolved.suffix == ".md"
+            and resolved.name != "SKILL.md"
+            and not (is_route_entry and resolved.is_relative_to(path.parent.resolve()))
         ):
             findings.append(
                 Finding(
