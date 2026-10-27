@@ -16,7 +16,7 @@ parent. Write the plan file for independently resolvable rows. If none remain, d
 write an empty plan or run the script: report all its comparisons as not run.
 A partial plan file's success covers only its included rows; unresolved actions remain
 failed and their affected hierarchies unready. If creation later succeeds, resolve
-the original approved rows into the same plan file before rerunning it.
+the original approved rows into the plan file. Write it if none exists, then run the script.
 
 ```json
 {
