@@ -11,6 +11,7 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 - Le parseur de `watch-pr` garde les identifiants de Bugbot et de Cursor que GitHub transmet. Ce sont des données de protocole, pas des consignes
 - La limite d'environ 40 lignes du corps d'une PR dans `opening-a-pr.md` tient à son rôle de briefing. Elle ne suppose pas que le commit squash reprend ce corps, car chaque dépôt règle le contenu du message
 - Le Laziness Protocol compte les cas réels avant de couvrir une forme d'entrée et refuse les formes restantes avec une erreur claire (#905)
+- Les conventions du dépôt réservent `-` aux entrées lues en flux. Les fichiers ouverts sur place, comme SQLite, prennent un chemin, sans exception propre à brigade-mode (#807)
 
 ## Synchro du 15 octobre 2026
 
