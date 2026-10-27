@@ -93,6 +93,25 @@ describe("readiness truth table", () => {
 });
 
 describe("snapshot query planning", () => {
+  it.each([
+    ["Security review", true],
+    ["PR Review Automation", true],
+    ["Review automation", true],
+    ["Unit tests", false],
+  ] as const)("recognizes generic automation in %s", async (name, expected) => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({
+        fastPath: { kind: "checks", checks: [pendingCheck(name)] },
+      }),
+      context: context(2),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+    expect(snapshot.kind).toBe("open");
+    if (snapshot.kind !== "open") throw new Error("expected open snapshot");
+    expect(snapshot.reviewAutomationRunning).toBe(expected);
+  });
+
   it("does not query commit rollups while queued checks are pending", async () => {
     const reader = fakeReader({
       fastPath: { kind: "checks", checks: [pendingCheck()] },

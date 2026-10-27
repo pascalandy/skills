@@ -42,7 +42,6 @@ async function mergeAssessment(
   };
 }
 const AUTOMATION_TOKENS = [
-  "bugbot",
   "security review",
   "pr review automation",
   "review automation",

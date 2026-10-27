@@ -192,68 +192,51 @@ describe("closed enum parsing", () => {
   });
 });
 
-it("annotates Bugbot threads with distinct review-pass counts", () => {
-  const response = {
+it("keeps unresolved threads and recognizes generic RUN_ID metadata", () => {
+  const node = (id: string, body: string | null, isResolved = false) => ({
+    id,
+    isResolved,
+    comments: {
+      nodes: body === null ? [] : [
+        {
+          body,
+          createdAt: "now",
+          path: "a.ts",
+          line: 1,
+          author: { login: "reviewer" },
+        },
+      ],
+    },
+  });
+  const threads = parseReviewThreads({
     data: {
       repository: {
         pullRequest: {
           reviewThreads: {
             nodes: [
-              {
-                id: "one",
-                isResolved: false,
-                comments: {
-                  nodes: [
-                    {
-                      body: "RUN_ID: run-1",
-                      createdAt: "now",
-                      path: "a.ts",
-                      line: 1,
-                      author: { login: "bugbot" },
-                    },
-                  ],
-                },
-              },
-              {
-                id: "two",
-                isResolved: false,
-                comments: {
-                  nodes: [
-                    {
-                      body: "CURSOR_AUTOMATION_ID: run-2 severity high",
-                      createdAt: "now",
-                      path: null,
-                      line: null,
-                      author: { login: "cursor" },
-                    },
-                  ],
-                },
-              },
-              {
-                id: "resolved",
-                isResolved: true,
-                comments: {
-                  nodes: [
-                    {
-                      body: "RUN_ID: run-3",
-                      createdAt: "now",
-                      path: null,
-                      line: null,
-                      author: { login: "bugbot" },
-                    },
-                  ],
-                },
-              },
+              node("one", "RUN_ID: run-1.foo:bar_baz"),
+              node("two", "Ordinary review comment"),
+              node("empty", null),
+              node("resolved", "RUN_ID: run-2", true),
             ],
           },
         },
       },
     },
-  };
-  const threads = parseReviewThreads(response);
-  expect(threads).toHaveLength(2);
-  expect(threads.map((thread) => thread.isBugbot)).toEqual([true, true]);
-  expect(threads.map((thread) => thread.bugbotReviewPasses)).toEqual([3, 3]);
+  });
+  expect(threads.map(({ id, runId }) => ({ id, runId }))).toEqual([
+    { id: "one", runId: "run-1.foo:bar_baz" },
+    { id: "two", runId: null },
+    { id: "empty", runId: null },
+  ]);
+  expect(threads[0].firstComment).toEqual({
+    authorLogin: "reviewer",
+    body: "RUN_ID: run-1.foo:bar_baz",
+    path: "a.ts",
+    line: 1,
+    createdAt: "now",
+  });
+  expect(threads[2].firstComment).toBeNull();
 });
 
 describe("context and stack discovery", () => {
