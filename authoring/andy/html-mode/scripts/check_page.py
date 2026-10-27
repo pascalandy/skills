@@ -385,6 +385,7 @@ SCREENS: tuple[Screen, ...] = (
     Screen("ipad-portrait", 820, 1180, touch=True),
     Screen("ipad-landscape", 1180, 820, touch=True),
     Screen("ipad-pro-portrait", 1032, 1376, touch=True),
+    Screen("ipad-pro-landscape", 1376, 1032, touch=True),
     Screen("laptop", 1280, 720, touch=False),
     Screen("desktop", 1440, 900, touch=False),
 )

@@ -200,6 +200,90 @@ def test_a_compliant_page_passes_on_phone_and_desktop(
     assert (evidence / "desktop-dark.png").is_file()
 
 
+@pytest.fixture
+def large_touch_page(tmp_path: Path) -> Path:
+    page = tmp_path / "large-touch.html"
+    page.write_text(
+        '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">'
+        "<style>body { background: white; color: #111; font: 16px/1 sans-serif; }"
+        "a { display: block; width: 160px; height: 44px; color: #111; }"
+        ":focus-visible { outline: 3px solid #111; outline-offset: 3px; }"
+        "@media (min-width: 75rem) and (pointer: coarse) { a { height: 20px; } }"
+        '</style><a href="#end">Contents</a><p id="end">End</p>',
+        encoding="utf-8",
+    )
+    return page
+
+
+@pytest.mark.usefixtures("browser_ready")
+@pytest.mark.parametrize("height", (20, 44))
+def test_default_screens_check_wide_touch_targets_in_both_schemes(
+    capsys: pytest.CaptureFixture[str],
+    large_touch_page: Path,
+    tmp_path: Path,
+    height: int,
+) -> None:
+    large_touch_page.write_text(
+        large_touch_page.read_text(encoding="utf-8").replace("20px", f"{height}px"),
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "evidence"
+    code, answer = run(
+        capsys,
+        str(large_touch_page),
+        "--output-dir",
+        str(evidence),
+    )
+    if height == 20:
+        assert code == 1, answer
+        assert len(answer["errors"]) == 2  # type: ignore[arg-type]
+        for scheme in ("light", "dark"):
+            assert (
+                f'ipad-pro-landscape/{scheme}: targets: a "Contents" hit area under 44px (box 160×20)'
+                in errors_of(answer)
+            )
+    else:
+        assert code == 0, answer
+        assert answer["ok"] is True
+    assert (evidence / "ipad-pro-landscape-light.png").is_file()
+    assert (evidence / "ipad-pro-landscape-dark.png").is_file()
+
+
+@pytest.mark.usefixtures("browser_ready")
+def test_large_touch_screen_has_coarse_pointer_and_is_selectable(
+    capsys: pytest.CaptureFixture[str],
+    pages: Path,
+    tmp_path: Path,
+) -> None:
+    with check_page.sync_playwright() as playwright:
+        browser = check_page.launch(playwright, "chromium")
+        try:
+            run_on = check_page.Run(
+                browser, "chromium", (pages / "good.html").as_uri(), tmp_path
+            )
+            context = run_on.context(check_page.BY_NAME["ipad-pro-landscape"], "light")
+            try:
+                page = context.new_page()
+                assert page.evaluate("[innerWidth, innerHeight]") == [1376, 1032]
+                assert page.evaluate("matchMedia('(pointer: coarse)').matches") is True
+            finally:
+                context.close()
+        finally:
+            browser.close()
+    code, answer = run(
+        capsys,
+        str(pages / "good.html"),
+        "--screen",
+        "ipad-pro-landscape",
+        "--scheme",
+        "light",
+        "--output-dir",
+        str(tmp_path / "evidence"),
+    )
+    assert code == 0, answer
+    assert (tmp_path / "evidence" / "ipad-pro-landscape-light.png").is_file()
+
+
 @pytest.mark.usefixtures("browser_ready")
 def test_each_defect_is_reported_with_its_check(
     capsys: pytest.CaptureFixture[str], pages: Path, tmp_path: Path
