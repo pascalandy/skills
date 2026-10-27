@@ -37,6 +37,8 @@ Make a skill model-invoked only when the agent or another skill must reach it un
 
 When hand-fired skills multiply past what you remember, a **router skill** names them and says when to reach for each, so you remember one skill instead of many.
 
+Above a router's route table, keep what helps choose a route, including skills to load first. Put other material, such as a tool pointer, after the table.
+
 ## BP_21 Invoke by a word
 
 A skill that fires only when called by a word still keeps a description: agents hide skills through settings that differ, and a host `AGENTS.md` may keep every skill model-invocable. Write ``Use only when explicitly invoked as `<word>`.`` plus an optional tail for what it does:
