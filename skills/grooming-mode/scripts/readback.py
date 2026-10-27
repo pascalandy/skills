@@ -1,0 +1,666 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""Compare an approved grooming plan with GitHub without writing to GitHub."""
+
+from __future__ import annotations
+
+# >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
+import argparse
+import json
+import logging
+import os
+import re
+import shlex
+import signal
+import sys
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, NoReturn, TextIO
+
+USAGE = 2
+TEMPORARY = 75
+INTERRUPTED = 128 + signal.SIGINT
+TERMINATED = 128 + signal.SIGTERM
+
+
+class ScriptError(Exception):
+    """An expected failure; each argument is one message that says what to fix.
+
+    `detail` is text printed on stderr before the answer; `report` holds the
+    fields the answer carries beside `errors`, such as `changes`.
+    """
+
+    code = 1
+
+    def __init__(
+        self, *messages: str, detail: str = "", report: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(*messages)
+        self.detail = detail
+        self.report = dict(report or {})
+
+
+class UsageError(ScriptError):
+    """A bad argument the parser cannot catch, such as an unknown name."""
+
+    code = USAGE
+
+
+class TemporaryError(ScriptError):
+    """A failure a later retry may fix: an outage, a timeout, or a held lock."""
+
+    code = TEMPORARY
+
+
+class Interrupted(KeyboardInterrupt):
+    """SIGINT or SIGTERM arrived; `code` is 130 or 143."""
+
+    def __init__(self, code: int) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def exit_codes(specific: Mapping[int, str]) -> dict[int, str]:
+    """Every code a script returns, in order, for its --help and its tests.
+
+    `specific` adds codes or renames 1; 0, 1, 2, 130, and 143 are always there.
+    """
+    codes = {
+        0: "success",
+        1: "failure",
+        USAGE: "bad usage",
+        INTERRUPTED: "interrupted (SIGINT)",
+        TERMINATED: "terminated (SIGTERM)",
+        **specific,
+    }
+    reserved = [
+        code for code in codes if code >= 124 and code not in (INTERRUPTED, TERMINATED)
+    ]
+    if reserved:
+        raise ValueError(f"exit codes {reserved} are reserved for the shell and OS")
+    return dict(sorted(codes.items()))
+
+
+class Parser(argparse.ArgumentParser):
+    """argparse without abbreviated options, whose help ends with the exit codes
+    and whose usage errors print short usage and the help hint, then exit 2;
+    run_script() makes them answer in JSON instead."""
+
+    def __init__(
+        self, *, exit_codes: Mapping[int, str], epilog: str = "", **kwargs: Any
+    ) -> None:
+        table = "\n".join(
+            f"  {code:<4} {meaning}" for code, meaning in exit_codes.items()
+        )
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
+        super().__init__(
+            epilog=f"{epilog}\n\nexit codes:\n{table}".lstrip("\n"),
+            allow_abbrev=False,
+            **kwargs,
+        )
+        self.exit_codes = dict(exit_codes)
+
+    def error(self, message: str) -> NoReturn:
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"error: {message}\nrun '{self.prog} --help'\n")
+
+
+def answer(code: int, fields: Mapping[str, Any]) -> int:
+    """Print the one JSON line a script answers with, and return `code`.
+
+    `ok` comes first and is true exactly when `code` is 0, whatever `fields`
+    says. Success goes to stdout; a failure goes to stderr, after its
+    diagnostics, and leaves stdout empty (docs/references/script-output.md).
+    """
+    body = {"ok": code == 0, **fields}
+    body["ok"] = code == 0
+    line = json.dumps(body, separators=(",", ":"))
+    print(line, file=sys.stderr if code else sys.stdout)
+    return code
+
+
+def given(
+    argv: Sequence[str], *flags: str, parser: argparse.ArgumentParser | None = None
+) -> bool:
+    """Whether one of `flags` comes before `--`, where options end; use it to let
+    -h and --help win over every other argument.
+
+    With `parser`, a bundle of its flag letters counts too, such as -vh for
+    -v -h; a bundle holding an option that takes a value never does.
+    """
+    letters = {flag[1] for flag in flags if len(flag) == 2 and flag[1] != "-"}
+    bundled = flag_letters(parser) if parser is not None and letters else set()
+    for arg in argv:
+        if arg == "--":
+            return False
+        if arg in flags:
+            return True
+        bundle = set(arg[1:]) if re.fullmatch(r"-[A-Za-z]{2,}", arg) else set()
+        if bundle & letters and bundle <= bundled:
+            return True
+    return False
+
+
+def flag_letters(parser: argparse.ArgumentParser) -> set[str]:
+    """The one-letter options of `parser` and its commands that take no value."""
+    letters: set[str] = set()
+    parsers = [parser]
+    while parsers:
+        each = parsers.pop()
+        for option, action in each._option_string_actions.items():
+            if len(option) == 2 and option[1] != "-" and action.nargs == 0:
+                letters.add(option[1])
+        for action in each._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.extend(action.choices.values())
+    return letters
+
+
+@contextmanager
+def signals_interrupt() -> Iterator[None]:
+    """Raise Interrupted(130) on SIGINT and Interrupted(143) on SIGTERM.
+
+    The first signal ignores any repeat, so cleanup in `finally` blocks runs to
+    the end. Handlers need the main thread; elsewhere this changes nothing.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handled = (signal.SIGINT, signal.SIGTERM)
+    previous = {number: signal.getsignal(number) for number in handled}
+    fired = False
+
+    def interrupt(number: int, _frame: object) -> None:
+        nonlocal fired
+        fired = True
+        for each in handled:
+            signal.signal(each, signal.SIG_IGN)
+        raise Interrupted(128 + number)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        if not fired:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def env_flag(name: str) -> bool:
+    """Whether an environment switch such as SYNC_FLEET_DEBUG is on: set, and not 0."""
+    return os.environ.get(name, "") not in ("", "0")
+
+
+def color_enabled(stream: TextIO, disabled: bool = False) -> bool:
+    """Color only on a terminal, and never with --no-color, NO_COLOR, or TERM=dumb."""
+    return (
+        not disabled
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb"
+        and stream.isatty()
+    )
+
+
+DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def duration(text: str) -> float:
+    """Seconds from `30s`, `5m`, `2h`, or bare seconds; use it as an argparse type."""
+    match = DURATION.fullmatch(text.strip())
+    if match is None or float(match[1]) <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid duration {text!r}; use a positive number of seconds, or 30s, 5m, 2h"
+        )
+    return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[match[2]]
+
+
+def command_parsers(parser: argparse.ArgumentParser) -> list[argparse.ArgumentParser]:
+    """The parser of every command below `parser`, at any depth."""
+    found: list[argparse.ArgumentParser] = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for command in dict.fromkeys(action.choices.values()):
+                found += [command, *command_parsers(command)]
+    return found
+
+
+def named_command(
+    parser: argparse.ArgumentParser, argv: Sequence[str]
+) -> argparse.ArgumentParser:
+    """The deepest command `argv` names, whose help -h asks for."""
+    for arg in argv:
+        if arg == "--":
+            break
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
+                parser = action.choices[arg]
+                break
+    return parser
+
+
+def usage_error_for(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
+    """The error method of `parser`: a usage error whose help hint names it, so
+    a command's mistake points to that command's help."""
+
+    def error(message: str) -> NoReturn:
+        raise UsageError(message, report={"help": f"{parser.prog} --help"})
+
+    return error
+
+
+def run_script(
+    parser: Parser,
+    work: Callable[[argparse.Namespace], Mapping[str, Any]],
+    argv: Sequence[str] | None = None,
+    *,
+    debug: str | None = None,
+) -> int:
+    """Parse arguments, run `work`, and answer its outcome in one JSON line with
+    its exit code, as docs/references/script-output.md describes.
+
+    Every outcome answers, even a usage error, a bug, or an interrupt. `work`
+    returns the data beside `ok`, usually {}, and raises ScriptError,
+    UsageError, or TemporaryError for expected failures. `debug` names the
+    script's <NAME>_DEBUG variable and adds --debug; without it the script never
+    prints a traceback. Call it from `main()` and pass the result to `SystemExit`.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # A command's parser takes -v and --debug too, after the command; SUPPRESS
+    # keeps a flag given before it
+    for each in (parser, *command_parsers(parser)):
+        default = False if each is parser else argparse.SUPPRESS
+        if "-v" not in each._option_string_actions:
+            each.add_argument(
+                "-v",
+                "--verbose",
+                action="store_true",
+                default=default,
+                help="print progress and step details on stderr",
+            )
+        if debug and "--debug" not in each._option_string_actions:
+            each.add_argument(
+                "--debug",
+                action="store_true",
+                default=default,
+                help=f"print internals, timings, and tracebacks on stderr; also {debug}=1",
+            )
+        # Parser.error prints usage errors itself; raising sends each one
+        # through answer_failure(). The root reports unknown arguments, which
+        # belong to the command argv names
+        named = named_command(parser, argv) if each is parser else each
+        each.error = usage_error_for(named)  # pyright: ignore[reportAttributeAccessIssue]
+    if given(argv, "-h", "--help", parser=parser):
+        named_command(parser, argv).print_help()
+        return 0
+
+    command = shlex.join([*parser.prog.split(), *argv])
+    tracing = False
+    with signals_interrupt():
+        try:
+            args = parser.parse_args(argv)
+            tracing = debug is not None and (args.debug or env_flag(debug))
+            logging.basicConfig(
+                format="%(message)s",
+                level=logging.DEBUG
+                if tracing
+                else logging.INFO
+                if args.verbose
+                else logging.WARNING,
+                stream=sys.stderr,
+                force=True,
+            )
+            return answer(0, work(args))
+        except KeyboardInterrupt as stop:
+            code = getattr(stop, "code", INTERRUPTED)
+            word = "interrupted" if code == INTERRUPTED else "terminated"
+            return answer(code, {"errors": [word]})
+        except ScriptError as error:
+            return answer_failure(error, parser, command)
+        except Exception as error:
+            # The traceback comes first, so the answer ends stderr
+            logging.getLogger(__name__).debug("unexpected failure", exc_info=True)
+            unexpected = ScriptError(f"{type(error).__name__}: {error}")
+            return answer_failure(
+                unexpected, parser, command, rerun=bool(debug) and not tracing
+            )
+
+
+def answer_failure(
+    error: ScriptError, parser: Parser, command: str, rerun: bool = False
+) -> int:
+    """Answer a failure on stderr, after its detail, and return its exit code.
+    Hints name the command to run next: help for a usage error, retry for a
+    temporary failure, and rerun with --debug for a bug."""
+    messages = [str(message) for message in error.args]
+    hints: dict[str, str] = {}
+    if isinstance(error, UsageError) and "help" not in error.report:
+        hints["help"] = f"{parser.prog} --help"
+    elif isinstance(error, TemporaryError) and messages:
+        hints["retry"] = command
+    elif rerun:
+        hints["rerun"] = f"{command} --debug"
+    if error.detail:
+        print(error.detail, file=sys.stderr)
+    return answer(error.code, {"errors": messages, **error.report, **hints})
+
+
+# <<< cli-block
+
+import shutil
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+REFERENCE = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*"
+REPOSITORY = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+FIELDS = {"repo", "number", "parent", "stories", "labels", "blocked_by", "state"}
+CONNECTIONS = {"labels": "name", "subIssues": "url", "blockedBy": "url"}
+
+
+@dataclass(frozen=True)
+class Issue:
+    repo: str
+    number: int
+
+    @property
+    def ref(self) -> str:
+        return f"{self.repo}#{self.number}"
+
+
+def valid_ref(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(REFERENCE, value) is not None
+
+
+def read_plan(path: str) -> list[dict[str, Any]]:
+    try:
+        text = (
+            sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+        )
+        data = json.loads(text)
+    except (OSError, ValueError) as error:
+        raise UsageError(
+            f"cannot read plan {path!r}: {error}; supply valid plan JSON"
+        ) from error
+    if not isinstance(data, dict) or set(data) != {"issues"}:
+        raise UsageError("plan must contain only an issues array")
+    rows = data["issues"]
+    if not isinstance(rows, list) or not rows:
+        raise UsageError("plan issues must be a nonempty array")
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        where = f"issues[{index}]"
+        if not isinstance(row, dict) or set(row) != FIELDS:
+            raise UsageError(
+                f"{where} must contain exactly {', '.join(sorted(FIELDS))}"
+            )
+        if not isinstance(row["repo"], str) or not re.fullmatch(
+            REPOSITORY, row["repo"]
+        ):
+            raise UsageError(f"{where}.repo must be OWNER/REPO")
+        if type(row["number"]) is not int or row["number"] < 1:
+            raise UsageError(f"{where}.number must be a positive integer")
+        if row["parent"] is not None and not valid_ref(row["parent"]):
+            raise UsageError(f"{where}.parent must be null or OWNER/REPO#N")
+        for field in ("stories", "labels", "blocked_by"):
+            values = row[field]
+            if not isinstance(values, list) or not all(
+                isinstance(v, str) and bool(v) if field == "labels" else valid_ref(v)
+                for v in values
+            ):
+                raise UsageError(
+                    f"{where}.{field} must be an array of "
+                    + (
+                        "nonempty label names"
+                        if field == "labels"
+                        else "OWNER/REPO#N references"
+                    )
+                )
+            if len(set(values)) != len(values):
+                raise UsageError(f"{where}.{field} contains duplicates")
+        if row["state"] not in ("OPEN", "CLOSED"):
+            raise UsageError(f"{where}.state must be OPEN or CLOSED")
+        ref = Issue(row["repo"], row["number"]).ref.lower()
+        if ref in seen:
+            raise UsageError(f"{where} repeats an issue")
+        seen.add(ref)
+    return rows
+
+
+def connection_query(field: str, cursor: str | None = None) -> str:
+    return (
+        f"{field}(first:100,after:{json.dumps(cursor)})"
+        f"{{totalCount nodes{{{CONNECTIONS[field]}}} pageInfo{{hasNextPage endCursor}}}}"
+    )
+
+
+def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str, Any]:
+    owner, repo = issue.repo.split("/")
+    query = (
+        "query($owner:String!,$repo:String!,$number:Int!){"
+        "repository(owner:$owner,name:$repo){issue(number:$number){url "
+        + fields
+        + "}}}"
+    )
+    command = [gh, "api", "--hostname", "github.com", "graphql", "--input", "-"]
+    request = {
+        "query": query,
+        "variables": {"owner": owner, "repo": repo, "number": issue.number},
+    }
+    logging.getLogger(__name__).info("Reading %s", issue.ref)
+    try:
+        result = subprocess.run(
+            command,
+            input=json.dumps(request),
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            env={**os.environ, "GH_PROMPT_DISABLED": "1", "GH_PAGER": "cat"},
+        )
+    except subprocess.TimeoutExpired as error:
+        raise TemporaryError(
+            f"{issue.ref}: GitHub read timed out; rerun with a larger --timeout"
+        ) from error
+    if result.returncode:
+        raise ScriptError(
+            f"{issue.ref}: gh read failed ({result.returncode}): {result.stderr.strip()}; "
+            "check access with gh auth status --hostname github.com, then rerun readback"
+        )
+    try:
+        response = json.loads(result.stdout)
+        if response.get("errors"):
+            raise ValueError(f"GraphQL errors: {json.dumps(response['errors'])}")
+        item = response["data"]["repository"]["issue"]
+        if (
+            not isinstance(item, dict)
+            or url_ref(item["url"]).lower() != issue.ref.lower()
+        ):
+            raise ValueError("missing or unexpected issue")
+    except (ValueError, KeyError, TypeError, AttributeError) as error:
+        raise ScriptError(
+            f"{issue.ref}: unreadable GitHub response: {error}; rerun readback after restoring access"
+        ) from error
+    return item
+
+
+def url_ref(url: object) -> str:
+    match = re.fullmatch(
+        r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)",
+        url if isinstance(url, str) else "",
+    )
+    if match is None:
+        raise ValueError(f"invalid issue URL {url!r}")
+    return f"{match[1]}#{match[2]}"
+
+
+def relation(
+    gh: str, issue: Issue, field: str, item: dict[str, Any], timeout: float
+) -> list[str]:
+    values: list[str] = []
+    cursors: set[str] = set()
+    total: int | None = None
+    try:
+        while True:
+            page = item[field]
+            count, nodes, info = page["totalCount"], page["nodes"], page["pageInfo"]
+            if (
+                type(count) is not int
+                or count < 0
+                or (total is not None and count != total)
+            ):
+                raise ValueError("missing or changing totalCount")
+            total = count
+            if not isinstance(nodes, list) or type(info["hasNextPage"]) is not bool:
+                raise ValueError("invalid nodes or pageInfo")
+            for node in nodes:
+                value = node[CONNECTIONS[field]]
+                if field != "labels":
+                    value = url_ref(value)
+                if not isinstance(value, str) or not value or value in values:
+                    raise ValueError("unreadable or repeated relation node")
+                values.append(value)
+            cursor = info["endCursor"]
+            if len(values) > total:
+                raise ValueError("more nodes than totalCount")
+            if not info["hasNextPage"]:
+                if len(values) != total:
+                    raise ValueError(
+                        f"truncated list: expected {total} nodes, read {len(values)}"
+                    )
+                return values
+            if (
+                not nodes
+                or not isinstance(cursor, str)
+                or not cursor
+                or cursor in cursors
+            ):
+                raise ValueError("pagination made no progress")
+            cursors.add(cursor)
+            item = github_issue(gh, issue, connection_query(field, cursor), timeout)
+    except (KeyError, TypeError, ValueError) as error:
+        raise ScriptError(
+            f"{issue.ref}: incomplete {field}: {error}; rerun readback after restoring complete GitHub reads"
+        ) from error
+
+
+def body_stories(body: str, repo: str) -> list[str] | None:
+    """Read the numbered entries in the Epic template's single Stories section."""
+    sections = re.split(r"(?m)^## Stories\s*$", body)
+    if len(sections) != 2:
+        return None
+    section = re.split(r"(?m)^#{1,2} ", sections[1], maxsplit=1)[0]
+    refs: list[str] = []
+    for line in section.splitlines():
+        if not line.strip():
+            continue
+        if line[0].isspace() and not re.match(r"\s*[0-9]+\.", line):
+            continue
+        match = re.fullmatch(
+            rf"[0-9]+\. .+\(({REFERENCE}|#[1-9][0-9]*)\) · .+", line.strip()
+        )
+        if match is None:
+            return None
+        ref = match[1]
+        refs.append(repo + ref if ref.startswith("#") else ref)
+    return refs
+
+
+def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
+    differences: list[dict[str, Any]] = []
+    for expected in rows:
+        issue = Issue(expected["repo"], expected["number"])
+        fields = "body state parent{url} " + " ".join(
+            connection_query(f) for f in CONNECTIONS
+        )
+        item = github_issue(gh, issue, fields, timeout)
+        try:
+            parent = item["parent"]
+            actual: dict[str, Any] = {
+                "parent": None if parent is None else url_ref(parent["url"]),
+                "state": item["state"],
+                "stories": relation(gh, issue, "subIssues", item, timeout),
+                "labels": relation(gh, issue, "labels", item, timeout),
+                "blocked_by": relation(gh, issue, "blockedBy", item, timeout),
+            }
+            if actual["state"] not in ("OPEN", "CLOSED") or not isinstance(
+                item["body"], str
+            ):
+                raise ValueError("missing state or body")
+        except (KeyError, TypeError, ValueError) as error:
+            raise ScriptError(
+                f"{issue.ref}: unreadable issue fields: {error}; rerun readback after restoring complete GitHub reads"
+            ) from error
+        for field in ("parent", "stories", "labels", "blocked_by", "state"):
+            wanted, found = expected[field], actual[field]
+            if field in ("labels", "blocked_by"):
+                wanted, found = sorted(wanted), sorted(found)
+            if wanted != found:
+                differences.append(
+                    {
+                        "issue": issue.ref,
+                        "field": field,
+                        "expected": wanted,
+                        "actual": found,
+                    }
+                )
+        if "4-epic" in expected["labels"] or "4-epic" in actual["labels"]:
+            found = body_stories(item["body"], issue.repo)
+            if found != actual["stories"]:
+                differences.append(
+                    {
+                        "issue": issue.ref,
+                        "field": "body_stories",
+                        "expected": actual["stories"],
+                        "actual": found,
+                    }
+                )
+    if differences:
+        raise ScriptError(
+            "GitHub differs from the approved plan; correct only approved actions and rerun readback",
+            report={"differences": differences},
+        )
+
+
+def work(args: argparse.Namespace) -> dict[str, Any]:
+    rows = read_plan(args.plan)
+    gh = shutil.which("gh")
+    if gh is None:
+        raise ScriptError(
+            "gh is unavailable; install GitHub CLI from https://cli.github.com/, then rerun readback"
+        )
+    compare(rows, gh, args.timeout)
+    return {}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = Parser(
+        description=__doc__,
+        exit_codes=exit_codes(
+            {
+                1: "difference or unreadable GitHub data",
+                75: "read timeout, safe to retry",
+            }
+        ),
+        epilog="Examples:\n  uv run scripts/readback.py approved-plan.json\n  uv run scripts/readback.py - --timeout 2m < approved-plan.json",
+    )
+    parser.add_argument(
+        "plan",
+        help="approved plan JSON path, or - for stdin; see references/readback.md",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=duration,
+        default=30.0,
+        help="timeout for each gh request (default: 30s)",
+    )
+    return run_script(parser, work, argv, debug="READBACK_DEBUG")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

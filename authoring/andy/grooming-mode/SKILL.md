@@ -296,6 +296,9 @@ Done when the unchanged approved actions and left-out actions are explicit
 
 ### 2. Apply the approved actions
 
+Requires `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/));
+confirm `uv --version` before writing the plan for readback.
+
 1. Apply those actions with the reconciliation and native commands of label-for-issues.
    New actions need a new proposal.
 2. Create approved Stories and Epics.
@@ -311,18 +314,25 @@ Done when the unchanged approved actions and left-out actions are explicit
    Otherwise, report the affected hierarchy as unready and report any unsupported existing Ready label.
 9. On a timeout, reread before a retry.
 10. After that readback, retry only missing operations.
+11. Write `approved-plan.json` with the final expected issue fields from the
+    unchanged approved actions, including preserved values and resolved new issue
+    numbers. Use the [readback format](references/readback.md). Keep failed actions
+    in the plan with their approved expectations, and report them as failed.
 
-Done when each approved action is applied or reported as failed
+Done when each approved action is applied or reported as failed and the plan file exists
 
 ### 3. Verify the writes
 
-1. Read back with the filters and paginated relations of label-for-issues.
-2. Compare every field and action in Proposal with GitHub.
-   Include agreement between native Rank and body Rank.
+1. From this skill's folder, run `uv run scripts/readback.py approved-plan.json`.
+   Read the verdict. For its input and failure format, use the
+   [readback reference](references/readback.md).
+2. With the filters and paginated relations of label-for-issues, compare the
+   remaining fields and actions in Proposal with GitHub.
    Each scoped issue must be placed, closed, or left out with its reason.
 3. Within approval, correct discrepancies.
-4. Reread the corrected actions.
+4. Rerun the script on the same plan and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
 
-Done when every write is verified or reported failed
+Done when the script confirms the issue fields and every other write is verified,
+or each failed comparison or read is reported as failed
