@@ -468,6 +468,7 @@ CHECKS = [
         pyright(IMAGE_CREATOR, "pillow"),
         pytest(f"{IMAGE_CREATOR}/tests", "pillow"),
     ),
+    Check("mermaid", pytest("authoring/andy/mermaid/scripts/tests")),
     Check(
         "pele",
         *ruff(PELE),

@@ -509,6 +509,33 @@ def rendered_files(results: list[tuple[Example, Path, str]]) -> list[str]:
     return [str(svg) for _, svg, error in results if not error]
 
 
+def sizing_option(mmdc: str) -> str:
+    """CLI 11 sizes the viewport; CLI 12 sizes the exported SVG (#552)."""
+    try:
+        help_result = subprocess.run(
+            [mmdc, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ScriptError(
+            f"cannot read {mmdc} --help: {error}; check that command, then rerun",
+            report={"files": []},
+        ) from None
+    if help_result.returncode == 0:
+        for option in ("--width", "--size"):
+            if re.search(r"(?<![\w-])" + option + r"(?=[\s=])", help_result.stdout):
+                return option
+    raise ScriptError(
+        f"{mmdc} --help exposes no supported sizing option; "
+        "use Mermaid CLI 11 or 12 with --mmdc /path/to/mmdc",
+        detail=(help_result.stderr or help_result.stdout).strip(),
+        report={"files": []},
+    )
+
+
 def render(args: argparse.Namespace) -> dict[str, Any]:
     """Render every example, then answer with the files written, or fail on
     each example that did not render."""
@@ -525,6 +552,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
             f"Mermaid CLI not found: {args.mmdc}; install it as SKILL.md's "
             "Render and verify section says, or pass --mmdc /path/to/mmdc"
         )
+    size_flag = sizing_option(args.mmdc)
     output = args.output.resolve()
     results: list[tuple[Example, Path, str]] = []
     try:
@@ -547,7 +575,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
                         "dark",
                         "-b",
                         "#000000",
-                        "-w",
+                        size_flag,
                         str(args.width),
                     ]
                     + (["-c", str(args.config)] if args.config else []),
@@ -606,7 +634,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Mermaid JSON configuration file (default: bundled assets/theme.json)",
     )
     parser.add_argument(
-        "--width", type=int, default=1400, help="Render width in pixels (default: 1400)"
+        "--width",
+        type=int,
+        default=1400,
+        help="Width in pixels (CLI 11 viewport width, CLI 12 SVG size limit; default: 1400)",
     )
     parser.add_argument(
         "--gallery", action="store_true", help="Write offline index.html"
