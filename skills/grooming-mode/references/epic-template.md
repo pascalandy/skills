@@ -2,8 +2,7 @@
 
 Every Story entry stands alone. Keep the same order as native sub-issue Rank.
 For cross-repo references, use `OWNER/REPO#N`.
-The Stories section holds only its ordered list, without other elements alongside it.
-Keep code blocks and quotes within nested Today and After details.
+Keep the Stories section in the shape the [readback format](readback.md) checks.
 
 Title: `Epic <N> · <outcome in plain words>`
 

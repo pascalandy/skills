@@ -360,7 +360,11 @@ from pathlib import Path
 REFERENCE = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*"
 REPOSITORY = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 FIELDS = {"repo", "number", "parent", "stories", "labels", "blocked_by", "state"}
-CONNECTIONS = {"labels": "name", "subIssues": "url", "blockedBy": "url"}
+CONNECTIONS = {
+    "stories": ("subIssues", "url"),
+    "labels": ("labels", "name"),
+    "blocked_by": ("blockedBy", "url"),
+}
 
 
 @dataclass(frozen=True)
@@ -441,17 +445,20 @@ def read_plan(path: str) -> list[dict[str, Any]]:
     return rows
 
 
-def connection_query(field: str, cursor: str | None = None) -> str:
+def connection_query(field: str) -> str:
+    connection, node_key = CONNECTIONS[field]
     return (
-        f"{field}(first:100,after:{json.dumps(cursor)})"
-        f"{{totalCount nodes{{{CONNECTIONS[field]}}} pageInfo{{hasNextPage endCursor}}}}"
+        f"{connection}(first:100,after:$after)"
+        f"{{totalCount nodes{{{node_key}}} pageInfo{{hasNextPage endCursor}}}}"
     )
 
 
-def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str, Any]:
+def github_issue(
+    gh: str, issue: Issue, fields: str, timeout: float, *, after: str | None = None
+) -> dict[str, Any]:
     owner, repo = issue.repo.split("/")
     query = (
-        "query($owner:String!,$repo:String!,$number:Int!){"
+        "query($owner:String!,$repo:String!,$number:Int!,$after:String){"
         "repository(owner:$owner,name:$repo){issue(number:$number){url "
         + fields
         + "}}}"
@@ -459,7 +466,12 @@ def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str
     command = [gh, "api", "--hostname", "github.com", "graphql", "--input", "-"]
     request = {
         "query": query,
-        "variables": {"owner": owner, "repo": repo, "number": issue.number},
+        "variables": {
+            "owner": owner,
+            "repo": repo,
+            "number": issue.number,
+            "after": after,
+        },
     }
     logging.getLogger(__name__).info("Reading %s", issue.ref)
     try:
@@ -518,9 +530,10 @@ def relation(
     values: list[str] = []
     cursors: set[str] = set()
     total: int | None = None
+    connection, node_key = CONNECTIONS[field]
     try:
         while True:
-            page = item[field]
+            page = item[connection]
             count, nodes, info = page["totalCount"], page["nodes"], page["pageInfo"]
             if (
                 type(count) is not int
@@ -532,7 +545,7 @@ def relation(
             if not isinstance(nodes, list) or type(info["hasNextPage"]) is not bool:
                 raise ValueError("invalid nodes or pageInfo")
             for node in nodes:
-                value = node[CONNECTIONS[field]]
+                value = node[node_key]
                 if field != "labels":
                     value = url_ref(value)
                 if not isinstance(value, str) or not value or value in values:
@@ -555,7 +568,9 @@ def relation(
             ):
                 raise ValueError("pagination made no progress")
             cursors.add(cursor)
-            item = github_issue(gh, issue, connection_query(field, cursor), timeout)
+            item = github_issue(
+                gh, issue, connection_query(field), timeout, after=cursor
+            )
     except (KeyError, TypeError, ValueError) as error:
         raise ScriptError(
             f"{issue.ref}: incomplete {field}: {error}; rerun readback after restoring complete GitHub reads"
@@ -673,20 +688,21 @@ def body_stories(body: str, repo: str) -> list[str] | None:
 
 def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
     differences: list[dict[str, Any]] = []
+    fields = "bodyHTML state parent{url} " + " ".join(
+        connection_query(f) for f in CONNECTIONS
+    )
     for expected in rows:
         issue = Issue(expected["repo"], expected["number"])
-        fields = "bodyHTML state parent{url} " + " ".join(
-            connection_query(f) for f in CONNECTIONS
-        )
         item = github_issue(gh, issue, fields, timeout)
         try:
             parent = item["parent"]
             actual: dict[str, Any] = {
                 "parent": None if parent is None else url_ref(parent["url"]),
+                **{
+                    field: relation(gh, issue, field, item, timeout)
+                    for field in CONNECTIONS
+                },
                 "state": item["state"],
-                "stories": relation(gh, issue, "subIssues", item, timeout),
-                "labels": relation(gh, issue, "labels", item, timeout),
-                "blocked_by": relation(gh, issue, "blockedBy", item, timeout),
             }
             if actual["state"] not in ("OPEN", "CLOSED") or not isinstance(
                 item["bodyHTML"], str
@@ -696,8 +712,8 @@ def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
             raise ScriptError(
                 f"{issue.ref}: unreadable issue fields: {error}; rerun readback after restoring complete GitHub reads"
             ) from error
-        for field in ("parent", "stories", "labels", "blocked_by", "state"):
-            wanted, found = expected[field], actual[field]
+        for field, found in actual.items():
+            wanted = expected[field]
             if field in ("labels", "blocked_by"):
                 wanted, found = sorted(wanted), sorted(found)
             if wanted != found:
@@ -722,7 +738,7 @@ def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
                 )
     if differences:
         raise ScriptError(
-            "GitHub differs from the approved plan; correct only approved actions and rerun readback",
+            "GitHub issue fields or Epic body order differ; correct only approved actions and rerun readback",
             report={"differences": differences},
         )
 

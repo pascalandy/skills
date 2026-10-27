@@ -1,4 +1,4 @@
-"""Exercise the installed CLI boundary with fake gh, never public issue writes."""
+"""Run readback.py as a subprocess against a fake gh; no test reaches GitHub."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ import pytest
 SCRIPT = Path(__file__).parents[1] / "readback.py"
 REF = "pascalandy/skills#335"
 PARENT = "pascalandy/skills#969"
+PLAN_FIELDS = {"subIssues": "stories", "blockedBy": "blocked_by"}
 
 FAKE_GH = r"""
 import json, os, re, sys, time
@@ -26,9 +27,9 @@ with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as stream:
     stream.write(json.dumps(request) + "\n")
 variables = request["variables"]
 key = f"{variables['owner']}/{variables['repo']}#{variables['number']}"
-page = re.search(r'(labels|subIssues|blockedBy)\(first:100,after:"([^"]+)"\)', request["query"])
-if page:
-    key += ":" + page[1] + ":" + page[2]
+if variables["after"] is not None:
+    page = re.search(r'\b(labels|subIssues|blockedBy)\s*\(', request["query"])
+    key += ":" + page[1] + ":" + variables["after"]
 response = json.loads(Path(os.environ["FAKE_RESPONSES"]).read_text(encoding="utf-8"))[key]
 if "delay" in response:
     time.sleep(response["delay"])
@@ -163,9 +164,7 @@ def test_each_field_difference(
     assert answer["differences"] == [
         {
             "issue": REF,
-            "field": {"subIssues": "stories", "blockedBy": "blocked_by"}.get(
-                field, field
-            ),
+            "field": PLAN_FIELDS.get(field, field),
             "expected": expected,
             "actual": actual,
         }
@@ -201,9 +200,7 @@ def test_pages_each_connection_past_100(tmp_path: Path, field: str) -> None:
         f"label-{i}" if field == "labels" else f"other/project#{i}"
         for i in range(1, 102)
     ]
-    approved["issues"][0][
-        {"subIssues": "stories", "labels": "labels", "blockedBy": "blocked_by"}[field]
-    ] = values
+    approved["issues"][0][PLAN_FIELDS.get(field, field)] = values
     page1, page2 = (
         connection(values[:100], labels=field == "labels"),
         connection(values[100:], labels=field == "labels"),
@@ -224,6 +221,13 @@ def test_pages_each_connection_past_100(tmp_path: Path, field: str) -> None:
     assert (
         len((tmp_path / "requests.jsonl").read_text(encoding="utf-8").splitlines()) == 2
     )
+    requests = [
+        json.loads(line)
+        for line in (tmp_path / "requests.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [request["variables"].get("after") for request in requests] == [None, "next"]
 
 
 def test_native_order_is_not_a_set(tmp_path: Path) -> None:
@@ -237,6 +241,26 @@ def test_native_order_is_not_a_set(tmp_path: Path) -> None:
         "expected": ["other/project#1", "other/project#2"],
         "actual": ["other/project#2", "other/project#1"],
     }
+
+
+def test_body_difference_names_native_order_when_native_differs_from_plan(
+    tmp_path: Path,
+) -> None:
+    approved, item = plan(), issue()
+    wanted = ["pascalandy/skills#1", "pascalandy/skills#2"]
+    native = list(reversed(wanted))
+    approved["issues"][0].update(stories=wanted, labels=["4-epic"])
+    item.update(
+        labels=connection(["4-epic"], labels=True),
+        subIssues=connection(native),
+        bodyHTML="<h2>Stories</h2><ol><li>First (#1)</li><li>Second (#2)</li></ol>",
+    )
+    answer = failure(run(tmp_path, approved, {REF: response(item)}))
+    assert answer["differences"] == [
+        {"issue": REF, "field": "stories", "expected": wanted, "actual": native},
+        {"issue": REF, "field": "body_stories", "expected": native, "actual": wanted},
+    ]
+    assert "Epic body order" in answer["errors"][0]
 
 
 BODY_CASES = json.loads(
@@ -289,7 +313,7 @@ def test_incomplete_relations_fail(tmp_path: Path, field: str, broken: str) -> N
         item[field]["nodes"] = [None]
     answer = failure(run(tmp_path, plan(), {REF: response(item)}))
     assert REF in answer["errors"][0]
-    assert f"incomplete {field}" in answer["errors"][0]
+    assert f"incomplete {PLAN_FIELDS.get(field, field)}" in answer["errors"][0]
 
 
 @pytest.mark.parametrize(

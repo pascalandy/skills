@@ -286,10 +286,8 @@ After approval, follow these three phases.
 
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
-   Read the [readback format](references/readback.md) to identify the issues to record,
-   including the previous and new parents of every moved issue.
-   Before any phase 2 GitHub write, record each included issue's parent, complete
-   native sub-issue order, labels, blockers including closed issues, and state.
+   Before any phase 2 GitHub write, record the preserved values of every issue the
+   [readback format](references/readback.md) includes.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
 4. Put dependent actions on the left-out list too.
    These actions include parent Ready labels and outcomes that rely on the changed item.
@@ -317,30 +315,32 @@ confirm `uv --version` before writing the plan for readback.
 8. Only after supporting body and relationship writes pass a direct reread, apply Ready labels.
    Otherwise, report the affected hierarchy as unready and report any unsupported existing Ready label.
 9. On a timeout, reread before a retry.
-10. After that readback, retry only missing operations.
-11. Write `approved-plan.json` in this run's own working folder and record its
-    absolute path. Take changed expectations from the approved proposal and other
-    preserved values from the phase 1 recheck, before any GitHub write.
-    Resolve approved new issue numbers. Use the [readback format](references/readback.md).
+10. After that reread, retry only missing operations.
+11. Write the plan in this run's own working folder as the
+    [readback format](references/readback.md) describes, and record its absolute path.
     Keep failed actions with their approved expectations and report them as failed.
+    If no row can be resolved, report the comparisons as not run.
 
-Done when each approved action is applied or reported as failed and the plan file exists
+Done when each approved action is applied or reported as failed, and the plan file
+exists or every comparison is explicitly reported as not run
 
 ### 3. Verify the writes
 
-1. From this skill's folder, run `uv run scripts/readback.py <absolute-plan-path>`.
-   Read the verdict. For its input and failure format, use the
-   [readback reference](references/readback.md).
+1. If the plan has resolvable rows, from this skill's folder run
+   `uv run scripts/readback.py <absolute-plan-path>` and read its verdict.
+   Otherwise, report the script's comparisons as not run.
+   For its input and failure format, use the
+   [readback format](references/readback.md).
 2. With the filters and paginated relations of label-for-issues, compare the
    remaining fields and actions in Proposal with GitHub.
    Each scoped issue must be placed, closed, or left out with its reason.
 3. Within approval, correct discrepancies.
-   Keep phase 2's Ready-withholding rule during corrections.
-   Correct supporting writes before applying a withheld Ready label.
-4. Rerun the script on the same plan and reread other corrected actions.
+   Phase 2 step 8 still governs Ready labels.
+4. Resolve any newly created issue numbers as the readback format describes,
+   rerun the script on the same plan when it has rows, and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
    Report affected hierarchies as unready and identify unsupported Ready labels.
 
 Done when the script confirms the issue fields and every other write is verified,
-or each failed comparison or read is reported as failed
+or each failed or unperformed comparison or read is explicitly reported
