@@ -286,6 +286,7 @@ After approval, follow these three phases.
 
 1. Rerun scope filters.
 2. Reread each touched object's body, labels, state, evidence, and membership.
+   Record preserved issue fields before any phase 2 GitHub write.
 3. If an action's scope, evidence, or membership changed, put that action on the left-out list.
 4. Put dependent actions on the left-out list too.
    These actions include parent Ready labels and outcomes that rely on the changed item.
@@ -310,20 +311,21 @@ confirm `uv --version` before writing the plan for readback.
 5. Reconcile membership, native Story Rank, dependencies, labels, and cleanup.
 6. Attach a Milestone only to its approved home-repo Epics.
 7. If a write fails, suspend actions that depend on that write.
-8. Only after supporting body and relationship writes pass readback, apply Ready labels.
+8. Only after supporting body and relationship writes pass a direct reread, apply Ready labels.
    Otherwise, report the affected hierarchy as unready and report any unsupported existing Ready label.
 9. On a timeout, reread before a retry.
 10. After that readback, retry only missing operations.
-11. Write `approved-plan.json` with the final expected issue fields from the
-    unchanged approved actions, including preserved values and resolved new issue
-    numbers. Use the [readback format](references/readback.md). Keep failed actions
-    in the plan with their approved expectations, and report them as failed.
+11. Write `approved-plan.json` in this run's own working folder and record its
+    absolute path. Take changed expectations from the approved proposal and other
+    preserved values from the phase 1 recheck, before any GitHub write.
+    Resolve approved new issue numbers. Use the [readback format](references/readback.md).
+    Keep failed actions with their approved expectations and report them as failed.
 
 Done when each approved action is applied or reported as failed and the plan file exists
 
 ### 3. Verify the writes
 
-1. From this skill's folder, run `uv run scripts/readback.py approved-plan.json`.
+1. From this skill's folder, run `uv run scripts/readback.py <absolute-plan-path>`.
    Read the verdict. For its input and failure format, use the
    [readback reference](references/readback.md).
 2. With the filters and paginated relations of label-for-issues, compare the
@@ -333,6 +335,7 @@ Done when each approved action is applied or reported as failed and the plan fil
 4. Rerun the script on the same plan and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
+   Report affected hierarchies as unready and identify unsupported Ready labels.
 
 Done when the script confirms the issue fields and every other write is verified,
 or each failed comparison or read is reported as failed

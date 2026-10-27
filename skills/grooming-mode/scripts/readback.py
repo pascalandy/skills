@@ -354,6 +354,7 @@ def answer_failure(
 import shutil
 import subprocess
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 
 REFERENCE = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*"
@@ -376,12 +377,21 @@ def valid_ref(value: object) -> bool:
     return isinstance(value, str) and re.fullmatch(REFERENCE, value) is not None
 
 
+def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise UsageError(f"duplicate plan key {key!r}; use each key once")
+        result[key] = value
+    return result
+
+
 def read_plan(path: str) -> list[dict[str, Any]]:
     try:
         text = (
             sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
         )
-        data = json.loads(text)
+        data = json.loads(text, object_pairs_hook=unique_object)
     except (OSError, ValueError) as error:
         raise UsageError(
             f"cannot read plan {path!r}: {error}; supply valid plan JSON"
@@ -470,7 +480,7 @@ def github_issue(gh: str, issue: Issue, fields: str, timeout: float) -> dict[str
     if result.returncode:
         raise ScriptError(
             f"{issue.ref}: gh read failed ({result.returncode}): {result.stderr.strip()}; "
-            "check access with gh auth status --hostname github.com, then rerun readback"
+            "check access with gh auth status --hostname github.com, or rerun readback if GitHub was unavailable"
         )
     try:
         response = json.loads(result.stdout)
@@ -549,56 +559,120 @@ def relation(
         ) from error
 
 
+OPAQUE_TAGS = {"pre", "blockquote", "script", "style", "textarea"}
+
+
+class StoriesHTML(HTMLParser):
+    """Read direct ordered-list entries under GitHub's rendered Stories heading."""
+
+    def __init__(self, repo: str) -> None:
+        super().__init__()
+        self.repo = repo
+        self.heading: list[str] | None = None
+        self.section = False
+        self.sections = 0
+        self.lists: list[str] = []
+        self.entry: list[str] | None = None
+        self.link: tuple[str, list[str]] | None = None
+        self.refs: list[str] = []
+        self.seen_list = False
+        self.invalid = False
+        self.opaque = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in OPAQUE_TAGS:
+            self.invalid |= self.section
+            self.opaque += 1
+        elif not self.opaque:
+            if tag in ("h1", "h2"):
+                self.invalid |= bool(self.lists)
+                self.section = False
+                self.heading = [] if tag == "h2" else None
+            elif self.section:
+                if tag in ("ol", "ul"):
+                    if not self.lists:
+                        self.invalid |= tag != "ol" or self.seen_list
+                        self.seen_list = True
+                    self.lists.append(tag)
+                elif tag == "li" and len(self.lists) == 1:
+                    self.invalid |= self.entry is not None
+                    self.entry = []
+                elif tag == "a" and self.entry is not None and len(self.lists) == 1:
+                    self.link = (dict(attrs).get("href") or "", [])
+                elif not self.lists:
+                    self.invalid = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in OPAQUE_TAGS:
+            self.opaque = max(0, self.opaque - 1)
+        elif not self.opaque:
+            if tag == "h2" and self.heading is not None:
+                self.section = "".join(self.heading).strip() == "Stories"
+                self.sections += self.section
+                self.heading = None
+            elif self.section:
+                if tag == "a" and self.link is not None:
+                    target, text = self.link
+                    ref = "".join(text).strip().strip("()")
+                    ref = self.repo + ref if ref.startswith("#") else ref
+                    if valid_ref(ref):
+                        try:
+                            actual = url_ref(
+                                "https://github.com" + target
+                                if target.startswith("/")
+                                else target
+                            )
+                            self.invalid |= actual != ref
+                        except ValueError:
+                            self.invalid = True
+                    self.link = None
+                elif tag == "li" and len(self.lists) == 1 and self.entry is not None:
+                    refs = re.findall(
+                        rf"\(({REFERENCE}|#[1-9][0-9]*)\)", "".join(self.entry)
+                    )
+                    self.invalid |= len(refs) != 1
+                    self.refs.extend(
+                        self.repo + ref if ref.startswith("#") else ref for ref in refs
+                    )
+                    self.entry = None
+                elif tag in ("ol", "ul"):
+                    if not self.lists or self.lists.pop() != tag:
+                        self.invalid = True
+
+    def handle_data(self, data: str) -> None:
+        if self.heading is not None:
+            self.heading.append(data)
+        elif self.section and not self.opaque:
+            if self.entry is not None and len(self.lists) == 1:
+                self.entry.append(data)
+                if self.link is not None:
+                    self.link[1].append(data)
+            elif not self.lists and data.strip():
+                self.invalid = True
+
+
 def body_stories(body: str, repo: str) -> list[str] | None:
-    """Read the numbered entries in the Epic template's single Stories section."""
-    lines: list[str] = []
-    fence = ""
-    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        marker = re.fullmatch(r" {0,3}(`{3,}|~{3,})(.*)", line)
-        if fence:
-            if (
-                marker
-                and marker[1][0] == fence[0]
-                and len(marker[1]) >= len(fence)
-                and not marker[2].strip(" \t")
-            ):
-                fence = ""
-            continue
-        if marker and (marker[1][0] == "~" or "`" not in marker[2]):
-            fence = marker[1]
-            continue
-        lines.append(line)
-    if fence:
+    parser = StoriesHTML(repo)
+    parser.feed(body)
+    parser.close()
+    if (
+        parser.invalid
+        or parser.sections != 1
+        or parser.lists
+        or parser.entry is not None
+        or parser.link is not None
+        or parser.heading is not None
+        or parser.opaque
+    ):
         return None
-    sections = re.split(r"(?m)^## Stories\s*$", "\n".join(lines))
-    if len(sections) != 2:
-        return None
-    section = re.split(r"(?m)^#{1,2} ", sections[1], maxsplit=1)[0]
-    refs: list[str] = []
-    for line in section.split("\n"):
-        if not line.strip():
-            continue
-        if refs and re.match(r"^\s+- \*\*(Today|After):\*\* ", line):
-            continue
-        entry = re.fullmatch(r"[0-9]+\. \*\*(.+)", line.strip())
-        if entry is None:
-            return None
-        title, _, suffix = entry[1].partition("**")
-        match = re.fullmatch(
-            rf" \(({REFERENCE}|#[1-9][0-9]*)\) · (?:text|code \+ tests)", suffix
-        )
-        if not title.strip() or match is None:
-            return None
-        ref = match[1]
-        refs.append(repo + ref if ref.startswith("#") else ref)
-    return refs
+    return parser.refs
 
 
 def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
     differences: list[dict[str, Any]] = []
     for expected in rows:
         issue = Issue(expected["repo"], expected["number"])
-        fields = "body state parent{url} " + " ".join(
+        fields = "bodyHTML state parent{url} " + " ".join(
             connection_query(f) for f in CONNECTIONS
         )
         item = github_issue(gh, issue, fields, timeout)
@@ -612,9 +686,9 @@ def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
                 "blocked_by": relation(gh, issue, "blockedBy", item, timeout),
             }
             if actual["state"] not in ("OPEN", "CLOSED") or not isinstance(
-                item["body"], str
+                item["bodyHTML"], str
             ):
-                raise ValueError("missing state or body")
+                raise ValueError("missing state or rendered body")
         except (KeyError, TypeError, ValueError) as error:
             raise ScriptError(
                 f"{issue.ref}: unreadable issue fields: {error}; rerun readback after restoring complete GitHub reads"
@@ -633,7 +707,7 @@ def compare(rows: list[dict[str, Any]], gh: str, timeout: float) -> None:
                     }
                 )
         if "4-epic" in expected["labels"] or "4-epic" in actual["labels"]:
-            found = body_stories(item["body"], issue.repo)
+            found = body_stories(item["bodyHTML"], issue.repo)
             if found != actual["stories"]:
                 differences.append(
                     {

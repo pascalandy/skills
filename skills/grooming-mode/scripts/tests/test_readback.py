@@ -57,7 +57,7 @@ def connection(values: list[str], *, labels: bool = False) -> dict[str, Any]:
 def issue() -> dict[str, Any]:
     return {
         "url": url(REF),
-        "body": "Story body",
+        "bodyHTML": "<p>Story body</p>",
         "state": "OPEN",
         "parent": {"url": url(PARENT)},
         "subIssues": connection([]),
@@ -88,7 +88,7 @@ def response(item: dict[str, Any]) -> dict[str, Any]:
 
 def run(
     tmp_path: Path,
-    approved: dict[str, Any],
+    approved: dict[str, Any] | str,
     responses: dict[str, Any],
     *args: str,
     stdin: bool = False,
@@ -99,10 +99,11 @@ def run(
     data = tmp_path / "responses.json"
     data.write_text(json.dumps(responses), encoding="utf-8")
     source = tmp_path / "plan.json"
-    source.write_text(json.dumps(approved), encoding="utf-8")
+    payload = approved if isinstance(approved, str) else json.dumps(approved)
+    source.write_text(payload, encoding="utf-8")
     return subprocess.run(
         [sys.executable, str(SCRIPT), "-" if stdin else str(source), *args],
-        input=json.dumps(approved) if stdin else None,
+        input=payload if stdin else None,
         capture_output=True,
         text=True,
         timeout=15,
@@ -238,70 +239,24 @@ def test_native_order_is_not_a_set(tmp_path: Path) -> None:
     }
 
 
-@pytest.mark.parametrize(
-    "body,actual",
-    [
-        (
-            "## Stories\n\n1. **One** (#1) · code + tests\n   - **Today:** #9\n2. **Two** (other/project#2) · text\n\n## Done when\nDone",
-            ["pascalandy/skills#1", "other/project#2"],
-        ),
-        (
-            "## Stories\n\n1. **Two** (other/project#2) · text\n2. **One** (#1) · text\n",
-            ["other/project#2", "pascalandy/skills#1"],
-        ),
-        ("No Stories section", None),
-        ("## Stories\n1. Missing reference\n", None),
-        ("## Stories\n## Stories\n", None),
-        (
-            "## Stories\n1. **Unexpected Story** (#999) · code + tests (#1) · text\n2. **Two** (other/project#2) · text\n",
-            None,
-        ),
-        (
-            "## Stories\n1. **Unexpected Story** (#999) · **Extra title** (#1) · text\n2. **Two** (other/project#2) · text\n",
-            None,
-        ),
-        (
-            "```md\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n```\n",
-            None,
-        ),
-        (
-            "~~~md\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n~~~\n",
-            None,
-        ),
-        (
-            "```md\n## Stories\n1. **Example** (#999) · text\n```\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n## Done when\nDone\n",
-            ["pascalandy/skills#1", "other/project#2"],
-        ),
-        (
-            "```markdown```\n## Stories\n1. **Unexpected Story** (#999) · text\n```\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
-            None,
-        ),
-        (
-            "```md\n```\u00a0\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
-            None,
-        ),
-        (
-            "```markdown```\n## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
-            ["pascalandy/skills#1", "other/project#2"],
-        ),
-        (
-            "```md\n```\u2028## Stories\n1. **One** (#1) · code + tests\n2. **Two** (other/project#2) · text\n",
-            None,
-        ),
-        (
-            "## Stories\n1. **One** (#1) · code + tests\u20282. **Two** (other/project#2) · text\n",
-            None,
-        ),
-    ],
-)
+BODY_CASES = json.loads(
+    (Path(__file__).parent / "fixtures" / "rendered_bodies.json").read_text(
+        encoding="utf-8"
+    )
+)["cases"]
+
+
+@pytest.mark.parametrize("case", BODY_CASES, ids=[case["name"] for case in BODY_CASES])
 def test_epic_body_agrees_with_native_order(
-    tmp_path: Path, body: str, actual: Any
+    tmp_path: Path, case: dict[str, Any]
 ) -> None:
     approved, item = plan(), issue()
-    stories = ["pascalandy/skills#1", "other/project#2"]
-    approved["issues"][0].update(stories=stories, labels=["4-epic"])
+    stories, actual = case["stories"], case["actual"]
+    state = case.get("state", "OPEN")
+    approved["issues"][0].update(stories=stories, labels=["4-epic"], state=state)
     item.update(
-        body=body,
+        state=state,
+        bodyHTML=case["html"],
         labels=connection(["4-epic"], labels=True),
         subIssues=connection(stories),
     )
@@ -335,34 +290,6 @@ def test_incomplete_relations_fail(tmp_path: Path, field: str, broken: str) -> N
     answer = failure(run(tmp_path, plan(), {REF: response(item)}))
     assert REF in answer["errors"][0]
     assert f"incomplete {field}" in answer["errors"][0]
-
-
-@pytest.mark.parametrize(
-    "entry,actual",
-    [
-        ("  1. **Unexpected Story** (#631) · code + tests", ["pascalandy/skills#631"]),
-        ("  1) **Unexpected Story** (#631) · code + tests", None),
-        ("   - **Today:** orphan detail", None),
-    ],
-)
-def test_indented_story_entry_is_not_ignored(
-    tmp_path: Path, entry: str, actual: Any
-) -> None:
-    approved, item = plan(), issue()
-    approved["issues"][0]["labels"] = ["4-epic"]
-    item.update(
-        labels=connection(["4-epic"], labels=True),
-        body=f"## Stories\n\n{entry}\n",
-    )
-    answer = failure(run(tmp_path, approved, {REF: response(item)}))
-    assert answer["differences"] == [
-        {
-            "issue": REF,
-            "field": "body_stories",
-            "expected": [],
-            "actual": actual,
-        }
-    ]
 
 
 @pytest.mark.parametrize(
@@ -400,6 +327,7 @@ def test_second_page_failures_cannot_pass(tmp_path: Path, broken: str) -> None:
         {"exit": 1, "stderr": "authentication failed"},
         {"raw": "not JSON"},
         {"data": {"repository": {"issue": None}}},
+        response({k: v for k, v in issue().items() if k != "bodyHTML"}),
         {
             "errors": [{"message": "hidden relation"}],
             "data": {"repository": {"issue": issue()}},
@@ -420,7 +348,7 @@ def test_timeout_is_safe_to_retry(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "change", ["missing-parent", "bad-ref", "duplicate-issue", "empty"]
+    "change", ["missing-parent", "bad-ref", "duplicate-issue", "duplicate-key", "empty"]
 )
 def test_invalid_plan_fails_before_github(tmp_path: Path, change: str) -> None:
     approved = plan()
@@ -430,6 +358,10 @@ def test_invalid_plan_fails_before_github(tmp_path: Path, change: str) -> None:
         approved["issues"][0]["parent"] = "#969"
     elif change == "duplicate-issue":
         approved["issues"].append(copy.deepcopy(approved["issues"][0]))
+    elif change == "duplicate-key":
+        approved = json.dumps(approved).replace(
+            '"state": "OPEN"', '"state":"OPEN","state":"CLOSED"'
+        )
     else:
         approved["issues"] = []
     answer = failure(run(tmp_path, approved, {}), 2)

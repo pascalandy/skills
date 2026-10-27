@@ -1,10 +1,12 @@
 # Approved plan readback
 
-Use this format when phase 2 writes `approved-plan.json`. Include each issue whose
+Use this format when phase 2 writes `approved-plan.json` in the run's own folder.
+Record its absolute path. Include each issue whose
 parent, native order, labels, blockers, or state the approved actions preserve or
 change, including affected Epics. Resolve new issue numbers before writing the file.
-Keep expectations from the approved proposal. A GitHub response is evidence to
-compare, not the source of the expected values.
+Take changed values from the approved proposal. Take other preserved values from
+the phase 1 recheck, before any phase 2 GitHub write. A read made after a write
+supplies actual values only. Approved new issue numbers may be resolved after creation.
 
 ```json
 {
@@ -44,23 +46,23 @@ The example shows the format, not current GitHub values. The file has only the
 - `state` is `OPEN` or `CLOSED`
 
 Use canonical references for all relations, also within the same repository.
-Repeated issues or repeated entries in an array are invalid.
+Repeated JSON keys, issues, or entries in an array are invalid.
 Labels and blockers compare as sets. Native order compares as a list.
 An issue with `4-epic` in either its expected or actual labels also gets a body
-comparison. Its single `## Stories` section must use the numbered entries of the
-Epic template, with `(#N)` for its own repository or `(OWNER/REPO#N)` for another.
-The reference follows the bold title and precedes `· text` or `· code + tests`.
-Indented `Today` and `After` bullets belong to a preceding Story entry.
-Other nonblank content makes the section unreadable.
-The body references must equal the native order. A missing or unreadable section
-fails, including when the expected list is empty.
-Headings in backtick or tilde code fences are examples, not body sections.
-An unclosed fence makes the body unreadable.
+comparison, including closed Epics. The script reads GitHub's rendered `bodyHTML`
+with the standard library HTML parser. Under its single Stories heading, each
+direct ordered-list entry must contain exactly one parenthesized `(#N)` or
+`(OWNER/REPO#N)` reference. Nested detail lists do not add Stories.
+The entries must equal native order. Missing or unreadable sections, ambiguous
+references or link targets, multiple lists, and code blocks within the section fail.
+GitHub renders Markdown, comments, and fences. The script does not reinterpret them.
+Preserve closed Epic bodies. Report their discrepancies as failed comparisons;
+a discrepancy does not authorize a body edit.
 
 From the skill folder, run:
 
 ```bash
-uv run scripts/readback.py approved-plan.json
+uv run scripts/readback.py /absolute/run-folder/approved-plan.json
 ```
 
 Run `uv run scripts/readback.py --help` for input and timeout options.
