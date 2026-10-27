@@ -553,18 +553,18 @@ def body_stories(body: str, repo: str) -> list[str] | None:
     """Read the numbered entries in the Epic template's single Stories section."""
     lines: list[str] = []
     fence = ""
-    for line in body.splitlines():
+    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         marker = re.fullmatch(r" {0,3}(`{3,}|~{3,})(.*)", line)
         if fence:
             if (
                 marker
                 and marker[1][0] == fence[0]
                 and len(marker[1]) >= len(fence)
-                and not marker[2].strip()
+                and not marker[2].strip(" \t")
             ):
                 fence = ""
             continue
-        if marker:
+        if marker and (marker[1][0] == "~" or "`" not in marker[2]):
             fence = marker[1]
             continue
         lines.append(line)
@@ -575,7 +575,7 @@ def body_stories(body: str, repo: str) -> list[str] | None:
         return None
     section = re.split(r"(?m)^#{1,2} ", sections[1], maxsplit=1)[0]
     refs: list[str] = []
-    for line in section.splitlines():
+    for line in section.split("\n"):
         if not line.strip():
             continue
         if refs and re.match(r"^\s+- \*\*(Today|After):\*\* ", line):
