@@ -1,7 +1,14 @@
 [
   {
     "skills": ["commit"],
-    "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/two-files/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
+    "setup": [
+      "cp -R \"$EVALS/fixtures/base/.\" .",
+      "mv authoring/demo/SKILL.md.txt authoring/demo/SKILL.md",
+      "git init -q",
+      "git add README.md app.py docs/guide.md authoring/demo/SKILL.md",
+      "git -c user.name='Eval Runner' -c user.email=eval@example.invalid -c commit.gpgsign=false commit -qm base",
+      "cp -R \"$EVALS/fixtures/two-files/.\" ."
+    ],
     "query": "Commit my changes.",
     "files": ["evals/fixtures/base/", "evals/fixtures/two-files/"],
     "expected_behavior": [
@@ -13,7 +20,14 @@
   },
   {
     "skills": ["commit"],
-    "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/one-file/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
+    "setup": [
+      "cp -R \"$EVALS/fixtures/base/.\" .",
+      "mv authoring/demo/SKILL.md.txt authoring/demo/SKILL.md",
+      "git init -q",
+      "git add README.md app.py docs/guide.md authoring/demo/SKILL.md",
+      "git -c user.name='Eval Runner' -c user.email=eval@example.invalid -c commit.gpgsign=false commit -qm base",
+      "cp -R \"$EVALS/fixtures/one-file/.\" ."
+    ],
     "query": "Commit my changes.",
     "files": ["evals/fixtures/base/", "evals/fixtures/one-file/"],
     "expected_behavior": [
@@ -25,7 +39,15 @@
   },
   {
     "skills": ["commit"],
-    "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/skill-and-doc/ over it, renaming any SKILL.md.txt to SKILL.md, and leave the change unstaged",
+    "setup": [
+      "cp -R \"$EVALS/fixtures/base/.\" .",
+      "mv authoring/demo/SKILL.md.txt authoring/demo/SKILL.md",
+      "git init -q",
+      "git add README.md app.py docs/guide.md authoring/demo/SKILL.md",
+      "git -c user.name='Eval Runner' -c user.email=eval@example.invalid -c commit.gpgsign=false commit -qm base",
+      "cp -R \"$EVALS/fixtures/skill-and-doc/.\" .",
+      "mv authoring/demo/SKILL.md.txt authoring/demo/SKILL.md"
+    ],
     "query": "Commit my changes.",
     "files": ["evals/fixtures/base/", "evals/fixtures/skill-and-doc/"],
     "expected_behavior": [
@@ -36,7 +58,15 @@
   },
   {
     "skills": ["commit"],
-    "setup": "In an empty folder, copy evals/fixtures/base/, rename authoring/demo/SKILL.md.txt to SKILL.md, run git init and commit it, then copy evals/fixtures/two-files/ over it and stage both files with git add README.md app.py",
+    "setup": [
+      "cp -R \"$EVALS/fixtures/base/.\" .",
+      "mv authoring/demo/SKILL.md.txt authoring/demo/SKILL.md",
+      "git init -q",
+      "git add README.md app.py docs/guide.md authoring/demo/SKILL.md",
+      "git -c user.name='Eval Runner' -c user.email=eval@example.invalid -c commit.gpgsign=false commit -qm base",
+      "cp -R \"$EVALS/fixtures/two-files/.\" .",
+      "git add README.md app.py"
+    ],
     "query": "Commit my changes.",
     "files": ["evals/fixtures/base/", "evals/fixtures/two-files/"],
     "expected_behavior": [

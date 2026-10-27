@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import logging
 import os
 import re
@@ -233,6 +234,7 @@ ANDY_MODE = "authoring/andy/andy-mode"
 BRIGADE_REPLAY = "authoring/andy/brigade-mode/scripts/replay"
 COREY_MODE = "authoring/corey-mode/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
+EVAL_RUNNER = f"{WRITING_FOR_AGENTS}/scripts/run_evals.py"
 # Every compiled skill, so a new skill is validated without a new row
 SKILLS = tuple(
     sorted(
@@ -452,6 +454,7 @@ CHECKS = [
         pytest(f"{WRITING_FOR_AGENTS}/scripts/tests"),
         uv_run(f"{WRITING_FOR_AGENTS}/scripts/validate_skill.py", WRITING_FOR_AGENTS),
     ),
+    Check("evals"),
     Check(
         "image-creator",
         *ruff(IMAGE_CREATOR),
@@ -564,6 +567,57 @@ def changed() -> list[str] | None:
     return [path for path in f"{diff.stdout}\0{untracked.stdout}".split("\0") if path]
 
 
+def eval_files(paths: list[str] | None) -> list[Path]:
+    """Existing authoring scenarios affected by any input in their evals folder."""
+    files = sorted((ROOT / "authoring").rglob("evals.json"))
+    if paths is None or EVAL_RUNNER in paths or "scripts/check.py" in paths:
+        return files
+    return [
+        file
+        for file in files
+        if any(
+            path == prefix or path.startswith(f"{prefix}/")
+            for path in paths
+            for prefix in (
+                file.parent.relative_to(ROOT).as_posix(),
+                f"skills/{file.parent.parent.name}/evals",
+            )
+        )
+    ]
+
+
+def check_evals(paths: list[str] | None) -> None:
+    """Use the runner's real loader without CLI prerequisites or run setup."""
+    files = eval_files(paths)
+    if not files:
+        return
+    spec = importlib.util.spec_from_file_location(
+        "_check_eval_runner", ROOT / EVAL_RUNNER
+    )
+    if spec is None or spec.loader is None:
+        raise ScriptError(f"cannot load {EVAL_RUNNER}; restore the scenario loader")
+    runner = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(spec.name)
+    sys.modules[spec.name] = runner
+    errors: list[str] = []
+    try:
+        spec.loader.exec_module(runner)
+        for file in files:
+            try:
+                runner.load_scenarios(file.parent, [])
+            except runner.ScriptError as error:
+                errors.extend(str(message) for message in error.args)
+            except (OSError, UnicodeError) as error:
+                errors.append(f"{file}: {error}; restore the scenario file")
+    finally:
+        if previous is None:
+            sys.modules.pop(spec.name, None)
+        else:
+            sys.modules[spec.name] = previous
+    if errors:
+        raise ScriptError(*errors)
+
+
 def in_scope(checks: list[Check]) -> list[Check]:
     """Every repository check, and each skill check whose skill the change touches."""
     paths = changed()
@@ -575,6 +629,10 @@ def in_scope(checks: list[Check]) -> list[Check]:
     )
     scoped: list[Check] = []
     for check in checks:
+        if check.name == "evals":
+            if eval_files(paths):
+                scoped.append(check)
+            continue
         if check.test_path:
             watched = (check.test_path, *check.reads)
             if (
@@ -647,6 +705,21 @@ def verdict(args: argparse.Namespace) -> dict[str, Any]:
     repo_tests = [check for check in selected if check.test_path]
     ran_repo_tests = False
     for check in selected:
+        if check.name == "evals":
+            try:
+                check_evals(None if args.only or args.sweep else changed())
+            except ScriptError as error:
+                failed.extend(
+                    f"evals failed: {message}; rerun: just check --only evals"
+                    for message in error.args
+                )
+            except Exception as error:
+                log.debug("evals loader failed", exc_info=True)
+                failed.append(
+                    f"evals failed: {EVAL_RUNNER}: {type(error).__name__}: {error}; "
+                    "restore the loader; rerun: just check --only evals"
+                )
+            continue
         if check.test_path:
             if ran_repo_tests:
                 continue
