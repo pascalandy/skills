@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import subprocess
 import sys
 import unicodedata
@@ -48,12 +49,30 @@ class TestHelp:
         assert "opencode" not in stdout.lower()
         assert "(default: follow_along_note)" in " ".join(stdout.split())
 
-    def test_help_marks_zoom_summary_as_conditional(self) -> None:
-        stdout, _stderr, code = run_script("run", "zoom", "--help")
+    @pytest.mark.parametrize(
+        "long_home", [False, True], ids=["normal-home", "long-home"]
+    )
+    def test_help_marks_zoom_summary_as_conditional(self, long_home, tmp_path) -> None:
+        home = tmp_path / ("private-long-home-" * 8) if long_home else Path("/tmp/home")
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), "run", "zoom", "--help"],
+            env={**os.environ, "HOME": str(home)},
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            timeout=30,
+        )
+        stdout, code = result.stdout, result.returncode
+        expected_path = str(home / "Desktop/Travail/Mandats")
 
         assert code == 0
+        assert result.stderr == ""
         assert "--no-summary" in stdout
-        assert str(Path("~/Desktop/Travail/Mandats").expanduser()) in stdout
+        assert "".join(expected_path.split()) in "".join(stdout.split())
+        if long_home:
+            assert len(str(home)) > 50
+            assert expected_path not in stdout
         assert "(default: synthese-rencontre from distill-prompt)" in " ".join(
             stdout.split()
         )
