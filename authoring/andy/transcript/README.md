@@ -213,7 +213,7 @@ uvx yt-dlp@2026.7.4 --skip-download --print duration "<youtube-url>"
 
 The length prints in seconds.
 
-Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `medium` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
+Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `xhigh` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
 
 Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 

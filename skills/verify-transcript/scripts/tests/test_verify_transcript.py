@@ -701,7 +701,7 @@ def test_dry_run_validator_requires_no_output(tmp_path: Path):
             "profile": "opus",
             "provider": "claude",
             "model": "claude-opus-5-5",
-            "effort": "high",
+            "effort": "xhigh",
             "prompt": "synthese-rencontre",
         },
         "output_dir": str(plan.output_dir),
