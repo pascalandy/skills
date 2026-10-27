@@ -559,7 +559,7 @@ def body_stories(body: str, repo: str) -> list[str] | None:
     for line in section.splitlines():
         if not line.strip():
             continue
-        if line[0].isspace() and not re.match(r"\s*[0-9]+\.", line):
+        if refs and re.match(r"^\s+- \*\*(Today|After):\*\* ", line):
             continue
         match = re.fullmatch(
             rf"[0-9]+\. .+\(({REFERENCE}|#[1-9][0-9]*)\) · .+", line.strip()

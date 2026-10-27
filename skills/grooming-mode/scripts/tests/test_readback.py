@@ -297,12 +297,22 @@ def test_incomplete_relations_fail(tmp_path: Path, field: str, broken: str) -> N
     assert f"incomplete {field}" in answer["errors"][0]
 
 
-def test_indented_story_entry_is_not_ignored(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "entry,actual",
+    [
+        ("  1. **Unexpected Story** (#631) · code + tests", ["pascalandy/skills#631"]),
+        ("  1) **Unexpected Story** (#631) · code + tests", None),
+        ("   - **Today:** orphan detail", None),
+    ],
+)
+def test_indented_story_entry_is_not_ignored(
+    tmp_path: Path, entry: str, actual: Any
+) -> None:
     approved, item = plan(), issue()
     approved["issues"][0]["labels"] = ["4-epic"]
     item.update(
         labels=connection(["4-epic"], labels=True),
-        body="## Stories\n\n  1. **Unexpected Story** (#631) · code + tests\n",
+        body=f"## Stories\n\n{entry}\n",
     )
     answer = failure(run(tmp_path, approved, {REF: response(item)}))
     assert answer["differences"] == [
@@ -310,7 +320,7 @@ def test_indented_story_entry_is_not_ignored(tmp_path: Path) -> None:
             "issue": REF,
             "field": "body_stories",
             "expected": [],
-            "actual": ["pascalandy/skills#631"],
+            "actual": actual,
         }
     ]
 

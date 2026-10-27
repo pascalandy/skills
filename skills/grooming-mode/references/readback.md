@@ -49,6 +49,8 @@ Labels and blockers compare as sets. Native order compares as a list.
 An issue with `4-epic` in either its expected or actual labels also gets a body
 comparison. Its single `## Stories` section must use the numbered entries of the
 Epic template, with `(#N)` for its own repository or `(OWNER/REPO#N)` for another.
+Indented `Today` and `After` bullets belong to a preceding Story entry.
+Other nonblank content makes the section unreadable.
 The body references must equal the native order. A missing or unreadable section
 fails, including when the expected list is empty.
 
