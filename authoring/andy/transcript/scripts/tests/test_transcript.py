@@ -1860,6 +1860,41 @@ class TestDownloadAudio:
 class TestYouTubeAuthenticationOrder:
     """YouTube prefers browser authentication before anonymous access."""
 
+    @pytest.mark.parametrize(
+        "browser,auth_mode",
+        [("Arc", "normal"), ("Chrome", "normal"), ("Arc", "arc-required")],
+    )
+    def test_every_ytdlp_attempt_suppresses_update_warnings(
+        self, browser, auth_mode, tmp_path, monkeypatch
+    ) -> None:
+        import transcript
+
+        profile = tmp_path / "Arc" / "Default"
+        if browser == "Arc":
+            profile.mkdir(parents=True)
+        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", profile)
+        commands = []
+
+        def failed_child(command, **_kwargs):
+            commands.append(command)
+            return subprocess.CompletedProcess(
+                command, 1, "", "ERROR: connection refused"
+            )
+
+        monkeypatch.setattr(transcript, "run_child", failed_child)
+        with pytest.raises(transcript.YtDlpError):
+            transcript.run_ytdlp(
+                ["--skip-download"],
+                "https://youtu.be/abc",
+                transcript.RunBudget.start(),
+                auth_mode=auth_mode,
+            )
+
+        assert len(commands) == (1 if auth_mode == "arc-required" else 2)
+        for command in commands:
+            assert "--no-update" in command
+            assert command[-1] == "https://youtu.be/abc"
+
     def test_runtime_pins_the_proven_ytdlp_version(self) -> None:
         script_text = SCRIPT_PATH.read_text(encoding="utf-8")
 
