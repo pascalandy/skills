@@ -45,9 +45,25 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def run(*args: str) -> subprocess.CompletedProcess[str]:
+def run(
+    *args: str, file_size_limit: int | None = None
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(SCRIPT), *args]
+    if file_size_limit is not None:
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import resource, runpy, signal, sys; "
+                "signal.signal(signal.SIGXFSZ, signal.SIG_IGN); "
+                f"resource.setrlimit(resource.RLIMIT_FSIZE, ({file_size_limit}, {file_size_limit})); "
+                "sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')"
+            ),
+            str(SCRIPT),
+            *args,
+        ]
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        command,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -157,6 +173,44 @@ def test_a_failed_update_answers_the_files_it_already_wrote(
         ["add", "playbooks/beta/beta.md"],
     ]
     assert answer["errors"][0].startswith("could not write the package: ")
+
+
+@pytest.mark.parametrize("file_size_limit", [64, None])
+def test_update_keeps_each_playbook_whole_when_a_write_fails(
+    upstream: Path, package: Path, file_size_limit: int | None
+) -> None:
+    update(upstream, package)
+    before = {name: (package / name).read_bytes() for name in files(package)}
+    replacement = "# Revised alpha\n" + "Complete new playbook.\n" * 20
+    write(upstream / "skills/alpha/SKILL.md", replacement)
+
+    result = run(
+        "update",
+        "--upstream",
+        str(upstream),
+        "--revision",
+        SHA,
+        "--package",
+        str(package),
+        file_size_limit=file_size_limit,
+    )
+
+    if file_size_limit is None:
+        assert success(result)["changes"] == [
+            ["update", "playbooks/alpha/alpha.md"],
+            ["update", "upstream-lock.json"],
+        ]
+        assert (
+            package / "playbooks/alpha/alpha.md"
+        ).read_bytes() == replacement.encode()
+    else:
+        answer = failure(result)
+        assert answer["changes"] == []
+        assert "File too large" in answer["errors"][0]
+        assert {
+            name: (package / name).read_bytes() for name in files(package)
+        } == before
+    assert files(package) == set(before)
 
 
 def test_update_rerun_changes_nothing(upstream: Path, package: Path) -> None:
