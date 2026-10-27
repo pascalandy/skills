@@ -316,17 +316,15 @@ confirm `uv --version` before writing the plan for readback.
    Otherwise, report the affected hierarchy as unready and report any unsupported existing Ready label.
 9. On a timeout, reread before a retry.
 10. After that reread, retry only missing operations.
-11. Write the plan in this run's own working folder as the
+11. Write the plan file in this run's own working folder as the
     [readback format](references/readback.md) describes, and record its absolute path.
-    Keep failed actions with their approved expectations and report them as failed.
-    If no row can be resolved, report the comparisons as not run.
 
 Done when each approved action is applied or reported as failed, and the plan file
-exists or every comparison is explicitly reported as not run
+exists unless no row could be resolved
 
 ### 3. Verify the writes
 
-1. If the plan has resolvable rows, from this skill's folder run
+1. If the plan file exists, from this skill's folder run
    `uv run scripts/readback.py <absolute-plan-path>` and read its verdict.
    Otherwise, report the script's comparisons as not run.
    For its input and failure format, use the
@@ -337,7 +335,7 @@ exists or every comparison is explicitly reported as not run
 3. Within approval, correct discrepancies.
    Phase 2 step 8 still governs Ready labels.
 4. Resolve any newly created issue numbers as the readback format describes,
-   rerun the script on the same plan when it has rows, and reread other corrected actions.
+   rerun the script once the plan file exists, and reread other corrected actions.
 5. Repeat steps 3 and 4 until every applied action matches or needs approval.
 6. Report each action that needs approval.
    Report affected hierarchies as unready and identify unsupported Ready labels.
