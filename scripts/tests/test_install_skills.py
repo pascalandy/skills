@@ -308,6 +308,63 @@ def test_failed_instruction_backup_preserves_destination_and_reports_prior_write
     assert run(repo, home, "--check").stdout == OK
 
 
+@pytest.mark.parametrize(("signal_name", "code"), [("SIGINT", 130), ("SIGTERM", 143)])
+def test_interrupted_instruction_backup_keeps_complete_backups_and_retry_converges(
+    sandbox: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    signal_name: str,
+    code: int,
+) -> None:
+    repo, home = sandbox
+    instruction_masters(repo.parent / "skills-private")
+    assert run(repo, home).returncode == 0
+    destination = home / ".claude/CLAUDE.md"
+    for version in range(5):
+        destination.write_bytes(f"complete {version}\n".encode())
+        result = run(repo, home)
+        assert result.returncode == 0, result.stderr
+    cache = home / ".cache/agents-instructions"
+    before = {path.name: path.read_bytes() for path in cache.iterdir()}
+    assert set(before.values()) == {
+        f"complete {version}\n".encode() for version in range(5)
+    }
+    destination.write_bytes(b"complete 5\n")
+    startup = tmp_path / "startup"
+    startup.mkdir()
+    (startup / "sitecustomize.py").write_text(
+        "import os, shutil, signal\n"
+        "from pathlib import Path\n"
+        "original = shutil.copy2\n"
+        "def interrupt(source, target, **kwargs):\n"
+        f"    if Path(source) == Path({str(destination)!r}):\n"
+        "        Path(target).write_bytes(b'partial')\n"
+        f"        os.kill(os.getpid(), signal.{signal_name})\n"
+        "    return original(source, target, **kwargs)\n"
+        "shutil.copy2 = interrupt\n",
+        encoding="utf-8",
+    )
+    with monkeypatch.context() as interrupted:
+        interrupted.setenv("PYTHONPATH", str(startup))
+        result = run(repo, home)
+
+    assert (result.returncode, result.stdout) == (code, "")
+    assert json.loads(result.stderr)["ok"] is False
+    assert destination.read_bytes() == b"complete 5\n"
+    assert {path.name: path.read_bytes() for path in cache.iterdir()} == before
+
+    retried = run(repo, home)
+    assert retried.returncode == 0, retried.stderr
+    assert json.loads(retried.stdout)["changes"] == [["update", "~/.claude/CLAUDE.md"]]
+    backups = list(cache.iterdir())
+    assert len(backups) == 5
+    assert {path.read_bytes() for path in backups} == {
+        f"complete {version}\n".encode() for version in range(1, 6)
+    }
+    assert destination.read_bytes() == b"synthetic harness instructions\n"
+    assert run(repo, home, "--check").stdout == OK
+
+
 def test_failed_instruction_write_preserves_old_bytes_and_rerun_converges(
     sandbox: tuple[Path, Path],
 ) -> None:
@@ -538,6 +595,12 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
         == "# secret\n\nprivate\n"
         for target in MAC
     )
+    assert (
+        repo.parent / "AGENTS.md"
+    ).read_bytes() == b"synthetic projects instructions\n"
+    assert (repo.parent / "CLAUDE.md").read_bytes() == b"@AGENTS.md\n"
+    assert not (worktree.parent / "AGENTS.md").exists()
+    assert not (worktree.parent / "CLAUDE.md").exists()
 
 
 def test_private_skill_promotes_to_public_without_flags(

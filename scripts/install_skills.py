@@ -353,13 +353,14 @@ def backup_instruction(home: Path, destination: Path) -> None:
     cache.mkdir(parents=True, exist_ok=True)
     key = f"{destination.name}-{hashlib.sha256(os.fsencode(destination)).hexdigest()}-"
     backup = cache / f"{key}{time.time_ns():020d}-{uuid4().hex}.bak"
-    try:
-        shutil.copy2(destination, backup, follow_symlinks=destination.is_file())
-        for previous in sorted(cache.glob(f"{key}*.bak"), reverse=True)[5:]:
-            previous.unlink()
-    except OSError:
-        backup.unlink(missing_ok=True)
-        raise
+    with tempfile.TemporaryDirectory(
+        prefix=".instruction-backup-", dir=cache
+    ) as temporary:
+        fresh = Path(temporary) / "fresh"
+        shutil.copy2(destination, fresh, follow_symlinks=destination.is_file())
+        fresh.replace(backup)
+    for previous in sorted(cache.glob(f"{key}*.bak"), reverse=True)[5:]:
+        previous.unlink()
 
 
 def replace_instruction(home: Path, source: Path, destination: Path) -> None:
