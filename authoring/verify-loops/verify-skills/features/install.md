@@ -1,11 +1,12 @@
 # Install
 
-`just install-skills` copies every public skill, every private skill, and each `commands/*.md` into the agent folders of one machine profile. It removes names the repository once published and no longer provides. Here it writes into the run's test home, with an empty private folder.
+`just install-skills` copies every public skill, every private skill, and each `commands/*.md` into the agent folders of one machine profile. It removes names the repository once published and no longer provides. Here it writes into the run's test home and projects folder, using synthetic instruction masters in the private fixture.
 
 ## Sub-features
 
 - `install-apply`: each skill lands in every skill folder of the profile, identical to `skills/<name>/`
 - `install-commands`: each command lands as a file for Claude Code, Pi, and OpenCode, and as a skill in Codex's skill folder
+- `install-instructions`: the four harness files and the two projects files match the synthetic masters and wrapper
 - `install-current`: after an install, `--check` finds nothing left to change
 
 ## How to get to it (user POV)
@@ -21,9 +22,13 @@ Preconditions:
 
 - **Install and check.** Run the block. It prints `install: exit 0` and `install-check: exit 0`. `install.out` holds one answer whose `changes` list one `add` per entry, and `install-check.out` reads `{"ok":true}`.
 - **Compare with the checkout.** The same block prints `install-diff: exit 0`, and `install-diff.out` is empty. The installed Claude Code skills match `skills/` file for file, each command folder matches `commands/`, and Codex has one skill per command.
+- **Compare instructions.** It also prints `install-instructions: exit 0`, and `install-instructions.out` is empty. The four harness files match the synthetic harness master, `$RUN/AGENTS.md` matches the projects master, and `$RUN/CLAUDE.md` contains `@AGENTS.md` followed by a newline.
 
 ```bash
 ( . "${RUN:?}/env" && cd "$CHECKOUT" &&
+  mkdir -p "$RUN/private/authoring/integrations/fleet/references" &&
+  printf 'synthetic harness instructions\n' >"$RUN/private/authoring/integrations/fleet/references/AGENTS-HARNAIS.md" &&
+  printf 'synthetic projects instructions\n' >"$RUN/private/authoring/integrations/fleet/references/AGENTS-PROJECTS.md" &&
   record install just install-skills --private-root "$RUN/private" &&
   record install-check just install-skills --check --private-root "$RUN/private" &&
   record install-diff sh -c '
@@ -32,12 +37,18 @@ Preconditions:
     for file in commands/*.md; do
       name=$(basename "$file" .md)
       test -f "$HOME/.codex/skills/$name/SKILL.md" || { echo "no Codex skill for $file"; exit 1; }
-    done' )
+    done' &&
+  record install-instructions sh -c '
+    for file in .claude/CLAUDE.md .codex/AGENTS.md .pi/agent/AGENTS.md .config/opencode/AGENTS.md; do
+      cmp "$1/private/authoring/integrations/fleet/references/AGENTS-HARNAIS.md" "$HOME/$file" || exit 1
+    done
+    cmp "$1/private/authoring/integrations/fleet/references/AGENTS-PROJECTS.md" "$1/AGENTS.md" &&
+    printf "@AGENTS.md\n" | cmp - "$1/CLAUDE.md"' sh "$RUN" )
 ```
 
 ## Gotchas
 
 - Without the run env, `just install-skills` writes into the live agent folders. Every block loads it first
-- The empty `$RUN/private` has no `authoring/`, so it keeps the private clone out of the run. Without `--private-root`, a checkout or worktree installs `authoring/` of `skills-private/` beside the main checkout
+- `$RUN/private` holds only the two synthetic instruction masters and no private skill packages. Its parent `$RUN` receives the projects instructions. Without `--private-root`, a checkout or worktree installs from `skills-private/` beside the main checkout
 - An install also recompiles the checkout's `skills/`, deletes cache-only leftover folders in `authoring/` and `skills/`, and creates the empty lock file `install-skills.lock` in the repository's git folder. Those are its only writes outside the run folder
 - Installs from one repository, worktrees included, take turns through that lock file. An install waits for a concurrent one and exits 75 after `--timeout`; rerun it
