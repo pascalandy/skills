@@ -52,6 +52,17 @@ def skill(root: Path, name: str, body: str = "old") -> Path:
     return package
 
 
+def instruction_masters(root: Path) -> Path:
+    """Synthetic fleet masters; no test reads the real private sources."""
+    references = root / "authoring/integrations/fleet/references"
+    references.mkdir(parents=True, exist_ok=True)
+    (references / "AGENTS-HARNAIS.md").write_bytes(b"synthetic harness instructions\n")
+    (references / "AGENTS-PROJECTS.md").write_bytes(
+        b"synthetic projects instructions\n"
+    )
+    return references
+
+
 def commit(repo: Path) -> None:
     """Stage everything and commit it, so git history publishes the names."""
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
@@ -86,6 +97,7 @@ def private_remote(parent: Path) -> Path:
     subprocess.run(["git", "init", "-q", "-b", "main", str(seed)], check=True)
     (seed / ".gitignore").write_text("fleet.toml\n")
     skill(seed / "authoring/content", "secret")
+    instruction_masters(seed)
     commit(seed)
     subprocess.run(["git", "push", "-q", str(remote), "main"], cwd=seed, check=True)
     shutil.rmtree(seed)

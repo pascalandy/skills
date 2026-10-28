@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-26
+date_updated: 2026-10-28
 ---
 
 `just install-skills` installs public skills, every package in the private clone's `authoring/`, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -15,11 +15,33 @@ date_updated: 2026-10-26
 ## Run it
 
 - The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
-- Every package under `skills-private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root, and one without `authoring/` installs no private package
+- Every package under `skills-private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root
 - A name that is both public and private stops the install, a dry run included, and the error names both paths: remove the public package to keep the skill private, or delete the private copy to publish it
 - A run answers `{"ok":true,"changes":[...]}`, one change per entry, such as `["add","~/.claude/skills/concise"]`, and `{"ok":true}` when every target is current. `--dry-run` answers the same without writing; `--check` fails when a selected target needs work, with the changes beside the error. `-v` logs how many entries each target holds current
 - Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
 - Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old folder in `authoring/` or `skills/` behind. An apply deletes each such category, package, or skill folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply fails once the install is done, naming the file. A file saved outside those caches during cleanup survives. If cleanup cannot scan or delete a leftover, the apply also fails once the install is done
+
+## Agent instructions
+
+When the private root exists, `just install-skills` also reads two masters under its `authoring/integrations/fleet/references/`:
+
+| Source | Destination |
+|---|---|
+| `AGENTS-HARNAIS.md` | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.config/opencode/AGENTS.md` |
+| `AGENTS-PROJECTS.md` | `<projects>/AGENTS.md` |
+| `@AGENTS.md` followed by a newline | `<projects>/CLAUDE.md` |
+
+`<projects>` is the parent of the resolved private root, including an override. Both profiles install all six files and create missing parent directories, even for an absent harness. Grok reads Claude's file, so the installer creates no `~/.grok/AGENTS.md`
+
+Without a private root, the public install leaves instruction files alone. With a private root, either missing master fails the run before any installation. A standalone install uses the local clone without network access. `just deploy` updates the private clone before installation
+
+The six files share the skills' plan and JSON report. An unchanged file produces no change. Preview and check compare their bytes too, so `just sync-fleet --check` sees missing or different instructions. Reports contain paths and actions, never file contents
+
+A destination symlink becomes a regular file, even when dangling. A directory or another non-file destination is a conflict that blocks the whole install. When contents differ, the old bytes go into a unique backup under `~/.cache/agents-instructions/`. A link without file contents is backed up as a link. An identical symlink target needs no content backup. Each destination keeps its five newest backups, separately from files with the same name elsewhere
+
+A failed backup cancels that destination's replacement. Each file is replaced through a temporary file and rename. If a later write fails, the failure report lists the destinations already changed; rerunning installs what remains
+
+Instruction files are installed copies. Their masters change through a skills-private worktree and PR
 
 ## Commands
 
@@ -99,7 +121,7 @@ Move one machine at a time from the old dotfiles skill engine to this installer,
    - The release clone in `~/.local/share/dotfiles-release/`
 2. **Preserve old state.** Copy `~/.local/state/dotfiles-skills/` outside every target. If `~/.local/state/dotfiles-skills/pending.json` exists, stop: the old engine has an unfinished recovery
 3. **Select the source.** Use a skills checkout at a reviewed `main` revision. Record the machine, `git rev-parse HEAD`, the profile, and the private packages already installed there. Check that the merged private `main` holds in `authoring/` exactly the packages that remain private, and fix any gap through a worktree of `skills-private` and a PR. Pass `--private-root PATH` when the root is not `skills-private/` beside the checkout
-4. **Preview.** Run `just install-skills --profile PROFILE --dry-run` with that source, then the same with `--check`. An in-place edit shows as `update`; move one worth keeping into `authoring/`, or into `authoring/` of `skills-private` through a PR, first. Resolve each conflict, a symlink or wrong type at a target path, by hand
+4. **Preview.** Run `just install-skills --profile PROFILE --dry-run` with that source, then the same with `--check`. An in-place edit shows as `update`; move one worth keeping into `authoring/`, or into `authoring/` of `skills-private` through a PR, first. Resolve each skill or command conflict, a symlink or wrong type at a target path, by hand. Instruction symlinks follow the [agent instructions](#agent-instructions) rules
 5. **Apply after approval.** Show Pascal the preview. After approval, run `just install-skills --profile PROFILE` with the same flags. The follow-up `--check` must exit 0
 6. **Verify discovery.** Run `just skills-discover --profile PROFILE` with the same `--private-root`. Claude Code has no command that lists its skills, so the check leaves it out: start a new Claude Code session and confirm the expected skills appear
 7. **Retire the old engine.** Only after step 6 passes, move the step 1 writers, the release clone, `~/.local/state/dotfiles-skills/`, and any `~/.local/state/install-skills/` left by an earlier installer version to the trash. Keep the step 2 copy until Pascal discards it. Switch the machine's chezmoi source to dotfiles `main`, which no longer ships the old writers. chezmoi does not delete files removed from its source, so the trash step is still needed
