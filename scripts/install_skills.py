@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Install public skills, private skills, and shared commands into local agent directories.
+"""Install skills, commands, and private instruction masters into local agent directories.
 
 The installer owns every name this repository ever published under skills/,
 commands/, or the former authoring/commands/, as recorded in git history. It
@@ -23,11 +23,13 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Iterable
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import compile_skills
 from _cli import Parser, ScriptError, duration, exit_codes, run_script
@@ -58,6 +60,13 @@ COMMAND_TARGETS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/co
 CODEX_SKILLS = ".codex/skills"
 # Codex and Amp stopped reading these; each run removes the commands put there
 RETIRED_COMMAND_TARGETS = (".codex/prompts", ".config/agents/commands")
+INSTRUCTION_MASTERS = Path("authoring/integrations/fleet/references")
+HARNESS_INSTRUCTIONS = (
+    ".claude/CLAUDE.md",
+    ".codex/AGENTS.md",
+    ".pi/agent/AGENTS.md",
+    ".config/opencode/AGENTS.md",
+)
 RUNTIME_NAMES = frozenset(
     {
         "node_modules",
@@ -98,12 +107,18 @@ A run answers {"ok":true,"changes":[...]}, one [action, path] per change,
 such as ["add","~/.claude/skills/andy-mode"], where the action is add,
 update, or remove, and {"ok":true} when nothing changes. A dry run answers the
 same and writes nothing; --check fails when an installed entry differs, with
-the changes beside the error. A conflict, a symlink or wrong type at a target
-path, or a skill both public and private blocks the install, and fails a dry
+the changes beside the error. A conflict, a symlink or wrong type at a skill
+or command target path, or a skill both public and private blocks the install, and fails a dry
 run too. An apply also deletes each authoring/ or skills/ folder a move left
 holding only caches; one holding other ignored files, or one it cannot
 delete, fails the run once the install is done. -v logs how many entries each target
 holds current.
+
+With a private root, fleet's AGENTS-HARNAIS.md and AGENTS-PROJECTS.md also
+install four harness instruction files and AGENTS.md / CLAUDE.md beside that
+root. Both masters must exist. Instruction symlinks become regular files;
+directories conflict. Different content is backed up in
+~/.cache/agents-instructions/, keeping five backups per destination.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
@@ -224,17 +239,25 @@ def replace_command(source: Path, destination: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def private_packages(root: Path | None) -> dict[str, Path]:
-    """Map every package under the private root's authoring/; the default root
-    is optional, and a root without authoring/ holds none."""
+def private_root(root: Path | None) -> Path | None:
+    """Reuse the main checkout's optional private clone, or validate an override."""
     if root is None:
         if not PRIVATE.exists():
-            return {}
+            return None
         root = PRIVATE
     if not root.is_dir() or root.is_symlink():
         raise ScriptError(
             f"private source {root} is missing or invalid; fix --private-root"
         )
+    return root.resolve()
+
+
+def private_packages(root: Path | None) -> dict[str, Path]:
+    """Map every package under the private root's authoring/; the default root
+    is optional, and a root without authoring/ holds none."""
+    root = private_root(root)
+    if root is None:
+        return {}
     tree = root / PACKAGES
     packages: dict[str, Path] = {}
     for entry in sorted(tree.rglob("SKILL.md")):
@@ -259,6 +282,98 @@ def private_packages(root: Path | None) -> dict[str, Path]:
             )
         packages[name] = package
     return packages
+
+
+def instruction_sources(stage: Path, root: Path | None, home: Path) -> dict[Path, Path]:
+    """Snapshot local masters once; never fetch or print their contents."""
+    root = private_root(root)
+    if root is None:
+        return {}
+    stage.mkdir(parents=True)
+    masters = {}
+    for name in ("AGENTS-HARNAIS.md", "AGENTS-PROJECTS.md"):
+        source = root / INSTRUCTION_MASTERS / name
+        if not source.is_file():
+            raise ScriptError(
+                f"instruction master {source} is missing or not a file; "
+                "restore it in --private-root, then rerun: just install-skills"
+            )
+        masters[name] = stage / name
+        shutil.copyfile(source, masters[name])
+    wrapper = stage / "CLAUDE.md"
+    wrapper.write_bytes(b"@AGENTS.md\n")
+    return {
+        **{home / path: masters["AGENTS-HARNAIS.md"] for path in HARNESS_INSTRUCTIONS},
+        root.parent / "AGENTS.md": masters["AGENTS-PROJECTS.md"],
+        root.parent / "CLAUDE.md": wrapper,
+    }
+
+
+def action_path(home: Path, action: Action) -> str:
+    path = home / action.target / action.name
+    return f"~/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
+
+
+def plan_instructions(home: Path, sources: dict[Path, Path]) -> list[Action]:
+    actions = []
+    for destination, source in sources.items():
+        # Harness parents follow the existing home boundary checks. Projects
+        # may live outside HOME when --private-root selects another folder.
+        if destination.is_relative_to(home):
+            target_groups(home, (str(destination.parent.relative_to(home)),))
+        else:
+            target_groups(destination.parent, (".",))
+        if destination.is_symlink():
+            kind = "update"
+        elif destination.exists() and not destination.is_file():
+            kind = "conflict"
+        elif not destination.exists():
+            kind = "add"
+        else:
+            kind = (
+                "current"
+                if destination.read_bytes() == source.read_bytes()
+                else "update"
+            )
+        actions.append(
+            Action(
+                str(destination.parent),
+                destination.name,
+                kind,
+                "instruction",
+                f"{destination} is not a regular file" if kind == "conflict" else None,
+            )
+        )
+    return actions
+
+
+def backup_instruction(home: Path, destination: Path) -> None:
+    """Preserve old bytes, or the link itself when it has no file contents."""
+    cache = home / ".cache/agents-instructions"
+    cache.mkdir(parents=True, exist_ok=True)
+    key = f"{destination.name}-{hashlib.sha256(os.fsencode(destination)).hexdigest()}-"
+    backup = cache / f"{key}{time.time_ns():020d}-{uuid4().hex}.bak"
+    try:
+        shutil.copy2(destination, backup, follow_symlinks=destination.is_file())
+        for previous in sorted(cache.glob(f"{key}*.bak"), reverse=True)[5:]:
+            previous.unlink()
+    except OSError:
+        backup.unlink(missing_ok=True)
+        raise
+
+
+def replace_instruction(home: Path, source: Path, destination: Path) -> None:
+    if (destination.exists() or destination.is_symlink()) and (
+        not destination.is_file() or destination.read_bytes() != source.read_bytes()
+    ):
+        try:
+            backup_instruction(home, destination)
+        except OSError as error:
+            raise ScriptError(
+                f"could not back up {destination} in {home / '.cache/agents-instructions'}: "
+                f"{error.strerror or error}; fix the backup directory, then rerun: just install-skills"
+            ) from error
+    replace_command(source, destination)
 
 
 def skill_sources(
@@ -523,19 +638,41 @@ def execute(
     sources: dict[str, Source],
     commands: dict[str, Source],
     actions: list[Action],
+    instructions: dict[Path, Path],
 ) -> None:
+    written: list[list[str]] = []
     for action in actions:
         destination = home / action.target / action.name
-        if action.kind in ("add", "update"):
-            if action.source == "command":
-                replace_command(commands[action.name].path, destination)
+        try:
+            if action.kind in ("add", "update"):
+                if action.source == "instruction":
+                    replace_instruction(home, instructions[destination], destination)
+                elif action.source == "command":
+                    replace_command(commands[action.name].path, destination)
+                else:
+                    replace(sources[action.name].path, destination)
+            elif action.kind == "remove":
+                if action.source == "command":
+                    destination.unlink()
+                else:
+                    shutil.rmtree(destination)
             else:
-                replace(sources[action.name].path, destination)
-        elif action.kind == "remove":
-            if action.source == "command":
-                destination.unlink()
-            else:
-                shutil.rmtree(destination)
+                continue
+        except (OSError, ScriptError) as error:
+            message = (
+                list(error.args)
+                if isinstance(error, ScriptError)
+                else [
+                    (
+                        f"could not {action.kind} {destination}: {error.strerror or error}; "
+                        "fix the destination, then rerun: just install-skills"
+                    )
+                ]
+            )
+            raise ScriptError(
+                *message, report={"changes": written} if written else None
+            ) from error
+        written.append([action.kind, action_path(home, action)])
 
 
 def git_common_dir() -> Path:
@@ -645,6 +782,9 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
         ) as temporary,
     ):
         stage = Path(temporary)
+        instructions = instruction_sources(
+            stage / "instructions", args.private_root, home
+        )
         sources = skill_sources(stage / "skills", args.private_root, args.profile)
         commands = command_sources()
         codex = command_skills(stage / "commands", commands)
@@ -672,17 +812,18 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
         actions = [action for group in groups for action in plan(home, group)]
+        actions += plan_instructions(home, instructions)
         expected = {
             target: len(group.sources) for group in groups for target in group.targets
         }
-        for target in dict.fromkeys(action.target for action in actions):
+        for target, count in expected.items():
             current = sum(
                 action.target == target and action.kind == "current"
                 for action in actions
             )
-            log.info("~/%s: %d of %d current", target, current, expected[target])
+            log.info("~/%s: %d of %d current", target, current, count)
         changes = [
-            [action.kind, f"~/{action.target}/{action.name}"]
+            [action.kind, action_path(home, action)]
             for action in actions
             if action.kind in CHANGES
         ]
@@ -706,7 +847,7 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
         if preview:
             return output
         compile_skills.compile_tree()
-        execute(home, {**sources, **codex}, commands, actions)
+        execute(home, {**sources, **codex}, commands, actions, instructions)
         try:
             leftovers = prune_leftovers()
         except (OSError, ScriptError) as error:
@@ -737,7 +878,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--private-root",
         type=Path,
-        help="private repository root whose authoring/ packages all install; a root without authoring/ installs none (default: skills-private/ beside the main checkout, when present)",
+        help="private repository root whose authoring/ packages and fleet instruction masters install; both masters are required when present (default: skills-private/ beside the main checkout, when present)",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(

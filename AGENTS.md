@@ -44,6 +44,8 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Install skills
 
+With a private root, `just install-skills` also copies fleet's instruction masters into the four harness files and the projects folder. Change those masters in a skills-private worktree and PR; the installed files are copies. [Install skills](docs/references/install-skills.md#agent-instructions) describes their destinations, backups, and conflicts
+
 `just install-skills` compiles current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first, then pulls `skills-private/`, the clone of the private repository `pascalandy/skills-private` beside the main checkout. Change a private skill in a worktree of that repository and a PR, never in the clone, then run `just sync-fleet` after the merge. From any machine, `just sync-fleet` brings every registered machine to GitHub's `main` over SSH, each machine pulls its private clone, and `--check` compares them. In each machine's main checkout, lefthook installs after a commit or pull on `main` and syncs the other machines after a pull or a push of `main`. `just merge` ends with `just deploy`, an alias of `just sync-fleet`, which runs from the main checkout, so keep each machine's main checkout on `main` and do branch work in a worktree. Otherwise run apply, `sync`, or `sync-fleet` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 
 ## Read on demand

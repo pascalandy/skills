@@ -16,7 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from conftest import commit, skill
+from conftest import commit, instruction_masters, skill
 from install_skills import replace
 
 MAC = (
@@ -55,6 +55,7 @@ def run(
             *args,
         ],
         check=False,
+        cwd=repo,
         env=env,
         capture_output=True,
         text=True,
@@ -67,7 +68,7 @@ OK = '{"ok":true}\n'
 
 
 def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
-    """The installer's changes, each as its kind, target, and name."""
+    """Skill and command changes; instruction files have their own CLI proofs."""
     return [
         {
             "kind": kind,
@@ -75,12 +76,265 @@ def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
             "name": path.rsplit("/", 1)[1],
         }
         for kind, path in json.loads(result.stdout).get("changes", [])
+        if path[2:].rsplit("/", 1)[0] in {*MAC, *OM1, *COMMANDS, *RETIRED}
     ]
 
 
 def failed(*errors: str, **fields: object) -> str:
     answer = {"ok": False, "errors": list(errors), **fields}
     return json.dumps(answer, separators=(",", ":")) + "\n"
+
+
+HARNESS_FILES = (
+    ".claude/CLAUDE.md",
+    ".codex/AGENTS.md",
+    ".pi/agent/AGENTS.md",
+    ".config/opencode/AGENTS.md",
+)
+
+
+@pytest.mark.parametrize("profile", ["mac", "om1"])
+@pytest.mark.parametrize("override", ["default", "absolute", "relative"])
+def test_instruction_files_preview_apply_update_and_converge(
+    sandbox: tuple[Path, Path], profile: str, override: str
+) -> None:
+    repo, home = sandbox
+    root = (
+        repo.parent / "skills-private"
+        if override == "default"
+        else home / "other-projects/private"
+    )
+    masters = instruction_masters(root)
+    selected = str(root)
+    if override == "relative":
+        (root / "nested").mkdir()
+        selected = os.path.relpath(root, repo) + "/nested/.."
+    args = (
+        "--profile",
+        profile,
+        *(("--private-root", selected) if override != "default" else ()),
+    )
+    paths = [*(f"~/{path}" for path in HARNESS_FILES)]
+    projects = str(repo.parent) if override == "default" else "~/other-projects"
+    paths += [f"{projects}/AGENTS.md", f"{projects}/CLAUDE.md"]
+    expected = [["add", path] for path in paths]
+
+    preview = run(repo, home, *args, "--dry-run")
+    assert preview.returncode == 0, preview.stderr
+    assert json.loads(preview.stdout)["changes"][-6:] == expected
+    assert not (home / ".claude").exists()
+    assert not (root.parent / "AGENTS.md").exists()
+    checked = run(repo, home, *args, "--check")
+    assert (checked.returncode, checked.stdout) == (1, "")
+    assert json.loads(checked.stderr)["changes"][-6:] == expected
+
+    installed = run(repo, home, *args)
+    assert (installed.returncode, installed.stdout, installed.stderr) == (
+        0,
+        preview.stdout,
+        "",
+    )
+    for path in HARNESS_FILES:
+        assert (home / path).read_bytes() == b"synthetic harness instructions\n"
+    assert (
+        root.parent / "AGENTS.md"
+    ).read_bytes() == b"synthetic projects instructions\n"
+    assert (root.parent / "CLAUDE.md").read_bytes() == b"@AGENTS.md\n"
+    assert not (home / ".grok").exists()
+    assert not (home / ".cache/agents-instructions").exists()
+    for mode in ((), ("--check",)):
+        result = run(repo, home, *args, *mode)
+        assert (result.returncode, result.stdout, result.stderr) == (0, OK, "")
+
+    (masters / "AGENTS-HARNAIS.md").write_bytes(b"changed harness\n")
+    (masters / "AGENTS-PROJECTS.md").write_bytes(b"changed projects\n")
+    updated = run(repo, home, *args)
+    assert updated.returncode == 0, updated.stderr
+    assert json.loads(updated.stdout)["changes"] == [
+        ["update", path] for path in paths[:-1]
+    ]
+    assert all(
+        (home / path).read_bytes() == b"changed harness\n" for path in HARNESS_FILES
+    )
+    assert (root.parent / "AGENTS.md").read_bytes() == b"changed projects\n"
+    backups = list((home / ".cache/agents-instructions").iterdir())
+    assert Counter(path.read_bytes() for path in backups) == {
+        b"synthetic harness instructions\n": 4,
+        b"synthetic projects instructions\n": 1,
+    }
+    assert "changed harness" not in updated.stdout + updated.stderr
+    assert run(repo, home, *args, "--check").stdout == OK
+
+
+@pytest.mark.parametrize("link", ["mbp", "dangling", "same-content"])
+def test_instruction_symlinks_become_regular_files(
+    sandbox: tuple[Path, Path], link: str
+) -> None:
+    repo, home = sandbox
+    masters = instruction_masters(repo.parent / "skills-private")
+    assert run(repo, home).returncode == 0
+    destination = home / ".claude/CLAUDE.md"
+    destination.unlink()
+    destination.symlink_to(
+        "../.config/opencode/AGENTS.md" if link != "dangling" else "missing.md"
+    )
+    if link == "mbp":
+        (masters / "AGENTS-HARNAIS.md").write_bytes(b"new harness\n")
+
+    applied = run(repo, home)
+
+    assert applied.returncode == 0, applied.stderr
+    assert ["update", "~/.claude/CLAUDE.md"] in json.loads(applied.stdout)["changes"]
+    assert not destination.is_symlink()
+    assert destination.read_bytes() == (
+        b"new harness\n" if link == "mbp" else b"synthetic harness instructions\n"
+    )
+    backups = list((home / ".cache/agents-instructions").glob("*.bak"))
+    if link == "dangling":
+        assert len(backups) == 1 and backups[0].is_symlink()
+        assert os.readlink(backups[0]) == "missing.md"
+    elif link == "mbp":
+        assert len(backups) == 4
+        assert all(
+            path.read_bytes() == b"synthetic harness instructions\n" for path in backups
+        )
+    else:
+        assert backups == []
+    assert run(repo, home, "--check").stdout == OK
+
+
+def test_instruction_directory_conflict_prevents_any_install(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    instruction_masters(repo.parent / "skills-private")
+    conflict = home / ".codex/AGENTS.md"
+    conflict.mkdir(parents=True)
+    (conflict / "keep").write_bytes(b"keep me")
+    for mode in ("--dry-run", "--check", ""):
+        result = run(repo, home, *((mode,) if mode else ()))
+        assert (result.returncode, result.stdout) == (1, "")
+        assert str(conflict) in json.loads(result.stderr)["errors"][0]
+        assert (conflict / "keep").read_bytes() == b"keep me"
+        assert not (home / ".claude").exists()
+        assert not (repo.parent / "AGENTS.md").exists()
+
+
+@pytest.mark.parametrize("missing", ["AGENTS-HARNAIS.md", "AGENTS-PROJECTS.md"])
+def test_missing_instruction_master_fails_before_writing(
+    sandbox: tuple[Path, Path], missing: str
+) -> None:
+    repo, home = sandbox
+    masters = instruction_masters(repo.parent / "skills-private")
+    (masters / missing).unlink()
+    for mode in ("--dry-run", "--check", ""):
+        result = run(repo, home, *((mode,) if mode else ()))
+        assert (result.returncode, result.stdout) == (1, "")
+        assert f"instruction master {masters / missing} is missing" in result.stderr
+        assert not home.exists()
+
+
+def test_public_install_leaves_instruction_files_alone(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    destination = home / ".claude/CLAUDE.md"
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"personal instructions\n")
+    result = run(repo, home)
+    assert result.returncode == 0, result.stderr
+    assert destination.read_bytes() == b"personal instructions\n"
+    assert not (repo.parent / "AGENTS.md").exists()
+    assert not (home / ".codex/AGENTS.md").exists()
+    assert run(repo, home, "--check").stdout == OK
+
+
+def test_instruction_backups_keep_five_per_destination(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    masters = instruction_masters(repo.parent / "skills-private")
+    for version in range(8):
+        for name in ("AGENTS-HARNAIS.md", "AGENTS-PROJECTS.md"):
+            (masters / name).write_bytes(f"version {version}\n".encode())
+        result = run(repo, home)
+        assert result.returncode == 0, result.stderr
+    backups = list((home / ".cache/agents-instructions").iterdir())
+    assert len(backups) == 25
+    assert Counter(path.read_bytes() for path in backups) == {
+        f"version {version}\n".encode(): 5 for version in range(2, 7)
+    }
+    before = {path.name: path.stat().st_mtime_ns for path in backups}
+    assert run(repo, home).stdout == OK
+    assert {path.name: path.stat().st_mtime_ns for path in backups} == before
+
+
+def test_failed_instruction_backup_preserves_destination_and_reports_prior_writes(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    instruction_masters(repo.parent / "skills-private")
+    destination = home / ".codex/AGENTS.md"
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"old codex\n")
+    cache = home / ".cache/agents-instructions"
+    cache.parent.mkdir()
+    cache.write_bytes(b"not a directory")
+
+    failed_run = run(repo, home)
+
+    assert (failed_run.returncode, failed_run.stdout) == (1, "")
+    answer = json.loads(failed_run.stderr)
+    assert f"could not back up {destination}" in answer["errors"][0]
+    assert ["add", "~/.claude/CLAUDE.md"] in answer["changes"]
+    assert ["update", "~/.codex/AGENTS.md"] not in answer["changes"]
+    assert destination.read_bytes() == b"old codex\n"
+    assert (
+        home / ".claude/CLAUDE.md"
+    ).read_bytes() == b"synthetic harness instructions\n"
+    assert not (home / ".pi/agent/AGENTS.md").exists()
+    cache.unlink()
+    retried = run(repo, home)
+    assert retried.returncode == 0, retried.stderr
+    assert json.loads(retried.stdout)["changes"] == [
+        ["update", "~/.codex/AGENTS.md"],
+        ["add", "~/.pi/agent/AGENTS.md"],
+        ["add", "~/.config/opencode/AGENTS.md"],
+        ["add", str(repo.parent / "AGENTS.md")],
+        ["add", str(repo.parent / "CLAUDE.md")],
+    ]
+    assert destination.read_bytes() == b"synthetic harness instructions\n"
+    assert [path.read_bytes() for path in cache.iterdir()] == [b"old codex\n"]
+    assert run(repo, home, "--check").stdout == OK
+
+
+def test_failed_instruction_write_preserves_old_bytes_and_rerun_converges(
+    sandbox: tuple[Path, Path],
+) -> None:
+    repo, home = sandbox
+    masters = instruction_masters(repo.parent / "skills-private")
+    assert run(repo, home).returncode == 0
+    (masters / "AGENTS-HARNAIS.md").write_bytes(b"new harness\n")
+    destination = home / ".codex/AGENTS.md"
+    destination.parent.chmod(0o500)
+    try:
+        result = run(repo, home)
+    finally:
+        destination.parent.chmod(0o700)
+    assert (result.returncode, result.stdout) == (1, "")
+    answer = json.loads(result.stderr)
+    assert f"could not update {destination}" in answer["errors"][0]
+    assert answer["changes"] == [["update", "~/.claude/CLAUDE.md"]]
+    assert destination.read_bytes() == b"synthetic harness instructions\n"
+    assert (home / ".claude/CLAUDE.md").read_bytes() == b"new harness\n"
+    assert len(list((home / ".cache/agents-instructions").iterdir())) == 2
+    retried = run(repo, home)
+    assert retried.returncode == 0, retried.stderr
+    assert json.loads(retried.stdout)["changes"] == [
+        ["update", f"~/{path}"] for path in HARNESS_FILES[1:]
+    ]
+    assert destination.read_bytes() == b"new harness\n"
+    assert run(repo, home, "--check").stdout == OK
 
 
 def test_preview_apply_check_and_repeat_agree(sandbox: tuple[Path, Path]) -> None:
@@ -230,6 +484,7 @@ def test_every_private_package_installs_and_a_public_namesake_stops_the_install(
     assert missing.returncode == 1 and "private source" in missing.stderr
     assert not home.exists()
     tree = repo.parent / "skills-private/authoring"
+    instruction_masters(tree.parent)
     private = skill(tree / "knowledge", "secret", "private")
     skill(private / "references", "example")
     applied = run(repo, home)
@@ -267,6 +522,7 @@ def test_a_worktree_installs_the_main_checkouts_private_skills(
 ) -> None:
     repo, home = sandbox
     skill(repo.parent / "skills-private/authoring/content", "secret", "private")
+    instruction_masters(repo.parent / "skills-private")
     # In another folder, so only the main checkout's neighbour holds the clone
     worktree = repo.parent / "elsewhere/worktree"
     subprocess.run(
@@ -291,6 +547,7 @@ def test_private_skill_promotes_to_public_without_flags(
     private = skill(
         repo.parent / "skills-private/authoring/content", "secret", "private"
     )
+    instruction_masters(repo.parent / "skills-private")
     assert run(repo, home).returncode == 0
     shutil.rmtree(private)
     skill(repo / "authoring/content", "secret", "public")
@@ -310,6 +567,7 @@ def test_private_skill_deleted_in_its_repository_leaves_every_target(
 ) -> None:
     repo, home = sandbox
     private = repo.parent / "skills-private"
+    instruction_masters(private)
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "authoring/content", "retired")
     outer = skill(private / "authoring/content", "outer")
@@ -352,6 +610,7 @@ def test_a_private_tree_inside_a_repository_does_not_inherit_its_history(
 ) -> None:
     repo, home = sandbox
     private = repo / "unversioned-private"
+    instruction_masters(private)
     historical = skill(private / "authoring/content", "foreign")
     commit(repo)
     shutil.rmtree(historical)
@@ -371,6 +630,7 @@ def test_archived_private_packages_never_install_and_archiving_one_retires_it(
 ) -> None:
     repo, home = sandbox
     private = repo.parent / "skills-private"
+    instruction_masters(private)
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "authoring/content", "secret")
     skill(private / "skill_archived/jeffreys-skills", "jsm")
@@ -399,21 +659,24 @@ def test_archived_private_packages_never_install_and_archiving_one_retires_it(
     assert run(repo, home, "--check").returncode == 0
 
 
-def test_a_private_root_without_authoring_installs_and_removes_nothing(
+def test_a_private_root_without_packages_installs_no_private_skills(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
     empty = repo.parent / "private"
     empty.mkdir()
+    instruction_masters(empty)
     applied = run(repo, home, "--private-root", str(empty))
     assert applied.returncode == 0, applied.stderr
     assert {a["name"] for a in report(applied)} == {"alpha"}
     # A clone laid out before authoring/: its history added a package elsewhere
     private = repo.parent / "skills-private"
+    instruction_masters(private)
     subprocess.run(["git", "init", "-q", str(private)], check=True)
     skill(private / "content", "legacy", "private")
     commit(private)
     installed = skill(home / ".claude/skills", "legacy")
+    assert run(repo, home).returncode == 0
 
     result = run(repo, home)
 

@@ -484,8 +484,12 @@ exec {executable} "$@"
         assert (homes / "remote/raced-ref").is_file()
 
 
+@pytest.mark.parametrize(
+    "drift", ["skill", "instruction-missing", "instruction-different"]
+)
 def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     fleet: tuple[Path, Path, Path],
+    drift: str,
 ) -> None:
     hub, homes, bin_dir = fleet
     origin = hub.parent / "skills.git"
@@ -498,8 +502,19 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
     before = git(behind, "rev-parse", "HEAD")
     for checkout in (current, stale):
         git(checkout, "pull", "-q")
-    # stale is at GitHub's main, but lost an installed skill
-    shutil.rmtree(homes / "stale/.claude/skills/alpha")
+    # stale is at GitHub's main, but an installed entry differs
+    if drift == "skill":
+        destination = homes / "stale/.claude/skills/alpha"
+        shutil.rmtree(destination)
+        waiting = "~/.claude/skills waits for add 1"
+    else:
+        destination = homes / "stale/.codex/AGENTS.md"
+        if drift == "instruction-missing":
+            destination.unlink()
+            waiting = "~/.codex waits for add 1"
+        else:
+            destination.write_bytes(b"edited instructions\n")
+            waiting = "~/.codex waits for update 1"
 
     result = run(hub, homes, bin_dir, "-n")
     preview = run(hub, homes, bin_dir, "-n", "-v")
@@ -510,9 +525,18 @@ def test_dry_run_names_each_machine_a_sync_would_change_and_changes_nothing(
         "",
     )
     assert preview.stdout == result.stdout
-    assert "stale: ~/.claude/skills waits for add 1" in preview.stderr.splitlines()
+    assert f"stale: {waiting}" in preview.stderr.splitlines()
+    checked = run(hub, homes, bin_dir, "--check")
+    assert (checked.returncode, checked.stdout) == (1, "")
+    assert (
+        f"stale drift: {waiting}; rerun just sync-fleet stale"
+        in json.loads(checked.stderr)["errors"]
+    )
     assert git(behind, "rev-parse", "HEAD") == before
-    assert not (homes / "stale/.claude/skills/alpha").exists()
+    if drift == "instruction-different":
+        assert destination.read_bytes() == b"edited instructions\n"
+    else:
+        assert not destination.exists()
 
     # A preview stops where a sync would, on this machine's private edits
     (private(hub) / "authoring/content/secret/SKILL.md").write_text("edited\n")
@@ -792,7 +816,7 @@ def test_a_broken_registry_keeps_the_private_pull_in_the_report(
     before = git(private(hub), "rev-parse", "HEAD")
     work = hub.parent / "private-pr"
     git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(work))
-    (work / REGISTRY).parent.mkdir(parents=True)
+    (work / REGISTRY).parent.mkdir(parents=True, exist_ok=True)
     (work / REGISTRY).write_text("[machines.broken\n")
     git(work, "add", "-f", REGISTRY)
     if hook:
@@ -1284,7 +1308,7 @@ def test_reads_the_registry_after_pulling_the_private_clone(
     # The merged PR adds the machine to the registry the hub has not pulled
     other = hub.parent / "other-private"
     git(hub.parent, "clone", "-q", str(hub.parent / "skills-private.git"), str(other))
-    (other / REGISTRY).parent.mkdir(parents=True)
+    (other / REGISTRY).parent.mkdir(parents=True, exist_ok=True)
     (other / REGISTRY).write_text(entries("added"))
     git(other, "add", "-f", REGISTRY)
     commit(other)
