@@ -26,6 +26,6 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 | [`arancini`](playbooks/arancini/arancini.md) | | The approved CU1: rounds in one Chef, with one Cook per card, then the barrages in order, then closing |
 | [`bisque`](playbooks/bisque/bisque.md) | | The approved CU1, second version: a Head Chef splits the plan into batches, one Chef per batch runs a Cook and delegates the barrages, and the Head Chef green-lights each merge |
 | [`carpaccio`](playbooks/carpaccio/carpaccio.md) | | CU1: a Head Chef aligns batches, Cooks own implementation, docs and delegated reviews, and each Chef validates, merges and closes its batch |
-| [`dolma`](playbooks/dolma/dolma.md) | | CU1, fourth version: a copy of carpaccio, the live version that every brigade change targets |
+| [`dolma`](playbooks/dolma/dolma.md) | | CU1, fourth and live version: a Head Chef aligns batches, one Cook per batch implements every card in one stack and runs each review pair on it, and each Chef validates, merges and closes its batch |
 
 To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`

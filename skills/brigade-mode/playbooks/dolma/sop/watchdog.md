@@ -22,9 +22,9 @@ Rules: <rules.md path>
 
 ## Files
 
-The parent writes `watch.toml` atomically after each launch, received report, status or subject change, hold change, scope change and replacement. It records its own threadId, projectId, subject and, when it has a Watchdog, that Watchdog's taskId, childThreadId, scheduledTaskId and arming time. Each `[[slots]]` record has a logical slot, threadId, projectId, last received phase, hold flag, final report received flag, optional `replacedBy` and, for a slot that waits for a merge, `afterMerge`. A slot registered before its launch has `threadId = ""` and `lastReceivedPhase = "queued"`, or `"queued_after_merge"` with `afterMerge` naming the slots whose merge it waits for, as [After-merge slots](../dolma.md#after-merge-slots) says. It stays live and counted, but the tick makes no thread or schedule lookup for it until the parent writes its threadId into that record at launch. If Stop or a cut ends it before launch, the parent sets `lastReceivedPhase = "⏹️"` and `reportReceived = true`; it has no thread to settle. A `🍽️ Stack ready` report is a phase report, not a final report. The Head Chef's file has its own `head-chef` record plus Chef records; a Chef's file has Cook records. The Head Chef marks its own record's `reportReceived` after sending the final report to Pascal. On replacement, retain the old record with `replacedBy` and append one new current record for the same logical slot without it. A split uses `replacedBy = "split"` on the old record and new slots for the successors. Ignore late messages from the old threadId; watch only current records.
+The parent writes `watch.toml` atomically after each launch, received report, status or subject change, hold change, scope change and replacement. It records its own threadId, projectId, subject and, when it has a Watchdog, that Watchdog's taskId, childThreadId, scheduledTaskId and arming time. Each `[[slots]]` record has a logical slot, threadId, projectId, last received phase, hold flag, final report received flag and optional `replacedBy`. A slot registered before its launch has `threadId = ""` and `lastReceivedPhase = "queued"`. It stays live and counted, but the tick makes no thread or schedule lookup for it until the parent writes its threadId into that record at launch. If Stop or a cut ends it before launch, the parent sets `lastReceivedPhase = "⏹️"` and `reportReceived = true`; it has no thread to settle. A `🍽️ Stack ready` report is a phase report, not a final report. The Head Chef's file has its own `head-chef` record plus Chef records; a Chef's file has its Cook's records. The Head Chef marks its own record's `reportReceived` after sending the final report to Pascal. On replacement, retain the old record with `replacedBy` and append one new current record for the same logical slot without it. A split uses `replacedBy = "split"` on the old record and new slots for the successors. Ignore late messages from the old threadId; watch only current records.
 
-Use these field names. Add batch metadata to the parent file as needed; omit `replacedBy` until replacement and `afterMerge` on a slot that waits for no merge:
+Use these field names. Add batch metadata to the parent file as needed; omit `replacedBy` until replacement:
 
 ```toml
 parentThreadId = "<full threadId>"
@@ -40,8 +40,7 @@ slot = "<head-chef | chef-b | cook-b.c>"
 threadId = "<full threadId>"
 projectId = "<projectId>"
 workFolder = "<absolute path>"
-lastReceivedPhase = "<status emoji the last received report implies, queued or queued_after_merge>"
-afterMerge = ["<b>.<c>"]
+lastReceivedPhase = "<status emoji the last received report implies, or queued>"
 hold = false
 reportReceived = false
 ```
@@ -106,7 +105,7 @@ Check these against the title and received phases in `watch.toml`. At rest means
 | F3 | Chef final while a Cook is not final |
 | F4 | A settled thread on a live status |
 | F5 | Chef 🍽️ while Head Chef is not ❓, outside a hold |
-| F6 | Chef 🍽️ below x/x, unless each slot missing from x is `queued_after_merge` and each slot its `afterMerge` names is on 🍽️ without a final report |
+| F6 | Chef 🍽️ below 1/1 |
 | F7 | A child ⏸️ under an idle parent on ⏳ |
 | F8 | ❓ on a Chef or a Cook |
 | F9 | A failed or interrupted Chef or Cook past `max-wakes` × `watch-minutes` with a live title |

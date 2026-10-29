@@ -9,8 +9,8 @@ This glossary is for Pascal designing a brigade.
 | Executive Chef | The user as a CTO. Oversees several kitchens, one Chef per project. Not in arancini | New |
 | Product Manager | The user managing one project. Decides what to build and why, and has the last word | Not renamed. The user, USER in the CU diagrams |
 | Head Chef | Bridges needs and requirements, splits batches and guides Chefs. In carpaccio and dolma, holds a merge only when the merge rule in Decisions is not met. Not in arancini | New |
-| Chef | In bisque, carpaccio and dolma, coordinates a batch for the Head Chef. In carpaccio and dolma, launches Cooks, prevents conflicts, validates, merges, releases and closes | MAIN |
-| Cook<n> | Owns its worktree and stack. In carpaccio and dolma, also writes docs, watches PRs, delegates reviews and triages findings | COD<n> |
+| Chef | In bisque, carpaccio and dolma, coordinates a batch for the Head Chef. In carpaccio, launches Cooks and prevents conflicts between them; in dolma, launches the batch's one Cook. In both, validates, merges, releases and closes | MAIN |
+| Cook<n> | Owns its worktree and stack. In carpaccio and dolma, also writes docs, watches PRs, delegates reviews and triages findings. In dolma, one Cook implements every card of its batch | COD<n> |
 | Watchdog | A Head Chef's or Chef's hidden delegate, scheduled in its own thread to wake or report stalled and failed work in carpaccio and dolma | New |
 | DocWriter<n> | Writes docs in arancini and bisque; not in carpaccio or dolma | DOC<n> |
 

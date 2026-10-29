@@ -5,7 +5,7 @@ Keep the batch registry in `watch.toml` in your work folder: batch number, name,
 ## Align
 
 1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md#arm) after pinning. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
-2. Write the goal and the problem in Pascal's words and each card's acceptance criteria, then split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../dolma.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan, and each card that can start only after other cards merge, as [After-merge slots](../dolma.md#after-merge-slots) says. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
+2. Write the goal and the problem in Pascal's words and each card's acceptance criteria, then split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../dolma.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan. Put each card that can start only after another card merges in a later batch of the same repository. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
 3. Send the Align plan from [Report](../dolma.md#report), then go to Launch in the same turn. Show `❓ align` only for a question that the plan, the issues and the agreed requirements leave open, and meanwhile launch the batches that do not depend on its answer. Done when each batch that waits on no open question is launched or queued under Launch
 
 ## Launch
@@ -44,7 +44,7 @@ Done when the schedule is live and each finding has an owner.
 
 ## Replace a Chef
 
-When a Chef cannot continue, inspect the old thread and PRs before retrying or relaunching anything. Keep the batch slot and the Cooks' worktrees.
+When a Chef cannot continue, inspect the old thread and PRs before retrying or relaunching anything. Keep the batch slot and the Cook's worktree.
 
 1. Stop the old Chef and its Watchdog:
    - Mark the old Chef's record `replacedBy = "pending"` in `watch.toml` before acting on it
@@ -61,13 +61,13 @@ When a Chef cannot continue, inspect the old thread and PRs before retrying or r
    - Launch a new Chef in the same project and slot at ⏳ with that state and the replacement procedure in [chef-run](chef-run.md#return-or-replace-a-cook)
    - Update the old record's `replacedBy` and append a current `watch.toml` record with the new threadId atomically
 
-   Done when the new Chef's PRs are linked and watched, each Cook reports to it, and its Watchdog is armed if it has a current Cook slot
+   Done when the new Chef's PRs are linked and watched, the Cook reports to it, and its Watchdog is armed if it has a current Cook slot
 
 3. Archive the old thread. Ignore a late report from it. Done when the sidebar has one Chef for the slot
 
 ## Split a batch
 
-Split card groups without adding or cutting cards or required deliverables. Set the old Chef's `replacedBy = "split"` in `watch.toml`, then stop any existing Watchdog with the Watchdog bullets of Replace a Chef step 1, from finding its childThreadId through the final check, before interrupting and archiving the old Chef at ⏹️. Preserve its Cooks' worktrees and branch heads, and remove its batch slot from the count. Register the successor batches as current or queued slots in `watch.toml`, then assign every card and Cook to exactly one successor. A Cook whose cards move to another owner closes at ⏹️. Launch successors under the one live batch per repository rule. The first Chef adopts its assigned live Cooks with the replacement message. Cooks assigned to a queued successor close at ⏹️ with their work preserved; that successor relaunches them in the same worktrees. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
+Split a batch's cards without adding or cutting cards or required deliverables. Set the old Chef's `replacedBy = "split"` in `watch.toml`, then stop any existing Watchdog with the Watchdog bullets of Replace a Chef step 1, from finding its childThreadId through the final check, before interrupting and archiving the old Chef at ⏹️. Preserve its Cook's worktree and branch heads, and remove its batch slot from the count. Register the successor batches as current or queued slots in `watch.toml`, then assign every card to exactly one successor. Launch successors under the one live batch per repository rule. The first successor's Chef adopts the live Cook with the replacement message; the Cook removes the layers of cards that moved and keeps their branches. Each later successor's Cook starts from those kept branches. Update the Head Chef's denominator when the successor slots are registered. Ask Pascal only if total scope changes. Done when the old Chef is ⏹️ and archived, each card has one successor, and the count includes only the successor batches.
 
 ## Status, added work and Stop
 

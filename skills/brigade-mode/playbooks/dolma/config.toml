@@ -10,7 +10,6 @@ retro = true # Head Chef: run its closing retros
 [chef]
 chef-on-claude = { inherit = true } # Head Chef: Chef selection
 chef-on-codex = { inherit = true } # Head Chef: Chef selection
-max-cooks = 2 # Chef: simultaneous Cooks when Decisions allow parallel
 max-returns = 2 # Chef: returns of one stack for the same cause before escalation
 retro = true # Chef: run its closing retros
 
