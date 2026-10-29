@@ -8,10 +8,10 @@ kind: "dev"
 
 ## Pick the route
 
-- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio Head Chef, Chef or Cook also loads 🧰 oem first; carpaccio's chain and Asking Pascal replace oem's When You Need Me
-- **A delegated carpaccio barrage, ending in `manic-1`, `manic-2`, `manic-3` or `manic-5`:** read only `playbooks/carpaccio/sop/<sop>.md` and your brief, then review under that contract
-- **A delegated carpaccio Watchdog, ending in `watchdog`:** read only `playbooks/carpaccio/sop/watchdog.md` and your brief, then run its scheduled tick
-- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque and carpaccio. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
+- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio or dolma Head Chef, Chef or Cook also loads 🧰 oem first; the route's chain and Asking Pascal replace oem's When You Need Me
+- **A delegated carpaccio or dolma barrage, ending in `manic-1`, `manic-2`, `manic-3` or `manic-5`:** read only `playbooks/<route>/sop/<sop>.md` and your brief, then review under that contract
+- **A delegated carpaccio or dolma Watchdog, ending in `watchdog`:** read only `playbooks/<route>/sop/watchdog.md` and your brief, then run its scheduled tick
+- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque, carpaccio and dolma. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
 - **Three parts ending in `manic-4`, such as `$brigade ; arancini ; manic-4`:** you are the thread the user talks to. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan, in fast track as the playbook defines it
 - **Other three-part invocations, `$brigade-mode ; <route> ; <sop>`:** another thread of the route launched or delegated you. Read `playbooks/<route>/<route>.md` for your role and the shared rules, then read `playbooks/<route>/sop/<sop>.md` and follow it
 
@@ -26,5 +26,6 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 | [`arancini`](playbooks/arancini/arancini.md) | | The approved CU1: rounds in one Chef, with one Cook per card, then the barrages in order, then closing |
 | [`bisque`](playbooks/bisque/bisque.md) | | The approved CU1, second version: a Head Chef splits the plan into batches, one Chef per batch runs a Cook and delegates the barrages, and the Head Chef green-lights each merge |
 | [`carpaccio`](playbooks/carpaccio/carpaccio.md) | | CU1: a Head Chef aligns batches, Cooks own implementation, docs and delegated reviews, and each Chef validates, merges and closes its batch |
+| [`dolma`](playbooks/dolma/dolma.md) | | CU1, fourth version: a copy of carpaccio, the live version that every brigade change targets |
 
 To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`

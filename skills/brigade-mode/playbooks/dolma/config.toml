@@ -1,0 +1,49 @@
+service-tier = "standard" # Launching role: default for thread and delegate selections
+runtime-mode = "inherit" # All threads: retain inherited modes throughout the run
+pr-assignee = "pascalandy" # Cook: assign every PR
+retro-max-issues = 2 # Head Chef and Chef: issue limit per thread per retro
+
+[head-chef]
+max-parallel = 2 # Head Chef: simultaneous Chefs when Decisions allow parallel
+retro = true # Head Chef: run its closing retros
+
+[chef]
+chef-on-claude = { inherit = true } # Head Chef: Chef selection
+chef-on-codex = { inherit = true } # Head Chef: Chef selection
+max-cooks = 2 # Chef: simultaneous Cooks when Decisions allow parallel
+max-returns = 2 # Chef: returns of one stack for the same cause before escalation
+retro = true # Chef: run its closing retros
+
+[cook]
+chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Chef: Cook selection
+chef-on-codex = { inherit = true } # Chef: Cook selection
+delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Cook on Claude: side work target
+retro = true # Chef: request Cook retros
+
+[watchdog]
+watch-on-claude = { instance = "claudeAgent", model = "claude-haiku-5-5", reasoning-level = "high" } # Head Chef or Chef on Claude: same-provider Watchdog
+watch-on-codex = { instance = "codex", model = "gpt-6-luna", reasoning-level = "high" } # Head Chef or Chef on Codex: same-provider Watchdog
+watch-minutes = 5 # Watchdog: schedule interval
+stall-minutes = 30 # Watchdog: idle threshold
+max-wakes = 2 # Watchdog: counted wakes before alert
+max-wait-minutes = 120 # Watchdog: maximum age of a declared wait
+
+[manic-1] # Cook: step 2, beside manic-2
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 3 # Cook: normal pass limit
+
+[manic-2] # Cook: step 2, beside manic-1
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 2 # Cook: normal pass limit
+
+[manic-3] # Cook: step 4, beside manic-5
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 2 # Cook: normal pass limit
+
+[manic-5] # Cook: step 4, beside manic-3
+cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
+cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+max-passes = 2 # Cook: normal pass limit
