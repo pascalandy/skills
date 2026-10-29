@@ -30,16 +30,16 @@ sequenceDiagram
     H->>H: Pin, register batches<br>❓ align only for an open question
     H->>H: Arm Head Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     H->>C: Agent: Launch ⏳ Chef with projectId<br>and Align choices ->
-    C->>C: Group disjoint files,<br>register Cook slots
+    C->>C: Register one Cook slot<br>with every card
     opt Chef has a Cook slot
         C->>C: Arm Chef Watchdog<br>Delegate owns its schedule<br>Check its bound thread
     end
-    C->>C: Create Cook worktrees
-    opt Open PR outside the run changes a group's files or cited specs
+    C->>C: Create the Cook's worktree
+    opt Open PR outside the run changes the batch's files or cited specs
         C-->>H: Agent: ⏸️ Overlap and default <-
-        H->>C: Agent: Answer, then launch that group's Cook ->
+        H->>C: Agent: Answer, then launch the Cook ->
     end
-    C->>K: Agent: Launch 🍳 Cook with ownership ->
+    C->>K: Agent: Launch 🍳 Cook with every card ->
     Note over H,K: Watchdogs are hidden delegates, not participants<br>Each tick reads watch and wake files
     opt Cook stalls or fails
         C->>C: Watchdog queues one Cook wake<br>then alerts Chef after max-wakes
@@ -49,19 +49,15 @@ sequenceDiagram
         H->>H: Watchdog queues one Chef wake<br>then alerts Head Chef after max-wakes
         H->>H: Reconcile effects, resume<br>or replace Chef in its slot
     end
-    Note over C,K: Parallel per Decisions: up to max-cooks<br>Separate worktrees, serialized merges
+    Note over C,K: One Cook per batch<br>One PR per card in one stack
     Note over C,K: Step 1: Implement
     opt Bug card
         K->>K: diagnose before reading source
         Note over H,K: Any question for Pascal climbs<br>through Chef and Head Chef
     end
-    K->>K: Implement, link PR 35,<br>watch, 2nd-pass and push
+    K->>K: Implement every card: PRs 35–36,<br>link, watch, 2nd-pass and push
     Note over K: Watch findings: queue while passes run,<br>otherwise triage at once
-    opt Cross-file ownership
-        K-->>C: Agent: ⏸️ Request file access <-
-        C->>K: Agent: Ownership decision ->
-    end
-    Note over C,K: Step 2: manic-1 and manic-2
+    Note over C,K: Step 2: manic-1 and manic-2 on the whole stack
     rect rgba(166, 209, 137, 0.25)
         par manic-1
             K->>K: Delegate interrogate rejection reviewer
@@ -71,8 +67,8 @@ sequenceDiagram
     end
     K->>K: End turn, then interrogate lead judgment<br>Other provider, one reviewer per barrage
     Note over C,K: Step 3: Docs
-    K->>K: andy-mode docs, PR 36 on top<br>or no-docs decision<br>Release yes: final content layer
-    Note over C,K: Step 4: manic-3 and manic-5
+    K->>K: andy-mode docs, PR 37 on top<br>or no-docs decision<br>Release yes: final content layer
+    Note over C,K: Step 4: manic-3 and manic-5 on the whole stack
     rect rgba(166, 209, 137, 0.25)
         par manic-3
             K->>K: Delegate docs review
@@ -86,7 +82,7 @@ sequenceDiagram
     Note over H,K: Step 5: Validation and merge
     K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch findings only
-    C->>C: Read rejections,<br>check cross-Cook conflicts
+    C->>C: Read rejections,<br>check every card's evidence
     opt Reopened finding, missing criterion evidence,<br>failed or missing required status, or frozen watch finding
         C->>K: Agent: Return worktree for Fix ->
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
@@ -95,12 +91,12 @@ sequenceDiagram
         alt Every merge gate holds#59; Pareto verdict challenged with sparring
             C-->>H: Agent: 🔀 Batch 1 merging <-
         else A gate fails
-            C-->>H: Agent: 🍽️ Batch ready at x/x,<br>or below it only by queued_after_merge slots <-
+            C-->>H: Agent: 🍽️ Batch ready at 1/1 <-
             alt Requirements or specs settle a question
                 H->>C: Agent: Answers from requirements or specs ->
                 C-->>H: Agent: Merge rule again: 🔀 Batch 1 merging<br>or a new 🍽️ Batch ready <-
             else Gate still open
-                H->>U: Agent: 🙋 merge PR 35–36 URL ? failed gate and recommendation <-
+                H->>U: Agent: 🙋 merge PR 35–37 URL ? failed gate and recommendation <-
                 U->>H: USER: Merge ->
                 H->>C: Agent: 🔀 Merge ->
             end
@@ -111,12 +107,7 @@ sequenceDiagram
         C->>K: Agent: Return worktree, fix cause ->
         K->>K: 🍳 Fix, checks and reviews,<br>fresh 🍽️ Stack ready
     end
-    Note over C,K: Next stack: Cook restacks on main<br>Same own diff keeps approval#59; changed diff needs review
-    opt After-merge slot waits for this round
-        C->>K: Agent: merged, close ->
-        C->>C: Confirm merged Cooks settled,<br>worktree from fresh origin/HEAD
-        C->>C: Launch 🍳 after-merge Cook<br>Steps 1 to 5 for its stack,<br>merge decision on its own heads
-    end
+    Note over C,K: Restack on main: same own diff keeps approval#59;<br>changed diff needs review
     C->>K: Agent: merged ->
     C-->>H: Agent: Batch merged, deploy result<br>No Head Chef count yet <-
     C->>C: Release yes: finish procedure<br>from main
@@ -132,7 +123,7 @@ sequenceDiagram
     end
     C->>K: Agent: Close, run enabled retros ->
     K->>K: 🧹 Retros, unwatch, report<br>🍽️ final after merge, then settle
-    C->>C: Retros, confirm Cooks settled,<br>remove merged worktrees
+    C->>C: Retros, confirm Cook settled,<br>remove merged worktree
     C-->>H: Agent: ⛳ Batch delivered, report <-
     opt Chef Watchdog exists
         C->>C: Delete Watchdog schedule<br>cancel task if recorded<br>remove its work folder if present
@@ -145,6 +136,6 @@ sequenceDiagram
     H->>H: Settle and unpin
 ```
 
-At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns affected Cooks to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
+At review, Pascal may instead choose `⏳ Rework`, `🍽️ Hold` or `⏹️ Drop`. Rework returns the Cook to 🍳 and may withdraw ❓. Hold keeps the Chef 🍽️; the Head Chef shows `❓ held batch <b>` once no other work can progress. Drop closes the Cook and Chef at ⏹️, and the cut batch leaves the Head Chef's count.
 
 Fast track implements required release content, skips docs and barrages, then uses the same readiness handoff. A batch without PRs runs in the Chef alone, keeps no Chef Watchdog and goes to Closing. On `⏹️ Stop`, the Head Chef tells Chefs, Chefs relay to Cooks, Cooks close at ⏹️ unless their stacks merged, and a merge or release already running finishes before each Chef follows Closing.

@@ -1,5 +1,5 @@
 ---
-description: "Run batches under a Head Chef: Cooks implement, document, watch and delegate reviews; each Chef validates, merges and closes its batch."
+description: "Run batches under a Head Chef: one Cook per batch implements every card in one stack, documents and watches it, and runs each review pair on it; each Chef validates, merges and closes its batch."
 ---
 
 # CU1. Batches under one Head Chef
@@ -7,7 +7,7 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 ## Vocabulary
 
 - **SOP**: a role's procedure in `sop/`
-- **Batch**: one Chef's work in one repository, grouped by the plan, such as an epic or milestone
+- **Batch**: one Chef's work in one repository, grouped by the plan, such as an epic or milestone. One Cook implements all of it
 - **Card**: a unit of work within a batch
 - **Chain**: a barrage reports to its Cook, a Cook to its Chef, a Chef to the Head Chef, and the Head Chef to Pascal
 - **Fast track**: `$brigade ; dolma ; manic-4`, or Pascal's request during a run. The Cook implements only, skipping docs and barrages
@@ -17,13 +17,13 @@ description: "Run batches under a Head Chef: Cooks implement, document, watch an
 | Role | Runs as | Title | Statuses | Responsibility |
 |---|---|---|---|---|
 | Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, launches and guides Chefs, resumes coordination on escalation. Never edits a repository or opens a PR, even after Close |
-| Chef | Thread in the batch's repository project | `🚥 Chef <b> <id4> [<served>/<cooks>] <status> <batch>` | ⏳ 🔀 🧹 🍽️ ⏸️ ⛳ ⏹️ | Creates worktrees, launches Cooks, prevents conflicts, validates, merges, releases and closes. Never edits code |
-| Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.<c> <id4> <status> <batch>` | 🍳 🧹 🍽️ ⏸️ ⏹️ | Owns implementation, PRs, watches, docs, barrage delegation and triage, then reports readiness. Leaves merging to the Chef |
+| Chef | Thread in the batch's repository project | `🚥 Chef <b> <id4> [<served>/<cooks>] <status> <batch>` | ⏳ 🔀 🧹 🍽️ ⏸️ ⛳ ⏹️ | Creates the batch's worktree, launches its one Cook, validates, merges, releases and closes. Never edits code |
+| Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.<c> <id4> <status> <batch>` | 🍳 🧹 🍽️ ⏸️ ⏹️ | Implements every card of its batch, one PR per card in one stack, and owns watches, docs, barrage delegation and triage, then reports readiness. Leaves merging to the Chef |
 | Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed or stalled threads and alerts its parent when repair is needed |
 | Barrage | Cook's delegate | `👀 <sop> · Cook <b>.<c> <id4>` | none | Reviews under the contract in its brief |
 | Side delegate | Cook's delegate | `🔧 <task> · Cook <b>.<c> <id4>` | none | Runs side work the Cook delegates, such as the repository's Verify |
 
-`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` numbers a batch's Cooks. `<task>` names the side work in one word, such as `verify`. `<done>` counts delivered batches. The Chef adds its counter once it has grouped the Cooks. The status is the emoji alone. ❓ adds the item label. The words in the Statuses table are a glossary; never put them in a title. Put the status before the subject, without `·` separators. Progress goes in `📍` lines, never in a title.
+`<id4>` is the last four characters of the Head Chef's threadId. `<b>` numbers batches in launch order; `<c>` is `1`, the batch's one Cook, and a replacement keeps it. `<task>` names the side work in one word, such as `verify`. `<done>` counts delivered batches. The Chef adds its counter once it has registered its Cook. The status is the emoji alone. ❓ adds the item label. The words in the Statuses table are a glossary; never put them in a title. Put the status before the subject, without `·` separators. Progress goes in `📍` lines, never in a title.
 
 A title displays computed status. It does not prove that a report arrived or an external action finished. The parent's `watch.toml` records received child phases, holds and report receipts. Check T3 for a launched thread's run state and settlement. Check GitHub for PR heads, checks and merges.
 
@@ -33,17 +33,17 @@ After renaming, read the title from T3. If the title is stale, retry the rename 
 
 Pascal watches the pinned Head Chef. ❓ means Pascal has an action; all other statuses belong to the brigade. If T3 shows the pinned Head Chef failed and its Watchdog stopped, that failed row also needs Pascal's attention.
 
-Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live, including one that waits for a merge as [After-merge slots](#after-merge-slots) says. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
+Every thread computes its status from its own facts and the last phases received from its children when it enters a phase and before ending a turn. A registered slot that has not launched is live. The first applicable line below wins. Statuses use the set of child phases; counters count every slot, including repeated phases. [The status model](../../references/model.py) checks these functions, counters and parent-child combinations.
 
 | Status | Meaning | Final for |
 |---|---|---|
 | 🟢 working | Head Chef does its own work, including answering a Chef and closing the run | none |
-| ⏳ monitoring | Head Chef follows unfinished batches; Chef launches, answers, validates or follows Cooks | none |
+| ⏳ monitoring | Head Chef follows unfinished batches; Chef launches, answers, validates or follows its Cook | none |
 | 🍳 cooking | Cook implements, runs barrages, writes docs or fixes its stack | none |
 | ❓ `<item>` | Head Chef waits on Pascal for an item in Asking Pascal | none |
 | 🔀 merging | Chef merges stacks and releases | none |
 | 🧹 closing | Chef or Cook runs retros and cleanup | none |
-| 🍽️ served | Cook handed up its stack, or finished after its stack merged; Chef has a ready batch at x/x, or below it only by after-merge slots | Cook, after closing |
+| 🍽️ served | Cook handed up its stack, or finished after its stack merged; Chef has a ready batch at 1/1 | Cook, after closing |
 | ⏸️ paused | Chef waits on Head Chef, or Cook waits on Chef | none |
 | ⛳ delivered | All in-scope slots and own deliverables are done | Head Chef, Chef |
 | ⏹️ stopped | Work closed without delivery after Stop, a cut or replacement | Head Chef, Chef, Cook |
@@ -53,10 +53,10 @@ Cook: show 🍳 while building, ⏸️ while waiting on the Chef, 🍽️ when t
 Chef, in priority order:
 
 1. ⏸️ while waiting on the Head Chef for an answer other than merge approval
-2. ⏳ while any Cook builds or asks
-3. Once the batch stops, or all its in-scope stacks merge and its release is done, 🧹 until every Cook is final and settled and the Chef has closed; then ⛳ for a merged and released batch, otherwise ⏹️
-4. 🔀 after the merge rule in Decisions authorizes the frozen heads or the Head Chef relays Pascal's approval, through release, or through the deploy of a round that after-merge slots wait for
-5. 🍽️ when every Cook in its count has served, merged in an earlier round or waits for this merge as [After-merge slots](#after-merge-slots) says, and checks passed on the frozen heads
+2. ⏳ while its Cook builds or asks
+3. Once the batch stops, or its stack merges and its release is done, 🧹 until its Cook is final and settled and the Chef has closed; then ⛳ for a merged and released batch, otherwise ⏹️
+4. 🔀 after the merge rule in Decisions authorizes the frozen heads or the Head Chef relays Pascal's approval, through release
+5. 🍽️ when its Cook has served and checks passed on the frozen heads
 6. ⏳ while validating or working alone on a batch without PRs
 
 For a batch without PRs, finishing the Chef's own work satisfies its checks, merge and merged facts. A release is done when completed, not required or cut by Pascal.
@@ -68,16 +68,7 @@ Head Chef, in priority order:
 3. ⏳ while any in-scope batch is unfinished, launched or not
 4. ⛳ when at least one batch was delivered and no Stop came; otherwise ⏹️. A batch Pascal cuts leaves the count
 
-The Head Chef counts delivered batches over batches in scope. The Chef counts served Cooks over Cooks in scope. A Cook whose cards were all cut leaves the Chef's count; a cut batch leaves the Head Chef's count. A stopped thread keeps the count it had. A replaced thread leaves the tree when archived, and its replacement takes the slot. Only `⛳ Batch delivered` increments the Head Chef's numerator. The `Batch merged` notice does not.
-
-### After-merge slots
-
-A slot whose cards can start only after other stacks of its batch merge, such as a check on the merged program, waits as `queued_after_merge`. Align marks those cards in the Chef's Plan with a line `After merge: <cards>, after <cards>`. The Chef gives them their own slot and records the slots they wait for as `afterMerge = ["<b>.<c>"]` in `watch.toml`. The slot is live and counted, so ⛳ still needs x/x.
-
-- It names only stacks of its batch that wait for no merge themselves. A chain of waits goes to a later batch
-- The served stacks merge before it, in order, once every counted Cook that has not served is `queued_after_merge` and names only served stacks. A Cook that builds or asks, or any other unlaunched slot, holds the merge: every other counted Cook still serves before it
-- That round spends its approval. After its last merge and deploy, the Chef tells the merged Cooks `merged`, has them close and confirms they settled. Then it creates each waiting slot's worktree from a fresh `origin/HEAD` and launches its Cook, as [chef-run](sop/chef-run.md#run) steps 3 and 4 say. Its stack merges in a later round, on a merge decision for its own heads
-- `Batch merged` goes after the last round
+The Head Chef counts delivered batches over batches in scope. The Chef counts its served Cook over its one Cook in scope, `0/1` or `1/1`. A Cook whose cards were all cut leaves the Chef's count; a cut batch leaves the Head Chef's count. A stopped thread keeps the count it had. A replaced thread leaves the tree when archived, and its replacement takes the slot. Only `⛳ Batch delivered` increments the Head Chef's numerator. The `Batch merged` notice does not.
 
 ## Messages
 
@@ -88,7 +79,7 @@ Send an answer or a relay with `t3_thread_send` `mode: "auto"` and a `clientRequ
 | Message | From → to | Effect |
 |---|---|---|
 | 🍽️ Stack ready | Cook → Chef | Cook freezes its stack; Chef validates |
-| 🍽️ Batch ready | Chef → Head Chef | Chef waits for a merge decision at x/x, or below it only by after-merge slots |
+| 🍽️ Batch ready | Chef → Head Chef | Chef waits for a merge decision at 1/1 |
 | 🔀 Merge | Head Chef → Chef | Approves the frozen stack heads |
 | 🔀 Batch merging | Chef → Head Chef | Notifies a merge that the merge rule allows |
 | Batch merged, with deploy results | Chef → Head Chef | Records merge progress, without counting delivery |
@@ -108,7 +99,7 @@ Apply this table without asking. Only the items in Asking Pascal go to Pascal. A
 
 | Choice | Rule | Decides |
 |---|---|---|
-| Parallel or serial | If the groups touch disjoint files and have no dependency, run them in parallel. If you have a doubt, run them in series. Stay within `max-parallel` and `max-cooks`. Never run two batches of one repository at the same time | Head Chef for batches, Chef for Cooks |
+| Parallel or serial | If batches touch disjoint files and have no dependency, run them in parallel. If you have a doubt, run them in series. Stay within `max-parallel`. Never run two batches of one repository at the same time. A batch has one Cook, which implements its cards in the Plan's order. A card that can start only after another card merges goes to a later batch of the same repository | Head Chef |
 | Merge | Apply Pareto 90-10 to the work left: focus on the few gaps that could change the outcome, not low-impact polish. Return an open `Act on` finding to Fix. Merge with `🔀 Batch merging` only when all of these gates hold: required checks pass on the frozen heads; every acceptance criterion of the cards it merges has its evidence; reverting the batch's PRs alone would undo the work, with no data migration, data deletion, or change to secrets, auth or billing; the merge deploys nothing that reaches the public, such as a site or a live service, while a deploy to Pascal's machines does not count and a required release follows the Release row; and your Pareto verdict, challenged with 🧰 andy-mode ; sparring, is that the remaining risk cannot change the result. State your confidence, evidence and low-impact remainder in the Report. If a gate still fails after you try to resolve it, send `🍽️ Batch ready` with that gate and your recommendation; the Head Chef answers what the agreed requirements or specs settle and asks Pascal one `🙋 merge` question only for the rest | Chef |
 | Release | If the `AGENTS.md` or release doc of the repository requires a release after a merge, release. Otherwise, do not release | Head Chef, at Align |
 | Docs | Put the doc change of a card in the layer of that card. Open a top docs PR only for docs that no card owns | Cook |
@@ -141,7 +132,7 @@ Read only the SOP for your current role and step, plus each section it links to.
 | SOP | Read when |
 |---|---|
 | [head-chef](sop/head-chef.md) | Coordinating the run |
-| [chef-run](sop/chef-run.md) | Launching Cooks, following progress or relaying Stop |
+| [chef-run](sop/chef-run.md) | Launching the Cook, following progress or relaying Stop |
 | [chef-closing](sop/chef-closing.md) | Validating a stack, merging or closing the batch |
 | [cook-implement](sop/cook-implement.md) | Implementing, fixing, documenting, reporting, stopping or running retros |
 | [cook-review](sop/cook-review.md) | Delegating reviews or triaging results and watch wakes |
@@ -162,10 +153,10 @@ Copy the table and check off your role's steps:
 | # | Step | Owner and SOP |
 |---|---|---|
 | 0 | Align and arm Watchdog | Head Chef and Pascal, `head-chef` |
-| 1 | Implement, diagnose first for bug cards | Cook, `cook-implement` |
-| 2 | manic-1 and manic-2 side by side through interrogate | Cook leads, delegates and triages, `cook-review` |
+| 1 | Implement every card, diagnose first for bug cards | Cook, `cook-implement` |
+| 2 | manic-1 and manic-2 side by side through interrogate, on the whole stack | Cook leads, delegates and triages, `cook-review` |
 | 3 | Docs | Cook, `cook-implement` Docs |
-| 4 | manic-3 and manic-5 side by side through interrogate | Cook leads, delegates and triages, `cook-review`; manic-3 uses technical-writing |
+| 4 | manic-3 and manic-5 side by side through interrogate, on the whole stack | Cook leads, delegates and triages, `cook-review`; manic-3 uses technical-writing |
 | 5 | Validation and merge | Chef, `chef-closing`; Head Chef for held batches |
 | 6 | Closing and remove Watchdogs | Head Chef, Chef and Cook, `head-chef`, `chef-closing` and `cook-implement` Retros |
 
@@ -173,7 +164,7 @@ For a batch that opens no PR, its Chef does the work alone, skips steps 1 to 5, 
 
 ## Shared rules
 
-- One PR per verifiable unit, in one stack per Cook and repository with 🧰 gh-stack, even for independent cards. Assign each PR to `pr-assignee`
+- One PR per card, in one stack with 🧰 gh-stack, even for independent cards. Assign each PR to `pr-assignee`
 - The Cook is the sole writer in its worktree and owns every restack. The Chef uses it for merging only after the Cook reports a clean, pushed checkout
 - Before a reviewer probe patches an installed dependency, the reviewer asks the Cook for a package copy. The Cook copies it into a separate private scratch directory for each reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged. Add this requirement to every reviewer's brief
 - While a delegate reads your worktree directly, such as a Verify run that must see uncommitted changes, leave its files, index and checked-out commit unchanged until `task_status` shows that every such delegate has finished or been cancelled. A delegate that reads its own detached worktree does not freeze yours
@@ -205,7 +196,7 @@ The Head Chef selects `[chef]`, the Chef selects `[cook]`, and the Cook selects 
 
 ## Report
 
-Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a message in its own thread that starts with `Detail · <role and id>`, such as `Detail · Cook 1.2 7f3a`. Name the frozen heads it covers. A Cook gives each acceptance criterion of its cards with its evidence. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
+Before sending `🍽️ Stack ready`, `🍽️ Batch ready`, `🔀 Batch merging` or a final outcome, each Cook and Chef posts a message in its own thread that starts with `Detail · <role and id>`, such as `Detail · Cook 1.1 7f3a`. Name the frozen heads it covers. A Cook gives each acceptance criterion of its cards with its evidence. Record review rounds, accepted, `Consider` and rejected findings with reasons, skipped steps, gaps not filed, and exceptional decisions. Post a new `Detail` after a changed head. The parent reads that thread and cites its threadId, but does not copy the Detail. The Detail survives work-folder cleanup.
 
 A Report message uses only its field set below. It has a maximum of 8 lines and 1200 characters, plus its `🙋` lines.
 
@@ -226,7 +217,7 @@ Confidence: <level, evidence and remaining risk>
 Detail: <Cook threadId>
 ```
 
-`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on every Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give the PR range only for a partial outcome.
+`🍽️ Batch ready` or `🔀 Batch merging`, Chef → Head Chef: replace the Cook template's first line with the Chef role and message. Use the batch's PR range, your confidence based on the Cook's evidence and `Detail: <Chef threadId>`. Add `For Pascal: <🙋 lines, or none>`. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send the outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give the PR range only for a partial outcome.
 
 Head Chef → Pascal, in Canadian French. At Align, send the Align plan below, then any open `🙋` lines. Repeat the `Lot` block for each batch in launch order, with one line per acceptance criterion, and omit an empty line. The Align plan has no line limit. For a later ask, send only the `🙋` lines.
 
@@ -234,7 +225,6 @@ Head Chef → Pascal, in Canadian French. At Align, send the Align plan below, t
 Je veux <goal>, pour régler <problem>
 Lot <b> · <repository> · après <batches, or aucun> · release <oui/non>
 - <card> : <acceptance criterion> → <evidence that will prove it>
-Après fusion : <cards>, après <cards>
 Pour toi : <Pascal-owned cards>
 ```
 
@@ -246,4 +236,4 @@ PR fusionnées : <#<n>–#<n>, or aucune>
 Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 
-`📍` progress, Cook → Chef, at the end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist.
+`📍` progress, Cook → Chef, at the end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist. Step 1 sends one line per card. Steps 2 to 6 cover the whole stack: send one line with `stack` as `<card>` and the top PR's URL.
