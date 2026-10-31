@@ -98,6 +98,7 @@ A mode's routes run through that mode's SKILL.md.
 - `2nd-pass`: Use when the user asks for a `2pass` or a second pass, fresh-eyes review, final cleanliness check, or pre-delivery audit of work and related artifacts.
 - `asd-ste100`: Use when a request asks to write, rewrite, or review an English spec, GitHub issue, or idea in ASD-STE100 Simplified Technical English (STE), or cites an `STE_NN` checklist ID.
 - `brainstorm`: Use only when explicitly invoked as `brainstorm`.
+- `colorfigures`: Use when someone wants a colourful, hand-drawn or sketchy isometric figure of an everyday object or machine, such as a toaster, kettle, lamp, or claw machine; a Colorfigures figure; a "how does X work" or "what's inside X" cutaway; or a clickable object illustration as one HTML page. For a precise technical figure that explains an idea, use anatomy.
 - `concise`: Use when the user requests to be more concise.
 - `feel-me`: Use when explicitly invoked as `feel me`, `same page`, or `same foot`, or when the user says they want to be on the same page or aligned with the agent.
 - `frontend-design`: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
