@@ -88,6 +88,7 @@ A mode's routes run through that mode's SKILL.md.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
 - `modernize`: For getting old prs up to date. Use when asked to rebase a pr or "modernize".
 - `sol-loop`: Use when the user says 'sol loop' or 'better call sol'.
+- `statechart`: Use only when explicitly invoked as `statechart`.
 - `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
 - `verify-transcript`: Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check.
