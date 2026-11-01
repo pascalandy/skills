@@ -64,6 +64,7 @@ A mode's routes run through that mode's SKILL.md.
 - `automate-me`: Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow.
 - `babysit-pr`: Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR.
 - `blast-radius`: Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust.
+- `codex-loop`: Use when the user says 'codex loop' 'sol loop' or 'better call sol'.
 - `coding-eng-laws`: Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned.
 - `coding-language`: Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code.
 - `coding-standard`: Use when designing, implementing, or reviewing an agent-friendly CLI, including commands, flags, help text, output, errors, and safety behavior.
@@ -87,7 +88,6 @@ A mode's routes run through that mode's SKILL.md.
 - `leaving-pr-comments`: Use whenever leaving comments on GitHub.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
 - `modernize`: For getting old prs up to date. Use when asked to rebase a pr or "modernize".
-- `sol-loop`: Use when the user says 'sol loop' or 'better call sol'.
 - `statechart`: Use only when explicitly invoked as `statechart`.
 - `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
