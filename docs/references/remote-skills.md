@@ -88,11 +88,15 @@ A mode's routes run through that mode's SKILL.md.
   - `video`: When the user wants to create, generate, or produce video content using AI tools or programmatic frameworks.
 - `html-mode`: Use for standalone HTML artifacts or HTML presentations, including shorthand such as 'plan; html'. Exclude ordinary application code changes.
   - `artifact`: Build a standalone HTML report, explainer, landing page, tool, or data story without a narrower playbook.
-  - `diagram`: Draw an HTML diagram that shows how components, events, states, or concepts relate.
+  - `diagram`: Choose the diagram that best shows how components, events, states, or concepts relate, then draw it in an HTML page.
+  - `graphviz`: Draw a Graphviz lane diagram and show it in an HTML page.
   - `interactive-page`: Build pages readers move through, such as guided reading pages from documents or journeys with maps that follow reading.
+  - `mermaid`: Draw a Mermaid diagram whose source must also render on GitHub or Obsidian, and show it in an HTML page.
+  - `pele`: Draw a diagram in Mermaid syntax with pele and show it in an HTML page.
   - `plan`: Turn a work plan into an HTML document that shows its commitments, order, owners, dependencies, and risks.
   - `prototype`: Build a polished HTML mockup or a working prototype of a bounded product flow.
   - `slides`: Build an HTML slide deck with reveal.js that tells one story a screen at a time.
+  - `statechart`: Draw a statechart that TLC checks, and show it in an HTML page with the rules that break.
   - `wireframe`: Sketch low-fidelity HTML wireframes that test content, navigation, and layout before visual design.
 
 ### Skills
