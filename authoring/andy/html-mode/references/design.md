@@ -2,7 +2,7 @@
 
 Read when visual decisions remain open.
 
-## HTML communication defaults
+## Team defaults
 
 For `html-mode`, use these defaults unless user or project decisions override them.
 
