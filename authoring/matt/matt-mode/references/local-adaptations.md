@@ -28,16 +28,44 @@ For `handoff`, follow the `handoff` skill's destination rule, which replaces its
 
 Use the complete upstream spec and ticket templates, with these adaptations:
 
+- Arrange every section of the spec in the layout below. Keep the headings "The problem (CMO)" and "The outcome (FMO)", and do not explain CMO or FMO in the body
+- Write the visible part, above For the agent, for the end user who decides: short sentences and plain words. The agent doing the work reads the details
 - In the spec's Problem Statement, restate the user's goal and the problem in your own words
 - Number the spec's user stories `US_101`, `US_102`, and onward, as `- US_101: As an <actor>, I want a <feature>, so that <benefit>`. List the use cases, including edge cases, under User Stories
 - Answer N/A in a section that does not apply, unless the template says to omit it, and add a section when the work needs one
-- For specs, replace Further Notes with this block and carry its notes over; for tickets, append the block. It holds what the agent doing the work needs and the other sections do not cover; the human reading the issue can skip it
+- For tickets, append the For the agent block without its Implementation Decisions and Testing Decisions
 
 ```md
+## The problem (CMO)
+
+### Problem Statement
+
+REF: <#N in the issue's repository, owner/repo#N in another>
+
+## The outcome (FMO)
+
+### Solution
+
+### User Stories
+
+### Out of Scope
+
+## How we'll know it works
+
+<The observable results that prove the outcome, each with the command, scenario, or artifact that checks it>
+
 ## 👨🏻‍🍳 For the agent
 
 <details>
 <summary>👨🏻‍🍳 Details</summary>
+
+### Implementation Decisions
+
+### Testing Decisions
+
+<The test seams and prior art. Do not repeat the results of How we'll know it works>
+
+### Further Notes
 
 Technical details, evidence, approaches considered, blast radius, non-functional requirements, and links to related issues or PRs.
 

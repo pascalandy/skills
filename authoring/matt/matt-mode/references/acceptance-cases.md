@@ -18,7 +18,7 @@ Use fresh independent sessions and isolated writable workspaces. Give each sessi
 | --- | --- | --- |
 | Conversation | Discuss an unclear idea without writing documents | Grounded questions, proposed terms, unchanged workspace |
 | Original route names | Say `matt-mode ; to spec` or `to tickets` | Reads the corresponding upstream procedure without teaching replacement names |
-| Spec | Settled rules and design/test-seam decisions, request a local spec | Full upstream sections, agreed decisions and testing included, no restarted interview or external publication |
+| Spec | Settled rules and design/test-seam decisions, request a local spec | Every upstream section in the CMO, FMO, How we'll know it works, and For the agent layout, agreed decisions and testing included, no restarted interview or external publication |
 | Draft spec | One unresolved product or technical decision | Visible blocker, no invented agreement or false ready status |
 | Tickets | Defined scope, authority to choose granularity and write local tickets | Verifiable vertical slices, justified blockers, one file per ticket, no repeated approval |
 | Wide refactor | A mechanical migration cannot land as green vertical slices | Uses the upstream wide-refactor exception, preserving actual migration constraints |
