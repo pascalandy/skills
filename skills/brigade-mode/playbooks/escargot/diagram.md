@@ -78,7 +78,7 @@ sequenceDiagram
     end
     K->>K: End turn, then interrogate lead judgment
     Note over C,K: Act on: accept#59; Consider: 🍽️ for Chef<br>Noted and Dismissed: reject with reason
-    Note over C,K: Both review pairs: fix and rerun within max-passes<br>Last allowed pass with any fix: one final limited pass
+    Note over C,K: Both review pairs: fix and rerun within max-passes#59; nits stay Consider<br>Last allowed pass fixes a critical or warning: one final delta pass
     Note over H,K: Step 5: Validation and merge
     K-->>C: Agent: 🍽️ Stack ready, report,<br>branch heads, clean and pushed <-
     K->>K: Freeze, forward watch findings only
