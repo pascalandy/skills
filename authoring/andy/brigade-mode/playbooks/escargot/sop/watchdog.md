@@ -13,7 +13,7 @@ Parent: threadId <id>, projectId <id>, provider <provider>
 Watch file: <absolute parent work folder>/watch.toml
 Wake file: <absolute watchdog work folder>/wake.toml
 Work folder: <absolute watchdog work folder>
-Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>, max-wait-minutes <n>
+Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>
 Rules: <rules.md path>
 ```
 
@@ -47,7 +47,7 @@ reportReceived = false
 
 Keep in `wake.toml`, per slot, the counted failure wakes, counted stall wakes and the title for that stall series. Also keep the last pending finding and its consecutive tick count, and the last delivered alert. A finding key includes the slot, current threadId, kind and relevant status or title; changing threadId starts new counters. Derive a stable `clientRequestId` from `scheduleId`, that key and the saved `nextWakeOrdinal` for a wake, or from `scheduleId` and the key for an alert. Advance the ordinal and count a wake only after T3 confirms delivery; mark an alert delivered only after confirmation. If delivery is uncertain, recompute the live finding next tick and retry with the same id only while it still applies. The parent and Watchdog write their respective files through a temporary file in the same folder followed by an atomic rename. Use `scheduleId` and `nextWakeOrdinal` at the root. In each `[[slots]]`, use `slot`, `threadId`, `failureWakes`, `stallWakes`, `stallTitle`, `pendingFinding`, `pendingTicks` and `alertedFinding`. Add no other key. Write the file only when a value changes. Read each threadId from `watch.toml`. Never build a threadId.
 
-A watched status is 🍳, 🔀, 🧹 or 🟢, or ⏳ for a Chef with no counted Cook on 🍳 or ⏸️. A watched thread writes `<its work folder>/wait` before it ends a turn on a watched status to wait. It can wait for delegates, a PR watch, a check or a child. Write the dependency, its task or thread ids and the current time after setting the title, and refresh it when the wait remains active. Remove it when the wait ends. For an idle stalled candidate, read with `t3_thread_read` the `startedAt` of its newest run that has one. The wait file protects it only when its modification time is at or after that turn's start and its age is less than `max-wait-minutes`. T3 updates the thread after the turn ends, so comparing the file to the thread's last update would reject a wait written during that turn.
+Only a Cook on 🍳 can stall. A Head Chef or Chef waits on its children by design and is never stalled. For an idle Cook candidate, call `t3_thread_list` in its project with `includeSubagents: true` and keep the threads whose `parentThreadId` is the Cook's threadId, following `nextCursor` until the list ends. A child that is starting, running or waiting means the Cook waits on its delegates, not a stall.
 
 Final phases: a Head Chef or Chef on ⛳ or ⏹️; a Cook on ⏹️, or on 🍽️ only after T3 shows it settled. An unsettled Cook on 🍽️ is live readiness, not an unreported end. All other phases are live.
 
@@ -70,9 +70,9 @@ First matching line for a watched thread:
 1. **Replaced or accounted final:** Skip a slot with `replacedBy`, or a final phase whose final report was received. A Cook's 🍽️ at readiness is still live until Closing and settlement. Clear its pending finding
 2. **Interrupted:** If the list shows `cancelled`, read the exact thread. Ignore cancelled runs with no `startedAt`; they never ran and prove neither an interruption nor F9. Judge the newest remaining run. An older cancelled run followed by a newer run is transient. If the judged run is cancelled, leave an interrupted Head Chef alone and record no F9; Pascal may have stopped it. For an interrupted Chef or Cook, alert the parent once with `🐕 Watchdog <id4>: interrupted <slot> <threadId>`. Never wake an interrupted thread. If a Chef's or Cook's live title persists past F9's window, alert F9 as a changed finding
 3. **Failed:** If the latest activity names a usage or rate limit, send a wake without incrementing the failure count, and retry on later ticks until it runs. Otherwise wake up to `max-wakes` counted times, then alert the parent once; if the live title persists past F9's window, alert F9 as a changed finding. For a failed Head Chef past the limit, rename its title to `Head Chef <id4> <done>/<batches> ❓ fault Head Chef down <subject>` instead of sending an alert to the failed parent. Preserve the count and subject from its watch file. If cross-thread rename fails, send the fault message to the Head Chef's thread; Pascal then uses T3's failed state on the pinned row as the fallback signal. If a Head Chef failure stops this schedule, drop self-watch and use that same pinned-row fallback
-4. **Stalled:** An idle, unsettled thread on a watched status is stalled at `stall-minutes` unless it has a fresh wait file. A parent on 🔀 or 🧹 with a nonfinal child is waiting by design. Wake up to `max-wakes` times for the same title, then alert the parent once. Reset that stall count when the title changes
-5. **Unreported end:** If the role's phase is final as defined above or T3 says settled, and `reportReceived` is false, hold this finding for two consecutive ticks, then alert the parent once to reconcile the report
-6. **Forbidden combination:** Hold an F1–F11 finding below for two consecutive ticks, then alert the parent once
+4. **Stalled:** An idle, unsettled Cook on 🍳 with no active child, as Files defines, is stalled once its last update is `stall-minutes` old. Wake up to `max-wakes` times for the same title, then alert the parent once. Reset that stall count when the title changes
+5. **Unreported end:** If T3 says the slot settled and `reportReceived` is false, hold this finding for two consecutive ticks, then alert the parent once to reconcile the report. An unsettled thread never matches, whatever its title, such as a Cook running its retros
+6. **Forbidden combination:** Hold an F2, F3, F4 or F9 finding below for two consecutive ticks, then alert the parent once
 
 An ordinary completed turn after a failure wake resets the failure count. A different finding clears the previous pending count. An alert repeats only if its finding key changes. Treat a missing current thread as an unreported end finding and ask the parent to reconcile it; never relaunch a child yourself.
 
@@ -96,21 +96,14 @@ To read the last run, call `t3_thread_read` on the schedule's `boundThreadId` wi
 
 ## Forbidden combinations at rest
 
-Check these against the title and received phases in `watch.toml`. At rest means no thread is mid-turn and no report is in flight. A two-tick observation gives an in-flight handoff time to settle. A hold in the watch file permits F5's exception.
+Check these against the title and received phases in `watch.toml`. At rest means no thread is mid-turn and no report is in flight. A two-tick observation gives an in-flight handoff time to settle. Each row signals a stuck or orphaned slot; the numbers match the rows of carpaccio and dolma.
 
 | # | Finding |
 |---|---|
-| F1 | Head Chef ⏸️ |
 | F2 | Head Chef final while a Chef is not final |
 | F3 | Chef final while a Cook is not final |
 | F4 | A settled thread on a live status |
-| F5 | Chef 🍽️ while Head Chef is not ❓, outside a hold |
-| F6 | Chef 🍽️ below 1/1 |
-| F7 | A child ⏸️ under an idle parent on ⏳ |
-| F8 | ❓ on a Chef or a Cook |
 | F9 | A failed or interrupted Chef or Cook past `max-wakes` × `watch-minutes` with a live title |
-| F10 | A parent ⛳ below x/x |
-| F11 | A Chef on 🔀 or 🧹 with a Cook on 🍳 or ⏸️ |
 
 ## Removal and replacement
 

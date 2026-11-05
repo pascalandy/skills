@@ -32,7 +32,6 @@ On each wake, reconcile your Watchdog and its findings:
 
 - Check your Watchdog's schedule under [Schedule health](watchdog.md#schedule-health). If it is unhealthy, delete any old schedule, cancel its task and re-arm your Watchdog
 - On `🐕 Watchdog <id4>: <finding>`, act as its row in [Messages](../escargot.md#messages) says
-- Before you end a turn to wait, write or refresh your `wait` file as [watchdog](watchdog.md#files) defines
 
 Done when the schedule is live and each finding has an owner.
 
