@@ -5,8 +5,8 @@ Keep the batch registry in `watch.toml` in your work folder: batch number, name,
 ## Align
 
 1. Rename yourself `Head Chef <id4> 0/0 🟢 <subject>` and pin yourself before asking Pascal anything. If pinning fails, retry and tell Pascal in your message. Create `watch.toml` with your own slot, then arm your 🐕 Watchdog with [watchdog](watchdog.md#arm) after pinning. Done when the pinned title matches the current work or wait and the Watchdog reported its schedule id
-2. Write the goal and the problem in Pascal's words and each card's acceptance criteria, then split the plan into batches in dependency order, one repository each. For each batch, decide release with [Decisions](../escargot.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan. Put each card that can start only after another card merges in a later batch of the same repository. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
-3. Send the Align plan from [Report](../escargot.md#report), then go to Launch in the same turn. Show `❓ align` only for a question that the plan, the issues and the agreed requirements leave open, and meanwhile launch the batches that do not depend on its answer. Done when each batch that waits on no open question is launched or queued under Launch
+2. Write the goal and the problem in Pascal's words and each card's acceptance criteria, then split the plan into batches in dependency order, one repository each. A batch whose checks need another batch's release depends on that batch. For each batch, decide release with [Decisions](../escargot.md#decisions). Record only overrides and exceptional calls in your thread's Detail. Mark each Pascal-owned card in the Plan. For a merge gate that a batch's own cards will fail, such as a change to a licence file, draft an advance authorization that names the batch, the gate exception, its scope and its conditions. Put each card that can start only after another card merges in a later batch of the same repository. Set `Fast track` from the invocation or a request from Pascal; otherwise set it to no. Write `rules.md` as Shared rules tell. Update the title with the in-scope batch count. Done when the batches, choices and title agree
+3. Send the Align plan from [Report](../escargot.md#report), then go to Launch in the same turn. Show `❓ align` only for a question that the plan, the issues and the agreed requirements leave open, or for an advance authorization Pascal has not answered, and meanwhile launch the batches that do not depend on its answer. A batch whose advance authorization waits launches with `none`; relay Pascal's approval to its Chef with `t3_thread_send` when it comes. Done when each batch that waits on no open question is launched or queued under Launch
 
 ## Launch
 
@@ -20,6 +20,7 @@ $brigade-mode ; escargot ; chef-run
 Role: Chef <b> <id4>. Report only to Head Chef, threadId <full threadId>, with t3_thread_send.
 Batch: <b>, <name>, repository <absolute clone path>
 Plan: <goal, cards with acceptance criteria, threat model and dependencies>
+Advance authorization: <gate exception, scope and conditions Pascal approved at Align, or none>
 Release: <yes/no, per Decisions>
 Fast track: <yes/no>
 Rules: <rules.md path, plus additions>
