@@ -22,10 +22,9 @@ retro = true # Chef: request Cook retros
 [watchdog]
 watch-on-claude = { instance = "claudeAgent", model = "claude-haiku-5-5", reasoning-level = "high" } # Head Chef or Chef on Claude: same-provider Watchdog
 watch-on-codex = { instance = "codex", model = "gpt-6-luna", reasoning-level = "high" } # Head Chef or Chef on Codex: same-provider Watchdog
-watch-minutes = 5 # Watchdog: schedule interval
-stall-minutes = 30 # Watchdog: idle threshold
+watch-minutes = 15 # Watchdog: schedule interval
+stall-minutes = 60 # Watchdog: idle threshold for a Cook on 🍳
 max-wakes = 2 # Watchdog: counted wakes before alert
-max-wait-minutes = 120 # Watchdog: maximum age of a declared wait
 
 [manic-1] # Cook: step 2, beside manic-2
 cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }

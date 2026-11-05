@@ -27,8 +27,6 @@ On each wake while your phase is live, reconstruct a missing or unreadable `watc
 
 On `🐕 Watchdog <id4>: <finding>`, act as its row in [Messages](../escargot.md#messages) says.
 
-Before you end a turn to wait, write or refresh your `wait` file as [watchdog](watchdog.md#files) defines.
-
 Done when each finding has an owner and any required schedule is live.
 
 Return a worktree for Fix when a finding, changed diff or merge failure withdraws readiness. Tell the Head Chef when a previously ready batch loses readiness. Count each return of the same stack for the same cause; at `max-returns`, show ⏸️ and send the history to the Head Chef as a fault. Done when the Cook either sends fresh `🍽️ Stack ready` or the fault has an owner.

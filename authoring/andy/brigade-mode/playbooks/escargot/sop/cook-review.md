@@ -8,11 +8,9 @@ The Cook stays 🍳 during barrages and triage. Apply [Statuses and Messages](..
 2. Delegate each review pair:
    - For each pass, call `delegate_task` with `mode: "async"`, `role: "review"`, the target and the brief below. Copy the barrage title from Roles word for word
    - Use `clientRequestId: <id4>-<b>.<c>-<sop>-<k>`; `<k>` counts this Cook's delegations from 1 without resetting. Reuse the key only to retry that call
-   - Retain each taskId. Submit a pair in the same turn
-   - Write `<work folder>/wait` with both taskIds, then end your turn for completion notifications
-   - When both results arrive, remove the wait file
+   - Retain each taskId. Submit a pair in the same turn, then end your turn for completion notifications
 
-   Done when every requested pass has a taskId and the wait file names every active pass
+   Done when every requested pass has a taskId
 
 ```text
 $brigade-mode ; escargot ; <sop>

@@ -14,7 +14,7 @@ Each step starts with its number and name. Chat messages start with `USER:` or `
 %%{init: {"sequence": {"diagramMarginX": 100}}}%%
 sequenceDiagram
     accTitle: CU1 Statuses and Watchdogs
-    accDescr: The Head Chef alone asks Pascal. Parent Watchdogs wake stalled children or report faults. Chefs validate, merge, release and close before the Head Chef counts delivery.
+    accDescr: The Head Chef alone asks Pascal. Parent Watchdogs wake failed children and stalled Cooks or report faults. Chefs validate, merge, release and close before the Head Chef counts delivery.
     autonumber
     actor U as USER
     participant H as Head Chef
@@ -45,7 +45,7 @@ sequenceDiagram
         C->>C: Watchdog queues one Cook wake<br>then alerts Chef after max-wakes
         C->>C: Reconcile effects, resume<br>or replace Cook in its slot
     end
-    opt Chef stalls or fails
+    opt Chef fails or is interrupted
         H->>H: Watchdog queues one Chef wake<br>then alerts Head Chef after max-wakes
         H->>H: Reconcile effects, resume<br>or replace Chef in its slot
     end

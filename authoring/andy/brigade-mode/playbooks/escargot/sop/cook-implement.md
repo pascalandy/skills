@@ -2,8 +2,6 @@
 
 Follow Implement, the review pairs, Docs and Ready in process order. Run Fix, Stop or Closing when their trigger arrives. Apply [Statuses and Messages](../escargot.md#statuses) at phase entry and turn end.
 
-Before you end a turn to wait, write or refresh your `wait` file as [watchdog](watchdog.md#files) defines.
-
 ## Implement
 
 1. Show 🍳. For a bug card, run 🧰 diagnose before reading source code. Route its one question for Pascal up the chain through the Chef and show ⏸️ until the answer comes. Implement every card of the batch in the Plan's order under the shared rules, one PR per card, commit as you go and open the PRs. With 🧰 label-for-issues, set each card to `1-wip-by-agent` when you start it and read the labels back. Name each layer above your worktree's branch `<branch>-<concern>`, where `<branch>` is the branch the Chef created for you. Run the checks for other machines as [Decisions](../escargot.md#decisions) tells. Apply shared Model selection for delegated side work. Copy the side delegate's title from Roles word for word. Done when every acceptance criterion of every card is met with its evidence and checks are green, or the card is reported blocked with its reason

@@ -19,7 +19,7 @@ description: "Run batches under a Head Chef: one Cook per batch implements every
 | Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, launches and guides Chefs, resumes coordination on escalation. Never edits a repository or opens a PR, even after Close |
 | Chef | Thread in the batch's repository project | `🚥 Chef <b> <id4> [<served>/<cooks>] <status> <batch>` | ⏳ 🔀 🧹 🍽️ ⏸️ ⛳ ⏹️ | Creates the batch's worktree, launches its one Cook, validates, merges, releases and closes. Never edits code |
 | Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.<c> <id4> <status> <batch>` | 🍳 🧹 🍽️ ⏸️ ⏹️ | Implements every card of its batch, one PR per card in one stack, and owns watches, docs, barrage delegation and triage, then reports readiness. Leaves merging to the Chef |
-| Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed or stalled threads and alerts its parent when repair is needed |
+| Watchdog | Head Chef's or Chef's delegate | `🐕 Watchdog · Head Chef <id4>` or `🐕 Watchdog · Chef <b> <id4>` | none | Ticks in its own thread, wakes failed threads and stalled Cooks and alerts its parent when repair is needed |
 | Barrage | Cook's delegate | `👀 <sop> · Cook <b>.<c> <id4>` | none | Reviews under the contract in its brief |
 | Side delegate | Cook's delegate | `🔧 <task> · Cook <b>.<c> <id4>` | none | Runs side work the Cook delegates, such as the repository's Verify |
 
