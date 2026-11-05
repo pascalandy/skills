@@ -45,7 +45,7 @@ sequenceDiagram
         C->>C: Watchdog queues one Cook wake<br>then alerts Chef after max-wakes
         C->>C: Reconcile effects, resume<br>or replace Cook in its slot
     end
-    opt Chef fails or is interrupted
+    opt Chef fails
         H->>H: Watchdog queues one Chef wake<br>then alerts Head Chef after max-wakes
         H->>H: Reconcile effects, resume<br>or replace Chef in its slot
     end
