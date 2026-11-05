@@ -65,6 +65,7 @@ A mode's routes run through that mode's SKILL.md.
 - `automate-me`: Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow.
 - `babysit-pr`: Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR.
 - `blast-radius`: Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust.
+- `cc-loop`: Use when the user says 'cc loop', 'claude loop', 'opus loop', or 'better call opus'.
 - `codex-loop`: Use when the user says 'codex loop' 'sol loop' or 'better call sol'.
 - `coding-eng-laws`: Use when analyzing code, architecture, team, or planning decisions using software engineering laws and principles, or when `coding-eng-laws` is mentioned.
 - `coding-language`: Use when writing, debugging, linting, or reviewing Bash, Python, TypeScript, JavaScript-with-types, or Starlette/ASGI code.
@@ -104,6 +105,7 @@ A mode's routes run through that mode's SKILL.md.
 - `principle-prove-it-works`: Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.'
 - `recall`: Use only when explicitly invoked as `recall`.
 - `reflect`: Use only when explicitly invoked as `reflect`.
+- `review-loop`: Use when the user says 'review loop', or when codex-loop or cc-loop hands over its reviewer.
 - `show-me-your-work`: Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away.
 - `swarm`: Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration.
 - `tdd`: Use only when explicitly invoked as `tdd`.
