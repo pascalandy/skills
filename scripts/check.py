@@ -233,6 +233,7 @@ HEADLESS = "authoring/andy/headless/scripts"
 ANDY_MODE = "authoring/andy/andy-mode"
 BRIGADE_REPLAY = "authoring/andy/brigade-mode/scripts/replay"
 COREY_MODE = "authoring/corey-mode/scripts"
+GIT_LOCAL = "authoring/andy/git-local/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
 EVAL_RUNNER = f"{WRITING_FOR_AGENTS}/scripts/run_evals.py"
 # Every compiled skill, so a new skill is validated without a new row
@@ -386,6 +387,12 @@ CHECKS = [
         pyright(COREY_MODE),
         pytest(f"{COREY_MODE}/tests"),
         uv_run(f"{COREY_MODE}/update_corey_mode.py", "check"),
+    ),
+    Check(
+        "git-local",
+        *ruff(GIT_LOCAL),
+        pyright(GIT_LOCAL),
+        pytest(f"{GIT_LOCAL}/tests"),
     ),
     Check(
         "brigade-replay",

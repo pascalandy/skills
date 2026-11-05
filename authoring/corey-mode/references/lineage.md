@@ -18,24 +18,23 @@ Upstream `tools/`, `evals/`, the README, `AGENTS.md`, `VERSIONS.md`, and the plu
 
 ## Refresh from upstream
 
-The source is the opensrc snapshot of `coreyhaines31/marketingskills`. Its revision comes from the cache's `sync-state.json`. The importer requires `--upstream` to match that repository's path in `sources.json`. Before changing the package, it reads the adjacent `sync-state.json` and rejects a `--revision` that differs from the recorded `commitSha`. Missing or invalid cache metadata stops `update` and `check --upstream`.
+The source is the opensrc snapshot of `coreyhaines31/marketingskills`. The importer reads it from disk, so run these steps on the machine that holds the cache, in a checkout of this skills repository. It requires `--upstream` to match that repository's path in the cache's `sources.json`; a missing or invalid registry stops `update` and `check --upstream`. An opensrc snapshot records no commit, so `--revision` comes from GitHub right after the refresh.
 
-1. Load `git-local` and follow its workflow for `coreyhaines31/marketingskills`. Keep its validated `OPENSRC_HOME` and `OPENSRC_ROOT` in the same shell for the commands below
-2. Confirm `jq --version`. If it is missing, stop and give the user `mise use -g jq` on Linux or `brew install jq` on macOS
-3. If `git-local` fetched the snapshot directly, run the cache's refresh recipe below to record its commit. Continue only on success. Otherwise, proceed to step 4
-
-```sh
-OPENSRC_HOME="$OPENSRC_HOME" just --justfile "$OPENSRC_ROOT/justfile" --working-directory "$OPENSRC_ROOT" opensrc-sync coreyhaines31/marketingskills
-```
-
-4. From this skills repository checkout, resolve the snapshot path and revision. Stop if either lookup fails or returns no value
+1. Confirm `jq --version` and `gh auth status`. If one is missing, stop and give the user `mise use -g jq` or `mise use -g gh` on Linux, or `brew install jq` or `brew install gh` on macOS
+2. Refresh the snapshot with the `git-local` script, without `--max-age`, so the copy is new. Continue only on success
 
 ```sh
-upstream="$OPENSRC_HOME/$(jq -er '.repos[] | select(.name == "github.com/coreyhaines31/marketingskills") | .path' "$OPENSRC_HOME/sources.json")"
-revision="$(jq -er '.repos["github.com/coreyhaines31/marketingskills"].commitSha' "$OPENSRC_HOME/sync-state.json")"
+answer="$(uv run authoring/andy/git-local/scripts/opensrc_sync.py coreyhaines31/marketingskills)"
 ```
 
-5. Preview the import with `--dry-run`, inspect the `changes` it answers, then apply and check it. Stop on a failed command
+3. Right after the refresh, resolve the snapshot path, then the commit of its branch on GitHub: a commit pushed upstream in between would pin links to a revision newer than the snapshot. Stop if either lookup fails or returns no value
+
+```sh
+upstream="$(printf '%s' "$answer" | jq -er '.repos[0].path')"
+revision="$(gh api repos/coreyhaines31/marketingskills/commits/main --jq .sha)"
+```
+
+4. Preview the import with `--dry-run`, inspect the `changes` it answers, then apply and check it. Stop on a failed command
 
 ```sh
 uv run authoring/corey-mode/scripts/update_corey_mode.py update --upstream "$upstream" --revision "$revision" --dry-run
@@ -48,4 +47,4 @@ just check
 
 `check` fails with `playbook without a route` when upstream adds a skill, and with `route without a playbook` when it removes one. Add or remove the row in `SKILL.md`, reading the new playbook's description for tie-breakers against its neighbors. Then replay the [routing cases](routing-cases.md).
 
-Offline, `check` compares every generated file with the lock, requires one route per playbook, rejects a nested `SKILL.md`, and resolves the links in handwritten files. With `--upstream`, it rebuilds every file from that folder and compares bytes when the snapshot revision matches the lock. On a revision mismatch, it skips rebuilding and reports the mismatch alongside package diagnostics. Neither proves how an agent routes a request.
+Offline, `check` compares every generated file with the lock, requires one route per playbook, rejects a nested `SKILL.md`, and resolves the links in handwritten files. With `--upstream`, it rebuilds every file from that folder at the lock's revision and compares bytes, so a snapshot newer than the lock shows as differences. Neither proves how an agent routes a request.

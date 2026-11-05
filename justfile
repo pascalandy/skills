@@ -58,6 +58,12 @@ remote-skills *args:
 transcript-cli *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py "$@"
 
+# Fetch or refresh repositories in the fleet's opensrc cache; without one, refresh them all
+[group('commands')]
+[no-exit-message]
+opensrc-sync *args:
+    @uv run --quiet authoring/andy/git-local/scripts/opensrc_sync.py --fleet ../skills-private/authoring/integrations/fleet/references/fleet.toml "$@"
+
 # Check that this machine's keyring holds every API key the skills name; presence, not validity
 [group('commands')]
 [no-exit-message]
