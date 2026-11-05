@@ -510,12 +510,14 @@ class Runner:
             raise ScriptError(f"cannot read the opensrc cache: {done.stderr.strip()}")
         home, _, text = done.stdout.partition("\n")
         try:
-            repos = json.loads(text)["repos"] if text.strip() else []
-        except (json.JSONDecodeError, KeyError, TypeError) as error:
+            # A registry of packages only has no "repos" key
+            repos = json.loads(text).get("repos", []) if text.strip() else []
+            by_name = {repo["name"]: repo for repo in repos}
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as error:
             raise ScriptError(
                 f"{home}/sources.json is not an opensrc registry: {error}; inspect it before running again"
             ) from error
-        return home, {repo["name"]: repo for repo in repos}
+        return home, by_name
 
 
 def stale(repo: dict[str, Any], max_age: float | None) -> bool:

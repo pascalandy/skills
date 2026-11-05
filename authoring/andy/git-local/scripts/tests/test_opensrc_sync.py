@@ -25,6 +25,7 @@ with open(os.environ["CALLS"], "a") as log:
     log.write(json.dumps({{"argv": sys.argv[1:], "cache": str(cache)}}) + "\\n")
 registry = cache / "sources.json"
 data = json.loads(registry.read_text()) if registry.exists() else {{"repos": []}}
+data.setdefault("repos", [])
 command, *args = sys.argv[1:]
 specs = [arg for arg in args if not arg.startswith("-")]
 for spec in specs:
@@ -149,6 +150,13 @@ class OpensrcSyncTests(unittest.TestCase):
             },
         )
         self.assertEqual((path / "README.md").read_text(), "fresh")
+
+    def test_a_registry_of_packages_only_still_fetches(self) -> None:
+        cache = self.home / ".opensrc"
+        cache.mkdir()
+        (cache / "sources.json").write_text(json.dumps({"packages": [{"name": "zod"}]}))
+        answer = self.run_sync("acme/widgets")
+        self.assertEqual(answer["changes"], [["fetch", "github.com/acme/widgets"]])
 
     def test_refresh_replaces_the_cached_copy_and_keeps_its_version(self) -> None:
         old = self.seed(
