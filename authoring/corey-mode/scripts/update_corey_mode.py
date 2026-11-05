@@ -426,7 +426,7 @@ def upstream_files(upstream: Path) -> set[PurePosixPath]:
         raise ScriptError(
             f"{upstream} is not a marketingskills checkout: it needs skills/ and "
             "LICENSE; pass --upstream the snapshot folder, such as "
-            "$OPENSRC_HOME/repos/github.com/coreyhaines31/marketingskills/main"
+            "~/.opensrc/repos/github.com/coreyhaines31/marketingskills/main"
         )
     return {
         PurePosixPath(path.relative_to(upstream).as_posix())
@@ -473,17 +473,14 @@ def rewrite_links(
     return LINK.sub(replace, text)
 
 
-def snapshot_revision(upstream: Path) -> str:
-    """Read the sidecar commit for the selected registered opensrc snapshot."""
+def registered_snapshot(upstream: Path) -> None:
+    """Fail unless the cache's sources.json records `upstream` as the snapshot."""
     snapshot = upstream.resolve()
     cache = next(
         (parent for parent in snapshot.parents if (parent / "sources.json").is_file()),
         None,
     )
-    remedy = (
-        "use the snapshot recorded in sources.json and its commitSha from the "
-        f"adjacent sync-state.json; {REGENERATE}"
-    )
+    remedy = f"use the snapshot path recorded in the cache's sources.json; {REGENERATE}"
     if cache is None:
         raise ScriptError(f"{upstream}: cannot locate opensrc sources.json; {remedy}")
     name = REPOSITORY.removeprefix("https://")
@@ -497,20 +494,12 @@ def snapshot_revision(upstream: Path) -> str:
                 continue
             path = entry.get("path")
             if isinstance(path, str) and (cache / path).resolve() == snapshot:
-                break
-        else:
-            raise ValueError(f"sources.json does not record {upstream} as {name}")
-        state = json.loads((cache / "sync-state.json").read_text(encoding="utf-8"))
-        recorded = state["repos"][name]["commitSha"]
-        if not isinstance(recorded, str) or not FULL_SHA.fullmatch(recorded):
-            raise ValueError(
-                "sync-state.json commitSha must be a full 40-character SHA"
-            )
+                return
+        raise ValueError(f"sources.json does not record {upstream} as {name}")
     except (OSError, ValueError, KeyError, TypeError) as error:
         raise ScriptError(
-            f"{cache}: cannot read snapshot revision: {error}; {remedy}"
+            f"{cache}: cannot read the snapshot registration: {error}; {remedy}"
         ) from error
-    return recorded
 
 
 def render(upstream: Path, revision: str) -> Plan:
@@ -630,11 +619,7 @@ def update(
     package: Path, upstream: Path, revision: str, dry_run: bool
 ) -> list[list[str]]:
     plan = render(upstream, revision)
-    recorded = snapshot_revision(upstream)
-    if recorded != revision:
-        raise ScriptError(
-            f"snapshot revision {recorded} does not match --revision {revision}; {REGENERATE}"
-        )
+    registered_snapshot(upstream)
     log.info("rendered %d files from %s at %s", len(plan), upstream, revision)
     lock = read_lock(package)
     files = {dest: item.content for dest, item in plan.items()}
@@ -737,20 +722,15 @@ def check(package: Path, upstream: Path | None) -> None:
                 links.append(f"broken link in {relative}: {target}")
     if upstream is not None:
         revision = lock.revision
-        recorded = snapshot_revision(upstream)
-        if recorded != revision:
-            stale.append(
-                f"snapshot revision {recorded} differs from lock revision {revision}"
-            )
-        else:
-            plan = render(upstream, revision)
-            log.info("rebuilt %d files from %s at %s", len(plan), upstream, revision)
-            if lock_document(plan, revision) != (package / LOCK).read_bytes():
-                stale.append(f"{LOCK} differs from a fresh render of {upstream}")
-            for dest, item in sorted(plan.items()):
-                path = package / dest
-                if not path.is_file() or path.read_bytes() != item.content:
-                    stale.append(f"differs from upstream: {dest}")
+        registered_snapshot(upstream)
+        plan = render(upstream, revision)
+        log.info("rebuilt %d files from %s at %s", len(plan), upstream, revision)
+        if lock_document(plan, revision) != (package / LOCK).read_bytes():
+            stale.append(f"{LOCK} differs from a fresh render of {upstream}")
+        for dest, item in sorted(plan.items()):
+            path = package / dest
+            if not path.is_file() or path.read_bytes() != item.content:
+                stale.append(f"differs from upstream: {dest}")
     problems = [f"{problem}; {REGENERATE}" for problem in stale]
     problems += [f"{problem}; {ONE_ROW}" for problem in check_routes(package)]
     problems += links
