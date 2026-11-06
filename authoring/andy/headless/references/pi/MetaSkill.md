@@ -21,15 +21,15 @@ COST: Confirm the selected provider before a live run. That provider charges its
 
 Before the run, confirm the model with `pi --list-models <model>`. Also check authentication for the selected provider. Pi [limits thinking to supported levels](https://pi.dev/docs/latest/cli#models). The `--thinking` flag requests a level but does not prove that the provider uses it.
 
-For Opus 5.5 paid through OpenRouter, check the connection and model before using the review recipe below:
+For Claude paid by API, take `<claude-model>` from the `[claude]` table of `config.toml`, then check the connection and model before using the review recipe below:
 
 ```bash
-pi auth check --provider openrouter --json
-pi --list-models openrouter/anthropic/claude-opus-5.5
+pi auth check --provider anthropic --json
+pi --list-models "anthropic/<claude-model>"
 ```
-Require a `status` value of `ready` and a matching provider and model row. Warnings about other models do not invalidate a matching OpenRouter row. The authentication check alone does not prove that a live request will work.
+Require a `status` value of `ready` and a matching provider and model row. Warnings about other models do not invalidate a matching `anthropic` row. The authentication check alone does not prove that a live request will work.
 
-In the recipe, set `model="openrouter/anthropic/claude-opus-5.5"`. Set `thinking` from the request or `[pi]`. The `claude-code` provider uses the Claude Code connection. The OpenRouter provider charges the OpenRouter account. If either check fails, report the failure without selecting another provider.
+In the recipe, set `model="anthropic/<claude-model>"`. Set `thinking` from the request or `[pi]`. The `claude-code` provider uses the Claude Code connection. The `anthropic` provider charges the Anthropic Console account of its API key. If either check fails, report the failure without selecting another provider.
 
 ```bash
 repo="/absolute/path/to/repository"
@@ -70,7 +70,7 @@ pi --mode json --model "$model" --thinking "$thinking" \
   < diff.patch > events.jsonl 2> review.stderr.log
 ```
 
-For OpenRouter Opus, use JSON mode when you must verify the billing route. In the final assistant `message_end.message`, require `provider` to equal `openrouter`. Require `model` to equal `anthropic/claude-opus-5.5`. Print mode outputs only text, so its answer cannot prove the provider.
+For Claude by API, use JSON mode when you must verify the billing route. In the final assistant `message_end.message`, require `provider` to equal `anthropic`. Require `model` to equal `<claude-model>`. Print mode outputs only text, so its answer cannot prove the provider.
 
 ## Model and session options
 

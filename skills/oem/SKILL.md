@@ -64,7 +64,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Inside T3 Code, load `$t3-runtime` before orchestration, PR tracking, scheduling, or thread-history work
 - For a T3 Code request to delegate through Pi, use the `delegate_task` tool with `target.providerInstanceId="pi"` and one of these models:
   - "Pi Opus" or "Pi Opus 5.5" selects `target.model="claude-code/claude-opus-5-5"`
-  - "Pi Sol" or "Pi Codex Sol" selects `target.model="openai-codex/gpt-6.1-sol"` unless I name another Sol version
+  - "Pi Sol" or "Pi Codex Sol" selects `target.model="cliproxy/gpt-6.1-sol"` unless I name another Sol version
 - Before a Pi delegation, confirm the model and supported levels with `orchestrator_capabilities`
 - If I request an effort level, pass that level as Pi's `target.options.thinking`
 - After `delegate_task` returns, verify the returned `providerInstanceId`, model, and options
