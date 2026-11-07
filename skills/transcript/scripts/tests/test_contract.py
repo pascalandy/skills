@@ -1619,12 +1619,13 @@ def test_the_spinner_animates_only_on_a_terminal_that_allows_it(
 DOCS = [
     SKILL_DIR / "SKILL.md",
     SKILL_DIR / "README.md",
+    SKILL_DIR / "references/youtube-auth-refresh.md",
     REPO_ROOT / "justfile",
     REPO_ROOT / "authoring/verify-loops/verify-transcript/SKILL.md",
 ]
 # A doc line runs transcript through its path or a just recipe
 RUNS = re.compile(
-    r"scripts/(transcript|youtube_smoke)\.py|just (ttr|transcript)(?:-cli)?\b"
+    r"scripts/(transcript|youtube_smoke)\.py|just (ttr|transcript)(?:-cli|-auth-refresh)?(?![\w-])"
 )
 FLAG = re.compile(r"(?<![\w/.-])(--?[A-Za-z][\w-]*)")
 
@@ -1641,7 +1642,9 @@ def doc_commands() -> list[tuple[str, str, list[str]]]:
                     args = shlex.split(rest)
                 except ValueError:
                     args = rest.split()
-                if match.group(2) == "ttr" or (
+                if match.group(0) == "just transcript-auth-refresh":
+                    args = ["auth", "refresh", *args]
+                elif match.group(2) == "ttr" or (
                     match.group(2) == "transcript" and "-cli" not in match.group(0)
                 ):
                     args = ["run", "youtube", "--url", *args]

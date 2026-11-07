@@ -203,10 +203,10 @@ For daily use, the permanent store is `~/.local/share/transcript/youtube.cookies
 
 #### Renew after signing in
 
-After signing in to YouTube in Arc, run in the source Mac's unlocked desktop terminal:
+After signing in to YouTube in Arc, run from the skills repository in the source Mac's unlocked desktop terminal:
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py auth refresh
+just transcript-auth-refresh
 ```
 
 This exports only YouTube-domain cookies from Arc's Default profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
@@ -214,11 +214,11 @@ This exports only YouTube-domain cookies from Arc's Default profile and verifies
 Configure destinations once in `~/.local/share/transcript/youtube-targets.txt` on the source Mac, one trusted SSH host alias or `user@host` per line. Without this file, renewal updates only the source Mac. Receivers need `uv`, already required by Transcript, and known SSH host keys. SSH never accepts new keys or prompts for a password. The receiver uses the verifier sent by this command, so it does not require a matching skill installation.
 
 ```bash
-uv run <skill_dir>/scripts/transcript.py auth check
-uv run <skill_dir>/scripts/transcript.py auth refresh --dry-run
+just transcript-cli auth check
+just transcript-auth-refresh --dry-run
 ```
 
-`auth check` requires a positive login response without transcription. `auth refresh --help` describes target overrides and the preview. A stored export survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. Renewal is an explicit operation after reconnection. The source Mac must be awake for renewal; other computers use their last valid copy independently. Network and rate-limit failures are reported separately from a signed-out session.
+`auth check` requires a positive login response without transcription. `just transcript-auth-refresh --help` describes target overrides and the preview. A stored export survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. Renewal is an explicit operation after reconnection. The source Mac must be awake for renewal; other computers use their last valid copy independently. Network and rate-limit failures are reported separately from a signed-out session.
 
 #### Supply another export
 

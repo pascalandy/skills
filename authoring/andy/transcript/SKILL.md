@@ -1,6 +1,6 @@
 ---
 name: "transcript"
-description: "Use when the user invokes `transcript` or asks to transcribe a YouTube video, Zoom recording, or local audio file."
+description: "Use when the user invokes `transcript`, asks to transcribe YouTube, Zoom, or local audio, or asks to refresh the YouTube cookies or login used by Transcript."
 kind: "general"
 configuration-is-needed: true
 api-key: "deepgram"
@@ -10,7 +10,9 @@ api-key: "deepgram"
 
 Transcribe YouTube, Zoom, or local audio with Deepgram, then optionally create a Markdown summary through a named inference profile, run by a tool-free, session-free `claude` or `pi` process.
 
-Resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
+For transcription commands, resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
+
+For a request such as « il faut rafraîchir le cookie pour Transcript », follow [Refresh YouTube cookies](references/youtube-auth-refresh.md). This maintenance request uses `just transcript-auth-refresh` on the source Mac and makes no paid transcription call.
 
 ## Choose the command
 
@@ -34,12 +36,6 @@ uv run <skill_dir>/scripts/transcript.py run file --path "<audio-file>" --no-sum
 Pass `--profile` only when the user selects a profile; `list profiles` marks the default.
 
 YouTube runs discover `~/.local/share/transcript/youtube.cookies.txt` automatically and verify its session before paid work. Add `--cookies FILE` to override it. Neither file mode falls back anonymously. Read [Use a portable cookies file](README.md#use-a-portable-cookies-file) for export, transfer, renewal, and the free transport check.
-
-## Renew YouTube authentication
-
-After the user signs in again to YouTube in Arc, run `uv run <skill_dir>/scripts/transcript.py auth refresh` on the source Mac, in its unlocked desktop terminal so Keychain can decrypt Arc cookies. It exports and verifies the session, then updates the permanent local file and the SSH destinations in `~/.local/share/transcript/youtube-targets.txt`. Configure this non-secret target list once from the user's machine identities, outside Git. `auth refresh --dry-run` previews destinations without reading cookies or Keychain.
-
-`auth check` requires a positive server login response and makes no paid call. An expired session requires reconnection in Arc on the source Mac, then renewal. A network error or rate limit requires a later check. Report failed destinations and successful updates from the command's answer. Do not promise automatic Google reconnection or a fixed cookie lifetime.
 
 ## Manage inference through profiles
 
