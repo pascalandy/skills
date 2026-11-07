@@ -20,6 +20,12 @@ alias ttr := transcript
 transcript url *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"
 
+# Refresh Arc's YouTube session and update fleet copies from the source Mac
+[group('commands')]
+[no-exit-message]
+transcript-auth-refresh *args:
+    @uv run --quiet authoring/andy/transcript/scripts/transcript.py auth refresh "$@"
+
 alias deploy := sync-fleet
 
 # Bring every fleet machine, or the named ones, to GitHub's main
