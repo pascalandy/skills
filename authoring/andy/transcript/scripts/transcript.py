@@ -362,11 +362,13 @@ import subprocess
 import tempfile
 import time
 import unicodedata
+import warnings
 from collections.abc import Iterable
 from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from http.cookiejar import LoadError, MozillaCookieJar
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Literal
@@ -650,8 +652,17 @@ SUMMARY_OPTIONS = frozenset(
 
 SourceKind = Literal["youtube", "zoom", "file"]
 TranscriptKind = Literal["plain", "timestamped"]
-YtDlpAuthMode = Literal["normal", "arc-required"]
-YtDlpMethod = Literal["anonymous", "arc", "chrome"]
+
+
+@dataclass(frozen=True)
+class CookieFile:
+    """An explicit cookie source, never a writable yt-dlp jar."""
+
+    path: Path
+
+
+YtDlpAuthMode = Literal["normal", "arc-required"] | CookieFile
+YtDlpMethod = Literal["anonymous", "arc", "chrome", "cookies"]
 
 
 @dataclass(frozen=True)
@@ -665,6 +676,7 @@ class RunPlan:
     summarize: bool
     profile: str | None = None
     preview: bool = False
+    youtube_auth: YtDlpAuthMode = "normal"
 
 
 @dataclass(frozen=True)
@@ -1108,6 +1120,48 @@ YTDLP_TEMPORARY = re.compile(
 )
 
 
+def resolve_cookie_file(path: Path) -> CookieFile:
+    """Resolve a regular file without opening its secret contents."""
+    try:
+        resolved = path.expanduser().resolve()
+        if not resolved.is_file():
+            raise OSError
+    except (OSError, RuntimeError):
+        raise ConfigurationError(
+            "--cookies requires an existing regular file",
+            f"{PROG} doctor --source youtube --cookies /path/to/youtube.cookies.txt",
+        ) from None
+    return CookieFile(resolved)
+
+
+def validate_cookie_file(source: CookieFile) -> None:
+    """Check Netscape syntax without exposing parser records or warnings."""
+    try:
+        with warnings.catch_warnings():
+            # Parser warnings must not bypass sanitization under -W error.
+            warnings.simplefilter("ignore")
+            jar = MozillaCookieJar(str(source.path))
+            jar.load(ignore_discard=True, ignore_expires=True)
+            if not any(jar):
+                raise LoadError
+    except (OSError, ValueError):
+        raise YtDlpError(
+            "Cookies file is unreadable, empty, or not Netscape format. "
+            "Replace it with a fresh YouTube cookies export."
+        ) from None
+
+
+@contextmanager
+def private_cookie_file(source: CookieFile) -> Iterator[Path]:
+    """Keep yt-dlp's writable jar private and remove it on every exit."""
+    with tempfile.TemporaryDirectory(prefix="transcript-cookies-") as directory:
+        path = Path(directory) / "cookies.txt"
+        path.touch(mode=0o600)
+        shutil.copyfile(source.path, path)
+        validate_cookie_file(CookieFile(path))
+        yield path
+
+
 def run_ytdlp(
     args: list[str],
     url: str,
@@ -1115,7 +1169,7 @@ def run_ytdlp(
     *,
     auth_mode: YtDlpAuthMode = "normal",
 ) -> YtDlpResult:
-    """Run the pinned yt-dlp module with browser authentication first.
+    """Run pinned yt-dlp with an explicit file, or browser access first.
 
     Use Arc when its default profile exists, otherwise use Chrome. Anonymous
     access is a fallback so a valid browser session never pays for a failed
@@ -1127,9 +1181,51 @@ def run_ytdlp(
         budget: Shared workflow deadline used to bound both attempts.
 
     Raises:
-        YtDlpError: If both attempts return a failure status.
+        YtDlpError: If the selected transport cannot supply the video.
         WorkflowTimeoutError: If no workflow time remains before an attempt.
     """
+    if isinstance(auth_mode, CookieFile):
+        with private_cookie_file(auth_mode) as cookie_path:
+            result = run_child(
+                [
+                    *YTDLP_MODULE_COMMAND,
+                    "--cookies",
+                    str(cookie_path),
+                    "--no-cookies-from-browser",
+                    "--no-update",
+                    *args,
+                    url,
+                ],
+                timeout=budget.remaining(
+                    "yt-dlp cookies-file attempt", SUMMARY_ATTEMPT_TIMEOUT
+                ),
+            )
+        if result.returncode != 0:
+            temporary = bool(YTDLP_TEMPORARY.search(result.stderr or result.stdout))
+            raise YtDlpError(
+                "yt-dlp cookies-file transport failed. "
+                + (
+                    "A temporary network failure may allow a later retry."
+                    if temporary
+                    else (
+                        "The video may be unavailable, the session expired or refused, "
+                        "or a YouTube JavaScript/PO-token challenge was not solved. "
+                        "Check transport: "
+                        + shlex.join(
+                            [
+                                "uv",
+                                "run",
+                                str(SCRIPT_DIR / "youtube_smoke.py"),
+                                "--cookies",
+                                str(auth_mode.path),
+                            ]
+                        )
+                    )
+                ),
+                temporary=temporary,
+            )
+        return YtDlpResult(result, "cookies")
+
     arc_command = [
         sys.executable,
         str(ARC_ADAPTER_PATH),
@@ -1993,6 +2089,16 @@ def _command_parser(
     return parser
 
 
+def add_cookies_option(parser: argparse.ArgumentParser) -> None:
+    """Offer the same explicit cookie source on transport entry points."""
+    parser.add_argument(
+        "--cookies",
+        type=Path,
+        metavar="FILE",
+        help="Use this Netscape cookies file exclusively; keep its contents unchanged",
+    )
+
+
 def _add_run_options(
     parser: argparse.ArgumentParser, *, output_default: Path, prompt_default: str
 ) -> None:
@@ -2184,6 +2290,7 @@ def build_parser() -> TranscriptParser:
         help="YouTube URL, at least one; give several, or repeat --url, to queue them",
     )
     youtube.set_defaults(zoom=False, zoom_custom_path=None)
+    add_cookies_option(youtube)
     _add_run_options(youtube, output_default=OUTPUT_DIR, prompt_default=DEFAULT_PROMPT)
 
     zoom = _command_parser(
@@ -2319,6 +2426,7 @@ def build_parser() -> TranscriptParser:
         default="all",
         help="Limit source-specific checks (default: all)",
     )
+    add_cookies_option(doctor)
     doctor.add_argument(
         "--no-summary",
         dest="no_prompt",
@@ -2471,6 +2579,11 @@ def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
         effort=effort,
         summarize=not args.no_prompt,
         preview=args.preview,
+        youtube_auth=(
+            resolve_cookie_file(args.cookies)
+            if getattr(args, "cookies", None) is not None
+            else "normal"
+        ),
     )
 
 
@@ -2568,6 +2681,8 @@ def _dry_run_plan(
         "effort": plan.effort if plan.summarize else None,
         "prompt": prompt.name if prompt is not None else None,
     }
+    if isinstance(plan.youtube_auth, CookieFile):
+        source["cookies_file"] = str(plan.youtube_auth.path)
     return {
         "source": source,
         "summary": summary,
@@ -2597,7 +2712,9 @@ def _doctor_check(
     return check
 
 
-def _doctor_checks(*, source: str, summarize: bool) -> list[dict[str, str]]:
+def _doctor_checks(
+    *, source: str, summarize: bool, youtube_auth: YtDlpAuthMode = "normal"
+) -> list[dict[str, str]]:
     """Inspect local prerequisites without making network or paid API calls."""
     checks: list[dict[str, str]] = []
 
@@ -2686,9 +2803,26 @@ def _doctor_checks(*, source: str, summarize: bool) -> list[dict[str, str]]:
             )
         )
 
-        if ARC_BROWSER_PROFILE.is_dir():
+        browser_check = "youtube_browser"
+        if isinstance(youtube_auth, CookieFile):
+            browser_check = "youtube_cookies"
+            try:
+                validate_cookie_file(youtube_auth)
+            except YtDlpError as error:
+                browser_message = str(error)
+                browser_status: Literal["pass", "warn", "fail"] = "fail"
+                browser_hint = (
+                    "Replace the cookies export, then run: "
+                    f"{PROG} doctor --source youtube --cookies "
+                    f"{shlex.quote(str(youtube_auth.path))}"
+                )
+            else:
+                browser_message = "Netscape cookies file is readable; server authentication is untested"
+                browser_status = "pass"
+                browser_hint = None
+        elif ARC_BROWSER_PROFILE.is_dir():
             browser_message = f"Arc profile is available at {ARC_BROWSER_PROFILE}"
-            browser_status: Literal["pass", "warn", "fail"] = "pass"
+            browser_status = "pass"
             browser_hint = None
         elif CHROME_BROWSER_PROFILE.is_dir():
             browser_message = f"Chrome profile is available at {CHROME_BROWSER_PROFILE}"
@@ -2700,7 +2834,7 @@ def _doctor_checks(*, source: str, summarize: bool) -> list[dict[str, str]]:
             browser_hint = "Sign in to YouTube in Arc or Chrome; anonymous access remains available"
         checks.append(
             _doctor_check(
-                "youtube_browser",
+                browser_check,
                 browser_status,
                 browser_message,
                 browser_hint,
@@ -2730,7 +2864,19 @@ def _doctor_checks(*, source: str, summarize: bool) -> list[dict[str, str]]:
 
 def _run_doctor(args: argparse.Namespace) -> dict:
     """List every check with -v, and fail with one error per failed check."""
-    checks = _doctor_checks(source=args.source, summarize=not args.no_prompt)
+    if args.cookies is not None and args.source not in {"youtube", "all"}:
+        raise UsageError("--cookies requires --source youtube or --source all")
+    try:
+        youtube_auth = (
+            resolve_cookie_file(args.cookies) if args.cookies is not None else "normal"
+        )
+    except ConfigurationError as error:
+        raise Failure(
+            "invalid_configuration", str(error), error.fix, code=USAGE
+        ) from None
+    checks = _doctor_checks(
+        source=args.source, summarize=not args.no_prompt, youtube_auth=youtube_auth
+    )
     for check in checks:
         log.info(f"[{check['status'].upper()}] {check['name']}: {check['message']}")
         if hint := check.get("hint"):
@@ -2748,6 +2894,8 @@ def _run_doctor(args: argparse.Namespace) -> dict:
 
 def _preflight(plan: RunPlan, budget: RunBudget) -> str:
     """Validate required executables and retrieve secrets before mutations."""
+    if isinstance(plan.youtube_auth, CookieFile):
+        validate_cookie_file(plan.youtube_auth)
     if plan.summarize:
         ensure_cli_available(PROVIDER_RUNNERS[plan.provider])
     return validate_env(budget)
@@ -2827,7 +2975,9 @@ def _acquire_source(
         )
     with reporter.step("Audio download") as step:
         downloaded = retry_request(
-            lambda: download_audio(args.url, audio_dir, budget),
+            lambda: download_audio(
+                args.url, audio_dir, budget, auth_mode=plan.youtube_auth
+            ),
             deadline=budget.deadline,
         )
         step.detail = f"method={downloaded.method}"
@@ -2962,9 +3112,10 @@ def _transcription_failure(
                 label="retry",
             )
     message = _clean_subprocess_diagnostic(str(error)) or type(error).__name__
-    return Failure(
-        "transcription_failed", message, f"{PROG} doctor --source {plan.source_kind}"
-    )
+    doctor = f"{PROG} doctor --source {plan.source_kind}"
+    if isinstance(plan.youtube_auth, CookieFile):
+        doctor += f" --cookies {shlex.quote(str(plan.youtube_auth.path))}"
+    return Failure("transcription_failed", message, doctor)
 
 
 def _generate_summary(
@@ -3164,6 +3315,11 @@ def _run_preflight(
             return _preflight(plan, budget)
     except SummaryCLIError as error:
         raise Failure("preflight_failed", str(error), _without_summary(argv)) from error
+    except YtDlpError as error:
+        doctor = f"{PROG} doctor --source youtube"
+        if isinstance(plan.youtube_auth, CookieFile):
+            doctor += f" --cookies {shlex.quote(str(plan.youtube_auth.path))}"
+        raise Failure("invalid_cookies", str(error), doctor, code=USAGE) from None
     except CredentialError as error:
         raise Failure("preflight_failed", str(error), KEYRING_COMMAND) from error
     except (WorkflowTimeoutError, subprocess.TimeoutExpired, TimeoutError) as error:

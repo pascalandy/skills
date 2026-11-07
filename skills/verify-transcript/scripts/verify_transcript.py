@@ -528,7 +528,7 @@ HELP_CONTRACTS = (
         "youtube-help",
         ("run", "youtube", "--help"),
         frozenset(),
-        RUN_OPTIONS | {"--url"},
+        RUN_OPTIONS | {"--cookies", "--url"},
     ),
     HelpContract(
         "zoom-help",
@@ -570,7 +570,7 @@ HELP_CONTRACTS = (
         "doctor-help",
         ("doctor", "--help"),
         frozenset(),
-        GLOBAL_OPTIONS | {"--no-summary", "--source"},
+        GLOBAL_OPTIONS | {"--cookies", "--no-summary", "--source"},
     ),
     HelpContract(
         "help-help",
@@ -633,6 +633,15 @@ PUBLIC_SURFACES = (
     PublicSurface("option.help", "option", "--help", ("interface.help-version",)),
     PublicSurface("option.version", "option", "--version", ("interface.help-version",)),
     PublicSurface("option.url", "option", "--url", ("youtube.dry-run-summary",)),
+    PublicSurface(
+        "option.cookies",
+        "option",
+        "--cookies",
+        exclusion_reason=(
+            "Secret-file validation and lifecycle are covered by transcript cookie-file tests; "
+            "live authentication requires an exported session"
+        ),
+    ),
     PublicSurface(
         "option.latest",
         "option",
