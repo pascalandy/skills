@@ -362,18 +362,17 @@ import subprocess
 import tempfile
 import time
 import unicodedata
-import warnings
 from collections.abc import Iterable
 from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from http.cookiejar import LoadError, MozillaCookieJar
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Literal
 
 import httpx
+import youtube_session
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.progress import Progress, ProgressColumn, SpinnerColumn, Task, TextColumn
@@ -659,6 +658,7 @@ class CookieFile:
     """An explicit cookie source, never a writable yt-dlp jar."""
 
     path: Path
+    verify_session: bool = False
 
 
 YtDlpAuthMode = Literal["normal", "arc-required"] | CookieFile
@@ -1137,18 +1137,29 @@ def resolve_cookie_file(path: Path) -> CookieFile:
 def validate_cookie_file(source: CookieFile) -> None:
     """Check Netscape syntax without exposing parser records or warnings."""
     try:
-        with warnings.catch_warnings():
-            # Parser warnings must not bypass sanitization under -W error.
-            warnings.simplefilter("ignore")
-            jar = MozillaCookieJar(str(source.path))
-            jar.load(ignore_discard=True, ignore_expires=True)
-            if not any(jar):
-                raise LoadError
-    except (OSError, ValueError):
-        raise YtDlpError(
-            "Cookies file is unreadable, empty, or not Netscape format. "
-            "Replace it with a fresh YouTube cookies export."
-        ) from None
+        youtube_session.load_cookie_jar(source.path)
+    except youtube_session.SessionError as error:
+        raise YtDlpError(str(error)) from None
+
+
+def select_youtube_auth(
+    path: Path | None, *, fallback: YtDlpAuthMode = "normal"
+) -> YtDlpAuthMode:
+    """Prefer an explicit file, then the managed store, then local browser access."""
+    managed = youtube_session.session_file()
+    if path is not None:
+        selected = resolve_cookie_file(path)
+        return CookieFile(selected.path, selected.path == managed.resolve())
+    if managed.parent.exists():
+        try:
+            selected = resolve_cookie_file(managed)
+        except ConfigurationError:
+            raise ConfigurationError(
+                "Managed YouTube session is missing. " + youtube_session.REFRESH_HINT,
+                f"{PROG} auth refresh",
+            ) from None
+        return CookieFile(selected.path, verify_session=True)
+    return fallback
 
 
 @contextmanager
@@ -2434,6 +2445,68 @@ def build_parser() -> TranscriptParser:
         help="Skip checks required only for AI summaries",
     )
 
+    auth = _command_parser(
+        commands,
+        "auth",
+        help_text="Check or renew the portable YouTube session",
+        description="Manage the permanent YouTube session without paid API calls.",
+        epilog="""examples:
+  transcript auth check
+  transcript auth refresh --dry-run
+  transcript auth refresh""",
+        codes=EXIT_CODES,
+    )
+    auth_actions = auth.add_subparsers(
+        dest="auth_action", metavar="ACTION", required=True
+    )
+    auth_check = _command_parser(
+        auth_actions,
+        "check",
+        help_text="Require a signed-in YouTube response",
+        description="Check the stored or supplied session against YouTube, without paid work.",
+        epilog="""examples:
+  transcript auth check
+  transcript auth check --cookies /path/to/youtube.cookies.txt""",
+        codes=EXIT_CODES,
+    )
+    add_cookies_option(auth_check)
+    auth_refresh = _command_parser(
+        auth_actions,
+        "refresh",
+        help_text="Export Arc and update the fleet copies",
+        description=(
+            "Run on the source Mac after signing in to YouTube in Arc. "
+            "Verify the export before atomically replacing the stored session, "
+            "then send private copies to the configured SSH targets."
+        ),
+        epilog="""examples:
+  transcript auth refresh
+  transcript auth refresh --dry-run
+  transcript auth refresh --to user@host --to other-host""",
+        codes=EXIT_CODES,
+    )
+    auth_refresh.add_argument(
+        "--to",
+        dest="targets",
+        action="append",
+        metavar="HOST",
+        help="SSH destination; repeat to override ~/.local/share/transcript/youtube-targets.txt",
+    )
+    auth_refresh.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="List updates without reading cookies, accessing Keychain or writing",
+    )
+    for command in (auth_check, auth_refresh):
+        command.add_argument(
+            "--timeout",
+            type=duration,
+            default=60.0,
+            metavar="DURATION",
+            help="Session check or per-target update timeout (default: 60s)",
+        )
+
     help_parser = _command_parser(
         commands,
         "help",
@@ -2469,6 +2542,7 @@ def parse_args(
         args.command,
         getattr(args, "source", None),
         getattr(args, "resource", None),
+        getattr(args, "auth_action", None),
     ):
         command_parser = _subcommands(command_parser).get(name or "", command_parser)
     if extras:
@@ -2579,11 +2653,9 @@ def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
         effort=effort,
         summarize=not args.no_prompt,
         preview=args.preview,
-        youtube_auth=(
-            resolve_cookie_file(args.cookies)
-            if getattr(args, "cookies", None) is not None
-            else "normal"
-        ),
+        youtube_auth=select_youtube_auth(getattr(args, "cookies", None))
+        if source_kind == "youtube"
+        else "normal",
     )
 
 
@@ -2868,7 +2940,9 @@ def _run_doctor(args: argparse.Namespace) -> dict:
         raise UsageError("--cookies requires --source youtube or --source all")
     try:
         youtube_auth = (
-            resolve_cookie_file(args.cookies) if args.cookies is not None else "normal"
+            select_youtube_auth(args.cookies)
+            if args.source in {"all", "youtube"}
+            else "normal"
         )
     except ConfigurationError as error:
         raise Failure(
@@ -2896,6 +2970,11 @@ def _preflight(plan: RunPlan, budget: RunBudget) -> str:
     """Validate required executables and retrieve secrets before mutations."""
     if isinstance(plan.youtube_auth, CookieFile):
         validate_cookie_file(plan.youtube_auth)
+        if plan.youtube_auth.verify_session:
+            youtube_session.check_session(
+                plan.youtube_auth.path,
+                timeout=budget.remaining("YouTube session check", 25),
+            )
     if plan.summarize:
         ensure_cli_available(PROVIDER_RUNNERS[plan.provider])
     return validate_env(budget)
@@ -3315,6 +3394,15 @@ def _run_preflight(
             return _preflight(plan, budget)
     except SummaryCLIError as error:
         raise Failure("preflight_failed", str(error), _without_summary(argv)) from error
+    except youtube_session.SessionError as error:
+        temporary = isinstance(error, youtube_session.SessionNetworkError)
+        raise Failure(
+            "youtube_session_failed",
+            str(error),
+            f"{PROG} auth check" if temporary else f"{PROG} auth refresh",
+            code=TEMPORARY if temporary else 1,
+        ) from None
+
     except YtDlpError as error:
         doctor = f"{PROG} doctor --source youtube"
         if isinstance(plan.youtube_auth, CookieFile):
@@ -3655,6 +3743,8 @@ def _dispatch(
     """Run the command `args` names and return the fields beside `ok`."""
     if args.command == "help":
         _show_help(parser, args.topic)
+    if args.command == "auth":
+        return _run_auth(args)
     prompts = scan_prompts(PROMPTS_DIR)
     if args.command == "list":
         return _discovery(args, prompts)
@@ -3666,6 +3756,42 @@ def _dispatch(
     if args.source == "youtube" and args.queued:
         return _run_queue(args, argv, prompts, source_parser)
     return _run(args, argv, prompts, source_parser)
+
+
+def _run_auth(args: argparse.Namespace) -> dict:
+    """Drive the free session lifecycle through the public command tree."""
+    try:
+        if args.auth_action == "check":
+            path = (
+                args.cookies.expanduser().resolve()
+                if args.cookies
+                else youtube_session.session_file()
+            )
+            youtube_session.check_session(path, timeout=min(args.timeout, 25))
+            return {"authenticated": True, "file": str(path)}
+        targets = youtube_session.refresh_targets(args.targets)
+        if args.dry_run:
+            return {
+                "changes": [
+                    ["update", str(youtube_session.session_file())],
+                    *(
+                        [
+                            "update",
+                            f"{host}:.local/share/transcript/youtube.cookies.txt",
+                        ]
+                        for host in targets
+                    ),
+                ]
+            }
+        changes, errors = youtube_session.refresh_session(targets, timeout=args.timeout)
+        if errors:
+            raise ScriptError(*errors, report={"changes": changes})
+        return {"changes": changes}
+    except youtube_session.SessionError as error:
+        failure = ScriptError(str(error))
+        if isinstance(error, youtube_session.SessionNetworkError):
+            failure.code = TEMPORARY
+        raise failure from None
 
 
 def main(argv: Sequence[str] | None = None) -> int:

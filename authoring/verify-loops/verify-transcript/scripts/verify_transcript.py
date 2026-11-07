@@ -515,7 +515,7 @@ HELP_CONTRACTS = (
     HelpContract(
         "root-help",
         ("--help",),
-        frozenset({"run", "list", "doctor", "help"}),
+        frozenset({"run", "list", "doctor", "auth", "help"}),
         GLOBAL_OPTIONS | {"--version"},
     ),
     HelpContract(
@@ -573,6 +573,21 @@ HELP_CONTRACTS = (
         GLOBAL_OPTIONS | {"--cookies", "--no-summary", "--source"},
     ),
     HelpContract(
+        "auth-help", ("auth", "--help"), frozenset({"check", "refresh"}), GLOBAL_OPTIONS
+    ),
+    HelpContract(
+        "auth-check-help",
+        ("auth", "check", "--help"),
+        frozenset(),
+        GLOBAL_OPTIONS | {"--cookies", "--timeout"},
+    ),
+    HelpContract(
+        "auth-refresh-help",
+        ("auth", "refresh", "--help"),
+        frozenset(),
+        GLOBAL_OPTIONS | {"--to", "--dry-run", "--timeout"},
+    ),
+    HelpContract(
         "help-help",
         ("help", "--help"),
         frozenset(),
@@ -581,6 +596,14 @@ HELP_CONTRACTS = (
 )
 
 PUBLIC_SURFACES = (
+    PublicSurface("command.auth", "command", "auth", ("interface.help-version",)),
+    PublicSurface(
+        "command.auth-check", "command", "check", ("interface.help-version",)
+    ),
+    PublicSurface(
+        "command.auth-refresh", "command", "refresh", ("interface.help-version",)
+    ),
+    PublicSurface("option.to", "option", "--to", ("interface.help-version",)),
     PublicSurface(
         "command.run",
         "command",

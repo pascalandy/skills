@@ -33,7 +33,13 @@ uv run <skill_dir>/scripts/transcript.py run file --path "<audio-file>" --no-sum
 
 Pass `--profile` only when the user selects a profile; `list profiles` marks the default.
 
-For a supplied YouTube cookies file, add `--cookies FILE`. It takes priority over browser access and fails without an anonymous fallback. Read [Use a portable cookies file](README.md#use-a-portable-cookies-file) for export, transfer, renewal, and the free transport check.
+YouTube runs discover `~/.local/share/transcript/youtube.cookies.txt` automatically and verify its session before paid work. Add `--cookies FILE` to override it. Neither file mode falls back anonymously. Read [Use a portable cookies file](README.md#use-a-portable-cookies-file) for export, transfer, renewal, and the free transport check.
+
+## Renew YouTube authentication
+
+After the user signs in again to YouTube in Arc, run `uv run <skill_dir>/scripts/transcript.py auth refresh` on the source Mac, in its unlocked desktop terminal so Keychain can decrypt Arc cookies. It exports and verifies the session, then updates the permanent local file and the SSH destinations in `~/.local/share/transcript/youtube-targets.txt`. Configure this non-secret target list once from the user's machine identities, outside Git. `auth refresh --dry-run` previews destinations without reading cookies or Keychain.
+
+`auth check` requires a positive server login response and makes no paid call. An expired session requires reconnection in Arc on the source Mac, then renewal. A network error or rate limit requires a later check. Report failed destinations and successful updates from the command's answer. Do not promise automatic Google reconnection or a fixed cookie lifetime.
 
 ## Manage inference through profiles
 
@@ -98,7 +104,7 @@ Report the result folder, the one holding the `files`, and whether a summary `.m
 
 ## YouTube transport check
 
-Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. Without `--cookies FILE`, the transport check requires Arc. Both modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
+Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. Without a stored or supplied cookies file, the transport check requires Arc. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
 
 For browser access, Arc's `Default` profile must have a valid YouTube session. If it expires, sign in again. Arc can remain open. YouTube Premium does not replace browser authentication. The normal run tries Arc, or Chrome when Arc is absent. If browser authentication fails, it retries anonymously.
 

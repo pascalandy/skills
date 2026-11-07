@@ -37,10 +37,11 @@ from transcript import (
     duration,
     exit_codes,
     log,
-    resolve_cookie_file,
     run_child,
     run_script,
+    select_youtube_auth,
     validate_youtube_url,
+    youtube_session,
 )
 
 PROG = "youtube_smoke.py"
@@ -86,7 +87,7 @@ def build_parser() -> Parser:
         prog=PROG,
         exit_codes=EXIT_CODES,
         description=(
-            "Download YouTube audio through Arc, or an explicit cookies file, and validate it with "
+            "Download YouTube audio through the stored session, Arc, or an explicit cookies file, and validate it with "
             'ffprobe, without Deepgram or AI. A pass answers {"ok":true}.'
         ),
         epilog=f"""examples:
@@ -119,9 +120,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     if not validate_youtube_url(args.url):
         raise UsageError(f"invalid YouTube URL: {args.url!r}")
     try:
-        auth_mode = (
-            resolve_cookie_file(args.cookies) if args.cookies else "arc-required"
-        )
+        auth_mode = select_youtube_auth(args.cookies, fallback="arc-required")
     except ConfigurationError as error:
         raise UsageError(str(error)) from None
     rerun = _rerun(argv, prog=PROG)
@@ -132,6 +131,10 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
 
     budget = RunBudget.start(args.timeout)
     try:
+        if isinstance(auth_mode, CookieFile) and auth_mode.verify_session:
+            youtube_session.check_session(
+                auth_mode.path, timeout=budget.remaining("YouTube session check", 25)
+            )
         with tempfile.TemporaryDirectory(prefix="transcript-youtube-smoke-") as temp:
             transport = (
                 "the cookies file"
@@ -144,6 +147,15 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
             )
             log.info("Checking the audio stream with ffprobe")
             validate_audio_stream(downloaded.path, budget)
+    except youtube_session.SessionError as error:
+        raise Failure(
+            "session_failed",
+            str(error),
+            "transcript auth refresh",
+            code=TEMPORARY
+            if isinstance(error, youtube_session.SessionNetworkError)
+            else 1,
+        ) from None
     except YtDlpError as error:
         if error.temporary:
             raise Failure(

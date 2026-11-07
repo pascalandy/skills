@@ -183,7 +183,7 @@ YouTube metadata also records the audio method that worked: `anonymous`, `arc`, 
 
 ## YouTube transport
 
-Without `--cookies FILE`, normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
+Without a stored or supplied cookies file, normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
@@ -195,9 +195,32 @@ Run the free transport check on the canonical video from [Test videos](#test-vid
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-Without `--cookies FILE`, the transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
+Without a stored or supplied cookies file, the transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
 
 ### Use a portable cookies file
+
+For daily use, the permanent store is `~/.local/share/transcript/youtube.cookies.txt` on each computer. YouTube runs, doctor and smoke discover it automatically. An explicit `--cookies FILE` overrides it. Once the store directory exists, a missing or malformed managed file fails without browser or anonymous fallback. Dry runs check only the path. Normal managed-session runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work.
+
+#### Renew after signing in
+
+After signing in to YouTube in Arc, run in the source Mac's unlocked desktop terminal:
+
+```bash
+uv run <skill_dir>/scripts/transcript.py auth refresh
+```
+
+This exports only YouTube-domain cookies from Arc's Default profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
+
+Configure destinations once in `~/.local/share/transcript/youtube-targets.txt` on the source Mac, one trusted SSH host alias or `user@host` per line. Without this file, renewal updates only the source Mac. Receivers need `uv`, already required by Transcript, and known SSH host keys. SSH never accepts new keys or prompts for a password. The receiver uses the verifier sent by this command, so it does not require a matching skill installation.
+
+```bash
+uv run <skill_dir>/scripts/transcript.py auth check
+uv run <skill_dir>/scripts/transcript.py auth refresh --dry-run
+```
+
+`auth check` requires a positive login response without transcription. `auth refresh --help` describes target overrides and the preview. A stored export survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. Renewal is an explicit operation after reconnection. The source Mac must be awake for renewal; other computers use their last valid copy independently. Network and rate-limit failures are reported separately from a signed-out session.
+
+#### Supply another export
 
 An exported Netscape cookies file works as a local source on macOS and Linux without Arc or its Keychain. The explicit file selects the cookie source and uses no browser or anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
 

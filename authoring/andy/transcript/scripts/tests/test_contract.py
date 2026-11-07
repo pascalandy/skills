@@ -51,6 +51,9 @@ COMMANDS: dict[tuple[str, ...], dict[int, str]] = {
     ("list", "profiles"): transcript.LIST_EXIT_CODES,
     ("list", "models"): transcript.LIST_EXIT_CODES,
     ("doctor",): transcript.DOCTOR_EXIT_CODES,
+    ("auth",): transcript.EXIT_CODES,
+    ("auth", "check"): transcript.EXIT_CODES,
+    ("auth", "refresh"): transcript.EXIT_CODES,
     ("help",): transcript.LIST_EXIT_CODES,
 }
 
