@@ -178,11 +178,11 @@ The metadata holds the title, date, and source from the moment the folder appear
 - `Transcript status`: `in progress`, `complete`, `failed`, or `interrupted`
 - `Summary status`: `pending`, `running`, `succeeded`, `failed`, `skipped`, `not started`, or `interrupted`
 
-YouTube metadata also records the audio method that worked: `anonymous`, `arc`, or `chrome`.
+YouTube metadata also records the audio method that worked: `anonymous`, `arc`, `chrome`, or `cookies`. The `cookies` method identifies a supplied file; it does not attest server-side account authentication.
 
 ## YouTube transport
 
-Normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
+Without `--cookies FILE`, normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
@@ -194,7 +194,43 @@ Run the free transport check on the canonical video from [Test videos](#test-vid
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-The transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the Arc adapter ran. It does not prove the full user flow.
+Without `--cookies FILE`, the transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
+
+### Use a portable cookies file
+
+An exported Netscape cookies file works as a local source on macOS and Linux without Arc or its Keychain. The explicit file selects the cookie source and uses no browser or anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
+
+Keep any files requested by your yt-dlp configuration private. The `--write-info-json` option can include personal information outside Transcript's logs.
+
+1. Create a separate private YouTube session. Sign in, then open `https://www.youtube.com/robots.txt` in the same and only private tab. Export only the `youtube.com` cookies in Netscape format, then close the private window without reopening that session. Follow the [yt-dlp YouTube export procedure](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies) and its recommended exporters. The generic combination of `--cookies-from-browser` and `--cookies` exports ordinary browser cookies, not this private session, and can include every site
+2. Keep the export outside Git and the skill package. Store it in a private directory with file permissions `0600`. For example:
+
+   ```bash
+   install -d -m 700 "$HOME/.local/share/transcript"
+   install -m 600 /path/to/exported-cookies.txt "$HOME/.local/share/transcript/youtube.cookies.txt"
+   ```
+
+3. To use another computer, transfer the file over a trusted SSH connection. Prepare the destination and restrict its copy:
+
+   ```bash
+   ssh user@host 'install -d -m 700 ~/.local/share/transcript'
+   scp "$HOME/.local/share/transcript/youtube.cookies.txt" user@host:.local/share/transcript/youtube.cookies.txt
+   ssh user@host 'chmod 600 ~/.local/share/transcript/youtube.cookies.txt'
+   ```
+
+4. Check local requirements and the free transport before transcription:
+
+   ```bash
+   uv run <skill_dir>/scripts/transcript.py doctor --source youtube --cookies ~/.local/share/transcript/youtube.cookies.txt
+   uv run <skill_dir>/scripts/youtube_smoke.py --cookies ~/.local/share/transcript/youtube.cookies.txt
+   uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --cookies ~/.local/share/transcript/youtube.cookies.txt
+   ```
+
+The run and queue validate the file before reading Deepgram credentials. A dry run checks the path and reports `source.cookies_file` without reading cookie values. `doctor` checks local readability and Netscape syntax, without testing YouTube authentication. Deepgram and the selected summary profile retain their own credentials.
+
+Each yt-dlp invocation receives a separate temporary `0600` copy in a `0700` directory. The source stays unchanged when yt-dlp rewrites its jar, and the temporary copy is removed after success, failure, timeout, or interruption. Queued and concurrent runs share no writable jar. Diagnostics omit cookie values and raw cookie-parser records, including in debug mode.
+
+YouTube can rotate or invalidate a session; no export has a guaranteed lifetime. To renew, create a fresh export and replace the source on each computer. To revoke, sign out the exported Google session and remove its stored copies. A cookies file does not supply JavaScript challenge solvers or PO tokens; see the [YouTube extractor guide](https://github.com/yt-dlp/yt-dlp/wiki/Extractors) if transport still fails.
 
 ## Test videos
 
@@ -217,7 +253,7 @@ Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `xhigh` effo
 
 Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 
-Run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`, and Linux has no Arc profile. Both fall back to anonymous access, which YouTube usually refuses. From SSH or Linux, hand the closeout commands to a local Mac session.
+For browser mode, run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`, and Linux has no Arc profile. Both fall back to anonymous access, which YouTube usually refuses. A valid `--cookies FILE` source avoids the Keychain dependency and can run from SSH or Linux. Append that option to the closeout commands when testing file mode.
 
 ## Validation model
 
@@ -230,6 +266,8 @@ Use these evidence names consistently:
 - **E2E** combines the relevant coded validation with Agent QA across the real pipeline
 
 Passing Checks, Automated tests, or CI alone never proves E2E. Always finish every `transcript` change, including documentation and test changes, with the E2E closeout below.
+
+Validate real use on each target computer. Distinguish file parsing, successful media transport, and positive server-side account authentication. Use a controlled account-only resource or another positive server response to establish the last one; a public download is insufficient.
 
 ## Checks
 
