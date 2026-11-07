@@ -34,8 +34,8 @@ def test_ytdlp_pin_matches_source_adapter_smoke_check_and_docs() -> None:
     smoke_text = (SKILL_DIR / "scripts" / "youtube_smoke.py").read_text(
         encoding="utf-8"
     )
-    source_pin = re.search(r'"yt-dlp==([^"\s]+)"', source_text)
-    smoke_pin = re.search(r'"yt-dlp==([^"\s]+)"', smoke_text)
+    source_pin = re.search(r'"yt-dlp\[default\]==([^"\s]+)"', source_text)
+    smoke_pin = re.search(r'"yt-dlp\[default\]==([^"\s]+)"', smoke_text)
 
     assert source_pin is not None
     assert smoke_pin is not None

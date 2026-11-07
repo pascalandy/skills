@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "httpx",
-#     "yt-dlp==2026.7.4",
+#     "yt-dlp[default]==2026.7.4",
 #     "pycryptodomex",
 #     "rich",
 # ]

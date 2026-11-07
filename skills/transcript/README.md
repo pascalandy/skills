@@ -8,6 +8,7 @@ The CLI uses subcommands, validates source input before execution, answers each 
 
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
+- A supported JavaScript runtime for YouTube. Deno is enabled automatically; `deno --version` confirms it. Follow the [yt-dlp EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS) for installation or a configured alternative
 - Zoom recordings under `~/Documents/Zoom` for Zoom mode
 - When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
@@ -22,7 +23,7 @@ chezmoi secret keyring set --service=deepgram --user=api_key
 
 The runtime falls back to `DEEPGRAM_API_KEY` when the keyring is unavailable. It never prints the key.
 
-The scripts pin `yt-dlp` to `2026.7.4`, the version covered by the Arc adapter and transport check.
+The scripts pin `yt-dlp` to `2026.7.4`, the version covered by the Arc adapter and transport check. They install its default dependencies, including the matching EJS challenge solver.
 
 ## Commands and options
 
