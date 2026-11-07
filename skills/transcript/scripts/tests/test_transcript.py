@@ -1936,7 +1936,7 @@ class TestYouTubeAuthenticationOrder:
     def test_runtime_pins_the_proven_ytdlp_version(self) -> None:
         script_text = SCRIPT_PATH.read_text(encoding="utf-8")
 
-        assert '"yt-dlp==2026.7.4"' in script_text
+        assert '"yt-dlp[default]==2026.7.4"' in script_text
 
     def test_ytdlp_uses_arc_first_and_skips_anonymous_when_it_succeeds(
         self, tmp_path, monkeypatch

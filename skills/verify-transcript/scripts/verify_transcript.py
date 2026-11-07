@@ -515,7 +515,7 @@ HELP_CONTRACTS = (
     HelpContract(
         "root-help",
         ("--help",),
-        frozenset({"run", "list", "doctor", "help"}),
+        frozenset({"run", "list", "doctor", "auth", "help"}),
         GLOBAL_OPTIONS | {"--version"},
     ),
     HelpContract(
@@ -528,7 +528,7 @@ HELP_CONTRACTS = (
         "youtube-help",
         ("run", "youtube", "--help"),
         frozenset(),
-        RUN_OPTIONS | {"--url"},
+        RUN_OPTIONS | {"--cookies", "--url"},
     ),
     HelpContract(
         "zoom-help",
@@ -570,7 +570,22 @@ HELP_CONTRACTS = (
         "doctor-help",
         ("doctor", "--help"),
         frozenset(),
-        GLOBAL_OPTIONS | {"--no-summary", "--source"},
+        GLOBAL_OPTIONS | {"--cookies", "--no-summary", "--source"},
+    ),
+    HelpContract(
+        "auth-help", ("auth", "--help"), frozenset({"check", "refresh"}), GLOBAL_OPTIONS
+    ),
+    HelpContract(
+        "auth-check-help",
+        ("auth", "check", "--help"),
+        frozenset(),
+        GLOBAL_OPTIONS | {"--cookies", "--timeout"},
+    ),
+    HelpContract(
+        "auth-refresh-help",
+        ("auth", "refresh", "--help"),
+        frozenset(),
+        GLOBAL_OPTIONS | {"--to", "--dry-run", "--timeout"},
     ),
     HelpContract(
         "help-help",
@@ -581,6 +596,14 @@ HELP_CONTRACTS = (
 )
 
 PUBLIC_SURFACES = (
+    PublicSurface("command.auth", "command", "auth", ("interface.help-version",)),
+    PublicSurface(
+        "command.auth-check", "command", "check", ("interface.help-version",)
+    ),
+    PublicSurface(
+        "command.auth-refresh", "command", "refresh", ("interface.help-version",)
+    ),
+    PublicSurface("option.to", "option", "--to", ("interface.help-version",)),
     PublicSurface(
         "command.run",
         "command",
@@ -633,6 +656,15 @@ PUBLIC_SURFACES = (
     PublicSurface("option.help", "option", "--help", ("interface.help-version",)),
     PublicSurface("option.version", "option", "--version", ("interface.help-version",)),
     PublicSurface("option.url", "option", "--url", ("youtube.dry-run-summary",)),
+    PublicSurface(
+        "option.cookies",
+        "option",
+        "--cookies",
+        exclusion_reason=(
+            "Secret-file validation and lifecycle are covered by transcript cookie-file tests; "
+            "live authentication requires an exported session"
+        ),
+    ),
     PublicSurface(
         "option.latest",
         "option",

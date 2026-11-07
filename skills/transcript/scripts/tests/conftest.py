@@ -10,6 +10,17 @@ from typing import Any, TypeVar, cast
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def isolated_youtube_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never discover a real signed-in session from the user's home."""
+    import youtube_session
+
+    monkeypatch.setattr(
+        youtube_session, "session_directory", lambda: tmp_path / "session"
+    )
+
+
 # Add the scripts directory to sys.path so `from transcript import ...` works
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

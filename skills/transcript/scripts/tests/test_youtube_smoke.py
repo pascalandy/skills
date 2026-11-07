@@ -34,8 +34,8 @@ def test_ytdlp_pin_matches_source_adapter_smoke_check_and_docs() -> None:
     smoke_text = (SKILL_DIR / "scripts" / "youtube_smoke.py").read_text(
         encoding="utf-8"
     )
-    source_pin = re.search(r'"yt-dlp==([^"\s]+)"', source_text)
-    smoke_pin = re.search(r'"yt-dlp==([^"\s]+)"', smoke_text)
+    source_pin = re.search(r'"yt-dlp\[default\]==([^"\s]+)"', source_text)
+    smoke_pin = re.search(r'"yt-dlp\[default\]==([^"\s]+)"', smoke_text)
 
     assert source_pin is not None
     assert smoke_pin is not None
@@ -85,20 +85,31 @@ def test_docs_define_validation_boundaries_and_mandatory_e2e() -> None:
         assert all("Agent QA" in line for line in qa_lines)
 
 
+@pytest.mark.parametrize("cookie_mode", [False, True], ids=["arc", "cookies-file"])
 def test_smoke_downloads_validates_and_cleans_without_paid_services(
-    monkeypatch, capsys
+    monkeypatch, capsys, tmp_path, cookie_mode
 ) -> None:
     import transcript
     import youtube_smoke
 
     observed_audio_paths: list[Path] = []
+    cookies_path = tmp_path / "cookies.txt"
+    cookies_path.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t0\tsession\tsynthetic-test-cookie\n",
+        encoding="utf-8",
+    )
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
-        assert auth_mode == "arc-required"
+        assert auth_mode == (
+            transcript.CookieFile(cookies_path) if cookie_mode else "arc-required"
+        )
         audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
         observed_audio_paths.append(audio_path)
-        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
+        return transcript.DownloadedAudio(
+            audio_path, "cookies" if cookie_mode else "arc", "A video", "abc"
+        )
 
     def fake_run(command, **kwargs):
         assert command[0] == "ffprobe"
@@ -119,7 +130,10 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
         lambda *_args: pytest.fail("smoke called Pi or GPT"),
     )
 
-    code = youtube_smoke.main([CANONICAL_TRANSPORT_URL])
+    code = youtube_smoke.main(
+        [CANONICAL_TRANSPORT_URL]
+        + (["--cookies", str(cookies_path)] if cookie_mode else [])
+    )
 
     assert code == 0
     # A pass answers in one line; -v reports the steps on stderr
