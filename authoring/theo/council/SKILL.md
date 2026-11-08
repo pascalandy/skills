@@ -2,20 +2,26 @@
 name: "council"
 description: "Trigger this if the user says 'council'."
 kind: "dev"
+configuration-is-needed: true
 ---
 
 # Council
 
 Bring in three delegates to help with the user's request, usually for review
-or feedback. Use one strong model from each of three different providers, at
-high reasoning effort. If the user's instructions name council members, use
-those. Otherwise pick the latest flagship model from each provider, for
-example Claude Opus, GPT Sol, and Gemini Pro.
+or feedback. Each seat takes the reviewer card of a loader skill: model,
+effort, T3 provider and effort option, route outside T3, and name in the
+report. Read only the card. Do not run `review-loop`.
 
-In T3 Code, use `orchestrator_capabilities` to resolve the models, then
-`delegate_task` to start one delegate per model in parallel. Elsewhere, use
-the harness's subagent tools. If you cannot reach three providers, or a named
-member is unavailable, report it instead of substituting.
+| Seat | Card |
+| --- | --- |
+| 1 | `cc-loop` |
+| 2 | `codex-loop` |
+| 3 | `dsf-loop` |
+
+A member or effort the user names wins. In T3 Code, call
+`orchestrator_capabilities` with `search` set to each model name, then start
+the three delegates in parallel with `delegate_task`. Outside T3, use each card's route. If a seat
+cannot run, report it instead of substituting.
 
 Give each delegate the request and relevant context. For review or feedback,
 keep their work read-only. Collect their responses and summarize the useful
@@ -35,9 +41,9 @@ Rounds: 2
 
 | Delegate | Round 1 | Round 2 |
 | --- | --- | --- |
-| Claude Opus | 7/10 | 9/10 |
-| GPT Sol | 8/10 | 10/10 |
-| Gemini Pro | 7/10 | 9/10 |
+| Opus | 7/10 | 9/10 |
+| Sol | 8/10 | 10/10 |
+| DeepSeek Flash (`ds4p1-slow`) | 7/10 | 9/10 |
 ```
 
 If a delegate gives no score, write `no score`. Do not invent one.

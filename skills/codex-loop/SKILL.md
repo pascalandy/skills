@@ -10,7 +10,7 @@ Load `review-loop` and follow it with this reviewer:
 
 - Model: the latest Sol at `xhigh`. When the user mentions Astra: the latest
   Astra at `high`
-- T3: provider `codex`, effort option `reasoningEffort`
+- T3: a provider whose driver is `codex`, effort option `reasoningEffort`
 - Outside T3: a native Sol subagent. In Claude Code, a custom subagent only if
   it is set up to run Sol
 - Name in the report: Sol
