@@ -77,6 +77,7 @@ A mode's routes run through that mode's SKILL.md.
 - `create-formal-verification-skill`: Use only when explicitly invoked as `create-formal-verification-skill`.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
 - `diagnose`: Use for any request to debug, find the root cause, or explain why something fails or got slower: incidents, latency jumps, error spikes, crashes, memory leaks, hangs and timeouts, regressions after a deploy or flag change. Load it before reading code. Also use when a verify-loop run fails, or when a claimed cause, repro, or fix needs checking against facts.
+- `dsf-loop`: Use when the user says 'dsf loop', 'deepseek loop', or 'better call deepseek'.
 - `file-pr`: File a concise pull request. Use when the user asks to file, open, or create a PR.
 - `full-send`: Trigger this if the user says 'full send'.
 - `full-stop`: Trigger this if the user says 'full stop'.
@@ -106,7 +107,7 @@ A mode's routes run through that mode's SKILL.md.
 - `principle-prove-it-works`: Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.'
 - `recall`: Use only when explicitly invoked as `recall`.
 - `reflect`: Use only when explicitly invoked as `reflect`.
-- `review-loop`: Use when the user says 'review loop', or when codex-loop or cc-loop hands over its reviewer.
+- `review-loop`: Use when the user says 'review loop', or when codex-loop, cc-loop, or dsf-loop hands over its reviewer.
 - `show-me-your-work`: Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away.
 - `swarm`: Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration.
 - `tdd`: Use only when explicitly invoked as `tdd`.
