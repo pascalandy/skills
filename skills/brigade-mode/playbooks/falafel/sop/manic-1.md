@@ -4,6 +4,6 @@ Use 🧰 poteto-mode to review every change in Cook <b>.<c>'s stack from <base b
 
 Look for changes that are wrong, risky or unnecessary against the batch threat model in your brief.
 
-Review as one 🧰 interrogate reviewer, following its `references/reviewer-prompt.md` and `references/rubric.md` through this rejection angle. Review eliminates and never confirms.
+Rate each finding `blocker`, `should` or `nit` as 🧰 review-loop defines them, and reply in the format of your brief, through this rejection angle. Review eliminates and never confirms.
 
 Done when your result lists your findings, or reports that you found none, and lists what you checked.

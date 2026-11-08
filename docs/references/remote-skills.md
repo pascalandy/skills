@@ -138,7 +138,7 @@ A mode's routes run through that mode's SKILL.md.
   - `carpaccio`: Run batches under a Head Chef: Cooks implement, document, watch and delegate reviews; each Chef validates, merges and closes its batch.
   - `dolma`: Run batches under a Head Chef: one Cook per batch implements every card in one stack, documents and watches it, and runs each review pair on it; each Chef validates, merges and closes its batch.
   - `escargot`: Run batches under a Head Chef: one Cook per batch implements every card in one stack, documents and watches it, and runs each review pair on it; each Chef validates, merges and closes its batch.
-  - `falafel`: Run batches under a Head Chef: one Cook per batch implements every card in one stack, documents and watches it, and runs each review pair on it; each Chef validates, merges and closes its batch.
+  - `falafel`: Run batches under a Head Chef with no Chef: one Cook per batch runs Pascal's solo recipe, one PR per card in one stack, with a review loop on each PR and one on the whole stack, then merges, releases and closes its batch.
 - `code-review-mode`: Use for a code review of a branch or code area, an architecture review, a test audit, a thermonuclear review, or a sweep for bugs and unfinished code outside any diff, and whenever writing or changing tests.
   - `architecture-review`: Review the module shape across a code area and propose refactors that turn shallow modules into deep ones.
   - `sweep`: Sweep code that no diff touches for bugs, hard-coded values that should vary, and unfinished code, and draft one issue per finding.
