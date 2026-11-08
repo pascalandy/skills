@@ -1,6 +1,6 @@
 ---
 name: "review-loop"
-description: "Use when the user says 'review loop', or when codex-loop or cc-loop hands over its reviewer."
+description: "Use when the user says 'review loop', or when codex-loop, cc-loop, or dsf-loop hands over its reviewer."
 kind: "dev"
 role: "helper"
 ---
