@@ -184,8 +184,8 @@ Use `~/.cache/brigade-<id4>/<thread>/` for temporary files and caches, with `TMP
 
 The Head Chef selects `[cook]`, and the Cook selects `[loop-1]` or `[loop-2]` from `config.toml` for each reviewer. The Head Chef selects `[watchdog]` for its own Watchdog.
 
-1. Read your selection with `t3_thread_configuration`. For a Cook, choose `head-chef-on-claude` or `head-chef-on-codex` from the Head Chef's provider; for a reviewer, choose `cook-on-claude` or `cook-on-codex` from the Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise resolve `instance` to a live provider instance in `orchestrator_capabilities`. Done when the provider and model exist
-2. Map `reasoning-level` to Codex `reasoningEffort` or claudeAgent `effort`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Send an option only when the catalog entry of the model lists it. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`, unless the repository's procedure selects a model for that work, such as its Verify delegate. In that case, follow the repository's model selection. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the reviewer rule. Done when the catalog supports each option, every reviewer uses the other provider and every Watchdog uses its parent's provider
+1. Read your selection with `t3_thread_configuration`. For a Cook, choose `head-chef-on-claude` or `head-chef-on-codex` from the Head Chef's provider. When Pascal asks for a Codex, Sol or DSF (DeepSeek Flash) Cook, in the invocation, at Align or during the run, choose `on-request-codex` or `on-request-dsf` instead, for the batches Pascal names or for every batch, and record it with the Align choices; a request during the run applies to Cooks not yet launched. For a reviewer, choose `cook-on-claude`, `cook-on-codex` or `cook-on-pi` from the Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise resolve `instance` to a live provider instance in `orchestrator_capabilities`. Done when the provider and model exist
+2. Map `reasoning-level` to Codex `reasoningEffort`, claudeAgent `effort` or Pi `thinking`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Send an option only when the catalog entry of the model lists it. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` through `delegate_task`, unless the repository's procedure selects a model for that work, such as its Verify delegate. In that case, follow the repository's model selection. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider rather than following the reviewer rule. Done when the catalog supports each option, every reviewer uses the other provider and every Watchdog uses its parent's provider
 3. Threads inherit runtime and interaction modes at launch; delegates inherit them from the Cook. Keep `runtime-mode = "inherit"` throughout the run, with no mode change. For launches use `modelSelection`; for delegations use `target`, renaming `instanceId` to `providerInstanceId`. Escalate an unavailable setting through the chain. Done when the selection is supported
 
 ## Report
@@ -219,7 +219,7 @@ Head Chef → Pascal, in Canadian French. At Align, send the Align plan below, t
 
 ```text
 Je veux <goal>, pour régler <problem>
-Lot <b> · <repository> · après <batches, or aucun> · release <oui/non>
+Lot <b> · <repository> · après <batches, or aucun> · release <oui/non> · cook <Cook model>
 - <card> : <acceptance criterion> → <evidence that will prove it>
 Pour toi : <Pascal-owned cards>
 🙋 feu vert d'avance lot <b> : <gate exception> ; <scope and conditions>
