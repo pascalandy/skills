@@ -8,8 +8,10 @@ max-parallel = 2 # Head Chef: simultaneous Cooks when Decisions allow parallel
 retro = true # Head Chef: run its closing retros
 
 [cook]
-head-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Head Chef: Cook selection
+head-chef-on-claude = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" } # Head Chef: Cook selection
 head-chef-on-codex = { inherit = true } # Head Chef: Cook selection
+on-request-codex = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Head Chef: Cook when Pascal asks for Codex or Sol
+on-request-dsf = { instance = "pi", model = "openrouter-hub/ds4p1-slow", reasoning-level = "max" } # Head Chef: Cook when Pascal asks for DSF
 delegate-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" } # Cook on Claude: side work target
 retro = true # Cook: run its closing retros
 
@@ -23,7 +25,9 @@ max-wakes = 2 # Watchdog: counted wakes before alert
 [loop-1] # Cook: reviewer of loop 1, on each PR; review-loop owns the round budget
 cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+cook-on-pi = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 
 [loop-2] # Cook: reviewer of loop 2, once on the whole stack; review-loop owns the round budget
 cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
 cook-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+cook-on-pi = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
