@@ -18,9 +18,9 @@ report. Read only the card. Do not run `review-loop`.
 | 2 | `codex-loop` |
 | 3 | `dsf-loop` |
 
-A member or effort the user names wins. In T3 Code, resolve each model with
-`orchestrator_capabilities` and `search`, then start the three delegates in
-parallel with `delegate_task`. Outside T3, use each card's route. If a seat
+A member or effort the user names wins. In T3 Code, call
+`orchestrator_capabilities` with `search` set to each model name, then start
+the three delegates in parallel with `delegate_task`. Outside T3, use each card's route. If a seat
 cannot run, report it instead of substituting.
 
 Give each delegate the request and relevant context. For review or feedback,
