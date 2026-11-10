@@ -13,7 +13,7 @@ description: "Run batches under a Head Chef with no Chef: one Cook per batch run
 - **Loop 1**: 🧰 review-loop on one PR, via manic-1 and manic-2 angles
 - **Loop 2**: 🧰 review-loop on what will merge together, whole stack or single PR, via manic-3 and manic-5 angles
 - **Fast track**: `$brigade ; gravlax ; manic-4`, or Pascal's request during a run. Cook implements only, skipping docs and both loops
-- **Shipped behavior**: what a user or caller of the cards' work can observe. A comment, wording, format, docs or test-only change leaves it unchanged, even if a reviewer proposed it
+- **Shipped behavior**: what a user or caller of the cards' work can observe. A comment, wording, format, docs or test-only change keeps approval when it leaves that unchanged, even if a reviewer proposed it. Text an agent executes, e.g. a prompt or a skill instruction, is behavior
 
 ## Roles
 
