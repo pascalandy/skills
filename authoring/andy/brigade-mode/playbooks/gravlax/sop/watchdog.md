@@ -1,6 +1,6 @@
 # watchdog
 
-Run in one delegated thread for the Head Chef, the run's only Watchdog. Read this SOP and the brief at every scheduled tick. Use 🧰 t3-runtime for T3 calls. The parent owns `watch.toml` and removes the Watchdog's work folder; you own `wake.toml` and the schedule bound to your thread. Keep the parent's context quiet while the watched threads are healthy.
+Run in one delegated thread for the Head Chef, the run's only Watchdog. Read this SOP, the brief and its Rules at every scheduled tick. Use 🧰 t3-runtime for T3 calls. The parent owns `watch.toml` and removes your work folder; you own `wake.toml` and the bound schedule. Send the parent only the alerts this SOP defines.
 
 ## Arm
 
@@ -13,7 +13,7 @@ Parent: threadId <id>, projectId <id>, provider <provider>
 Watch file: <absolute parent work folder>/watch.toml
 Wake file: <absolute watchdog work folder>/wake.toml
 Work folder: <absolute watchdog work folder>
-Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>
+Config: watch-minutes <n>, stall-minutes <n>, max-wakes <n>, progress-hours <n>
 Rules: <rules.md path>
 ```
 
@@ -22,7 +22,7 @@ Rules: <rules.md path>
 
 ## Files
 
-The parent writes `watch.toml` atomically after each launch, received report, status or subject change, hold change, scope change and replacement. It records its own threadId, projectId, subject and, when it has a Watchdog, that Watchdog's taskId, childThreadId, scheduledTaskId and arming time. Each `[[slots]]` record has a logical slot, threadId, projectId, last received phase, hold flag, final report received flag and optional `replacedBy`. A slot registered before its launch has `threadId = ""` and `lastReceivedPhase = "queued"`. It stays live and counted, but the tick makes no thread or schedule lookup for it until the parent writes its threadId into that record at launch. If Stop or a cut ends it before launch, the parent sets `lastReceivedPhase = "⏹️"` and `reportReceived = true`; it has no thread to settle. A `🍽️ Batch ready` report is a phase report, not a final report. The Head Chef's file has its own `head-chef` record plus Cook records. The Head Chef marks its own record's `reportReceived` after sending the final report to Pascal. On replacement, retain the old record with `replacedBy` and append one new current record for the same logical slot without it. A split uses `replacedBy = "split"` on the old record and new slots for the successors. Ignore late messages from the old threadId; watch only current records.
+The parent writes `watch.toml` atomically after each launch, received report, status or subject change, hold change, scope change and replacement. It records its own threadId, projectId, subject and, when it has a Watchdog, that Watchdog's taskId, childThreadId, scheduledTaskId and arming time. Each `[[slots]]` record has a logical slot, threadId, projectId, last received phase, hold flag, final report received flag and optional `replacedBy`. A Cook record also has `progressSince`: its batch's launch time, kept across a Cook replacement and reset when the parent receives `🍽️ Batch ready` or `🔀 Batch merging`. A slot registered before its launch has `threadId = ""` and `lastReceivedPhase = "queued"`. It stays live and counted, but the tick makes no thread or schedule lookup for it until the parent writes its threadId into that record at launch. If Stop or a cut ends it before launch, the parent sets `lastReceivedPhase = "⏹️"` and `reportReceived = true`; it has no thread to settle. A `🍽️ Batch ready` report is a phase report, not a final report. The Head Chef's file has its own `head-chef` record plus Cook records. The Head Chef marks its own record's `reportReceived` after sending the final report to Pascal. On replacement, retain the old record with `replacedBy` and append one new current record for the same logical slot without it. A split uses `replacedBy = "split"` on the old record and new slots for the successors. Ignore late messages from the old threadId; watch only current records.
 
 Use these field names. Add batch metadata to the parent file as needed; omit `replacedBy` until replacement:
 
@@ -43,9 +43,10 @@ workFolder = "<absolute path>"
 lastReceivedPhase = "<status emoji the last received report implies, or queued>"
 hold = false
 reportReceived = false
+progressSince = "<ISO timestamp; Cook records only>"
 ```
 
-Keep in `wake.toml`, per slot, the counted failure wakes, counted stall wakes and the title for that stall series. Also keep the last pending finding and its consecutive tick count, and the last delivered alert. A finding key includes the slot, current threadId, kind and relevant status or title; changing threadId starts new counters. Derive a stable `clientRequestId` from `scheduleId`, that key and the saved `nextWakeOrdinal` for a wake, or from `scheduleId` and the key for an alert. Advance the ordinal and count a wake only after T3 confirms delivery; mark an alert delivered only after confirmation. If delivery is uncertain, recompute the live finding next tick and retry with the same id only while it still applies. The parent and Watchdog write their respective files through a temporary file in the same folder followed by an atomic rename. Use `scheduleId` and `nextWakeOrdinal` at the root. In each `[[slots]]`, use `slot`, `threadId`, `failureWakes`, `stallWakes`, `stallTitle`, `pendingFinding`, `pendingTicks` and `alertedFinding`. Add no other key. Write the file only when a value changes. Read each threadId from `watch.toml`. Never build a threadId.
+Keep in `wake.toml`, per slot, the counted failure wakes, counted stall wakes and title for that stall series, last pending finding, consecutive tick count and last delivered alert. A finding key includes slot, current threadId, kind and relevant status or title; changing threadId resets failure wakes, stall wakes and pending findings. Derive a stable `clientRequestId` from `scheduleId`, that key and `nextWakeOrdinal` for a wake, or `scheduleId` and the key for an alert. Advance the wake ordinal and wake counts only after confirmed delivery; mark an alert delivered then. If uncertain, retry with the same id next tick while the finding applies. Write each file through a same-folder temporary file and atomic rename. Use `scheduleId` and `nextWakeOrdinal` at the root. Each `[[slots]]` uses `slot`, `threadId`, `failureWakes`, `stallWakes`, `stallTitle`, `pendingFinding`, `pendingTicks`, `alertedFinding` and `progressHours`: the last long-batch threshold alerted for the slot's current `progressSince`, 0 at first and again when `progressSince` changes. Write only changed values. Read threadIds from `watch.toml`.
 
 Only a Cook on 🍳 can stall. A Head Chef waits on its children by design and is never stalled. For an idle Cook candidate, call `t3_thread_list` in its project with `includeSubagents: true` and keep the threads whose `parentThreadId` is the Cook's threadId, following `nextCursor` until the list ends. A child that is starting, running or waiting means the Cook waits on its delegates, not a stall.
 
@@ -63,7 +64,7 @@ Final phases: a Head Chef or Cook on ⛳ or ⏹️. A Cook on 🍽️ waits for 
    Done when the parent and every launched current slot have a T3 state, title and last update, or a missing-thread finding
 
 2. For each current slot, apply the first matching line below. Persist its finding before any new send. A skipped slot clears a pending two-tick finding. Done when each slot has exactly one new outcome for this tick
-3. Check forbidden combinations only for slots without a higher-precedence finding. Use the same two-tick and once-per-finding alert rule. If the parent is final, every child is final, settled and reported, and no finding remains pending or active, delete your schedule and end. Done when every standing finding is recorded or alerted once
+3. Apply Long batches, then check forbidden combinations for slots without a higher-precedence finding. Use the same two-tick and once-per-finding rule for forbidden combinations. If the parent is final, every child is final, settled and reported, and no finding remains, delete your schedule and end. Done when every standing finding is recorded or alerted once
 
 First matching line for a watched thread:
 
@@ -75,6 +76,10 @@ First matching line for a watched thread:
 6. **Forbidden combination:** Hold an F2, F4 or F9 finding below for two consecutive ticks, then alert the parent once
 
 An ordinary completed turn after a failure wake resets the failure count. A different finding clears the previous pending count. An alert repeats only if its finding key changes. Treat a missing current thread as an unreported end finding and ask the parent to reconcile it; never relaunch a child yourself.
+
+### Long batches
+
+At each tick, for each Cook record whose last received phase is 🍳 or ⏸️, count the full `progress-hours` intervals since its `progressSince`. For each newly crossed threshold, alert the Head Chef once with `🐕 Watchdog <id4>: long batch <slot> <hours> h`. Use a stable id for the slot, its `progressSince` and the threshold, and save that threshold as `progressHours` only after confirmed delivery. This alert is independent of failure and stall findings; it wakes the Head Chef for the notice in [Report](../gravlax.md#report).
 
 ## Wake and alert
 

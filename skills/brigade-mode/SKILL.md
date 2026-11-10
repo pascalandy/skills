@@ -8,16 +8,18 @@ kind: "dev"
 
 ## Pick the route
 
-- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio, dolma or escargot Head Chef, Chef or Cook, or a falafel Head Chef or Cook, also loads 🧰 oem first; the route's chain and Asking Pascal replace oem's When You Need Me
+- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio, dolma or escargot Head Chef, Chef or Cook, or a falafel or gravlax Head Chef or Cook, also loads 🧰 oem first; the route's chain and Asking Pascal replace oem's When You Need Me
 - **A delegated carpaccio, dolma or escargot barrage, ending in `manic-1`, `manic-2`, `manic-3` or `manic-5`:** read only `playbooks/<route>/sop/<sop>.md` and your brief, then review under that contract
-- **A delegated carpaccio, dolma, escargot or falafel Watchdog, ending in `watchdog`:** read only `playbooks/<route>/sop/watchdog.md` and your brief, then run its scheduled tick
-- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque, carpaccio, dolma, escargot and falafel. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
+- **A delegated carpaccio, dolma, escargot, falafel or gravlax Watchdog, ending in `watchdog`:** read only `playbooks/<route>/sop/watchdog.md` and your brief, then run its scheduled tick
+- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque, carpaccio, dolma, escargot, falafel and gravlax. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
 - **Three parts ending in `manic-4`, such as `$brigade ; arancini ; manic-4`:** you are the thread the user talks to. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan, in fast track as the playbook defines it
 - **Other three-part invocations, `$brigade-mode ; <route> ; <sop>`:** another thread of the route launched or delegated you. Read `playbooks/<route>/<route>.md` for your role and the shared rules, then read `playbooks/<route>/sop/<sop>.md` and follow it
 
 No SOP is ever named `manic-4`, so the cases never overlap.
 
 ## Routes
+
+The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is.
 
 ### Appetizers
 
@@ -27,7 +29,8 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 | [`bisque`](playbooks/bisque/bisque.md) | | The approved CU1, second version: a Head Chef splits the plan into batches, one Chef per batch runs a Cook and delegates the barrages, and the Head Chef green-lights each merge |
 | [`carpaccio`](playbooks/carpaccio/carpaccio.md) | | CU1: a Head Chef aligns batches, Cooks own implementation, docs and delegated reviews, and each Chef validates, merges and closes its batch |
 | [`dolma`](playbooks/dolma/dolma.md) | | CU1, fourth version: a Head Chef aligns batches, one Cook per batch implements every card in one stack and runs each review pair on it, and each Chef validates, merges and closes its batch |
-| [`escargot`](playbooks/escargot/escargot.md) | | CU1, fifth and live version: dolma with fewer review passes, checks rerun once per set of fixes, Watchdogs narrowed to failures and stalled Cooks, and advance authorizations at Align |
+| [`escargot`](playbooks/escargot/escargot.md) | | CU1, fifth version: dolma with fewer review passes, checks rerun once per set of fixes, Watchdogs narrowed to failures and stalled Cooks, and advance authorizations at Align |
 | [`falafel`](playbooks/falafel/falafel.md) | | CU1, sixth version: escargot without the Chef; each Cook runs Pascal's solo recipe with loop 1 per PR and loop 2 per stack |
+| [`gravlax`](playbooks/gravlax/gravlax.md) | | CU1, seventh and live version: falafel with merge gates stated by purpose; the Cook merges alone, the Head Chef settles a doubt, and only a hard stop reaches Pascal |
 
-To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`. falafel runs do not replay yet: https://github.com/pascalandy/skills/issues/1172
+To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`. falafel and gravlax runs do not replay yet: https://github.com/pascalandy/skills/issues/1172

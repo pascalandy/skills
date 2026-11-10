@@ -1,6 +1,6 @@
 # manic-2
 
-Use 🧰 poteto-mode and 🧰 blast-radius on Cook <b>.<c>'s PRs. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?
+Use 🧰 poteto-mode and 🧰 blast-radius on your brief's subject. Then run a premortem: assume this stack merged and broke something a week later. Which blind spots explain it?
 
 Rate each finding `blocker`, `should` or `nit` as 🧰 review-loop defines them, and reply in the format of your brief, through this blast-radius and premortem angle. Review eliminates and never confirms.
 

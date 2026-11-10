@@ -21,6 +21,7 @@ watch-on-codex = { instance = "codex", model = "gpt-6-luna", reasoning-level = "
 watch-minutes = 15 # Watchdog: schedule interval
 stall-minutes = 60 # Watchdog: idle threshold for a Cook on 🍳
 max-wakes = 2 # Watchdog: counted wakes before alert
+progress-hours = 8 # Watchdog: long-batch alert interval
 
 [loop-1] # Cook: reviewer of loop 1, on each PR; review-loop owns the round budget
 cook-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
