@@ -17,11 +17,20 @@ works selected for a shared style, and which output media the editor should supp
 Use the supplied accessible material; collecting a creator's complete work is a
 separate task.
 
-Resolve the output location using the repository's authoring instructions. In this
-repository the default is a new skill in the managed `content` category. Use the
-requested name or derive a concise name from the modeled craft. If it collides with
-an existing skill, choose a distinct name or ask when the name matters; overwriting
-requires authorization. Creating source files does not authorize deployment.
+Resolve the output location before writing any file. A style profile and its corpus
+are private, so both go to Pascal's private repository `pascalandy/skills-private`,
+in a worktree created as its `AGENTS.md` describes:
+
+- the package at `authoring/styles/style-<name>/`
+- the supplied corpus files at `skill_archived/style-<name>/references/source/`,
+  which never installs
+
+Use the requested destination when one is given. When the private repository is
+unavailable, ask for the destination and write nothing to the current repository.
+Use the requested name or derive `<name>` from the creator or the modeled craft. If
+it collides with an existing skill, choose a distinct name or ask when the name
+matters; overwriting requires authorization. Creating source files does not
+authorize deployment.
 
 When enough material is available, reserve an excerpt for evaluation after the first
 profile is frozen. A single short excerpt can support a provisional profile, with its
