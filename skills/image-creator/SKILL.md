@@ -1,8 +1,9 @@
 ---
 name: "image-creator"
-description: "Use when generating or editing images or animated GIFs from the terminal with OpenAI GPT Image, including requests for best quality (Sunburst) or speed (Flare)."
+description: "Use when generating or editing images or animated GIFs from the terminal with OpenAI GPT Image, including requests that name Flare, Sunburst, a quality level, or the API."
 kind: "general"
 api-key: "openrouter"
+model-version: "2.6"
 ---
 
 # Image Creator
@@ -11,16 +12,16 @@ Use `<skill_dir>/scripts/image_creator.py`. Read [settings](references/guide.md#
 
 ## Steps
 
-1. Pick the route from the request:
+1. Pick the route from the request, without asking the user:
 
    | Request | Route |
    |---|---|
-   | an image, with no quality or speed asked | Codex plan: no `--model` |
-   | best quality, or Sunburst | `--model sunburst` |
-   | fast, quick, or Flare | `--model flare` |
-   | a GIF or an animation | `--out <name>.gif` with `--model sunburst`, or `--model flare` when speed is asked |
+   | an image, even one that names Flare, Sunburst, a quality, or speed | Codex plan: no `--model` |
+   | an image that names the API or OpenRouter | `--model sunburst`, or `--model flare` when it names speed or Flare |
+   | a GIF or an animation that names the API or OpenRouter | `--out <name>.gif` on the API route above |
+   | a GIF or an animation without the API | stop: the plan has no GIF yet; the API has it |
 
-   The plan has one model chosen by OpenAI's server, fixed quality and size, and no GIF yet. `--model` bills OpenRouter, so before the request's first `--model` run, ask in one line: the plan does not offer this; use paid OpenRouter? In that line, name the quality levels, `low`, `medium`, `high` (default), `xhigh`, and `max`, and pass the one the user names with `--quality`. On no, stay on the plan, or for a GIF, stop
+   The plan is the user's Codex subscription: Images 2.6, with the model chosen by OpenAI's server and a fixed quality and size. Flare, Sunburst, quality levels, and GIF exist only through the API, which bills OpenRouter. A request that names the API is the consent to pay: pass the quality it names with `--quality` (`low`, `medium`, `high`, `xhigh`, or `max`, which "maximum" means), or keep the default `high`
 2. Set `--aspect W:H` for composition or `--size WxH` for exact delivery pixels. Add `--transparent` with `.png` or `.webp` for cutouts. Ask about unresolved requirements that have no documented default
 3. Name the deliverable, composition, visible details, quoted text, and exclusions. For edits, state the change and what must remain unchanged. For a GIF, state the motion and how the loop closes
 4. Run the CLI; use `--prompt-file` for long briefs and `--dry-run` to inspect settings. It answers in one JSON line
@@ -31,7 +32,7 @@ Use `<skill_dir>/scripts/image_creator.py`. Read [settings](references/guide.md#
    ```
 
 5. View every file under `files`, apply the [checks](references/guide.md#51-checks), and resolve each of the answer's `errors`. A written image that needs attention fails the run and still lists its `files`. `"ok":true` alone does not establish visual quality
-6. Retry one variable at a time on the same route. `--quality` and `--model` apply only on OpenRouter
-7. Deliver the chosen file, the answer's `backend`, and unresolved defects
+6. Retry one variable at a time on the same route. On the plan, change the prompt or the shape flags; `--quality` and `--model` apply only on OpenRouter
+7. Deliver the chosen file, its route, model, and quality, and unresolved defects. On the plan, that is the Codex plan, Images 2.6, quality fixed by OpenAI; when the request named Flare, Sunburst, or a quality, add in one line that this choice needs the API
 
 Run `doctor` for backend readiness or `generate --help` for flags. There is no paid fallback when the [plan](references/guide.md#7-chatgpt-and-codex-plans) is unavailable. Resizing adds pixels, not native detail

@@ -1,10 +1,10 @@
 # GPT Image 2.6 guide: plan, Flare, and Sunburst
 
-Two modes: the Codex plan by default, OpenRouter for GPT Image 2.6 Flare or Sunburst after the user agrees to pay. Settings were checked against OpenAI and OpenRouter documentation and probed on the plan on 2026-11-11. Defaults are starting points, not experimentally proven optima; [test limits](#8-test-evidence) apply.
+Two modes: the Codex plan always, OpenRouter for GPT Image 2.6 Flare or Sunburst only when the request names the API or OpenRouter. Settings were checked against OpenAI and OpenRouter documentation and probed on the plan on 2026-11-11. Defaults are starting points, not experimentally proven optima; [test limits](#8-test-evidence) apply.
 
 ## 1. Decide the request
 
-Default to the Codex plan. It generates with Images 2.6, but OpenAI offers the Flare and Sunburst choice only in the API: the plan has one model, chosen by the server, and fixed quality and size. A request for best quality, speed, or a GIF needs OpenRouter. The presence of an API key never switches to paid generation. If the plan is unavailable, stop with the readiness error.
+Use the Codex plan without asking. It generates with Images 2.6, but OpenAI offers the Flare and Sunburst choice only in the API: the plan has one model, chosen by the server, and fixed quality and size. A request that names Flare, Sunburst, a quality, or speed stays on the plan; only a request that names the API or OpenRouter selects OpenRouter, and a GIF without that request stops. The presence of an API key never switches to paid generation. If the plan is unavailable, stop with the readiness error.
 
 `--model flare` or `--model sunburst` selects OpenRouter, reads the key from the keyring entry `openrouter`, user `api_key`, then from `OPENROUTER_API_KEY`, and bills the OpenRouter account. Both generation and edits use `POST https://openrouter.ai/api/v1/images`. `--backend` names the provider; OpenRouter is the only paid one today.
 

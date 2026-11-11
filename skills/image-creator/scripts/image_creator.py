@@ -651,8 +651,8 @@ def resolve(job: Job) -> Plan:
     backend, reason = choose_backend(job)
     if backend == "plan" and out_format == "gif":
         raise UsageError(
-            "the Codex plan does not produce GIF yet; once the user agrees to "
-            "OpenRouter, add --model flare or --model sunburst"
+            "the Codex plan does not produce GIF yet; when the user asks for "
+            "the API, add --model flare or --model sunburst"
         )
     limit = API_MAX_IMAGES if backend == "openrouter" else PLAN_MAX_IMAGES
     if len(job.images) > limit:
