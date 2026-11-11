@@ -110,7 +110,7 @@ A mode's routes run through that mode's SKILL.md.
 - `grilling`: Use when the user wants to stress-test a plan, decision, or idea through an interview or says `grill me`.
 - `handoff`: Use when the user asks to prepare a handoff for another agent.
 - `html-publish`: Use when publishing, updating, inspecting, or recovering a standalone HTML artifact through the configured html-publish service with a durable receipt. Use html-mode for artifact design and browser review.
-- `image-creator`: Use when generating or editing raster images from the terminal with OpenAI GPT Image models through a Codex plan or, when explicitly requested, OpenRouter.
+- `image-creator`: Use when generating or editing images or animated GIFs from the terminal with OpenAI GPT Image, including requests for best quality (Sunburst) or speed (Flare).
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
 - `oem`: Load at the start of every interactive session, before the first reply. A headless run bound to an output schema starts on its task instead. Shared definitions and conventions for every task.
 - `pele`: Use when a request names pele or pele.run, or a project depends on the `pele` npm package: writing, rendering, or theming its diagrams, or calling its API.

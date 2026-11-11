@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import io
 import json
-import re
 import stat
 import urllib.request
 from pathlib import Path
@@ -128,25 +127,21 @@ def test_parse_size_names_the_broken_rule(size: str, problem: str) -> None:
         image_creator.parse_size(size)
 
 
-def test_output_tokens_match_calculator_estimates() -> None:
-    assert image_creator.output_tokens(1024, 1024, "high") == 1756
-    assert image_creator.output_tokens(1536, 864, "low") == 120
-    assert image_creator.output_tokens(3840, 2160, "max") == 13342
-    assert image_creator.output_tokens(2048, 1152, "xhigh") == 2511
+def test_the_guide_names_each_model_and_quality() -> None:
+    guide = GUIDE.read_text()
+    for model in image_creator.MODELS.values():
+        assert f"`{model}`" in guide
+    assert ", ".join(f"`{q}`" for q in image_creator.QUALITIES) in guide
+    assert f"default `{image_creator.DEFAULT_QUALITY}`" in guide
 
 
-def test_tiers_match_the_guide_tier_table() -> None:
-    rows = {
-        m.group(1).lower(): (m.group(2).lower(), m.group(3))
-        for m in re.finditer(
-            r"^\| (Draft|Standard|High|Max) \|[^|]*\| (Flare|Sunburst) \| `(\w+)`",
-            GUIDE.read_text(),
-            re.MULTILINE,
-        )
-    }
-    assert rows == {
-        name: (tier.model, tier.quality) for name, tier in image_creator.TIERS.items()
-    }
+def gif_bytes(frames: int) -> bytes:
+    images = [Image.new("RGB", (64, 64), (i * 40, 0, 0)) for i in range(frames)]
+    buffer = io.BytesIO()
+    images[0].save(
+        buffer, "GIF", save_all=True, append_images=images[1:], duration=200, loop=0
+    )
+    return buffer.getvalue()
 
 
 def test_no_backend_is_a_usage_error(
@@ -165,15 +160,13 @@ def test_no_backend_is_a_usage_error(
     }
 
 
-def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
+def test_plan_is_the_default_backend_and_makes_one_image(
     plan_login: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     out = plan_login / "hero.png"
     code, stdout, _ = run(
         capsys,
         "generate",
-        "--intent",
-        "max",
         "--aspect",
         "16:9",
         "--prompt",
@@ -184,22 +177,19 @@ def test_plan_is_the_default_backend_and_max_asks_for_three_candidates(
     )
     receipt = success(code, stdout)
     assert receipt["backend"] == "plan"
-    assert receipt["outputs"] == [str(plan_login / f"hero-{i}.png") for i in (1, 2, 3)]
+    assert receipt["outputs"] == [str(out)]
     assert receipt["prompt"] == "A hero\nAspect ratio: 16:9, landscape."
 
 
-@pytest.mark.parametrize("intent", [None, "draft", "standard", "high", "max"])
 def test_openrouter_key_never_changes_the_default_mode(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    intent: str | None,
 ) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     code, stdout, _ = run(
         capsys,
         "generate",
-        *(["--intent", intent] if intent else []),
         "--prompt",
         "poster",
         "--out",
@@ -209,9 +199,6 @@ def test_openrouter_key_never_changes_the_default_mode(
     receipt = success(code, stdout)
     assert receipt["backend"] == "plan"
     assert not (plan_login / "chezmoi.log").exists()
-    if intent is None:
-        assert receipt["intent"] == "high"
-        assert receipt["outputs"] == [str(plan_login / f"out-{i}.png") for i in (1, 2)]
 
 
 def test_no_plan_does_not_fall_back_to_paid_openrouter(
@@ -254,7 +241,7 @@ def test_explicit_model_uses_openrouter_image_protocol(
         assert request.get_method() == "POST"
         assert isinstance(request.data, bytes)
         expected = {
-            "model": f"openai/gpt-image-2.5-{model}",
+            "model": f"openai/gpt-image-2.6-{model}",
             "prompt": "poster",
             "quality": "high",
             "background": "auto",
@@ -365,7 +352,7 @@ def test_without_any_openrouter_key_the_error_says_how_to_add_one(
     ) in err
 
 
-def test_explicit_openrouter_defaults_to_high_intent(
+def test_sunburst_defaults_to_high_quality(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -378,8 +365,8 @@ def test_explicit_openrouter_defaults_to_high_intent(
         "3:2",
         "--prompt",
         "A product",
-        "--backend",
-        "openrouter",
+        "--model",
+        "sunburst",
         "--out",
         str(plan_login / "p.png"),
         "--dry-run",
@@ -387,16 +374,83 @@ def test_explicit_openrouter_defaults_to_high_intent(
     receipt = success(code, stdout)
     assert receipt["backend"] == "openrouter"
     assert receipt["request"] == {
-        "model": "openai/gpt-image-2.5-sunburst",
+        "model": "openai/gpt-image-2.6-sunburst",
         "quality": "high",
         "size": "1872x1248",
         "background": "auto",
         "output_format": "png",
         "n": 1,
     }
-    assert receipt["estimated_output_tokens"] == image_creator.output_tokens(
-        1872, 1248, "high"
+
+
+def test_openrouter_without_a_model_is_refused(
+    plan_login: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    out = str(plan_login / "x.png")
+    argv = ["generate", "--backend", "openrouter", "--prompt", "x", "--out", out]
+    code, _, err = run(capsys, *argv)
+    assert code == 2
+    assert "--backend openrouter needs --model flare or --model sunburst" in err
+
+
+def test_the_plan_refuses_a_gif(
+    plan_login: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, _, err = run(
+        capsys, "generate", "--prompt", "x", "--out", str(plan_login / "x.gif")
     )
+    assert code == 2
+    assert "the Codex plan does not produce GIF yet" in err
+
+
+@pytest.mark.parametrize(("frames", "ok"), [(4, True), (1, False)])
+def test_a_gif_request_keeps_the_animation_and_puts_the_aspect_in_the_prompt(
+    env: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    frames: int,
+    ok: bool,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    animation = gif_bytes(frames)
+    sent: list[dict[str, Any]] = []
+
+    def post(route: str, body: dict[str, Any]) -> dict[str, Any]:
+        sent.append(body)
+        return {"data": [{"b64_json": base64.b64encode(animation).decode()}]}
+
+    monkeypatch.setattr(image_creator, "api_post", post)
+    out = env / "wave.gif"
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--model",
+        "flare",
+        "--aspect",
+        "16:9",
+        "--prompt",
+        "A mascot waves",
+        "--out",
+        str(out),
+    )
+    assert sent == [
+        {
+            "model": "openai/gpt-image-2.6-flare",
+            "prompt": "A mascot waves\nAspect ratio: 16:9, landscape.",
+            "quality": "high",
+            "background": "auto",
+            "output_format": "gif",
+            "n": 1,
+        }
+    ]
+    assert out.read_bytes() == animation
+    if ok:
+        assert success(code, stdout)["files"][0]["path"] == str(out)
+    else:
+        assert failure(stdout, err)["errors"] == ["wave.gif has one frame; inspect it"]
 
 
 def test_api_only_flags_on_the_plan_backend_are_refused(
@@ -415,7 +469,7 @@ def test_api_only_flags_on_the_plan_backend_are_refused(
         str(plan_login / "x.png"),
     )
     assert code == 2
-    assert "--quality needs --backend openrouter" in err
+    assert "--quality needs --model" in err
 
 
 def test_transparent_jpeg_is_refused(
@@ -506,6 +560,40 @@ def test_plan_run_fails_when_codex_changed_the_prompt(
     }
 
 
+def test_transparent_plan_request_sets_the_tool_flag() -> None:
+    assert "Set transparent_background to true. " in image_creator.plan_instruction(
+        "A fox", [], transparent=True
+    )
+    assert "transparent_background" not in image_creator.plan_instruction(
+        "A fox", [], transparent=False
+    )
+
+
+def test_transparent_plan_run_fails_when_codex_sent_an_opaque_request(
+    plan_login: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompt = f"A fox\n{image_creator.TRANSPARENT_LINE}"
+    monkeypatch.setenv(
+        "FAKE_TRACE_BODY", json.dumps({"prompt": prompt, "background": "opaque"})
+    )
+    code, stdout, err = run(
+        capsys,
+        "generate",
+        "--transparent",
+        "--prompt",
+        "A fox",
+        "--out",
+        str(plan_login / "fox.png"),
+    )
+    assert code == 1
+    assert failure(stdout, err)["errors"] == [
+        "Codex did not request a transparent background; retry once",
+        "fox.png has no alpha channel; retry with a transparent background",
+    ]
+
+
 def test_transparent_request_without_alpha_fails(
     plan_login: Path,
     capsys: pytest.CaptureFixture[str],
@@ -541,13 +629,15 @@ def test_alpha_report_reads_a_real_cutout() -> None:
     }
 
 
-def test_sent_prompt_reads_the_codex_trace_line() -> None:
+def test_sent_request_reads_the_codex_trace_line() -> None:
     line = (
         "2026-09-28T13:32:43.908904Z TRACE endpoint_session.execute_with{http.method=POST}: "
         "codex_http_client::transport: POST to https://chatgpt.com/backend-api/codex/images/generations: "
         '{"prompt":"A red circle on white.","background":"auto","model":"gpt-image-2","quality":"auto","size":"auto"}'
     )
-    assert image_creator.sent_prompt(f"noise\n{line}\n") == "A red circle on white."
+    sent = image_creator.sent_request(f"noise\n{line}\n")
+    assert sent is not None
+    assert (sent["prompt"], sent["background"]) == ("A red circle on white.", "auto")
 
 
 @pytest.mark.parametrize(
@@ -605,8 +695,8 @@ def test_api_output_preserves_original_bytes(
     code, stdout, err = run(
         capsys,
         "generate",
-        "--backend",
-        "openrouter",
+        "--model",
+        "flare",
         "--prompt",
         "texture",
         "--out",
@@ -642,8 +732,8 @@ def test_api_mismatches_fail_and_list_only_delivered_files(
     code, stdout, err = run(
         capsys,
         "generate",
-        "--backend",
-        "openrouter",
+        "--model",
+        "flare",
         "--prompt",
         "sticker",
         "--out",
@@ -677,7 +767,7 @@ def test_api_mismatches_fail_and_list_only_delivered_files(
     ("argv", "error"),
     [
         (["--json"], "unrecognized arguments: --json"),
-        (["--intent", "best"], "argument --intent: invalid choice: 'best'"),
+        (["--model", "best"], "argument --model: invalid choice: 'best'"),
     ],
 )
 def test_a_usage_error_answers_in_json_with_the_help_command(
@@ -710,7 +800,7 @@ def test_verbose_works_before_and_after_the_command(
     argv = ["-v", *argv] if where == "before" else [*argv, "-v"]
     code, stdout, err = run(capsys, *argv)
     assert success(code, stdout)["backend"] == "plan"
-    assert "backend plan: Codex plan is the default for every intent" in err
+    assert "backend plan: Codex plan is the default" in err
 
 
 def test_each_command_help_prints_its_own_flags_and_answer(
@@ -791,8 +881,8 @@ def test_a_save_failure_keeps_the_images_already_written(
     code, stdout, err = run(
         capsys,
         "generate",
-        "--backend",
-        "openrouter",
+        "--model",
+        "flare",
         "--prompt",
         "sticker",
         "--out",
@@ -820,8 +910,8 @@ def test_a_malformed_api_image_fails_without_a_paid_rerun_hint(
     code, stdout, err = run(
         capsys,
         "generate",
-        "--backend",
-        "openrouter",
+        "--model",
+        "flare",
         "--prompt",
         "x",
         "--out",
@@ -850,8 +940,8 @@ def test_a_malformed_candidate_still_saves_its_valid_sibling(
     code, stdout, err = run(
         capsys,
         "generate",
-        "--backend",
-        "openrouter",
+        "--model",
+        "flare",
         "--prompt",
         "x",
         "--out",
