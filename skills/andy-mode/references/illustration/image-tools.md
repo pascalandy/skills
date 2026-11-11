@@ -11,7 +11,7 @@
 The `image-creator` skill is the default image tool in every harness, through the Codex plan.
 
 - Load `image-creator` before generating or editing an image, and follow its steps
-- Use the Codex plan backend (`--backend plan`); select OpenRouter only when the user explicitly requests that backend or GPT Image 2.5, as `image-creator` documents
+- Pick the route with `image-creator`'s route table: the Codex plan by default, and paid OpenRouter only after the user agrees
 - Pass `--aspect 16:9`, the filled prompt template through `--prompt-file`, and a `.png` output path through `--out`
 - Run one command per planned illustration; inspect every file in the answer's `files` and keep the candidate that passes the QA checklist
 - Write candidates to a scratch folder outside the export destination, using a fresh output stem for each retry. Preserve the originals and copy the kept candidate to the filename required by step 5 of the illustration playbook

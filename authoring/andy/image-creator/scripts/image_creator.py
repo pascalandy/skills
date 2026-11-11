@@ -4,7 +4,8 @@
 # ///
 """Generate or edit images with GPT Image through a Codex plan or OpenRouter.
 
-The caller states an intent and a prompt; this CLI owns every other setting.
+The caller states a prompt, plus a model only for OpenRouter; this CLI owns
+every other setting.
 See ../references/guide.md for the rationale behind each choice.
 """
 
@@ -370,39 +371,22 @@ from pathlib import Path
 
 from PIL import Image
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 log = logging.getLogger("image-creator")
 
 # ---------------------------------------------------------------------------
 # Settings owned by this CLI
 
-INTENTS = ("draft", "standard", "high", "max")
-
+# The plan backend cannot set model, quality, or size; these apply to OpenRouter.
+# Complexity is left to the API default, high. The --out extension picks the format.
 MODELS = {
-    "flare": "openai/gpt-image-2.5-flare",
-    "sunburst": "openai/gpt-image-2.5-sunburst",
+    "flare": "openai/gpt-image-2.6-flare",
+    "sunburst": "openai/gpt-image-2.6-sunburst",
 }
 QUALITIES = ("low", "medium", "high", "xhigh", "max")
-
-
-@dataclass(frozen=True)
-class Tier:
-    model: str
-    quality: str
-    pixel_budget: int
-    plan_candidates: int
-
-
-# API settings follow the guide's tier table; the plan backend cannot set model,
-# quality, or size, so it spends the higher intents on extra candidates instead.
-# The --out extension picks the file format.
-TIERS = {
-    "draft": Tier("flare", "low", 1024 * 1024, 1),
-    "standard": Tier("flare", "medium", 1536 * 1024, 1),
-    "high": Tier("sunburst", "high", 2048 * 1152, 2),
-    "max": Tier("sunburst", "xhigh", 2560 * 1440, 3),
-}
+DEFAULT_QUALITY = "high"
+PIXEL_BUDGET = 2048 * 1152
 
 MIN_PIXELS = 655_360
 MAX_PIXELS = 8_294_400
@@ -503,15 +487,6 @@ def fit_size(ratio: float, budget: int) -> tuple[int, int]:
     return best[1], best[2]
 
 
-def output_tokens(width: int, height: int, quality: str) -> int:
-    """Estimate image output tokens using OpenAI's GPT Image 2.5 calculator formula."""
-    grid = {"low": 16, "medium": 24, "high": 48, "xhigh": 64, "max": 96}[quality]
-    scaled = grid / (max(width, height) / min(width, height))
-    floor = math.floor(scaled)
-    short = floor + floor % 2 if scaled - floor == 0.5 else round(scaled)
-    return math.ceil(grid * short * (2_000_000 + width * height) / 4_000_000)
-
-
 def candidate_paths(out: Path, count: int) -> list[Path]:
     if count == 1:
         return [out]
@@ -520,9 +495,17 @@ def candidate_paths(out: Path, count: int) -> list[Path]:
 
 def format_for(path: Path) -> str:
     suffix = path.suffix.lower()
-    formats = {".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".webp": "webp"}
+    formats = {
+        ".png": "png",
+        ".jpg": "jpeg",
+        ".jpeg": "jpeg",
+        ".webp": "webp",
+        ".gif": "gif",
+    }
     if suffix not in formats:
-        raise UsageError(f"--out {path} needs a .png, .jpg, .jpeg, or .webp extension")
+        raise UsageError(
+            f"--out {path} needs a .png, .jpg, .jpeg, .webp, or .gif extension"
+        )
     return formats[suffix]
 
 
@@ -534,7 +517,6 @@ def format_for(path: Path) -> str:
 class Job:
     command: str
     prompt: str
-    intent: str
     out: Path
     aspect: str | None
     size: tuple[int, int] | None
@@ -557,7 +539,6 @@ class Plan:
     final_prompt: str
     api_body: dict[str, Any] | None = None
     target_size: tuple[int, int] | None = None
-    estimated_output_tokens: int | None = None
     # What needs action; any problem fails the run once its images are written
     problems: list[str] = field(default_factory=list)
 
@@ -619,57 +600,66 @@ def api_ready() -> tuple[bool, str]:
 
 def choose_backend(job: Job) -> tuple[str, str]:
     if job.backend == "plan" and job.model:
-        raise UsageError("--model selects GPT Image 2.5; use --backend openrouter")
-    if job.backend == "openrouter" or job.model:
+        raise UsageError("--model selects OpenRouter; drop --backend plan")
+    if job.backend == "openrouter" and not job.model:
+        raise UsageError("--backend openrouter needs --model flare or --model sunburst")
+    if job.model:
         ready, note = api_ready()
         if not ready:
             raise UsageError(f"OpenRouter backend unavailable: {note}")
-        return "openrouter", "explicit GPT Image 2.5 request through OpenRouter"
+        return "openrouter", f"explicit {job.model} request through OpenRouter"
     if job.quality:
-        raise UsageError(
-            "--quality needs --backend openrouter or --model; the Codex plan fixes quality"
-        )
+        raise UsageError("--quality needs --model; the Codex plan fixes quality")
     ready, note = plan_ready()
     if not ready:
         raise UsageError(
             f"plan backend unavailable: {note}; no paid fallback was selected"
         )
-    return "plan", "Codex plan is the default for every intent"
+    return "plan", "Codex plan is the default"
 
 
 def shape_of(ratio: float) -> str:
     return "landscape" if ratio > 1 else "portrait" if ratio < 1 else "square"
 
 
-def plan_prompt(job: Job) -> str:
-    lines = [job.prompt.strip()]
+def aspect_line(job: Job) -> str | None:
+    """The prompt line that asks for the shape a request cannot set directly."""
     if job.size:
         w, h = job.size
         g = math.gcd(w, h)
-        lines.append(f"Aspect ratio: {w // g}:{h // g}, {shape_of(w / h)}.")
-    elif job.aspect:
-        lines.append(
-            f"Aspect ratio: {job.aspect}, {shape_of(parse_aspect(job.aspect))}."
-        )
+        return f"Aspect ratio: {w // g}:{h // g}, {shape_of(w / h)}."
+    if job.aspect:
+        return f"Aspect ratio: {job.aspect}, {shape_of(parse_aspect(job.aspect))}."
+    return None
+
+
+def plan_prompt(job: Job) -> str:
+    lines = [job.prompt.strip()]
+    if line := aspect_line(job):
+        lines.append(line)
     if job.transparent:
         lines.append(TRANSPARENT_LINE)
     return "\n".join(lines)
 
 
 def resolve(job: Job) -> Plan:
-    tier = TIERS[job.intent]
     out_format = format_for(job.out)
-    if job.transparent and out_format == "jpeg":
+    if job.transparent and out_format in ("jpeg", "gif"):
         raise UsageError(
-            "--transparent needs a .png or .webp --out; JPEG has no alpha channel"
+            f"--transparent needs a .png or .webp --out; {out_format.upper()} has no alpha channel"
         )
     backend, reason = choose_backend(job)
+    if backend == "plan" and out_format == "gif":
+        raise UsageError(
+            "the Codex plan does not produce GIF yet; once the user agrees to "
+            "OpenRouter, add --model flare or --model sunburst"
+        )
     limit = API_MAX_IMAGES if backend == "openrouter" else PLAN_MAX_IMAGES
     if len(job.images) > limit:
         raise UsageError(
             f"{backend} backend accepts at most {limit} --image inputs, got {len(job.images)}"
         )
-    count = job.candidates or (tier.plan_candidates if backend == "plan" else 1)
+    count = job.candidates or 1
     if not 1 <= count <= 10:
         raise UsageError("--candidates must be between 1 and 10")
     paths = candidate_paths(job.out, count)
@@ -690,20 +680,26 @@ def resolve(job: Job) -> Plan:
             target_size=job.size,
         )
 
+    # A GIF's size is per frame and shares the request's pixel budget, so only
+    # an explicit --size sets it; an aspect ratio goes into the prompt instead
+    gif = out_format == "gif"
+    prompt = job.prompt.strip()
     if job.size:
         size = job.size
-    elif job.aspect:
-        size = fit_size(parse_aspect(job.aspect), tier.pixel_budget)
+    elif job.aspect and not gif:
+        size = fit_size(parse_aspect(job.aspect), PIXEL_BUDGET)
     else:
         size = None
-    quality = job.quality or tier.quality
-    model = MODELS[job.model] if job.model else MODELS[tier.model]
+        if line := aspect_line(job):
+            prompt += f"\n{line}"
+    if job.transparent:
+        prompt += f"\n{TRANSPARENT_LINE}"
+    assert job.model is not None
     api_format = out_format
     body: dict[str, Any] = {
-        "model": model,
-        "prompt": job.prompt.strip()
-        + (f"\n{TRANSPARENT_LINE}" if job.transparent else ""),
-        "quality": quality,
+        "model": MODELS[job.model],
+        "prompt": prompt,
+        "quality": job.quality or DEFAULT_QUALITY,
         "background": "transparent" if job.transparent else "auto",
         "output_format": api_format,
         "n": count,
@@ -722,10 +718,8 @@ def resolve(job: Job) -> Plan:
         api_body=body,
         target_size=size,
     )
-    if size:
-        plan.estimated_output_tokens = output_tokens(size[0], size[1], quality) * count
-        if size[0] * size[1] > EXPERIMENTAL_PIXELS:
-            log.info("%dx%d is above 2560x1440, which OpenAI marks experimental", *size)
+    if size and size[0] * size[1] > EXPERIMENTAL_PIXELS:
+        log.info("%dx%d is above 2560x1440, which OpenAI marks experimental", *size)
     return plan
 
 
@@ -742,6 +736,9 @@ def describe(path: Path) -> dict[str, Any]:
             "mode": image.mode,
             "bytes": path.stat().st_size,
         }
+        frames = getattr(image, "n_frames", 1)
+        if frames > 1:
+            info["frames"] = frames
         if image.mode in ("RGBA", "LA"):
             info["alpha"] = alpha_report(image)
     return info
@@ -806,11 +803,13 @@ def save_image(
 # Backends
 
 
-def plan_instruction(prompt: str, images: list[Path]) -> str:
+def plan_instruction(prompt: str, images: list[Path], transparent: bool) -> str:
     refs = ""
     if images:
         listed = json.dumps([str(p.resolve()) for p in images])
         refs = f"Set referenced_image_paths to exactly {listed}, in that order. "
+    if transparent:
+        refs += "Set transparent_background to true. "
     return (
         "Call the image generation tool exactly once. "
         f"{refs}"
@@ -821,8 +820,8 @@ def plan_instruction(prompt: str, images: list[Path]) -> str:
     )
 
 
-def sent_prompt(stderr: str) -> str | None:
-    """Return the prompt Codex sent to the image endpoint, read from its trace log."""
+def sent_request(stderr: str) -> dict[str, Any] | None:
+    """Return the request Codex sent to the image endpoint, read from its trace log."""
     for line in stderr.splitlines():
         index = line.find(PLAN_TRACE_MARKER)
         if index < 0:
@@ -835,12 +834,12 @@ def sent_prompt(stderr: str) -> str | None:
         except ValueError:
             continue
         if isinstance(body, dict) and isinstance(body.get("prompt"), str):
-            return body["prompt"]
+            return body
     return None
 
 
 def plan_generate_one(
-    prompt: str, images: list[Path], verbose: bool
+    prompt: str, images: list[Path], transparent: bool, verbose: bool
 ) -> tuple[bytes, dict[str, Any]]:
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="image-creator-") as work:
@@ -855,7 +854,8 @@ def plan_generate_one(
         env = {**os.environ, "RUST_LOG": "codex_http_client::transport=trace"}
         try:
             result = subprocess.run(
-                cmd, input=plan_instruction(prompt, images), capture_output=True, text=True,
+                cmd, input=plan_instruction(prompt, images, transparent),
+                capture_output=True, text=True,
                 timeout=PLAN_TIMEOUT_S, env=env, check=False,
             )  # fmt: skip
         except subprocess.TimeoutExpired:
@@ -888,11 +888,12 @@ def plan_generate_one(
             f"Codex returned no image; the controller may have skipped the tool, retry once{log_hint}",
             detail=detail,
         )
-    sent = sent_prompt(result.stderr)
+    sent = sent_request(result.stderr)
     meta = {
         "seconds": round(time.monotonic() - started, 1),
         "source": str(produced[-1]),
-        "prompt_verbatim": None if sent is None else sent == prompt,
+        "prompt_verbatim": None if sent is None else sent["prompt"] == prompt,
+        "background": None if sent is None else sent.get("background"),
     }
     return produced[-1].read_bytes(), meta
 
@@ -900,7 +901,13 @@ def plan_generate_one(
 def plan_run(plan: Plan, job: Job, verbose: bool) -> tuple[list[bytes], dict[str, Any]]:
     with ThreadPoolExecutor(max_workers=plan.count) as pool:
         futures = [
-            pool.submit(plan_generate_one, plan.final_prompt, job.images, verbose)
+            pool.submit(
+                plan_generate_one,
+                plan.final_prompt,
+                job.images,
+                job.transparent,
+                verbose,
+            )
             for _ in range(plan.count)
         ]
         results = [f.result() for f in futures]
@@ -908,6 +915,12 @@ def plan_run(plan: Plan, job: Job, verbose: bool) -> tuple[list[bytes], dict[str
     if any(call["prompt_verbatim"] is False for call in calls):
         plan.problems.append(
             "Codex changed the prompt before sending it; inspect the result"
+        )
+    if job.transparent and any(
+        call["background"] not in (None, "transparent") for call in calls
+    ):
+        plan.problems.append(
+            "Codex did not request a transparent background; retry once"
         )
     return [data for data, _ in results], {"calls": calls}
 
@@ -1021,18 +1034,12 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
     plan = resolve(job)
     log.info("backend %s: %s", plan.backend, plan.reason)
     receipt: dict[str, Any] = {
-        "intent": job.intent,
         "backend": plan.backend,
         "outputs": [str(p) for p in plan.paths],
         "prompt": plan.final_prompt,
     }
     if plan.api_body:
         receipt["request"] = {k: v for k, v in plan.api_body.items() if k != "prompt"}
-        if plan.estimated_output_tokens is not None:
-            receipt["estimated_output_tokens"] = plan.estimated_output_tokens
-            receipt["estimated_output_usd"] = round(
-                plan.estimated_output_tokens * 30 / 1_000_000, 4
-            )
     else:
         receipt["request"] = {
             "controller": PLAN_CONTROLLER,
@@ -1082,6 +1089,8 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
                 f"{path.name} is {info['width']}x{info['height']}, "
                 f"requested {plan.target_size[0]}x{plan.target_size[1]}"
             )
+        if plan.output_format == "gif" and "frames" not in info:
+            plan.problems.append(f"{path.name} has one frame; inspect it")
         if job.transparent and "alpha" not in info:
             plan.problems.append(
                 f"{path.name} has no alpha channel; retry with a transparent background"
@@ -1123,47 +1132,38 @@ def doctor() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # CLI
 
-INTENT_USE = {
-    "draft": "quick idea",
-    "standard": "everyday image",
-    "high": "client-facing final (default)",
-    "max": "quality is paramount",
-}
+EPILOG_GENERATE = """\
+backend auto: always the Codex plan. The plan fixes model, quality, and size,
+and does not produce GIF yet; --size is applied by cropping and resizing.
 
-EPILOG_GENERATE = (
-    "intents:\n"
-    + "".join(
-        f"  {name:<9} {INTENT_USE[name]}; plan: {t.plan_candidates} image(s); "
-        f"API: {t.model.title()} {t.quality}, ~{t.pixel_budget / 1e6:.1f} MP\n"
-        for name, t in TIERS.items()
-    )
-    + """
-backend auto: always the Codex plan, including high and max.
-Select GPT Image 2.5 explicitly with --model flare/sunburst or --backend openrouter.
-OpenRouter reads its key from the keyring entry openrouter, then from
-OPENROUTER_API_KEY; there is no automatic paid fallback.
-The plan fixes model, quality, and size; --size is applied by cropping and resizing.
+--model selects paid GPT Image 2.6 through OpenRouter; there is no automatic
+paid fallback. OpenRouter reads its key from the keyring entry openrouter, then
+from OPENROUTER_API_KEY.
+  flare     fastest
+  sunburst  best quality
+--quality sets either model's quality (default: high). A .gif --out asks for an
+animated GIF; the API picks the frames.
 
 examples:
   image_creator.py generate --prompt "Minimal poster ..." --out poster.png
-  image_creator.py generate --intent max --aspect 16:9 --prompt-file brief.txt --out hero.png --dry-run
-  image_creator.py generate --intent draft --out idea.jpg --prompt "Three layout ideas for ..."
+  image_creator.py generate --model sunburst --aspect 16:9 --prompt-file brief.txt --out hero.png --dry-run
+  image_creator.py generate --model flare --out idea.jpg --prompt "Three layout ideas for ..."
+  image_creator.py generate --model flare --out wave.gif --prompt "A mascot waves; seamless loop"
   image_creator.py generate --transparent --out logo.png --prompt "Flat vector logo ..."
 """
-)
 
 EPILOG_EDIT = """\
 examples:
   image_creator.py edit --image photo.png --out photo-snow.png \\
     --prompt "Change only the weather to light snow. Keep the person, pose, and framing unchanged."
-  image_creator.py edit --image scene.png --image subject.png --intent high --out combined.png \\
+  image_creator.py edit --image scene.png --image subject.png --out combined.png \\
     --prompt "Image 1 is the scene; image 2 is the subject. ..."
 """
 
 ANSWER = """
 answer: one JSON line on stdout, such as
   {"ok":true,"files":[{"path":"/abs/hero.png","width":2048,"height":1152}],"backend":"plan"}
-OpenRouter adds "cost"; --dry-run answers the resolved request and estimated cost.
+OpenRouter adds "cost"; --dry-run answers the resolved request.
 A failure, including a written image that needs attention, leaves stdout empty
 and ends stderr with {"ok":false,"errors":[...]}, plus "files" once images exist.
 -v adds the full receipt on stderr."""
@@ -1184,13 +1184,10 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
         "--prompt-file", type=Path, help="file holding the prompt; - reads stdin"
     )
     parser.add_argument(
-        "--out", required=True, type=Path, help="output file: .png, .jpg, or .webp"
-    )
-    parser.add_argument(
-        "--intent",
-        choices=INTENTS,
-        default="high",
-        help="quality intent (default: high)",
+        "--out",
+        required=True,
+        type=Path,
+        help="output file: .png, .jpg, .webp, or .gif (OpenRouter only)",
     )
     shape = parser.add_mutually_exclusive_group()
     shape.add_argument("--aspect", help="aspect ratio such as 16:9, 1:1, 2:3")
@@ -1203,7 +1200,7 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--candidates",
         type=int,
-        help="images to produce (default: set by intent and backend)",
+        help="images to produce (default: 1)",
     )
     parser.add_argument(
         "--backend", choices=("auto", "plan", "openrouter"), default="auto"
@@ -1211,12 +1208,12 @@ def add_job_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--model",
         choices=tuple(MODELS),
-        help="OpenRouter only: override the intent's model",
+        help="select OpenRouter with this GPT Image 2.6 model",
     )
     parser.add_argument(
         "--quality",
         choices=QUALITIES,
-        help="OpenRouter only: override the intent's quality",
+        help=f"OpenRouter only: rendering quality (default: {DEFAULT_QUALITY})",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="replace existing output files"
@@ -1301,12 +1298,12 @@ def job_from_args(args: argparse.Namespace) -> Job:
     for path in images:
         if not path.is_file():
             raise UsageError(f"input image {path} does not exist")
-    if images and not (size or aspect):
+    # A GIF frame size shares the request's pixel budget; the API picks it
+    if images and not (size or aspect) and args.out.suffix.lower() != ".gif":
         size, aspect = edit_shape(images[0])
     return Job(
         command=args.command,
         prompt=prompt,
-        intent=args.intent,
         out=args.out,
         aspect=aspect,
         size=size,
