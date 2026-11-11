@@ -143,7 +143,7 @@ Retry `429` and transient `5xx` with backoff. For invalid requests or moderation
 
 ## 7. ChatGPT and Codex plans
 
-The default runs `codex exec` with Codex's built-in image tool through the user's plan. Codex sends `model: gpt-image-2`, `quality: auto`, and `size: auto`; on 2026-11-11 the plan endpoint answered `quality: low` at `1536x1024` whatever model, quality, or size it received. `--quality` and `--model` select OpenRouter and never apply to the plan.
+The default runs `codex exec` with Codex's built-in image tool through the user's plan. Codex sends `model: gpt-image-2`, `quality: auto`, and `size: auto`; on 2026-11-11 the plan endpoint answered `quality: low` at `1536x1024` whatever model, quality, or size it received. `--model` selects OpenRouter; `--quality` requires it and never applies to the plan.
 
 `--aspect` guides the prompt; `--size` crops and resizes the result. That can remove content or interpolate pixels without generating native detail. Inspect the saved image before delivery; `-v` names each upscale.
 
