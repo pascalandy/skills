@@ -65,6 +65,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - For a T3 Code request to delegate through Pi, use the `delegate_task` tool with `target.providerInstanceId="pi"` and one of these models:
   - "Pi Opus" or "Pi Opus 5.5" selects `target.model="claude-code/claude-opus-5-5"`
   - "Pi Sol" or "Pi Codex Sol" selects `target.model="cliproxy/gpt-6.1-sol"` unless I name another Sol version
+  - "Pi Terra" or "Pi Codex Terra" selects `target.model="cliproxy/gpt-6.1-terra"`
 - Before a Pi delegation, confirm the model and supported levels with `orchestrator_capabilities`
 - If I request an effort level, pass that level as Pi's `target.options.thinking`
 - After `delegate_task` returns, verify the returned `providerInstanceId`, model, and options
@@ -85,7 +86,7 @@ To keep cost low, delegate each web task, such as a search, a page read, or a co
 4. Pi Codex Terra high (`gpt-6.1-terra`) with the `exa` extension
 
 - Codex is not available when its provider is off, its usage limit is reached, or its delegation fails. Then use Haiku 5.5 high at the same level
-- To delegate to Codex, use `delegate_task` with `serviceTier: "default"`. To delegate to Pi, use `delegate_task` with the Pi provider and the model `openai-codex/gpt-6.1-terra`
+- To delegate to Codex, use `delegate_task` with `serviceTier: "default"`. To delegate to Pi, use the "Pi Terra" model from the Pi delegation list above
 - In the brief, give one page or one topic, ask for raw facts with their sources, and write "do not delegate". The delegated agent collects facts only and does not analyze them
 - Do not use web tools yourself. When you cannot delegate, such as in a delegated agent or a headless run, use the levels yourself in order
 
