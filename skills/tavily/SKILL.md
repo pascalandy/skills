@@ -12,16 +12,6 @@ api-key: "tavily"
 
 Tavily gives LLM-optimized search, content extraction, site mapping, and crawling via REST.
 
-## Routing Policy
-
-| Situation | Tool | Rule |
-|---|---|---|
-| A request that names Tavily or Exa | Requested tool | Honor the request. |
-| Tavily fails to satisfy the request, or the request asks for corroboration | Exa after Tavily | Sequential escalation is allowed. |
-| Local filesystem or repository work | Local tools | Use neither Tavily nor Exa. |
-
-Do not automatically use both tools.
-
 ## Quick Reference
 
 | Need | Endpoint | Use Case |
@@ -35,9 +25,7 @@ Do not automatically use both tools.
 ## When NOT to Use
 
 - Local filesystem or repository work; use local tools
-- A request that names Exa
 - A search that no request named Tavily for
-- A request to use both tools at once; escalate to Exa only after Tavily fails or the request asks for corroboration
 - API key is missing from keyring (check first)
 
 ## Authentication
