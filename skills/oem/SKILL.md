@@ -80,11 +80,12 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 To keep cost low, delegate each web task, such as a search, a page read, or a content extraction. Use these levels in this order. When the current level is blocked, returns no result, or returns facts without sources, use the next level:
 
 1. Codex Luna high (`gpt-6-luna`)
-2. Codex Terra high (`gpt-6.1-terra`) with `$tavily`, without its Exa step
+2. Codex Terra high (`gpt-6.1-terra`) with `$tavily`
 3. Codex Terra high (`gpt-6.1-terra`) with `$firecrawl`
+4. Pi Codex Terra high (`gpt-6.1-terra`) with the `exa` extension
 
 - Codex is not available when its provider is off, its usage limit is reached, or its delegation fails. Then use Haiku 5.5 high at the same level
-- To delegate to Codex, use `delegate_task` with `serviceTier: "default"`
+- To delegate to Codex, use `delegate_task` with `serviceTier: "default"`. To delegate to Pi, use `delegate_task` with the Pi provider and the model `openai-codex/gpt-6.1-terra`
 - In the brief, give one page or one topic, ask for raw facts with their sources, and write "do not delegate". The delegated agent collects facts only and does not analyze them
 - Do not use web tools yourself. When you cannot delegate, such as in a delegated agent or a headless run, use the levels yourself in order
 
