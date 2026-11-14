@@ -1228,7 +1228,14 @@ def run_ytdlp(
         return YtDlpResult(result, "cookies")
 
     result = run_child(
-        [*YTDLP_MODULE_COMMAND, "--no-cookies-from-browser", "--no-update", *args, url],
+        [
+            *YTDLP_MODULE_COMMAND,
+            "--no-cookies",
+            "--no-cookies-from-browser",
+            "--no-update",
+            *args,
+            url,
+        ],
         timeout=budget.remaining("yt-dlp anonymous attempt", SUMMARY_ATTEMPT_TIMEOUT),
     )
     if result.returncode == 0:

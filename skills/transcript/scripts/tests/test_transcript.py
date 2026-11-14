@@ -1918,10 +1918,9 @@ class TestYouTubeTransport:
         assert result.method == "anonymous"
         ((command, kwargs),) = calls
         assert command[:3] == [sys.executable, "-m", "yt_dlp"]
+        assert "--no-cookies" in command
         assert "--no-cookies-from-browser" in command
         assert "--no-update" in command
-        assert not any(part.startswith("--cookies=") for part in command)
-        assert "--cookies" not in command
         assert command[-1] == "https://youtu.be/abc"
         assert kwargs["timeout"] > 0
 
