@@ -1815,10 +1815,7 @@ class TestRetryPolicy:
         http_timeouts = []
         audio = tmp_path / "audio.mp3"
         audio.write_bytes(b"audio")
-        responses = [
-            SimpleNamespace(stdout="", stderr="public failure", returncode=1),
-            SimpleNamespace(stdout="Title\nabc\n", stderr="", returncode=0),
-        ]
+        responses = [SimpleNamespace(stdout="Title\nabc\n", stderr="", returncode=0)]
 
         def fake_run(_command, **kwargs):
             subprocess_timeouts.append(kwargs["timeout"])
@@ -1841,16 +1838,13 @@ class TestRetryPolicy:
         transcript.run_ytdlp(["--get-title", "--get-id"], "url", budget)
         transcript.transcribe_audio(audio, "secret", budget)
 
-        assert all(0 < timeout <= 20 for timeout in subprocess_timeouts)
-        assert subprocess_timeouts[1] < subprocess_timeouts[0]
-        assert 0 < http_timeouts[0] <= 18
+        assert len(subprocess_timeouts) == 1 and 0 < subprocess_timeouts[0] <= 20
+        assert 0 < http_timeouts[0] <= 19
 
 
 class TestDownloadAudio:
     def _ytdlp_prints(self, transcript, tmp_path, monkeypatch, info: dict) -> list:
-        """Make the Arc attempt succeed and print `info` as yt-dlp's last line."""
-        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
-        arc_profile.mkdir(parents=True)
+        """Make the anonymous attempt succeed and print `info` as yt-dlp's last line."""
         commands = []
 
         def fake_run(command, **_kwargs):
@@ -1858,7 +1852,6 @@ class TestDownloadAudio:
             stdout = f"[download] 100%\n{json.dumps(info)}\n"
             return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
 
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
         monkeypatch.setattr(transcript, "run_child", fake_run)
         return commands
 
@@ -1877,7 +1870,9 @@ class TestDownloadAudio:
         )
 
         (command,) = commands
-        assert result == transcript.DownloadedAudio(audio, "arc", "A video", "abc")
+        assert result == transcript.DownloadedAudio(
+            audio, "anonymous", "A video", "abc"
+        )
         assert command[command.index("-f") + 1] == "ba[abr<=64]/ba/b"
         assert "--no-simulate" in command
         assert "-x" not in command
@@ -1895,340 +1890,68 @@ class TestDownloadAudio:
             )
 
 
-class TestYouTubeAuthenticationOrder:
-    """YouTube prefers browser authentication before anonymous access."""
-
-    @pytest.mark.parametrize(
-        "browser,auth_mode",
-        [("Arc", "normal"), ("Chrome", "normal"), ("Arc", "arc-required")],
-    )
-    def test_every_ytdlp_attempt_suppresses_update_warnings(
-        self, browser, auth_mode, tmp_path, monkeypatch
-    ) -> None:
-        import transcript
-
-        profile = tmp_path / "Arc" / "Default"
-        if browser == "Arc":
-            profile.mkdir(parents=True)
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", profile)
-        commands = []
-
-        def failed_child(command, **_kwargs):
-            commands.append(command)
-            return subprocess.CompletedProcess(
-                command, 1, "", "ERROR: connection refused"
-            )
-
-        monkeypatch.setattr(transcript, "run_child", failed_child)
-        with pytest.raises(transcript.YtDlpError):
-            transcript.run_ytdlp(
-                ["--skip-download"],
-                "https://youtu.be/abc",
-                transcript.RunBudget.start(),
-                auth_mode=auth_mode,
-            )
-
-        assert len(commands) == (1 if auth_mode == "arc-required" else 2)
-        for command in commands:
-            assert "--no-update" in command
-            assert command[-1] == "https://youtu.be/abc"
+class TestYouTubeTransport:
+    """Without a cookies file, yt-dlp runs once, anonymously, never from a browser."""
 
     def test_runtime_pins_the_proven_ytdlp_version(self) -> None:
         script_text = SCRIPT_PATH.read_text(encoding="utf-8")
 
         assert '"yt-dlp[default]==2026.7.4"' in script_text
 
-    def test_ytdlp_uses_arc_first_and_skips_anonymous_when_it_succeeds(
-        self, tmp_path, monkeypatch
+    def test_anonymous_mode_runs_once_without_browser_cookies(
+        self, monkeypatch
     ) -> None:
         import transcript
 
-        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
-        arc_profile.mkdir(parents=True)
         calls = []
 
         def fake_run(command, **kwargs):
             calls.append((command, kwargs))
             return SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr="")
 
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
-        monkeypatch.setattr(
-            transcript,
-            "run_child",
-            fake_run,
-        )
-
-        result = transcript.run_ytdlp(
-            ["--get-title", "--get-id"],
-            "url",
-            transcript.RunBudget(float("inf")),
-        )
-
-        assert result.method == "arc"
-        assert result.process.stdout == "Title\nabc\n"
-        assert len(calls) == 1
-        assert calls[0][0][:2] == [sys.executable, str(transcript.ARC_ADAPTER_PATH)]
-
-    def test_ytdlp_falls_back_to_anonymous_after_arc_failure(
-        self, tmp_path, monkeypatch, caplog
-    ) -> None:
-        import transcript
-
-        caplog.set_level(logging.INFO, logger="transcript")
-        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
-        arc_profile.mkdir(parents=True)
-        responses = [
-            SimpleNamespace(returncode=1, stdout="", stderr="Arc failed"),
-            SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr=""),
-        ]
-        calls = []
-
-        def fake_run(command, **kwargs):
-            calls.append((command, kwargs))
-            return responses.pop(0)
-
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
         monkeypatch.setattr(transcript, "run_child", fake_run)
 
         result = transcript.run_ytdlp(
-            ["--get-title", "--get-id"],
-            "url",
-            transcript.RunBudget(float("inf")),
+            ["--get-title"], "https://youtu.be/abc", transcript.RunBudget.start()
         )
 
         assert result.method == "anonymous"
-        assert calls[0][0][:2] == [sys.executable, str(transcript.ARC_ADAPTER_PATH)]
-        assert calls[0][0][2:4] == [
-            "--cookies-from-browser",
-            f"chrome:{arc_profile}",
-        ]
-        assert calls[1][0][:3] == [sys.executable, "-m", "yt_dlp"]
-        assert caplog.messages == [
-            (
-                "Arc YouTube access failed; retrying anonymously. "
-                "Sign in to YouTube in Arc to use your session"
-            )
-        ]
+        ((command, kwargs),) = calls
+        assert command[:3] == [sys.executable, "-m", "yt_dlp"]
+        assert "--no-cookies" in command
+        assert "--no-cookies-from-browser" in command
+        assert "--no-update" in command
+        assert command[-1] == "https://youtu.be/abc"
+        assert kwargs["timeout"] > 0
 
-    def test_ytdlp_uses_chrome_first_when_arc_is_absent(
-        self, tmp_path, monkeypatch
+    def test_anonymous_failure_is_redacted_and_names_the_session_fix(
+        self, monkeypatch
     ) -> None:
         import transcript
 
-        commands = []
-
-        monkeypatch.setattr(
-            transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
-        )
         monkeypatch.setattr(
             transcript,
             "run_child",
-            lambda command, **_kwargs: (
-                commands.append(command)
-                or SimpleNamespace(returncode=0, stdout="ok", stderr="")
-            ),
-        )
-
-        result = transcript.run_ytdlp([], "url", transcript.RunBudget(float("inf")))
-
-        assert result.method == "chrome"
-        assert len(commands) == 1
-        assert commands[0][:5] == [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--cookies-from-browser",
-            "chrome",
-        ]
-
-    def test_ytdlp_falls_back_to_anonymous_after_chrome_failure(
-        self, tmp_path, monkeypatch, caplog
-    ) -> None:
-        import transcript
-
-        caplog.set_level(logging.INFO, logger="transcript")
-        responses = [
-            SimpleNamespace(returncode=1, stdout="", stderr="Chrome failed"),
-            SimpleNamespace(returncode=0, stdout="Title\nabc\n", stderr=""),
-        ]
-        commands = []
-
-        def fake_run(command, **_kwargs):
-            commands.append(command)
-            return responses.pop(0)
-
-        monkeypatch.setattr(
-            transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
-        )
-        monkeypatch.setattr(transcript, "run_child", fake_run)
-
-        result = transcript.run_ytdlp([], "url", transcript.RunBudget(float("inf")))
-
-        assert result.method == "anonymous"
-        assert caplog.messages == [
-            (
-                "Chrome YouTube access failed; retrying anonymously. "
-                "Sign in to YouTube in Chrome to use your session"
-            )
-        ]
-        assert commands[0][3:5] == ["--cookies-from-browser", "chrome"]
-        assert commands[1][:3] == [sys.executable, "-m", "yt_dlp"]
-
-    def test_arc_required_mode_skips_anonymous_and_uses_the_adapter(
-        self, tmp_path, monkeypatch
-    ) -> None:
-        import transcript
-
-        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
-        arc_profile.mkdir(parents=True)
-        calls = []
-
-        def fake_run(command, **kwargs):
-            calls.append((command, kwargs))
-            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
-        monkeypatch.setattr(transcript, "run_child", fake_run)
-
-        result = transcript.run_ytdlp(
-            [],
-            "url",
-            transcript.RunBudget(float("inf")),
-            auth_mode="arc-required",
-        )
-
-        assert result.method == "arc"
-        assert len(calls) == 1
-        assert calls[0][0][:2] == [sys.executable, str(transcript.ARC_ADAPTER_PATH)]
-        assert calls[0][0][2:4] == [
-            "--cookies-from-browser",
-            f"chrome:{arc_profile}",
-        ]
-        assert calls[0][1]["timeout"] > 0
-
-    def test_arc_required_mode_fails_before_subprocess_without_profile(
-        self, tmp_path, monkeypatch
-    ) -> None:
-        import transcript
-
-        monkeypatch.setattr(
-            transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-profile"
-        )
-        monkeypatch.setattr(
-            transcript,
-            "run_child",
-            lambda *_args, **_kwargs: pytest.fail(
-                "subprocess started without the required Arc profile"
-            ),
-        )
-
-        with pytest.raises(
-            transcript.YtDlpError, match="transport check requires the Arc"
-        ):
-            transcript.run_ytdlp(
-                [],
-                "url",
-                transcript.RunBudget(float("inf")),
-                auth_mode="arc-required",
-            )
-
-    def test_failed_attempts_keep_labeled_redacted_diagnostics(
-        self, tmp_path, monkeypatch
-    ) -> None:
-        import transcript
-
-        arc_profile = tmp_path / "Arc" / "User Data" / "Default"
-        arc_profile.mkdir(parents=True)
-        failures = [
-            SimpleNamespace(
+            lambda *_args, **_kwargs: SimpleNamespace(
                 returncode=1,
                 stdout="",
                 stderr=(
-                    "\x1b[31mArc cookies expired\x1b[0m\n"
-                    "\x1b[33mAuthorization:\x1b[0m arc-secret\n"
+                    "\x1b[31mSign in to confirm you're not a bot\x1b[0m\n"
+                    "Cookie: SID=anon-secret\n"
                 ),
             ),
-            SimpleNamespace(
-                returncode=1,
-                stdout="",
-                stderr="anonymous blocked\nCookie: SID=anon-secret\n",
-            ),
-        ]
-
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
-        monkeypatch.setattr(
-            transcript,
-            "run_child",
-            lambda *_args, **_kwargs: failures.pop(0),
         )
 
         with pytest.raises(transcript.YtDlpError) as error:
             transcript.run_ytdlp([], "url", transcript.RunBudget(float("inf")))
 
         diagnostic = str(error.value)
-        assert "Arc attempt: Arc cookies expired" in diagnostic
-        assert "anonymous fallback: anonymous blocked" in diagnostic
-        assert diagnostic.index("Arc attempt") < diagnostic.index("anonymous fallback")
+        assert "anonymous transport failed" in diagnostic
+        assert "not a bot" in diagnostic
+        assert "auth refresh" in diagnostic
         assert "anon-secret" not in diagnostic
-        assert "arc-secret" not in diagnostic
         assert "\x1b" not in diagnostic
-
-    def test_arc_adapter_changes_only_the_keyring_name(self) -> None:
-        import ytdlp_arc
-
-        original_settings = {
-            "browser_dir": "/browser",
-            "keyring_name": "Chrome",
-            "supports_profiles": True,
-        }
-        cookies_module = SimpleNamespace(
-            _get_chromium_based_browser_settings=lambda _name: original_settings.copy()
-        )
-
-        ytdlp_arc.install_arc_cookie_adapter(
-            cookies_module, runtime_version="2026.07.04"
-        )
-        adapted = cookies_module._get_chromium_based_browser_settings("chrome")
-
-        assert adapted == {**original_settings, "keyring_name": "Arc"}
-        assert original_settings["keyring_name"] == "Chrome"
-
-    def test_arc_adapter_rejects_unproven_ytdlp_version(self) -> None:
-        import ytdlp_arc
-
-        cookies_module = SimpleNamespace(
-            _get_chromium_based_browser_settings=lambda _name: {
-                "browser_dir": "/browser",
-                "keyring_name": "Chrome",
-                "supports_profiles": True,
-            }
-        )
-
-        with pytest.raises(
-            ytdlp_arc.ArcCookieAdapterError,
-            match="requires yt-dlp 2026.07.04",
-        ):
-            ytdlp_arc.install_arc_cookie_adapter(
-                cookies_module, runtime_version="2099.01.01"
-            )
-
-    def test_arc_adapter_fails_loud_when_private_contract_changes(self) -> None:
-        import ytdlp_arc
-
-        cookies_module = SimpleNamespace(
-            _get_chromium_based_browser_settings=lambda _name: {
-                "browser_dir": "/browser",
-                "supports_profiles": True,
-            }
-        )
-
-        with pytest.raises(
-            ytdlp_arc.ArcCookieAdapterError,
-            match="private cookie settings contract changed",
-        ):
-            ytdlp_arc.install_arc_cookie_adapter(
-                cookies_module, runtime_version="2026.07.04"
-            )
+        assert error.value.temporary is False
 
 
 class TestFilePipeline:
@@ -2726,7 +2449,6 @@ class TestPreflightAndCleanup:
         import transcript
 
         failures = [
-            SimpleNamespace(returncode=1, stdout="", stderr="public attempt failed"),
             SimpleNamespace(
                 returncode=1,
                 stdout="",

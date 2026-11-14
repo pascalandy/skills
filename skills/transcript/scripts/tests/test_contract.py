@@ -87,19 +87,6 @@ def json_line(fields: dict) -> str:
     return json.dumps(fields, separators=(",", ":")) + "\n"
 
 
-FALLBACK = "Arc YouTube access failed; retrying anonymously"
-
-
-def fall_back(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fall back to anonymous access, as a run without a browser session does."""
-
-    def fall_back_then_download(_url, output_dir, *_args, **_kwargs):
-        transcript.log.info(FALLBACK)
-        return downloaded(output_dir)
-
-    fake_youtube(monkeypatch, download=fall_back_then_download)
-
-
 def fake_youtube(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -483,24 +470,6 @@ def test_stdout_is_exactly_one_json_line(
     assert json.loads(out)["ok"] is True
 
 
-def test_a_browser_fallback_is_verbose_detail_and_keeps_success(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    fall_back(monkeypatch)
-    argv = ["run", "youtube", "--url", URL, "--no-summary", "--output-dir"]
-
-    code, out, err = cli(capsys, *argv, str(tmp_path / "quiet"))
-
-    assert code == 0
-    assert answer(out)["ok"] is True
-    assert FALLBACK not in err
-
-    code, out, err = cli(capsys, *argv, str(tmp_path / "verbose"), "-v")
-
-    assert code == 0
-    assert FALLBACK in err.splitlines()
-
-
 def test_a_failed_finder_launch_is_verbose_detail_and_keeps_success(
     tmp_path, monkeypatch, capsys
 ) -> None:
@@ -738,7 +707,6 @@ def test_a_network_failure_reaching_youtube_is_safe_to_retry(
     monkeypatch, capsys
 ) -> None:
     responses = [
-        subprocess.CompletedProcess([], 1, "", "ERROR: Sign in failed"),
         subprocess.CompletedProcess(
             [], 1, "", "ERROR: HTTP Error 429: Too Many Requests"
         ),
@@ -759,7 +727,6 @@ def test_a_retry_hint_drops_the_empty_url_that_just_ttr_adds(
     monkeypatch, capsys
 ) -> None:
     responses = [
-        subprocess.CompletedProcess([], 1, "", "ERROR: Sign in failed"),
         subprocess.CompletedProcess(
             [], 1, "", "ERROR: HTTP Error 429: Too Many Requests"
         ),
@@ -795,7 +762,7 @@ def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> N
     assert smoke(capsys) == (0, json_line({"ok": True}), "")
     verbose = smoke(capsys, "-v")
     assert verbose[:2] == (0, json_line({"ok": True}))
-    assert "Arc adapter exercised; audio stream verified" in verbose[2]
+    assert "Anonymous transport exercised; audio stream verified" in verbose[2]
 
     monkeypatch.setattr(
         youtube_smoke,

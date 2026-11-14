@@ -4,11 +4,17 @@ Use this procedure for requests to refresh, renew or update Transcript's YouTube
 
 ## 1. Locate the source Mac
 
-Use the Mac with the signed-in Arc Default profile and the configured `~/.local/share/transcript/youtube-targets.txt`. Resolve its identity and skills checkout from available machine context or an installed fleet inventory. Confirm the source machine's identity before running commands. The consuming machine may be a different Mac or Linux computer.
+Use the Mac with Helium's `CLI` profile and the configured `~/.local/share/transcript/youtube-targets.txt`. Resolve its identity and skills checkout from available machine context or an installed fleet inventory. Confirm the source machine's identity before running commands. The consuming machine may be a different Mac or Linux computer.
 
 The source Mac must be awake with its desktop session unlocked. When a skills checkout is available, confirm its `transcript-auth-refresh` recipe and the `just` and `uv` executables. Otherwise use the installed-only CLI fallback in step 3 for preview and renewal. Noninteractive SSH can omit Homebrew from PATH; use the verified executable paths or supply that PATH.
 
-If Google requires reconnection, ask the user to sign in to YouTube in Arc on this Mac. Ask only for this necessary interaction or the unavailable machine access. The command creates the export itself; no cookie contents, Netscape export or export path need to be supplied by the user.
+The `CLI` profile is used only by tools, so YouTube never rotates its cookies. Ask the user for one of these interactions only when the command requires it, along with any unavailable machine access:
+
+- **No `CLI` profile.** The user creates a Helium profile named `CLI` and signs in to YouTube there with the account Transcript should use. Then the user opens `https://www.youtube.com/robots.txt` and closes that profile's window
+- **Google signed the session out.** The user signs in to YouTube again in the `CLI` profile, opens `robots.txt`, and closes the window
+- **First Keychain prompt.** The user chooses `Always Allow` for `Helium Storage Key`
+
+The command creates the export itself; no cookie contents, Netscape export or export path need to be supplied by the user.
 
 ## 2. Preview the configured destinations
 
@@ -33,7 +39,7 @@ This is the preferred command when the repository checkout is available. An inst
 
 ### When working from another machine
 
-Use an available, authorized desktop control to run the same Just command in the source Mac's logged-in session. Plain SSH can reach the Mac while Keychain refuses to decrypt Arc cookies. That refusal does not establish that the session is unavailable.
+Use an available, authorized desktop control to run the same Just command in the source Mac's logged-in session. Plain SSH can reach the Mac while Keychain refuses to release Helium's cookie key. That refusal does not establish that the session is unavailable.
 
 With macOS automation available over SSH, `osascript` can start the command in a new Terminal window. Use a new window owned by this operation, record its window ID and tab TTY, and capture stdout, stderr and the exit status in a private temporary directory. Wait for the command to finish before reading the captured result. Close only the recorded window after checking that its TTY still matches and the tab is no longer busy. Leave the user's existing windows untouched.
 

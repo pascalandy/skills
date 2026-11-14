@@ -1,6 +1,6 @@
 # Diagnostics
 
-Diagnostics reports Deepgram credential availability, commands, browser state, and source paths without calling paid APIs.
+Diagnostics reports Deepgram credential availability, commands, the YouTube session, and source paths without calling paid APIs.
 
 ## Sub-features
 
@@ -28,7 +28,7 @@ Preconditions:
 
 - A failed readiness check does not mean the doctor behavior is broken
 - Both diagnostics include the `claude` and `pi` checks; a missing `pi` only warns, because only non-default profiles need it
-- Diagnostics can read default browser and Zoom paths but do not mutate them
+- Diagnostics can read the stored YouTube session and Zoom paths but do not mutate them
 - Inspect `readiness_ok` before attempting the paid feature
 - Doctor does not measure upload bandwidth or prove that an audio file reached Deepgram
 - An upload or workflow timeout fails with an error whose fix reruns with twice the `--timeout`; a stalled write reports a lower bound on bytes sent because the last block may have been partially transmitted

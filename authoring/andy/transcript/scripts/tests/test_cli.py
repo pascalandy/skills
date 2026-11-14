@@ -320,10 +320,6 @@ class TestDoctor:
 
         monkeypatch.setenv("PATH", str(tmp_path))
         monkeypatch.setattr(transcript, "ZOOM_ROOT", tmp_path / "missing-zoom")
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", tmp_path / "missing-arc")
-        monkeypatch.setattr(
-            transcript, "CHROME_BROWSER_PROFILE", tmp_path / "missing-chrome"
-        )
         reads = []
         monkeypatch.setattr(
             transcript,
@@ -350,10 +346,13 @@ class TestDoctor:
 
         zoom_root = tmp_path / "Zoom"
         zoom_root.mkdir()
-        arc_profile = tmp_path / "Arc" / "Default"
-        arc_profile.mkdir(parents=True)
+        cookies = tmp_path / "youtube.cookies.txt"
+        cookies.write_text(
+            "# Netscape HTTP Cookie File\n"
+            ".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tsynthetic\n",
+            encoding="utf-8",
+        )
         monkeypatch.setattr(transcript, "ZOOM_ROOT", zoom_root)
-        monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
         monkeypatch.setattr(
             transcript,
             "validate_env",
@@ -366,7 +365,9 @@ class TestDoctor:
             lambda: "2026.7.4",
         )
 
-        checks = transcript._doctor_checks(source="all", summarize=True)
+        checks = transcript._doctor_checks(
+            source="all", summarize=True, youtube_auth=transcript.CookieFile(cookies)
+        )
 
         assert all(check["status"] == "pass" for check in checks)
         assert "deepgram-secret-value" not in json.dumps(checks)
@@ -377,7 +378,7 @@ class TestDoctor:
             "ffmpeg",
             "ffprobe",
             "yt_dlp",
-            "youtube_browser",
+            "youtube_cookies",
             "zoom_recordings",
         }
 

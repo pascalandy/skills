@@ -36,9 +36,6 @@ def test_transport_owns_a_private_copy_on_every_exit(
 ) -> None:
     original = cookies_file.read_bytes()
     observed: list[Path] = []
-    arc_profile = cookies_file.parent / "Arc" / "Default"
-    arc_profile.mkdir(parents=True)
-    monkeypatch.setattr(transcript, "ARC_BROWSER_PROFILE", arc_profile)
 
     def child(command, **kwargs):
         path = Path(command[command.index("--cookies") + 1])
@@ -270,7 +267,7 @@ def test_doctor_checks_the_file_instead_of_browser_presence(
         summarize=False,
         youtube_auth=transcript.CookieFile(cookies_file),
     )
-    assert "youtube_browser" not in {check["name"] for check in checks}
+    assert "youtube_session" not in {check["name"] for check in checks}
     check = next(check for check in checks if check["name"] == "youtube_cookies")
     if malformed:
         assert [item["name"] for item in checks if item["status"] == "fail"] == [

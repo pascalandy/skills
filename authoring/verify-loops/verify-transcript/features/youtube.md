@@ -1,6 +1,6 @@
 # YouTube
 
-YouTube mode validates a public video URL, resolves a summary plan, attempts a browser-authenticated download before an anonymous fallback, transcribes audio with Deepgram, and can summarize it through `claude` or `pi`.
+YouTube mode validates a public video URL, resolves a summary plan, downloads audio through the stored or supplied cookies file, or anonymously without one, transcribes audio with Deepgram, and can summarize it through `claude` or `pi`.
 
 ## Sub-features
 
@@ -35,7 +35,7 @@ Preconditions:
 - A YouTube dry run validates URL shape, not video availability
 - `--no-summary` still calls paid Deepgram transcription
 - `--allow-paid` alone selects no paid feature
-- An expired browser session falls back to anonymous access. The run fails if both download methods fail or YouTube removes the video
+- A stored session that YouTube refuses stops the run before paid work, with `transcript auth refresh` as its fix. A run without a cookies file is anonymous and fails when YouTube refuses it or removes the video
 - Full transcript and summary content is removed with scratch after its hashes and sizes are recorded
 - Upload completion means the client sent the full payload; publication also requires a valid Deepgram response
 - A real success does not exercise slow or interrupted uploads. Run the deterministic upload verification loop in [SKILL.md](../SKILL.md) for those cases

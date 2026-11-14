@@ -97,7 +97,7 @@ def test_refresh_verifies_before_atomic_replacement_and_reports_partial_targets(
 ) -> None:
     destination = session.session_file()
     write_cookies(destination, "old-session")
-    monkeypatch.setattr(session, "_export_arc", lambda path: write_cookies(path))
+    monkeypatch.setattr(session, "_export_helium", lambda path: write_cookies(path))
 
     def verify(path, **_kwargs):
         assert VALUE in path.read_text()
@@ -184,3 +184,131 @@ def test_targets_reject_ssh_options_before_any_export(monkeypatch, capsys) -> No
     )
     assert transcript.main(["auth", "refresh", "--to=-oProxyCommand=bad"]) == 1
     assert "host aliases" in capsys.readouterr().err
+
+
+def write_helium(root: Path, profiles: dict[str, str]) -> None:
+    """A Helium data folder whose profiles map folder -> display name."""
+    root.mkdir(parents=True, exist_ok=True)
+    for folder in profiles:
+        (root / folder).mkdir()
+        (root / folder / "Cookies").write_bytes(b"sqlite")
+    info_cache = {folder: {"name": name} for folder, name in profiles.items()}
+    (root / "Local State").write_text(
+        json.dumps({"profile": {"info_cache": info_cache}}), encoding="utf-8"
+    )
+
+
+def test_helium_profile_is_found_by_its_display_name(tmp_path, monkeypatch) -> None:
+    root = tmp_path / "helium"
+    write_helium(root, {"Default": "Your Helium", "Profile 3": "CLI"})
+    monkeypatch.setattr(session, "HELIUM_DATA", root)
+
+    assert session.helium_profile() == root / "Profile 3"
+
+
+@pytest.mark.parametrize(
+    "profiles",
+    [None, {"Default": "Your Helium"}, {"Profile 1": "CLI", "Profile 2": "CLI"}],
+)
+def test_missing_helium_profile_explains_the_one_time_setup(
+    tmp_path, monkeypatch, profiles
+) -> None:
+    root = tmp_path / "helium"
+    if profiles is not None:
+        write_helium(root, profiles)
+    monkeypatch.setattr(session, "HELIUM_DATA", root)
+
+    with pytest.raises(
+        session.SessionError, match="Create a Helium profile named 'CLI'"
+    ):
+        session.helium_profile()
+
+
+def test_helium_key_comes_from_its_own_keychain_entry(monkeypatch) -> None:
+    calls = []
+
+    def security(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, b"secret-key\n", b"")
+
+    monkeypatch.setattr(session.subprocess, "run", security)
+
+    assert session._helium_cookie_key() == b"secret-key"
+    assert calls == [
+        [
+            "security",
+            "find-generic-password",
+            "-w",
+            "-s",
+            "Helium Storage Key",
+            "-a",
+            "Helium",
+        ]
+    ]
+
+
+def test_refused_keychain_access_names_the_desktop_fix(monkeypatch) -> None:
+    monkeypatch.setattr(
+        session.subprocess,
+        "run",
+        lambda command, **_k: subprocess.CompletedProcess(command, 51, b"", b"denied"),
+    )
+
+    with pytest.raises(session.SessionError, match="Always Allow"):
+        session._helium_cookie_key()
+
+
+def test_export_keeps_youtube_cookies_only_and_restores_ytdlp(
+    tmp_path, monkeypatch
+) -> None:
+    from http.cookiejar import Cookie
+
+    from yt_dlp import cookies
+
+    profile = tmp_path / "Profile 3"
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(session, "helium_profile", lambda: profile)
+    monkeypatch.setattr(session, "_helium_cookie_key", lambda: b"secret-key")
+    original = cookies._get_mac_keyring_password
+
+    def cookie(domain: str, name: str) -> Cookie:
+        return Cookie(
+            0,
+            name,
+            VALUE,
+            None,
+            False,
+            domain,
+            True,
+            True,
+            "/",
+            True,
+            True,
+            4102444800,
+            False,
+            None,
+            None,
+            {},
+        )
+
+    def extract(browser, *, profile):
+        assert browser == "chrome" and profile == str(tmp_path / "Profile 3")
+        assert cookies._get_mac_keyring_password("Chrome", None) == b"secret-key"
+        jar = cookies.YoutubeDLCookieJar()
+        for domain, name in [
+            (".youtube.com", "SID"),
+            ("music.youtube.com", "PREF"),
+            (".google.com", "SID"),
+            ("notyoutube.com", "SID"),
+        ]:
+            jar.set_cookie(cookie(domain, name))
+        return jar
+
+    monkeypatch.setattr(cookies, "extract_cookies_from_browser", extract)
+    exported = tmp_path / "cookies.txt"
+
+    session._export_helium(exported)
+
+    domains = {item.domain for item in session.load_cookie_jar(exported)}
+    assert domains == {".youtube.com", "music.youtube.com"}
+    assert cookies._get_mac_keyring_password is original

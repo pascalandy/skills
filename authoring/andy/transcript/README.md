@@ -23,7 +23,7 @@ chezmoi secret keyring set --service=deepgram --user=api_key
 
 The runtime falls back to `DEEPGRAM_API_KEY` when the keyring is unavailable. It never prints the key.
 
-The scripts pin `yt-dlp` to `2026.7.4`, the version covered by the Arc adapter and transport check. They install its default dependencies, including the matching EJS challenge solver.
+The scripts pin `yt-dlp` to `2026.7.4`, the version covered by the Helium export and transport check. They install its default dependencies, including the matching EJS challenge solver.
 
 ## Commands and options
 
@@ -111,7 +111,7 @@ Every command answers in one JSON line, as `docs/references/script-output.md` of
 - A dry run answers its plan: `source`, `summary`, `output_dir`, and `timeout_seconds`
 - `doctor` answers `{"ok":true}`, or one error per failed check
 
-While a run works, `stderr` shows each result folder as soon as it appears, before Deepgram starts, so the path is usable at once. Nothing else reaches `stderr` by default. `-v` adds the run plan, one line per step, and what needs no action, such as browser access falling back to anonymous; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off. `--preview` renders the summary on `stderr` too.
+While a run works, `stderr` shows each result folder as soon as it appears, before Deepgram starts, so the path is usable at once. Nothing else reaches `stderr` by default. `-v` adds the run plan, one line per step, and what needs no action, such as a Finder launch that failed; `--debug` adds child commands, timings, and tracebacks. On a terminal, each step shows a spinner that leaves nothing behind; `--no-progress`, `--no-color`, `NO_COLOR`, or `TERM=dumb` turn it off. `--preview` renders the summary on `stderr` too.
 
 A successful run answers:
 
@@ -179,15 +179,15 @@ The metadata holds the title, date, and source from the moment the folder appear
 - `Transcript status`: `in progress`, `complete`, `failed`, or `interrupted`
 - `Summary status`: `pending`, `running`, `succeeded`, `failed`, `skipped`, `not started`, or `interrupted`
 
-YouTube metadata also records the audio method that worked: `anonymous`, `arc`, `chrome`, or `cookies`. The `cookies` method identifies a supplied file; it does not attest server-side account authentication.
+YouTube metadata also records the audio method that worked: `anonymous` or `cookies`. The `cookies` method identifies a supplied file; it does not attest server-side account authentication.
 
 ## YouTube transport
 
-Without a stored or supplied cookies file, normal YouTube runs try browser authentication first. When Arc's `~/Library/Application Support/Arc/User Data/Default` profile exists, a bounded adapter changes only yt-dlp's in-memory keyring name to `Arc`. Otherwise the CLI uses Chrome's Default profile. If browser authentication fails, it retries anonymously, which `-v` reports and the metadata records.
+A run reads YouTube through a cookies file: `--cookies FILE`, or else the stored session described in [Use a portable cookies file](#use-a-portable-cookies-file). Without either, it runs anonymously, which YouTube often refuses, and the metadata records it. A run never reads a browser profile: YouTube rotates the cookies of a profile with a YouTube tab open, so a copy taken from an everyday profile expires within days.
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
-Arc's `Default` profile must have a valid YouTube session. If the session expires, sign in again to YouTube in Arc. Arc can remain open. YouTube Premium does not replace browser authentication. The script does not export cookies or modify Arc, Chrome, or Keychain.
+YouTube Premium needs no extra setting: the stored session carries the account signed in to Helium's `CLI` profile.
 
 Run the free transport check on the canonical video from [Test videos](#test-videos):
 
@@ -195,21 +195,30 @@ Run the free transport check on the canonical video from [Test videos](#test-vid
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-Without a stored or supplied cookies file, the transport check requires Arc. It skips anonymous access, downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
+The transport check uses the same source as a run: the stored or supplied cookies file, or anonymous access without one. It downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
 
 ### Use a portable cookies file
 
-For daily use, the permanent store is `~/.local/share/transcript/youtube.cookies.txt` on each computer. YouTube runs, doctor and smoke discover it automatically. An explicit `--cookies FILE` overrides it. Once the store directory exists, a missing or malformed managed file fails without browser or anonymous fallback. Dry runs check only the path. Normal managed-session runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work.
+For daily use, the permanent store is `~/.local/share/transcript/youtube.cookies.txt` on each computer. YouTube runs, doctor and smoke discover it automatically. An explicit `--cookies FILE` overrides it. Once the store directory exists, a missing or malformed managed file fails without anonymous fallback. Dry runs check only the path. Normal managed-session runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work.
 
-#### Renew after signing in
+#### Renew from Helium's CLI profile
 
-After signing in to YouTube in Arc, run from the skills repository in the source Mac's unlocked desktop terminal:
+The stored session comes from a Helium profile that only tools use. Nobody browses there, so YouTube never rotates its cookies and the stored copy stays valid for weeks or months. Set it up once on the source Mac:
 
-```bash
-just transcript-auth-refresh
-```
+1. In Helium, create a profile named `CLI`
+2. In that profile, sign in to YouTube with the account Transcript should use, such as your YouTube Premium account
+3. Open `https://www.youtube.com/robots.txt` in that tab, then close the profile's window. Never browse YouTube in this profile
+4. From the skills repository, in the source Mac's unlocked desktop terminal, run:
 
-This exports only YouTube-domain cookies from Arc's Default profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
+   ```bash
+   just transcript-auth-refresh
+   ```
+
+   The first run asks for Keychain access to `Helium Storage Key`. Choose `Always Allow`
+
+Run step 4 again when a run or `auth check` reports that YouTube refused the stored session. If the refresh itself fails, repeat steps 2 and 3 first.
+
+The refresh exports only YouTube-domain cookies from the `CLI` profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
 
 Configure destinations once in `~/.local/share/transcript/youtube-targets.txt` on the source Mac, one trusted SSH host alias or `user@host` per line. Without this file, renewal updates only the source Mac. Receivers need `uv`, already required by Transcript, and known SSH host keys. SSH never accepts new keys or prompts for a password. The receiver uses the verifier sent by this command, so it does not require a matching skill installation.
 
@@ -222,7 +231,7 @@ just transcript-auth-refresh --dry-run
 
 #### Supply another export
 
-An exported Netscape cookies file works as a local source on macOS and Linux without Arc or its Keychain. The explicit file selects the cookie source and uses no browser or anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
+An exported Netscape cookies file works as a local source on macOS and Linux without Helium or its Keychain. The explicit file selects the cookie source and uses no anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
 
 Keep any files requested by your yt-dlp configuration private. The `--write-info-json` option can include personal information outside Transcript's logs.
 
@@ -277,7 +286,7 @@ Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `xhigh` effo
 
 Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 
-For browser mode, run a paid test from a local session on a Mac whose Arc is signed in to YouTube, such as mbp. Over SSH, the macOS Keychain keeps Arc's cookies out of reach and yt-dlp reports `find-generic-password failed`, and Linux has no Arc profile. Both fall back to anonymous access, which YouTube usually refuses. A valid `--cookies FILE` source avoids the Keychain dependency and can run from SSH or Linux. Append that option to the closeout commands when testing file mode.
+Paid tests use the stored session, so they run the same from a local terminal, over SSH, or on Linux. Only `auth refresh` needs the source Mac's desktop session, because macOS Keychain refuses Helium's cookie key over SSH. To test another export, append `--cookies FILE` to the closeout commands.
 
 ## Validation model
 
