@@ -18,9 +18,18 @@ from pathlib import Path
 import httpx
 
 LOGIN_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
+SUPPORTED_YTDLP_VERSION = "2026.07.04"
+# Tools own this Helium profile; nobody browses in it, so YouTube never rotates
+# its cookies and an exported copy stays valid. Everyday profiles rotate them
+# within days, which invalidates every copy
+HELIUM_DATA = Path.home() / "Library/Application Support/net.imput.helium"
+HELIUM_PROFILE_NAME = "CLI"
+HELIUM_KEYCHAIN_SERVICE = "Helium Storage Key"
+HELIUM_KEYCHAIN_ACCOUNT = "Helium"
 REFRESH_HINT = (
-    "Sign in to YouTube in Arc on the source Mac, then run "
-    "'transcript auth refresh' in its unlocked desktop terminal"
+    "Run 'transcript auth refresh' in the source Mac's unlocked desktop terminal. "
+    f"If it fails, sign in to YouTube again in Helium's '{HELIUM_PROFILE_NAME}' "
+    "profile, then close that profile's window"
 )
 
 
@@ -107,7 +116,9 @@ def check_session(path: Path, *, timeout: float = 25) -> None:
         )
     flag = logged_in_flag(response.text) if response.status_code == 200 else None
     if flag is False:
-        raise SessionError(f"YouTube session is expired or signed out. {REFRESH_HINT}")
+        raise SessionError(
+            f"YouTube refused the stored session: it expired or was signed out. {REFRESH_HINT}"
+        )
     if flag is not True or response.url.host not in {"www.youtube.com", "youtube.com"}:
         raise SessionError(
             "YouTube did not confirm a signed-in session. "
@@ -139,28 +150,83 @@ def refresh_targets(explicit: list[str] | None) -> list[str]:
     return targets
 
 
-def _export_arc(path: Path) -> None:
+def helium_profile() -> Path:
+    """Find the tools profile by its display name; Helium names folders itself."""
+    setup = (
+        f"Create a Helium profile named '{HELIUM_PROFILE_NAME}', sign in to YouTube "
+        "there, open https://www.youtube.com/robots.txt, close that profile's window, "
+        "then run 'transcript auth refresh'"
+    )
+    try:
+        state = json.loads((HELIUM_DATA / "Local State").read_text(encoding="utf-8"))
+        profiles = state["profile"]["info_cache"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise SessionError(f"Helium was not found. {setup}") from None
+    folders = [
+        folder
+        for folder, info in profiles.items()
+        if isinstance(info, dict) and info.get("name") == HELIUM_PROFILE_NAME
+    ]
+    if len(folders) != 1 or not (HELIUM_DATA / folders[0] / "Cookies").is_file():
+        raise SessionError(
+            f"Helium has no single profile named '{HELIUM_PROFILE_NAME}' with cookies. "
+            f"{setup}"
+        )
+    return HELIUM_DATA / folders[0]
+
+
+def _helium_cookie_key() -> bytes:
+    """Read Helium's cookie key; macOS asks once, then 'Always Allow' remembers."""
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-w",
+                "-s",
+                HELIUM_KEYCHAIN_SERVICE,
+                "-a",
+                HELIUM_KEYCHAIN_ACCOUNT,
+            ],
+            capture_output=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        result = None
+    if result is None or result.returncode or not result.stdout.strip():
+        raise SessionError(
+            "Keychain did not release Helium's cookie key. Run 'transcript auth refresh' "
+            "in the source Mac's unlocked desktop terminal and choose 'Always Allow'"
+        )
+    return result.stdout.rstrip(b"\n")
+
+
+def _export_helium(path: Path) -> None:
     """Export only YouTube domains; retain all browser diagnostics in memory."""
     if sys.platform != "darwin":
-        raise SessionError(f"Arc session renewal requires macOS. {REFRESH_HINT}")
+        raise SessionError(f"Helium session renewal requires macOS. {REFRESH_HINT}")
+    profile = helium_profile()
+    key = _helium_cookie_key()
     from yt_dlp import cookies, version
-    from ytdlp_arc import install_arc_cookie_adapter
 
-    original = cookies._get_chromium_based_browser_settings
+    original = getattr(cookies, "_get_mac_keyring_password", None)
+    if version.__version__ != SUPPORTED_YTDLP_VERSION or not callable(original):
+        raise SessionError(
+            f"The Helium export supports yt-dlp {SUPPORTED_YTDLP_VERSION} only; "
+            f"found {version.__version__}"
+        )
     try:
+        # yt-dlp reads Chromium cookies but looks up '<name> Safe Storage'; Helium
+        # stores its key under another name, so hand yt-dlp the key directly
+        cookies._get_mac_keyring_password = lambda *_args: key
         with (
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
             warnings.catch_warnings(),
         ):
             warnings.simplefilter("ignore")
-            install_arc_cookie_adapter(cookies, runtime_version=version.__version__)
-            jar = cookies.extract_cookies_from_browser(
-                "chrome",
-                profile=str(
-                    Path.home() / "Library/Application Support/Arc/User Data/Default"
-                ),
-            )
+            jar = cookies.extract_cookies_from_browser("chrome", profile=str(profile))
             exported = cookies.YoutubeDLCookieJar(str(path))
             for cookie in jar:
                 domain = cookie.domain.lstrip(".")
@@ -171,10 +237,10 @@ def _export_arc(path: Path) -> None:
             exported.save(ignore_discard=True, ignore_expires=True)
     except Exception:  # noqa: BLE001 - browser exceptions can contain secret cookie records
         raise SessionError(
-            f"Arc YouTube cookies could not be exported. {REFRESH_HINT}"
+            f"Helium YouTube cookies could not be exported. {REFRESH_HINT}"
         ) from None
     finally:
-        cookies._get_chromium_based_browser_settings = original
+        cookies._get_mac_keyring_password = original
 
 
 def _install_local(candidate: Path, destination: Path) -> None:
@@ -276,7 +342,7 @@ def refresh_session(
     with tempfile.TemporaryDirectory(prefix="transcript-renew-") as directory:
         candidate = Path(directory) / "cookies.txt"
         candidate.touch(mode=0o600)
-        _export_arc(candidate)
+        _export_helium(candidate)
         check_session(candidate, timeout=min(timeout, 25))
         _install_local(candidate, session_file())
         changes.append(["update", str(session_file())])

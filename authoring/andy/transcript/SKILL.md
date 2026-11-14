@@ -100,9 +100,9 @@ Report the result folder, the one holding the `files`, and whether a summary `.m
 
 ## YouTube transport check
 
-Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. Without a stored or supplied cookies file, the transport check requires Arc. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
+Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. It uses the same source as a run: the stored or supplied cookies file, or anonymous access without one. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
 
-For browser access, Arc's `Default` profile must have a valid YouTube session. If it expires, sign in again. Arc can remain open. YouTube Premium does not replace browser authentication. The normal run tries Arc, or Chrome when Arc is absent. If browser authentication fails, it retries anonymously.
+A run never reads a browser. The stored session comes from Helium's `CLI` profile, a profile only tools use, signed in to the account Transcript should use, such as YouTube Premium. When YouTube refuses the stored session, follow [Refresh YouTube cookies](references/youtube-auth-refresh.md).
 
 ## Changing this skill
 

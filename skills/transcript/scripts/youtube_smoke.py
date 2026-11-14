@@ -87,7 +87,7 @@ def build_parser() -> Parser:
         prog=PROG,
         exit_codes=EXIT_CODES,
         description=(
-            "Download YouTube audio through the stored session, Arc, or an explicit cookies file, and validate it with "
+            "Download YouTube audio through the stored session, an explicit cookies file, or anonymously without one, and validate it with "
             'ffprobe, without Deepgram or AI. A pass answers {"ok":true}.'
         ),
         epilog=f"""examples:
@@ -120,7 +120,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     if not validate_youtube_url(args.url):
         raise UsageError(f"invalid YouTube URL: {args.url!r}")
     try:
-        auth_mode = select_youtube_auth(args.cookies, fallback="arc-required")
+        auth_mode = select_youtube_auth(args.cookies)
     except ConfigurationError as error:
         raise UsageError(str(error)) from None
     rerun = _rerun(argv, prog=PROG)
@@ -139,7 +139,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
             transport = (
                 "the cookies file"
                 if isinstance(auth_mode, CookieFile)
-                else "the Arc adapter"
+                else "anonymous access"
             )
             log.info(f"Downloading {args.url} through {transport}")
             downloaded = download_audio(
@@ -168,7 +168,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
         repair = (
             "replace the YouTube cookies export"
             if isinstance(auth_mode, CookieFile)
-            else "sign in to YouTube in Arc"
+            else "store a session with 'transcript auth refresh'"
         )
         raise Failure(
             "transport_failed",
@@ -194,7 +194,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     log.info(
         "Cookies-file transport exercised; audio stream verified"
         if isinstance(auth_mode, CookieFile)
-        else "Arc adapter exercised; audio stream verified"
+        else "Anonymous transport exercised; audio stream verified"
     )
     return {}
 

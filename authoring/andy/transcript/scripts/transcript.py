@@ -540,13 +540,6 @@ def unknown_command(name: str, choices: Iterable[str]) -> str:
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 OUTPUT_DIR = Path("~/Documents/_my_docs/61_transcription_exports_yt").expanduser()
-ARC_BROWSER_PROFILE = Path(
-    "~/Library/Application Support/Arc/User Data/Default"
-).expanduser()
-CHROME_BROWSER_PROFILE = Path(
-    "~/Library/Application Support/Google/Chrome/Default"
-).expanduser()
-ARC_ADAPTER_PATH = SCRIPT_DIR / "ytdlp_arc.py"
 YTDLP_MODULE_COMMAND = (sys.executable, "-m", "yt_dlp")
 
 PROVIDER_CLAUDE = "claude"
@@ -661,8 +654,8 @@ class CookieFile:
     verify_session: bool = False
 
 
-YtDlpAuthMode = Literal["normal", "arc-required"] | CookieFile
-YtDlpMethod = Literal["anonymous", "arc", "chrome", "cookies"]
+YtDlpAuthMode = Literal["anonymous"] | CookieFile
+YtDlpMethod = Literal["anonymous", "cookies"]
 
 
 @dataclass(frozen=True)
@@ -676,7 +669,7 @@ class RunPlan:
     summarize: bool
     profile: str | None = None
     preview: bool = False
-    youtube_auth: YtDlpAuthMode = "normal"
+    youtube_auth: YtDlpAuthMode = "anonymous"
 
 
 @dataclass(frozen=True)
@@ -1142,10 +1135,11 @@ def validate_cookie_file(source: CookieFile) -> None:
         raise YtDlpError(str(error)) from None
 
 
-def select_youtube_auth(
-    path: Path | None, *, fallback: YtDlpAuthMode = "normal"
-) -> YtDlpAuthMode:
-    """Prefer an explicit file, then the managed store, then local browser access."""
+def select_youtube_auth(path: Path | None) -> YtDlpAuthMode:
+    """Prefer an explicit file, then the managed store, then anonymous access.
+
+    A CLI never reads an everyday browser profile: copies of its rotating
+    cookies expire within days. `auth refresh` fills the managed store instead."""
     managed = youtube_session.session_file()
     if path is not None:
         selected = resolve_cookie_file(path)
@@ -1159,7 +1153,7 @@ def select_youtube_auth(
                 f"{PROG} auth refresh",
             ) from None
         return CookieFile(selected.path, verify_session=True)
-    return fallback
+    return "anonymous"
 
 
 @contextmanager
@@ -1178,13 +1172,9 @@ def run_ytdlp(
     url: str,
     budget: RunBudget,
     *,
-    auth_mode: YtDlpAuthMode = "normal",
+    auth_mode: YtDlpAuthMode = "anonymous",
 ) -> YtDlpResult:
-    """Run pinned yt-dlp with an explicit file, or browser access first.
-
-    Use Arc when its default profile exists, otherwise use Chrome. Anonymous
-    access is a fallback so a valid browser session never pays for a failed
-    unauthenticated request first.
+    """Run pinned yt-dlp with a cookies file, or anonymously without one.
 
     Args:
         args: Extra yt-dlp flags (inserted before the URL).
@@ -1237,87 +1227,19 @@ def run_ytdlp(
             )
         return YtDlpResult(result, "cookies")
 
-    arc_command = [
-        sys.executable,
-        str(ARC_ADAPTER_PATH),
-        "--cookies-from-browser",
-        f"chrome:{ARC_BROWSER_PROFILE}",
-        "--no-update",
-        *args,
-        url,
-    ]
-    if auth_mode == "arc-required":
-        if not ARC_BROWSER_PROFILE.is_dir():
-            raise YtDlpError(
-                "The transport check requires the Arc Default profile at "
-                f"{ARC_BROWSER_PROFILE}. Sign in to YouTube in Arc and retry."
-            )
-        result = run_child(
-            arc_command,
-            timeout=budget.remaining(
-                "yt-dlp Arc-required transport check", SUMMARY_ATTEMPT_TIMEOUT
-            ),
-        )
-        if result.returncode != 0:
-            diagnostic = _clean_subprocess_diagnostic(result.stderr or result.stdout)
-            raise YtDlpError(
-                "yt-dlp failed: Arc-required transport check: "
-                f"{diagnostic or 'no diagnostic was returned'}",
-                temporary=bool(YTDLP_TEMPORARY.search(diagnostic)),
-            )
-        return YtDlpResult(result, "arc")
-
-    if ARC_BROWSER_PROFILE.is_dir():
-        authenticated_command = arc_command
-        authenticated_operation = "yt-dlp Arc cookie attempt"
-        authenticated_label = "Arc"
-        authenticated_method: YtDlpMethod = "arc"
-    else:
-        authenticated_command = [
-            *YTDLP_MODULE_COMMAND,
-            "--cookies-from-browser",
-            "chrome",
-            "--no-update",
-            *args,
-            url,
-        ]
-        authenticated_operation = "yt-dlp Chrome cookie attempt"
-        authenticated_label = "Chrome"
-        authenticated_method = "chrome"
-    authenticated = run_child(
-        authenticated_command,
-        timeout=budget.remaining(authenticated_operation, SUMMARY_ATTEMPT_TIMEOUT),
+    result = run_child(
+        [*YTDLP_MODULE_COMMAND, "--no-cookies-from-browser", "--no-update", *args, url],
+        timeout=budget.remaining("yt-dlp anonymous attempt", SUMMARY_ATTEMPT_TIMEOUT),
     )
-    if authenticated.returncode == 0:
-        return YtDlpResult(authenticated, authenticated_method)
-
-    authenticated_diagnostic = _clean_subprocess_diagnostic(
-        authenticated.stderr or authenticated.stdout
-    )
-    # The run goes on, and meta.txt records the method that worked, so this is
-    # -v detail
-    log.info(
-        f"{authenticated_label} YouTube access failed; retrying anonymously. "
-        f"Sign in to YouTube in {authenticated_label} to use your session"
-    )
-    log.debug(f"{authenticated_label} attempt: {authenticated_diagnostic}")
-    anonymous = run_child(
-        [*YTDLP_MODULE_COMMAND, "--no-update", *args, url],
-        timeout=budget.remaining("yt-dlp anonymous fallback", SUMMARY_ATTEMPT_TIMEOUT),
-    )
-    if anonymous.returncode == 0:
-        return YtDlpResult(anonymous, "anonymous")
-
-    anonymous_diagnostic = _clean_subprocess_diagnostic(
-        anonymous.stderr or anonymous.stdout
-    )
+    if result.returncode == 0:
+        return YtDlpResult(result, "anonymous")
+    diagnostic = _clean_subprocess_diagnostic(result.stderr or result.stdout)
     raise YtDlpError(
-        "yt-dlp failed: "
-        f"{authenticated_label} attempt: "
-        f"{authenticated_diagnostic or 'no diagnostic was returned'}; "
-        "anonymous fallback: "
-        f"{anonymous_diagnostic or 'no diagnostic was returned'}",
-        temporary=bool(YTDLP_TEMPORARY.search(anonymous_diagnostic)),
+        "yt-dlp anonymous transport failed: "
+        f"{diagnostic or 'no diagnostic was returned'}. "
+        "YouTube often refuses anonymous access; store a session with "
+        f"'{PROG} auth refresh' or pass --cookies FILE",
+        temporary=bool(YTDLP_TEMPORARY.search(diagnostic)),
     )
 
 
@@ -1365,7 +1287,7 @@ def download_audio(
     output_dir: Path,
     budget: RunBudget,
     *,
-    auth_mode: YtDlpAuthMode = "normal",
+    auth_mode: YtDlpAuthMode = "anonymous",
 ) -> DownloadedAudio:
     """Download native YouTube audio, and its video's title and ID, in one
     yt-dlp call."""
@@ -2422,7 +2344,7 @@ def build_parser() -> TranscriptParser:
         "doctor",
         help_text="Check local requirements without paid API calls",
         description=(
-            "Check commands, credentials, browser state, and local source paths. "
+            "Check commands, credentials, the YouTube session, and local source paths. "
             "Each failed check is one error with its fix; -v lists every check."
         ),
         epilog="""examples:
@@ -2473,9 +2395,10 @@ def build_parser() -> TranscriptParser:
     auth_refresh = _command_parser(
         auth_actions,
         "refresh",
-        help_text="Export Arc and update the fleet copies",
+        help_text="Export Helium's CLI profile and update the fleet copies",
         description=(
-            "Run on the source Mac after signing in to YouTube in Arc. "
+            "Run on the source Mac, in its unlocked desktop session, after signing in "
+            "to YouTube in Helium's 'CLI' profile and closing that profile's window. "
             "Verify the export before atomically replacing the stored session, "
             "then send private copies to the configured SSH targets."
         ),
@@ -2655,7 +2578,7 @@ def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
         preview=args.preview,
         youtube_auth=select_youtube_auth(getattr(args, "cookies", None))
         if source_kind == "youtube"
-        else "normal",
+        else "anonymous",
     )
 
 
@@ -2785,7 +2708,7 @@ def _doctor_check(
 
 
 def _doctor_checks(
-    *, source: str, summarize: bool, youtube_auth: YtDlpAuthMode = "normal"
+    *, source: str, summarize: bool, youtube_auth: YtDlpAuthMode = "anonymous"
 ) -> list[dict[str, str]]:
     """Inspect local prerequisites without making network or paid API calls."""
     checks: list[dict[str, str]] = []
@@ -2875,7 +2798,7 @@ def _doctor_checks(
             )
         )
 
-        browser_check = "youtube_browser"
+        browser_check = "youtube_session"
         if isinstance(youtube_auth, CookieFile):
             browser_check = "youtube_cookies"
             try:
@@ -2892,18 +2815,13 @@ def _doctor_checks(
                 browser_message = "Netscape cookies file is readable; server authentication is untested"
                 browser_status = "pass"
                 browser_hint = None
-        elif ARC_BROWSER_PROFILE.is_dir():
-            browser_message = f"Arc profile is available at {ARC_BROWSER_PROFILE}"
-            browser_status = "pass"
-            browser_hint = None
-        elif CHROME_BROWSER_PROFILE.is_dir():
-            browser_message = f"Chrome profile is available at {CHROME_BROWSER_PROFILE}"
-            browser_status = "pass"
-            browser_hint = None
         else:
-            browser_message = "No Arc or Chrome Default profile was found"
+            browser_message = (
+                "No stored YouTube session; runs use anonymous access, "
+                "which YouTube often refuses"
+            )
             browser_status = "warn"
-            browser_hint = "Sign in to YouTube in Arc or Chrome; anonymous access remains available"
+            browser_hint = f"On the source Mac, run: {PROG} auth refresh"
         checks.append(
             _doctor_check(
                 browser_check,
@@ -2942,7 +2860,7 @@ def _run_doctor(args: argparse.Namespace) -> dict:
         youtube_auth = (
             select_youtube_auth(args.cookies)
             if args.source in {"all", "youtube"}
-            else "normal"
+            else "anonymous"
         )
     except ConfigurationError as error:
         raise Failure(

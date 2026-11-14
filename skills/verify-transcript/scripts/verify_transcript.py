@@ -1441,7 +1441,8 @@ def _validate_doctor(
             "ffmpeg",
             "ffprobe",
             "yt_dlp",
-            "youtube_browser",
+            "youtube_session",
+            "youtube_cookies",
         }
     else:
         expected_checks = {"deepgram_credential", "claude", "pi", "zoom_recordings"}

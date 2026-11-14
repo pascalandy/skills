@@ -20,7 +20,7 @@ alias ttr := transcript
 transcript url *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"
 
-# Refresh Arc's YouTube session and update fleet copies from the source Mac
+# Export Helium's CLI-profile YouTube session and update fleet copies from the source Mac
 [group('commands')]
 [no-exit-message]
 transcript-auth-refresh *args:

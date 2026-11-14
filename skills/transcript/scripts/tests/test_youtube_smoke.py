@@ -27,8 +27,8 @@ def test_canonical_fixture_is_documented_for_the_transport_check() -> None:
         assert "transport check" in content
 
 
-def test_ytdlp_pin_matches_source_adapter_smoke_check_and_docs() -> None:
-    import ytdlp_arc
+def test_ytdlp_pin_matches_source_export_smoke_check_and_docs() -> None:
+    import youtube_session
 
     source_text = (SKILL_DIR / "scripts" / "transcript.py").read_text(encoding="utf-8")
     smoke_text = (SKILL_DIR / "scripts" / "youtube_smoke.py").read_text(
@@ -41,7 +41,7 @@ def test_ytdlp_pin_matches_source_adapter_smoke_check_and_docs() -> None:
     assert smoke_pin is not None
     assert source_pin.group(1) == smoke_pin.group(1) == "2026.7.4"
     normalized_adapter_pin = ".".join(
-        str(int(part)) for part in ytdlp_arc.SUPPORTED_YTDLP_VERSION.split(".")
+        str(int(part)) for part in youtube_session.SUPPORTED_YTDLP_VERSION.split(".")
     )
     assert normalized_adapter_pin == source_pin.group(1)
 
@@ -51,15 +51,12 @@ def test_ytdlp_pin_matches_source_adapter_smoke_check_and_docs() -> None:
         assert source_pin.group(1) in documentation.read_text(encoding="utf-8")
 
 
-def test_docs_explain_arc_transport_and_user_auth_responsibilities() -> None:
+def test_docs_explain_the_helium_session_and_user_auth_responsibilities() -> None:
     required_phrases = (
-        "Default",
-        "valid YouTube session",
-        "sign in again",
-        "Arc can remain open",
-        "YouTube Premium does not replace browser authentication",
-        "If browser authentication fails",
-        "transport check requires Arc",
+        "A run never reads a browser",
+        "Helium's `CLI` profile",
+        "YouTube Premium",
+        "anonymous access without one",
     )
     for documentation in (SKILL_DIR / "SKILL.md", SKILL_DIR / "README.md"):
         content = documentation.read_text(encoding="utf-8")
@@ -85,7 +82,9 @@ def test_docs_define_validation_boundaries_and_mandatory_e2e() -> None:
         assert all("Agent QA" in line for line in qa_lines)
 
 
-@pytest.mark.parametrize("cookie_mode", [False, True], ids=["arc", "cookies-file"])
+@pytest.mark.parametrize(
+    "cookie_mode", [False, True], ids=["anonymous", "cookies-file"]
+)
 def test_smoke_downloads_validates_and_cleans_without_paid_services(
     monkeypatch, capsys, tmp_path, cookie_mode
 ) -> None:
@@ -102,13 +101,13 @@ def test_smoke_downloads_validates_and_cleans_without_paid_services(
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
         assert auth_mode == (
-            transcript.CookieFile(cookies_path) if cookie_mode else "arc-required"
+            transcript.CookieFile(cookies_path) if cookie_mode else "anonymous"
         )
         audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
         observed_audio_paths.append(audio_path)
         return transcript.DownloadedAudio(
-            audio_path, "cookies" if cookie_mode else "arc", "A video", "abc"
+            audio_path, "cookies" if cookie_mode else "anonymous", "A video", "abc"
         )
 
     def fake_run(command, **kwargs):
@@ -149,11 +148,11 @@ def test_smoke_cleans_temporary_audio_when_ffprobe_fails(monkeypatch) -> None:
     observed_audio_paths: list[Path] = []
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
-        assert auth_mode == "arc-required"
+        assert auth_mode == "anonymous"
         audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
         observed_audio_paths.append(audio_path)
-        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
+        return transcript.DownloadedAudio(audio_path, "anonymous", "A video", "abc")
 
     monkeypatch.setattr(youtube_smoke, "download_audio", fake_download)
     monkeypatch.setattr(youtube_smoke.shutil, "which", lambda _command: "ffprobe")
@@ -178,10 +177,10 @@ def test_smoke_bounds_ffprobe_with_the_global_budget(monkeypatch) -> None:
     observed_timeouts: list[float] = []
 
     def fake_download(_url, output_dir, _budget, *, auth_mode):
-        assert auth_mode == "arc-required"
+        assert auth_mode == "anonymous"
         audio_path = output_dir / "audio.webm"
         audio_path.write_bytes(b"audio")
-        return transcript.DownloadedAudio(audio_path, "arc", "A video", "abc")
+        return transcript.DownloadedAudio(audio_path, "anonymous", "A video", "abc")
 
     def timeout(_command, **kwargs):
         observed_timeouts.append(kwargs["timeout"])
