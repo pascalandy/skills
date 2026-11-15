@@ -1,7 +1,7 @@
 # chef-launch
 
 1. **Prepare the worktree.** Before the batch's first writer, create its worktree from your clone: `git -C <clone> fetch origin`, then `git -C <clone> worktree add ~/projects/.worktrees/<repo>-<branch> -b <branch> origin/HEAD`, with a branch named after the batch. Skip this step when the Head Chef gave you PRs, whose worktrees you reuse. Done when `git -C <worktree> status` shows the branch
-2. **Pick the model.** Read the role's row for your provider in `config.toml`: `chef-on-claude` or `chef-on-codex`. If the row sets `inherit`, use your instance, model, and reasoning level. Read them on your own thread with `t3_thread_configuration`. Otherwise map `instance` to `instanceId` and copy `model`. Build `modelSelection` with these provider options:
+2. **Pick the model.** Read the role's row for your provider in `config.toml`: `chef-on-claude` or `chef-on-codex`. If the row sets `inherit`, use your instance, model, and reasoning level. Read them on your own thread with `t3_thread_configuration`. Otherwise `instance` names a driver: set `instanceId` to its enabled provider instance in `orchestrator_capabilities`, and copy `model`. Build `modelSelection` with these provider options:
 	- `reasoning-level` maps to codex `reasoningEffort` or claudeAgent `effort`
 	- `service-tier` maps `standard` and `fast` to codex `serviceTier` values `default` and `priority`, or claudeAgent `fastMode` values `false` and `true`, respectively
 
