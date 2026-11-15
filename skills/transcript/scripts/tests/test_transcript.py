@@ -1948,7 +1948,7 @@ class TestYouTubeTransport:
         diagnostic = str(error.value)
         assert "anonymous transport failed" in diagnostic
         assert "not a bot" in diagnostic
-        assert "auth refresh" in diagnostic
+        assert "just transcript-auth-refresh" in diagnostic
         assert "anon-secret" not in diagnostic
         assert "\x1b" not in diagnostic
         assert error.value.temporary is False

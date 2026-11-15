@@ -4,6 +4,16 @@
 
 The CLI uses subcommands, validates source input before execution, answers each command in one JSON line, and has a read-only `doctor` command. It never prompts for input. It follows the CLI contract in `docs/references/script-conventions.md` of the `pascalandy/skills` repository.
 
+## Transcribe a YouTube video
+
+From the skills repository on the source Mac:
+
+```bash
+just ttr "<youtube-url>"
+```
+
+The first time, and whenever `just ttr` reports that YouTube refused the stored session, follow [Renew from Helium's CLI profile](#renew-from-heliums-cli-profile). Those errors end with `fix: just transcript-auth-refresh`.
+
 ## Runtime requirements
 
 - Python 3.12+ and `uv`
@@ -216,7 +226,7 @@ The stored session comes from a Helium profile that only tools use. Nobody brows
 
    The first run asks for Keychain access to `Helium Storage Key`. Choose `Always Allow`
 
-Run step 4 again when a run or `auth check` reports that YouTube refused the stored session. If the refresh itself fails, repeat steps 2 and 3 first.
+Run step 4 again when `just ttr` or `auth check` reports that YouTube refused the stored session. If the refresh itself fails, repeat steps 2 and 3 first.
 
 The refresh exports only YouTube-domain cookies from the `CLI` profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
 

@@ -151,7 +151,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
         raise Failure(
             "session_failed",
             str(error),
-            "transcript auth refresh",
+            youtube_session.REFRESH_COMMAND,
             code=TEMPORARY
             if isinstance(error, youtube_session.SessionNetworkError)
             else 1,
@@ -168,7 +168,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
         repair = (
             "replace the YouTube cookies export"
             if isinstance(auth_mode, CookieFile)
-            else "store a session with 'transcript auth refresh'"
+            else f"store a session with '{youtube_session.REFRESH_COMMAND}'"
         )
         raise Failure(
             "transport_failed",

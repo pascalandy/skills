@@ -58,7 +58,7 @@ def test_rejected_managed_session_stops_before_credentials_and_paid_work(
     urls = [URL, "https://www.youtube.com/watch?v=QwpTAk_IiyU"] if queued else [URL]
     assert transcript.main(["run", "youtube", "--url", *urls, "--no-summary"]) == 1
     output = capsys.readouterr()
-    assert output.out == "" and "auth refresh" in output.err
+    assert output.out == "" and "fix: just transcript-auth-refresh" in output.err
     assert VALUE not in output.err
 
 
