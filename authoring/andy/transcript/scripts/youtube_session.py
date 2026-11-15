@@ -26,8 +26,11 @@ HELIUM_DATA = Path.home() / "Library/Application Support/net.imput.helium"
 HELIUM_PROFILE_NAME = "CLI"
 HELIUM_KEYCHAIN_SERVICE = "Helium Storage Key"
 HELIUM_KEYCHAIN_ACCOUNT = "Helium"
+# The command Pascal runs from the skills checkout; `transcript` is not on PATH
+REFRESH_COMMAND = "just transcript-auth-refresh"
 REFRESH_HINT = (
-    "Run 'transcript auth refresh' in the source Mac's unlocked desktop terminal. "
+    f"Run '{REFRESH_COMMAND}' from the skills checkout, in the source Mac's "
+    "unlocked desktop terminal. "
     f"If it fails, sign in to YouTube again in Helium's '{HELIUM_PROFILE_NAME}' "
     "profile, then close that profile's window"
 )
@@ -136,7 +139,7 @@ def refresh_targets(explicit: list[str] | None) -> list[str]:
             )
         except (OSError, UnicodeError):
             raise SessionError(
-                f"Cannot read SSH targets. Fix {path}, then run 'transcript auth refresh'"
+                f"Cannot read SSH targets. Fix {path}, then run '{REFRESH_COMMAND}'"
             ) from None
     targets = list(dict.fromkeys(line.strip() for line in explicit if line.strip()))
     if any(
@@ -155,7 +158,7 @@ def helium_profile() -> Path:
     setup = (
         f"Create a Helium profile named '{HELIUM_PROFILE_NAME}', sign in to YouTube "
         "there, open https://www.youtube.com/robots.txt, close that profile's window, "
-        "then run 'transcript auth refresh'"
+        f"then run '{REFRESH_COMMAND}'"
     )
     try:
         state = json.loads((HELIUM_DATA / "Local State").read_text(encoding="utf-8"))
@@ -196,7 +199,7 @@ def _helium_cookie_key() -> bytes:
         result = None
     if result is None or result.returncode or not result.stdout.strip():
         raise SessionError(
-            "Keychain did not release Helium's cookie key. Run 'transcript auth refresh' "
+            f"Keychain did not release Helium's cookie key. Run '{REFRESH_COMMAND}' "
             "in the source Mac's unlocked desktop terminal and choose 'Always Allow'"
         )
     return result.stdout.rstrip(b"\n")
@@ -327,10 +330,10 @@ def _install_remote(candidate: Path, host: str, *, timeout: float) -> None:
         )
     except (OSError, subprocess.SubprocessError):
         raise SessionError(
-            f"Could not update {host}. Retry 'transcript auth refresh'"
+            f"Could not update {host}. Retry '{REFRESH_COMMAND}'"
         ) from None
     if result.returncode:
-        raise SessionError(f"Could not update {host}. Retry 'transcript auth refresh'")
+        raise SessionError(f"Could not update {host}. Retry '{REFRESH_COMMAND}'")
 
 
 def refresh_session(

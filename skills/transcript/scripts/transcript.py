@@ -1150,7 +1150,7 @@ def select_youtube_auth(path: Path | None) -> YtDlpAuthMode:
         except ConfigurationError:
             raise ConfigurationError(
                 "Managed YouTube session is missing. " + youtube_session.REFRESH_HINT,
-                f"{PROG} auth refresh",
+                youtube_session.REFRESH_COMMAND,
             ) from None
         return CookieFile(selected.path, verify_session=True)
     return "anonymous"
@@ -1245,7 +1245,7 @@ def run_ytdlp(
         "yt-dlp anonymous transport failed: "
         f"{diagnostic or 'no diagnostic was returned'}. "
         "YouTube often refuses anonymous access; store a session with "
-        f"'{PROG} auth refresh' or pass --cookies FILE",
+        f"'{youtube_session.REFRESH_COMMAND}' or pass --cookies FILE",
         temporary=bool(YTDLP_TEMPORARY.search(diagnostic)),
     )
 
@@ -2828,7 +2828,7 @@ def _doctor_checks(
                 "which YouTube often refuses"
             )
             browser_status = "warn"
-            browser_hint = f"On the source Mac, run: {PROG} auth refresh"
+            browser_hint = f"On the source Mac, run: {youtube_session.REFRESH_COMMAND}"
         checks.append(
             _doctor_check(
                 browser_check,
@@ -3324,7 +3324,7 @@ def _run_preflight(
         raise Failure(
             "youtube_session_failed",
             str(error),
-            f"{PROG} auth check" if temporary else f"{PROG} auth refresh",
+            f"{PROG} auth check" if temporary else youtube_session.REFRESH_COMMAND,
             code=TEMPORARY if temporary else 1,
         ) from None
 
