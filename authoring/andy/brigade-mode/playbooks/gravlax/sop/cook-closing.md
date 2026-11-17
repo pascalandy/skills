@@ -5,7 +5,7 @@ Apply [Statuses, Messages and Decisions](../gravlax.md#statuses) at phase entry 
 ## Merge gate and merge
 
 1. Freeze stack: no commit, checkout, restack or push until merge, a restack step 3 needs, or Fix. Run any signoff assigned to merge on each frozen head without merging. Read required GitHub statuses under Checks gate. Try to resolve failing or absent status via [Fix](cook-run.md#fix); carry remaining uncertainty under Decisions. Done when checks support a merge judgment or remaining doubt is recorded
-2. Apply [Merge gates](../gravlax.md#merge-gates) and [Approval](../gravlax.md#approval) to frozen heads. Record gate results and any kept approval's comparison evidence in Detail. When every gate's purpose is met and no hard stop is open, show 🔀 and send `🔀 Batch merging` with Report. Otherwise send `🍽️ Batch ready`, show 🍽️ and wait for Head Chef's decision under Decisions. On `🔀 Merge`, record decision and frozen heads in Detail, then send `🔀 Batch merging` before step 3. `⏳ Rework` → Fix; `🍽️ Hold` keeps batch ready; `⏹️ Drop` → Closing. Done when merge notice is received, a decision is pending with Head Chef, or Pascal's cut is recorded
+2. Apply [Merge gates](../gravlax.md#merge-gates) and [Approval](../gravlax.md#approval) to frozen heads. Record gate results and any kept approval's comparison evidence in Detail. When every gate's purpose is met and no hard stop is open, under full-send show 🔀 and send `🔀 Batch merging` with Report; under full-stop go to Closing with your PRs open and unmerged. Otherwise send `🍽️ Batch ready`, show 🍽️ and wait for Head Chef's decision under Decisions. On `🔀 Merge`, record decision and frozen heads in Detail, then under full-send send `🔀 Batch merging` before step 3; under full-stop go to Closing. `⏳ Rework` → Fix; `🍽️ Hold` keeps batch ready; `⏹️ Drop` → Closing. Done when merge notice is received, a full-stop batch is in Closing, a decision is pending with Head Chef, or Pascal's cut is recorded
 3. Merge stack:
    - Show 🔀. Check your worktree is clean and pushed, and GitHub holds approved heads
    - After restack, run any signoff assigned to merge on each new head, then apply [Approval](../gravlax.md#approval)
@@ -25,7 +25,7 @@ If Pascal says Stop, follow [cook-run Stop](cook-run.md#stop). While frozen, a w
 
 ## Closing
 
-Batch without PRs: begin here.
+Batch without PRs, or a ready full-stop batch: begin here. A full-stop batch has no merged card, so its cards keep their labels, Epics stay open and its PR branches stay.
 
 1. Show 🧹. For batch's Epic and Epic of each merged card, read every child's state and every item of Epic's "Done when". An open child inside the batch blocks ⛳ until completed or cut by Pascal. Close an Epic with proof only when every child is closed and each "Done when" item holds; clear its state label. If its body reserves closing for Pascal, leave it open at `1-ready-for-human` instead. Otherwise keep it open and name every pending child and "Done when" item. Done when each applicable Epic is closed, ready for Pascal or reported with its pending items, and every in-batch child is done or cut
 2. With 🧰 label-for-issues, remove each merged card's state label and read labels back. If `[cook].retro`, follow [shared Retros](../gravlax.md#retros). Done when labels are read back and each enabled retro has issue links or a no-findings result

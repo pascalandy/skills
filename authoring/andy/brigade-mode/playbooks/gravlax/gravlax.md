@@ -1,5 +1,5 @@
 ---
-description: "Run batches under a Head Chef with no Chef: one Cook per batch runs Pascal's solo recipe, one PR per card in one stack, with a review loop on each PR and one on the whole stack, then merges, releases and closes its batch."
+description: "Run batches under a Head Chef with no Chef: one Cook per batch runs Pascal's solo recipe, one PR per card in one stack, with a review loop on each PR and one on the whole stack, then merges and releases under full-send and closes its batch."
 ---
 
 # CU1. Batches under one Head Chef
@@ -13,6 +13,7 @@ description: "Run batches under a Head Chef with no Chef: one Cook per batch run
 - **Loop 1**: 🧰 review-loop on one PR, via manic-1 and manic-2 angles
 - **Loop 2**: 🧰 review-loop on what will merge together, whole stack or single PR, via manic-3 and manic-5 angles
 - **Fast track**: `$brigade ; gravlax ; manic-4`, or Pascal's request during a run. Cook implements only, skipping docs and both loops
+- **Delivery mode**: `full-send` or `full-stop`, from Pascal's words in the invocation or at Align; default full-stop. [Decisions](#decisions) owns what each allows
 - **Shipped behavior**: what a user or caller of the cards' work can observe. A comment, wording, format, docs or test-only change keeps approval when it leaves that unchanged, even if a reviewer proposed it. Text an agent executes, e.g. a prompt or a skill instruction, is behavior
 
 ## Roles
@@ -20,7 +21,7 @@ description: "Run batches under a Head Chef with no Chef: one Cook per batch run
 | Role | Runs as | Title | Statuses | Responsibility |
 |---|---|---|---|---|
 | Head Chef | Pascal's pinned thread | `Head Chef <id4> <done>/<batches> <status> <subject>` | 🟢 ⏳ ❓ ⛳ ⏹️ | Bridges needs and requirements, splits batches, creates each Cook's worktree, launches and guides Cooks, resumes coordination on escalation, removes each settled Cook's worktree. Never edits code or opens a PR, even after Close |
-| Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.1 <id4> <status> <batch>` | 🍳 ⏸️ 🍽️ 🔀 🧹 ⛳ ⏹️ | Runs Pascal's solo recipe on every card of its batch, one PR per card in one stack, owns watches, docs and both loops, then merges, releases and closes its batch |
+| Cook | Thread bound to its own worktree | `🧑‍🍳 Cook <b>.1 <id4> <status> <batch>` | 🍳 ⏸️ 🍽️ 🔀 🧹 ⛳ ⏹️ | Runs Pascal's solo recipe on every card of its batch, one PR per card in one stack, owns watches, docs and both loops, then merges and releases under full-send and closes its batch |
 | Watchdog | Head Chef's delegate | `🐕 Watchdog · Head Chef <id4>` | none | Ticks in its own thread, wakes failed threads and stalled Cooks, alerts Head Chef when repair is needed |
 | Reviewer | Cook's delegate, one review-loop round | `👀 loop-<n> · Cook <b>.1 <id4>` | none | Reviews one round of loop `<n>` under its brief |
 | Side delegate | Cook's delegate | `🔧 <task> · Cook <b>.1 <id4>` | none | Runs side work the Cook delegates, e.g. repository's Verify |
@@ -45,20 +46,20 @@ Every thread computes its status from its own facts and last phases received fro
 | ❓ `<item>` | Head Chef waits on Pascal for an item in Asking Pascal | none |
 | 🔀 merging | Cook merges its stack and releases | none |
 | 🧹 closing | Cook runs retros and cleanup | none |
-| 🍽️ served | Cook sent `🍽️ Batch ready`, waits for merge decision | none |
+| 🍽️ served | Cook sent `🍽️ Batch ready`, waits for Head Chef's decision | none |
 | ⏸️ paused | Cook waits on the Head Chef | none |
 | ⛳ delivered | All in-scope slots and own deliverables are done | Head Chef, Cook |
 | ⏹️ stopped | Work closed without delivery after Stop, a cut or replacement | Head Chef, Cook |
 
 Cook, in priority order:
 
-1. ⏸️ while waiting on Head Chef for an answer other than a merge decision
-2. Once batch stops, or its stack merged and its release is done, 🧹 until retros and cleanup are done; then ⛳ for a merged and released batch, else ⏹️
-3. 🔀 after merge rule in Decisions authorizes frozen heads or Head Chef sends `🔀 Merge`, through release
-4. 🍽️ after `🍽️ Batch ready`, while waiting for merge decision
+1. ⏸️ while waiting on Head Chef for an answer other than a decision on `🍽️ Batch ready`
+2. Once batch stops, its stack merged and its release is done, or it is a ready full-stop batch: 🧹 until retros and cleanup are done; then ⛳ for a merged and released batch or a ready full-stop batch, else ⏹️
+3. 🔀 under full-send, after the merge rule in Decisions authorizes frozen heads or Head Chef sends `🔀 Merge`, through release
+4. 🍽️ after `🍽️ Batch ready`, while waiting for Head Chef's decision
 5. 🍳 otherwise
 
-Batch without PRs: finishing Cook's own work satisfies its checks, merge and merged facts. A release is done when completed, not required or cut by Pascal.
+Batch without PRs: finishing Cook's own work satisfies its checks, merge and merged facts. A full-stop batch is ready when its merge gates' purposes are met on frozen heads, or Head Chef's `🔀 Merge` settled the doubted gate; its PRs stay open and unmerged. A release is done when completed, not required, cut by Pascal or the batch is full-stop.
 
 Head Chef, in priority order:
 
@@ -78,8 +79,8 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | Message | From → to | Effect |
 |---|---|---|
 | 🍽️ Batch ready | Cook → Head Chef | A real doubt or hard stop remains; Cook freezes its stack, waits for a decision |
-| 🔀 Merge | Head Chef → Cook | Authorizes frozen heads under Decisions |
-| 🔀 Batch merging | Cook → Head Chef | Notifies a merge the merge rule allows |
+| 🔀 Merge | Head Chef → Cook | Settles the doubted gate for frozen heads under Decisions; under full-send, authorizes their merge |
+| 🔀 Batch merging | Cook → Head Chef | Under full-send, notifies a merge the merge rule allows |
 | Batch merged, with deploy results | Cook → Head Chef | Records merge progress, without counting delivery |
 | Readiness withdrawn | Cook → Head Chef | Records a return to Fix, withdraws a pending merge decision |
 | ⛳ Batch delivered or ⏹️ Batch stopped | Cook → Head Chef | Counts final batch outcome |
@@ -95,9 +96,9 @@ Cook → Head Chef uses only this table, `📍` step lines, questions and a repo
 
 ## Decisions
 
-When a rule's words do not fit your case, apply its purpose, decide and record the decision in your Detail. Applies to every rule of this route. Never stop to ask which rule wins. An explicit instruction from Pascal overrides a rule; Head Chef writes it in the Cook's Plan.
+When a rule's words do not fit your case, apply its purpose, decide and record the decision in your Detail. Applies to every rule of this route. Never stop to ask which rule wins. One exception: when this route and a repository rule conflict and this route does not settle it, decide as above and state the conflict and your decision as the first line of Head Chef's Align plan, or of its next message to Pascal when found later; a Cook sends it to Head Chef. An explicit instruction from Pascal overrides a rule; Head Chef writes it in the Cook's Plan.
 
-Cook merges alone when every merge gate's purpose is met and no [hard stop](#hard-stops) is open. Send a real doubt to Head Chef, incl. a loop ended at budget or on a dispute, or a required check that stays unconfirmed. Head Chef decides from the evidence and records its reasons and remaining risk in Detail. Its `🔀 Merge` settles the doubted gate for the frozen heads; loop's recorded end stays as it was. Only a hard stop goes to Pascal. Other questions follow Asking Pascal.
+Delivery mode decides whether a batch merges. A repository's `AGENTS.md` or docs own only the procedure, e.g. recipes, gates and commands, never that decision. Under full-send, Cook merges alone when every merge gate's purpose is met and no [hard stop](#hard-stops) is open. Under full-stop, the batch ends ready, under the same gates and doubts, with its PRs open and unmerged; nobody asks Pascal for merge permission, and a hard stop only the merge would cross stays unasked and goes in the Report's `Gates` line. Send a real doubt to Head Chef, incl. a loop ended at budget or on a dispute, or a required check that stays unconfirmed. Head Chef decides from the evidence and records its reasons and remaining risk in Detail. Its `🔀 Merge` settles the doubted gate for the frozen heads; loop's recorded end stays as it was. Only a hard stop goes to Pascal. Other questions follow Asking Pascal.
 
 | Choice | Rule | Decides |
 |---|---|---|
@@ -185,7 +186,7 @@ Copy the table and check off your role's steps:
 | 2 | Docs and required release content; loop 1 on each PR this step opens | Cook, `cook-run` Docs |
 | 3 | Loop 2 on whole stack or single PR | Cook, `cook-run` Loops |
 | 4 | Prove every acceptance criterion; babysit until bots finish and required checks pass or an unconfirmed check is with Head Chef | Cook, `cook-run` Proof |
-| 5 | Merge gate, merge and release | Cook, `cook-closing`; Head Chef for `🍽️ Batch ready` |
+| 5 | Merge gate; under full-send, merge and release | Cook, `cook-closing`; Head Chef for `🍽️ Batch ready` |
 | 6 | Closing, remove Cook's worktree, then the Watchdog at run end | Cook and Head Chef, `cook-closing` and `head-chef` |
 
 Batch that opens no PR: its Cook does the work, skips the PR part of step 1 and steps 2 to 5, and reports that choice. Fast track skips docs and both loops: Cook implements every card, adds required release content, then goes to step 4.
@@ -197,11 +198,11 @@ Batch that opens no PR: its Cook does the work, skips the PR part of step 1 and 
 - Before a reviewer probe patches an installed dependency, the reviewer asks Cook for a package copy. Cook copies it into a separate private scratch directory per reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged
 - While a delegate reads your worktree directly, e.g. a Verify run needing uncommitted changes, keep its files, index and commit unchanged until completion or confirmed cancellation. Reviewers use the isolated checkout in Loops
 - Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from trunk, use the layer whose change made it wrong
-- Cook follows repository's `AGENTS.md` procedure first; solo skills [cook-run](sop/cook-run.md#solo-recipe) names, starting with 🧰 poteto-mode, fill what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to Head Chef
+- Cook follows repository's `AGENTS.md` procedure first: recipes, gates and commands, never the decision to merge, which delivery mode owns. Solo skills [cook-run](sop/cook-run.md#solo-recipe) names, starting with 🧰 poteto-mode, fill what it leaves open. Treat issue proposals as drafts: verify each command, flag and message against the tool's source or a throwaway run before copying it. Report each false line and its fix to Head Chef
 - Head Chef writes `~/.cache/brigade-<id4>/rules.md` once: the judgment rule that opens [Decisions](#decisions), these Shared rules, [Work folders](#work-folders) and Pascal's standing instructions, leaving out any rule a role's loaded skills already give, e.g. oem's signature line. Every launch message, loop brief and side-delegate brief carries `Rules: <rules.md path>`, plus the additions it inherited and its own. A delegate that tests how an agent acts without the run's context gets a separate `rules.md` with both data-safety rules and only its checkout, work-folder, deletion, repository, concurrency and GitHub limits
 - A comment posted via Pascal's account does not wake the Cook's watch; Head Chef also sends it to the Cook with `t3_thread_send`
 - When Pascal writes to a Cook directly, act, record the change in Detail and include it in next allowed message to Head Chef
-- Keep going without Pascal within agreed repositories and their PRs and issues. The run may push, open or update PRs and issues, and force-push its own branches with `--force-with-lease`. Merge deploys under the merge rule in Decisions and retro issues in Pascal's repositories are allowed
+- Keep going without Pascal within agreed repositories and their PRs and issues. The run may push, open or update PRs and issues, and force-push its own branches with `--force-with-lease`. Merge deploys under full-send's merge rule in Decisions and retro issues in Pascal's repositories are allowed
 - Before a live proof removes, rewrites or refreshes real data, or before merging a job that will, Cook takes a backup or snapshot, runs the restore path once and checks restored data. Include needed token and API budget. A scheduled job writes and verifies a backup of each item before deleting it, outside every path any scheduled job prunes. Record restore result and backup location in Detail
 - Never print the text or diff of a file that can hold a secret, e.g. a shell startup file, keyring template, `.env` or credentials file, context lines included. Record only its path, status and line count; check a move with a count or a hash
 - Before retrying a launch, merge, deploy or release, check in T3, GitHub or deploy output whether it already happened
@@ -248,12 +249,14 @@ Detail: <Cook threadId>
 For Pascal: <🙋 lines, or none>
 ```
 
-For `🔀 Batch merging`, replace first line's message. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give PR range only for a partial outcome.
+For `🔀 Batch merging`, replace first line's message. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give PR range only for a partial outcome. A ready full-stop batch's `⛳ Batch delivered` adds the `PR`, `Gates` and `Not confirmed` lines above.
 
 Head Chef → Pascal, in Canadian French. At Align, send Align plan below, then any open `🙋` lines. Repeat the `Lot` block per batch in launch order, one line per acceptance criterion; omit an empty line. Align plan has no line limit. For a later ask, send only the `🙋` lines.
 
 ```text
+⚠️ Conflit : <route rule> contre <repository rule> → <decision>, or omit
 Je veux <goal>, pour régler <problem>
+Livraison : <full-send or full-stop>, <fusion quand les gates passent or PR prêtes, jamais fusionnées>
 Lot <b> · <repository> · après <batches, or aucun> · release <oui/non> · cook <Cook model>
 - <card> : <acceptance criterion> → <evidence that will prove it>
 Pour toi : <Pascal-owned cards>
@@ -268,7 +271,7 @@ Head Chef records overrides, exceptional calls and authorizations in its Detail.
 
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
-PR fusionnées : <#<n>–#<n>, or aucune>
+PR <fusionnées under full-send or prêtes under full-stop> : <#<n>–#<n>, or aucune>
 Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 
