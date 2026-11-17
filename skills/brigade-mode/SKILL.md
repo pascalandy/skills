@@ -19,7 +19,7 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 
 ## Routes
 
-The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is.
+The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; oem's full-stop default governs gravlax and work outside a route.
 
 ### Appetizers
 
