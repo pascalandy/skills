@@ -7,7 +7,7 @@ Follow Implement, Docs, loop 2 under Loops and Proof in process order, then [coo
 Each step runs the solo skill it names. Brigade rules below override those skills:
 
 - Ask Head Chef with `t3_thread_send`; show ⏸️ until it answers. Never use a question tool, e.g. AskUserQuestion
-- Merge rule in [Decisions](../gravlax.md#decisions) replaces 🧰 full-send's merge gate; [cook-closing](cook-closing.md) replaces its Merge step. From full-send, use only Proof and its babysit step; loops replace its codex-loop step, [Report](../gravlax.md#report) replaces its report
+- Delivery mode and merge rule in [Decisions](../gravlax.md#decisions) replace 🧰 full-send's merge gate; [cook-closing](cook-closing.md) replaces its Merge step. From full-send, use only Proof and its babysit step; loops replace its codex-loop step, [Report](../gravlax.md#report) replaces its report
 - Between rounds, follow [Fix](#fix) instead of review-loop's local-only restriction
 - [Shared rules](../gravlax.md#shared-rules) set one PR per card, layer ownership and repository's `AGENTS.md` first
 

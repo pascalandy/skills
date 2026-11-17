@@ -80,7 +80,7 @@ sequenceDiagram
     Note over H,K: Step 5: Merge gate, merge and release
     K->>K: Freeze the stack
     rect rgba(239, 159, 118, 0.2)
-        alt Every gate purpose met and no open hard stop
+        alt Full-send, every gate purpose met and no open hard stop
             K-->>H: Agent: 🔀 Batch 1 merging <-
         else Real doubt or open hard stop
             K-->>H: Agent: 🍽️ Batch ready, evidence and recommendation <-
@@ -119,5 +119,7 @@ sequenceDiagram
 ```
 
 The Head Chef's decision or Pascal's answer may produce `⏳ Rework` or `🍽️ Hold`; only Pascal can `⏹️ Drop`. Rework returns the Cook to 🍳. Hold keeps it 🍽️; `❓ held batch <b>` appears once nothing else can progress. Drop closes it at ⏹️ and removes the cut batch from the count.
+
+The sequence shows full-send. Under full-stop, the default, a batch whose gates pass, or whose doubt the Head Chef settles with `🔀 Merge`, skips the merge and release and goes to Closing with its PRs open; the Cook closes at ⛳ and nobody asks Pascal to merge.
 
 Fast track implements required release content, skips docs and both loops, then goes to Proof and the same merge gate. A batch without PRs runs in its Cook alone and goes to Closing. On `⏹️ Stop`, the Head Chef tells each Cook; a merge or release already running finishes, then each Cook follows Closing and closes at ⛳ for a merged and released batch, otherwise ⏹️.
