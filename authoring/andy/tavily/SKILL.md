@@ -35,12 +35,17 @@ The key is `TAVILY_API_KEY` in the fnox store (`docs/operations/secrets.md` in p
 fnox exec --only TAVILY_API_KEY --if-missing error -- <command>
 ```
 
-`tavily_curl` below runs curl that way and sends the key as a header on stdin, so it stays out of argv. The endpoint examples call it.
+`tavily_curl` below sends the key as a header on stdin, so it stays out of argv. It uses `TAVILY_API_KEY` from the environment when set, otherwise fnox, which it finds even under a bare `PATH`, such as T3 Code's on macOS. The endpoint examples call it.
 
 ```bash
+fnox_run() { for f in "$(command -v fnox)" ~/.local/bin/fnox ~/.local/share/fnox/fnox; do [ -x "$f" ] && { "$f" "$@"; return; }; done; echo 'fnox not found' >&2; return 127; }
 tavily_curl() {
-  fnox exec --only TAVILY_API_KEY --if-missing error -- sh -c \
-    'printf "Authorization: Bearer %s\n" "$TAVILY_API_KEY" | curl -sS -H @- "$@"' sh "$@"
+  if [ -n "${TAVILY_API_KEY:-}" ]; then
+    printf 'Authorization: Bearer %s\n' "$TAVILY_API_KEY" | curl -sS -H @- "$@"
+  else
+    fnox_run exec --only TAVILY_API_KEY --if-missing error -- sh -c \
+      'printf "Authorization: Bearer %s\n" "$TAVILY_API_KEY" | curl -sS -H @- "$@"' sh "$@"
+  fi
 }
 ```
 
