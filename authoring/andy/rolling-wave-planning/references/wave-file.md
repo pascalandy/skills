@@ -38,7 +38,7 @@ One paragraph: what it covers and why it is in this wave.
   - [ ] `curl -s -XPOST localhost:3000/login -d @fixtures/ok.json` returns 200 with `token`
 - Verify: `make verify`
 - Out of scope: password reset, rate limiting (E04-T03)
-- Fixes finding: #71 (fix tasks only; the PR must not close #71)
+- Fixes finding: #71 (fix tasks only; #71 stays open until the QA agent closes it)
 - Steps (optional):
   - [ ] E04-T01-S1: …
 
@@ -72,7 +72,6 @@ One paragraph: what it covers and why it is in this wave.
 ## Brief rules
 
 - Each acceptance item and each QA scenario is a command with an expected result, or exact steps with a result that a person can see. Never write "works correctly"
-- A brief says what to build and how to check it. It gives no implementation instruction and no UAT scenario
 - Two tasks in the same batch must not have the same path in `Touches`. If they do, add a dependency between them
 - A QA task has no `Touches`
 - A batch is a view of the dependency graph, not a gate. A task is ready when each of its blockers is closed

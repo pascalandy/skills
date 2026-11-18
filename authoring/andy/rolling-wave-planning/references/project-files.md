@@ -20,7 +20,7 @@ Read this file before you write `01-project.md` or `decisions.md`.
 1. … → spike E01-T01 | asked to PM | resolved D002
 
 ## Limits
-- Task: one module or ≤ 8 files, ≤ ~400 changed lines, ≤ 5 acceptance criteria.
+- Task: one module or ≤ 8 files, ≤ ~400 changed lines, ≤ 5 acceptance items.
 - QA: intermediate QA when an epic has > 5 tasks or spans > 2 batches; ≤ 8 QA scenarios per QA task.
 - Recalibrated: W01 review
 
