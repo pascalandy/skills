@@ -37,6 +37,7 @@ from transcript import (
     duration,
     exit_codes,
     log,
+    private_cookie_file,
     run_child,
     run_script,
     select_youtube_auth,
@@ -87,7 +88,7 @@ def build_parser() -> Parser:
         prog=PROG,
         exit_codes=EXIT_CODES,
         description=(
-            "Download YouTube audio through the stored session, an explicit cookies file, or anonymously without one, and validate it with "
+            "Download YouTube audio through the vault session, an explicit cookies file, or anonymously without one, and validate it with "
             'ffprobe, without Deepgram or AI. A pass answers {"ok":true}.'
         ),
         epilog=f"""examples:
@@ -132,12 +133,15 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     budget = RunBudget.start(args.timeout)
     try:
         if isinstance(auth_mode, CookieFile) and auth_mode.verify_session:
-            youtube_session.check_session(
-                auth_mode.path, timeout=budget.remaining("YouTube session check", 25)
-            )
+            with private_cookie_file(auth_mode) as cookies:
+                youtube_session.check_session(
+                    cookies, timeout=budget.remaining("YouTube session check", 25)
+                )
         with tempfile.TemporaryDirectory(prefix="transcript-youtube-smoke-") as temp:
             transport = (
                 "the cookies file"
+                if isinstance(auth_mode, CookieFile) and auth_mode.path
+                else "the vault cookies"
                 if isinstance(auth_mode, CookieFile)
                 else "anonymous access"
             )
@@ -167,7 +171,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
             ) from error
         repair = (
             "replace the YouTube cookies export"
-            if isinstance(auth_mode, CookieFile)
+            if isinstance(auth_mode, CookieFile) and auth_mode.path
             else f"store a session with '{youtube_session.REFRESH_COMMAND}'"
         )
         raise Failure(

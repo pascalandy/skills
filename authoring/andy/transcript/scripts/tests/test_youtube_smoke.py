@@ -56,7 +56,7 @@ def test_docs_explain_the_helium_session_and_user_auth_responsibilities() -> Non
         "A run never reads a browser",
         "Helium's `CLI` profile",
         "YouTube Premium",
-        "anonymous access without one",
+        "else anonymous access",
     )
     for documentation in (SKILL_DIR / "SKILL.md", SKILL_DIR / "README.md"):
         content = documentation.read_text(encoding="utf-8")

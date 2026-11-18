@@ -11,7 +11,7 @@ Transcribe YouTube, Zoom, or local audio with Deepgram, then optionally create a
 
 For transcription commands, resolve `scripts/transcript.py` relative to this skill directory and run that absolute path with `uv run`. Allow a 600-second process timeout for a real run, multiplied by the input URL count for a queue.
 
-For a request such as « il faut rafraîchir le cookie pour Transcript », follow [Refresh YouTube cookies](references/youtube-auth-refresh.md). This maintenance request uses `just transcript-auth-refresh` on the source Mac and makes no paid transcription call.
+For a request such as « il faut rafraîchir le cookie pour Transcript », follow [Refresh YouTube cookies](references/youtube-auth-refresh.md). This maintenance request uses `just transcript-auth-refresh --dotfiles-worktree <worktree>` on the source Mac, a dotfiles PR and `just merge`, and makes no paid transcription call.
 
 ## Choose the command
 
@@ -34,7 +34,7 @@ uv run <skill_dir>/scripts/transcript.py run file --path "<audio-file>" --no-sum
 
 Pass `--profile` only when the user selects a profile; `list profiles` marks the default.
 
-YouTube runs discover `~/.local/share/transcript/youtube.cookies.txt` automatically and verify its session before paid work. Add `--cookies FILE` to override it. Neither file mode falls back anonymously. Read [Use a portable cookies file](README.md#use-a-portable-cookies-file) for export, transfer, renewal, and the free transport check.
+YouTube runs read the session from the fnox vault entry `YOUTUBE_COOKIES_TXT` and verify it before paid work. No machine keeps a plaintext copy. Add `--cookies FILE` to override the vault. Neither mode falls back anonymously. Read [Use the vault session](README.md#use-the-vault-session) for the source order, renewal, and the free transport check.
 
 ## Manage inference through profiles
 
@@ -99,9 +99,9 @@ Report the result folder, the one holding the `files`, and whether a summary `.m
 
 ## YouTube transport check
 
-Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. It uses the same source as a run: the stored or supplied cookies file, or anonymous access without one. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
+Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. It uses the same source as a run: the explicit cookies file, else the vault session, else anonymous access. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
 
-A run never reads a browser. The stored session comes from Helium's `CLI` profile, a profile only tools use, signed in to the account Transcript should use, such as YouTube Premium. When YouTube refuses the stored session, follow [Refresh YouTube cookies](references/youtube-auth-refresh.md).
+A run never reads a browser. The vault session comes from Helium's `CLI` profile, a profile only tools use, signed in to the account Transcript should use, such as YouTube Premium. When YouTube refuses the vault session, follow [Refresh YouTube cookies](references/youtube-auth-refresh.md).
 
 ## Changing this skill
 

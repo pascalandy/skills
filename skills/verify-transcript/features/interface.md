@@ -39,8 +39,8 @@ The inventory assigns every public behavior to an executable feature or an expli
 | `command.help` | `interface.help-version` |
 | `command.auth` | `interface.help-version`; lifecycle behavior uses deterministic Transcript tests and real fleet QA |
 | `command.auth-check` | `interface.help-version`; a signed-in response is checked by Transcript session tests |
-| `command.auth-refresh` | `interface.help-version`; renewal and partial distribution use Transcript lifecycle tests |
-| `option.to` | `interface.help-version`; SSH destinations are validated by Transcript lifecycle tests |
+| `command.auth-refresh` | `interface.help-version`; renewal into the fnox vault uses Transcript lifecycle tests |
+| `option.dotfiles-worktree` | `interface.help-version`; the vault write is covered by Transcript lifecycle tests |
 | `option.help` | `interface.help-version` |
 | `option.version` | `interface.help-version` |
 | `option.url` | `youtube.dry-run-summary` |

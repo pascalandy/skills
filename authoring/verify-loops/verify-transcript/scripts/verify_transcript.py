@@ -585,7 +585,7 @@ HELP_CONTRACTS = (
         "auth-refresh-help",
         ("auth", "refresh", "--help"),
         frozenset(),
-        GLOBAL_OPTIONS | {"--to", "--dry-run", "--timeout"},
+        GLOBAL_OPTIONS | {"--dotfiles-worktree", "--dry-run", "--timeout"},
     ),
     HelpContract(
         "help-help",
@@ -603,7 +603,12 @@ PUBLIC_SURFACES = (
     PublicSurface(
         "command.auth-refresh", "command", "refresh", ("interface.help-version",)
     ),
-    PublicSurface("option.to", "option", "--to", ("interface.help-version",)),
+    PublicSurface(
+        "option.dotfiles-worktree",
+        "option",
+        "--dotfiles-worktree",
+        ("interface.help-version",),
+    ),
     PublicSurface(
         "command.run",
         "command",

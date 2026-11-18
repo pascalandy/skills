@@ -1,23 +1,43 @@
-"""Store, verify and renew a YouTube session without publishing its secrets."""
+"""Verify a YouTube session and renew it in the fnox vault, never in a plaintext file."""
 
 from __future__ import annotations
 
 import contextlib
 import io
 import json
+import logging
 import os
 import re
 import shlex
 import subprocess
 import sys
 import tempfile
+import tomllib
 import warnings
+from collections.abc import Iterator, Sequence
 from http.cookiejar import LoadError, MozillaCookieJar
 from pathlib import Path
 
 import httpx
 
 LOGIN_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
+# The only copy of the session: an age-encrypted fnox entry with `as_file = true`,
+# so `fnox exec` hands a consumer the path of a temporary 0600 file it then removes
+VAULT_KEY = "YOUTUBE_COOKIES_TXT"
+VAULT_LABEL = f"fnox:{VAULT_KEY}"
+# The fnox store inside a worktree of pascalandy/dotfiles
+VAULT_SOURCE = "dot_config/private_fnox/private_config.toml"
+FNOX_TIMEOUT = 15
+# Exit code of the child shell when `as_file` did not hand it a file path
+NOT_A_FILE = 97
+HTTP_LOGGERS = ("httpcore", "httpx")
+# A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
+# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1
+FNOX_CANDIDATES = (
+    "fnox",
+    str(Path.home() / ".local/bin/fnox"),
+    str(Path.home() / ".local/share/fnox/fnox"),
+)
 SUPPORTED_YTDLP_VERSION = "2026.07.04"
 # Tools own this Helium profile; nobody browses in it, so YouTube never rotates
 # its cookies and an exported copy stays valid. Everyday profiles rotate them
@@ -26,12 +46,13 @@ HELIUM_DATA = Path.home() / "Library/Application Support/net.imput.helium"
 HELIUM_PROFILE_NAME = "CLI"
 HELIUM_KEYCHAIN_SERVICE = "Helium Storage Key"
 HELIUM_KEYCHAIN_ACCOUNT = "Helium"
-# The command Pascal runs from the skills checkout; `transcript` is not on PATH
+# The command run from the skills checkout; `transcript` is not on PATH
 REFRESH_COMMAND = "just transcript-auth-refresh"
 REFRESH_HINT = (
-    f"Run '{REFRESH_COMMAND}' from the skills checkout, in the source Mac's "
-    "unlocked desktop terminal. "
-    f"If it fails, sign in to YouTube again in Helium's '{HELIUM_PROFILE_NAME}' "
+    f"Follow references/youtube-auth-refresh.md: run '{REFRESH_COMMAND} "
+    "--dotfiles-worktree <dotfiles worktree>' from the skills checkout, in the "
+    "source Mac's unlocked desktop terminal, then land the dotfiles PR with 'just merge'. "
+    f"If the export fails, sign in to YouTube again in Helium's '{HELIUM_PROFILE_NAME}' "
     "profile, then close that profile's window"
 )
 
@@ -42,18 +63,6 @@ class SessionError(RuntimeError):
 
 class SessionNetworkError(SessionError):
     """A free session check failed temporarily, before any paid work."""
-
-
-def session_directory() -> Path:
-    return Path.home() / ".local/share/transcript"
-
-
-def session_file() -> Path:
-    return session_directory() / "youtube.cookies.txt"
-
-
-def targets_file() -> Path:
-    return session_directory() / "youtube-targets.txt"
 
 
 def load_cookie_jar(path: Path) -> MozillaCookieJar:
@@ -90,11 +99,34 @@ def logged_in_flag(body: str) -> bool | None:
     return flags[0] if flags and len(set(flags)) == 1 else None
 
 
+@contextlib.contextmanager
+def _quiet_http_transport() -> Iterator[None]:
+    """Silence httpx and httpcore for the session check.
+
+    Their debug records print request and response headers, Set-Cookie included,
+    and --debug would copy them to stderr. The check's own diagnostics stay."""
+    prefixes = tuple(HTTP_LOGGERS) + tuple(f"{each}." for each in HTTP_LOGGERS)
+
+    def keep(record: logging.LogRecord) -> bool:
+        return not (record.name in HTTP_LOGGERS or record.name.startswith(prefixes))
+
+    # A filter on the root handlers also drops records from child loggers
+    # created during the check or set to DEBUG explicitly.
+    handlers = list(logging.getLogger().handlers)
+    for each in handlers:
+        each.addFilter(keep)
+    try:
+        yield
+    finally:
+        for each in handlers:
+            each.removeFilter(keep)
+
+
 def check_session(path: Path, *, timeout: float = 25) -> None:
     """Require a positive YouTube login response without saving changed cookies."""
     jar = load_cookie_jar(path)
     try:
-        with httpx.Client(
+        with _quiet_http_transport(), httpx.Client(
             cookies=jar,
             headers={
                 "User-Agent": (
@@ -127,30 +159,6 @@ def check_session(path: Path, *, timeout: float = 25) -> None:
             "YouTube did not confirm a signed-in session. "
             f"Run 'transcript auth check' or renew it. {REFRESH_HINT}"
         )
-
-
-def refresh_targets(explicit: list[str] | None) -> list[str]:
-    """Read non-secret SSH destinations; explicit targets override the file."""
-    if explicit is None:
-        path = targets_file()
-        try:
-            explicit = (
-                path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-            )
-        except (OSError, UnicodeError):
-            raise SessionError(
-                f"Cannot read SSH targets. Fix {path}, then run '{REFRESH_COMMAND}'"
-            ) from None
-    targets = list(dict.fromkeys(line.strip() for line in explicit if line.strip()))
-    if any(
-        re.fullmatch(r"(?:[A-Za-z0-9_.-]+@)?[A-Za-z0-9][A-Za-z0-9.-]*", host) is None
-        for host in targets
-    ):
-        raise SessionError(
-            "SSH targets must be host aliases or user@host, one per line. "
-            f"Fix {targets_file()} or the --to arguments"
-        )
-    return targets
 
 
 def helium_profile() -> Path:
@@ -246,116 +254,258 @@ def _export_helium(path: Path) -> None:
         cookies._get_mac_keyring_password = original
 
 
-def _install_local(candidate: Path, destination: Path) -> None:
-    """Publish an already verified candidate with one atomic replacement."""
-    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    destination.parent.chmod(0o700)
-    descriptor, name = tempfile.mkstemp(prefix=".youtube-", dir=destination.parent)
-    temporary = Path(name)
-    try:
-        with os.fdopen(descriptor, "wb") as output:
-            output.write(candidate.read_bytes())
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, destination)
-    finally:
-        temporary.unlink(missing_ok=True)
-
-
-# The remote owns only its private store. Secrets travel on stdin, never argv.
-# uv is already required by Transcript; no remote skill installation is needed.
-REMOTE_INSTALL = """import os, sys, tempfile, warnings
-from pathlib import Path
-from http.cookiejar import MozillaCookieJar
-directory = Path.home() / ".local/share/transcript"
-directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-directory.chmod(0o700)
-fd, name = tempfile.mkstemp(prefix=".youtube-", dir=directory)
-temporary = Path(name)
-try:
-    data = sys.stdin.buffer.read(1048577)
-    if not data or len(data) > 1048576:
-        raise ValueError()
-    with os.fdopen(fd, "wb") as output:
-        output.write(data)
-        output.flush()
-        os.fsync(output.fileno())
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        jar = MozillaCookieJar(str(temporary))
-        jar.load(ignore_discard=True, ignore_expires=True)
-    if not any(jar):
-        raise ValueError()
-    check_session(temporary)
-    os.replace(temporary, directory / "youtube.cookies.txt")
-except Exception:
-    sys.stderr.write("Session installation failed\\n")
-    sys.exit(1)
-finally:
-    temporary.unlink(missing_ok=True)
-"""
-
-
-def remote_install_code() -> str:
-    """Send this verifier with its receiver, without installing remote skills."""
-    return Path(__file__).read_text(encoding="utf-8") + "\n" + REMOTE_INSTALL
-
-
-def _install_remote(candidate: Path, host: str, *, timeout: float) -> None:
-    remote = (
-        'PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" '
-        "uv run --quiet --no-project --with httpx python -c "
-        + shlex.quote(remote_install_code())
+def _run_process(
+    command: Sequence[str], *, input: str | None = None, timeout: float | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        list(command),
+        input=input,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
     )
+
+
+# transcript.py swaps in its own child runner, which stops a child gently on a
+# signal or deadline; this default keeps the module usable on its own
+run_process = _run_process
+
+
+def _fnox_run(
+    arguments: Sequence[str], *, stdin: str | None = None, timeout: float = FNOX_TIMEOUT
+) -> subprocess.CompletedProcess[str] | None:
+    """Run fnox from the first candidate that exists; None when none is installed.
+
+    Only a missing executable moves on to the next candidate. Output stays captured
+    and callers never print it, because it can hold cookie values."""
+    for fnox in FNOX_CANDIDATES:
+        try:
+            return run_process([fnox, *arguments], input=stdin, timeout=timeout)
+        except FileNotFoundError:
+            continue
+        except (OSError, subprocess.SubprocessError):
+            raise SessionError(
+                f"fnox could not run to reach {VAULT_LABEL}. Check 'fnox list'"
+            ) from None
+    return None
+
+
+def _outer_vault_file() -> Path | None:
+    """The temporary file an enclosing `fnox exec --only YOUTUBE_COOKIES_TXT` made."""
+    value = os.environ.get(VAULT_KEY, "")
     try:
-        result = subprocess.run(
+        return Path(value) if value and Path(value).is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
+def vault_available() -> bool:
+    """True when the vault holds the session. Reads no secret: `fnox list` names keys.
+
+    False only when fnox is not installed or a successful listing omits the key,
+    the two cases where a run may go anonymous. A failed or timed-out listing
+    raises, because it says nothing about whether the entry exists."""
+    if _outer_vault_file() is not None:
+        return True
+    result = _fnox_run(["list"])
+    if result is None:
+        return False
+    if result.returncode:
+        raise SessionError(
+            f"'fnox list' failed, so {VAULT_LABEL} could not be checked. "
+            "Fix fnox, then retry"
+        )
+    return re.search(rf"(?m)^\s*{re.escape(VAULT_KEY)}\s", result.stdout) is not None
+
+
+def _file_script(command: str) -> str:
+    """A child shell script that runs `command` only when $YOUTUBE_COOKIES_TXT is a
+    file. Without `as_file`, the variable holds the raw value, and the builtin
+    `test` keeps it out of any external command's arguments."""
+    return f'test -f "${VAULT_KEY}" || exit {NOT_A_FILE}; {command}'
+
+
+def _require_as_file(result: subprocess.CompletedProcess[str]) -> None:
+    if result.returncode == NOT_A_FILE:
+        raise SessionError(
+            f"{VAULT_LABEL} is not exposed as a file: its entry lacks as_file = true. "
+            "Restore it in the dotfiles fnox store, then retry"
+        )
+
+
+def copy_vault_cookies(destination: Path) -> None:
+    """Copy the vault session into `destination`, a file the caller made private.
+
+    An enclosing `fnox exec` already provides the temporary file; otherwise one
+    `fnox exec` provides it for the length of the copy and removes it."""
+    outer = _outer_vault_file()
+    if outer is not None:
+        try:
+            destination.write_bytes(outer.read_bytes())
+        except OSError:
+            raise SessionError(f"{VAULT_LABEL} could not be read") from None
+        return
+    result = _fnox_run(
+        [
+            "exec",
+            "--only",
+            VAULT_KEY,
+            "--if-missing",
+            "error",
+            "--",
+            "/bin/sh",
+            "-c",
+            _file_script(f'cp -- "${VAULT_KEY}" "$1"'),
+            "sh",
+            str(destination),
+        ]
+    )
+    if result is None:
+        raise SessionError(
+            f"fnox was not found, so {VAULT_LABEL} cannot be read. "
+            "Install fnox as docs/operations/secrets.md in pascalandy/dotfiles describes"
+        )
+    _require_as_file(result)
+    if result.returncode:
+        raise SessionError(
+            f"{VAULT_LABEL} could not be read from fnox. Check that 'fnox list' "
+            f"shows it with as_file = true. {REFRESH_HINT}"
+        )
+
+
+def _entry_has_as_file(source: Path) -> bool:
+    try:
+        entry = tomllib.loads(source.read_text(encoding="utf-8"))["secrets"][VAULT_KEY]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return isinstance(entry, dict) and entry.get("as_file") is True
+
+
+def _ensure_as_file(source: Path) -> None:
+    """`fnox set` can drop `as_file = true`; restore it on the entry's own line."""
+    if _entry_has_as_file(source):
+        return
+    text = source.read_text(encoding="utf-8")
+    pattern = re.compile(rf"(?m)^({re.escape(VAULT_KEY)}\s*=\s*\{{.*?)\s*\}}[ \t]*$")
+    patched, count = pattern.subn(r"\1, as_file = true }", text, count=1)
+    if count != 1:
+        raise SessionError(f"{VAULT_KEY} has no inline entry in {source}")
+    source.write_text(patched, encoding="utf-8")
+    if not _entry_has_as_file(source):
+        raise SessionError(f"Could not keep as_file = true on {VAULT_KEY}")
+
+
+def vault_source(worktree: Path) -> Path:
+    """The fnox store of a dotfiles worktree, which must contain it.
+
+    The folder must be the root of a linked git worktree: the ordinary clone, which
+    chezmoi applies from, is never written."""
+    root = worktree.expanduser().resolve()
+    source = root / VAULT_SOURCE
+    hint = "Create one as docs/operations/secrets.md in pascalandy/dotfiles describes"
+    if not source.is_file():
+        raise SessionError(
+            f"{root} is not a dotfiles worktree: {VAULT_SOURCE} is missing. {hint}"
+        )
+    try:
+        git = run_process(
             [
-                "ssh",
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "StrictHostKeyChecking=yes",
-                "-o",
-                "ConnectTimeout=8",
-                "-o",
-                "ForwardAgent=no",
-                "--",
-                host,
-                remote,
+                "git",
+                "-C",
+                str(root),
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
             ],
-            input=candidate.read_bytes(),
-            capture_output=True,
-            timeout=timeout,
-            check=False,
+            timeout=FNOX_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError):
+        raise SessionError("git could not run to check the dotfiles worktree") from None
+    paths = git.stdout.split("\n") if git.returncode == 0 else []
+    if (
+        len(paths) < 3
+        or Path(paths[0]).resolve() != root
+        or Path(paths[1]).resolve() == Path(paths[2]).resolve()
+    ):
         raise SessionError(
-            f"Could not update {host}. Retry '{REFRESH_COMMAND}'"
-        ) from None
-    if result.returncode:
-        raise SessionError(f"Could not update {host}. Retry '{REFRESH_COMMAND}'")
+            f"{root} is not the root of a linked git worktree of the dotfiles repo. {hint}"
+        )
+    return source
+
+
+def write_vault(candidate: Path, source: Path) -> None:
+    """Encrypt the verified candidate into the entry of `source`, then read it back."""
+    store = ["-c", str(source)]
+    result = _fnox_run(
+        [
+            "--no-daemon",
+            "--non-interactive",
+            *store,
+            "set",
+            VAULT_KEY,
+            "--provider",
+            "age",
+            "--from-file",
+            "/dev/stdin",
+        ],
+        stdin=candidate.read_text(encoding="utf-8"),
+    )
+    if result is None or result.returncode:
+        raise SessionError(f"fnox could not write {VAULT_LABEL} into {source}")
+    _ensure_as_file(source)
+    check = _fnox_run(
+        [
+            "--no-daemon",
+            "--non-interactive",
+            *store,
+            "exec",
+            "--only",
+            VAULT_KEY,
+            "--if-missing",
+            "error",
+            "--",
+            "/bin/sh",
+            "-c",
+            _file_script(f'cmp -s -- "${VAULT_KEY}" "$1"'),
+            "sh",
+            str(candidate),
+        ]
+    )
+    if check is not None:
+        _require_as_file(check)
+    if check is None or check.returncode:
+        raise SessionError(
+            f"{VAULT_LABEL} in {source} does not read back as the verified export"
+        )
 
 
 def refresh_session(
-    targets: list[str], *, timeout: float = 60
+    worktree: Path, *, timeout: float = 60
 ) -> tuple[list[list[str]], list[str]]:
-    """Verify before replacing the old session; report partial fleet updates."""
-    changes: list[list[str]] = []
-    errors: list[str] = []
+    """Export, verify, then write the session into a dotfiles worktree's vault.
+
+    The export lives in a private temporary directory for the length of the call.
+    A failed export or verification leaves the worktree untouched. Returns the
+    changes and the steps that still land them, since the vault changes only
+    once the dotfiles PR merges."""
+    source = vault_source(worktree)
     with tempfile.TemporaryDirectory(prefix="transcript-renew-") as directory:
         candidate = Path(directory) / "cookies.txt"
         candidate.touch(mode=0o600)
         _export_helium(candidate)
         check_session(candidate, timeout=min(timeout, 25))
-        _install_local(candidate, session_file())
-        changes.append(["update", str(session_file())])
-        for host in targets:
-            try:
-                _install_remote(candidate, host, timeout=timeout)
-            except SessionError as error:
-                errors.append(str(error))
-            else:
-                changes.append(
-                    ["update", f"{host}:.local/share/transcript/youtube.cookies.txt"]
-                )
-    return changes, errors
+        write_vault(candidate, source)
+    root = source.parents[2]
+    in_root = f"cd {shlex.quote(str(root))} &&"
+    steps = [
+        f"{in_root} git diff --stat   # only {VAULT_SOURCE} changes, one encrypted value",
+        f"{in_root} git add {VAULT_SOURCE}",
+        f"{in_root} git commit -m 'chore(secrets): refresh the YouTube cookies ciphertext'",
+        f"{in_root} git push -u origin HEAD && gh pr create --fill",
+        f"{in_root} just merge   # a values-only diff merges without review",
+        "uv run <skills checkout>/authoring/andy/transcript/scripts/transcript.py auth check",
+    ]
+    return [["update", f"{VAULT_LABEL} in {source}"]], steps
