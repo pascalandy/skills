@@ -105,15 +105,21 @@ def _quiet_http_transport() -> Iterator[None]:
 
     Their debug records print request and response headers, Set-Cookie included,
     and --debug would copy them to stderr. The check's own diagnostics stay."""
-    loggers = [logging.getLogger(name) for name in HTTP_LOGGERS]
-    levels = [each.level for each in loggers]
-    for each in loggers:
-        each.setLevel(logging.CRITICAL + 1)
+    prefixes = tuple(HTTP_LOGGERS) + tuple(f"{each}." for each in HTTP_LOGGERS)
+
+    def keep(record: logging.LogRecord) -> bool:
+        return not (record.name in HTTP_LOGGERS or record.name.startswith(prefixes))
+
+    # A filter on the root handlers also drops records from child loggers
+    # created during the check or set to DEBUG explicitly.
+    handlers = list(logging.getLogger().handlers)
+    for each in handlers:
+        each.addFilter(keep)
     try:
         yield
     finally:
-        for each, level in zip(loggers, levels, strict=True):
-            each.setLevel(level)
+        for each in handlers:
+            each.removeFilter(keep)
 
 
 def check_session(path: Path, *, timeout: float = 25) -> None:
@@ -493,13 +499,13 @@ def refresh_session(
         check_session(candidate, timeout=min(timeout, 25))
         write_vault(candidate, source)
     root = source.parents[2]
+    in_root = f"cd {shlex.quote(str(root))} &&"
     steps = [
-        f"cd {shlex.quote(str(root))}",
-        f"git diff --stat   # only {VAULT_SOURCE} changes, one encrypted value",
-        f"git add {VAULT_SOURCE}",
-        "git commit -m 'chore(secrets): refresh the YouTube cookies ciphertext'",
-        "git push -u origin HEAD && gh pr create --fill",
-        "just merge   # a values-only diff merges without review",
+        f"{in_root} git diff --stat   # only {VAULT_SOURCE} changes, one encrypted value",
+        f"{in_root} git add {VAULT_SOURCE}",
+        f"{in_root} git commit -m 'chore(secrets): refresh the YouTube cookies ciphertext'",
+        f"{in_root} git push -u origin HEAD && gh pr create --fill",
+        f"{in_root} just merge   # a values-only diff merges without review",
         "uv run <skills checkout>/authoring/andy/transcript/scripts/transcript.py auth check",
     ]
     return [["update", f"{VAULT_LABEL} in {source}"]], steps

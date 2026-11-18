@@ -279,14 +279,20 @@ def test_the_session_check_keeps_http_transport_logs_out_of_debug(
         "Client",
         lambda **kwargs: original(**kwargs, transport=httpx.MockTransport(respond)),
     )
-    before = logging.getLogger("httpcore").level
-    with caplog.at_level(logging.DEBUG):
-        session.check_session(cookies)
-        logging.getLogger("httpcore.http11").debug("after the check")
+    # A caller may set DEBUG on a child logger explicitly; the guard still holds
+    child = logging.getLogger("httpcore.http11")
+    before = child.level
+    child.setLevel(logging.DEBUG)
+    try:
+        with caplog.at_level(logging.DEBUG):
+            session.check_session(cookies)
+            child.debug("after the check")
+    finally:
+        child.setLevel(before)
 
     assert "synthetic-set-cookie-value" not in caplog.text
     assert "after the check" in caplog.text  # the loggers work again afterwards
-    assert logging.getLogger("httpcore").level == before
+    assert not child.disabled
 
 
 @pytest.mark.parametrize("failure", ["exit", "timeout"])
@@ -477,9 +483,11 @@ def test_refresh_steps_start_in_the_quoted_dotfiles_worktree(
 
     _, steps = session.refresh_session(root)
 
-    assert steps[0] == f"cd {shlex.quote(str(root))}"
+    in_root = f"cd {shlex.quote(str(root))} && "
+    git_steps = [step for step in steps if " git " in step or "just merge" in step]
+    assert git_steps and all(step.startswith(in_root) for step in git_steps)
     assert next(step for step in steps if "gh pr create" in step) == (
-        "git push -u origin HEAD && gh pr create --fill"
+        in_root + "git push -u origin HEAD && gh pr create --fill"
     )
 
 
