@@ -648,10 +648,21 @@ TranscriptKind = Literal["plain", "timestamped"]
 
 @dataclass(frozen=True)
 class CookieFile:
-    """An explicit cookie source, never a writable yt-dlp jar."""
+    """A cookie source, never a writable yt-dlp jar: an explicit file, or the
+    fnox vault when `path` is None. The vault has no file to name; each use
+    copies it into a private temporary file."""
 
-    path: Path
+    path: Path | None = None
     verify_session: bool = False
+
+    @property
+    def label(self) -> str:
+        return youtube_session.VAULT_LABEL if self.path is None else str(self.path)
+
+    @property
+    def doctor_option(self) -> str:
+        """The doctor flag that repeats this source; the vault is the default."""
+        return "" if self.path is None else f" --cookies {shlex.quote(str(self.path))}"
 
 
 YtDlpAuthMode = Literal["anonymous"] | CookieFile
@@ -1135,34 +1146,40 @@ def validate_cookie_file(source: CookieFile) -> None:
         raise YtDlpError(str(error)) from None
 
 
+# The vault reads and writes run through the same gentle child runner as yt-dlp
+youtube_session.run_process = run_child
+
+
 def select_youtube_auth(path: Path | None) -> YtDlpAuthMode:
-    """Prefer an explicit file, then the managed store, then anonymous access.
+    """Prefer an explicit file, then the fnox vault, then anonymous access.
 
     A CLI never reads an everyday browser profile: copies of its rotating
-    cookies expire within days. `auth refresh` fills the managed store instead."""
-    managed = youtube_session.session_file()
+    cookies expire within days. `auth refresh` fills the vault instead. Without
+    a vault entry, YouTube runs anonymously, as they did without a stored file."""
     if path is not None:
-        selected = resolve_cookie_file(path)
-        return CookieFile(selected.path, selected.path == managed.resolve())
-    if managed.parent.exists():
-        try:
-            selected = resolve_cookie_file(managed)
-        except ConfigurationError:
-            raise ConfigurationError(
-                "Managed YouTube session is missing. " + youtube_session.REFRESH_HINT,
-                youtube_session.REFRESH_COMMAND,
-            ) from None
-        return CookieFile(selected.path, verify_session=True)
-    return "anonymous"
+        return resolve_cookie_file(path)
+    try:
+        in_vault = youtube_session.vault_available()
+    except youtube_session.SessionError as error:
+        raise ConfigurationError(
+            str(error), f"{PROG} doctor --source youtube"
+        ) from None
+    return CookieFile(verify_session=True) if in_vault else "anonymous"
 
 
 @contextmanager
 def private_cookie_file(source: CookieFile) -> Iterator[Path]:
-    """Keep yt-dlp's writable jar private and remove it on every exit."""
+    """Keep yt-dlp's writable jar private and remove it on every exit.
+
+    The vault session is copied into this temporary file only; no other
+    plaintext copy exists on the machine."""
     with tempfile.TemporaryDirectory(prefix="transcript-cookies-") as directory:
         path = Path(directory) / "cookies.txt"
         path.touch(mode=0o600)
-        shutil.copyfile(source.path, path)
+        if source.path is None:
+            youtube_session.copy_vault_cookies(path)
+        else:
+            shutil.copyfile(source.path, path)
         validate_cookie_file(CookieFile(path))
         yield path
 
@@ -1186,21 +1203,24 @@ def run_ytdlp(
         WorkflowTimeoutError: If no workflow time remains before an attempt.
     """
     if isinstance(auth_mode, CookieFile):
-        with private_cookie_file(auth_mode) as cookie_path:
-            result = run_child(
-                [
-                    *YTDLP_MODULE_COMMAND,
-                    "--cookies",
-                    str(cookie_path),
-                    "--no-cookies-from-browser",
-                    "--no-update",
-                    *args,
-                    url,
-                ],
-                timeout=budget.remaining(
-                    "yt-dlp cookies-file attempt", SUMMARY_ATTEMPT_TIMEOUT
-                ),
-            )
+        try:
+            with private_cookie_file(auth_mode) as cookie_path:
+                result = run_child(
+                    [
+                        *YTDLP_MODULE_COMMAND,
+                        "--cookies",
+                        str(cookie_path),
+                        "--no-cookies-from-browser",
+                        "--no-update",
+                        *args,
+                        url,
+                    ],
+                    timeout=budget.remaining(
+                        "yt-dlp cookies-file attempt", SUMMARY_ATTEMPT_TIMEOUT
+                    ),
+                )
+        except youtube_session.SessionError as error:
+            raise YtDlpError(str(error)) from None
         if result.returncode != 0:
             temporary = bool(YTDLP_TEMPORARY.search(result.stderr or result.stdout))
             raise YtDlpError(
@@ -1217,8 +1237,11 @@ def run_ytdlp(
                                 "uv",
                                 "run",
                                 str(SCRIPT_DIR / "youtube_smoke.py"),
-                                "--cookies",
-                                str(auth_mode.path),
+                                *(
+                                    ["--cookies", str(auth_mode.path)]
+                                    if auth_mode.path is not None
+                                    else []
+                                ),
                             ]
                         )
                     )
@@ -2389,8 +2412,8 @@ def build_parser() -> TranscriptParser:
     auth = _command_parser(
         commands,
         "auth",
-        help_text="Check or renew the portable YouTube session",
-        description="Manage the permanent YouTube session without paid API calls.",
+        help_text="Check or renew the YouTube session in the fnox vault",
+        description="Manage the YouTube session kept in the fnox vault, without paid API calls.",
         epilog="""examples:
   transcript auth check
   transcript auth refresh --dry-run
@@ -2404,7 +2427,7 @@ def build_parser() -> TranscriptParser:
         auth_actions,
         "check",
         help_text="Require a signed-in YouTube response",
-        description="Check the stored or supplied session against YouTube, without paid work.",
+        description="Check the vault's or the supplied session against YouTube, without paid work.",
         epilog="""examples:
   transcript auth check
   transcript auth check --cookies /path/to/youtube.cookies.txt""",
@@ -2414,31 +2437,32 @@ def build_parser() -> TranscriptParser:
     auth_refresh = _command_parser(
         auth_actions,
         "refresh",
-        help_text="Export Helium's CLI profile and update the fleet copies",
+        help_text="Export Helium's CLI profile into a dotfiles worktree's fnox vault",
         description=(
             "Run on the source Mac, in its unlocked desktop session, after signing in "
             "to YouTube in Helium's 'CLI' profile and closing that profile's window. "
-            "Verify the export before atomically replacing the stored session, "
-            "then send private copies to the configured SSH targets."
+            "Verify the export, then encrypt it into YOUTUBE_COOKIES_TXT in the fnox "
+            "store of a dotfiles worktree. No plaintext file is kept. The answer's "
+            "'next' steps land the dotfiles PR, which updates every machine."
         ),
         epilog="""examples:
-  transcript auth refresh
-  transcript auth refresh --dry-run
-  transcript auth refresh --to user@host --to other-host""",
+  transcript auth refresh --dotfiles-worktree ~/projects/.worktrees/dotfiles-youtube-cookies
+  transcript auth refresh --dotfiles-worktree ~/projects/.worktrees/dotfiles-youtube-cookies --dry-run""",
         codes=EXIT_CODES,
     )
     auth_refresh.add_argument(
-        "--to",
-        dest="targets",
-        action="append",
-        metavar="HOST",
-        help="SSH destination; repeat to override ~/.local/share/transcript/youtube-targets.txt",
+        "--dotfiles-worktree",
+        dest="dotfiles_worktree",
+        type=Path,
+        required=True,
+        metavar="DIR",
+        help="Worktree of pascalandy/dotfiles whose fnox store receives the session",
     )
     auth_refresh.add_argument(
         "-n",
         "--dry-run",
         action="store_true",
-        help="List updates without reading cookies, accessing Keychain or writing",
+        help="Name the update without reading cookies, accessing Keychain or writing",
     )
     for command in (auth_check, auth_refresh):
         command.add_argument(
@@ -2446,7 +2470,7 @@ def build_parser() -> TranscriptParser:
             type=duration,
             default=60.0,
             metavar="DURATION",
-            help="Session check or per-target update timeout (default: 60s)",
+            help="Session check timeout (default: 60s)",
         )
 
     help_parser = _command_parser(
@@ -2696,7 +2720,7 @@ def _dry_run_plan(
         "prompt": prompt.name if prompt is not None else None,
     }
     if isinstance(plan.youtube_auth, CookieFile):
-        source["cookies_file"] = str(plan.youtube_auth.path)
+        source["cookies_file"] = plan.youtube_auth.label
     return {
         "source": source,
         "summary": summary,
@@ -2821,22 +2845,28 @@ def _doctor_checks(
         if isinstance(youtube_auth, CookieFile):
             browser_check = "youtube_cookies"
             try:
-                validate_cookie_file(youtube_auth)
-            except YtDlpError as error:
+                with private_cookie_file(youtube_auth):
+                    pass
+            except (YtDlpError, youtube_session.SessionError) as error:
                 browser_message = str(error)
                 browser_status: Literal["pass", "warn", "fail"] = "fail"
                 browser_hint = (
                     "Replace the cookies export, then run: "
-                    f"{PROG} doctor --source youtube --cookies "
-                    f"{shlex.quote(str(youtube_auth.path))}"
+                    f"{PROG} doctor --source youtube{youtube_auth.doctor_option}"
+                    if youtube_auth.path is not None
+                    else youtube_session.REFRESH_HINT
                 )
             else:
-                browser_message = "Netscape cookies file is readable; server authentication is untested"
+                browser_message = (
+                    "Netscape cookies file is readable; server authentication is untested"
+                    if youtube_auth.path is not None
+                    else f"{youtube_session.VAULT_LABEL} is readable; server authentication is untested"
+                )
                 browser_status = "pass"
                 browser_hint = None
         else:
             browser_message = (
-                "No stored YouTube session; runs use anonymous access, "
+                f"No {youtube_session.VAULT_LABEL} entry; runs use anonymous access, "
                 "which YouTube often refuses"
             )
             browser_status = "warn"
@@ -2906,12 +2936,11 @@ def _run_doctor(args: argparse.Namespace) -> dict:
 def _preflight(plan: RunPlan, budget: RunBudget) -> str:
     """Validate required executables and retrieve secrets before mutations."""
     if isinstance(plan.youtube_auth, CookieFile):
-        validate_cookie_file(plan.youtube_auth)
-        if plan.youtube_auth.verify_session:
-            youtube_session.check_session(
-                plan.youtube_auth.path,
-                timeout=budget.remaining("YouTube session check", 25),
-            )
+        with private_cookie_file(plan.youtube_auth) as cookies:
+            if plan.youtube_auth.verify_session:
+                youtube_session.check_session(
+                    cookies, timeout=budget.remaining("YouTube session check", 25)
+                )
     if plan.summarize:
         ensure_cli_available(PROVIDER_RUNNERS[plan.provider])
     return validate_env(budget)
@@ -3130,7 +3159,7 @@ def _transcription_failure(
     message = _clean_subprocess_diagnostic(str(error)) or type(error).__name__
     doctor = f"{PROG} doctor --source {plan.source_kind}"
     if isinstance(plan.youtube_auth, CookieFile):
-        doctor += f" --cookies {shlex.quote(str(plan.youtube_auth.path))}"
+        doctor += plan.youtube_auth.doctor_option
     return Failure("transcription_failed", message, doctor)
 
 
@@ -3343,7 +3372,7 @@ def _run_preflight(
     except YtDlpError as error:
         doctor = f"{PROG} doctor --source youtube"
         if isinstance(plan.youtube_auth, CookieFile):
-            doctor += f" --cookies {shlex.quote(str(plan.youtube_auth.path))}"
+            doctor += plan.youtube_auth.doctor_option
         raise Failure("invalid_cookies", str(error), doctor, code=USAGE) from None
     except CredentialError as error:
         raise Failure("preflight_failed", str(error), FNOX_FIX) from error
@@ -3699,36 +3728,34 @@ def _run_auth(args: argparse.Namespace) -> dict:
     """Drive the free session lifecycle through the public command tree."""
     try:
         if args.auth_action == "check":
-            path = (
-                args.cookies.expanduser().resolve()
-                if args.cookies
-                else youtube_session.session_file()
-            )
-            youtube_session.check_session(path, timeout=min(args.timeout, 25))
-            return {"authenticated": True, "file": str(path)}
-        targets = youtube_session.refresh_targets(args.targets)
+            if args.cookies:
+                path = args.cookies.expanduser().resolve()
+                youtube_session.check_session(path, timeout=min(args.timeout, 25))
+                return {"authenticated": True, "file": str(path)}
+            if not youtube_session.vault_available():
+                raise youtube_session.SessionError(
+                    f"{youtube_session.VAULT_LABEL} is not in the vault. "
+                    + youtube_session.REFRESH_HINT
+                )
+            with private_cookie_file(CookieFile()) as cookies:
+                youtube_session.check_session(cookies, timeout=min(args.timeout, 25))
+            return {"authenticated": True, "file": youtube_session.VAULT_LABEL}
+        source = youtube_session.vault_source(args.dotfiles_worktree)
         if args.dry_run:
             return {
-                "changes": [
-                    ["update", str(youtube_session.session_file())],
-                    *(
-                        [
-                            "update",
-                            f"{host}:.local/share/transcript/youtube.cookies.txt",
-                        ]
-                        for host in targets
-                    ),
-                ]
+                "changes": [["update", f"{youtube_session.VAULT_LABEL} in {source}"]]
             }
-        changes, errors = youtube_session.refresh_session(targets, timeout=args.timeout)
-        if errors:
-            raise ScriptError(*errors, report={"changes": changes})
-        return {"changes": changes}
+        changes, steps = youtube_session.refresh_session(
+            args.dotfiles_worktree, timeout=args.timeout
+        )
+        return {"changes": changes, "next": steps}
     except youtube_session.SessionError as error:
         failure = ScriptError(str(error))
         if isinstance(error, youtube_session.SessionNetworkError):
             failure.code = TEMPORARY
         raise failure from None
+    except YtDlpError as error:
+        raise ScriptError(str(error)) from None
 
 
 def main(argv: Sequence[str] | None = None) -> int:

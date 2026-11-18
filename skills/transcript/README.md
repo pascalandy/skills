@@ -12,7 +12,7 @@ From the skills repository on the source Mac:
 just ttr "<youtube-url>"
 ```
 
-The first time, and whenever `just ttr` reports that YouTube refused the stored session, follow [Renew from Helium's CLI profile](#renew-from-heliums-cli-profile). Those errors end with `fix: just transcript-auth-refresh`.
+The first time, and whenever `just ttr` reports that YouTube refused the vault session, follow [Renew from Helium's CLI profile](#renew-from-heliums-cli-profile). Those errors end with `fix: just transcript-auth-refresh`.
 
 ## Runtime requirements
 
@@ -187,11 +187,11 @@ YouTube metadata also records the audio method that worked: `anonymous` or `cook
 
 ## YouTube transport
 
-A run reads YouTube through a cookies file: `--cookies FILE`, or else the stored session described in [Use a portable cookies file](#use-a-portable-cookies-file). Without either, it runs anonymously, which YouTube often refuses, and the metadata records it. A run never reads a browser profile: YouTube rotates the cookies of a profile with a YouTube tab open, so a copy taken from an everyday profile expires within days.
+A run reads YouTube through a cookies file: `--cookies FILE`, or else the session in the fnox vault described in [Use the vault session](#use-the-vault-session). Without either, it runs anonymously, which YouTube often refuses, and the metadata records it. A run never reads a browser profile: YouTube rotates the cookies of a profile with a YouTube tab open, so a copy taken from an everyday profile expires within days.
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
-YouTube Premium needs no extra setting: the stored session carries the account signed in to Helium's `CLI` profile.
+YouTube Premium needs no extra setting: the vault session carries the account signed in to Helium's `CLI` profile.
 
 Run the free transport check on the canonical video from [Test videos](#test-videos):
 
@@ -199,75 +199,68 @@ Run the free transport check on the canonical video from [Test videos](#test-vid
 uv run <skill_dir>/scripts/youtube_smoke.py
 ```
 
-The transport check uses the same source as a run: the stored or supplied cookies file, or anonymous access without one. It downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
+The transport check uses the same source as a run: the explicit cookies file, else the vault session, else anonymous access. It downloads temporary audio, validates the stream with `ffprobe`, and removes the download. A pass answers `{"ok":true}`; `-v` reports each step, and a network failure exits `75`. It never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio. A public-video success does not prove account authentication or the full user flow.
 
-### Use a portable cookies file
+### Use the vault session
 
-For daily use, the permanent store is `~/.local/share/transcript/youtube.cookies.txt` on each computer. YouTube runs, doctor and smoke discover it automatically. An explicit `--cookies FILE` overrides it. Once the store directory exists, a missing or malformed managed file fails without anonymous fallback. Dry runs check only the path. Normal managed-session runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work.
+The only copy of the session is the age-encrypted fnox entry `YOUTUBE_COOKIES_TXT` in the `pascalandy/dotfiles` store, declared with `as_file = true`. No machine keeps a plaintext cookies file. The cookie source is, in order:
+
+1. `--cookies FILE`, used exclusively
+2. The vault: `fnox exec --only YOUTUBE_COOKIES_TXT --if-missing error -- …` makes a temporary `0600` copy that fnox removes when the command ends. When an outer `fnox exec` already set `$YOUTUBE_COOKIES_TXT`, its file is used. fnox is found as `fnox` on `PATH`, then `~/.local/bin/fnox`, then `~/.local/share/fnox/fnox`; only a missing executable moves on to the next
+3. Anonymous access, only when fnox is missing or has no `YOUTUBE_COOKIES_TXT` entry
+
+YouTube runs, doctor, smoke and `auth check` choose the vault by default. A dry run names `fnox:YOUTUBE_COOKIES_TXT` after `fnox list` finds the entry, and decrypts nothing. Normal vault runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work. When the entry exists but fnox cannot read it, the run fails without an anonymous fallback.
 
 #### Renew from Helium's CLI profile
 
-The stored session comes from a Helium profile that only tools use. Nobody browses there, so YouTube never rotates its cookies and the stored copy stays valid for weeks or months. Set it up once on the source Mac:
+The session comes from a Helium profile that only tools use. Nobody browses there, so YouTube never rotates its cookies and the copy stays valid for weeks or months. Set it up once on the source Mac:
 
 1. In Helium, create a profile named `CLI`
 2. In that profile, sign in to YouTube with the account Transcript should use, such as your YouTube Premium account
 3. Open `https://www.youtube.com/robots.txt` in that tab, then close the profile's window. Never browse YouTube in this profile
-4. From the skills repository, in the source Mac's unlocked desktop terminal, run:
+4. Create a worktree of `pascalandy/dotfiles` from `origin/HEAD`, as `docs/operations/secrets.md` of that repository describes
+5. From the skills repository, in the source Mac's unlocked desktop terminal, run:
 
    ```bash
-   just transcript-auth-refresh
+   just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree>
    ```
 
    The first run asks for Keychain access to `Helium Storage Key`. Choose `Always Allow`
+6. Commit that one changed file, open the dotfiles PR and run `just merge` from the worktree, using the `next` steps in the command's answer. A diff that only replaces one encrypted value merges without a delegated review, and `just merge` brings every machine to the new value
+7. Run `just transcript-cli auth check`
 
-Run step 4 again when `just ttr` or `auth check` reports that YouTube refused the stored session. If the refresh itself fails, repeat steps 2 and 3 first.
+Sign in again in the `CLI` profile (steps 2 and 3) only when `auth check` reports that YouTube refused the session or the export fails. No fixed interval applies.
 
-The refresh exports only YouTube-domain cookies from the `CLI` profile and verifies the session before replacing the permanent file. Each configured destination receives the same export over SSH, verifies its own signed-in response, then replaces its local file atomically. A failed validation keeps the previous copy. A partial distribution reports successful updates and failed destinations so a retry can finish. No paid API is involved. Cookie values enter neither arguments nor diagnostics.
-
-Configure destinations once in `~/.local/share/transcript/youtube-targets.txt` on the source Mac, one trusted SSH host alias or `user@host` per line. Without this file, renewal updates only the source Mac. Receivers need `uv`, already required by Transcript, and known SSH host keys. SSH never accepts new keys or prompts for a password. The receiver uses the verifier sent by this command, so it does not require a matching skill installation.
+The refresh exports only YouTube-domain cookies from the `CLI` profile and verifies the session against YouTube first. It then runs `fnox set YOUTUBE_COOKIES_TXT --provider age --from-file /dev/stdin -c <dotfiles-worktree>/dot_config/private_fnox/private_config.toml`, restores `as_file = true` on the entry when `fnox set` dropped it, and reads the value back through `fnox exec` to confirm it matches the verified export. The export lives only in a private temporary directory that is removed on exit. A failed export or verification leaves the worktree unchanged. No paid API is involved, and cookie values enter neither arguments nor diagnostics. The vault changes for the fleet only once the dotfiles PR merges.
 
 ```bash
 just transcript-cli auth check
-just transcript-auth-refresh --dry-run
+just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree> --dry-run
 ```
 
-`auth check` requires a positive login response without transcription. `just transcript-auth-refresh --help` describes target overrides and the preview. A stored export survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. Renewal is an explicit operation after reconnection. The source Mac must be awake for renewal; other computers use their last valid copy independently. Network and rate-limit failures are reported separately from a signed-out session.
+`auth check` requires a positive login response without transcription. `just transcript-auth-refresh --help` describes the preview. The session survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. The source Mac must be awake for renewal; other computers read the vault. Network and rate-limit failures are reported separately from a signed-out session.
 
 #### Supply another export
 
-An exported Netscape cookies file works as a local source on macOS and Linux without Helium or its Keychain. The explicit file selects the cookie source and uses no anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
+An exported Netscape cookies file works as a local source on macOS and Linux without Helium, its Keychain or the vault. The explicit file selects the cookie source, wins over the vault and uses no anonymous fallback. Other yt-dlp configuration, such as proxy and JavaScript runtime settings, still applies. A missing, empty, unreadable, or malformed file fails locally. A readable export can still be expired or refused by YouTube.
 
 Keep any files requested by your yt-dlp configuration private. The `--write-info-json` option can include personal information outside Transcript's logs.
 
 1. Create a separate private YouTube session. Sign in, then open `https://www.youtube.com/robots.txt` in the same and only private tab. Export only the `youtube.com` cookies in Netscape format, then close the private window without reopening that session. Follow the [yt-dlp YouTube export procedure](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies) and its recommended exporters. The generic combination of `--cookies-from-browser` and `--cookies` exports ordinary browser cookies, not this private session, and can include every site
-2. Keep the export outside Git and the skill package. Store it in a private directory with file permissions `0600`. For example:
+2. Keep the export outside Git and the skill package, in a private directory with file permissions `0600`, and delete it when the test is done. Never leave it where Transcript or another tool would pick it up as a standing copy; the vault holds the only permanent session
+3. Check local requirements and the free transport before transcription:
 
    ```bash
-   install -d -m 700 "$HOME/.local/share/transcript"
-   install -m 600 /path/to/exported-cookies.txt "$HOME/.local/share/transcript/youtube.cookies.txt"
-   ```
-
-3. To use another computer, transfer the file over a trusted SSH connection. Prepare the destination and restrict its copy:
-
-   ```bash
-   ssh user@host 'install -d -m 700 ~/.local/share/transcript'
-   scp "$HOME/.local/share/transcript/youtube.cookies.txt" user@host:.local/share/transcript/youtube.cookies.txt
-   ssh user@host 'chmod 600 ~/.local/share/transcript/youtube.cookies.txt'
-   ```
-
-4. Check local requirements and the free transport before transcription:
-
-   ```bash
-   uv run <skill_dir>/scripts/transcript.py doctor --source youtube --cookies ~/.local/share/transcript/youtube.cookies.txt
-   uv run <skill_dir>/scripts/youtube_smoke.py --cookies ~/.local/share/transcript/youtube.cookies.txt
-   uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --cookies ~/.local/share/transcript/youtube.cookies.txt
+   uv run <skill_dir>/scripts/transcript.py doctor --source youtube --cookies /path/to/exported-cookies.txt
+   uv run <skill_dir>/scripts/youtube_smoke.py --cookies /path/to/exported-cookies.txt
+   uv run <skill_dir>/scripts/transcript.py run youtube --url "<youtube-url>" --cookies /path/to/exported-cookies.txt
    ```
 
 The run and queue validate the file before reading Deepgram credentials. A dry run checks the path and reports `source.cookies_file` without reading cookie values. `doctor` checks local readability and Netscape syntax, without testing YouTube authentication. Deepgram and the selected summary profile retain their own credentials.
 
 Each yt-dlp invocation receives a separate temporary `0600` copy in a `0700` directory. The source stays unchanged when yt-dlp rewrites its jar, and the temporary copy is removed after success, failure, timeout, or interruption. Queued and concurrent runs share no writable jar. Diagnostics omit cookie values and raw cookie-parser records, including in debug mode.
 
-YouTube can rotate or invalidate a session; no export has a guaranteed lifetime. To renew, create a fresh export and replace the source on each computer. To revoke, sign out the exported Google session and remove its stored copies. A cookies file does not supply JavaScript challenge solvers or PO tokens; see the [YouTube extractor guide](https://github.com/yt-dlp/yt-dlp/wiki/Extractors) if transport still fails.
+YouTube can rotate or invalidate a session; no export has a guaranteed lifetime. To renew, create a fresh export. To revoke, sign out the exported Google session and replace or remove the vault entry. A cookies file does not supply JavaScript challenge solvers or PO tokens; see the [YouTube extractor guide](https://github.com/yt-dlp/yt-dlp/wiki/Extractors) if transport still fails.
 
 ## Test videos
 
@@ -290,7 +283,7 @@ Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `xhigh` effo
 
 Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 
-Paid tests use the stored session, so they run the same from a local terminal, over SSH, or on Linux. Only `auth refresh` needs the source Mac's desktop session, because macOS Keychain refuses Helium's cookie key over SSH. To test another export, append `--cookies FILE` to the closeout commands.
+Paid tests use the vault session, so they run the same from a local terminal, over SSH, or on Linux. Only `auth refresh` needs the source Mac's desktop session, because macOS Keychain refuses Helium's cookie key over SSH. To test another export, append `--cookies FILE` to the closeout commands.
 
 ## Validation model
 

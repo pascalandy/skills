@@ -12,13 +12,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def isolated_youtube_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Unit tests never discover a real signed-in session from the user's home."""
+def isolated_youtube_vault(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never reach the real vault: with no fnox installed, YouTube
+    runs anonymously. A test that needs the vault replaces `_fnox_run`."""
     import youtube_session
 
-    monkeypatch.setattr(
-        youtube_session, "session_directory", lambda: tmp_path / "session"
-    )
+    monkeypatch.delenv(youtube_session.VAULT_KEY, raising=False)
+    monkeypatch.setattr(youtube_session, "_fnox_run", lambda *_a, **_k: None)
 
 
 # Add the scripts directory to sys.path so `from transcript import ...` works
