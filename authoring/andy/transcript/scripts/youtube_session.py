@@ -5,14 +5,16 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import logging
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
 import tomllib
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from http.cookiejar import LoadError, MozillaCookieJar
 from pathlib import Path
 
@@ -26,6 +28,9 @@ VAULT_LABEL = f"fnox:{VAULT_KEY}"
 # The fnox store inside a worktree of pascalandy/dotfiles
 VAULT_SOURCE = "dot_config/private_fnox/private_config.toml"
 FNOX_TIMEOUT = 15
+# Exit code of the child shell when `as_file` did not hand it a file path
+NOT_A_FILE = 97
+HTTP_LOGGERS = ("httpcore", "httpx")
 # A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
 # fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1
 FNOX_CANDIDATES = (
@@ -94,11 +99,28 @@ def logged_in_flag(body: str) -> bool | None:
     return flags[0] if flags and len(set(flags)) == 1 else None
 
 
+@contextlib.contextmanager
+def _quiet_http_transport() -> Iterator[None]:
+    """Silence httpx and httpcore for the session check.
+
+    Their debug records print request and response headers, Set-Cookie included,
+    and --debug would copy them to stderr. The check's own diagnostics stay."""
+    loggers = [logging.getLogger(name) for name in HTTP_LOGGERS]
+    levels = [each.level for each in loggers]
+    for each in loggers:
+        each.setLevel(logging.CRITICAL + 1)
+    try:
+        yield
+    finally:
+        for each, level in zip(loggers, levels, strict=True):
+            each.setLevel(level)
+
+
 def check_session(path: Path, *, timeout: float = 25) -> None:
     """Require a positive YouTube login response without saving changed cookies."""
     jar = load_cookie_jar(path)
     try:
-        with httpx.Client(
+        with _quiet_http_transport(), httpx.Client(
             cookies=jar,
             headers={
                 "User-Agent": (
@@ -273,16 +295,37 @@ def _outer_vault_file() -> Path | None:
 
 
 def vault_available() -> bool:
-    """True when the vault holds the session. Reads no secret: `fnox list` names keys."""
+    """True when the vault holds the session. Reads no secret: `fnox list` names keys.
+
+    False only when fnox is not installed or a successful listing omits the key,
+    the two cases where a run may go anonymous. A failed or timed-out listing
+    raises, because it says nothing about whether the entry exists."""
     if _outer_vault_file() is not None:
         return True
-    try:
-        result = _fnox_run(["list"])
-    except SessionError:
+    result = _fnox_run(["list"])
+    if result is None:
         return False
-    if result is None or result.returncode:
-        return False
+    if result.returncode:
+        raise SessionError(
+            f"'fnox list' failed, so {VAULT_LABEL} could not be checked. "
+            "Fix fnox, then retry"
+        )
     return re.search(rf"(?m)^\s*{re.escape(VAULT_KEY)}\s", result.stdout) is not None
+
+
+def _file_script(command: str) -> str:
+    """A child shell script that runs `command` only when $YOUTUBE_COOKIES_TXT is a
+    file. Without `as_file`, the variable holds the raw value, and the builtin
+    `test` keeps it out of any external command's arguments."""
+    return f'test -f "${VAULT_KEY}" || exit {NOT_A_FILE}; {command}'
+
+
+def _require_as_file(result: subprocess.CompletedProcess[str]) -> None:
+    if result.returncode == NOT_A_FILE:
+        raise SessionError(
+            f"{VAULT_LABEL} is not exposed as a file: its entry lacks as_file = true. "
+            "Restore it in the dotfiles fnox store, then retry"
+        )
 
 
 def copy_vault_cookies(destination: Path) -> None:
@@ -307,7 +350,7 @@ def copy_vault_cookies(destination: Path) -> None:
             "--",
             "/bin/sh",
             "-c",
-            f'cp -- "${VAULT_KEY}" "$1"',
+            _file_script(f'cp -- "${VAULT_KEY}" "$1"'),
             "sh",
             str(destination),
         ]
@@ -317,6 +360,7 @@ def copy_vault_cookies(destination: Path) -> None:
             f"fnox was not found, so {VAULT_LABEL} cannot be read. "
             "Install fnox as docs/operations/secrets.md in pascalandy/dotfiles describes"
         )
+    _require_as_file(result)
     if result.returncode:
         raise SessionError(
             f"{VAULT_LABEL} could not be read from fnox. Check that 'fnox list' "
@@ -347,13 +391,41 @@ def _ensure_as_file(source: Path) -> None:
 
 
 def vault_source(worktree: Path) -> Path:
-    """The fnox store of a dotfiles worktree, which must contain it."""
+    """The fnox store of a dotfiles worktree, which must contain it.
+
+    The folder must be the root of a linked git worktree: the ordinary clone, which
+    chezmoi applies from, is never written."""
     root = worktree.expanduser().resolve()
     source = root / VAULT_SOURCE
+    hint = "Create one as docs/operations/secrets.md in pascalandy/dotfiles describes"
     if not source.is_file():
         raise SessionError(
-            f"{root} is not a dotfiles worktree: {VAULT_SOURCE} is missing. "
-            "Create one as docs/operations/secrets.md in pascalandy/dotfiles describes"
+            f"{root} is not a dotfiles worktree: {VAULT_SOURCE} is missing. {hint}"
+        )
+    try:
+        git = run_process(
+            [
+                "git",
+                "-C",
+                str(root),
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
+            ],
+            timeout=FNOX_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        raise SessionError("git could not run to check the dotfiles worktree") from None
+    paths = git.stdout.split("\n") if git.returncode == 0 else []
+    if (
+        len(paths) < 3
+        or Path(paths[0]).resolve() != root
+        or Path(paths[1]).resolve() == Path(paths[2]).resolve()
+    ):
+        raise SessionError(
+            f"{root} is not the root of a linked git worktree of the dotfiles repo. {hint}"
         )
     return source
 
@@ -391,11 +463,13 @@ def write_vault(candidate: Path, source: Path) -> None:
             "--",
             "/bin/sh",
             "-c",
-            f'cmp -s -- "${VAULT_KEY}" "$1"',
+            _file_script(f'cmp -s -- "${VAULT_KEY}" "$1"'),
             "sh",
             str(candidate),
         ]
     )
+    if check is not None:
+        _require_as_file(check)
     if check is None or check.returncode:
         raise SessionError(
             f"{VAULT_LABEL} in {source} does not read back as the verified export"
@@ -420,11 +494,12 @@ def refresh_session(
         write_vault(candidate, source)
     root = source.parents[2]
     steps = [
-        f"git -C {root} diff --stat   # only {VAULT_SOURCE} changes, one encrypted value",
-        f"git -C {root} add {VAULT_SOURCE}",
-        f"git -C {root} commit -m 'chore(secrets): refresh the YouTube cookies ciphertext'",
-        f"git -C {root} push -u origin HEAD && gh pr create --fill",
-        f"cd {root} && just merge   # a values-only diff merges without review",
+        f"cd {shlex.quote(str(root))}",
+        f"git diff --stat   # only {VAULT_SOURCE} changes, one encrypted value",
+        f"git add {VAULT_SOURCE}",
+        "git commit -m 'chore(secrets): refresh the YouTube cookies ciphertext'",
+        "git push -u origin HEAD && gh pr create --fill",
+        "just merge   # a values-only diff merges without review",
         "uv run <skills checkout>/authoring/andy/transcript/scripts/transcript.py auth check",
     ]
     return [["update", f"{VAULT_LABEL} in {source}"]], steps

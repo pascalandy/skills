@@ -1349,13 +1349,16 @@ class Sandbox:
         return [sys.executable, str(SCRIPTS / "transcript.py"), *args]
 
 
+EMPTY_FNOX = '#!/bin/sh\n[ "$1" = list ] && exit 0\nexit 1\n'
+
+
 @pytest.fixture
 def sandbox(tmp_path: Path) -> Sandbox:
     box = Sandbox(tmp_path / "home", tmp_path / "bin")
     box.home.mkdir()
     box.bin.mkdir()
-    # The real fnox store must never answer
-    box.stub("fnox", "#!/bin/sh\nexit 1\n")
+    # The real fnox store must never answer: it lists no key and holds no secret
+    box.stub("fnox", EMPTY_FNOX)
     return box
 
 
@@ -1569,7 +1572,7 @@ def test_the_spinner_animates_only_on_a_terminal_that_allows_it(
     sandbox: Sandbox, flags: list[str], env: dict[str, str], animated: bool
 ) -> None:
     # A slow fnox lookup keeps the Preflight step on screen long enough to draw
-    sandbox.stub("fnox", "#!/bin/sh\nsleep 1\nexit 1\n")
+    sandbox.stub("fnox", '#!/bin/sh\nsleep 1\n[ "$1" = list ] && exit 0\nexit 1\n')
 
     drawn = on_terminal(
         sandbox, "run", "youtube", "--url", URL, "--no-summary", *flags, **env

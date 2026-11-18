@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -254,11 +256,153 @@ def test_check_without_a_vault_entry_names_the_refresh(monkeypatch, capsys) -> N
     assert "just transcript-auth-refresh" in capsys.readouterr().err
 
 
-def make_dotfiles(tmp_path: Path) -> Path:
-    root = tmp_path / "dotfiles-worktree"
-    store = root / session.VAULT_SOURCE
+def test_the_session_check_keeps_http_transport_logs_out_of_debug(
+    monkeypatch, tmp_path, caplog
+) -> None:
+    cookies = tmp_path / "cookies.txt"
+    write_cookies(cookies)
+    set_cookie = "SID=synthetic-set-cookie-value; Path=/"
+
+    def respond(request):
+        # What httpcore's debug records carry for a real response
+        for name in session.HTTP_LOGGERS:
+            logging.getLogger(f"{name}.http11").debug(
+                "receive_response_headers.complete return_value=%r",
+                [(b"Set-Cookie", set_cookie.encode())],
+            )
+        body = "ytcfg.set(" + json.dumps({"LOGGED_IN": True}) + ");"
+        return httpx.Response(200, text=body, headers={"Set-Cookie": set_cookie})
+
+    original = httpx.Client
+    monkeypatch.setattr(
+        session.httpx,
+        "Client",
+        lambda **kwargs: original(**kwargs, transport=httpx.MockTransport(respond)),
+    )
+    before = logging.getLogger("httpcore").level
+    with caplog.at_level(logging.DEBUG):
+        session.check_session(cookies)
+        logging.getLogger("httpcore.http11").debug("after the check")
+
+    assert "synthetic-set-cookie-value" not in caplog.text
+    assert "after the check" in caplog.text  # the loggers work again afterwards
+    assert logging.getLogger("httpcore").level == before
+
+
+@pytest.mark.parametrize("failure", ["exit", "timeout"])
+def test_a_failed_vault_listing_is_an_error_not_an_absent_entry(
+    monkeypatch, capsys, failure
+) -> None:
+    def run(command, **_kwargs):
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired(command, 15)
+        return subprocess.CompletedProcess(command, 2, "", "boom")
+
+    monkeypatch.setattr(session, "_fnox_run", REAL_FNOX_RUN)
+    monkeypatch.setattr(session, "run_process", run)
+    monkeypatch.setattr(session, "FNOX_CANDIDATES", ("fnox",))
+    monkeypatch.delenv(session.VAULT_KEY, raising=False)
+
+    with pytest.raises(session.SessionError):
+        session.vault_available()
+    # No transport is chosen: a run cannot slip into anonymous access
+    with pytest.raises(transcript.ConfigurationError):
+        transcript.select_youtube_auth(None)
+    assert transcript.main(["auth", "check"]) == 1
+    error = capsys.readouterr().err
+    assert "not in the vault" not in error and "just transcript-auth-refresh" not in error
+
+
+def test_a_missing_fnox_or_an_omitting_listing_is_the_only_anonymous_fallback(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(session.VAULT_KEY, raising=False)
+    monkeypatch.setattr(session, "_fnox_run", lambda *_a, **_k: None)
+    assert session.vault_available() is False
+    use_vault(monkeypatch, FakeFnox(listed=False))
+    assert session.vault_available() is False
+
+
+class ShellFnox:
+    """A `_fnox_run` that runs the child shell command with the vault value in
+    $YOUTUBE_COOKIES_TXT, and PATH shims that record any external call."""
+
+    def __init__(self, tmp_path: Path, value: str) -> None:
+        shims = tmp_path / "shims"
+        shims.mkdir()
+        self.calls = tmp_path / "external-calls"
+        for name in ("cp", "cmp", "test"):
+            shim = shims / name
+            shim.write_text(f'#!/bin/sh\necho "$@" >> "{self.calls}"\n')
+            shim.chmod(0o755)
+        self.env = {"PATH": f"{shims}:/usr/bin:/bin", session.VAULT_KEY: value}
+
+    def __call__(self, arguments, *, stdin=None, timeout=15):
+        arguments = list(arguments)
+        if "set" in arguments:
+            store = Path(arguments[arguments.index("-c") + 1])
+            store.write_text(f"[secrets]\n{STORE_LINE[:-1]}, as_file = true }}\n")
+            return subprocess.CompletedProcess(arguments, 0, "", "")
+        command = arguments[arguments.index("--") + 1 :]
+        return subprocess.run(
+            command, env=self.env, capture_output=True, text=True, check=False
+        )
+
+
+def test_a_vault_value_that_is_not_a_file_never_reaches_an_external_command(
+    monkeypatch, tmp_path
+) -> None:
+    raw = "synthetic-raw-value-not-a-path"
+    monkeypatch.delenv(session.VAULT_KEY, raising=False)
+    shell = ShellFnox(tmp_path, raw)
+    monkeypatch.setattr(session, "_fnox_run", shell)
+    destination = tmp_path / "copy.txt"
+    candidate = tmp_path / "candidate.txt"
+    write_cookies(candidate)
+
+    with pytest.raises(session.SessionError, match="as_file") as copied:
+        session.copy_vault_cookies(destination)
+    root = make_dotfiles(tmp_path)
+    with pytest.raises(session.SessionError, match="as_file") as written:
+        session.write_vault(candidate, session.vault_source(root))
+
+    assert not shell.calls.exists() and not destination.exists()
+    assert raw not in f"{copied.value} {written.value}"
+
+def git(directory: Path, *arguments: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "-C",
+            str(directory),
+            *arguments,
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+def make_clone(tmp_path: Path) -> Path:
+    """An ordinary dotfiles clone holding the fnox store, like chezmoi's source."""
+    clone = tmp_path / "dotfiles-clone"
+    store = clone / session.VAULT_SOURCE
     store.parent.mkdir(parents=True)
     store.write_text('[secrets]\nOTHER= { provider = "age", value = "X" }\n')
+    git(clone, "init", "-q")
+    git(clone, "add", ".")
+    git(clone, "commit", "-q", "-m", "init")
+    return clone
+
+
+def make_dotfiles(tmp_path: Path, name: str = "dotfiles-worktree") -> Path:
+    """A linked worktree of that clone, the only folder a refresh may write."""
+    clone = make_clone(tmp_path)
+    root = tmp_path / name
+    git(clone, "worktree", "add", "-q", "-b", "refresh", str(root))
     return root
 
 
@@ -313,9 +457,30 @@ def test_refresh_verifies_then_writes_only_the_vault_never_a_plaintext_file(
     assert "OTHER=" in store.read_text()
     # The export lived in a temporary directory that is gone, and no cookie file remains
     assert export_paths and not export_paths[0].exists()
-    files = sorted(path.name for path in tmp_path.rglob("*") if path.is_file())
-    assert files == ["private_config.toml"]
+    files = sorted(
+        path.name
+        for path in tmp_path.rglob("*")
+        if path.is_file() and ".git" not in path.parts and path.name != ".git"
+    )
+    # the clone's tracked store and the worktree's checkout of it, nothing else
+    assert files == ["private_config.toml"] * 2
     assert "just merge" in " ".join(steps) and VALUE not in " ".join(steps)
+
+
+def test_refresh_steps_start_in_the_quoted_dotfiles_worktree(
+    tmp_path, monkeypatch
+) -> None:
+    root = make_dotfiles(tmp_path, "dotfiles worktree")
+    use_vault(monkeypatch, FakeFnox(stored=None))
+    monkeypatch.setattr(session, "_export_helium", lambda path: write_cookies(path))
+    monkeypatch.setattr(session, "check_session", lambda *_a, **_k: None)
+
+    _, steps = session.refresh_session(root)
+
+    assert steps[0] == f"cd {shlex.quote(str(root))}"
+    assert next(step for step in steps if "gh pr create" in step) == (
+        "git push -u origin HEAD && gh pr create --fill"
+    )
 
 
 def test_refresh_refuses_a_folder_that_is_not_a_dotfiles_worktree(
@@ -324,6 +489,22 @@ def test_refresh_refuses_a_folder_that_is_not_a_dotfiles_worktree(
     monkeypatch.setattr(session, "_export_helium", lambda *_a: pytest.fail("export"))
     with pytest.raises(session.SessionError, match="not a dotfiles worktree"):
         session.refresh_session(tmp_path)
+
+
+def test_refresh_refuses_the_ordinary_clone_and_a_subfolder(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(session, "_export_helium", lambda *_a: pytest.fail("export"))
+    worktree = make_dotfiles(tmp_path)
+    clone = tmp_path / "dotfiles-clone"
+    nested = worktree / "dot_config" / "private_fnox"
+    (nested / session.VAULT_SOURCE).parent.mkdir(parents=True)
+    (nested / session.VAULT_SOURCE).touch()
+
+    for refused in (clone, nested):
+        with pytest.raises(session.SessionError, match="linked git worktree"):
+            session.refresh_session(refused)
+    assert session.vault_source(worktree) == worktree / session.VAULT_SOURCE
 
 
 def test_refresh_dry_run_names_the_vault_without_opening_keychain_or_writing(

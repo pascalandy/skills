@@ -2416,8 +2416,8 @@ def build_parser() -> TranscriptParser:
         description="Manage the YouTube session kept in the fnox vault, without paid API calls.",
         epilog="""examples:
   transcript auth check
-  transcript auth refresh --dry-run
-  transcript auth refresh""",
+  transcript auth refresh --dotfiles-worktree DIR --dry-run
+  transcript auth refresh --dotfiles-worktree DIR""",
         codes=EXIT_CODES,
     )
     auth_actions = auth.add_subparsers(

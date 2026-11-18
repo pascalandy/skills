@@ -73,4 +73,12 @@ After the deploy, on each relevant machine:
 just transcript-cli auth check
 ```
 
-A passing check reads the vault and asks YouTube; it needs no Deepgram, summary model or paid E2E run. Report which machines pass or still need action, and name the merged dotfiles PR. Keep values out of chat, logs and Git. Once every machine passes, delete any leftover plaintext `~/.local/share/transcript/youtube.cookies.txt` from the earlier managed-file design; nothing reads it any more.
+A passing check reads the vault and asks YouTube; it needs no Deepgram, summary model or paid E2E run. Report which machines pass or still need action, and name the merged dotfiles PR. Keep values out of chat, logs and Git.
+
+## 6. One-time migration: remove the old plaintext files
+
+This step belongs to the move from the earlier managed-file design to the vault. It is not part of renewal; skip it on every later refresh. On each machine, once `just transcript-cli auth check` passes through the vault, remove what nothing reads any more:
+
+- `~/.local/share/transcript/youtube.cookies.txt`
+- any renamed copy of that file, such as a backup or a `.bak` next to it
+- `~/.local/share/transcript/youtube-targets.txt`
