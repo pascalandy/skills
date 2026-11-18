@@ -11,7 +11,7 @@ Manage Trello boards, lists, and cards.
 
 All commands use curl to hit Trello REST API. Run the helper, the resolver and the requested recipe in one shell invocation, inside `fnox exec`, so the variables remain available. Start with the lines below, paste the blocks, then close with `SH` on its own line. An error exits only that child shell. See **Setup** for the keys.
 
-`fnox_run` finds fnox even under a bare `PATH`, such as T3 Code's on macOS. When `TRELLO_API_KEY`, `TRELLO_TOKEN` and `TRELLO_BOARD_SDC` are already set, start with `/bin/bash <<'SH'` instead.
+`fnox_run` finds fnox even under a bare `PATH`, such as T3 Code's on macOS. When `TRELLO_API_KEY`, `TRELLO_TOKEN` and `TRELLO_BOARD_SDC` are all already set, start with `/bin/bash <<'SH'` instead. Otherwise fnox supplies all three.
 
 ```bash
 fnox_run() { for f in "$(command -v fnox)" ~/.local/bin/fnox ~/.local/share/fnox/fnox; do [ -x "$f" ] && { "$f" "$@"; return; }; done; echo 'fnox not found' >&2; return 127; }
@@ -22,7 +22,7 @@ Paste this helper first. It sends the key and token in Trello's `Authorization` 
 
 ```bash
 trello_curl() {
-  printf 'Authorization: OAuth oauth_consumer_key="%s", oauth_token="%s"\n' "$TRELLO_API_KEY" "$TRELLO_TOKEN" | curl -H @- "$@"
+  printf 'Authorization: OAuth oauth_consumer_key="%s", oauth_token="%s"\n' "$TRELLO_API_KEY" "$TRELLO_TOKEN" | curl -q -H @- "$@"
 }
 ```
 

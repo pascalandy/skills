@@ -41,10 +41,10 @@ fnox exec --only TAVILY_API_KEY --if-missing error -- <command>
 fnox_run() { for f in "$(command -v fnox)" ~/.local/bin/fnox ~/.local/share/fnox/fnox; do [ -x "$f" ] && { "$f" "$@"; return; }; done; echo 'fnox not found' >&2; return 127; }
 tavily_curl() {
   if [ -n "${TAVILY_API_KEY:-}" ]; then
-    printf 'Authorization: Bearer %s\n' "$TAVILY_API_KEY" | curl -sS -H @- "$@"
+    printf 'Authorization: Bearer %s\n' "$TAVILY_API_KEY" | curl -q -sS -H @- "$@"
   else
     fnox_run exec --only TAVILY_API_KEY --if-missing error -- sh -c \
-      'printf "Authorization: Bearer %s\n" "$TAVILY_API_KEY" | curl -sS -H @- "$@"' sh "$@"
+      'printf "Authorization: Bearer %s\n" "$TAVILY_API_KEY" | curl -q -sS -H @- "$@"' sh "$@"
   fi
 }
 ```
