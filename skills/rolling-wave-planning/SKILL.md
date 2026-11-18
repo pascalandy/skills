@@ -123,7 +123,7 @@ plan/
 ## Pick the procedure
 
 - To make the first plan from a business case, follow **Procedure A**
-- When each task of the active wave is merged, dropped or stopped by a `needs-replan` label, follow **Procedure B**. Do not wait for the QA tasks
+- When each task of the active wave is finished, dropped or stopped by a `needs-replan` label, follow **Procedure B**. Do not wait for the QA tasks
 - When a `discovery`, `qa-finding` or `needs-replan` issue is open, follow **Procedure C**
 - To do a QA task, follow [QA task](references/qa-task.md)
 
@@ -217,7 +217,7 @@ When a task shows something that the plan did not include, one of these cases ap
 | Case | Result |
 |---|---|
 | The work is in the scope of the task and changes no contract | The implementer does the work and reports it in the PR |
-| The work is new, agrees with the wave goal and has no effect on other tasks | The implementer opens an issue with the labels `discovery` and the active wave. No agent executes it before triage |
+| The work is new, agrees with the wave goal and has no effect on other tasks | The implementer opens an issue that gives the task ID, with the labels `discovery` and the active wave. No agent executes it before triage |
 | The work changes a contract, makes a different task invalid or exceeds the task limits | The implementer stops, comments on the issue and adds the label `needs-replan` |
 
 For each `needs-replan` issue, the planner amends the wave file and logs a decision, or defers the issue to the wave review.
@@ -243,7 +243,7 @@ QA is not UAT: see [Actors](#actors).
 
 ### Which QA tasks to plan
 
-- **For each epic (default):** a final QA task tests all the tasks of the epic against the `Traces` of the epic. The final QA task starts when the last task of the epic is merged
+- **For each epic (default):** a final QA task tests all the tasks of the epic against the `Traces` of the epic. The final QA task starts when the last task of the epic is finished
 - **Intermediate:** when an epic has more than 5 tasks or more than 2 batches, add a QA task after its first slice that a user can see
 - **For one task (exception):** only for high risk, add a QA task with `Verifies: E04-T03` and the title `QA: <task title>`
   - High risk is a shared contract, security, a data migration, money or a change that cannot be reversed
@@ -259,7 +259,7 @@ QA is not UAT: see [Actors](#actors).
 
 ### Blocking
 
-- A QA task is `blocked by` the tasks that it tests. It starts when they are merged
+- A QA task is `blocked by` the tasks that it tests. It starts when they are finished
 - By default, no task depends on a QA task (`Blocking: no`). Later tasks, epics and batches continue while the QA agent tests
 - When work without a passing verdict is expensive to reverse, set `Blocking: yes` and give the reason. The permitted reasons are:
   - A later task uses a contract or schema that the QA task tests
@@ -273,7 +273,7 @@ QA is not UAT: see [Actors](#actors).
 
 The verdict of a QA task is:
 
-- `rejected` if a QA scenario fails, if an acceptance item of a tested task fails on the default branch, or if a traced success criterion is not met
+- `rejected` if a QA scenario fails, if an acceptance item or the `Verify` command of a tested task fails on the default branch, or if a traced success criterion is not met
 - `accepted-with-findings` if each scenario passes and each finding is cosmetic or an edge case
 - `accepted` in all other cases
 
@@ -283,7 +283,7 @@ These rules apply to each finding:
 2. The planner creates one fix task for each finding in Procedure C. The fix task has `Fixes finding: #71`, and its acceptance items include the reproduction
 3. Only the QA agent closes a finding, after the reproduction passes on the default branch
 4. After `accepted-with-findings`, the reproduction check of rule 3 is sufficient
-5. After `rejected`, the planner also adds a re-QA task, which is a QA task with the next free QA ID
+5. After `rejected`, the planner also adds one re-QA task for the rejected QA task. A re-QA task is a QA task with the next free QA ID
    - The `Verifies` line of the re-QA task lists the fix tasks and the failed scenarios
    - The re-QA task is blocking only if the rejected QA task was blocking
 6. After two `rejected` verdicts in sequence on one epic, the planner stops, adds the label `needs-replan` to the epic and asks the PM
