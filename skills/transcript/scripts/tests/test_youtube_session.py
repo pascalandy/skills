@@ -484,8 +484,9 @@ def test_refresh_steps_start_in_the_quoted_dotfiles_worktree(
     _, steps = session.refresh_session(root)
 
     in_root = f"cd {shlex.quote(str(root))} && "
-    git_steps = [step for step in steps if " git " in step or "just merge" in step]
-    assert git_steps and all(step.startswith(in_root) for step in git_steps)
+    handoff = steps[:-1]  # the last step re-checks the session from anywhere
+    assert len(handoff) == 5 and all(step.startswith(in_root) for step in handoff)
+    assert "auth check" in steps[-1]
     assert next(step for step in steps if "gh pr create" in step) == (
         in_root + "git push -u origin HEAD && gh pr create --fill"
     )
