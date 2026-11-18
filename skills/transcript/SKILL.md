@@ -3,7 +3,6 @@ name: "transcript"
 description: "Use when the user invokes `transcript`, asks to transcribe YouTube, Zoom, or local audio, or asks to refresh the YouTube cookies or login used by Transcript."
 kind: "general"
 configuration-is-needed: true
-api-key: "deepgram"
 ---
 
 # Transcript

@@ -186,7 +186,7 @@ class TestDryRun:
         before = set(tmp_path.rglob("*"))
         monkeypatch.setattr(
             transcript,
-            "get_api_key_from_keyring",
+            "get_api_key_from_fnox",
             lambda *_args: pytest.fail("dry-run read a secret"),
         )
 
@@ -252,7 +252,7 @@ class TestDryRun:
         )
         monkeypatch.setattr(
             transcript,
-            "get_api_key_from_keyring",
+            "get_api_key_from_fnox",
             lambda *_args: pytest.fail("invalid source read a secret"),
         )
 
@@ -323,7 +323,7 @@ class TestDoctor:
         reads = []
         monkeypatch.setattr(
             transcript,
-            "get_api_key_from_keyring",
+            "get_api_key_from_fnox",
             lambda *_args: reads.append("deepgram") or "dummy-key",
         )
 

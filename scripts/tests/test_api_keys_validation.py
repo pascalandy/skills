@@ -162,7 +162,7 @@ def test_no_value_reaches_the_process_streams(
     """Run the script as a process over this repository's own skills, so a raw
     write to a file descriptor, or a chezmoi child that inherits one, shows."""
     monkeypatch.setenv("FAKE_KEYRING", "*")
-    monkeypatch.setenv("FAKE_REFUSE", "deepgram")
+    monkeypatch.setenv("FAKE_REFUSE", "openrouter")
 
     result = subprocess.run(
         [sys.executable, api_keys_validation.__file__, "--verbose"],
@@ -173,4 +173,4 @@ def test_no_value_reaches_the_process_streams(
     assert b"s3cret" not in result.stdout + result.stderr
     assert (result.returncode, result.stdout) == (1, b"")
     errors = json.loads(result.stderr.splitlines()[-1])["errors"]
-    assert [error.split(" (")[0] for error in errors] == ["deepgram"]
+    assert [error.split(" (")[0] for error in errors] == ["openrouter"]

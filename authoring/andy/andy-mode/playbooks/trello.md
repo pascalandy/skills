@@ -1,7 +1,6 @@
 ---
 description: "Manage Trello boards, lists, and cards through the Trello REST API."
 configuration-is-needed: true
-api-key: "TRELLO_API_KEY, TRELLO_TOKEN"
 ---
 
 # Trello Skill
@@ -10,13 +9,17 @@ Manage Trello boards, lists, and cards.
 
 ## Usage
 
-All commands use curl to hit Trello REST API. Run **Setup**, the resolver and the requested recipe in one shell invocation so their variables remain available. In an interactive terminal, run that whole sequence in a child Bash shell: start with `/bin/bash <<'SH'`, paste the blocks, then close with `SH` on its own line. An error exits only that child shell.
+All commands use curl to hit Trello REST API. Run the resolver and the requested recipe in one shell invocation, inside `fnox exec`, so the variables remain available. Start with the line below, paste the blocks, then close with `SH` on its own line. An error exits only that child shell. See **Setup** for the keys.
+
+```bash
+fnox exec --only TRELLO_API_KEY,TRELLO_TOKEN,TRELLO_BOARD_SDC --if-missing error -- /bin/bash <<'SH'
+```
 
 Use the read recipes by default. This board is shared: obtain the user's approval for the specific change before running any write recipe below. Keep board data and credentials out of public issues, PRs and logs; publish only aggregate verification counts.
 
 ### Validate the API call is working
 
-Run **Setup** first.
+Run it inside the `fnox exec` shell from **Usage**.
 
 ```bash
 curl --fail --silent --show-error --get 'https://api.trello.com/1/members/me' \
@@ -26,10 +29,10 @@ curl --fail --silent --show-error --get 'https://api.trello.com/1/members/me' \
 
 ### Resolve and validate the default SDC board
 
-`TRELLO_BOARD_SDC` stores a Trello URL, not an API board ID. Run **Setup** first to export `TRELLO_API_KEY` and `TRELLO_TOKEN`, then run this snippet in bash or zsh before any SDC board request. Pass `${board_id}` to `/1/boards/...` endpoints.
+`TRELLO_BOARD_SDC` stores a Trello URL, not an API board ID. Run this snippet inside the `fnox exec` shell from **Usage** before any SDC board request. Pass `${board_id}` to `/1/boards/...` endpoints.
 
 ```bash
-board_url="$(chezmoi secret keyring get --service=TRELLO_BOARD_SDC --user=url)" || exit 1
+board_url="${TRELLO_BOARD_SDC:-}"
 board_id="$(printf '%s\n' "$board_url" | sed -nE 's#^https://trello\.com/b/([A-Za-z0-9]+)(/[^[:space:]]*)?$#\1#p')"
 if [ -z "$board_id" ]; then
   printf '%s\n' 'TRELLO_BOARD_SDC must be a Trello board URL: https://trello.com/b/<board-id>/...' >&2
@@ -44,13 +47,9 @@ curl --fail-with-body --silent --show-error --get "https://api.trello.com/1/boar
 
 ### List boards
 
-By default, user is working on this board (SDC):
+By default, user is working on the board whose URL `TRELLO_BOARD_SDC` holds (SDC); the resolver above reads it.
 
-````shell
-chezmoi secret keyring get --service=TRELLO_BOARD_SDC --user=url
-````
-
-to list them all:
+To list them all:
 
 ```bash
 curl -s "https://api.trello.com/1/members/me/boards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" | jq '.[] | {name, id}'
@@ -75,7 +74,7 @@ curl -s "https://api.trello.com/1/lists/{listId}/cards?key=$TRELLO_API_KEY&token
 
 ### Read open cards with list names, last activity and labels
 
-Requires `curl`, `jq` and `chezmoi` (`command -v curl jq chezmoi`). Run **Setup** and the resolver first. Keep the variables below in the same shell for the decision recipe. Each TSV line contains four fields: card name, list name, last activity, labels. `@tsv` escapes embedded tabs and newlines so one card occupies one line.
+Requires `curl`, `jq` and `fnox` (`command -v curl jq fnox`). Run the resolver first. Keep the variables below in the same shell for the decision recipe. Each TSV line contains four fields: card name, list name, last activity, labels. `@tsv` escapes embedded tabs and newlines so one card occupies one line.
 
 ```bash
 set -o pipefail
@@ -96,7 +95,7 @@ printf '%s\n' "$lists_json" "$open_cards" | jq -r -s '
 
 ### Read comments and card activity since a date
 
-Run **Setup** and the resolver first. Set `since` to the requested ISO 8601 date. The helper reads `boards/{id}/actions?filter=commentCard&since=<date>` or the activity filter below. It pages with `before` until no actions remain, so a busy board is not silently truncated at the API's 1,000-action limit. See the [Trello API paging guide](https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging).
+Run the resolver first. Set `since` to the requested ISO 8601 date. The helper reads `boards/{id}/actions?filter=commentCard&since=<date>` or the activity filter below. It pages with `before` until no actions remain, so a busy board is not silently truncated at the API's 1,000-action limit. See the [Trello API paging guide](https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging).
 
 ```bash
 set -o pipefail
@@ -235,11 +234,11 @@ Here's instructions if it's not already done.
 
 1. Get your API key: https://trello.com/app-key
 2. Generate token (click "Token" link on that page)
-3. With `chezmoi` installed and the keyring entries configured, export and validate the environment variables before running any recipe. For interactive use, follow the child-shell rule in **Usage**:
+3. Add `TRELLO_API_KEY`, `TRELLO_TOKEN` and `TRELLO_BOARD_SDC` to the fnox store as `docs/operations/secrets.md` in pascalandy/dotfiles describes. Check that the shell from **Usage** sees them without printing a value:
 
 ```bash
-TRELLO_API_KEY="$(chezmoi secret keyring get --service=TRELLO_API_KEY --user=api_key)" || exit 1
-TRELLO_TOKEN="$(chezmoi secret keyring get --service=TRELLO_TOKEN --user=api_key)" || exit 1
-[ -n "$TRELLO_API_KEY" ] && [ -n "$TRELLO_TOKEN" ] || { printf '%s\n' 'Trello credentials are missing' >&2; exit 1; }
-export TRELLO_API_KEY TRELLO_TOKEN
+fnox exec --only TRELLO_API_KEY,TRELLO_TOKEN,TRELLO_BOARD_SDC --if-missing error -- /bin/bash -c '
+for name in TRELLO_API_KEY TRELLO_TOKEN TRELLO_BOARD_SDC; do
+  [ -n "${!name:-}" ] || { printf "%s is missing\n" "$name" >&2; exit 1; }
+done'
 ```

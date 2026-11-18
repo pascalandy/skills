@@ -370,8 +370,15 @@ TAVILY_API_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 GROKIPEDIA_BASE = "https://grokipedia.com/page"
 SEARCH_DOMAINS = ["grokipedia.com", "grokxpedia.us"]
-KEYRING_GET = "chezmoi secret keyring get --service=tavily --user=api_key"
-KEYRING_SET = "chezmoi secret keyring set --service=tavily --user=api_key"
+KEY_NAME = "TAVILY_API_KEY"
+SECRETS_DOC = "docs/operations/secrets.md in pascalandy/dotfiles"
+# A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
+# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1.
+FNOX_CANDIDATES = (
+    "fnox",
+    str(Path.home() / ".local/bin/fnox"),
+    str(Path.home() / ".local/share/fnox/fnox"),
+)
 
 EPILOG = """\
 The results go to a Markdown file: the --output path, or a new
@@ -397,47 +404,59 @@ class ApiKeyError(ScriptError):
 
 
 def get_api_key() -> str:
-    """Retrieve Tavily API key from macOS keyring via chezmoi.
+    """Retrieve the Tavily API key from the environment, else from fnox.
+
+    `fnox exec` puts the key in printenv's environment, so it never reaches argv.
+    The candidates are tried in turn; only a missing executable moves to the next.
 
     Returns:
         The API key string, stripped of whitespace.
 
     Raises:
-        ApiKeyError: If chezmoi is missing, keyring lookup fails, or key is empty.
+        ApiKeyError: If fnox is missing, the lookup fails, or the key is empty.
     """
-    try:
-        result = subprocess.run(
-            [
-                "chezmoi",
-                "secret",
-                "keyring",
-                "get",
-                "--service=tavily",
-                "--user=api_key",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        )
+    key = os.environ.get(KEY_NAME, "").strip()
+    if key:
+        return key
+    for fnox in FNOX_CANDIDATES:
+        try:
+            result = subprocess.run(
+                [
+                    fnox,
+                    "exec",
+                    "--only",
+                    KEY_NAME,
+                    "--if-missing",
+                    "error",
+                    "--",
+                    "printenv",
+                    KEY_NAME,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+        except FileNotFoundError:
+            continue
+        except subprocess.CalledProcessError as exc:
+            raise ApiKeyError(
+                f"fnox could not read {KEY_NAME} (exit {exc.returncode}); "
+                f"add it as {SECRETS_DOC} describes"
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise ApiKeyError(
+                f"fnox lookup of {KEY_NAME} timed out; check the store as {SECRETS_DOC} describes"
+            ) from exc
         key = result.stdout.strip()
         if not key:
             raise ApiKeyError(
-                f"Tavily API key from keyring is empty; set it with: {KEYRING_SET}"
+                f"{KEY_NAME} from fnox is empty; replace it as {SECRETS_DOC} describes"
             )
         return key
-    except FileNotFoundError as exc:
-        raise ApiKeyError(
-            "chezmoi not found in PATH; install chezmoi: https://www.chezmoi.io/install/"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        raise ApiKeyError(
-            f"Could not retrieve Tavily API key from keyring; set it with: {KEYRING_SET}"
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise ApiKeyError(
-            f"Tavily API key lookup timed out; check the keyring with: {KEYRING_GET}"
-        ) from exc
+    raise ApiKeyError(
+        f"fnox not found. Tried: {', '.join(FNOX_CANDIDATES)}; see {SECRETS_DOC}"
+    )
 
 
 def search_grokipedia(
@@ -452,13 +471,13 @@ def search_grokipedia(
         query: Search query string.
         max_results: Maximum number of results (1-20).
         include_raw: Whether to include raw page content.
-        api_key: Tavily API key. If None, retrieved from keyring via get_api_key().
+        api_key: Tavily API key. If None, read from the environment or fnox via get_api_key().
 
     Returns:
         Tavily API response as a dictionary.
 
     Raises:
-        ApiKeyError: If api_key is None and keyring lookup fails.
+        ApiKeyError: If api_key is None and the key lookup fails.
         httpx.HTTPStatusError: On non-2xx response.
         httpx.RequestError: On connection/timeout failure.
     """
@@ -522,7 +541,7 @@ def extract_exact_page(
 
     Args:
         query: Search query to derive the page title from.
-        api_key: Tavily API key. If None, retrieved from keyring.
+        api_key: Tavily API key. If None, read from the environment or fnox.
 
     Returns:
         A dict with keys (title, url, content, score, raw_content) or None.
@@ -640,7 +659,7 @@ def http_failure(response: httpx.Response) -> str:
     """The error message for a non-2xx answer from Tavily, with what to do next."""
     status = response.status_code
     if status in (401, 403):
-        return f"Tavily API returned HTTP {status}; verify the API key: {KEYRING_GET}"
+        return f"Tavily API returned HTTP {status}; verify {KEY_NAME} as {SECRETS_DOC} describes"
     if status == 429:
         return "Tavily API returned HTTP 429, rate limited; wait a moment, then rerun the search"
     body = " ".join(response.text[:200].split())

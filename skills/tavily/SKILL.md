@@ -3,7 +3,6 @@ name: "tavily"
 description: "Use only when explicitly invoked as `tavily`."
 kind: "general"
 configuration-is-needed: true
-api-key: "tavily"
 ---
 
 # Tavily REST API
@@ -26,21 +25,30 @@ Tavily gives LLM-optimized search, content extraction, site mapping, and crawlin
 
 - Local filesystem or repository work; use local tools
 - A search that no request named Tavily for
-- API key is missing from keyring (check first)
+- `TAVILY_API_KEY` is missing from fnox (check first)
 
 ## Authentication
 
-API key stored in macOS keyring. Retrieve with:
+The key is `TAVILY_API_KEY` in the fnox store (`docs/operations/secrets.md` in pascalandy/dotfiles). Give a command its key with:
 
 ```bash
-chezmoi secret keyring get --service=tavily --user=api_key
+fnox exec --only TAVILY_API_KEY --if-missing error -- <command>
+```
+
+`tavily_curl` below runs curl that way and sends the key as a header on stdin, so it stays out of argv. The endpoint examples call it.
+
+```bash
+tavily_curl() {
+  fnox exec --only TAVILY_API_KEY --if-missing error -- sh -c \
+    'printf "Authorization: Bearer %s\n" "$TAVILY_API_KEY" | curl -sS -H @- "$@"' sh "$@"
+}
 ```
 
 ## Base Configuration
 
 ```
 Base URL: https://api.tavily.com
-Auth:     Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)
+Auth:     Authorization: Bearer $TAVILY_API_KEY (set by fnox exec)
 Content:  Content-Type: application/json
 Optional: X-Project-ID: <project-id>
 ```
@@ -52,9 +60,8 @@ Optional: X-Project-ID: <project-id>
 Web search with optional AI-generated answer.
 
 ```bash
-curl -sS -X POST "https://api.tavily.com/search" \
+tavily_curl -X POST "https://api.tavily.com/search" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)" \
   -d '{
     "query": "<query>",
     "search_depth": "basic",
@@ -85,9 +92,8 @@ curl -sS -X POST "https://api.tavily.com/search" \
 Pull content from specific URLs.
 
 ```bash
-curl -sS -X POST "https://api.tavily.com/extract" \
+tavily_curl -X POST "https://api.tavily.com/extract" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)" \
   -d '{
     "urls": ["https://example.com/article"],
     "format": "markdown"
@@ -112,9 +118,8 @@ curl -sS -X POST "https://api.tavily.com/extract" \
 Discover URLs on domain (no content extraction).
 
 ```bash
-curl -sS -X POST "https://api.tavily.com/map" \
+tavily_curl -X POST "https://api.tavily.com/map" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)" \
   -d '{
     "url": "https://docs.example.com",
     "max_depth": 1,
@@ -140,9 +145,8 @@ curl -sS -X POST "https://api.tavily.com/map" \
 Map site and extract content in one call.
 
 ```bash
-curl -sS -X POST "https://api.tavily.com/crawl" \
+tavily_curl -X POST "https://api.tavily.com/crawl" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)" \
   -d '{
     "url": "https://docs.example.com",
     "max_depth": 1,
@@ -168,9 +172,8 @@ Multi-step analysis with citations. Async workflow.
 **Start research:**
 
 ```bash
-curl -sS -X POST "https://api.tavily.com/research" \
+tavily_curl -X POST "https://api.tavily.com/research" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)" \
   -d '{
     "input": "<research question>",
     "model": "auto",
@@ -184,13 +187,12 @@ curl -sS -X POST "https://api.tavily.com/research" \
 **Check status:**
 
 ```bash
-curl -sS -X GET "https://api.tavily.com/research/<request_id>" \
-  -H "Authorization: Bearer $(chezmoi secret keyring get --service=tavily --user=api_key)"
+tavily_curl -X GET "https://api.tavily.com/research/<request_id>"
 ```
 
 **Response:** `status` (completed), `content` (report), `sources[]`
 
-**Streaming:** Set `"stream": true` and use `curl -N` for SSE events.
+**Streaming:** Set `"stream": true` and use `tavily_curl -N` for SSE events.
 
 ## Defaults
 
@@ -204,7 +206,7 @@ Use conservative defaults unless deeper recall needed:
 
 | Error | Action |
 |-------|--------|
-| 401/403 | Verify key in keyring: `chezmoi secret keyring get --service=tavily --user=api_key` |
+| 401/403 | Verify `TAVILY_API_KEY` in fnox: `fnox exec --only TAVILY_API_KEY --if-missing error -- /usr/bin/sh -c 'test -n "${TAVILY_API_KEY:-}"'` |
 | Timeout | Reduce `max_depth`/`limit` or use `search_depth: basic` |
 | Response too large | Lower `max_results` or `chunks_per_source` |
 

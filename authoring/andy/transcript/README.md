@@ -22,16 +22,10 @@ The first time, and whenever `just ttr` reports that YouTube refused the stored 
 - Zoom recordings under `~/Documents/Zoom` for Zoom mode
 - When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
-- Deepgram API key in the macOS keyring
+- `fnox` with `DEEPGRAM_TRANSCRIPT_API_KEY` in the fnox store, or that variable in the environment
 - The `andy-mode` skill installed beside this one for Zoom summaries, which use the `synthese-rencontre` prompt of its `distill-prompt` route
 
-Set the Deepgram key with:
-
-```bash
-chezmoi secret keyring set --service=deepgram --user=api_key
-```
-
-The runtime falls back to `DEEPGRAM_API_KEY` when the keyring is unavailable. It never prints the key.
+Add the key to the store as `docs/operations/secrets.md` in pascalandy/dotfiles describes. The runtime reads `DEEPGRAM_TRANSCRIPT_API_KEY` from the environment first, then runs `fnox exec --only DEEPGRAM_TRANSCRIPT_API_KEY --if-missing error -- printenv DEEPGRAM_TRANSCRIPT_API_KEY` with the key held in memory only. It tries `fnox` on `PATH`, then `~/.local/bin/fnox`, then `~/.local/share/fnox/fnox`. It never reads the dictation key `DEEPGRAM_API_KEY` and never prints a key.
 
 The scripts pin `yt-dlp` to `2026.7.4`, the version covered by the Helium export and transport check. They install its default dependencies, including the matching EJS challenge solver.
 

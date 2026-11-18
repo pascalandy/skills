@@ -513,7 +513,7 @@ def test_doctor_validator_rejects_crossed_source():
     payload = {
         "ok": False,
         "errors": [
-            "deepgram_credential: Missing Deepgram API key; fix: chezmoi secret",
+            "deepgram_credential: Missing Deepgram API key; fix: add DEEPGRAM_TRANSCRIPT_API_KEY to fnox",
             "zoom_recordings: no Zoom folder; fix: record a meeting",
         ],
     }

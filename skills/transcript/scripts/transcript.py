@@ -430,7 +430,7 @@ class ConfigurationError(ValueError):
 
 
 class CredentialError(RuntimeError):
-    """The Deepgram API key is in neither the keyring nor the environment."""
+    """The Deepgram API key is in neither the environment nor fnox."""
 
 
 class DeepgramResponseError(ValueError):
@@ -633,7 +633,7 @@ SAVE_OUTPUT_NAMES = {
 WORKFLOW_TOTAL_TIMEOUT = 570
 SUMMARY_ATTEMPT_TIMEOUT = 480
 SUMMARY_MAX_RETRIES = 3  # Retry attempts for summary CLI failures
-KEYRING_TIMEOUT = 15
+FNOX_TIMEOUT = 15
 DEEPGRAM_TIMEOUT = 300
 POST_RUN_TIMEOUT = 10
 
@@ -1564,47 +1564,59 @@ def ensure_cli_available(command_name: str) -> None:
     raise SummaryCLIError(f"Required CLI '{command_name}' was not found on PATH")
 
 
-def get_api_key_from_keyring(budget: RunBudget) -> str | None:
-    """Retrieve Deepgram API key from macOS keyring via chezmoi."""
-    try:
-        result = run_child(
-            [
-                "chezmoi",
-                "secret",
-                "keyring",
-                "get",
-                "--service=deepgram",
-                "--user=api_key",
-            ],
-            check=True,
-            timeout=budget.remaining("Deepgram keyring lookup", KEYRING_TIMEOUT),
-        )
+DEEPGRAM_KEY_NAME = "DEEPGRAM_TRANSCRIPT_API_KEY"
+SECRETS_DOC = "docs/operations/secrets.md in pascalandy/dotfiles"
+# A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
+# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1.
+FNOX_CANDIDATES = (
+    "fnox",
+    str(Path.home() / ".local/bin/fnox"),
+    str(Path.home() / ".local/share/fnox/fnox"),
+)
+FNOX_FIX = f"add {DEEPGRAM_KEY_NAME} to fnox as {SECRETS_DOC} describes"
+
+
+def get_api_key_from_fnox(budget: RunBudget) -> str | None:
+    """Read the Deepgram key from fnox; None when fnox cannot give one.
+
+    `fnox exec` puts the key in printenv's environment, so it never reaches
+    argv. Only a missing executable moves on to the next candidate.
+    """
+    for fnox in FNOX_CANDIDATES:
+        try:
+            result = run_child(
+                [
+                    fnox,
+                    "exec",
+                    "--only",
+                    DEEPGRAM_KEY_NAME,
+                    "--if-missing",
+                    "error",
+                    "--",
+                    "printenv",
+                    DEEPGRAM_KEY_NAME,
+                ],
+                check=True,
+                timeout=budget.remaining("Deepgram fnox lookup", FNOX_TIMEOUT),
+            )
+        except FileNotFoundError:
+            continue
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            log.debug("fnox has no %s", DEEPGRAM_KEY_NAME)
+            return None
         return result.stdout.strip() or None
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        FileNotFoundError,
-    ):
-        log.debug("the keyring has no Deepgram key; trying DEEPGRAM_API_KEY")
-        return None
-
-
-KEYRING_COMMAND = "chezmoi secret keyring set --service=deepgram --user=api_key"
+    log.debug("fnox not found; tried %s", ", ".join(FNOX_CANDIDATES))
+    return None
 
 
 def validate_env(budget: RunBudget) -> str:
-    """Get Deepgram API key from keyring or environment."""
-    # Try keyring first
-    api_key = get_api_key_from_keyring(budget)
-
-    # Fall back to environment variable
-    if not api_key:
-        api_key = os.getenv("DEEPGRAM_API_KEY")
+    """Get the Deepgram key from the environment, else from fnox."""
+    api_key = os.getenv(DEEPGRAM_KEY_NAME, "").strip() or get_api_key_from_fnox(budget)
 
     if not api_key:
         raise CredentialError(
-            "Missing Deepgram API key: the keyring has none and DEEPGRAM_API_KEY "
-            "is not set"
+            f"Missing Deepgram API key: {DEEPGRAM_KEY_NAME} is neither set in the "
+            "environment nor readable from fnox"
         )
 
     return api_key
@@ -2721,7 +2733,7 @@ def _doctor_checks(
     checks: list[dict[str, str]] = []
 
     try:
-        validate_env(RunBudget(time.monotonic() + KEYRING_TIMEOUT + 1))
+        validate_env(RunBudget(time.monotonic() + FNOX_TIMEOUT + 1))
     except (OSError, RuntimeError, WorkflowTimeoutError) as error:
         checks.append(
             _doctor_check(
@@ -2729,7 +2741,7 @@ def _doctor_checks(
                 "fail",
                 _clean_subprocess_diagnostic(str(error))
                 or "Deepgram credential is unavailable",
-                KEYRING_COMMAND,
+                FNOX_FIX,
             )
         )
     else:
@@ -3334,7 +3346,7 @@ def _run_preflight(
             doctor += f" --cookies {shlex.quote(str(plan.youtube_auth.path))}"
         raise Failure("invalid_cookies", str(error), doctor, code=USAGE) from None
     except CredentialError as error:
-        raise Failure("preflight_failed", str(error), KEYRING_COMMAND) from error
+        raise Failure("preflight_failed", str(error), FNOX_FIX) from error
     except (WorkflowTimeoutError, subprocess.TimeoutExpired, TimeoutError) as error:
         raise Failure(
             "temporary_failure",
