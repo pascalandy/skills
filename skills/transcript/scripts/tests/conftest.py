@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 @pytest.fixture(autouse=True)
 def no_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fail an in-process test that would start yt-dlp, pi, or the keyring, or
+    """Fail an in-process test that would start yt-dlp, pi, or fnox, or
     call Deepgram; a test that needs one replaces it first."""
     import transcript
     import youtube_smoke

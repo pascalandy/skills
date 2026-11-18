@@ -243,13 +243,13 @@ class TestPureDiscovery:
             ["list", "profiles"],
         ],
     )
-    def test_discovery_does_not_read_keyring(self, argv, monkeypatch) -> None:
+    def test_discovery_does_not_read_the_key(self, argv, monkeypatch) -> None:
         import transcript
 
         def fail_if_called(*_args, **_kwargs) -> None:
-            pytest.fail("discovery attempted to read the keyring")
+            pytest.fail("discovery attempted to read the key")
 
-        monkeypatch.setattr(transcript, "get_api_key_from_keyring", fail_if_called)
+        monkeypatch.setattr(transcript, "get_api_key_from_fnox", fail_if_called)
 
         assert transcript.main(argv) == 0
 
@@ -1988,7 +1988,7 @@ class TestFilePipeline:
 
         monkeypatch.setattr(transcript, "datetime", FrozenClock)
         monkeypatch.setattr(
-            transcript, "get_api_key_from_keyring", lambda *_args: "dummy-key"
+            transcript, "get_api_key_from_fnox", lambda *_args: "dummy-key"
         )
         audio = tmp_path / file_name
         payload = b"local-audio" * 20_000
@@ -2341,24 +2341,22 @@ class TestPreflightAndCleanup:
     def test_missing_deepgram_key_is_runtime_error(self, monkeypatch) -> None:
         import transcript
 
-        monkeypatch.setattr(transcript, "get_api_key_from_keyring", lambda *_args: None)
-        monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
+        monkeypatch.setattr(transcript, "get_api_key_from_fnox", lambda *_args: None)
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
 
-        with pytest.raises(RuntimeError, match="Missing Deepgram API key"):
+        with pytest.raises(
+            RuntimeError, match="Missing Deepgram API key: DEEPGRAM_TRANSCRIPT_API_KEY"
+        ):
             transcript.validate_env(transcript.RunBudget(float("inf")))
 
-    def test_keyring_process_timeout_falls_back_to_environment(
-        self, monkeypatch
-    ) -> None:
+    def test_environment_key_wins_without_running_fnox(self, monkeypatch) -> None:
         import transcript
 
-        monkeypatch.setenv("DEEPGRAM_API_KEY", "environment-secret")
+        monkeypatch.setenv("DEEPGRAM_TRANSCRIPT_API_KEY", " environment-secret \n")
         monkeypatch.setattr(
             transcript,
             "run_child",
-            lambda *_args, **_kwargs: (_ for _ in ()).throw(
-                subprocess.TimeoutExpired("chezmoi", 15)
-            ),
+            lambda *_args, **_kwargs: pytest.fail("fnox started despite the key"),
         )
 
         assert (
@@ -2366,17 +2364,115 @@ class TestPreflightAndCleanup:
             == "environment-secret"
         )
 
-    def test_exhausted_workflow_budget_is_not_masked_by_environment_fallback(
+    def test_the_dictation_key_is_never_used(self, monkeypatch) -> None:
+        import transcript
+
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
+        monkeypatch.setenv("DEEPGRAM_API_KEY", "dictation-secret")
+        monkeypatch.setattr(transcript, "get_api_key_from_fnox", lambda *_args: None)
+
+        with pytest.raises(transcript.CredentialError):
+            transcript.validate_env(transcript.RunBudget(float("inf")))
+
+    def test_fnox_is_run_with_an_argument_list_and_the_key_stays_out_of_argv(
         self, monkeypatch
     ) -> None:
         import transcript
 
-        monkeypatch.setenv("DEEPGRAM_API_KEY", "environment-secret")
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
+        commands = []
+
+        def fake_run_child(command, **_kwargs):
+            commands.append(list(command))
+            return subprocess.CompletedProcess(command, 0, stdout="fnox-secret\n")
+
+        monkeypatch.setattr(transcript, "run_child", fake_run_child)
+
+        key = transcript.validate_env(transcript.RunBudget(float("inf")))
+
+        assert key == "fnox-secret"
+        assert commands == [
+            [
+                "fnox",
+                "exec",
+                "--only",
+                "DEEPGRAM_TRANSCRIPT_API_KEY",
+                "--if-missing",
+                "error",
+                "--",
+                "printenv",
+                "DEEPGRAM_TRANSCRIPT_API_KEY",
+            ]
+        ]
+        assert "fnox-secret" not in " ".join(commands[0])
+
+    def test_a_missing_fnox_tries_each_install_path(self, monkeypatch) -> None:
+        import transcript
+
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
+        tried = []
+
+        def fake_run_child(command, **_kwargs):
+            tried.append(command[0])
+            raise FileNotFoundError(command[0])
+
+        monkeypatch.setattr(transcript, "run_child", fake_run_child)
+
+        with pytest.raises(transcript.CredentialError, match="Missing Deepgram"):
+            transcript.validate_env(transcript.RunBudget(float("inf")))
+
+        assert tried == list(transcript.FNOX_CANDIDATES)
+
+    def test_fnox_failure_does_not_try_another_candidate(self, monkeypatch) -> None:
+        import transcript
+
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
+        calls = []
+
+        def fake_run_child(command, **_kwargs):
+            calls.append(command[0])
+            raise subprocess.CalledProcessError(1, command)
+
+        monkeypatch.setattr(transcript, "run_child", fake_run_child)
+
+        with pytest.raises(transcript.CredentialError):
+            transcript.validate_env(transcript.RunBudget(float("inf")))
+
+        assert calls == ["fnox"]
+
+    def test_fnox_timeout_is_a_missing_key(self, monkeypatch) -> None:
+        import transcript
+
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
+        monkeypatch.setattr(
+            transcript,
+            "run_child",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                subprocess.TimeoutExpired("fnox", 15)
+            ),
+        )
+
+        with pytest.raises(transcript.CredentialError):
+            transcript.validate_env(transcript.RunBudget(float("inf")))
+
+    def test_the_fix_names_the_key_and_the_procedure(self) -> None:
+        import transcript
+
+        assert "DEEPGRAM_TRANSCRIPT_API_KEY" in transcript.FNOX_FIX
+        assert "docs/operations/secrets.md" in transcript.FNOX_FIX
+        assert "keyring" not in transcript.FNOX_FIX
+
+    def test_exhausted_workflow_budget_stops_before_fnox_starts(
+        self, monkeypatch
+    ) -> None:
+        import transcript
+
+        monkeypatch.delenv("DEEPGRAM_TRANSCRIPT_API_KEY", raising=False)
         monkeypatch.setattr(transcript.time, "monotonic", lambda: 10.0)
         monkeypatch.setattr(
             transcript,
             "run_child",
-            lambda *_args, **_kwargs: pytest.fail("keyring started after deadline"),
+            lambda *_args, **_kwargs: pytest.fail("fnox started after deadline"),
         )
 
         with pytest.raises(transcript.WorkflowTimeoutError, match="budget"):

@@ -37,7 +37,7 @@ Preconditions:
 ## Gotchas
 
 - The transcript CLI has no configuration file
-- Credentials come from the macOS keyring or `DEEPGRAM_API_KEY` but never appear in eval evidence
+- Credentials come from `DEEPGRAM_TRANSCRIPT_API_KEY` in the environment or the fnox store but never appear in eval evidence
 - Invalid flags exit `2` before output creation or paid work
 - `features[].id` contains the exact values accepted by `verify --feature`
 - The verifier builds output flags itself and does not accept a transcript output override

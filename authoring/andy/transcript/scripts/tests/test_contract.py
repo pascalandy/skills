@@ -1239,7 +1239,7 @@ def test_a_preflight_failure_stops_the_queue_before_any_url(
     assert err == json_line(
         {
             "ok": False,
-            "errors": [f"Missing Deepgram API key; fix: {transcript.KEYRING_COMMAND}"],
+            "errors": [f"Missing Deepgram API key; fix: {transcript.FNOX_FIX}"],
         }
     )
     assert list(tmp_path.iterdir()) == []
@@ -1331,7 +1331,7 @@ class Sandbox:
             name: value
             for name, value in os.environ.items()
             if not name.endswith("_DEBUG")
-            and name not in {"DEEPGRAM_API_KEY", "NO_COLOR", "FORCE_COLOR"}
+            and name not in {"DEEPGRAM_TRANSCRIPT_API_KEY", "NO_COLOR", "FORCE_COLOR"}
         }
         return {
             **env,
@@ -1354,8 +1354,8 @@ def sandbox(tmp_path: Path) -> Sandbox:
     box = Sandbox(tmp_path / "home", tmp_path / "bin")
     box.home.mkdir()
     box.bin.mkdir()
-    # The real keyring must never answer
-    box.stub("chezmoi", "#!/bin/sh\nexit 1\n")
+    # The real fnox store must never answer
+    box.stub("fnox", "#!/bin/sh\nexit 1\n")
     return box
 
 
@@ -1397,9 +1397,9 @@ def test_a_signal_exits_without_a_traceback_and_stops_children_gently(
     last: str,
     tmp_path: Path,
 ) -> None:
-    # The keyring lookup blocks, so the signal lands while a child runs
+    # The fnox lookup blocks, so the signal lands while a child runs
     ready = tmp_path / "ready"
-    sandbox.stub("chezmoi", STUB.format(ready=ready))
+    sandbox.stub("fnox", STUB.format(ready=ready))
     process = subprocess.Popen(
         sandbox.command("run", "youtube", "--url", URL, "--no-summary"),
         cwd=sandbox.home,
@@ -1453,7 +1453,7 @@ def test_a_signal_also_stops_what_a_child_started(
     sandbox: Sandbox, tmp_path: Path
 ) -> None:
     ready = tmp_path / "ready"
-    sandbox.stub("chezmoi", UNCOOPERATIVE.format(ready=ready))
+    sandbox.stub("fnox", UNCOOPERATIVE.format(ready=ready))
     process = subprocess.Popen(
         sandbox.command("run", "youtube", "--url", URL, "--no-summary"),
         cwd=sandbox.home,
@@ -1568,8 +1568,8 @@ def on_terminal(sandbox: Sandbox, *args: str, **env: str) -> bytes:
 def test_the_spinner_animates_only_on_a_terminal_that_allows_it(
     sandbox: Sandbox, flags: list[str], env: dict[str, str], animated: bool
 ) -> None:
-    # A slow keyring keeps the Preflight step on screen long enough to draw
-    sandbox.stub("chezmoi", "#!/bin/sh\nsleep 1\nexit 1\n")
+    # A slow fnox lookup keeps the Preflight step on screen long enough to draw
+    sandbox.stub("fnox", "#!/bin/sh\nsleep 1\nexit 1\n")
 
     drawn = on_terminal(
         sandbox, "run", "youtube", "--url", URL, "--no-summary", *flags, **env

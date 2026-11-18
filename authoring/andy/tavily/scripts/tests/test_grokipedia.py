@@ -254,94 +254,108 @@ class TestCLIValidation:
 class TestGetApiKey:
     """get_api_key must raise ApiKeyError, not sys.exit."""
 
-    def test_missing_chezmoi_raises_api_key_error(self) -> None:
-        """If chezmoi is not installed, should raise ApiKeyError."""
-        with patch("grokipedia.subprocess.run", side_effect=FileNotFoundError):
-            with pytest.raises(grokipedia.ApiKeyError, match="chezmoi"):
-                grokipedia.get_api_key()
+    @pytest.fixture(autouse=True)
+    def no_environment_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
 
-    def test_keyring_failure_raises_api_key_error(self) -> None:
-        """If keyring lookup fails, should raise ApiKeyError."""
+    def test_environment_key_wins_without_running_fnox(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TAVILY_API_KEY", "  tvly-env  ")
+        with patch("grokipedia.subprocess.run") as run:
+            assert grokipedia.get_api_key() == "tvly-env"
+        run.assert_not_called()
+
+    def test_fnox_is_called_with_an_argument_list_and_no_key(self) -> None:
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="tvly-abc123\n", stderr=""
+        )
+        with patch("grokipedia.subprocess.run", return_value=mock_result) as run:
+            assert grokipedia.get_api_key() == "tvly-abc123"
+        command = run.call_args.args[0]
+        assert command == [
+            "fnox",
+            "exec",
+            "--only",
+            "TAVILY_API_KEY",
+            "--if-missing",
+            "error",
+            "--",
+            "printenv",
+            "TAVILY_API_KEY",
+        ]
+        assert not run.call_args.kwargs.get("shell")
+
+    def test_missing_fnox_tries_each_install_path_then_raises(self) -> None:
+        with patch(
+            "grokipedia.subprocess.run", side_effect=FileNotFoundError
+        ) as run:
+            with pytest.raises(grokipedia.ApiKeyError, match="fnox not found") as info:
+                grokipedia.get_api_key()
+        assert [call.args[0][0] for call in run.call_args_list] == list(
+            grokipedia.FNOX_CANDIDATES
+        )
+        assert "docs/operations/secrets.md" in str(info.value)
+
+    def test_a_later_candidate_answers_when_the_first_is_missing(self) -> None:
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="tvly-late\n", stderr=""
+        )
         with patch(
             "grokipedia.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "chezmoi"),
-        ):
-            with pytest.raises(grokipedia.ApiKeyError, match="keyring"):
-                grokipedia.get_api_key()
+            side_effect=[FileNotFoundError, mock_result],
+        ) as run:
+            assert grokipedia.get_api_key() == "tvly-late"
+        assert run.call_args.args[0][0] == grokipedia.FNOX_CANDIDATES[1]
 
-    def test_keyring_timeout_reports_actionable_error(self) -> None:
+    def test_fnox_failure_names_the_key_and_the_procedure(self) -> None:
         with patch(
             "grokipedia.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="chezmoi", timeout=10),
+            side_effect=subprocess.CalledProcessError(1, "fnox"),
+        ) as run:
+            with pytest.raises(grokipedia.ApiKeyError) as info:
+                grokipedia.get_api_key()
+        message = str(info.value)
+        assert "TAVILY_API_KEY" in message
+        assert "docs/operations/secrets.md" in message
+        assert "keyring" not in message
+        assert run.call_count == 1
+
+    def test_fnox_timeout_reports_actionable_error(self) -> None:
+        with patch(
+            "grokipedia.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="fnox", timeout=10),
         ):
             with pytest.raises(grokipedia.ApiKeyError, match="timed out"):
                 grokipedia.get_api_key()
 
     def test_empty_key_raises_api_key_error(self) -> None:
-        """Keyring returning empty/whitespace should be rejected."""
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="   \n", stderr=""
         )
         with patch("grokipedia.subprocess.run", return_value=mock_result):
-            with pytest.raises(grokipedia.ApiKeyError, match="empty"):
-                grokipedia.get_api_key()
-
-    def test_valid_key_returned(self) -> None:
-        """Valid key should be returned stripped."""
-        mock_result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="  tvly-abc123  \n", stderr=""
-        )
-        with patch("grokipedia.subprocess.run", return_value=mock_result):
-            assert grokipedia.get_api_key() == "tvly-abc123"
-
-    # --- Gap: error message actionability ---
-
-    def test_unit_file_not_found_error_includes_install_url(self) -> None:
-        """Error for missing chezmoi must include the install URL."""
-        with patch("grokipedia.subprocess.run", side_effect=FileNotFoundError):
-            with pytest.raises(grokipedia.ApiKeyError, match="chezmoi.io/install"):
-                grokipedia.get_api_key()
-
-    def test_unit_subprocess_error_includes_set_command(self) -> None:
-        """Error for keyring failure must include the set command."""
-        with patch(
-            "grokipedia.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "chezmoi"),
-        ):
             with pytest.raises(
-                grokipedia.ApiKeyError, match="chezmoi secret keyring set"
+                grokipedia.ApiKeyError, match="TAVILY_API_KEY from fnox is empty"
             ):
                 grokipedia.get_api_key()
 
-    def test_unit_empty_key_error_includes_set_command(self) -> None:
-        """Error for empty key must include actionable set command."""
-        mock_result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="  \n", stderr=""
-        )
-        with patch("grokipedia.subprocess.run", return_value=mock_result):
-            with pytest.raises(
-                grokipedia.ApiKeyError, match="chezmoi secret keyring set"
-            ):
-                grokipedia.get_api_key()
-
-    # --- Gap: exception chaining ---
-
-    def test_unit_file_not_found_chains_original_exception(self) -> None:
-        """ApiKeyError must chain the original FileNotFoundError via __cause__."""
-        with patch("grokipedia.subprocess.run", side_effect=FileNotFoundError("nope")):
-            with pytest.raises(grokipedia.ApiKeyError) as exc_info:
-                grokipedia.get_api_key()
-            assert isinstance(exc_info.value.__cause__, FileNotFoundError)
-
-    def test_unit_subprocess_error_chains_original_exception(self) -> None:
-        """ApiKeyError must chain the original CalledProcessError via __cause__."""
+    def test_failure_chains_original_exception(self) -> None:
         with patch(
             "grokipedia.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "chezmoi"),
+            side_effect=subprocess.CalledProcessError(1, "fnox"),
         ):
             with pytest.raises(grokipedia.ApiKeyError) as exc_info:
                 grokipedia.get_api_key()
             assert isinstance(exc_info.value.__cause__, subprocess.CalledProcessError)
+
+    def test_error_text_never_carries_the_key(self) -> None:
+        error = subprocess.CalledProcessError(
+            1, ["fnox"], output="tvly-secret", stderr="tvly-secret"
+        )
+        with patch("grokipedia.subprocess.run", side_effect=error):
+            with pytest.raises(grokipedia.ApiKeyError) as info:
+                grokipedia.get_api_key()
+        assert "tvly-secret" not in str(info.value)
 
 
 # ===================================================================
@@ -750,8 +764,8 @@ class TestMainFunction:
         with patch("grokipedia.get_api_key", return_value="bad-key"):
             assert grokipedia.main(["test"]) == 1
         assert failed(capsys)["errors"] == [
-            "Tavily API returned HTTP 401; verify the API key: "
-            "chezmoi secret keyring get --service=tavily --user=api_key"
+            "Tavily API returned HTTP 401; verify TAVILY_API_KEY as "
+            "docs/operations/secrets.md in pascalandy/dotfiles describes"
         ]
 
     @respx.mock
