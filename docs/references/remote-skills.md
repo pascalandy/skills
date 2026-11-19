@@ -121,6 +121,7 @@ A mode's routes run through that mode's SKILL.md.
 - `tavily`: Use only when explicitly invoked as `tavily`.
 - `transcript`: Use when the user invokes `transcript`, asks to transcribe YouTube, Zoom, or local audio, or asks to refresh the YouTube cookies or login used by Transcript.
 - `unslop`: Use when communicating directly with the user or writing and editing documents.
+- `web-research`: Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase.
 - `writing-for-agents`: Use when creating, editing, or reviewing a skill, AGENTS.md, CLAUDE.md, or another document agents read.
 - `writing-great-skills`: Use when creating, modifying, evaluating a skill.
 
