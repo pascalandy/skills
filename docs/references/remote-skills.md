@@ -118,7 +118,7 @@ A mode's routes run through that mode's SKILL.md.
 - `pele`: Use when a request names pele or pele.run, or a project depends on the `pele` npm package: writing, rendering, or theming its diagrams, or calling its API.
 - `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `sharpen`: Use only when explicitly invoked as `sharpen`.
-- `tavily`: Use only when explicitly invoked as `tavily`.
+- `tavily`: Use when a request names Tavily, or when `web-research` reaches level 2.
 - `transcript`: Use when the user invokes `transcript`, asks to transcribe YouTube, Zoom, or local audio, or asks to refresh the YouTube cookies or login used by Transcript.
 - `unslop`: Use when communicating directly with the user or writing and editing documents.
 - `web-research`: Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase.

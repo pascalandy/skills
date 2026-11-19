@@ -1,6 +1,6 @@
 ---
 name: "tavily"
-description: "Use only when explicitly invoked as `tavily`."
+description: "Use when a request names Tavily, or when `web-research` reaches level 2."
 kind: "general"
 configuration-is-needed: true
 ---
