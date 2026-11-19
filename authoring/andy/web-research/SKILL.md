@@ -28,7 +28,7 @@ Web research progress:
 
 Done when one level is chosen.
 
-**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime` and call `orchestrator_capabilities` with `search` set to the level's model, since the short list can omit it. Note the provider instance that lists it. Done when that route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. On the first pass, call `orchestrator_capabilities`, with `search` set to the level's model when the short list omits it, and note the provider instance that lists it. Reuse that answer on later climbs; call again only after a delegation error. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -50,7 +50,7 @@ Done when the delegate is running with one page or one topic.
 
 Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
 
-**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or level 4 fails and you report its error.
+**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2; at level 4, report its error. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
 
 ## The ladder
 
@@ -66,11 +66,11 @@ Done when each check passes or you name the one that failed. A failed check coun
 
 ## Named tool
 
-Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails or falls short, report the exact error, or the shortfall when no error came back, name the next level, and stop. Climb only when the user says so.
+Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails or falls short, report the exact error, or the shortfall when no error came back, name the next level when one exists, and stop. Climb only when the user says so.
 
 ## Run the levels yourself
 
-Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 1 level upward, each with its level's tool. Check the tool you actually used and each fact's source URL. A level whose tool is unavailable counts as a failed attempt.
+Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 1 level upward, each with its level's tool. Check the tool you actually used and each fact's source URL; a level whose tool is unavailable counts as a failed attempt. Then apply Step 5, including its named-tool stop.
 
 ## Known limits
 
