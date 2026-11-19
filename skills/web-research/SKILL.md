@@ -70,7 +70,7 @@ Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's lev
 
 ## Run the levels yourself
 
-Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself in order, each with its level's tool, and apply the checks of Step 4 to your own results.
+Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 2 level upward, each with its level's tool, and apply the checks of Step 4 to your own results.
 
 ## Known limits
 
