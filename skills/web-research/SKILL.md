@@ -10,16 +10,14 @@ Delegate each web task through a 4-level ladder, starting at the level the task 
 
 ```
 Web research progress:
-- [ ] Step 1: Routes confirmed
-- [ ] Step 2: Starting level chosen
+- [ ] Step 1: Starting level chosen
+- [ ] Step 2: Route confirmed
 - [ ] Step 3: Delegate briefed
 - [ ] Step 4: Result checked
 - [ ] Step 5: Climbed or done
 ```
 
-**Step 1: Routes confirmed.** In T3 Code, call `orchestrator_capabilities` once and confirm the Codex models and the Pi Terra route. Done when you know which routes exist. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
-
-**Step 2: Starting level chosen.** When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth:
+**Step 1: Starting level chosen.** When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth:
 
 | Task | Start at |
 |---|---|
@@ -29,6 +27,8 @@ Web research progress:
 | Semantic discovery ("find things like X") or deep research | Level 4 |
 
 Done when one level is chosen.
+
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime` and call `orchestrator_capabilities` with `search` set to the level's model, since the short list can omit it. Note the provider instance that lists it. Done when that route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -48,9 +48,9 @@ Done when the delegate is running with one page or one topic.
 2. Read the child thread with `t3_thread_read` and `view: "activity"`. Confirm the real tool calls used the level's tool; the summary alone is not proof
 3. Check every fact carries a source URL
 
-Done when each check passes or you name the one that failed.
+Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
 
-**Step 5: Climbed or done.** When the result is blocked, empty, without sources, or too thin for the question, go up one level and return to Step 3. Done when the facts answer the question, or level 4 fails and you report its error.
+**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or level 4 fails and you report its error.
 
 ## The ladder
 
@@ -59,20 +59,19 @@ Done when each check passes or you name the one that failed.
 3. Codex Terra high (`gpt-6.1-terra`) with `$firecrawl`
 4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`). Take the model ID for "Pi Terra" from the Pi delegation list in `$oem` "## Tools and utilities"; the Mini uses different IDs
 
-- **Codex delegation**: `delegate_task` with `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
+- **Codex delegation**: `delegate_task` with the Codex provider instance from Step 2, the model, and `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
 - **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra model, and `target.options.thinking: "high"`
-- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high at the same level, with that level's tool
+- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high (`target.options.effort: "high"`) at the same level, with that level's tool
 - **Level 4 has no fallback**: report the error
 
 ## Named tool
 
-Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails, report the exact error and name the next level; do not switch tools silently.
+Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails or falls short, report the exact error, or the shortfall when no error came back, name the next level, and stop. Climb only when the user says so.
 
 ## Run the levels yourself
 
-Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 2 level upward, each with its level's tool, and apply the checks of Step 4 to your own results.
+Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 1 level upward, each with its level's tool. Check the tool you actually used and each fact's source URL. A level whose tool is unavailable counts as a failed attempt.
 
 ## Known limits
 
 - Luna's native web tool cannot read npm hosts: `www.npmjs.com` returns 403 and `registry.npmjs.org` refuses it. Haiku reads `registry.npmjs.org`
-- Firecrawl was the most precise page reader in tests
