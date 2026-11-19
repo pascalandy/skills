@@ -2,6 +2,7 @@
 name: "web-research"
 description: "Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase."
 kind: "general"
+configuration-is-needed: true
 ---
 
 Delegate each web task through a 4-level ladder, starting at the level the task needs and climbing only when a result falls short.
@@ -28,7 +29,7 @@ Web research progress:
 
 Done when one level is chosen.
 
-**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -50,7 +51,7 @@ Done when the delegate is running with one page or one topic.
 
 Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
 
-**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2; at level 4, report its error. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
+**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. At level 1, run the Haiku attempt from [The ladder](#the-ladder) through Steps 2 to 4 before level 2. At level 4, report its error, or the shortfall when no error came back. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
 
 ## The ladder
 
@@ -60,13 +61,14 @@ Done when each check passes or you name the one that failed. A failed check coun
 4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`). Take the model ID for "Pi Terra" from the Pi delegation list in `$oem` "## Tools and utilities"; the Mini uses different IDs
 
 - **Codex delegation**: `delegate_task` with the Codex provider instance from Step 2, the model, and `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
+- **Haiku delegation**: `delegate_task` with the Claude provider instance from Step 2, `claude-haiku-5-5`, and `target.options.effort: "high"`
 - **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra model, and `target.options.thinking: "high"`
-- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high (`target.options.effort: "high"`) at the same level, with that level's tool
+- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high at the same level, with that level's tool
 - **Level 4 has no fallback**: report the error
 
 ## Named tool
 
-Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails or falls short, report the exact error, or the shortfall when no error came back, name the next level when one exists, and stop. Climb only when the user says so.
+Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's level directly. When it fails or falls short, report the exact error, or the shortfall when no error came back, name the next level when one exists, and stop. Climb only when the user says so. A Haiku swap at the same level keeps the named tool and is not a climb.
 
 ## Run the levels yourself
 
@@ -74,4 +76,4 @@ Do not use web tools yourself while you can delegate. When you cannot delegate, 
 
 ## Known limits
 
-- Luna's native web tool cannot read npm hosts: `www.npmjs.com` returns 403 and `registry.npmjs.org` refuses it. Haiku reads `registry.npmjs.org`
+- Luna's native web tool cannot read npm hosts: `www.npmjs.com` returns 403 and `registry.npmjs.org` refuses it. For a fact on an npm host, start level 1 with Haiku, which reads `registry.npmjs.org`
