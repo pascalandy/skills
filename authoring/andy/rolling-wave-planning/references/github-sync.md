@@ -5,7 +5,7 @@ Read this file before you write the plan to GitHub or read issue states from Git
 ## Prerequisites
 
 - `gh` 2.94.0 or later. Check with `gh --version`. If the version is earlier, stop and ask the PM to upgrade ([install](https://github.com/cli/cli#installation))
-- The labels of the `label-for-issues` skill. Load that skill and create its labels as it says. This file uses its `4-epic`, `2-type:*` and `1-ready-for-*` labels
+- The `label-for-issues` skill. This file uses its `4-epic`, `2-type:*` and `1-ready-for-*` labels. Before the first issue write, load that skill and do its Step 4 for these labels only
 
 ## Ownership
 
@@ -24,7 +24,7 @@ Read this file before you write the plan to GitHub or read issue states from Git
 | Task (`active` wave only) | Sub-issue of its epic, `[E03-T02] <name>`, with the label of its `Kind` |
 | `Kind` of a task | `feature` gives `2-type:feature`. `fix` gives `2-type:bug`. `spike` and `chore` give `2-type:task` |
 | QA task | Sub-issue of its epic, `[E03-QA1] QA: <epic name>`, labels `2-type:task` and `qa` |
-| Task or QA task that passed the plan checks | Label `1-ready-for-agent`, or `1-ready-for-human` when the brief has `Executor: human` |
+| Task or QA task that obeys the Ready rule of `label-for-issues` | Label `1-ready-for-agent`, or `1-ready-for-human` when the brief has `Executor: human`. The plan checks are the review that the Ready rule records. An open blocker does not prevent the label |
 | QA verdict | Label `qa:accepted`, `qa:accepted-with-findings` or `qa:rejected` on the QA issue |
 | Finding | Sub-issue of the epic, `Finding (E03-QA1): <title>`, label `qa-finding` |
 | Subtask | Checklist in the body of the task issue |
@@ -34,14 +34,16 @@ Read this file before you write the plan to GitHub or read issue states from Git
 ## Rules
 
 1. Each epic, task, QA, finding and discovery issue has one `wave:` label
-2. The body of an epic issue is the epic entry from the wave file, word for word, without its briefs. The body of a task issue or QA issue is the brief. Each body ends with a link to the wave file
+2. The body of an epic issue is the epic entry, word for word, without its briefs. For a continued epic, use the entry in the wave file where the epic started. The body of a task issue or QA issue is the brief. Each body ends with a link to the wave file
 3. Write the issue number into the wave file: `#### E03-T02: <title> → #57`
 4. Before you create an issue, find its exact title prefix. If the issue exists, update it:
    `gh issue list --state all --limit 500 --json number,title --jq '.[] | select(.title | startswith("[E03-T02] "))'`
 5. Create the issues in batch order, so that each blocker exists before the issues that depend on it
 6. A closed issue keeps the label of the wave in which it closed. A carried epic and its open tasks get the label of the receiving wave
 7. Close the issue of a dropped task as not planned, with the reason in a comment
-8. After each sync, read each issue that you wrote: title, body, labels, parent and `blocked by`. Correct each difference from the wave file, then read the issue again
+8. After each sync, read each issue that the sync wrote or closed
+9. Compare the title, body, labels, parent, `blocked by`, state and close reason with the changes that the sync intended. Keep the execution state that GitHub owns
+10. Correct each difference. Then do rules 8 and 9 again for the corrected issues
 
 ## Commands
 

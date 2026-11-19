@@ -42,7 +42,7 @@ The planner plans the later waves again at each wave review.
 |---|---|
 | Project | The full initiative that the business case defines |
 | Wave | One goal and one result that a person can see or measure. 2 to 5 exit criteria. Target 10 to 30 tasks. Split a wave that has more than 40 tasks |
-| Epic | A block of work in a wave that gives one outcome. Its name is that outcome in plain words. Its `Traces` line links it to sections of the business case. 3 to 8 tasks |
+| Epic | A block of work in a wave that gives one outcome. Its name is that outcome in plain words. Its `Traces` line links it to sections of the business case. Its `Problem (CMO)` line gives the current mode of operation, and its `Outcome (FMO)` line gives the future mode of operation. 3 to 8 tasks |
 | Task | One agent session and one PR. Split a task that exceeds a task limit, or that defines and also uses a new contract |
 | Subtask | An ordered step of commit size in the PR of its task. Optional. Never a separate PR |
 | QA task | A test of the work of an epic by the QA agent. At most 8 QA scenarios |
@@ -166,7 +166,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 - Each task is in the task limits
 - Each acceptance item is a command or a step with a result that a person can see
 - Each brief obeys the brief rules in [Wave file](references/wave-file.md)
-- For each epic, if each task is done, the `Outcome (FMO)` of the epic is true
+- For each epic of the active wave, if each task of the epic in all waves is done, the `Outcome (FMO)` of the epic is true
 - Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
 - Each QA task with `Blocking: yes` gives its reason
 - The exit criteria of at least one wave cover each success criterion
@@ -188,8 +188,20 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 5. Set the wave to `done`, including when a criterion is not met
    - Each criterion that is not met becomes a carried task or a discovery
 6. Write `## Learnings` in the closed wave file
-7. Put each discovery in one bucket. A discovery is work that the plan did not include
+7. Compare each carried task and each discovery with the default branch, and give it one verdict. A discovery is work that the plan did not include
    - The discoveries come from the open `discovery`, `needs-replan` and `qa-finding` issues, from `## Discoveries` and from Learnings
+   - Write each verdict and its evidence in the closed wave file. Do not close an issue in this step
+
+   | Verdict | Evidence | Action at the sync |
+   |---|---|---|
+   | Holds | The current files still need the work | None |
+   | Fixed | A merged PR or a commit on the default branch does the work | Set a task to `done`. Close a `discovery` or `needs-replan` issue as completed, and cite the change |
+   | Gone | The problem does not occur, and no change fixed it | Drop a task. Close a `discovery` or `needs-replan` issue as not planned, and cite the proof |
+   | Stale | The current files still need the work, but the brief or the issue quotes code that changed | None. Write the brief of the item from the current files |
+
+   - For a `qa-finding` issue with the verdict Fixed or Gone, comment the evidence at the sync. Only the QA agent closes it (finding rule 3)
+
+8. Put each discovery that has the verdict Holds or Stale in one bucket
 
    | Bucket | Condition | Action |
    |---|---|---|
@@ -197,15 +209,6 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
    | (b) | The discovery is a separate block that must come first, such as a foundation or an architecture correction | Insert a wave, such as `W01B`. Use this bucket only if (a) weakens the goal of the next wave |
    | (c) | The discovery belongs to a later wave | Add it to the scope of a later wave, or add a wave at the end |
    | (d) | The discovery makes a later wave invalid | Drop that wave, or merge it into a different wave |
-
-8. Compare each carried task and each discovery with the default branch, and give it one verdict
-
-   | Verdict | Evidence | Action |
-   |---|---|---|
-   | Holds | The current files still need the work | Keep the item |
-   | Fixed | A merged PR or a commit on the default branch does the work | Set the task to `done`, or close the issue as completed. Cite the change |
-   | Gone | The problem does not occur, and no change fixed it | Drop the task, or close the issue as not planned. Cite the proof |
-   | Stale | The current files still need the work, but the brief or the issue quotes code that changed | Keep the item. Write its brief from the current files |
 
 9. Set the next wave in table order to `active`, and the wave after it to `planned`
 10. Write the new active wave in full: briefs, QA tasks, execution order and carried tasks
@@ -216,8 +219,8 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 14. Log one decision for each change to the plan structure
 15. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
 16. Update the wave table and `Next IDs` in `01-project.md`
-17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met and the changes to the plan structure. Continue only when the PM approves
-18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule
+17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
+18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
 19. Commit, for example `plan: review W01, insert W01B, amend W02`
 
 ## Procedure C: triage during a wave
@@ -242,8 +245,9 @@ For each open `discovery` or `qa-finding` issue that has no task, the planner do
 3. Give the task its QA:
    - For a `discovery` issue, add the task to the `Verifies` line of an open QA task of that epic. If that epic has no open QA task, create the next QA task
    - For a `qa-finding` issue, obey rules 4 and 5 of [Findings and verdicts](#findings-and-verdicts)
-4. Sync the plan to GitHub
-5. Commit `plan: triage`
+4. Do the [plan checks](#plan-checks) on the new task
+5. Sync the plan to GitHub
+6. Commit `plan: triage`
 
 ## Quality assurance
 
@@ -255,7 +259,7 @@ QA is not UAT: see [Actors](#actors).
 ### Which QA tasks to plan
 
 - **For each epic (default):** a final QA task tests all the tasks of the epic against the `Traces` of the epic. The final QA task starts when the last task of the epic is finished
-  - At least one QA scenario of the final QA task checks a result that no acceptance item of one task checks
+  - At least one QA scenario of the final QA task goes through more than one task. The acceptance items of one task alone do not cover that scenario
 - **Intermediate:** when an epic has more than 5 tasks or more than 2 batches, add a QA task after its first slice that a user can see
 - **For one task (exception):** only for high risk, add a QA task with `Verifies: E04-T03` and the title `QA: <task title>`
   - High risk is a shared contract, security, a data migration, money or a change that cannot be reversed
