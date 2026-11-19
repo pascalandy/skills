@@ -85,7 +85,8 @@
     }
   ],
   "handoffs": {
-    "prototype": "poteto-mode"
+    "prototype": "poteto-mode",
+    "research": "web-research"
   },
   "files": [
     {

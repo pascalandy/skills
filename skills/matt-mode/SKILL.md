@@ -36,7 +36,7 @@ Resolve `grilling`, `writing-for-agents`, and `web-research` from the active cat
 
 - `grilling` supplies the interview used by `grill-me`, `grill-with-docs`, and Wayfinder
 - `writing-for-agents` supplies the writing discipline when producing a spec, tickets, a map, or another artifact an agent will consume
-- `web-research` gathers facts from the web, including when the user says `matt-mode ; research`
+- `web-research` gathers facts from the web, including when the user says `matt-mode ; research`; for the codebase or local documents, inspect them directly
 
 If a required dependency is unavailable, name it and the affected step. Continue independent work without claiming the missing procedure ran.
 

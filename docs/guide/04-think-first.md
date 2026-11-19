@@ -44,6 +44,8 @@ web-research how bakeries in Montreal price custom cakes
 
 The agent searches the web and gives the source of each fact, such as a business's own website or an official page. Open at least one source to check the answer instead of trusting it.
 
+**Prerequisite:** T3 Code with the Codex and Pi models, and the Tavily, Firecrawl, and Exa keys. Without them, the agent reports the level it could not reach.
+
 **Pitfall:** `feel-me` and `grilling` do different jobs. `feel-me` leads to execution after you say `go`. `grilling` tests an idea without carrying it out.
 
 Next: [Write and edit with the agent](./05-write.md).
