@@ -29,7 +29,7 @@ Web research progress:
 
 Done when one level is chosen.
 
-**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it and can run a child task. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -51,11 +51,11 @@ Done when the delegate is running with one page or one topic.
 
 Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
 
-**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. At level 1, run the Haiku attempt from [The ladder](#the-ladder) through Steps 2 to 4 before level 2. At level 4, report its error, or the shortfall when no error came back. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
+**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. At level 1, when Luna made the failed attempt, run the Haiku attempt from [The ladder](#the-ladder) once, through Steps 2 to 4, before level 2. At level 4, report its error, or the shortfall when no error came back. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
 
 ## The ladder
 
-1. Codex Luna high (`gpt-6-luna`) with its native web tools. When Luna is blocked, returns no result, or returns facts without sources, try Haiku 5.5 high with its native web tools (WebSearch, WebFetch) before level 2
+1. Codex Luna high (`gpt-6-luna`) with its native web tools. When Luna's attempt fails (Step 5), try Haiku 5.5 high with its native web tools (WebSearch, WebFetch) before level 2
 2. Codex Terra high (`gpt-6.1-terra`) with `$tavily`
 3. Codex Terra high (`gpt-6.1-terra`) with `$firecrawl`
 4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`). Take the model ID for "Pi Terra" from the Pi delegation list in `$oem` "## Tools and utilities"; the Mini uses different IDs
@@ -64,7 +64,7 @@ Done when each check passes or you name the one that failed. A failed check coun
 - **Haiku delegation**: `delegate_task` with the Claude provider instance from Step 2, `claude-haiku-5-5`, and `target.options.effort: "high"`
 - **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra model, and `target.options.thinking: "high"`
 - **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high at the same level, with that level's tool
-- **Level 4 has no fallback**: report the error
+- **Level 4 has no fallback** (see Step 5)
 
 ## Named tool
 
@@ -72,7 +72,7 @@ Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's lev
 
 ## Run the levels yourself
 
-Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the current level yourself with its level's tool. Check the tool you actually used and each fact's source URL; a level whose tool is unavailable counts as a failed attempt. Then apply Step 5, including its named-tool stop; when it climbs, run the next level the same way.
+Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the current level yourself with its level's tool. Check the tool you actually used and each fact's source URL; a level whose tool is unavailable counts as a failed attempt. Then apply Step 5, including its named-tool stop, but skip the level 1 Haiku attempt; when it climbs, run the next level the same way.
 
 ## Known limits
 
