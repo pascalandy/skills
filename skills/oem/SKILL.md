@@ -77,10 +77,6 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Sign off through the project's recipe, such as `just signoff`, which runs the checks before it calls `gh signoff`. A bare `gh signoff` posts a green status without running anything
 - Find the latest screenshot by running: `ls -lt ~/Documents/screenshots | head -2` (on my fleet, see mbp)
 
-## Web access
-
-For each web task, such as a search, a page read, or a content extraction, load `$web-research` and follow its ladder.
-
 ## Definitions
 
 - AFK: away from keyboard
