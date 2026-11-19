@@ -22,14 +22,16 @@ One sentence.
 
 ## Epics
 
-### E04: <name> → #52
-Traces: [BC §4](../00-business-case.md#4-onboarding), SC2
-One paragraph: what it covers and why it is in this wave.
+### E04: <outcome in plain words> → #52
+- Traces: [BC §4](../00-business-case.md#4-onboarding), SC2
+- Problem (CMO): what is wrong or absent today, with its cost.
+- Outcome (FMO): what is true when the epic is closed.
 
 #### E04-T01: <imperative title> → #57
 - Kind: feature | spike | chore | fix · Executor: agent | human · State: todo
-- Depends on: E03-T02 (or none) · Batch: 2
-- Context: 2–4 sentences. What exists, what this adds, why. Readable without the business case.
+- Depends on: E03-T02, because it defines the `/session` contract (or none) · Batch: 2
+- Today: the current behavior or state, with evidence. Readable without the business case.
+- After: what is true when the task is done.
 - Traces: [BC §4.2](../00-business-case.md#42-login), D005
 - Touches: `src/auth/**`, `tests/auth/**` (new: `src/auth/login.ts`)
 - Contract: `POST /login {email,password} → 200 {token} | 401` (or none)
@@ -74,6 +76,7 @@ One paragraph: what it covers and why it is in this wave.
 - Each acceptance item and each QA scenario is a command with an expected result, or exact steps with a result that a person can see. Never write "works correctly"
 - Two tasks in the same batch must not have the same path in `Touches`. If they do, add a dependency between them
 - A QA task has no `Touches`
+- Each `Depends on` gives its reason: an acceptance item or the current code needs the other task. Possible later work is not a reason
 - A batch is a view of the dependency graph, not a gate. A task is ready when each of its blockers is closed
 - The QA tasks are on their own `QA` line and never delay a batch
 - A task that defines a shared contract is in an earlier batch than the tasks that use the contract

@@ -33,7 +33,8 @@ The planner plans the later waves again at each wave review.
 - A brief is the full definition of a task in the wave file. The brief and the agent file (`CLAUDE.md` or `AGENTS.md`) give the implementer all the content of the task. The implementer does not open `00-business-case.md`
 - The plan says what to build and how the QA agent tests it. The plan does not say how to implement a task: see [Actors](#actors)
 - Do not write the word "milestone" in the plan. Do not use GitHub Milestones or GitHub Projects
-- Write the plan prose in the PM's language. Keep IDs, file names, labels and commands in English
+- Write each epic entry and each brief in English with the `asd-ste100` skill, because GitHub issues get this text. Write the other plan prose in the PM's language
+- Keep IDs, file names, labels and commands in English
 
 ## Levels
 
@@ -41,7 +42,7 @@ The planner plans the later waves again at each wave review.
 |---|---|
 | Project | The full initiative that the business case defines |
 | Wave | One goal and one result that a person can see or measure. 2 to 5 exit criteria. Target 10 to 30 tasks. Split a wave that has more than 40 tasks |
-| Epic | A coherent block of work in a wave. Its `Traces` line links it to sections of the business case. 3 to 8 tasks |
+| Epic | A block of work in a wave that gives one outcome. Its name is that outcome in plain words. Its `Traces` line links it to sections of the business case. 3 to 8 tasks |
 | Task | One agent session and one PR. Split a task that exceeds a task limit, or that defines and also uses a new contract |
 | Subtask | An ordered step of commit size in the PR of its task. Optional. Never a separate PR |
 | QA task | A test of the work of an epic by the QA agent. At most 8 QA scenarios |
@@ -56,7 +57,7 @@ The status of a wave sets its detail level:
 | Status | Detail |
 |---|---|
 | `proposed` | Goal, exit criteria and 3 to 6 scope bullets. No epics |
-| `planned` | Epics, each with `Traces` and one paragraph. No tasks |
+| `planned` | Epics, each with `Traces`, `Problem (CMO)` and `Outcome (FMO)`. No tasks |
 | `active` | Epics, full task briefs, QA tasks and execution order |
 | `done` | Closed at the wave review, with Learnings |
 | `dropped` | Kept, with a reason in one line and a decision ID |
@@ -165,6 +166,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 - Each task is in the task limits
 - Each acceptance item is a command or a step with a result that a person can see
 - Each brief obeys the brief rules in [Wave file](references/wave-file.md)
+- For each epic, if each task is done, the `Outcome (FMO)` of the epic is true
 - Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
 - Each QA task with `Blocking: yes` gives its reason
 - The exit criteria of at least one wave cover each success criterion
@@ -196,18 +198,27 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
    | (c) | The discovery belongs to a later wave | Add it to the scope of a later wave, or add a wave at the end |
    | (d) | The discovery makes a later wave invalid | Drop that wave, or merge it into a different wave |
 
-8. Set the next wave in table order to `active`, and the wave after it to `planned`
-9. Write the new active wave in full: briefs, QA tasks, execution order and carried tasks
-10. Do the [plan checks](#plan-checks)
-11. Write the epics of the new planned wave
+8. Compare each carried task and each discovery with the default branch, and give it one verdict
+
+   | Verdict | Evidence | Action |
+   |---|---|---|
+   | Holds | The current files still need the work | Keep the item |
+   | Fixed | A merged PR or a commit on the default branch does the work | Set the task to `done`, or close the issue as completed. Cite the change |
+   | Gone | The problem does not occur, and no change fixed it | Drop the task, or close the issue as not planned. Cite the proof |
+   | Stale | The current files still need the work, but the brief or the issue quotes code that changed | Keep the item. Write its brief from the current files |
+
+9. Set the next wave in table order to `active`, and the wave after it to `planned`
+10. Write the new active wave in full: briefs, QA tasks, execution order and carried tasks
+11. Do the [plan checks](#plan-checks)
+12. Write the epics of the new planned wave
     - Adjust the `proposed` waves in outline only
-12. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
-13. Log one decision for each change to the plan structure
-14. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
-15. Update the wave table and `Next IDs` in `01-project.md`
-16. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met and the changes to the plan structure. Continue only when the PM approves
-17. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule
-18. Commit, for example `plan: review W01, insert W01B, amend W02`
+13. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
+14. Log one decision for each change to the plan structure
+15. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
+16. Update the wave table and `Next IDs` in `01-project.md`
+17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met and the changes to the plan structure. Continue only when the PM approves
+18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule
+19. Commit, for example `plan: review W01, insert W01B, amend W02`
 
 ## Procedure C: triage during a wave
 
@@ -244,6 +255,7 @@ QA is not UAT: see [Actors](#actors).
 ### Which QA tasks to plan
 
 - **For each epic (default):** a final QA task tests all the tasks of the epic against the `Traces` of the epic. The final QA task starts when the last task of the epic is finished
+  - At least one QA scenario of the final QA task checks a result that no acceptance item of one task checks
 - **Intermediate:** when an epic has more than 5 tasks or more than 2 batches, add a QA task after its first slice that a user can see
 - **For one task (exception):** only for high risk, add a QA task with `Verifies: E04-T03` and the title `QA: <task title>`
   - High risk is a shared contract, security, a data migration, money or a change that cannot be reversed
