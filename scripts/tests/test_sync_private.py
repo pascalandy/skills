@@ -285,6 +285,15 @@ def test_a_network_failure_exits_75_and_a_missing_repository_exits_1(
             "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun",
         ),
         (
+            "fatal: could not read Username for 'https://github.com': Device not configured\nSECRET remote URL\n",
+            1,
+            (
+                "no git credential helper gave GitHub an HTTPS login on this machine; a "
+                "token in the macOS login keychain cannot be read over SSH, so check "
+                "git config --get-all credential.https://github.com.helper, then rerun"
+            ),
+        ),
+        (
             "ssh: connect to host github.com port 22: Connection timed out\nSECRET remote URL\n",
             75,
             "",
