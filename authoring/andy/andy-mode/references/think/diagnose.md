@@ -12,7 +12,7 @@ Use this method when observations admit several causal explanations and the next
 6. Find the cheapest safe observation or test whose possible outcomes best separate the leading hypotheses
 7. State which result would weaken the favored hypothesis
 
-Do not turn diagnosis into execution. Route external fact-finding to research and software reproduction or repair to the `poteto-mode` Bug fix playbook when those actions become the next step.
+Do not turn diagnosis into execution. Route web fact-finding to `web-research` and software reproduction or repair to the `poteto-mode` Bug fix playbook when those actions become the next step.
 
 ## Completion criterion
 

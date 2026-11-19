@@ -32,11 +32,11 @@ When upstream asks to call a Skill by one of these names, read that procedure he
 
 ## Shared skills
 
-Resolve `research`, `grilling`, and `writing-for-agents` from the active catalog or the sibling skill directories in a source or compiled installation. Read each skill's `SKILL.md` before using it. Their canonical upstream bodies live in those packages, not here.
+Resolve `grilling`, `writing-for-agents`, and `web-research` from the active catalog or the sibling skill directories in a source or compiled installation. Read each skill's `SKILL.md` before using it. Imported bodies, such as `grilling`'s, live in those packages, not here.
 
-- `research` gathers primary-source evidence, including when the user says `matt-mode ; research`
 - `grilling` supplies the interview used by `grill-me`, `grill-with-docs`, and Wayfinder
 - `writing-for-agents` supplies the writing discipline when producing a spec, tickets, a map, or another artifact an agent will consume
+- `web-research` gathers facts from the web, including when the user says `matt-mode ; research`; for the codebase or local documents, inspect them directly
 
 If a required dependency is unavailable, name it and the affected step. Continue independent work without claiming the missing procedure ran.
 

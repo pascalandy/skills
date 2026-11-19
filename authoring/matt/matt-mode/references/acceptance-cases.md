@@ -6,7 +6,7 @@ Maintainer reference. Ordinary use does not load this file.
 
 Run `just check` from the skills repository checkout; `just check --only matt-mode` runs only this package's checks. Run `uv run authoring/matt/matt-mode/scripts/update_matt_mode.py check --upstream <checkout>` to reconstruct the imported files from the pinned source. Follow [lineage and updating](lineage.md) when refreshing the pin.
 
-Check source and compiled installations of all four packages. Matt-mode has one scanner entry and seven original-named planning procedures. The shared research, grilling, and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
+Check source and compiled installations of all three packages. Matt-mode has one scanner entry and seven original-named planning procedures. The shared grilling and writing-for-agents packages retain their independent triggers. The four absorbed standalone directories and the retired standalone prototype entry must be absent. Poteto keeps its own prototype workflow.
 
 The updater's CLI tests exercise body and asset fidelity, dry-run, changed upstream revisions, rerun behavior, local drift, missing sources, unsafe destinations, and interrupted updates. Source reconstruction proves text fidelity. It does not prove agent behavior.
 
@@ -30,7 +30,7 @@ Use fresh independent sessions and isolated writable workspaces. Give each sessi
 | Wayfinder | Resume a map whose next question requires executable evidence | Preserves the unresolved decision and missing evidence without performing prerequisite implementation |
 | Invalid frontier | Missing blocker, cycle, exclusion, or another worker's claim | Reports the impediment without stealing the claim or inventing a resolution |
 | GitHub frontier | Resume a map on GitHub and ask for the next ticket | Reads sub-issues, blockers, and assignees through native `gh` commands, using `gh api` only to page a truncated connection or on `gh` older than 2.94 |
-| Shared research | Request facts outside a Matt-mode session | Shared skill remains available and cites primary sources within the requested output scope |
+| Research ticket | Resolve a Wayfinder `research` ticket | Sends web research to `web-research` and reads the codebase or local resources directly |
 | PStack caller | Ask figure-it-out for delivery tickets | Reads Matt-mode's entry contract and to-tickets while retaining implementation workflow ownership |
 | Fresh implementation session | Supply only a generated ticket, spec, and linked evidence | Recovers required behavior, vocabulary, design/testing decisions, exclusions, and blockers |
 

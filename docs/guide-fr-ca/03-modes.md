@@ -48,7 +48,7 @@ L'agent répond `emails`.
 
 ## Appelle un skill seul
 
-`feel-me`, `brainstorm`, `grilling`, `research`, `unslop`, `concise` et `2nd-pass` fonctionnent sans mode. Nomme-les dans la demande.
+`feel-me`, `brainstorm`, `grilling`, `web-research`, `unslop`, `concise` et `2nd-pass` fonctionnent sans mode. Nomme-les dans la demande.
 
 **Piège :** énumérer les skills, comme "utilise sparring, puis storytelling, puis copywriting". Donne le but. Nomme une route seulement pour imposer un choix.
 
