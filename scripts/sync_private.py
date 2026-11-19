@@ -64,10 +64,19 @@ def last_line(result: subprocess.CompletedProcess[str]) -> str:
     return lines[-1] if lines else f"git exited {result.returncode}"
 
 
-# Also sent to fleet inspection before an older remote checkout is updated.
-# This expression works in both Python and the remote shell's grep -E.
+# Each refusal and its fix are also sent to fleet inspection before an older
+# remote checkout is updated. Each expression works in both Python and the
+# remote shell's grep -E.
 SSH_KEY_REFUSAL = r"permission denied *\([^)]*publickey[^)]*\)"
 SSH_KEY_FIX = "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun"
+# Git needed an HTTPS login that no credential helper gave, as when gh keeps
+# its token in the macOS login keychain, which an SSH session cannot read
+HTTPS_LOGIN_REFUSAL = r"could not read (username|password) for 'https?://"
+HTTPS_LOGIN_FIX = (
+    "no git credential helper gave GitHub an HTTPS login on this machine; a token "
+    "in the macOS login keychain cannot be read over SSH, so check "
+    "git config --get-all credential.https://github.com.helper, then rerun"
+)
 
 
 def failed(
@@ -77,8 +86,12 @@ def failed(
     git's own words stay out, since they can quote a token from the remote URL;
     `look` is the command that shows them on this machine."""
     hint = f"run {look} on this machine to see why"
-    if re.search(SSH_KEY_REFUSAL, result.stderr, re.IGNORECASE):
-        return ScriptError(f"{what}; {SSH_KEY_FIX}; {hint}")
+    for refusal, fix_it in (
+        (SSH_KEY_REFUSAL, SSH_KEY_FIX),
+        (HTTPS_LOGIN_REFUSAL, HTTPS_LOGIN_FIX),
+    ):
+        if re.search(refusal, result.stderr, re.IGNORECASE):
+            return ScriptError(f"{what}; {fix_it}; {hint}")
     if is_network_failure(result.stderr):
         return TemporaryError(f"{what}; {hint}")
     return ScriptError(f"{what}; {fix}; {hint}")
