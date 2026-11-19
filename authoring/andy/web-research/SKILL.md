@@ -28,7 +28,7 @@ Web research progress:
 
 Done when one level is chosen.
 
-**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. On the first pass, call `orchestrator_capabilities`, with `search` set to the level's model when the short list omits it, and note the provider instance that lists it. Reuse that answer on later climbs; call again only after a delegation error. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -70,7 +70,7 @@ Tavily is level 2, Firecrawl level 3, Exa level 4. Start at the named tool's lev
 
 ## Run the levels yourself
 
-Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the levels yourself from the Step 1 level upward, each with its level's tool. Check the tool you actually used and each fact's source URL; a level whose tool is unavailable counts as a failed attempt. Then apply Step 5, including its named-tool stop.
+Do not use web tools yourself while you can delegate. When you cannot delegate, because you are a delegated agent, in a headless run, or outside T3 Code, run the current level yourself with its level's tool. Check the tool you actually used and each fact's source URL; a level whose tool is unavailable counts as a failed attempt. Then apply Step 5, including its named-tool stop; when it climbs, run the next level the same way.
 
 ## Known limits
 
