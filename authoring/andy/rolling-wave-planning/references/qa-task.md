@@ -1,6 +1,7 @@
 # QA task
 
 Read this file when you are the QA agent and you do a QA task.
+If the PM starts you only to check `qa-recheck` findings again, do step 1, then step 13.
 
 1. Confirm that this session runs on the QA machine that `01-project.md` names. If it does not, stop and tell the PM
 2. Take a ready issue with the label `qa`: each of its blockers is closed and it has no assignee

@@ -126,7 +126,7 @@ plan/
 - To make the first plan from a business case, follow **Procedure A**
 - When each task of the active wave is finished, dropped or stopped by a `needs-replan` label, follow **Procedure B**. Do not wait for the QA tasks
 - When a `discovery`, `qa-finding` or `needs-replan` issue is open, follow **Procedure C**
-- To do a QA task, follow [QA task](references/qa-task.md)
+- To do a QA task, or to check again a finding that has the label `qa-recheck`, follow [QA task](references/qa-task.md)
 
 Before you write a plan file, read its template:
 
@@ -200,7 +200,8 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
    | Gone | The problem does not occur, and no change fixed it | Set a carried task to `dropped` | Close the issue as not planned, and cite the proof |
    | Stale | The current files still need the work, but the brief or the issue quotes code that changed | Write the brief of the item from the current files | None |
 
-   - Exception: do not close a `qa-finding` issue. Comment the evidence on it and add the label `qa-recheck`. The QA agent runs its reproduction and closes it (finding rule 3)
+   - Exception: do not close a `qa-finding` issue that has the verdict Fixed or Gone. At the sync, comment the evidence on it and add the label `qa-recheck`
+   - The QA agent runs the reproduction of each `qa-recheck` finding and closes it (finding rule 3). If the epic of the finding has no open QA task, ask the PM to start a QA agent session for the recheck
 
 8. Put each discovery that has the verdict Holds or Stale in one bucket
 
