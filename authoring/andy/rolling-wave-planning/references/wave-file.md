@@ -41,6 +41,7 @@ One sentence.
 - Verify: `make verify`
 - Out of scope: password reset, rate limiting (E04-T03)
 - Fixes finding: #71 (fix tasks only; #71 stays open until the QA agent closes it)
+- Ready review: planner, YYYY-MM-DD, plan checks pass
 - Steps (optional):
   - [ ] E04-T01-S1: …
 
@@ -55,6 +56,7 @@ One sentence.
   - [ ] A wrong password shows an error and does not create a session
 - Also check: every verified task's Acceptance still passes on the default branch; `make verify` passes.
 - Output: QA report comment, verdict label, one finding issue per finding. No commits, no PRs.
+- Ready review: planner, YYYY-MM-DD, plan checks pass
 
 ## Execution order
 - Batch 1 (parallel): E04-T01, E05-T01
@@ -76,7 +78,7 @@ One sentence.
 - Each acceptance item and each QA scenario is a command with an expected result, or exact steps with a result that a person can see. Never write "works correctly"
 - Two tasks in the same batch must not have the same path in `Touches`. If they do, add a dependency between them
 - A QA task has no `Touches`
-- Each `Depends on` gives its reason: an acceptance item, the current code or a shared path in `Touches` needs the other task first. Possible later work is not a reason
+- Each `Depends on` gives its reason: an acceptance item, the current code or a shared path in `Touches` needs the other task first, or a QA scenario tests the result of the other task. Possible later work is not a reason
 - A batch is a view of the dependency graph, not a gate. A task is ready when each of its blockers is closed
 - The QA tasks are on their own `QA` line and never delay a batch
 - A task that defines a shared contract is in an earlier batch than the tasks that use the contract

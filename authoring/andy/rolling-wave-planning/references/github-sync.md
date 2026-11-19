@@ -24,12 +24,13 @@ Read this file before you write the plan to GitHub or read issue states from Git
 | Task (`active` wave only) | Sub-issue of its epic, `[E03-T02] <name>`, with the label of its `Kind` |
 | `Kind` of a task | `feature` gives `2-type:feature`. `fix` gives `2-type:bug`. `spike` and `chore` give `2-type:task` |
 | QA task | Sub-issue of its epic, `[E03-QA1] QA: <epic name>`, labels `2-type:task` and `qa` |
-| Task or QA task that obeys the Ready rule of `label-for-issues` | Label `1-ready-for-agent`, or `1-ready-for-human` when the brief has `Executor: human`. The plan checks are the review that the Ready rule records. An open blocker does not prevent the label |
+| Task or QA task that obeys the Ready rule of `label-for-issues` | Label `1-ready-for-agent`, or `1-ready-for-human` when the brief has `Executor: human`. The plan checks are the review, and the `Ready review` line of the brief records it. An open blocker does not prevent the label |
 | QA verdict | Label `qa:accepted`, `qa:accepted-with-findings` or `qa:rejected` on the QA issue |
 | Finding | Sub-issue of the epic, `Finding (E03-QA1): <title>`, label `qa-finding` |
 | Subtask | Checklist in the body of the task issue |
 | Dependency | Native `blocked by` |
 | Discovery in a wave | Labels `discovery`, `needs-replan` |
+| Finding that the wave review found Fixed or Gone | Label `qa-recheck` and an evidence comment |
 
 ## Rules
 
@@ -41,14 +42,14 @@ Read this file before you write the plan to GitHub or read issue states from Git
 5. Create the issues in batch order, so that each blocker exists before the issues that depend on it
 6. A closed issue keeps the label of the wave in which it closed. A carried epic and its open tasks get the label of the receiving wave
 7. Close the issue of a dropped task as not planned, with the reason in a comment
-8. After each sync, read each issue that the sync wrote or closed
-9. Compare the title, body, labels, parent, `blocked by`, state and close reason with the changes that the sync intended. Keep the execution state that GitHub owns
+8. After each sync, read each issue that the sync wrote, commented or closed
+9. Compare the title, body, labels, parent, `blocked by`, state, close reason and new comments with the changes that the sync intended. Keep the execution state that GitHub owns
 10. Correct each difference. Then do rules 8 and 9 again for the corrected issues
 
 ## Commands
 
 ```bash
-for l in qa qa:accepted qa:accepted-with-findings qa:rejected qa-finding discovery needs-replan; do
+for l in qa qa:accepted qa:accepted-with-findings qa:rejected qa-finding qa-recheck discovery needs-replan; do
   gh label create "$l" --force
 done
 gh label create "wave:W02" --color 0E8A16 --force

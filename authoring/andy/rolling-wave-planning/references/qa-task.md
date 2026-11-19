@@ -21,6 +21,7 @@ Read this file when you are the QA agent and you do a QA task.
     - The line `Independence: fresh session on <QA machine>, no implementation context; verified PRs #57 #58`
 11. Set the verdict label: `qa:accepted`, `qa:accepted-with-findings` or `qa:rejected`
 12. If the brief has `Blocking: yes` and the verdict is `rejected`, keep the QA issue open. In all other cases, close it
-13. For each open `qa-finding` issue whose fix task is closed, run its reproduction on the default branch and comment the evidence
+13. For each open `qa-finding` issue whose fix task is closed, or that has the label `qa-recheck`, run its reproduction on the default branch and comment the evidence
+    - Remove the label `qa-recheck`
     - If the reproduction passes, close the finding
-    - If the reproduction fails, open the fix task again
+    - If the reproduction fails and the finding has a fix task, open the fix task again

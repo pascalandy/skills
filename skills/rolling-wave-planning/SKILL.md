@@ -166,7 +166,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 - Each task is in the task limits
 - Each acceptance item is a command or a step with a result that a person can see
 - Each brief obeys the brief rules in [Wave file](references/wave-file.md)
-- For each epic of the active wave, if each task of the epic in all waves is done, the `Outcome (FMO)` of the epic is true
+- For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true
 - Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
 - Each QA task with `Blocking: yes` gives its reason
 - The exit criteria of at least one wave cover each success criterion
@@ -190,16 +190,17 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 6. Write `## Learnings` in the closed wave file
 7. Compare each carried task and each discovery with the default branch, and give it one verdict. A discovery is work that the plan did not include
    - The discoveries come from the open `discovery`, `needs-replan` and `qa-finding` issues, from `## Discoveries` and from Learnings
-   - Write each verdict and its evidence in the closed wave file. Do not close an issue in this step
+   - Write each verdict and its evidence in the closed wave file
+   - Do the plan action now. Do the GitHub action only at the sync, after the PM approves
 
-   | Verdict | Evidence | Action at the sync |
-   |---|---|---|
-   | Holds | The current files still need the work | None |
-   | Fixed | A merged PR or a commit on the default branch does the work | Set a task to `done`. Close a `discovery` or `needs-replan` issue as completed, and cite the change |
-   | Gone | The problem does not occur, and no change fixed it | Drop a task. Close a `discovery` or `needs-replan` issue as not planned, and cite the proof |
-   | Stale | The current files still need the work, but the brief or the issue quotes code that changed | None. Write the brief of the item from the current files |
+   | Verdict | Evidence | Plan action | GitHub action |
+   |---|---|---|---|
+   | Holds | The current files still need the work | None | None |
+   | Fixed | A merged PR or a commit on the default branch does the work | Set a carried task to `done` | Close the issue as completed, and cite the change |
+   | Gone | The problem does not occur, and no change fixed it | Set a carried task to `dropped` | Close the issue as not planned, and cite the proof |
+   | Stale | The current files still need the work, but the brief or the issue quotes code that changed | Write the brief of the item from the current files | None |
 
-   - For a `qa-finding` issue with the verdict Fixed or Gone, comment the evidence at the sync. Only the QA agent closes it (finding rule 3)
+   - Exception: do not close a `qa-finding` issue. Comment the evidence on it and add the label `qa-recheck`. The QA agent runs its reproduction and closes it (finding rule 3)
 
 8. Put each discovery that has the verdict Holds or Stale in one bucket
 
@@ -245,7 +246,7 @@ For each open `discovery` or `qa-finding` issue that has no task, the planner do
 3. Give the task its QA:
    - For a `discovery` issue, add the task to the `Verifies` line of an open QA task of that epic. If that epic has no open QA task, create the next QA task
    - For a `qa-finding` issue, obey rules 4 and 5 of [Findings and verdicts](#findings-and-verdicts)
-4. Do the [plan checks](#plan-checks) on the new task
+4. Do the [plan checks](#plan-checks) on the new task and on each QA brief that changed
 5. Sync the plan to GitHub
 6. Commit `plan: triage`
 
