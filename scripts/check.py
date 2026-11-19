@@ -234,6 +234,7 @@ ANDY_MODE = "authoring/andy/andy-mode"
 BRIGADE_REPLAY = "authoring/andy/brigade-mode/scripts/replay"
 COREY_MODE = "authoring/corey-mode/scripts"
 GIT_LOCAL = "authoring/andy/git-local/scripts"
+ROLLING_WAVE = "authoring/andy/rolling-wave-planning/scripts"
 WRITING_FOR_AGENTS = "authoring/matt/writing-for-agents"
 EVAL_RUNNER = f"{WRITING_FOR_AGENTS}/scripts/run_evals.py"
 # Every compiled skill, so a new skill is validated without a new row
@@ -393,6 +394,12 @@ CHECKS = [
         *ruff(GIT_LOCAL),
         pyright(GIT_LOCAL),
         pytest(f"{GIT_LOCAL}/tests"),
+    ),
+    Check(
+        "rolling-wave-planning",
+        *ruff(ROLLING_WAVE),
+        pyright(ROLLING_WAVE),
+        pytest(f"{ROLLING_WAVE}/tests"),
     ),
     Check(
         "brigade-replay",

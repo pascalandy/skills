@@ -5,7 +5,7 @@ Read this file before you write the plan to GitHub or read issue states from Git
 ## Prerequisites
 
 - `gh` 2.94.0 or later. Check with `gh --version`. If the version is earlier, stop and ask the PM to upgrade ([install](https://github.com/cli/cli#installation))
-- The `label-for-issues` skill. This file uses its `4-epic`, `2-type:*` and `1-ready-for-*` labels. Before the first issue write, load that skill and do its Step 4 for these labels only
+- The `label-for-issues` skill. This file uses its `4-epic`, `2-type:*`, `1-ready-for-*` and `0-impediment` labels. Before the first issue write, load that skill and do its Step 4 for these labels only
 
 ## Ownership
 
@@ -28,7 +28,8 @@ Read this file before you write the plan to GitHub or read issue states from Git
 | QA verdict | Label `qa:accepted`, `qa:accepted-with-findings` or `qa:rejected` on the QA issue |
 | Finding | Sub-issue of the epic, `Finding (E03-QA1): <title>`, label `qa-finding` |
 | Subtask | Checklist in the body of the task issue |
-| Dependency | Native `blocked by` |
+| Each `blocked_by` and `verifies` of a graph block | Native `blocked by`. Remove a native `blocked by` that the graph block does not have |
+| `needs` check that failed | Label `0-impediment` and a comment from the executor |
 | Discovery in a wave | Labels `discovery`, `needs-replan` |
 | Finding that the wave review found Fixed or Gone | Label `qa-recheck` and an evidence comment |
 
@@ -39,7 +40,7 @@ Read this file before you write the plan to GitHub or read issue states from Git
 3. Write the issue number into the wave file: `#### E03-T02: <title> → #57`
 4. Before you create an issue, find its exact title prefix. If the issue exists, update it:
    `gh issue list --state all --limit 500 --json number,title --jq '.[] | select(.title | startswith("[E03-T02] "))'`
-5. Create the issues in batch order, so that each blocker exists before the issues that depend on it
+5. Create the issues in the order of the `batches` of [the graph file](../SKILL.md#dependency-graph), so that each blocker exists before the issues that depend on it
 6. A closed issue keeps the label of the wave in which it closed. A carried epic and its open tasks get the label of the receiving wave
 7. Close the issue of a dropped task as not planned, with the reason in a comment
 8. After each sync, read each issue that the sync wrote, commented or closed

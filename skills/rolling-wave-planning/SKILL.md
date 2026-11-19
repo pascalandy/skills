@@ -2,6 +2,7 @@
 name: "rolling-wave-planning"
 description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
+version: "2.0.0"
 ---
 
 # Rolling Wave Planning
@@ -22,11 +23,12 @@ The planner plans the later waves again at each wave review.
 - **QA machine:** the dedicated machine on which the QA agent tests. The default is the Mac Mini. If the PM names a different machine, record it in `01-project.md`
 - **UAT (user acceptance test):** the PM does every UAT. The PM reads the QA reports, then decides which tests to do and how detailed they are. The plan defines no UAT scenario, no UAT task and no UAT status
 - **Implementation instructions:** the PM gives them when implementation starts. Do not write a branch rule, a PR rule or an implementer procedure in `plan/`, in a brief or in the agent file
-- **Signals:** the procedures read these four signals from GitHub. The implementation instructions of the PM must produce them:
+- **Signals:** the procedures read these five signals from GitHub. The implementation instructions of the PM must produce them:
   - A finished task closes its issue. A task is finished when its PR is merged or, for a task without a PR, when its result is on its issue
   - A PR and its branch refer to the task by its ID (ID rule 4)
   - A fix PR does not close its finding
   - The implementer reports work that the plan did not include, as [Procedure C](#procedure-c-triage-during-a-wave) says
+  - Before the work starts, the executor of a task or QA task runs each `check` of the `needs` in its brief. If a `check` fails, the executor stops, comments the command and its output on the issue, and adds the label `0-impediment`
 
 ## Rules
 
@@ -58,7 +60,7 @@ The status of a wave sets its detail level:
 |---|---|
 | `proposed` | Goal, exit criteria and 3 to 6 scope bullets. No epics |
 | `planned` | Epics, each with `Traces`, `Problem (CMO)` and `Outcome (FMO)`. No tasks |
-| `active` | Epics, full task briefs, QA tasks and execution order |
+| `active` | Epics, full task briefs with their graph blocks, and QA tasks |
 | `done` | Closed at the wave review, with Learnings |
 | `dropped` | Kept, with a reason in one line and a decision ID |
 
@@ -98,7 +100,7 @@ Only the PM can waive QA. The planner logs each waiver as a decision.
    - In the closed wave file, keep the task line and mark it `carried→W02`
    - In the receiving wave file, add `### E03 (continued from W01) → #41` and list only the open tasks
    - The receiving wave is the wave that becomes `active`, unless a decision names a different wave
-6. A task never changes its epic. If the task must move, drop it and create a task that refers to the old ID. On GitHub, close the old issue as not planned and link the new issue
+6. A task never changes its epic. If the task must move, drop it and create a task that refers to the old ID. In each `blocked_by` and `verifies` that names the old ID, write the new ID. On GitHub, close the old issue as not planned and link the new issue
 
 ## Files
 
@@ -113,25 +115,27 @@ plan/
     ├── W01-walking-skeleton.md  # done
     ├── W01B-auth-foundation.md  # done, inserted at W01 review
     ├── W02-user-onboarding.md   # active
+    ├── W02-user-onboarding.graph.json  # dependency graph of W02, written by the graph script
     ├── W03-billing.md           # planned
     ├── W04-reporting.md         # proposed
     └── W05-admin-console.md     # dropped
 ```
 
 - Never delete a wave file
+- Never edit a `.graph.json` file. The graph blocks of the briefs are its source
 - Never edit the business case, so that its section anchors stay stable for `Traces`
 
 ## Pick the procedure
 
 - To make the first plan from a business case, follow **Procedure A**
-- When each task of the active wave is finished, dropped or stopped by a `needs-replan` label, follow **Procedure B**. Do not wait for the QA tasks
+- When each task of the active wave is finished, dropped, stopped by a `needs-replan` or `0-impediment` label, or blocked by a stopped task or by a QA task, follow **Procedure B**. Do not wait for the QA tasks
 - When a `discovery`, `qa-finding` or `needs-replan` issue is open, follow **Procedure C**
 - To do a QA task, or to check again a finding that has the label `qa-recheck`, follow [QA task](references/qa-task.md)
 
 Before you write a plan file, read its template:
 
 - [Project files](references/project-files.md): `01-project.md` and `decisions.md`
-- [Wave file](references/wave-file.md): the wave file, the task brief, the QA brief and the brief rules
+- [Wave file](references/wave-file.md): the wave file, the task brief, the QA brief, the graph block and the brief rules
 
 Before you write the plan to GitHub or read issue states from GitHub, read [GitHub sync](references/github-sync.md).
 
@@ -150,9 +154,8 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 6. Write the wave table in `01-project.md`
 7. Write one `proposed` file for each wave in `waves/`
 8. **Checkpoint:** show the waves, the open questions and the signals of [Actors](#actors) to the PM. Continue only when the PM approves
-9. Write W01 at `active` detail: epics with `Traces`, a full brief for each task, QA tasks and `## Execution order`
+9. Write W01 at `active` detail: epics with `Traces`, a full brief with its graph block for each task, and QA tasks
    - Plan the QA tasks as [Quality assurance](#quality-assurance) says
-   - `## Execution order` puts the tasks in batches. A batch is a group of tasks that can run at the same time
    - The first task of W01 writes the agent file, or updates it. The agent file gives the stack, the layout, the one verify command and how to start the system
 10. Write W02 at `planned` detail
 11. Keep each later wave `proposed`
@@ -168,12 +171,36 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 - Each brief obeys the brief rules in [Wave file](references/wave-file.md)
 - For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true
 - Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
-- Each QA task with `Blocking: yes` gives its reason
+- [The graph script](#dependency-graph) answers `{"ok":true,…}` for the active wave file
 - The exit criteria of at least one wave cover each success criterion
 - Each epic of the active wave has `Traces`
 - Only the active wave has tasks
 - The word "milestone" is not in the plan
 - No plan file and no brief has an implementation instruction or a UAT scenario
+
+### Dependency graph
+
+The dependency graph of a wave is in two places:
+
+- **Source:** the graph block at the end of each brief in the wave file. Only the planner writes it, as [Wave file](references/wave-file.md) says
+- **Graph file:** `plan/waves/<wave file name>.graph.json`, beside the wave file. The graph script writes it from the graph blocks. It gives the full graph of the wave in one file:
+
+  | Key | Content |
+  |---|---|
+  | `nodes` | Each graph block, with its `kind` (`task` or `qa`) and its `state` |
+  | `edges` | Each blocker as `{"from": "E03-T02", "to": "E04-T01", "why": "…"}`. The `why` of a `verifies` edge is `verifies` |
+  | `batches` | The IDs that can run at the same time, in execution order |
+  | `gates` | For each blocking QA task, the tasks that it blocks |
+
+The graph script needs `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/)); confirm it with `uv --version`. Run it after each change to a brief, and commit the graph file with the wave file:
+
+```bash
+uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.md
+```
+
+- It answers `{"ok":true,"file":"…"}`, with `changes` when it wrote the graph file
+- It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, or two parallel tasks that are `todo` have a common path in `touches`. The last line of stderr lists each error with its correction. Correct the wave file and run it again
+- With `--check`, it writes nothing and fails when the graph file does not match the briefs
 
 ## Procedure B: review a wave
 
@@ -213,7 +240,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
    | (d) | The discovery makes a later wave invalid | Drop that wave, or merge it into a different wave |
 
 9. Set the next wave in table order to `active`, and the wave after it to `planned`
-10. Write the new active wave in full: briefs, QA tasks, execution order and carried tasks
+10. Write the new active wave in full: briefs with their graph blocks, QA tasks and carried tasks
 11. Do the [plan checks](#plan-checks)
 12. Write the epics of the new planned wave
     - Adjust the `proposed` waves in outline only
@@ -236,6 +263,8 @@ When a task shows something that the plan did not include, one of these cases ap
 | The work is new, agrees with the wave goal and has no effect on other tasks | The implementer opens an issue that gives the task ID, with the labels `discovery` and the active wave. No agent executes it before triage |
 | The work changes a contract, makes a different task invalid or exceeds the task limits | The implementer stops, comments on the issue and adds the label `needs-replan` |
 
+Before the planner changes the wave file in this procedure, the planner gets the issue states of the wave from GitHub, as step 1 of Procedure B says, and writes the state of each task in the wave file, including a task that is open again. Thus the graph script does not compare a new task with finished work.
+
 For each `needs-replan` issue, the planner amends the wave file and logs a decision, or defers the issue to the wave review.
 
 For each open `discovery` or `qa-finding` issue that has no task, the planner does these steps:
@@ -245,7 +274,7 @@ For each open `discovery` or `qa-finding` issue that has no task, the planner do
    - For a `discovery` issue, the epic is the epic of the task that reported the issue
    - For a `qa-finding` issue, the epic is the parent of the issue
 3. Give the task its QA:
-   - For a `discovery` issue, add the task to the `Verifies` line of an open QA task of that epic. If that epic has no open QA task, create the next QA task
+   - For a `discovery` issue, add the task to the `verifies` of an open QA task of that epic. If that epic has no open QA task, create the next QA task
    - For a `qa-finding` issue, obey rules 4 and 5 of [Findings and verdicts](#findings-and-verdicts)
 4. Do the [plan checks](#plan-checks) on the new task and on each QA brief that changed
 5. Sync the plan to GitHub
@@ -263,7 +292,7 @@ QA is not UAT: see [Actors](#actors).
 - **For each epic (default):** a final QA task tests all the tasks of the epic against the `Traces` of the epic. The final QA task starts when the last task of the epic is finished
   - At least one QA scenario of the final QA task goes through more than one task. The acceptance items of one task alone do not cover that scenario
 - **Intermediate:** when an epic has more than 5 tasks or more than 2 batches, add a QA task after its first slice that a user can see
-- **For one task (exception):** only for high risk, add a QA task with `Verifies: E04-T03` and the title `QA: <task title>`
+- **For one task (exception):** only for high risk, add a QA task with `"verifies": ["E04-T03"]` and the title `QA: <task title>`
   - High risk is a shared contract, security, a data migration, money or a change that cannot be reversed
 - Do not let all the epics end in the last batch, so that the QA tasks do not all start at the end of the wave
 - For an enabler epic (infrastructure or tooling), the user is the next developer or agent that uses its result
@@ -278,14 +307,13 @@ QA is not UAT: see [Actors](#actors).
 ### Blocking
 
 - A QA task is `blocked by` the tasks that it tests. It starts when they are finished
-- By default, no task depends on a QA task (`Blocking: no`). Later tasks, epics and batches continue while the QA agent tests
-- When work without a passing verdict is expensive to reverse, set `Blocking: yes` and give the reason. The permitted reasons are:
+- By default, no task names a QA task in its `blocked_by`. Later tasks, epics and batches continue while the QA agent tests
+- A QA task is blocking when a task names it in `blocked_by`. Add it only to the tasks for which work without a passing verdict is expensive to reverse, never to a full wave, and give the reason in `why`. Name only a QA task that is open or that has a passing verdict. The permitted reasons are:
   - A later task uses a contract or schema that the QA task tests
   - The work includes security, possible data loss, money or a migration that cannot be reversed
   - A release or a deployment follows
-- Add a blocking QA task as a `blocked by` dependency only on the tasks that it gates, never on a full wave
 - A blocking QA issue closes only on a passing verdict. On `rejected`, it stays open with the label `qa:rejected`. The planner closes it when a later QA task has a passing verdict
-- QA gates only the closure of an epic. It never gates the wave review
+- A QA task never gates the wave review
 
 ### Findings and verdicts
 
@@ -302,7 +330,11 @@ These rules apply to each finding:
 3. Only the QA agent closes a finding, after the reproduction passes on the default branch
 4. After `accepted-with-findings`, the reproduction check of rule 3 is sufficient
 5. After `rejected`, the planner also adds one re-QA task for the rejected QA task. A re-QA task is a QA task with the next free QA ID
-   - The `Verifies` line of the re-QA task lists the fix tasks and the failed scenarios
-   - The re-QA task is blocking only if the rejected QA task was blocking
+   - The `verifies` of the re-QA task lists the fix tasks. Its `QA scenarios` include the failed scenarios
+   - If the rejected QA task was blocking, the re-QA task replaces it in each `blocked_by` that names it
 6. After two `rejected` verdicts in sequence on one epic, the planner stops, adds the label `needs-replan` to the epic and asks the PM
 7. If a finding changes the scope or a contract, it is a `needs-replan` case of Procedure C
+
+## Version
+
+The `version` in the frontmatter of this file changes with the skill. Its first number changes when the format of a brief changes. Each wave file records the version in `skill_version` when the planner creates the file.
