@@ -66,6 +66,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
   - "Pi Opus" or "Pi Opus 5.5" selects `target.model="claude-code/claude-opus-5-5"`
   - "Pi Sol" or "Pi Codex Sol" selects `target.model="cliproxy/gpt-6.1-sol"` unless I name another Sol version
   - "Pi Terra" or "Pi Codex Terra" selects `target.model="cliproxy/gpt-6.1-terra"`
+- On the Mini (hostname `m4mini`), Pi runs without the hub, so these models replace the list above: `anthropic-byok/claude-opus-5-5` for Pi Opus, `openai-codex/gpt-6.1-sol` for Pi Sol, and `openai-codex/gpt-6.1-terra` for Pi Terra
 - Before a Pi delegation, confirm the model and supported levels with `orchestrator_capabilities`
 - If I request an effort level, pass that level as Pi's `target.options.thinking`
 - After `delegate_task` returns, verify the returned `providerInstanceId`, model, and options
