@@ -5,8 +5,7 @@
 # ///
 """Sync this machine: pull main, pull the private clone, then install.
 
-It refuses a checkout off main and reaches only this machine; just sync-fleet
-reaches the others. --dry-run and --check skip the pulls and preview the
+It refuses a checkout off main and reaches only this machine. --dry-run and --check skip the pulls and preview the
 current checkout.
 """
 
@@ -48,8 +47,7 @@ log = logging.getLogger("sync")
 
 
 def git(*args: str, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
-    # Hooks stay off: just sync is this machine only; just sync-fleet reaches
-    # the others
+    # Hooks stay off: just sync is this machine only
     env = os.environ | {"LEFTHOOK": "0"}
     return run_git(*args, cwd=ROOT, timeout=timeout, env=env)
 

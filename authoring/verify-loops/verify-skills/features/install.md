@@ -11,7 +11,7 @@
 
 ## How to get to it (user POV)
 
-- `just install-skills`, directly or through `just sync`, `just sync-fleet`, or the lefthook hooks on `main`
+- `just install-skills`, directly or through `just sync`
 - `just install-skills --dry-run` or `--check` to preview
 
 ## Driving it with just

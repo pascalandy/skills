@@ -64,9 +64,7 @@ def last_line(result: subprocess.CompletedProcess[str]) -> str:
     return lines[-1] if lines else f"git exited {result.returncode}"
 
 
-# Each refusal and its fix are also sent to fleet inspection before an older
-# remote checkout is updated. Each expression works in both Python and the
-# remote shell's grep -E.
+# Each refusal names its cause and fix in a failed network step's error.
 SSH_KEY_REFUSAL = r"permission denied *\([^)]*publickey[^)]*\)"
 SSH_KEY_FIX = "GitHub refused this machine's SSH key; unlock its SSH agent or load the key, then rerun"
 # Git needed an HTTPS login that no credential helper gave, as when gh keeps

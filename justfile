@@ -2,6 +2,9 @@
 # Each recipe is one line that calls one script or tool; logic lives in scripts/
 set positional-arguments
 
+# Machine-local recipes, kept outside git; absent on a machine that has none
+import? '~/.config/skills/local.just'
+
 [private]
 default:
     @{{ just_executable() }} --justfile {{ quote(justfile()) }} --list --unsorted
@@ -26,20 +29,6 @@ transcript url *args:
 transcript-auth-refresh *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py auth refresh "$@"
 
-alias deploy := sync-fleet
-
-# Bring every fleet machine, or the named ones, to GitHub's main
-[group('commands')]
-[no-exit-message]
-sync-fleet *args:
-    @uv run --quiet scripts/sync_fleet.py "$@"
-
-# Sign off this branch's PR head if needed, squash-merge that commit, then deploy
-[group('commands')]
-[no-exit-message]
-merge *args:
-    @uv run --quiet scripts/merge.py "$@"
-
 # Install skills/ into the agent skill directories
 [group('commands')]
 [no-exit-message]
@@ -63,12 +52,6 @@ remote-skills *args:
 [no-exit-message]
 transcript-cli *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py "$@"
-
-# Fetch or refresh repositories in the fleet's opensrc cache; without one, refresh them all
-[group('commands')]
-[no-exit-message]
-opensrc-sync *args:
-    @uv run --quiet authoring/andy/git-local/scripts/opensrc_sync.py --fleet ../skills-private/authoring/integrations/fleet/references/fleet.toml "$@"
 
 # Check that this machine's keyring holds every API key the skills name; presence, not validity
 [group('commands')]
@@ -122,9 +105,3 @@ replay-routing *args:
 [no-exit-message]
 release-check version *args:
     @uv run --quiet scripts/release_check.py "$@"
-
-# Lefthook's sync entry point; it acts only in a main checkout with the private clone
-[private]
-[no-exit-message]
-sync-hook *args:
-    @uv run --quiet scripts/sync_fleet.py --hook "$@"

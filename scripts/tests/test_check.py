@@ -700,7 +700,6 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
                 "scripts/tests/test_install_skills.py",
                 "scripts/tests/test_skill_invocation.py",
                 "scripts/tests/test_sync.py",
-                "scripts/tests/test_sync_fleet.py",
             ],
         ),
         (
@@ -713,7 +712,6 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
                 "scripts/tests/test_install_skills.py",
                 "scripts/tests/test_skill_invocation.py",
                 "scripts/tests/test_sync.py",
-                "scripts/tests/test_sync_fleet.py",
             ],
         ),
         (
@@ -727,7 +725,6 @@ def test_cheap_project_rules_run_on_every_default_check_without_xdist(
                 "scripts/tests/test_install_skills.py",
                 "scripts/tests/test_skill_invocation.py",
                 "scripts/tests/test_sync.py",
-                "scripts/tests/test_sync_fleet.py",
                 "scripts/tests/test_sync_private.py",
             ],
         ),

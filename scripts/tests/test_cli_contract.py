@@ -35,13 +35,11 @@ ENTRIES = {
     "scripts/discover_skills.py": "just skills-discover",
     "scripts/compile_skills.py": "just compile-skills",
     "scripts/install_skills.py": "just install-skills",
-    "scripts/merge.py": "just merge",
     "scripts/release_check.py": "just release-check",
     "scripts/remote_skills.py": "just remote-skills",
     "scripts/replay_routing.py": "just replay-routing",
     "scripts/signoff.py": "just signoff",
     "scripts/sync.py": "just sync",
-    "scripts/sync_fleet.py": "just sync-fleet",
     "scripts/sync_private.py": "scripts/sync_private.py",
 }
 
@@ -82,7 +80,6 @@ def doc_sources() -> Iterator[Path]:
     yield from (ROOT / "authoring").rglob("*.md")
     yield from (ROOT / "commands").rglob("*.md")
     yield from (ROOT / ".github").rglob("*.yml")
-    yield from (path for path in (ROOT / ".lefthook").rglob("*") if path.is_file())
     yield from SCRIPTS.glob("*.py")
 
 

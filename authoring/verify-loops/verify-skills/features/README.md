@@ -14,7 +14,7 @@
 
 ## Not driven
 
-- `just sync`, `just sync-fleet` and its alias `just deploy`, `just merge`, `just signoff`, and `just release-check` reach GitHub or other machines
+- `just sync`, `just signoff`, and `just release-check` reach GitHub
 - `just replay-routing` calls Codex models
 - `just transcript` has its own skill, `verify-transcript`
 - Edge cases already covered by pytest, such as a symlink at a target, a private copy replacing a public one, the Mac targets, and lock timeouts: run `just check --only test-compile-skills --only test-install-skills --only test-discover-skills`
