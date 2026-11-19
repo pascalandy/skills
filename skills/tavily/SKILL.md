@@ -24,7 +24,6 @@ Tavily gives LLM-optimized search, content extraction, site mapping, and crawlin
 ## When NOT to Use
 
 - Local filesystem or repository work; use local tools
-- A search that no request named Tavily for
 - `TAVILY_API_KEY` is missing from fnox (check first)
 
 ## Authentication
