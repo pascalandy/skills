@@ -42,7 +42,7 @@ web-research Comment les boulangeries de Montréal fixent-elles le prix des gât
 
 L'agent cherche sur le web et donne la source de chaque fait. Ouvre au moins une source.
 
-**Prérequis :** T3 Code avec les modèles Codex et Pi, et les clés Tavily, Firecrawl et Exa. Sans eux, l'agent rapporte le niveau qu'il n'a pas pu joindre.
+**Prérequis :** les quatre niveaux de l'échelle demandent T3 Code avec les modèles Codex et Pi, et les clés Tavily, Firecrawl et Exa. Quand l'agent épuise les niveaux sans réponse, il rapporte l'échec.
 
 **Piège :** confondre `feel-me` et `grilling`. `feel-me` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
 
