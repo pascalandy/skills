@@ -81,7 +81,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 
 To keep cost low, delegate each web task, such as a search, a page read, or a content extraction. Use these levels in this order. When the current level is blocked, returns no result, or returns facts without sources, use the next level:
 
-1. Codex Luna high (`gpt-6-luna`)
+1. Codex Luna high (`gpt-6-luna`) with its native web tools. When Luna fails in one of these ways, use Haiku 5.5 high with its native web tools before level 2
 2. Codex Terra high (`gpt-6.1-terra`) with `$tavily`
 3. Codex Terra high (`gpt-6.1-terra`) with `$firecrawl`
 4. Pi Codex Terra high (`gpt-6.1-terra`) with the `exa` extension
