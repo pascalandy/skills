@@ -1,6 +1,6 @@
 ---
 name: "tavily"
-description: "Use only when explicitly invoked as `tavily`."
+description: "Use when a request names Tavily, or when `web-research` reaches level 2."
 kind: "general"
 configuration-is-needed: true
 ---
@@ -24,7 +24,6 @@ Tavily gives LLM-optimized search, content extraction, site mapping, and crawlin
 ## When NOT to Use
 
 - Local filesystem or repository work; use local tools
-- A search that no request named Tavily for
 - `TAVILY_API_KEY` is missing from fnox (check first)
 
 ## Authentication
