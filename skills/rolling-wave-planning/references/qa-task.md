@@ -22,7 +22,7 @@ If the PM starts you only to check `qa-recheck` findings again, do step 1, then 
     - The verdict
     - The line `Independence: fresh session on <QA machine>, no implementation context; verified PRs #57 #58`
 11. Set the verdict label: `qa:accepted`, `qa:accepted-with-findings` or `qa:rejected`
-12. If [the graph script](../SKILL.md#graph-script) lists this QA task in `gates` and the verdict is `rejected`, keep the QA issue open. In all other cases, close it
+12. If `gates` of [the graph file](../SKILL.md#dependency-graph) of the wave has this QA task and the verdict is `rejected`, keep the QA issue open. In all other cases, close it
 13. For each open `qa-finding` issue whose fix task is closed, or that has the label `qa-recheck`, run its reproduction on the default branch and comment the evidence
     - Remove the label `qa-recheck`
     - If the reproduction passes, close the finding

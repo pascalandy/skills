@@ -40,7 +40,7 @@ Read this file before you write the plan to GitHub or read issue states from Git
 3. Write the issue number into the wave file: `#### E03-T02: <title> → #57`
 4. Before you create an issue, find its exact title prefix. If the issue exists, update it:
    `gh issue list --state all --limit 500 --json number,title --jq '.[] | select(.title | startswith("[E03-T02] "))'`
-5. Create the issues in the order of the `batches` that [the graph script](../SKILL.md#graph-script) prints, so that each blocker exists before the issues that depend on it
+5. Create the issues in the order of the `batches` of [the graph file](../SKILL.md#dependency-graph), so that each blocker exists before the issues that depend on it
 6. A closed issue keeps the label of the wave in which it closed. A carried epic and its open tasks get the label of the receiving wave
 7. Close the issue of a dropped task as not planned, with the reason in a comment
 8. After each sync, read each issue that the sync wrote, commented or closed

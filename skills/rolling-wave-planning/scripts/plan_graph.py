@@ -2,16 +2,20 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Check the dependency graph of a wave file and print its execution order.
+"""Check the dependency graph of a wave file and write it as one JSON file.
 
 Each brief of the wave file has one fenced `json` block, as
 references/wave-file.md defines. The script reads those blocks and fails when:
 a brief has no valid block, an ID is unknown or dropped, the graph has a cycle,
 or two tasks that can run at the same time have a common path in `touches`.
 
-Answers in one JSON line: {"ok":true,"batches":[[...],...],"gates":{...}}.
-`batches` lists the IDs that can run at the same time, in execution order.
-`gates` gives, for each blocking QA task, the tasks that it blocks.
+It writes the graph beside the wave file, as `<wave file name>.graph.json`:
+`nodes` (each block with its kind and state), `edges` (blocker, blocked and
+why), `batches` (the IDs that can run at the same time, in execution order) and
+`gates` (for each blocking QA task, the tasks that it blocks).
+
+Answers in one JSON line: {"ok":true,"file":"...","changes":[["write","..."]]}.
+`changes` is absent when the file is already up to date.
 """
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
@@ -358,31 +362,38 @@ def answer_failure(
 
 # <<< cli-block
 
-from fnmatch import fnmatchcase
 from pathlib import Path
 
 EPILOG = """\
 examples:
   uv run scripts/plan_graph.py plan/waves/W02-user-onboarding.md
-  uv run scripts/plan_graph.py --verbose plan/waves/W02-user-onboarding.md"""
+  uv run scripts/plan_graph.py --check plan/waves/W02-user-onboarding.md
+  uv run scripts/plan_graph.py --dry-run plan/waves/W02-user-onboarding.md"""
 
-EXIT_CODES = exit_codes({1: "a brief or the dependency graph has an error"})
+EXIT_CODES = exit_codes(
+    {1: "a brief or the graph has an error, or --check found a stale graph file"}
+)
 
 log = logging.getLogger("plan_graph")
 
 HEADING = re.compile(r"^#{1,6} ")
 BRIEF = re.compile(r"^#### (?P<id>E\d+-(?P<kind>T|QA)\d+): ")
-STATE = re.compile(r"\bState: (?P<state>[a-z]+)")
+STATE = re.compile(r"^- Kind:.*\bState: (?P<state>\S+)")
 TASK_KEYS = {"id", "blocked_by", "needs", "touches"}
 QA_KEYS = {"id", "verifies", "needs"}
-WILDCARD = re.compile(r"[*?\[]")
+WILDCARD = re.compile(r"[*?]")
+STATES = re.compile(r"todo|done|dropped|carried→W\d+[A-Z]?")
 
 
-def briefs_in(text: str) -> dict[str, dict[str, Any]]:
-    """Each brief of a wave file by ID: its line, kind, state and raw json block."""
+def briefs_in(text: str) -> tuple[dict[str, dict[str, Any]], list[int]]:
+    """Each brief of a wave file by ID: its line, kind, state and raw json block.
+    Then the lines of the level-4 headings that are not a brief heading, and
+    of a json fence that never closes."""
     briefs: dict[str, dict[str, Any]] = {}
+    malformed: list[int] = []
     current: dict[str, Any] | None = None
     block: list[str] | None = None
+    opened = 0
     for number, line in enumerate(text.splitlines(), start=1):
         if block is not None:
             if line.strip() == "```":
@@ -394,9 +405,19 @@ def briefs_in(text: str) -> dict[str, dict[str, Any]]:
             continue
         if line.strip() == "```json":
             block = []
+            opened = number
+        elif (
+            current is not None
+            and current["blocks"]
+            and line.strip()
+            and not HEADING.match(line)
+        ):
+            current.setdefault("after", number)
         elif HEADING.match(line):
             found = BRIEF.match(line)
             current = None
+            if line.startswith("#### ") and not found:
+                malformed.append(number)
             if found:
                 current = {
                     "line": number,
@@ -406,9 +427,11 @@ def briefs_in(text: str) -> dict[str, dict[str, Any]]:
                     "duplicate": found["id"] in briefs,
                 }
                 briefs[found["id"]] = current
-        elif current is not None and (state := STATE.search(line)):
+        elif current is not None and (state := STATE.match(line)):
             current["state"] = state["state"]
-    return briefs
+    if block is not None:
+        malformed.append(opened)
+    return briefs, malformed
 
 
 def is_text(value: object) -> bool:
@@ -435,10 +458,26 @@ def texts_problem(value: object) -> str | None:
     return None
 
 
+def touches_problem(value: object) -> str | None:
+    if problem := texts_problem(value):
+        return problem
+    assert isinstance(value, list)
+    wrong = [path for path in value if WILDCARD.search(path.removesuffix("/**"))]
+    if wrong:
+        return f"has {wrong}; write each entry as a path or as `dir/**`"
+    return None
+
+
 def graph_of(brief_id: str, brief: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """The parsed json block of one brief, and what is wrong with it."""
     if len(brief["blocks"]) != 1:
         return {}, [f"has {len(brief['blocks'])} json blocks; give it exactly one"]
+    if "after" in brief:
+        return {}, [f"has text after its json block, at line {brief['after']}; move it"]
+    if not STATES.fullmatch(brief["state"]):
+        return {}, [
+            f"has the state {brief['state']!r}; write todo, done, dropped or carried→WNN"
+        ]
     try:
         data = json.loads(brief["blocks"][0])
     except json.JSONDecodeError as error:
@@ -459,36 +498,30 @@ def graph_of(brief_id: str, brief: dict[str, Any]) -> tuple[dict[str, Any], list
             checks.append(("verifies", "must name at least one task"))
     else:
         checks.append(("blocked_by", pairs_problem(data["blocked_by"], "id", "why")))
-        checks.append(("touches", texts_problem(data["touches"])))
+        checks.append(("touches", touches_problem(data["touches"])))
     problems += [f'"{key}" {problem}' for key, problem in checks if problem]
     return (data if not problems else {}), problems
 
 
-def other_wave_ids(wave_file: Path) -> set[str]:
-    """The brief IDs of the other wave files in the same folder."""
-    ids: set[str] = set()
-    for path in wave_file.parent.glob("*.md"):
+def other_wave_briefs(wave_file: Path) -> dict[str, dict[str, Any]]:
+    """The briefs of the other wave files in the same folder, by ID."""
+    found: dict[str, dict[str, Any]] = {}
+    for path in sorted(wave_file.parent.glob("*.md")):
         if path.resolve() != wave_file.resolve():
-            ids |= set(briefs_in(path.read_text(encoding="utf-8")))
-    return ids
-
-
-def static_prefix(pattern: str) -> str:
-    found = WILDCARD.search(pattern)
-    return pattern[: found.start()] if found else pattern
+            found.update(briefs_in(path.read_text(encoding="utf-8"))[0])
+    return found
 
 
 def overlap(first: str, second: str) -> bool:
-    """Whether two `touches` entries can name the same path. Two globs overlap
-    when one's fixed start contains the other's: a safe over-estimate."""
-    first_glob, second_glob = WILDCARD.search(first), WILDCARD.search(second)
-    if not first_glob and not second_glob:
+    """Whether two `touches` entries, each a path or `dir/**`, share a path."""
+    first, second = first.removeprefix("./"), second.removeprefix("./")
+    if not first.endswith("/**") and not second.endswith("/**"):
         return first == second
-    if first_glob and second_glob:
-        a, b = static_prefix(first), static_prefix(second)
+    a, b = first.removesuffix("**"), second.removesuffix("**")
+    if first.endswith("/**") and second.endswith("/**"):
         return a.startswith(b) or b.startswith(a)
-    pattern, path = (first, second) if first_glob else (second, first)
-    return fnmatchcase(path, pattern.replace("**/", "*").replace("**", "*"))
+    folder, path = (a, b) if first.endswith("/**") else (b, a)
+    return path.startswith(folder)
 
 
 def cycle_in(blockers: Mapping[str, list[str]]) -> list[str] | None:
@@ -517,7 +550,16 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     wave_file = Path(args.wave_file)
     if not wave_file.is_file():
         raise UsageError(f"{wave_file} is not a file; give the path of a wave file")
-    briefs = briefs_in(wave_file.read_text(encoding="utf-8"))
+    briefs, malformed = briefs_in(wave_file.read_text(encoding="utf-8"))
+    if malformed:
+        raise ScriptError(
+            *(
+                f"{wave_file}:{line}: this line is not a brief heading such as "
+                "`#### E04-T01: <title>`, or opens a json fence that never closes; "
+                "correct it"
+                for line in malformed
+            )
+        )
     if not briefs:
         raise ScriptError(
             f"{wave_file} has no brief; a brief starts with a heading such as "
@@ -536,8 +578,9 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     if errors:
         raise ScriptError(*errors)
 
-    elsewhere = other_wave_ids(wave_file)
+    elsewhere = other_wave_briefs(wave_file)
     blockers: dict[str, list[str]] = {}
+    gates: dict[str, list[str]] = {}
     for brief_id, graph in graphs.items():
         where = f"{wave_file}:{briefs[brief_id]['line']}: {brief_id}"
         named = (
@@ -549,22 +592,25 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
         for blocker in named:
             if blocker == brief_id:
                 errors.append(f"{where} names itself as a blocker; remove it")
-            elif blocker in briefs:
-                if briefs[blocker]["state"] == "dropped":
-                    errors.append(
-                        f"{where} is blocked by {blocker}, which is dropped; "
-                        "remove the blocker or name the task that replaces it"
-                    )
-                if briefs[brief_id]["qa"] and briefs[blocker]["qa"]:
-                    errors.append(
-                        f"{where} verifies {blocker}, a QA task; name tasks only"
-                    )
-                blockers[brief_id].append(blocker)
-            elif blocker not in elsewhere:
+                continue
+            other = briefs.get(blocker) or elsewhere.get(blocker)
+            if other is None:
                 errors.append(
                     f"{where} names {blocker}, which no wave file in "
                     f"{wave_file.parent} defines; correct the ID"
                 )
+                continue
+            if briefs[brief_id]["state"] == "todo" and other["state"] == "dropped":
+                errors.append(
+                    f"{where} is blocked by {blocker}, which is dropped; "
+                    "remove the blocker or name the task that replaces it"
+                )
+            if briefs[brief_id]["qa"] and other["qa"]:
+                errors.append(f"{where} verifies {blocker}, a QA task; name tasks only")
+            elif other["qa"]:
+                gates.setdefault(blocker, []).append(brief_id)
+            if blocker in briefs:
+                blockers[brief_id].append(blocker)
     if errors:
         raise ScriptError(*errors)
     if cycle := cycle_in(blockers):
@@ -619,18 +665,68 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     batches: list[list[str]] = [[] for _ in range(max(depth.values()) + 1)]
     for brief_id in briefs:
         batches[depth[brief_id]].append(brief_id)
-    gates: dict[str, list[str]] = {}
-    for brief_id, named in blockers.items():
-        for blocker in named:
-            if briefs[blocker]["qa"]:
-                gates.setdefault(blocker, []).append(brief_id)
     log.info("%d briefs, %d batches", len(briefs), len(batches))
-    return {"batches": batches, "gates": gates}
+
+    nodes = [
+        {
+            **graphs[brief_id],
+            "kind": "qa" if brief["qa"] else "task",
+            "state": brief["state"],
+        }
+        for brief_id, brief in briefs.items()
+    ]
+    edges = [
+        {"from": blocker, "to": brief_id, "why": why}
+        for brief_id, graph in graphs.items()
+        for blocker, why in (
+            [(verified, "verifies") for verified in graph["verifies"]]
+            if briefs[brief_id]["qa"]
+            else [(edge["id"], edge["why"]) for edge in graph["blocked_by"]]
+        )
+    ]
+    content = (
+        json.dumps(
+            {
+                "wave_file": wave_file.name,
+                "nodes": nodes,
+                "edges": edges,
+                "batches": batches,
+                "gates": gates,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
+    graph_file = wave_file.with_suffix(".graph.json")
+    if graph_file.is_file() and graph_file.read_text(encoding="utf-8") == content:
+        return {"file": str(graph_file)}
+    report = {"file": str(graph_file), "changes": [["write", str(graph_file)]]}
+    if args.check:
+        raise ScriptError(
+            f"{graph_file} does not match the briefs; run "
+            f"`uv run {Path(__file__).resolve()} {wave_file}` to write it",
+            report=report,
+        )
+    if not args.dry_run:
+        graph_file.write_text(content, encoding="utf-8")
+    return report
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = Parser(exit_codes=EXIT_CODES, description=__doc__, epilog=EPILOG)
     parser.add_argument("wave_file", help="the wave file, such as plan/waves/W02-x.md")
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="check the briefs and answer the same, without writing the graph file",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="write nothing, and fail when the graph file does not match the briefs",
+    )
     return run_script(parser, check, argv)
 
 
