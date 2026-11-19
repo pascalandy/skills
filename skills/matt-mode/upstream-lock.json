@@ -74,16 +74,6 @@
       ]
     },
     {
-      "name": "research",
-      "kind": "shared",
-      "source": "skills/engineering/research",
-      "destination": "research/references/upstream",
-      "entry": "research.md",
-      "exclude": [
-        "agents/openai.yaml"
-      ]
-    },
-    {
       "name": "grilling",
       "kind": "shared",
       "source": "skills/productivity/grilling",
@@ -175,12 +165,6 @@
       "destination": "matt-mode/references/LICENSE",
       "source_sha256": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
       "rendered_sha256": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5"
-    },
-    {
-      "source": "skills/engineering/research/SKILL.md",
-      "destination": "research/references/upstream/research.md",
-      "source_sha256": "985569f15739c713d6784887c3d186d4ef9ac85bec5ad9c068d25bf0739928e4",
-      "rendered_sha256": "24ad336b28f61d2ac49f31531fadd45047b8682a15b30825cafac886d3543cb9"
     }
   ]
 }

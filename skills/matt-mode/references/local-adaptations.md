@@ -76,6 +76,6 @@ Record agreed implementation and testing decisions using the supplied evidence. 
 
 ## Runtime and dependencies
 
-Resolve upstream named Skill calls through the Matt-mode route table or its shared skills. When another workflow needs just domain modeling or codebase design, it reads this contract and that procedure directly. It retains its original task and authority.
+Resolve upstream named Skill calls through the Matt-mode route table or its shared skills. For an upstream call to the `research` Skill, such as a Wayfinder `research` ticket, send web research to `web-research`; the subagent does other research, such as reading the codebase or local resources, directly. When another workflow needs just domain modeling or codebase design, it reads this contract and that procedure directly. It retains its original task and authority.
 
 Use the active harness's available research and delegation capabilities. Keep delegated work read-only except for the authorized findings document. Use actual context limits rather than upstream's fixed session-size estimates. If delegation is unavailable, investigate facts directly and report the limitation. Human decisions still require the human's answers.

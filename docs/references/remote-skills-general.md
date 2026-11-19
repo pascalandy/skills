@@ -114,7 +114,6 @@ A mode's routes run through that mode's SKILL.md.
 - `mermaid`: Use when choosing, creating, editing, or validating Mermaid diagrams to explain concepts, systems, processes, or data.
 - `oem`: Load at the start of every interactive session, before the first reply. A headless run bound to an output schema starts on its task instead. Shared definitions and conventions for every task.
 - `pele`: Use when a request names pele or pele.run, or a project depends on the `pele` npm package: writing, rendering, or theming its diagrams, or calling its API.
-- `research`: Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 - `sharpen`: Use only when explicitly invoked as `sharpen`.
 - `tavily`: Use when a request names Tavily, or when `web-research` reaches level 2.
 - `transcript`: Use when the user invokes `transcript`, asks to transcribe YouTube, Zoom, or local audio, or asks to refresh the YouTube cookies or login used by Transcript.

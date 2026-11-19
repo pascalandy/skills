@@ -34,13 +34,13 @@ andy-mode ; think. Est-ce que j'embauche un junior ou un senior comme premier em
 
 L'agent cherche l'incertitude qui ferait basculer ta décision, puis choisit une seule méthode pour la réduire. Tu obtiens une vue nette plutôt qu'un inventaire d'angles.
 
-## Cherche des faits avec `research`
+## Cherche des faits sur le web avec `web-research`
 
 ```text
-research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux sur mesure? Cite tes sources.
+web-research Comment les boulangeries de Montréal fixent-elles le prix des gâteaux sur mesure?
 ```
 
-L'agent remonte chaque affirmation jusqu'à sa source et la cite. Ouvre au moins une source.
+L'agent cherche sur le web et donne la source de chaque fait. Ouvre au moins une source.
 
 **Piège :** confondre `feel-me` et `grilling`. `feel-me` mène à une exécution. `grilling` éprouve une idée, sans rien exécuter.
 

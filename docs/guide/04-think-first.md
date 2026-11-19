@@ -36,13 +36,13 @@ andy-mode ; think. Should I hire a junior or a senior for my first employee?
 
 The agent finds the one uncertainty that would change your decision. It picks a single reasoning method to reduce that uncertainty and tells you which one and why. You get a clearer view of the decision, not a list of every possible angle.
 
-## Research a topic with `research`
+## Research the web with `web-research`
 
 ```text
-research how bakeries in Montreal price custom cakes. Cite your sources.
+web-research how bakeries in Montreal price custom cakes
 ```
 
-The agent follows each claim back to the source that owns it, such as a business's own website or an official page, and cites it. Open at least one source to check the answer instead of trusting it.
+The agent searches the web and gives the source of each fact, such as a business's own website or an official page. Open at least one source to check the answer instead of trusting it.
 
 **Pitfall:** `feel-me` and `grilling` do different jobs. `feel-me` leads to execution after you say `go`. `grilling` tests an idea without carrying it out.
 
