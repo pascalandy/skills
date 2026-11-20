@@ -174,7 +174,7 @@ def test_optional_reference_lookup_preserves_genuine_read_errors(
 def test_timeline_start_does_not_show_final_story_counts(
     tmp_path: Path, chromium: Browser
 ) -> None:
-    recording = Path(__file__).parent / "recordings" / "0ba0.json.gz"
+    recording = Path(__file__).parent / "recordings" / "a91e.json.gz"
     brigade = pipeline.recording_data(t3.load_recording(recording))["brigades"][0]
     artifact = tmp_path / "replay.html"
     artifact.write_text(
@@ -196,12 +196,11 @@ def test_timeline_start_does_not_show_final_story_counts(
 
 
 def test_recorded_reassignment_moves_the_count_and_metadata() -> None:
-    recording = Path(__file__).parent / "recordings" / "0ba0.json.gz"
+    recording = Path(__file__).parent / "recordings" / "a91e.json.gz"
     brigade = pipeline.recording_data(t3.load_recording(recording))["brigades"][0]
-    before = oracles.story_counts_at(
-        brigade, 1792367596.0
-    )  # 2026-10-18 19:53:16 Montreal
-    after = oracles.story_counts_at(brigade, 1792367598.0)
+    before_reassignment = brigade["start"] + 9538.814
+    before = oracles.story_counts_at(brigade, before_reassignment)
+    after = oracles.story_counts_at(brigade, before_reassignment + 2)
     assert (before["cook-2.1"], before["cook-3.1"]) == (3, 0)
     assert (after["cook-2.1"], after["cook-3.1"]) == (2, 1)
     final = oracles.story_counts_at(brigade, brigade["end"])

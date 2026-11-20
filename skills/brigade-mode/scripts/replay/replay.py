@@ -485,7 +485,7 @@ examples:
   uv run scripts/replay/replay.py
   uv run scripts/replay/replay.py --brigade abcd
   uv run scripts/replay/replay.py --db snapshot.sqlite -o replay.html
-  uv run scripts/replay/replay.py --recording scripts/replay/tests/recordings/66ab.json.gz
+  uv run scripts/replay/replay.py --recording scripts/replay/tests/recordings/b82c.json.gz
   uv run scripts/replay/replay.py --dry-run""",
     )
     parser.add_argument(
