@@ -234,7 +234,7 @@ A Cook lists its PRs and heads in `🍽️ Batch ready` or `🔀 Batch merging`,
 
 Head Chef's Close removes the cache folders → a message to Pascal cites only PR, issue and artifact URLs, except a follow-up naming a folder kept after a failed cleanup.
 
-In a message or Detail, write every clock time in America/Montreal time. GitHub and T3 return UTC; convert first.
+For clock times in messages and Details, follow [Report times](../../SKILL.md#report-times).
 
 `🍽️ Batch ready` or `🔀 Batch merging`, Cook → Head Chef:
 
