@@ -10,14 +10,37 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "plan_graph.py"
 
 
-def task(brief_id, blocked_by=(), touches=("src/a.ts",), state="todo", needs=()):
+def task(
+    brief_id,
+    blocked_by=(),
+    touches=("src/a.ts",),
+    state="todo",
+    needs=(),
+    executor=None,
+):
     block = {
         "id": brief_id,
         "blocked_by": [{"id": blocker, "why": "contract"} for blocker in blocked_by],
         "needs": list(needs),
         "touches": list(touches),
     }
-    return brief(brief_id, block, f"- Kind: feature · State: {state}")
+    who = f" · Executor: {executor}" if executor else ""
+    return brief(brief_id, block, f"- Kind: feature{who} · State: {state}")
+
+
+def wave(
+    executor: str | None = "agent",
+    epic: str | None = "agent",
+    status: str = "active",
+    version: str | None = "3.0.0",
+):
+    """The head of a wave file: front matter and the entry of epic E04."""
+    lines = ["---", "id: W02", f"status: {status}"]
+    lines += [f'skill_version: "{version}"'] if version else []
+    lines += [f"executor: {executor}   # agent | human | tbd"] if executor else []
+    lines += ["---", "", "# W02: x", "", "### E04: epic → #1"]
+    lines += [f"- Executor: {epic}"] if epic else []
+    return "\n".join(lines) + "\n\n"
 
 
 def qa(brief_id, verifies):
@@ -35,9 +58,11 @@ class PlanGraph(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.waves = Path(folder.name)
 
-    def run_on(self, *briefs, name="W02-x.md", flags=()):
+    def run_on(
+        self, *briefs, name="W02-x.md", flags=(), head="# W02\n\n### E04: epic\n\n"
+    ):
         path = self.waves / name
-        path.write_text("# W02\n\n### E04: epic\n\n" + "\n".join(briefs))
+        path.write_text(head + "\n".join(briefs))
         return subprocess.run(
             [sys.executable, str(SCRIPT), *flags, str(path)],
             capture_output=True,
@@ -45,15 +70,15 @@ class PlanGraph(unittest.TestCase):
             check=False,
         )
 
-    def passes(self, *briefs):
-        result = self.run_on(*briefs)
+    def passes(self, *briefs, head="# W02\n\n### E04: epic\n\n"):
+        result = self.run_on(*briefs, head=head)
         self.assertEqual(result.returncode, 0, result.stderr)
         answer = json.loads(result.stdout)
         self.assertEqual(answer["file"], str(self.waves / "W02-x.graph.json"))
         return json.loads(Path(answer["file"]).read_text())
 
-    def fails(self, *briefs):
-        result = self.run_on(*briefs)
+    def fails(self, *briefs, head="# W02\n\n### E04: epic\n\n"):
+        result = self.run_on(*briefs, head=head)
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertEqual(result.stdout, "")
         answer = json.loads(result.stderr.splitlines()[-1])
@@ -202,6 +227,139 @@ class PlanGraph(unittest.TestCase):
     def test_a_missing_file_is_a_usage_error(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), str(self.waves / "none.md")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+
+    def hitl(self):
+        before = sorted(self.waves.iterdir())
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--hitl", str(self.waves)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sorted(self.waves.iterdir()), before)
+        return {each["wave"]: each for each in json.loads(result.stdout)["waves"]}
+
+    def test_a_human_task_blocks_the_wave_until_it_is_done(self):
+        human = task("E04-T02", touches=["b"], executor="human")
+        (self.waves / "W02-x.md").write_text(
+            wave(executor="human", epic="human")
+            + task("E04-T01", executor="agent")
+            + human
+        )
+        report = self.hitl()["W02"]
+        self.assertFalse(report["agent_ready"])
+        self.assertEqual(
+            report["unresolved"],
+            [{"id": "E04-T02", "executor": "human", "state": "todo"}],
+        )
+        (self.waves / "W02-x.md").write_text(
+            wave(executor="human", epic="human")
+            + task("E04-T01", executor="agent")
+            + human.replace("State: todo", "State: done")
+        )
+        self.assertTrue(self.hitl()["W02"]["agent_ready"])
+
+    def test_a_carried_human_task_counts_only_in_its_receiving_wave(self):
+        carried = task("E04-T02", executor="human", state="carried→W03")
+        (self.waves / "W02-x.md").write_text(
+            wave(status="done", executor="human", epic="human") + carried
+        )
+        receiving = wave(executor="human", epic=None).replace("W02", "W03")
+        receiving = receiving.replace("### E04: epic", "### E04 (continued from W02)")
+        copy = task("E04-T02", executor="human")
+        (self.waves / "W03-y.md").write_text(receiving + copy)
+        report = self.hitl()
+        self.assertTrue(report["W02"]["agent_ready"])
+        self.assertEqual(
+            [item["id"] for item in report["W03"]["unresolved"]], ["E04-T02"]
+        )
+        (self.waves / "W03-y.md").write_text(
+            receiving + copy.replace("State: todo", "State: done")
+        )
+        self.assertTrue(self.hitl()["W03"]["agent_ready"])
+
+    def test_each_tbd_is_unresolved_and_a_legacy_file_reports_unknown(self):
+        (self.waves / "W04-z.md").write_text(
+            wave(status="proposed", executor="tbd", epic="tbd").replace("W02", "W04")
+        )
+        (self.waves / "W01-y.md").write_text(
+            wave(status="done", executor=None, epic=None, version=None).replace(
+                "W02", "W01"
+            )
+            + task("E04-T01", state="done", executor="agent")
+        )
+        report = self.hitl()
+        self.assertFalse(report["W04"]["agent_ready"])
+        self.assertEqual(
+            report["W04"]["unresolved"],
+            [{"id": "W04", "executor": "tbd"}, {"id": "E04", "executor": "tbd"}],
+        )
+        self.assertEqual(report["W01"]["executor"], "unknown")
+        self.assertEqual(report["W01"]["epics"], {"E04": "unknown"})
+        self.assertTrue(report["W01"]["agent_ready"])
+
+    def test_a_human_task_after_unfinished_agent_work_of_its_wave_fails(self):
+        head = wave(executor="human", epic="human")
+        agent = task("E04-T01", touches=["a"], executor="agent")
+        middle = task(
+            "E04-T02", ["E04-T01"], touches=["b"], executor="human", state="done"
+        )
+        late = task("E04-T03", ["E04-T02"], touches=["c"], executor="human")
+        errors = self.fails(agent, middle, late, head=head)
+        self.assertIn("E04-T03 is a human task that waits", errors)
+        self.assertIn("['E04-T01']", errors)
+        finished = agent.replace("State: todo", "State: done")
+        self.passes(finished, middle, late, head=head)
+
+    def test_a_human_task_after_a_qa_task_of_its_wave_fails(self):
+        errors = self.fails(
+            task("E04-T01", touches=["a"], executor="agent"),
+            qa("E04-QA1", ["E04-T01"]),
+            task("E04-T02", ["E04-QA1"], touches=["b"], executor="human"),
+            head=wave(executor="human", epic="human"),
+        )
+        self.assertIn("['E04-QA1', 'E04-T01']", errors)
+
+    def test_the_wave_and_its_epics_agree_with_their_tasks(self):
+        human = task("E04-T01", executor="human")
+        epic = self.fails(human, head=wave(executor="human", epic="agent"))
+        self.assertIn("E04 declares `agent` but has the human tasks", epic)
+        whole = self.fails(human, head=wave(executor="agent", epic="human"))
+        self.assertIn("the wave declares `agent` but has the human tasks", whole)
+        self.assertIn("the human epics ['E04']", whole)
+        empty = self.fails(
+            task("E04-T01", executor="agent"), head=wave(executor="human", epic="human")
+        )
+        self.assertIn("declares `human` but has no human task", empty)
+        self.passes(human, head=wave(executor="human", epic="human"))
+
+    def test_a_brief_never_says_tbd_and_version_3_needs_each_executor(self):
+        self.assertIn(
+            "has `Executor: tbd`",
+            self.fails(task("E04-T01", executor="tbd"), head=wave()),
+        )
+        missing = self.fails(task("E04-T01"), head=wave(executor=None, epic=None))
+        self.assertIn("the front matter has no `executor`", missing)
+        self.assertIn("E04 has no `- Executor:` line", missing)
+        self.assertIn("E04-T01 has no `Executor`", missing)
+
+    def test_a_legacy_file_without_executor_lines_passes(self):
+        legacy = wave(executor=None, epic=None, version="2.0.0")
+        self.passes(task("E04-T01"), task("E04-T02", ["E04-T01"]), head=legacy)
+        self.assertIn(
+            "has `Executor: tbd`",
+            self.fails(task("E04-T01", executor="tbd"), head=legacy),
+        )
+
+    def test_hitl_needs_a_folder(self):
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--hitl", str(self.waves / "none.md")],
             capture_output=True,
             text=True,
             check=False,

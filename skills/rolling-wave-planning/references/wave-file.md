@@ -11,6 +11,7 @@ project: ACME
 status: active   # proposed | planned | active | done | dropped
 label: wave:W02
 skill_version: "2.0.0"   # the `version` of this skill when the planner created this file
+executor: agent   # agent | human | tbd
 ---
 
 # W02: <name>
@@ -25,6 +26,7 @@ One sentence.
 
 ### E04: <outcome in plain words> → #52
 - Traces: [BC §4](../00-business-case.md#4-onboarding), SC2
+- Executor: agent | human | tbd
 - Problem (CMO): what is wrong or absent today, with its cost.
 - Outcome (FMO): what is true when the epic is closed.
 

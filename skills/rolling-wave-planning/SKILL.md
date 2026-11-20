@@ -23,12 +23,13 @@ The planner plans the later waves again at each wave review.
 - **QA machine:** the dedicated machine on which the QA agent tests. The default is the Mac Mini. If the PM names a different machine, record it in `01-project.md`
 - **UAT (user acceptance test):** the PM does every UAT. The PM reads the QA reports, then decides which tests to do and how detailed they are. The plan defines no UAT scenario, no UAT task and no UAT status
 - **Implementation instructions:** the PM gives them when implementation starts. Do not write a branch rule, a PR rule or an implementer procedure in `plan/`, in a brief or in the agent file
-- **Signals:** the procedures read these five signals from GitHub. The implementation instructions of the PM must produce them:
+- **Signals:** the procedures read these six signals. The implementation instructions of the PM must produce them:
   - A finished task closes its issue. A task is finished when its PR is merged or, for a task without a PR, when its result is on its issue
   - A PR and its branch refer to the task by its ID (ID rule 4)
   - A fix PR does not close its finding
   - The implementer reports work that the plan did not include, as [Procedure C](#procedure-c-triage-during-a-wave) says
   - Before the work starts, the executor of a task or QA task runs each `check` of the `needs` in its brief. If a `check` fails, the executor stops, comments the command and its output on the issue, and adds the label `0-impediment`
+  - Agents start a wave only after the planner reports `agent_ready: true` for it ([Hand off a wave](#hand-off-a-wave))
 
 ## Rules
 
@@ -51,6 +52,16 @@ The planner plans the later waves again at each wave review.
 
 The initial task limits are: one module or at most 8 files, approximately 400 changed lines, at most 5 acceptance items, and no open decision.
 `01-project.md` records the task limits and the QA limits.
+
+**Executor:** each wave, epic and task has one executor:
+
+- `agent`: an agent session does the work. A QA task counts as `agent`
+- `human`: the PM or a different person does the work
+- `tbd`: the PM wants the work, but nobody knows how to do it yet
+
+1. A brief has `agent` or `human`. Before a wave becomes `active`, make each `tbd` item of the wave a spike or a human task
+2. A wave or an epic that has a human task is `human`
+3. A human task blocks each task that names it in `blocked_by`. It also blocks its wave: agents start a wave only when each human task of the wave is `done` or `dropped`. Thus, a human task that needs agent work of its wave goes to a later wave
 
 ## Statuses
 
@@ -152,9 +163,9 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 5. Divide the project into 3 to 7 waves. Order them by risk and by dependency
    - W01 is a walking skeleton (a thin slice from end to end) or a test of the assumption with the highest risk
 6. Write the wave table in `01-project.md`
-7. Write one `proposed` file for each wave in `waves/`
-8. **Checkpoint:** show the waves, the open questions and the signals of [Actors](#actors) to the PM. Continue only when the PM approves
-9. Write W01 at `active` detail: epics with `Traces`, a full brief with its graph block for each task, and QA tasks
+7. Write one `proposed` file for each wave in `waves/`, with its `executor`
+8. **Checkpoint:** show the PM the waves, each wave `executor` that is `human` or `tbd`, the open questions and the signals of [Actors](#actors). Continue only when the PM approves
+9. Write W01 at `active` detail: epics with `Traces` and `Executor`, a full brief with its graph block for each task, and QA tasks
    - Plan the QA tasks as [Quality assurance](#quality-assurance) says
    - The first task of W01 writes the agent file, or updates it. The agent file gives the stack, the layout, the one verify command and how to start the system
 10. Write W02 at `planned` detail
@@ -163,6 +174,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 13. Do the [plan checks](#plan-checks). Correct each failure, then do the checks again
 14. Sync the plan to GitHub
 15. Commit `plan: initial decomposition` after the sync, so that the commit includes the issue numbers
+16. [Hand off](#hand-off-a-wave) W01
 
 ### Plan checks
 
@@ -199,8 +211,10 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
 ```
 
 - It answers `{"ok":true,"file":"…"}`, with `changes` when it wrote the graph file
-- It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, or two parallel tasks that are `todo` have a common path in `touches`. The last line of stderr lists each error with its correction. Correct the wave file and run it again
+- It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, two parallel tasks that are `todo` have a common path in `touches`, or an `Executor` breaks a rule of [Levels](#levels). The last line of stderr lists each error with its correction. Correct the wave file and run it again
 - With `--check`, it writes nothing and fails when the graph file does not match the briefs
+- With `--hitl plan/waves`, it writes nothing and answers each wave with its `executor`, its `unresolved` items and `agent_ready`. An unresolved item is a human task that is not `done` or `dropped`, or a `tbd` item. It ignores a `carried→WNN` task, because the receiving wave has its copy
+- A wave file with `skill_version` 3.0.0 or later must give each `Executor`. In an older wave file, the script reports a missing wave or epic `Executor` as `unknown`
 
 ## Procedure B: review a wave
 
@@ -251,6 +265,18 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
 17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
 18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
 19. Commit, for example `plan: review W01, insert W01B, amend W02`
+20. [Hand off](#hand-off-a-wave) the new active wave
+
+## Hand off a wave
+
+Do this procedure before agents start a wave.
+
+1. Get the issue states of the wave, as step 1 of Procedure B says. Get each carried task by the issue number of its heading (`→ #NN`)
+2. Write the states in the wave file. Run the graph script, and commit the change, such as `plan: hand off W02`
+3. Run `uv run <this-skill-folder>/scripts/plan_graph.py --hitl plan/waves`
+4. If the wave has `agent_ready: false`, show the PM its unresolved items by ID, and stop
+5. When the PM closes a human task, or when you resolve a `tbd` item, do this procedure again from step 1
+6. When the wave has `agent_ready: true`, tell the PM that agents can start the wave
 
 ## Procedure C: triage during a wave
 
