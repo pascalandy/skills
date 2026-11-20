@@ -25,7 +25,7 @@ One sentence.
 ## Epics
 
 ### E04: <outcome in plain words> → #52
-- Traces: [BC §4](../00-business-case.md#4-onboarding), SC2
+- Traces: [BC §4](../00-business-case.md#4-onboarding), SC2, FR-03
 - Executor: agent | human | tbd
 - Problem (CMO): what is wrong or absent today, with its cost.
 - Outcome (FMO): what is true when the epic is closed.
@@ -39,7 +39,7 @@ One sentence.
 - Acceptance:
   - [ ] `pnpm test tests/auth/login.test.ts` passes (valid login, wrong password, unknown user)
   - [ ] `curl -s -XPOST localhost:3000/login -d @fixtures/ok.json` returns 200 with `token`
-- Verify: `make verify`
+- Verify: `just check`
 - Out of scope: password reset, rate limiting (E04-T03)
 - Fixes finding: #71 (fix tasks only; #71 stays open until the QA agent closes it)
 - Ready review: planner, YYYY-MM-DD, plan checks pass
@@ -62,11 +62,11 @@ One sentence.
 #### E04-QA1: QA: <epic name> → #60
 - Kind: qa · Executor: QA agent on the QA machine · State: todo · Verdict: —
 - Context: what the epic delivers for the user, in 2–3 sentences.
-- Traces: [BC §4](../00-business-case.md#4-onboarding), SC2
+- Traces: [BC §4](../00-business-case.md#4-onboarding), SC2, FR-03
 - QA scenarios (≤ 8):
-  - [ ] A new user signs up, logs in and lands on the dashboard (`<exact steps or command>` → `<observable result>`)
-  - [ ] A wrong password shows an error and does not create a session
-- Also check: every verified task's Acceptance still passes on the default branch; `make verify` passes.
+  - [ ] FR-03: A new user signs up, logs in and lands on the dashboard (`<exact steps or command>` → `<observable result>`)
+  - [ ] FR-03: A wrong password shows an error and does not create a session
+- Also check: every verified task's Acceptance still passes on the default branch; `just check` passes.
 - Output: QA report comment, verdict label, one finding issue per finding. No commits, no PRs.
 - Ready review: planner, YYYY-MM-DD, plan checks pass
 
@@ -86,6 +86,7 @@ One sentence.
 ## Brief rules
 
 - Each acceptance item and each QA scenario is a command with an expected result, or exact steps with a result that a person can see. Never write "works correctly"
+- A QA scenario starts with each `FR-NN` or `NFR-NN` of `qa.md` that it tests
 
 ## Graph block
 

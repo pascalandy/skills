@@ -116,12 +116,13 @@ Only the PM can waive QA. The planner logs each waiver as a decision.
 ## Files
 
 ```
-CLAUDE.md / AGENTS.md            # agent file: stack, layout, verify command, how to start the system
+CLAUDE.md / AGENTS.md            # agent file: stack, layout, `just check`, how to start the system
                                  # (start command, seed data, test accounts)
 plan/
 ├── 00-business-case.md          # source document, read-only
 ├── 01-project.md                # summary, open questions, limits, QA machine, next IDs, wave table
 ├── decisions.md                 # D###: plan-structure and technical decisions
+├── qa.md                        # QA playbook: requirements, environments, ordered QA steps
 └── waves/
     ├── W01-walking-skeleton.md  # done
     ├── W01B-auth-foundation.md  # done, inserted at W01 review
@@ -145,7 +146,7 @@ plan/
 
 Before you write a plan file, read its template:
 
-- [Project files](references/project-files.md): `01-project.md` and `decisions.md`
+- [Project files](references/project-files.md): `01-project.md`, `decisions.md` and `qa.md`
 - [Wave file](references/wave-file.md): the wave file, the task brief, the QA brief, the graph block and the brief rules
 
 Before you write the plan to GitHub or read issue states from GitHub, read [GitHub sync](references/github-sync.md).
@@ -156,6 +157,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 2. Write the summary in `01-project.md`: objective, stakeholders, success criteria, constraints and out of scope
    - Number the success criteria `SC1`, `SC2`
    - Give each item 1 to 3 lines and a link to its section. Do not write the business case again
+   - Write the requirements of `qa.md` from each applicable section of the business case ([QA playbook](#maturity-checkpoints))
 3. Write `## Open questions` in `01-project.md`. Order the questions by how much each answer can change the plan, largest change first
 4. For each question whose answer can change the waves, write a `spike` task in W01 or ask the PM
    - A spike is a task that answers a question. It has no PR
@@ -167,7 +169,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 8. **Checkpoint:** show the PM the waves, each wave `executor` that is `human` or `tbd`, the open questions and the signals of [Actors](#actors). Continue only when the PM approves
 9. Write W01 at `active` detail: epics with `Traces` and `Executor`, a full brief with its graph block for each task, and QA tasks
    - Plan the QA tasks as [Quality assurance](#quality-assurance) says
-   - The first task of W01 writes the agent file, or updates it. The agent file gives the stack, the layout, the one verify command and how to start the system
+   - Add the tasks and the scope bullets of the [maturity checkpoints](#maturity-checkpoints)
 10. Write W02 at `planned` detail
 11. Keep each later wave `proposed`
 12. Log `D001`: the initial waves and the reason for them
@@ -261,11 +263,12 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
 13. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
 14. Log one decision for each change to the plan structure
 15. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
-16. Update the wave table and `Next IDs` in `01-project.md`
-17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
-18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
-19. Commit, for example `plan: review W01, insert W01B, amend W02`
-20. [Hand off](#hand-off-a-wave) the new active wave
+16. Do the [maturity checkpoints](#maturity-checkpoints)
+17. Update the wave table and `Next IDs` in `01-project.md`
+18. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
+19. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
+20. Commit, for example `plan: review W01, insert W01B, amend W02`
+21. [Hand off](#hand-off-a-wave) the new active wave
 
 ## Hand off a wave
 
@@ -360,6 +363,18 @@ These rules apply to each finding:
    - If the rejected QA task was blocking, the re-QA task replaces it in each `blocked_by` that names it
 6. After two `rejected` verdicts in sequence on one epic, the planner stops, adds the label `needs-replan` to the epic and asks the PM
 7. If a finding changes the scope or a contract, it is a `needs-replan` case of Procedure C
+
+## Maturity checkpoints
+
+Do these checkpoints in Procedure A and at each wave review. A checkpoint whose trigger is true adds its task, unless the PM waives it. Log each waiver as a decision.
+
+- **CI baseline** (always, the first task of W01): a chore task writes the agent file, a `justfile` and a lefthook pre-commit configuration. Examples: the `justfile` of pascalandy/skills and of pascalandy/mixtape
+  - `just check` is the one CI command. `just signoff` refuses a dirty tree, runs `just check` on the pushed HEAD, and posts a green status with `gh signoff`
+  - Each pre-commit hook calls a `just` recipe. Each recipe is one line. The logic is in scripts
+  - Each agent task after the CI baseline is `blocked_by` it. Its `Verify` is `just check`, with task-specific proof when necessary. The CI baseline task and the human tasks use task-specific proof
+- **CI mature** (when `just check` is slow, or the project has more than one contributor or makes releases): `just check` selects its checks from the changed files, and `--only NAME` runs one check. `just merge` merges a PR only when its head has a green signoff. Add a GitHub Actions runner only for a mature private repository with more than one contributor or with releases
+- **Verification loop** (when the checkout builds and starts with one command, and a user journey can be driven end to end): a chore task runs `create-verification-skill`. Until then, keep a placeholder scope bullet in a `proposed` wave. When a wave changes the feature map, a user journey, the launch or the harness, add a task that runs `maintain-verification-skill`
+- **QA playbook** (always): `plan/qa.md` holds the requirements, the environments and the ordered QA steps, as [Project files](references/project-files.md) says. At each wave review, update it from the QA reports
 
 ## Version
 
