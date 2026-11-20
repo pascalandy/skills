@@ -14,7 +14,7 @@ date_updated: 2026-10-28
 
 ## Run it
 
-- The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
+- The profile follows the OS: `mac` on macOS, `linux` elsewhere. Pass `--profile` to override
 - Every package under `skills-private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root
 - A name that is both public and private stops the install, a dry run included, and the error names both paths: remove the public package to keep the skill private, or delete the private copy to publish it
 - A run answers `{"ok":true,"changes":[...]}`, one change per entry, such as `["add","~/.claude/skills/concise"]`, and `{"ok":true}` when every target is current. `--dry-run` answers the same without writing; `--check` fails when a selected target needs work, with the changes beside the error. `-v` logs how many entries each target holds current

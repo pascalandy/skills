@@ -60,7 +60,7 @@ def fake_opencode(binary: Path, location: Path) -> None:
     binary.chmod(0o755)
 
 
-@pytest.mark.parametrize("profile", [None, "om1", "mac"])
+@pytest.mark.parametrize("profile", [None, "linux", "mac"])
 def test_profile_defaults_to_the_os_and_an_explicit_profile_wins(
     sandbox: tuple[Path, Path], tmp_path: Path, profile: str | None
 ) -> None:
@@ -74,7 +74,7 @@ def test_profile_defaults_to_the_os_and_an_explicit_profile_wins(
     args = ("--profile", profile) if profile else ()
     result = run(home, binary, *args, "--agent", "opencode")
 
-    selected = profile or ("mac" if sys.platform == "darwin" else "om1")
+    selected = profile or ("mac" if sys.platform == "darwin" else "linux")
     if selected == "mac":
         assert errors(result) == [
             "opencode did not load apple-mail; run just install-skills --profile mac, then rerun"

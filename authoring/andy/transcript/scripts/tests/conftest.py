@@ -61,7 +61,7 @@ def no_export_machine(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> None:
     """Results stay local, whatever fleet skill this machine holds; a test of
-    the copy to mbp installs its own fleet.toml."""
+    the export copy installs its own fleet.toml."""
     import transcript
 
     absent = tmp_path_factory.mktemp("no-fleet") / "fleet.toml"

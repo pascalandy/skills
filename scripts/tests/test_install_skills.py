@@ -26,7 +26,12 @@ MAC = (
     ".config/opencode/skills",
     ".config/agents/skills",
 )
-OM1 = (".pi/agent/skills", ".codex/skills", ".claude/skills", ".config/opencode/skills")
+LINUX = (
+    ".pi/agent/skills",
+    ".codex/skills",
+    ".claude/skills",
+    ".config/opencode/skills",
+)
 COMMANDS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
 RETIRED = (".codex/prompts", ".config/agents/commands")
 
@@ -76,7 +81,7 @@ def report(result: subprocess.CompletedProcess[str]) -> list[dict]:
             "name": path.rsplit("/", 1)[1],
         }
         for kind, path in json.loads(result.stdout).get("changes", [])
-        if path[2:].rsplit("/", 1)[0] in {*MAC, *OM1, *COMMANDS, *RETIRED}
+        if path[2:].rsplit("/", 1)[0] in {*MAC, *LINUX, *COMMANDS, *RETIRED}
     ]
 
 
@@ -93,7 +98,7 @@ HARNESS_FILES = (
 )
 
 
-@pytest.mark.parametrize("profile", ["mac", "om1"])
+@pytest.mark.parametrize("profile", ["mac", "linux"])
 @pytest.mark.parametrize("override", ["default", "absolute", "relative"])
 def test_instruction_files_preview_apply_update_and_converge(
     sandbox: tuple[Path, Path], profile: str, override: str
@@ -166,7 +171,7 @@ def test_instruction_files_preview_apply_update_and_converge(
     assert run(repo, home, *args, "--check").stdout == OK
 
 
-@pytest.mark.parametrize("link", ["mbp", "dangling", "same-content"])
+@pytest.mark.parametrize("link", ["updated-master", "dangling", "same-content"])
 def test_instruction_symlinks_become_regular_files(
     sandbox: tuple[Path, Path], link: str
 ) -> None:
@@ -178,7 +183,7 @@ def test_instruction_symlinks_become_regular_files(
     destination.symlink_to(
         "../.config/opencode/AGENTS.md" if link != "dangling" else "missing.md"
     )
-    if link == "mbp":
+    if link == "updated-master":
         (masters / "AGENTS-HARNAIS.md").write_bytes(b"new harness\n")
 
     applied = run(repo, home)
@@ -187,13 +192,15 @@ def test_instruction_symlinks_become_regular_files(
     assert ["update", "~/.claude/CLAUDE.md"] in json.loads(applied.stdout)["changes"]
     assert not destination.is_symlink()
     assert destination.read_bytes() == (
-        b"new harness\n" if link == "mbp" else b"synthetic harness instructions\n"
+        b"new harness\n"
+        if link == "updated-master"
+        else b"synthetic harness instructions\n"
     )
     backups = list((home / ".cache/agents-instructions").glob("*.bak"))
     if link == "dangling":
         assert len(backups) == 1 and backups[0].is_symlink()
         assert os.readlink(backups[0]) == "missing.md"
-    elif link == "mbp":
+    elif link == "updated-master":
         assert len(backups) == 4
         assert all(
             path.read_bytes() == b"synthetic harness instructions\n" for path in backups
@@ -988,15 +995,15 @@ def test_symlink_at_a_target_blocks_apply_and_fails_a_preview_too(
     assert ["add", "~/.agents/skills/alpha"] in answer["changes"]
 
 
-def test_om1_exclusion_and_inactive_mac_target(sandbox: tuple[Path, Path]) -> None:
+def test_linux_exclusion_and_inactive_mac_target(sandbox: tuple[Path, Path]) -> None:
     repo, home = sandbox
     skill(repo / "authoring/content", "apple-mail")
-    preview = run(repo, home, "--profile", "om1", "--dry-run")
+    preview = run(repo, home, "--profile", "linux", "--dry-run")
     assert preview.returncode == 0
     assert {a["name"] for a in report(preview)} == {"alpha"}
-    assert run(repo, home, "--profile", "om1").returncode == 0
+    assert run(repo, home, "--profile", "linux").returncode == 0
     assert not (home / ".agents").exists()
-    assert not any((home / target / "apple-mail").exists() for target in OM1)
+    assert not any((home / target / "apple-mail").exists() for target in LINUX)
     assert (home / ".codex/skills/alpha/SKILL.md").exists()
 
 
@@ -1078,18 +1085,18 @@ def test_a_command_retired_from_authoring_commands_is_still_removed(
     assert not any((home / target / "legacy.md").exists() for target in COMMANDS)
 
 
-def test_om1_codex_directory_holds_skills_beside_commands(
+def test_linux_codex_directory_holds_skills_beside_commands(
     sandbox: tuple[Path, Path],
 ) -> None:
     repo, home = sandbox
     command(repo, "review")
     commit(repo)
-    assert run(repo, home, "--profile", "om1").returncode == 0
+    assert run(repo, home, "--profile", "linux").returncode == 0
     assert sorted(path.name for path in (home / ".codex/skills").iterdir()) == [
         "alpha",
         "review",
     ]
-    checked = run(repo, home, "--profile", "om1", "--check", "-v")
+    checked = run(repo, home, "--profile", "linux", "--check", "-v")
     assert (checked.returncode, checked.stdout) == (0, OK)
     assert "~/.codex/skills: 2 of 2 current\n" in checked.stderr
 
@@ -1104,7 +1111,7 @@ def test_retired_command_targets_lose_only_published_commands(
         (home / target).mkdir(parents=True)
         (home / target / "review.md").write_text("old\n", encoding="utf-8")
         (home / target / "mine.md").write_text("keep\n", encoding="utf-8")
-    applied = run(repo, home, "--profile", "om1")
+    applied = run(repo, home, "--profile", "linux")
     assert applied.returncode == 0
     assert {("remove", target, "review.md") for target in RETIRED} <= {
         (a["kind"], a["target"], a["name"]) for a in report(applied)
@@ -1112,7 +1119,7 @@ def test_retired_command_targets_lose_only_published_commands(
     for target in RETIRED:
         assert not (home / target / "review.md").exists()
         assert (home / target / "mine.md").read_text(encoding="utf-8") == "keep\n"
-    assert run(repo, home, "--profile", "om1", "--check").returncode == 0
+    assert run(repo, home, "--profile", "linux", "--check").returncode == 0
 
 
 def test_retired_targets_reached_through_a_symlink_are_left_alone(

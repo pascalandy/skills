@@ -1,4 +1,4 @@
-"""The copy of each result folder to mbp, the machine Pascal reads transcripts on."""
+"""Copy result folders to the configured export machine."""
 
 from __future__ import annotations
 
@@ -10,25 +10,24 @@ from pathlib import Path
 import pytest
 from test_transcript import deepgram_response
 
-MBP = "andy16@mbp16.example.ts.net"
+READER_SSH = "reader@receiving-host.example.test"
 
 
 @pytest.fixture
 def fleet(tmp_path, monkeypatch):
-    """A fleet.toml naming mbp, the default output parent in tmp_path, and a
-    machine named om1; answers the rsync commands the run starts."""
+    """Set up an export role and a local output folder, then stub rsync."""
     import httpx
     import transcript
 
     machines = tmp_path / "fleet.toml"
     machines.write_text(
-        f'[machines.om1]\nssh = "pascal@om1.example.ts.net"\n'
-        f'[machines.mbp]\nssh = "{MBP}"\n',
+        '[roles]\ntranscript_export = "reader"\n'
+        f'[machines.reader]\nssh = "{READER_SSH}"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(transcript, "FLEET_MACHINES", machines)
     monkeypatch.setattr(transcript, "OUTPUT_DIR", tmp_path / "exports")
-    monkeypatch.setattr(transcript.platform, "node", lambda: "om1")
+    monkeypatch.setattr(transcript.platform, "node", lambda: "worker")
     monkeypatch.setattr(transcript, "get_api_key_from_fnox", lambda *_args: "dummy-key")
     monkeypatch.setattr(
         transcript.httpx,
@@ -66,11 +65,11 @@ def run_file(capsys, audio: Path, *extra: str) -> tuple[int, dict]:
     return code, json.loads(out if code == 0 else err.splitlines()[-1])
 
 
-def test_a_result_under_the_default_parent_is_copied_to_mbp(fleet, capsys) -> None:
+def test_a_result_under_the_default_parent_is_copied_to_the_configured_host(fleet, capsys) -> None:
     code, answer = run_file(capsys, fleet["audio"])
 
     folder = Path(answer["files"][0]).parent
-    destination = f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/"
+    destination = f"{READER_SSH}:Documents/_my_docs/61_transcription_exports_yt/"
     assert code == 0
     assert fleet["commands"] == [
         [
@@ -91,7 +90,7 @@ def test_a_failed_copy_keeps_the_local_result_and_names_the_rsync_retry(
     fleet, capsys
 ) -> None:
     fleet["outcome"].update(
-        returncode=255, stderr="ssh: connect to host mbp16: Operation timed out"
+        returncode=255, stderr="ssh: connect to host receiving-host: Operation timed out"
     )
 
     code, answer = run_file(capsys, fleet["audio"])
@@ -108,7 +107,7 @@ def test_a_failed_copy_keeps_the_local_result_and_names_the_rsync_retry(
         "rsync",
         "-rt",
         str(folder),
-        f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/",
+        f"{READER_SSH}:Documents/_my_docs/61_transcription_exports_yt/",
     ]
 
 
@@ -122,8 +121,10 @@ def test_a_custom_output_dir_stays_local(fleet, tmp_path, capsys) -> None:
     assert "changes" not in answer
 
 
-@pytest.mark.parametrize("node", ["mbp16.example.ts.net", "MBP16", "mbp"])
-def test_results_stay_on_mbp_itself(fleet, monkeypatch, capsys, node) -> None:
+@pytest.mark.parametrize(
+    "node", ["receiving-host.example.test", "RECEIVING-HOST", "reader"]
+)
+def test_results_stay_on_the_export_machine(fleet, monkeypatch, capsys, node) -> None:
     import transcript
 
     monkeypatch.setattr(transcript.platform, "node", lambda: node)
@@ -148,16 +149,28 @@ def test_without_the_fleet_skill_results_stay_local(
     assert fleet["commands"] == []
 
 
-def test_a_fleet_toml_without_mbp_fails_the_dry_run_and_doctor(fleet, capsys) -> None:
+@pytest.mark.parametrize(
+    ("inventory", "error"),
+    [
+        ("[roles]\n", "must name a machine in [roles].transcript_export"),
+        (
+            '[roles]\ntranscript_export = "reader"\n',
+            "has no ssh address for [machines.reader]",
+        ),
+    ],
+)
+def test_incomplete_export_config_fails_the_dry_run_and_doctor(
+    fleet, capsys, inventory: str, error: str
+) -> None:
     import transcript
 
-    transcript.FLEET_MACHINES.write_text(
-        '[machines.om1]\nssh = "pascal@om1"\n', encoding="utf-8"
-    )
+    transcript.FLEET_MACHINES.write_text(inventory, encoding="utf-8")
 
-    assert run_file(capsys, fleet["audio"], "--dry-run")[0] == 1
+    code, plan = run_file(capsys, fleet["audio"], "--dry-run")
+    assert code == 1
+    assert error in plan["errors"][0]
     assert transcript.main(["doctor", "--source", "file", "--no-summary"]) == 1
-    assert "has no ssh address for [machines.mbp]" in capsys.readouterr().err
+    assert error in capsys.readouterr().err
 
 
 def test_the_dry_run_and_doctor_name_the_destination(
@@ -167,7 +180,7 @@ def test_the_dry_run_and_doctor_name_the_destination(
 
     code, plan = run_file(capsys, fleet["audio"], "--dry-run")
     assert code == 0
-    assert plan["export"] == f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/"
+    assert plan["export"] == f"{READER_SSH}:Documents/_my_docs/61_transcription_exports_yt/"
     assert fleet["commands"] == []
 
     monkeypatch.setattr(
@@ -199,7 +212,7 @@ def test_a_failed_run_still_copies_the_folder_it_saved(
     assert code == 1
     assert len(fleet["commands"]) == 1
     assert answer["changes"] == [
-        ["copy", f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/{folder.name}"]
+        ["copy", f"{READER_SSH}:Documents/_my_docs/61_transcription_exports_yt/{folder.name}"]
     ]
 
 
@@ -225,7 +238,7 @@ def test_an_interrupted_copy_answers_the_saved_files_and_the_rsync(
                 "rsync",
                 "-rt",
                 str(folder),
-                f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/",
+                f"{READER_SSH}:Documents/_my_docs/61_transcription_exports_yt/",
             ]
         )
     ]

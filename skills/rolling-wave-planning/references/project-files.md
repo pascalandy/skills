@@ -14,7 +14,7 @@ Read this file before you write `01-project.md`, `decisions.md` or `qa.md`.
 - Constraints: …
 - Out of scope: …
 - Source: [Business case](00-business-case.md) · Agent file: [CLAUDE.md](../CLAUDE.md)
-- QA machine: Mac Mini
+- QA machine: dedicated QA host
 
 ## Open questions
 1. … → spike E01-T01 | asked to PM | resolved D002
@@ -66,7 +66,7 @@ Verification skill: `verify-acme` (or none)
 ## Environments
 | Name | Machine | Access | Tools |
 |---|---|---|---|
-| qa | Mac Mini | `ssh qa-host` | `pnpm`, `playwright` |
+| qa | Dedicated QA host | `ssh qa-host` | `pnpm`, `playwright` |
 
 ## Steps
 | Step | After | Command or tool | Machine | Expected result |
