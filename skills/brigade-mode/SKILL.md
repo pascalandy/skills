@@ -23,7 +23,7 @@ A `model` in a route's `config.toml` is an alias, such as `sol`, `opus`, `terra`
 
 ## Report times
 
-Use the user's reporting time zone for clock times in messages and Details. If it is unset, use `timezone` in `fleet/references/fleet.toml` when available, or UTC otherwise. Convert timestamps from GitHub and T3 before reporting them.
+Use the time zone the user states for clock times in messages and Details. If the user gives no time zone, use `timezone` in `fleet/references/fleet.toml` when available, or UTC otherwise. Convert timestamps from GitHub and T3 before reporting them.
 
 ## Routes
 
