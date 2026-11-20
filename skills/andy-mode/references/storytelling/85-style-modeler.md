@@ -17,20 +17,22 @@ works selected for a shared style, and which output media the editor should supp
 Use the supplied accessible material; collecting a creator's complete work is a
 separate task.
 
-Resolve the output location before writing any file. A style profile and its corpus
-are private, so both go to Pascal's private repository `pascalandy/skills-private`,
-in a worktree created as its `AGENTS.md` describes:
+Resolve a private destination before writing any files. Use the local path supplied
+by the user if present. Otherwise, use the local environment variable
+`STYLE_MODELER_DESTINATION`. If the selected destination is missing, unavailable, or
+public, ask for a private destination and defer all writes.
 
-- the package at `authoring/styles/style-<name>/`
-- the supplied corpus files at `skill_archived/style-<name>/references/source/`,
-  which never installs
+For a managed repository, read its `AGENTS.md` and follow its worktree rules. Use
+its authoring layout for the package and its archive layout for the supplied
+corpus. Group the corpus by skill in an archive outside the skill installation
+trees. For a standalone directory, put the package at
+`<destination>/<skill-name>/` and the supplied corpus at
+`<destination>/.corpus/<skill-name>/`.
 
-Use the requested destination when one is given. When the private repository is
-unavailable, ask for the destination and write nothing to the current repository.
-Use the requested name or derive `<name>` from the creator or the modeled craft. If
-it collides with an existing skill, choose a distinct name or ask when the name
-matters; overwriting requires authorization. Creating source files does not
-authorize deployment.
+Use the requested skill name. Otherwise, choose a slug for the creator or modeled
+craft and prefix it with `style-`. If the skill name collides with an existing
+skill, choose a distinct name or ask when the name matters. Overwriting requires
+authorization. Creating source files does not authorize deployment.
 
 When enough material is available, reserve an excerpt for evaluation after the first
 profile is frozen. A single short excerpt can support a provisional profile, with its
