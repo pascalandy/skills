@@ -382,7 +382,7 @@ These rules apply to each finding:
 
 ## Maturity checkpoints
 
-Do these checkpoints in Procedure A and at each wave review. A checkpoint whose trigger is true adds its task, unless the PM waives it. Log each waiver as a decision.
+Do these checkpoints in Procedure A and at each wave review. A mandatory checkpoint whose trigger is true adds its task, unless the PM waives it. An optional checkpoint adds its task only when the PM chooses it. Log each waiver as a decision.
 
 - **CI baseline** (always, the first task of W01): a chore task writes the agent file, a `justfile` and a lefthook pre-commit configuration. Examples: the `justfile` of pascalandy/skills and of pascalandy/mixtape
   - `just check` is the one CI command. `just signoff` refuses a dirty tree, runs `just check` on the pushed HEAD, and posts a green status with `gh signoff`
