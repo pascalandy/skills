@@ -12,7 +12,7 @@ From the skills repository on the source Mac:
 just ttr "<youtube-url>"
 ```
 
-The first time, and whenever `just ttr` reports that YouTube refused the vault session, follow [Renew from Helium's CLI profile](#renew-from-heliums-cli-profile). Those errors end with `fix: just transcript-auth-refresh`.
+The first time, and whenever `just ttr` reports that YouTube refused the vault session, follow [Renew from the configured Helium profile](#renew-from-the-configured-helium-profile). Those errors end with `fix: just transcript-auth-refresh`.
 
 ## Runtime requirements
 
@@ -209,7 +209,7 @@ A run reads YouTube through a cookies file: `--cookies FILE`, or else the sessio
 
 One yt-dlp call reads the video's title and ID and downloads its best native audio stream at 64 kbps or less, or its best audio when none is that small. Deepgram receives that file as is, with no transcode.
 
-YouTube Premium needs no extra setting: the vault session carries the account signed in to Helium's `CLI` profile.
+YouTube Premium needs no extra setting: the vault session carries the account signed in to the configured Helium profile.
 
 Run the free transport check on the canonical video from [Test videos](#test-videos):
 
@@ -229,34 +229,14 @@ The only copy of the session is the age-encrypted fnox entry `YOUTUBE_COOKIES_TX
 
 YouTube runs, doctor, smoke and `auth check` choose the vault by default. A dry run names `fnox:YOUTUBE_COOKIES_TXT` after `fnox list` finds the entry, and decrypts nothing. Normal vault runs require a positive signed-in YouTube response before reading Deepgram credentials or starting paid work. When the entry exists but fnox cannot read it, the run fails without an anonymous fallback.
 
-#### Renew from Helium's CLI profile
+#### Renew from the configured Helium profile
 
-The session comes from a Helium profile that only tools use. Nobody browses there, so YouTube never rotates its cookies and the copy stays valid for weeks or months. Set it up once on the source Mac:
+On the source Mac, configure the dedicated profile in `youtube-session.toml`.
+Follow [YouTube session renewal](references/youtube-auth-refresh.md) to locate
+the local settings file, export the session, and verify the result.
 
-1. In Helium, create a profile named `CLI`
-2. In that profile, sign in to YouTube with the account Transcript should use, such as your YouTube Premium account
-3. Open `https://www.youtube.com/robots.txt` in that tab, then close the profile's window. Never browse YouTube in this profile
-4. Create a worktree of `pascalandy/dotfiles` from `origin/HEAD`, as `docs/operations/secrets.md` of that repository describes
-5. From the skills repository, in the source Mac's unlocked desktop terminal, run:
-
-   ```bash
-   just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree>
-   ```
-
-   The first run asks for Keychain access to `Helium Storage Key`. Choose `Always Allow`
-6. Commit that one changed file, open the dotfiles PR and run `just merge` from the worktree, using the `next` steps in the command's answer. A diff that only replaces one encrypted value merges without a delegated review, and `just merge` brings every machine to the new value
-7. Run `just transcript-cli auth check`
-
-Sign in again in the `CLI` profile (steps 2 and 3) only when `auth check` reports that YouTube refused the session or the export fails. No fixed interval applies.
-
-The refresh exports only YouTube-domain cookies from the `CLI` profile and verifies the session against YouTube first. It then runs `fnox set YOUTUBE_COOKIES_TXT --provider age --from-file /dev/stdin -c <dotfiles-worktree>/dot_config/private_fnox/private_config.toml`, restores `as_file = true` on the entry when `fnox set` dropped it, and reads the value back through `fnox exec` to confirm it matches the verified export. The export lives only in a private temporary directory that is removed on exit. A failed export or verification leaves the worktree unchanged. No paid API is involved, and cookie values enter neither arguments nor diagnostics. The vault changes for the fleet only once the dotfiles PR merges.
-
-```bash
-just transcript-cli auth check
-just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree> --dry-run
-```
-
-`auth check` requires a positive login response without transcription. `just transcript-auth-refresh --help` describes the preview. The session survives restarts, but YouTube can invalidate it at any time. Reconnection remains interactive when Google requires it. The source Mac must be awake for renewal; other computers read the vault. Network and rate-limit failures are reported separately from a signed-out session.
+Sign in again when `auth check` reports that YouTube refused the session or
+the export fails. After renewing the session, run `just transcript-cli auth check`.
 
 #### Supply another export
 
