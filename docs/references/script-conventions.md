@@ -92,7 +92,6 @@ Opt-in flags that would give no real choice are left out, and a script outside t
 - `just compile-skills`, `just install-skills`, `just remote-skills`: no `-o` or `-`; they write fixed paths: `skills/` and the skill count, the agent directories, and the skill lists
 - `just install-skills`: no `--force`; it would delete entries the installer does not own
 - `just release-check`: `--notes FILE` names what `-o` would write
-- `just sync-fleet`: no `-c/--config`; `--fleet PATH` is the one registry
 - `headless`: `--config` has no `-c`, because Codex's own `-c key=value` flags pass after `--`, and a short alias would read one typed before `--` as a config path
 - `scripts/check_cli_block.py`: no `-n/--dry-run`; it changes nothing without `--fix`
 - `transcript`: no `-o` or `-`; a run writes a folder of several files, named by `--output-dir`

@@ -1,4 +1,4 @@
-"""A throwaway GitHub for the tests of just signoff and just merge: a bare
+"""A throwaway GitHub for the tests of just signoff: a bare
 origin, a pushed checkout, and a fake gh.
 
 Run as a program, this file is gh. It answers from the JSON state that
@@ -42,20 +42,6 @@ else:
     print('{"ok":true}')
 sys.exit(code)
 """
-DEPLOY = """\
-import os, sys
-
-with open(os.environ["FAKE_DEPLOYS"], "a") as log:
-    log.write(os.getcwd() + "\\n")
-code = int(os.environ.get("FAKE_DEPLOY_EXIT", "0"))
-sys.stderr.write(os.environ.get("FAKE_DEPLOY_STDERR", ""))
-if os.environ.get("FAKE_DEPLOY_PARTIAL"):
-    print('{"ok":false,"errors":["mini offline"],"changes":[["sync","mbp","abc1234"]]}', file=sys.stderr)
-    sys.exit(1)
-if code == 0:
-    print('{"ok":true,"changes":[["sync","mbp","abc1234"]]}')
-sys.exit(code)
-"""
 
 
 class Sandbox:
@@ -69,7 +55,6 @@ class Sandbox:
         self.work = root / "work"
         self.state_path = root / "github.json"
         self.checks_log = root / "checks.log"
-        self.deploys_log = root / "deploys.log"
         fakes = root / "bin"
         fakes.mkdir()
         gh = fakes / "gh"
@@ -87,7 +72,6 @@ class Sandbox:
             "PATH": f"{fakes}{os.pathsep}{os.environ['PATH']}",
             "FAKE_GITHUB": str(self.state_path),
             "FAKE_CHECKS": str(self.checks_log),
-            "FAKE_DEPLOYS": str(self.deploys_log),
         }
         self.save({"origin": str(self.origin), "statuses": {}, "prs": [], "hooks": {}})
         scripts_dir = self.main / "scripts"
@@ -95,7 +79,6 @@ class Sandbox:
         for name in ("_cli.py", "_common.py", *scripts):
             shutil.copy2(SCRIPTS / name, scripts_dir / name)
         (scripts_dir / "check.py").write_text(CHECK)
-        (scripts_dir / "sync_fleet.py").write_text(DEPLOY)
         (self.main / ".gitignore").write_text("__pycache__/\n")
         self.git("init", "-q", "-b", "main", cwd=self.main)
         self.git("add", "-A", cwd=self.main)
@@ -206,12 +189,6 @@ class Sandbox:
         if not self.checks_log.exists():
             return []
         return self.checks_log.read_text().splitlines()
-
-    def deploys(self) -> list[Path]:
-        """The checkout each deploy ran in, in order."""
-        if not self.deploys_log.exists():
-            return []
-        return [Path(line) for line in self.deploys_log.read_text().splitlines()]
 
 
 def origin(state: dict, *args: str) -> subprocess.CompletedProcess[str]:

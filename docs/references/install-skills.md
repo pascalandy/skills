@@ -1,6 +1,6 @@
 ---
 name: Install skills
-description: Profiles, the private clone, ownership, fleet sync from any machine, hooks, and cutover for just install-skills
+description: Profiles, the private clone, ownership, syncing this machine, and cutover for just install-skills
 tags:
   - area/ea
   - kind/doc
@@ -18,7 +18,7 @@ date_updated: 2026-10-28
 - Every package under `skills-private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root
 - A name that is both public and private stops the install, a dry run included, and the error names both paths: remove the public package to keep the skill private, or delete the private copy to publish it
 - A run answers `{"ok":true,"changes":[...]}`, one change per entry, such as `["add","~/.claude/skills/concise"]`, and `{"ok":true}` when every target is current. `--dry-run` answers the same without writing; `--check` fails when a selected target needs work, with the changes beside the error. `-v` logs how many entries each target holds current
-- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as a commit hook during `just sync-fleet`, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
+- Applies from one repository, its worktrees included, take turns through a lock in its git directory, so overlapping runs, such as two worktrees installing at once, leave the newest working tree installed. An apply waits up to `--timeout` for another, then exits 75; previews and checks do not wait
 - Git keeps a directory that still holds ignored files, so moving or renaming a skill can leave its old folder in `authoring/` or `skills/` behind. An apply deletes each such category, package, or skill folder when it holds only caches: `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, or `.DS_Store`. A leftover holding any other ignored file stays, and the apply fails once the install is done, naming the file. A file saved outside those caches during cleanup survives. If cleanup cannot scan or delete a leftover, the apply also fails once the install is done
 
 ## Agent instructions
@@ -33,9 +33,9 @@ When the private root exists, `just install-skills` also reads two masters under
 
 `<projects>` is the parent of the resolved private root, including an override. Both profiles install all six files and create missing parent directories, even for an absent harness. Grok reads Claude's file, so the installer creates no `~/.grok/AGENTS.md`
 
-Without a private root, the public install leaves instruction files alone. With a private root, either missing master fails the run before any installation. A standalone install uses the local clone without network access. `just deploy` updates the private clone before installation
+Without a private root, the public install leaves instruction files alone. With a private root, either missing master fails the run before any installation. A standalone install uses the local clone without network access. `just sync` updates the private clone before installation
 
-The six files share the skills' plan and JSON report. An unchanged file produces no change. Preview and check compare their bytes too, so `just sync-fleet --check` sees missing or different instructions. Reports contain paths and actions, never file contents
+The six files share the skills' plan and JSON report. An unchanged file produces no change. Preview and check compare their bytes too, so `--check` sees missing or different instructions. Reports contain paths and actions, never file contents
 
 A destination symlink becomes a regular file, even when dangling. A directory or another non-file destination is a conflict that blocks the whole install. When contents differ, the old bytes go into a unique backup under `~/.cache/agents-instructions/`. A link without file contents is backed up as a link. An identical symlink target needs no content backup. Each destination keeps its five newest backups, separately from files with the same name elsewhere
 
@@ -55,52 +55,22 @@ Instruction files are installed copies. Their masters change through a skills-pr
 Private skills live in the private repository `pascalandy/skills-private`, cloned once per machine at `skills-private/`, beside the main checkout in the same projects folder. Its URL is this checkout's `origin` with `skills` renamed to `skills-private`, so each machine reaches GitHub the way its public checkout does
 
 - The clone mirrors this repository: packages that install live in `authoring/<category>/<skill>/`, and `skill_archived/` holds packages that never install, such as the skills `jsm` installs. Move a package into `authoring/` to install it, and back to `skill_archived/` to retire it
-- The repository is the source of truth. Change a private skill in a worktree of `skills-private` and open a PR there, never in the clone. After the merge, run `just sync-fleet` from this checkout
-- `scripts/sync_private.py` manages the clone; `just sync` and `just sync-fleet` run it. It clones a missing folder, then fast-forwards `main` to GitHub's. A folder that is not a clone, a clone off `main`, one with uncommitted edits, or one with commits GitHub lacks stops it with exit 1, untouched: it never commits or pushes
+- The repository is the source of truth. Change a private skill in a worktree of `skills-private` and open a PR there, never in the clone. After the merge, `just sync` pulls and installs it
+- `scripts/sync_private.py` manages the clone; `just sync` runs it. It clones a missing folder, then fast-forwards `main` to GitHub's. A folder that is not a clone, a clone off `main`, one with uncommitted edits, or one with commits GitHub lacks stops it with exit 1, untouched: it never commits or pushes
 - Worktrees of this repository share the main checkout's clone, since it sits beside the main checkout
-- The private sync names a refused SSH key and asks you to unlock the SSH agent or load the key. It treats network failures as temporary. Fleet inspection also reports key refusals when its comparison needs a private fetch. Every clone or fetch failure includes a command to inspect it locally, without copying Git's output into the report
+- The private sync names a refused SSH key and asks you to unlock the SSH agent or load the key. It names an HTTPS login that no git credential helper answered, and the git config key to check. It treats network failures as temporary. Every clone or fetch failure includes a command to inspect it locally, without copying Git's output into the report
 
-## Sync machines
+## Sync this machine
 
-GitHub's `main` is the source. Every machine in the fleet runs the same commands and hooks, and any of them can start a sync
-
-- `just sync` pulls `main` and the private clone, and installs on the machine it runs on, without touching the others. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
-- `just sync-fleet`, or its alias `just deploy`, brings every machine in the fleet registry to GitHub's `main`, the machine it runs on included; name machines to limit it, such as `just sync-fleet mbp`, by registry name or host. It fetches GitHub's `main`, or uses the last one fetched when GitHub is unreachable, and pulls its own private clone first, then reads the registry from it, so a registry change merged on GitHub applies to the same run. Each machine then receives that commit over SSH, fast-forwards its checkout to it, pulls its own private clone from GitHub, and runs `just install-skills`. The machine running it takes the same steps in a local shell. A worktree uses the registry and private clone of its main checkout, so `just deploy` also runs from a worktree
-- A commit GitHub lacks reaches no other machine, so push it first. A machine whose checkout is off `main`, has uncommitted changes under `authoring/`, `commands/`, `skills/`, `scripts/`, or `justfile`, has commits GitHub lacks, or whose `skills-private` is not a clone, is off `main`, has uncommitted edits, or has commits its `origin/main` lacks reports `needs-you` and stays untouched; `--check` reports the same clone as drift. Other edits, such as editor settings, do not block it
-- Each machine also advances its public `origin/main` to the received commit, even when `main` already holds it. This runs before the private pull and install, so a later failure leaves the base used by `just check` current. A newer or diverged `origin/main` stays in place, so a deploy never rewinds a concurrent fetch. The private pull and install still run after a failed ref update. If both succeed, the run reports the ref failure and fix; a ref lock or concurrent writer gives temporary exit 75
-- An `offline` or `failed` machine waits for the next sync. It needs no queue: any later sync, from any machine, or its own `just sync`, catches it up. A run whose only failures are temporary, such as offline machines, exits 75 instead of 1
-- A run answers `{"ok":true,"changes":[...]}`, one `["sync",NAME,SHA]` for each machine it changed, this one included when it pulled its private clone, and `{"ok":true}` when none needed a change; `--dry-run` runs every check without changing anything and answers the same for each machine a sync would change: one behind GitHub, or one whose private clone or installed skills would change. A failure names each machine that needs you or failed, and what to do, and keeps the rows of the machines it changed. `--verbose` adds GitHub's commit, its public skill count, and each machine's outcome and changes; `--debug` adds the remote output
-- `just merge` runs `just deploy` from this machine's main checkout after it merges a PR, when `main` holds the tree its checks ran on, so the fleet gets the new `main` without a pull
-- `just sync-fleet --check` compares each machine's checkout and private clone with GitHub's `main` of each repository, and its installed skills per harness with its sources, then exits 1 naming each difference in its errors, such as `~/.claude/skills waits for update 1`. It compares names and contents, so skills other tools installed do not count. A machine whose installer predates #490 answers no JSON line and only warns about a conflict, so `--check` fails on it until `just sync-fleet` brings it to `main`
-- Merging a private PR fires no hook here, so run `just sync-fleet` after the merge
-- The registry is `fleet.toml`, tracked in the private repository, so every machine has it and hosts and accounts stay out of this public one. The private `fleet` skill ships it in `references/`, so agents read it too; the sync uses the only `fleet.toml` in the clone's `authoring/`, wherever that skill lives. It reads `ssh` and `path`, relative to that machine's home; other keys are notes for agents:
-
-```toml
-[machines.om1]
-ssh = "pascal@om1.example.ts.net"
-path = "projects/skills"
-
-[machines.mbp]
-ssh = "andy16@mbp16.example.ts.net"
-path = "projects/skills"
-```
-
-### Hooks
-
-Run `lefthook install` once in each machine's main checkout. On `main` in a checkout that has the private clone:
-
-- A commit installs this machine at once. The other machines wait for GitHub: pushing `main` starts a background job that waits for the push to land, then syncs them
-- A pull that brings commits pulls this machine's private clone before installing, then syncs the other machines in the background. If the private pull fails, the hook reports its cause and skips the install and the other machines' sync. A pull with nothing new fires no hook
-- The pull hook owns this machine's private pull and install together. Its background peer sync leaves that clone at the installed revision, even if another private commit reaches GitHub meanwhile
-- Worktrees, other branches, and checkouts without the private clone skip all of it. A main checkout whose private clone lacks the registry fails the hook instead, so a pre-push stops the push until the registry is back. A machine a sync reaches runs its merge with hooks off, so it never starts another sync
-
-Background runs never make git wait on a sleeping laptop. They log to `~/.local/state/skills-sync/fleet.log` and send a desktop notification, `notify-send` on Linux or Notification Center on macOS, only when a machine needs you or fails; an offline machine waits for the next sync
+- `just sync` pulls `main` and the private clone, and installs on the machine it runs on. It refuses a checkout off `main`. With `--dry-run` or `--check` it skips the pulls and previews the current checkout
+- Keep the main checkout on `main`, without edits, and do branch work in a worktree, so a pull or an install never meets your work
+- The justfile imports `~/.config/skills/local.just` when it exists. A machine keeps its own recipes there, outside git, such as one that merges a PR and deploys it
 
 ## Ownership
 
 - The installer keeps no state. It owns every name git history ever added under `skills/`, `commands/`, or the former `authoring/commands/`, plus uncommitted skills still compiled in `skills/`. A shallow clone is refused because its history is incomplete
 - It removes an owned name once no source provides it and never touches entries it did not publish, such as `~/.claude/skills/synced/`
-- It also owns every package name the private clone's history ever added under `authoring/`, so deleting a private skill, or moving it to `skill_archived/`, in a merged PR of `skills-private` removes its installed copies on every machine the next sync reaches. A name only ever added elsewhere, such as an archived skill `jsm` installed, stays untouched, unless this repository's history owns it too, as it owns `cass`. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
+- It also owns every package name the private clone's history ever added under `authoring/`, so deleting a private skill, or moving it to `skill_archived/`, in a merged PR of `skills-private` removes its installed copies at each machine's next install. A name only ever added elsewhere, such as an archived skill `jsm` installed, stays untouched, unless this repository's history owns it too, as it owns `cass`. A private skill never committed is not owned; after deleting it, trash its installed copies yourself
 - Installed copies are execution copies. Apply overwrites an in-place edit, so make edits in `authoring/`, `commands/`, or a worktree of `skills-private`
 - To make a public skill private, remove it from `authoring/` in a PR, then add its package to `authoring/` of `skills-private` in a PR there once the first lands. An install while both copies exist stops and names them
 - To promote a private skill, add it to `authoring/` in a PR, and remove the private copy in a `skills-private` PR merged right before it. An install while both copies exist stops and names them
