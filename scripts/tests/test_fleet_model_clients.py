@@ -11,7 +11,9 @@ CLIENTS = (
     "matt/writing-for-agents/scripts/run_evals.py",
 )
 BRIDGE = {"ModelAliasError", "is_model_alias", "resolve_model_alias"}
-END = re.compile(r"^(?!def (?:is_model_alias|resolve_model_alias)\()[^\s#]", re.M)
+END = re.compile(
+    r"^(?!def (?:is_model_alias|resolve_model_alias)\()[^\s#]", re.MULTILINE
+)
 
 
 def client_bridge(path: str) -> dict[str, str]:

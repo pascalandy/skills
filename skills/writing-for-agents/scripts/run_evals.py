@@ -406,7 +406,7 @@ def resolve_model_alias(name: str) -> str:
             f" or unset {FLEET_REGISTRY_ENV}"
         )
     interpreter = (
-        ["uv", "run", "--script"]
+        ["uv", "run", "--python", ">=3.11", "--script"]
         if sys.version_info < (3, 11)
         else [sys.executable, "-I"]
     )
