@@ -623,7 +623,8 @@ def hitl(args: argparse.Namespace) -> Mapping[str, Any]:
         front = front_matter(text)
         briefs = briefs_in(text)[0]
         epics = epics_in(text)
-        errors += declaration_errors(path, text, briefs)
+        # The deadlock rule needs the graph; the graph check runs it before handoff.
+        errors += executor_errors(path, text, briefs, {})
         unresolved: list[dict[str, str]] = []
         wave = front.get("executor", "unknown")
         if wave == "tbd":

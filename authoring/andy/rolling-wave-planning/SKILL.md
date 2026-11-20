@@ -201,7 +201,7 @@ Report one line with only the IDs that you checked, such as `RWP: Pass: RWP_01�
 - [ ] **RWP_16 Blocking QA** (§Blocking): Each QA task in a `blocked_by` has a permitted reason in `why`, and no QA task blocks a full wave
 - [ ] **RWP_17 Findings** (§Findings and verdicts): Each open finding has a fix task with `Fixes finding`. Each `rejected` QA task has a re-QA task
 - [ ] **RWP_18 CI baseline** (§Maturity checkpoints): The first task of W01 is the CI baseline, or a decision logs the waiver of the PM. Each agent task after it is `blocked_by` it and has `just check` in `Verify`
-- [ ] **RWP_19 Maturity review** (§Maturity checkpoints): Each checkpoint whose trigger is true has its task, or a decision logs the waiver of the PM. Until its trigger is true, the verification loop is a scope bullet of a `proposed` wave
+- [ ] **RWP_19 Maturity review** (§Maturity checkpoints): Each mandatory checkpoint whose trigger is true, and each optional checkpoint that the PM chose, has its task, or a decision logs the waiver of the PM. Until its trigger is true, the verification loop is a scope bullet of a `proposed` wave
 - [ ] **RWP_20 QA playbook** (§Maturity checkpoints): For each `FR-NN` and `NFR-NN` that an epic of the active wave traces, a QA scenario cites the ID, or a decision logs the waiver of the PM
 - [ ] **RWP_21 Traps** (§Traps): Each `Traps` line has the form `Want: … Not: …` and names an effort sink inside the deliverable
 - [ ] **RWP_22 Version** (§Version): Each new wave file records the current skill version in `skill_version`

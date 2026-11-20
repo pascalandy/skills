@@ -375,6 +375,19 @@ class PlanGraph(unittest.TestCase):
         self.assertIn("W03-y.md:1: the front matter has no `executor`", errors)
         self.assertIn("E04 has no `- Executor:` line", errors)
 
+    def test_hitl_fails_on_an_active_wave_that_disagrees_with_its_tasks(self):
+        (self.waves / "W02-x.md").write_text(
+            wave(executor="human") + task("E04-T01", executor="agent")
+        )
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--hitl", str(self.waves)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("the wave declares `human`", result.stderr)
+
     def test_hitl_needs_a_folder(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--hitl", str(self.waves / "none.md")],
