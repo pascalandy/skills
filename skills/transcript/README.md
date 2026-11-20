@@ -134,7 +134,7 @@ Pascal reads his transcripts on mbp. With the fleet skill installed, whose `refe
 
 The copy runs after the run ends, after a failed run too, so mbp also gets the metadata of a failure; an interrupt skips it. A failed run keeps its own exit code and recovery command, and a failed copy adds its own error with its rsync retry. A successful copy joins the answer as one `changes` entry per folder, such as `["copy","andy16@mbp16.donkey-arcturus.ts.net:Documents/_my_docs/61_transcription_exports_yt/<folder>"]`. A dry run names the destination as `export`, or `null` when results stay local, and `doctor` checks `fleet.toml` and `rsync` without reaching mbp.
 
-When mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy. An interrupt during the copy exits `130` or `143` with the saved `files` and the same rsync after `rerun:`.
+When the run succeeded but mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy. An interrupt during the copy exits `130` or `143` with the saved `files` and the same rsync after `rerun:`.
 
 ## Safety and reruns
 
