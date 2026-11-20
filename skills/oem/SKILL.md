@@ -71,7 +71,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Delete with `trash`, and only literal absolute paths that your own thread created or that the user, your brief or a skill you follow told you to delete, once nothing still writes to them. Never run `rm` on a path built from a variable: a variable from an earlier shell call may be unset or empty, and `set -u` stops only the unset case. If you are unsure a path is yours to delete, or `trash` is missing or fails, keep the files and report it. A skill's documented cleanup procedure, such as verify-skills' guarded `rm -r "$RUN"`, still applies to the paths it names
 - Run CI through project commands such as `just`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
 - Sign off through the project's recipe, such as `just signoff`, which runs the checks before it calls `gh signoff`. A bare `gh signoff` posts a green status without running anything
-- Find the latest screenshot with `ls -lt ~/Documents/screenshots | head -2`. If the fleet skill is installed, see its Roles section for the screenshot location
+- To find the latest screenshot, follow the fleet skill's Roles section for the screenshot location and access. Run `ls -lt ~/Documents/screenshots | head -2` there, or run it locally when the fleet skill is absent
 
 ## Definitions
 

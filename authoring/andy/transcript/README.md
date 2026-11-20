@@ -141,9 +141,9 @@ Exit `75` means a temporary failure before any paid request, such as a network e
 
 To enable copying, set `transcript_export` in the `[roles]` table of the fleet skill's `references/fleet.toml`. Give it the key of a `[machines]` entry with an `ssh` address. YouTube and local file runs copy each result folder under `~/Documents/_my_docs/61_transcription_exports_yt` to the same path on that machine with `rsync -rt` over SSH. The local copy stays. Results stay local on the destination machine, with another `--output-dir`, or without the fleet inventory. Zoom runs use their own local export folder.
 
-The copy runs after success or failure and includes any saved failure metadata. An interrupt skips it. A failed run keeps its own exit code and recovery command. A failed copy adds its error and rsync retry. A successful copy adds one `changes` entry per folder, in the form `["copy","<destination>"]`. A dry run reports the destination as `export`, or `null` when results stay local. `doctor` checks the inventory and `rsync` locally.
+The copy runs after success or failure and includes any saved failure metadata. An interrupt skips it. A failed run keeps its own exit code and recovery command. If rsync fails, the command adds its error and retry command. A successful copy adds one `changes` entry per folder, in the form `["copy","<destination>"]`. A dry run reports the destination as `export`, or `null` when results stay local. Run `doctor` to check the inventory and `rsync` before transcribing.
 
-If the transcription succeeds and the copy fails, the command exits `1`, lists the saved `files`, and gives `retry: rsync -rt <folder> <destination>`. Run that rsync command once the destination is reachable to copy the saved files without another transcription. An interrupt during the copy exits `130` or `143` with the saved `files` and the same command after `rerun:`.
+If the transcription succeeds and rsync fails, the command exits `1`, lists the saved `files`, and gives `retry: rsync -rt <folder> <destination>`. Run that rsync command once the destination is reachable to copy the saved files without another transcription. An interrupt during the copy exits `130` or `143` with the saved `files` and the same command after `rerun:`.
 
 ## Safety and reruns
 
