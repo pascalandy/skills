@@ -52,7 +52,7 @@ The list order records preference only. The CLI runs one profile and never falls
 
 To update or create a profile, edit the `INFERENCE_PROFILES` registry in `scripts/transcript.py`, the only list of profiles, then run the validation procedure in `README.md`. The `opus`, `astra`, `sol` and `sonnet` profiles name a model alias: with Pascal's fleet skill installed, its `references/active-models.toml` gives the alias's current ID, so a model version changes there, not here. Without the fleet skill, `STANDALONE_MODELS` in the script applies. `glm` names its model ID.
 
-For Zoom, `--path` names the meeting folder, not its `audio*.m4a` file. A plain folder name resolves under `~/Documents/Zoom`.
+For Zoom, give `--path` a meeting folder name relative to the recordings directory or an absolute folder path. To set the recordings or export directory, read [Zoom directories](README.md#zoom-directories).
 
 `help run youtube`, `help run zoom`, and `help run file` list every run option and its default. Add an option only when the request calls for it. `--provider`, `--model`, and `--effort` form an advanced custom target for diagnostics only. `--open` and `--preview` are opt-in, so a normal run has no GUI side effect.
 
