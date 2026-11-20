@@ -1,20 +1,14 @@
 # Skills
 
+![A cozy library room with shelves of books, a reading lamp, and a table: a shelf of tested methods your AI chat can open and follow](docs/assets/hero.png)
+
 **Your AI chat, with a method. Paste one sentence, install nothing.**
 
 En français : [le guide](docs/guide-fr-ca/README.md).
 
-Ask an AI chat something vague and you get something generic. Then comes the back-and-forth: you explain, it guesses, you explain again. A skill ends that loop. It's a written method the agent reads and follows step by step, so the first answer is already structured.
-
-I'm Pascal Andy, a business analyst. I've worked at Bell, National Bank, Desjardins, and BDC, so I know the corporate world and the traps worth avoiding. I like to organize things and to get leverage from technology, and skills are the natural next step. I spend my days thinking about how things work today so they work better tomorrow, and I spot the back-and-forth that an agent can take over. My goal is skills that feel almost like magic.
-
-These are the skills I use every day. They work in ChatGPT, Claude, and other chat apps that can open a web page, on your phone or your computer. You never open a terminal.
-
 ## Get started
 
-Two steps:
-
-1. Paste this sentence into your chat app:
+1. Paste this sentence into ChatGPT, Claude, or any chat app that can open a web page:
 
    ```text
    Read https://raw.githubusercontent.com/pascalandy/skills/main/docs/references/remote-skills-general.md and skip `oem`. When a request of mine matches a skill there, open that skill and follow it.
@@ -29,6 +23,14 @@ Two steps:
 The agent reads the list, opens the marketing mode, picks its copywriting playbook, and follows it. You get headline options, the reason behind each one, and the questions that would sharpen them.
 
 To keep the skills on in every chat, put the sentence in your app's custom instructions or in a project's instructions. The sentence skips `oem` because that skill holds my personal preferences.
+
+## What a skill is
+
+Ask an AI chat something vague and you get something generic. Then comes the back-and-forth: you explain, it guesses, you explain again. A skill ends that loop. It's a written method the agent reads and follows step by step, so the first answer is already structured.
+
+I'm Pascal Andy, a business analyst. I've worked at Bell, National Bank, Desjardins, and BDC, so I know the corporate world and the traps worth avoiding. I like to organize things and to get leverage from technology, and skills are the natural next step. I spend my days thinking about how things work today so they work better tomorrow, and I spot the back-and-forth that an agent can take over. My goal is skills that feel almost like magic.
+
+These are the skills I use every day. They work on your phone or your computer. You never open a terminal.
 
 New here? **[Start the guide](docs/guide/README.md).** It walks you through a first real task, then shows you how to think, write, market, and present with the skills.
 
