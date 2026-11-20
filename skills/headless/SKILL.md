@@ -118,10 +118,10 @@ A model or reasoning level in the request overrides the file through `--model` o
 
 ## Read the result
 
-On success, stdout holds one JSON line:
+On success, stdout holds one JSON line. This example uses a fictional file path and session ID.
 
 ```json
-{"ok":true,"file":"/tmp/headless-codex-review-only.8gcz_axu/answer.md","model":"gpt-6.1-terra","effort":"medium","session":"01a0f7d4-cbcf-7162-869b-94b331ed56b0","changed":[]}
+{"ok":true,"file":"/tmp/headless-codex-review-only.example1/answer.md","model":"gpt-6.1-terra","effort":"medium","session":"87654321-4321-4321-a321-cba987654321","changed":[]}
 ```
 
 `file` holds the child's answer in every mode. Read that file to get the whole answer. Its folder also holds `prompt.md` and the child's logs.
