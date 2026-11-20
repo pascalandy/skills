@@ -213,7 +213,7 @@ A Cook lists its PRs and heads in `🍽️ Stack ready`, and again after a resta
 
 The Head Chef's Close removes the cache folders. Thus a message to Pascal cites only PR, issue and artifact URLs, except a follow-up that names a folder kept after a failed cleanup.
 
-In a message or a Detail, write every clock time in America/Montreal time. GitHub and T3 return UTC times. Convert them first.
+For clock times in messages and Details, follow [Report times](../../SKILL.md#report-times).
 
 `🍽️ Stack ready`, Cook → Chef:
 

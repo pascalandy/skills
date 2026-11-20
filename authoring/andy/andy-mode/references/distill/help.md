@@ -118,7 +118,7 @@ Show program version and exit.
 Every run answers in one JSON line. A success prints it on stdout, with the path of the distilled file:
 
 ```json
-{"ok":true,"file":"/Users/me/Documents/article_2026-04-06_14-32-08_follow_along_note/article_follow_along_note.md"}
+{"ok":true,"file":"/path/to/output/article_2026-04-06_14-32-08_follow_along_note/article_follow_along_note.md"}
 ```
 
 A failure leaves stdout empty and ends stderr with `{"ok":false,"errors":["…"]}`; a usage error adds `"help":"distill.py --help"`.
@@ -204,12 +204,12 @@ distill --dry-run --prompt summary_with_quotes ~/Documents/article.md
 
 **opencode**
 ```bash
-uv run <skill_dir>/scripts/distill/distill.py --provider opencode --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
+uv run <skill_dir>/scripts/distill/distill.py --provider opencode --prompt short_summary ./raw_transcript.txt
 ```
 
 **claude**
 ```bash
-uv run <skill_dir>/scripts/distill/distill.py --provider claude --prompt short_summary ~/Documents/_my_docs/62_distill_exports/raw_transcript.txt
+uv run <skill_dir>/scripts/distill/distill.py --provider claude --prompt short_summary ./raw_transcript.txt
 ```
 
 ## See also
