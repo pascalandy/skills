@@ -376,6 +376,13 @@ Do these checkpoints in Procedure A and at each wave review. A checkpoint whose 
 - **Verification loop** (when the checkout builds and starts with one command, and a user journey can be driven end to end): a chore task runs `create-verification-skill`. Until then, keep a placeholder scope bullet in a `proposed` wave. When a wave changes the feature map, a user journey, the launch or the harness, add a task that runs `maintain-verification-skill`
 - **QA playbook** (always): `plan/qa.md` holds the requirements, the environments and the ordered QA steps, as [Project files](references/project-files.md) says. At each wave review, update it from the QA reports
 
+## Traps
+
+A trap is work that uses effort but adds no value. When a task has a probable trap, name it in the `Traps` line of the brief. Avoid these planner traps:
+
+- Want: a task that stops when its acceptance items pass. Not: a task that polishes a detail without value
+- Want: a late human task, such as an approval before a deploy, in the next wave. Not: that task in the active wave, where it stops all agents
+
 ## Version
 
 The `version` in the frontmatter of this file changes with the skill. Its first number changes when the format of a brief changes. Each wave file records the version in `skill_version` when the planner creates the file.

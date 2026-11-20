@@ -41,6 +41,7 @@ One sentence.
   - [ ] `curl -s -XPOST localhost:3000/login -d @fixtures/ok.json` returns 200 with `token`
 - Verify: `just check`
 - Out of scope: password reset, rate limiting (E04-T03)
+- Traps (optional): Want: one error message for each failure. Not: a new error framework
 - Fixes finding: #71 (fix tasks only; #71 stays open until the QA agent closes it)
 - Ready review: planner, YYYY-MM-DD, plan checks pass
 - Steps (optional):
@@ -67,6 +68,7 @@ One sentence.
   - [ ] FR-03: A new user signs up, logs in and lands on the dashboard (`<exact steps or command>` → `<observable result>`)
   - [ ] FR-03: A wrong password shows an error and does not create a session
 - Also check: every verified task's Acceptance still passes on the default branch; `just check` passes.
+- Traps (optional): Want: each scenario run once with its evidence. Not: a full audit of the screens.
 - Output: QA report comment, verdict label, one finding issue per finding. No commits, no PRs.
 - Ready review: planner, YYYY-MM-DD, plan checks pass
 
@@ -87,6 +89,7 @@ One sentence.
 
 - Each acceptance item and each QA scenario is a command with an expected result, or exact steps with a result that a person can see. Never write "works correctly"
 - A QA scenario starts with each `FR-NN` or `NFR-NN` of `qa.md` that it tests
+- `Traps` is optional. It names an effort sink inside the deliverable. `Out of scope` names what is outside the deliverable
 
 ## Graph block
 
