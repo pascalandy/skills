@@ -15,13 +15,13 @@ With terminal stdin and stdout, plain `pi` opens the text user interface (TUI). 
 ## Review or execute
 
 For a review, prepare an absolute prompt-file path with the scope, criteria, and expected findings.
-Read `provider`, `model`, and `reasoning-level` from the `[pi]` table of [config.toml](../../config.toml), unless the request specifies them. Pass the values as `--model <provider>/<model>` and `--thinking <reasoning-level>`. Several providers can serve one model.
+Read `provider`, `model`, and `reasoning-level` from the `[pi]` table of [config.toml](../../config.toml), unless the request specifies them. Resolve a model alias as [Defaults](../../SKILL.md#defaults) says. Pass the values as `--model <provider>/<model>` and `--thinking <reasoning-level>`. Several providers can serve one model.
 
 COST: Confirm the selected provider before a live run. That provider charges its associated account for the request.
 
 Before the run, confirm the model with `pi --list-models <model>`. Also check authentication for the selected provider. Pi [limits thinking to supported levels](https://pi.dev/docs/latest/cli#models). The `--thinking` flag requests a level but does not prove that the provider uses it.
 
-For Claude paid by API, take `<claude-model>` from the `[claude]` table of `config.toml`, then check the connection and model before using the review recipe below:
+For Claude paid by API, take `<claude-model>` from the `[claude]` table of `config.toml`, resolved the same way, then check the connection and model before using the review recipe below:
 
 ```bash
 pi auth check --provider anthropic --json

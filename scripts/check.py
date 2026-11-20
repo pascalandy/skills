@@ -302,6 +302,14 @@ CHECKS = [
     ),
     repo_test("compile_skills", "scripts/compile_skills.py"),
     repo_test(
+        "fleet_model_clients",
+        f"{HEADLESS}/headless.py",
+        f"{ANDY_MODE}/scripts/distill/distill.py",
+        f"{IMAGE_CREATOR}/image_creator.py",
+        f"{TRANSCRIPT}/scripts/transcript.py",
+        f"{WRITING_FOR_AGENTS}/scripts/run_evals.py",
+    ),
+    repo_test(
         "install_skills",
         "scripts/install_skills.py",
         "scripts/compile_skills.py",

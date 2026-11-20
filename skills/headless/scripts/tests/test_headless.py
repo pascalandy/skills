@@ -134,8 +134,13 @@ def env(tmp_path: Path) -> dict[str, str]:
         stub.write_text(f"#!{sys.executable}\n{STUB}")
         stub.chmod(0o755)
     (tmp_path / "config.toml").write_text(CONFIG)
+    home = tmp_path / "home"
+    home.mkdir()
+    base = {k: v for k, v in os.environ.items() if k != "FLEET_ACTIVE_MODELS"}
     return {
-        **os.environ,
+        **base,
+        # A home without the fleet skill, so the launcher's own defaults apply
+        "HOME": str(home),
         "PATH": f"{stubs}{os.pathsep}{os.environ['PATH']}",
         "STUB_LOG": str(tmp_path / "calls.jsonl"),
         "TMPDIR": str(tmp_path),
@@ -583,6 +588,14 @@ def test_descendants_left_after_the_child_exits_are_stopped(env, repo, tmp_path)
     assert not alive(wait_for(pid_file))
 
 
+# The IDs the shipped aliases take without the fleet skill
+STANDALONE: dict[str, str] = {
+    "sol": "gpt-6.2-sol",
+    "opus": "claude-opus-5-5",
+    "grok": "grok-4.7",
+}
+
+
 @pytest.mark.parametrize("name", [None, "codex", "claude", "grok"])
 def test_the_shipped_config_reaches_each_cli(env, repo, name):
     shipped = tomllib.loads(SHIPPED.read_text())
@@ -598,7 +611,7 @@ def test_the_shipped_config_reaches_each_cli(env, repo, name):
 
     assert done.returncode == 0, done.stderr
     [call] = calls(env)
-    assert table["model"] in call["argv"]
+    assert STANDALONE[table["model"]] in call["argv"]
     if (name or shipped["harness"]) in ("claude", "grok"):
         flag = "--effort" if name == "claude" else "--reasoning-effort"
         assert call["argv"][call["argv"].index(flag) + 1] == table["reasoning-level"]
@@ -699,7 +712,11 @@ def test_a_missing_config_says_how_to_point_at_another(env, repo, tmp_path):
 
 def test_the_docs_repeat_no_model_from_the_config():
     shipped = tomllib.loads(SHIPPED.read_text())
-    models = {table["model"] for table in shipped.values() if isinstance(table, dict)}
+    models = {
+        str(STANDALONE.get(table["model"], table["model"]))
+        for table in shipped.values()
+        if isinstance(table, dict)
+    }
     repeats = [
         f"{doc.relative_to(PACKAGE)} names {model}"
         for doc in PACKAGE.rglob("*.md")
@@ -1042,3 +1059,110 @@ def test_code_review_outside_git_is_a_usage_error(env, tmp_path):
     assert done.returncode == 2
     assert "is not a Git checkout" in errors(done)
     assert calls(env) == []
+
+
+RESOLVER = """\
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["RESOLVER_LOG"], "a") as log:
+    log.write(json.dumps(args) + "\\n")
+alias = args[-1]
+ids = {"sol": "gpt-9-sol", "opus": "claude-opus-9"}
+if alias not in ids:
+    print(json.dumps({"ok": False, "errors": [f"unknown alias {alias}"]}), file=sys.stderr)
+    sys.exit(1)
+print(json.dumps({"ok": True, "alias": alias, "id": ids[alias]}))
+"""
+
+
+def fleet_skill(env: dict[str, str], resolver: bool = True) -> Path:
+    """Install a fake fleet skill in the test home; its resolver logs each call."""
+    scripts = Path(env["HOME"]) / ".pi/agent/skills/fleet/scripts"
+    scripts.mkdir(parents=True)
+    (scripts.parent / "references").mkdir()
+    (scripts.parent / "references/active-models.toml").write_text("schema = 1\n")
+    if resolver:
+        (scripts / "active_models.py").write_text(RESOLVER)
+    env["RESOLVER_LOG"] = str(Path(env["HOME"]) / "resolver.jsonl")
+    return Path(env["RESOLVER_LOG"])
+
+
+def test_an_installed_fleet_registry_resolves_the_config_alias(env, repo, tmp_path):
+    log = fleet_skill(env)
+    (tmp_path / "config.toml").write_text(CONFIG.replace('"gpt-6.1-sol"', '"sol"', 1))
+    done = launch(env, repo, "codex", "--review-only")
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][call["argv"].index("-m") + 1] == "gpt-9-sol"
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [
+        ["resolve", "sol"]
+    ]
+
+
+def test_an_injected_registry_reaches_the_resolver(env, repo, tmp_path):
+    log = fleet_skill(env)
+    env["FLEET_ACTIVE_MODELS"] = str(tmp_path / "models.toml")
+    done = launch(env, repo, "codex", "--review-only", "--model", "opus")
+
+    assert done.returncode == 0, done.stderr
+    assert json.loads(log.read_text()) == [
+        "--registry",
+        str(tmp_path / "models.toml"),
+        "resolve",
+        "opus",
+    ]
+
+
+def test_an_explicit_model_id_skips_the_registry(env, repo):
+    fleet_skill(env, resolver=False)
+    done = launch(env, repo, "codex", "--review-only", "--model", "gpt-6.2-astra")
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][call["argv"].index("-m") + 1] == "gpt-6.2-astra"
+
+
+def test_a_missing_resolver_or_unknown_alias_fails_before_the_child(env, repo):
+    fleet_skill(env, resolver=False)
+    done = launch(env, repo, "codex", "--review-only", "--model", "sol")
+    assert done.returncode == 1
+    assert "fleet resolver" in errors(done) and "is missing" in errors(done)
+
+    (Path(env["HOME"]) / ".pi/agent/skills/fleet/scripts/active_models.py").write_text(
+        RESOLVER
+    )
+    done = launch(env, repo, "codex", "--review-only", "--model", "terra")
+    assert done.returncode == 1
+    assert "unknown alias terra" in errors(done)
+    assert not Path(env["STUB_LOG"]).exists()
+
+
+def test_a_fleet_skill_without_its_registry_keeps_the_own_defaults(env, repo):
+    (Path(env["HOME"]) / ".pi/agent/skills/fleet/scripts").mkdir(parents=True)
+    done = launch(env, repo, "codex", "--review-only", "--model", "sol")
+
+    assert done.returncode == 0, done.stderr
+    [call] = calls(env)
+    assert call["argv"][call["argv"].index("-m") + 1] == "gpt-6.2-sol"
+
+
+def test_an_installed_resolver_without_its_registry_fails_before_the_child(env, repo):
+    fleet_skill(env)
+    registry = (
+        Path(env["HOME"]) / ".pi/agent/skills/fleet/references/active-models.toml"
+    )
+    registry.unlink()
+    done = launch(env, repo, "codex", "--review-only", "--model", "sol")
+
+    assert done.returncode == 1
+    assert "fleet registry" in errors(done) and "is missing" in errors(done)
+    assert calls(env) == []
+
+
+def test_an_unknown_alias_in_the_config_fails_without_the_fleet(env, repo, tmp_path):
+    (tmp_path / "config.toml").write_text(CONFIG.replace('"gpt-6.1-sol"', '"luna"', 1))
+    done = launch(env, repo, "codex", "--review-only")
+
+    assert done.returncode == 1
+    assert "model 'luna' is not a known alias" in errors(done)

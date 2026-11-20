@@ -17,6 +17,10 @@ kind: "dev"
 
 No SOP is ever named `manic-4`, so the cases never overlap.
 
+## Models
+
+A `model` in a route's `config.toml` is an alias, such as `sol`, `opus`, `terra` or `haiku`, or a Pi ID with its provider, such as `openrouter-hub/ds4p1-slow`, used as given. Read `fleet/references/active-models.toml` and resolve the alias before a selection: its `id` for the `codex` and `claudeAgent` drivers, its Pi ID on this machine for `pi`. Without the fleet skill, take the newest model of that family that `orchestrator_capabilities` lists. A version Pascal names wins over the alias. Then check the ID and the reasoning level in `orchestrator_capabilities` as the route's model selection says; a missing ID is an unavailable setting, escalated with the ID expected.
+
 ## Routes
 
 The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; oem's full-stop default governs gravlax and work outside a route.

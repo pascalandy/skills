@@ -575,23 +575,118 @@ PROVIDER_EFFORTS = {
 }
 
 
+FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
+FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
+STANDALONE_MODELS = {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "sol": "gpt-6.2-sol",
+    "astra": "gpt-6.2-astra",
+}
+
+
+class ModelAliasError(ValueError):
+    """The fleet registry or resolver is missing or invalid, or the alias is unknown."""
+
+
+def is_model_alias(name: str) -> bool:
+    return name.isascii() and name.isalpha() and name.islower()
+
+
+def resolve_model_alias(name: str) -> str:
+    """Return the model ID for an alias, or `name` itself when it is an explicit ID."""
+    if not is_model_alias(name):
+        return name
+    resolver = Path.home() / FLEET_RESOLVER
+    registry = os.environ.get(FLEET_REGISTRY_ENV)
+    installed = resolver.parents[1] / "references" / "active-models.toml"
+    if not registry and not installed.exists() and not resolver.exists():
+        if name not in STANDALONE_MODELS:
+            raise ModelAliasError(
+                f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
+            )
+        return STANDALONE_MODELS[name]
+    if not registry and not installed.is_file():
+        raise ModelAliasError(
+            f"the fleet registry {installed} is missing or not a file"
+        )
+    if not resolver.is_file():
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} is missing; install the fleet skill"
+            f" or unset {FLEET_REGISTRY_ENV}"
+        )
+    interpreter = (
+        ["uv", "run", "--python", ">=3.11", "--script"]
+        if sys.version_info < (3, 11)
+        else [sys.executable, "-I"]
+    )
+    command = [*interpreter, str(resolver)]
+    command += ["--registry", registry] if registry else []
+    try:
+        done = subprocess.run(
+            [*command, "resolve", name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} failed: {error}"
+        ) from None
+    if done.returncode != 0:
+        lines = done.stderr.strip().splitlines()
+        try:
+            errors = json.loads(lines[-1])["errors"]
+        except (IndexError, ValueError, KeyError, TypeError):
+            errors = [lines[-1] if lines else f"exit {done.returncode}"]
+        raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
+    try:
+        identifier = json.loads(done.stdout)["id"]
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("empty or invalid model ID")
+        return identifier
+    except (ValueError, KeyError, TypeError):
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} gave no ID for {name}"
+        ) from None
+
+
 @dataclass(frozen=True)
 class InferenceProfile:
-    """One named, complete summary inference choice."""
+    """One named, complete summary inference choice. `alias` is a model alias,
+    such as "sol", resolved by resolve_model_alias, or an explicit model ID."""
 
     provider: str
-    model: str
+    alias: str
     effort: str
+
+    @property
+    def model(self) -> str:
+        return profile_model(self.alias)
 
 
 INFERENCE_PROFILES = {
-    "opus": InferenceProfile(PROVIDER_CLAUDE, "claude-opus-5-5", "xhigh"),
-    "astra": InferenceProfile(PROVIDER_CODEX, "gpt-6-astra", "low"),
-    "sol": InferenceProfile(PROVIDER_CODEX, "gpt-6.1-sol", "xhigh"),
+    "opus": InferenceProfile(PROVIDER_CLAUDE, "opus", "xhigh"),
+    "astra": InferenceProfile(PROVIDER_CODEX, "astra", "low"),
+    "sol": InferenceProfile(PROVIDER_CODEX, "sol", "xhigh"),
     "glm": InferenceProfile(PROVIDER_OPENROUTER, "z-ai/glm-5.3-flash", "medium"),
     # The README's Test videos rule runs every paid test on this profile
-    "sonnet": InferenceProfile(PROVIDER_CLAUDE, "claude-sonnet-5-5", "xhigh"),
+    "sonnet": InferenceProfile(PROVIDER_CLAUDE, "sonnet", "xhigh"),
 }
+
+
+@functools.cache
+def profile_model(alias: str) -> str:
+    """A profile's model ID; a fleet registry fault is a configuration error."""
+    try:
+        return resolve_model_alias(alias)
+    except ModelAliasError as error:
+        raise ConfigurationError(
+            str(error), "uv run ~/.pi/agent/skills/fleet/scripts/active_models.py list"
+        ) from None
+
+
 DEFAULT_PROFILE = "opus"
 DEFAULT_PROVIDER = INFERENCE_PROFILES[DEFAULT_PROFILE].provider
 PROVIDER_PI_PREFIXES = {
@@ -2588,16 +2683,22 @@ def resolve_run_plan(args: argparse.Namespace) -> RunPlan:
     if args.provider is not None:
         profile_name = None
         provider = args.provider
-        model = args.model
+        # An alias, such as sol, resolves like a profile's; an explicit ID stays
+        model = (
+            profile_model(args.model)
+            if isinstance(args.model, str) and not args.no_prompt
+            else args.model
+        )
         effort = args.effort
     else:
         profile_name = args.profile or DEFAULT_PROFILE
         profile = INFERENCE_PROFILES[profile_name]
         provider = profile.provider
-        model = profile.model
+        # A run without a summary needs no model, so it never asks the fleet registry
+        model = profile.alias if args.no_prompt else profile.model
         effort = profile.effort
 
-    if not is_valid_model(provider, model):
+    if not args.no_prompt and not is_valid_model(provider, model):
         raise ConfigurationError(
             f"Invalid {provider} model: {model!r}. "
             f"Use 'transcript list models --provider {provider}'",

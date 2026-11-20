@@ -352,6 +352,7 @@ def answer_failure(
 
 # <<< cli-block
 
+import functools
 import posixpath
 import shutil
 import subprocess
@@ -365,8 +366,82 @@ from typing import BinaryIO
 
 DEBUG_ENV = "RUN_EVALS_DEBUG"
 AGENTS = ("claude", "codex")
-CODEX_MODEL = "gpt-6.1-sol"
+# A model alias; codex_model() gives its ID through resolve_model_alias
+CODEX_MODEL = "sol"
 CODEX_EFFORT = "high"
+
+FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
+FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
+STANDALONE_MODELS = {"sol": "gpt-6.2-sol"}
+
+
+class ModelAliasError(ValueError):
+    """The fleet registry or resolver is missing or invalid, or the alias is unknown."""
+
+
+def is_model_alias(name: str) -> bool:
+    return name.isascii() and name.isalpha() and name.islower()
+
+
+def resolve_model_alias(name: str) -> str:
+    """Return the model ID for an alias, or `name` itself when it is an explicit ID."""
+    if not is_model_alias(name):
+        return name
+    resolver = Path.home() / FLEET_RESOLVER
+    registry = os.environ.get(FLEET_REGISTRY_ENV)
+    installed = resolver.parents[1] / "references" / "active-models.toml"
+    if not registry and not installed.exists() and not resolver.exists():
+        if name not in STANDALONE_MODELS:
+            raise ModelAliasError(
+                f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
+            )
+        return STANDALONE_MODELS[name]
+    if not registry and not installed.is_file():
+        raise ModelAliasError(
+            f"the fleet registry {installed} is missing or not a file"
+        )
+    if not resolver.is_file():
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} is missing; install the fleet skill"
+            f" or unset {FLEET_REGISTRY_ENV}"
+        )
+    interpreter = (
+        ["uv", "run", "--python", ">=3.11", "--script"]
+        if sys.version_info < (3, 11)
+        else [sys.executable, "-I"]
+    )
+    command = [*interpreter, str(resolver)]
+    command += ["--registry", registry] if registry else []
+    try:
+        done = subprocess.run(
+            [*command, "resolve", name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} failed: {error}"
+        ) from None
+    if done.returncode != 0:
+        lines = done.stderr.strip().splitlines()
+        try:
+            errors = json.loads(lines[-1])["errors"]
+        except (IndexError, ValueError, KeyError, TypeError):
+            errors = [lines[-1] if lines else f"exit {done.returncode}"]
+        raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
+    try:
+        identifier = json.loads(done.stdout)["id"]
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("empty or invalid model ID")
+        return identifier
+    except (ValueError, KeyError, TypeError):
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} gave no ID for {name}"
+        ) from None
+
+
 GRACE = 10.0
 CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
 INSTALLED = (CODEX_HOME / "skills", Path.home() / ".agents" / "skills")
@@ -384,6 +459,16 @@ CREDENTIALS = (
 )
 
 log = logging.getLogger("run_evals")
+
+
+@functools.cache
+def codex_model() -> str:
+    """The Codex model ID for every run; a fleet registry fault stops the evals."""
+    try:
+        return resolve_model_alias(CODEX_MODEL)
+    except ModelAliasError as error:
+        raise ScriptError(str(error)) from None
+
 
 EXIT_CODES = exit_codes(
     {1: "a run failed or timed out, or git or an agent CLI is missing"}
@@ -409,8 +494,8 @@ disk, so this keeps the rubric out of the agent's way, not out of reach. Setup a
 run with XDG_STATE_HOME set to the run folder's state/, so whatever a skill
 keeps there stays with the run.
 
-Codex runs with --dangerously-bypass-approvals-and-sandbox, model gpt-6.1-sol
-at high, and the installed copies of the listed skills, and of skills <ref>
+Codex runs with --dangerously-bypass-approvals-and-sandbox, the model the
+fleet skill's registry gives the sol alias (gpt-6.2-sol without it) at high, and the installed copies of the listed skills, and of skills <ref>
 deleted, disabled in $CODEX_HOME/skills (default ~/.codex/skills) and
 ~/.agents/skills. Claude runs with --setting-sources project, so it sees only
 the copies this run installs. Setup and agent run without GitHub or git
@@ -768,7 +853,7 @@ def agent_command(run: Run, work: Path, hide: list[Path]) -> tuple[list[str], by
         "--skip-git-repo-check",
         "--dangerously-bypass-approvals-and-sandbox",
         "-m",
-        CODEX_MODEL,
+        codex_model(),
         "-c",
         f'model_reasoning_effort="{CODEX_EFFORT}"',
         "-c",

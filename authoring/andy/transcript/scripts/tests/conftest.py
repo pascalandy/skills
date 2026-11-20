@@ -41,6 +41,22 @@ def no_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def standalone_models(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[None]:
+    """Profiles take the script's own model defaults, whatever fleet skill this
+    machine holds; a test of the fleet registry installs its own resolver."""
+    import transcript
+
+    absent = tmp_path_factory.mktemp("no-fleet") / "fleet/scripts/active_models.py"
+    monkeypatch.setattr(transcript, "FLEET_RESOLVER", absent)
+    monkeypatch.delenv(transcript.FLEET_REGISTRY_ENV, raising=False)
+    transcript.profile_model.cache_clear()
+    yield
+    transcript.profile_model.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def restore_transcript_logger() -> Iterator[None]:
     """main() sets the shared transcript logger's level, handlers, and
     propagation; restore them so a --debug run cannot leak DEBUG records into a

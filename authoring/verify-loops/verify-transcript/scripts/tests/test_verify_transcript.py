@@ -314,8 +314,7 @@ def test_run_help_accepts_file_and_still_rejects_unexpected_commands(extra_comma
     if extra_command:
         text += f"    {extra_command}  Unsupported command\n"
     text += (
-        "\noptions:\n  --help\n  --verbose\n  --debug\n"
-        "  --no-color\n  --no-progress\n"
+        "\noptions:\n  --help\n  --verbose\n  --debug\n  --no-color\n  --no-progress\n"
     )
     commands = (
         verify_transcript.CommandPlan("run-help", ("run", "--help")),
@@ -709,9 +708,15 @@ def test_dry_run_validator_requires_no_output(tmp_path: Path):
     }
     process = verify_transcript.CapturedProcess((), 0, "", "", 0.1, False)
     try:
+        profiles = {"profiles": [{"name": "opus", "model": "claude-opus-5-5"}]}
         observations = verify_transcript._validate_dry_run(
-            feature, plan, process, payload
+            feature, plan, process, payload, profiles
         )
+        renamed = {"profiles": [{"name": "opus", "model": "claude-opus-9"}]}
+        with pytest.raises(AssertionError, match="not the opus profile's"):
+            verify_transcript._validate_dry_run(
+                feature, plan, process, payload, renamed
+            )
         assert observations == {
             "source": payload["source"],
             "summary": payload["summary"],

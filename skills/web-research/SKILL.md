@@ -29,7 +29,7 @@ Web research progress:
 
 Done when one level is chosen.
 
-**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it and can run a child task. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku 5.5 route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
+**Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it and can run a child task. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
 **Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
@@ -51,19 +51,21 @@ Done when the delegate is running with one page or one topic.
 
 Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
 
-**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. At level 1, when Luna made the failed attempt, run the Haiku attempt from [The ladder](#the-ladder) once, through Steps 2 to 4, before level 2. At level 4, report its error, or the shortfall when no error came back. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
+**Step 5: Climbed or done.** When an attempt is blocked, empty, without sources, too thin for the question, or failed a Step 4 check, go up one level and return to Step 2. At level 1, when Terra made the failed attempt, run the Haiku attempt from [The ladder](#the-ladder) once, through Steps 2 to 4, before level 2. At level 4, report its error, or the shortfall when no error came back. On a [named tool](#named-tool), report and stop instead. Done when the facts answer the question, or you report the failure.
 
 ## The ladder
 
-1. Codex Luna high (`gpt-6-luna`) with its native web tools. When Luna's attempt fails (Step 5), try Haiku 5.5 high with its native web tools (WebSearch, WebFetch) before level 2
-2. Codex Terra high (`gpt-6.1-terra`) with `$tavily`
-3. Codex Terra high (`gpt-6.1-terra`) with `$firecrawl`
-4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`). Take the model ID for "Pi Terra" from the Pi delegation list in `$oem` "## Tools and utilities"; the Mini uses different IDs
+1. Codex Terra high with its native web tools. When Terra's attempt fails (Step 5), try Haiku high with its native web tools (WebSearch, WebFetch) before level 2
+2. Codex Terra high with `$tavily`
+3. Codex Terra high with `$firecrawl`
+4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`)
 
-- **Codex delegation**: `delegate_task` with the Codex provider instance from Step 2, the model, and `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
-- **Haiku delegation**: `delegate_task` with the Claude provider instance from Step 2, `claude-haiku-5-5`, and `target.options.effort: "high"`
-- **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra model, and `target.options.thinking: "high"`
-- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku 5.5 high at the same level, with that level's tool
+Each level names the aliases `terra` and `haiku`. Read `fleet/references/active-models.toml` and resolve each one: its `id` for Codex and Claude, and for Pi Terra its Pi ID on this machine, which differs on the Mini. Without the fleet skill, take the newest Terra or Haiku that `orchestrator_capabilities` lists.
+
+- **Codex delegation**: `delegate_task` with the Codex provider instance from Step 2, the Terra ID, and `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
+- **Haiku delegation**: `delegate_task` with the Claude provider instance from Step 2, the Haiku ID, and `target.options.effort: "high"`
+- **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra ID, and `target.options.thinking: "high"`
+- **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku high at the same level, with that level's tool
 - **Level 4 has no fallback** (see Step 5)
 
 ## Named tool
@@ -76,4 +78,4 @@ Do not use web tools yourself while you can delegate. When you cannot delegate, 
 
 ## Known limits
 
-- Luna's native web tool cannot read npm hosts: `www.npmjs.com` returns 403 and `registry.npmjs.org` refuses it. For a fact on an npm host, start level 1 with Haiku, which reads `registry.npmjs.org`
+- Terra's native web tool cannot read npm hosts: `www.npmjs.com` returns 403 and `registry.npmjs.org` refuses it (checked with Terra 6.1 on 2026-11-19). For a fact on an npm host, start level 1 with Haiku, which reads `registry.npmjs.org`

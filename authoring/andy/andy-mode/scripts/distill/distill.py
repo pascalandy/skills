@@ -396,17 +396,13 @@ VALID_PROVIDERS: tuple[str, ...] = (
 )
 DEFAULT_PROVIDER = PROVIDER_CLAUDE
 
-VALID_CLAUDE_MODELS: tuple[str, ...] = (
-    "claude-opus-4-6",
-    "claude-sonnet-4-6",
-)
-DEFAULT_CLAUDE_MODEL = "claude-opus-4-6"
+VALID_CLAUDE_MODELS: tuple[str, ...] = ("opus", "sonnet")
+DEFAULT_CLAUDE_MODEL = "opus"
 
-# Models that default to 'low' effort (faster, cheaper)
-SONNET_MODELS: tuple[str, ...] = ("claude-sonnet-4-6",)
+SONNET_ALIAS = "sonnet"
 
-VALID_CODEX_MODELS: tuple[str, ...] = ("gpt-5.4",)
-DEFAULT_CODEX_MODEL = "gpt-5.4"
+VALID_CODEX_MODELS: tuple[str, ...] = ("sol", "astra", "terra")
+DEFAULT_CODEX_MODEL = "sol"
 
 VALID_OPENCODE_MODELS: tuple[str, ...] = (
     "1-glm",
@@ -416,6 +412,84 @@ VALID_OPENCODE_MODELS: tuple[str, ...] = (
     "5-qwen",
 )
 DEFAULT_OPENCODE_MODEL = "1-glm"
+
+FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
+FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
+STANDALONE_MODELS = {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "sol": "gpt-6.2-sol",
+    "astra": "gpt-6.2-astra",
+    "terra": "gpt-6.1-terra",
+}
+
+
+class ModelAliasError(ValueError):
+    """The fleet registry or resolver is missing or invalid, or the alias is unknown."""
+
+
+def is_model_alias(name: str) -> bool:
+    return name.isascii() and name.isalpha() and name.islower()
+
+
+def resolve_model_alias(name: str) -> str:
+    """Return the model ID for an alias, or `name` itself when it is an explicit ID."""
+    if not is_model_alias(name):
+        return name
+    resolver = Path.home() / FLEET_RESOLVER
+    registry = os.environ.get(FLEET_REGISTRY_ENV)
+    installed = resolver.parents[1] / "references" / "active-models.toml"
+    if not registry and not installed.exists() and not resolver.exists():
+        if name not in STANDALONE_MODELS:
+            raise ModelAliasError(
+                f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
+            )
+        return STANDALONE_MODELS[name]
+    if not registry and not installed.is_file():
+        raise ModelAliasError(
+            f"the fleet registry {installed} is missing or not a file"
+        )
+    if not resolver.is_file():
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} is missing; install the fleet skill"
+            f" or unset {FLEET_REGISTRY_ENV}"
+        )
+    interpreter = (
+        ["uv", "run", "--python", ">=3.11", "--script"]
+        if sys.version_info < (3, 11)
+        else [sys.executable, "-I"]
+    )
+    command = [*interpreter, str(resolver)]
+    command += ["--registry", registry] if registry else []
+    try:
+        done = subprocess.run(
+            [*command, "resolve", name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} failed: {error}"
+        ) from None
+    if done.returncode != 0:
+        lines = done.stderr.strip().splitlines()
+        try:
+            errors = json.loads(lines[-1])["errors"]
+        except (IndexError, ValueError, KeyError, TypeError):
+            errors = [lines[-1] if lines else f"exit {done.returncode}"]
+        raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
+    try:
+        identifier = json.loads(done.stdout)["id"]
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("empty or invalid model ID")
+        return identifier
+    except (ValueError, KeyError, TypeError):
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} gave no ID for {name}"
+        ) from None
+
 
 CANONICAL_EFFORTS: tuple[str, ...] = ("low", "medium", "high", "max")
 DEFAULT_EFFORT = "high"
@@ -663,8 +737,9 @@ def build_parser() -> DistillParser:
         default=None,
         metavar="MODEL",
         help=(
-            f"Model name. Defaults: claude={DEFAULT_CLAUDE_MODEL}, "
-            f"codex={DEFAULT_CODEX_MODEL}, opencode={DEFAULT_OPENCODE_MODEL}."
+            f"Model alias or ID. Defaults: claude={DEFAULT_CLAUDE_MODEL}, "
+            f"codex={DEFAULT_CODEX_MODEL}, opencode={DEFAULT_OPENCODE_MODEL}; "
+            "--list-models gives each alias's ID."
         ),
     )
     parser.add_argument(
@@ -772,30 +847,39 @@ def resolve_prompt(raw: str) -> tuple[Path, str, str]:
     return prompt_path, prompt_text, prompt_name
 
 
-def resolve_model(provider: str, raw_model: str | None) -> str:
-    if provider == PROVIDER_CLAUDE:
-        model = (raw_model or DEFAULT_CLAUDE_MODEL).strip()
-        if model not in VALID_CLAUDE_MODELS:
-            raise UsageError(
-                (
-                    f"Invalid claude model: {model}. "
-                    f"Valid: {', '.join(VALID_CLAUDE_MODELS)}. "
-                    f"Run with --list-models --provider claude to see the list."
-                ),
-            )
-        return model
+def alias_ids(aliases: Sequence[str]) -> dict[str, str]:
+    """Each alias's model ID; a registry fault stops the run."""
+    try:
+        return {alias: resolve_model_alias(alias) for alias in aliases}
+    except ModelAliasError as exc:
+        raise ScriptError(str(exc)) from None
 
-    if provider == PROVIDER_CODEX:
-        model = (raw_model or DEFAULT_CODEX_MODEL).strip()
-        if model not in VALID_CODEX_MODELS:
-            raise UsageError(
-                (
-                    f"Invalid codex model: {model}. "
-                    f"Valid: {', '.join(VALID_CODEX_MODELS)}. "
-                    f"Run with --list-models --provider codex to see the list."
-                ),
-            )
-        return model
+
+def resolve_model(provider: str, raw_model: str | None) -> tuple[str, str]:
+    """Return the model ID and its alias; OpenCode agents are their own alias."""
+    if provider in (PROVIDER_CLAUDE, PROVIDER_CODEX):
+        aliases, default = (
+            (VALID_CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL)
+            if provider == PROVIDER_CLAUDE
+            else (VALID_CODEX_MODELS, DEFAULT_CODEX_MODEL)
+        )
+        model = (raw_model or default).strip()
+        if model in aliases:
+            return alias_ids((model,))[model], model
+        prefix = "claude-" if provider == PROVIDER_CLAUDE else "gpt-"
+        if (
+            model.startswith(prefix)
+            and model.removeprefix(prefix).strip()
+            and not any(char.isspace() for char in model)
+        ):
+            return model, SONNET_ALIAS if model.startswith("claude-sonnet-") else model
+        raise UsageError(
+            (
+                f"Invalid {provider} model: {model}. "
+                f"Use one of {', '.join(aliases)} or an explicit {provider} model ID. "
+                f"Run with --list-models --provider {provider} to see the list."
+            ),
+        )
 
     model = (raw_model or DEFAULT_OPENCODE_MODEL).strip()
     if model not in VALID_OPENCODE_MODELS:
@@ -806,7 +890,7 @@ def resolve_model(provider: str, raw_model: str | None) -> str:
                 f"Run with --list-models --provider opencode to see the list."
             ),
         )
-    return model
+    return model, model
 
 
 def translate_effort(provider: str, canonical: str) -> str:
@@ -908,7 +992,7 @@ def build_plan(args: argparse.Namespace) -> ResolvedPlan:
     provider: str = args.provider or DEFAULT_PROVIDER
     provider_cli_path = ensure_cli_available(provider)
 
-    model = resolve_model(provider, args.model)
+    model, alias = resolve_model(provider, args.model)
 
     # Determine effort: use explicit value, or default based on model.
     if provider == PROVIDER_OPENCODE:
@@ -917,7 +1001,7 @@ def build_plan(args: argparse.Namespace) -> ResolvedPlan:
     elif args.effort is not None:
         effort_canonical = args.effort
         effort_vendor = translate_effort(provider, effort_canonical)
-    elif model in SONNET_MODELS:
+    elif alias == SONNET_ALIAS:
         effort_canonical = "low"
         effort_vendor = translate_effort(provider, effort_canonical)
     else:
@@ -972,11 +1056,14 @@ def list_models(provider_filter: str | None) -> dict[str, list[str]]:
         (PROVIDER_CODEX, VALID_CODEX_MODELS, DEFAULT_CODEX_MODEL),
         (PROVIDER_OPENCODE, VALID_OPENCODE_MODELS, DEFAULT_OPENCODE_MODEL),
     )
-    return {
-        provider: [default, *(model for model in models if model != default)]
-        for provider, models, default in catalog
-        if provider_filter in (None, provider)
-    }
+    listed: dict[str, list[str]] = {}
+    for provider, models, default in catalog:
+        if provider_filter not in (None, provider):
+            continue
+        ordered = [default, *(model for model in models if model != default)]
+        ids = alias_ids(ordered) if provider != PROVIDER_OPENCODE else {}
+        listed[provider] = [ids.get(model, model) for model in ordered]
+    return listed
 
 
 def list_prompt_names() -> list[str]:

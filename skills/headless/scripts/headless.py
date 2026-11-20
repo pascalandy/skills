@@ -378,6 +378,87 @@ READ_ONLY = ("review-only", "code-review")
 
 log = logging.getLogger("headless")
 
+FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
+FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
+STANDALONE_MODELS = {
+    "opus": "claude-opus-5-5",
+    "fable": "claude-fable-5-2",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5",
+    "sol": "gpt-6.2-sol",
+    "astra": "gpt-6.2-astra",
+    "terra": "gpt-6.1-terra",
+    "grok": "grok-4.7",
+}
+
+
+class ModelAliasError(ValueError):
+    """The fleet registry or resolver is missing or invalid, or the alias is unknown."""
+
+
+def is_model_alias(name: str) -> bool:
+    return name.isascii() and name.isalpha() and name.islower()
+
+
+def resolve_model_alias(name: str) -> str:
+    """Return the model ID for an alias, or `name` itself when it is an explicit ID."""
+    if not is_model_alias(name):
+        return name
+    resolver = Path.home() / FLEET_RESOLVER
+    registry = os.environ.get(FLEET_REGISTRY_ENV)
+    installed = resolver.parents[1] / "references" / "active-models.toml"
+    if not registry and not installed.exists() and not resolver.exists():
+        if name not in STANDALONE_MODELS:
+            raise ModelAliasError(
+                f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
+            )
+        return STANDALONE_MODELS[name]
+    if not registry and not installed.is_file():
+        raise ModelAliasError(
+            f"the fleet registry {installed} is missing or not a file"
+        )
+    if not resolver.is_file():
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} is missing; install the fleet skill"
+            f" or unset {FLEET_REGISTRY_ENV}"
+        )
+    interpreter = (
+        ["uv", "run", "--python", ">=3.11", "--script"]
+        if sys.version_info < (3, 11)
+        else [sys.executable, "-I"]
+    )
+    command = [*interpreter, str(resolver)]
+    command += ["--registry", registry] if registry else []
+    try:
+        done = subprocess.run(
+            [*command, "resolve", name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} failed: {error}"
+        ) from None
+    if done.returncode != 0:
+        lines = done.stderr.strip().splitlines()
+        try:
+            errors = json.loads(lines[-1])["errors"]
+        except (IndexError, ValueError, KeyError, TypeError):
+            errors = [lines[-1] if lines else f"exit {done.returncode}"]
+        raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
+    try:
+        identifier = json.loads(done.stdout)["id"]
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("empty or invalid model ID")
+        return identifier
+    except (ValueError, KeyError, TypeError):
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} gave no ID for {name}"
+        ) from None
+
+
 RULES = {
     "review-only": (
         "Mode: review only. Report your findings only. Leave every file in {cwd} "
@@ -407,7 +488,7 @@ EXAMPLES = """\
 examples:
   headless.py --code-review --base main --cwd ~/projects/app
   headless.py claude --code-review --commit HEAD --cwd ~/projects/app
-  headless.py codex --review-fix --prompt-file fix.md --model gpt-6-astra --effort high
+  headless.py codex --review-fix --prompt-file fix.md --model astra --effort high
   headless.py claude --review-fix --prompt-file next.md --resume 3f1c2e9a-0b4d-4c55-9a0e-6d1f2b7c8e90
   headless.py grok --code-review --uncommitted --cwd ~/projects/app
   headless.py codex --review-only --prompt-file prompt.md -- -c 'web_search="live"'
@@ -897,6 +978,15 @@ def load_config(path: Path) -> Config:
             problems.append(
                 f"[{name}] reasoning-level '{effort}' is not one of {', '.join(efforts)}"
             )
+        if (
+            isinstance(model, str)
+            and is_model_alias(model)
+            and model not in STANDALONE_MODELS
+        ):
+            problems.append(
+                f"[{name}] model '{model}' is not a known alias; "
+                f"use one of {', '.join(STANDALONE_MODELS)} or an explicit model ID"
+            )
         if isinstance(model, str) and isinstance(effort, str):
             tables[name] = Defaults(
                 model, effort, provider if isinstance(provider, str) else None
@@ -1169,6 +1259,10 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
             f"--effort {effort} is not one of {', '.join(runner.efforts)} for {target}"
         )
     check_mode_flags(args)
+    try:
+        model = resolve_model_alias(args.model or defaults.model)
+    except ModelAliasError as error:
+        raise ScriptError(str(error)) from None
     if args.mode == "code-review":
         for flag in ("--dangerously-bypass-approvals-and-sandbox", "--yolo"):
             if flag in extra:
@@ -1204,7 +1298,7 @@ def launch(args: argparse.Namespace, extra: list[str]) -> Result:
         target=target,
         mode=args.mode,
         cwd=cwd,
-        model=args.model or defaults.model,
+        model=model,
         effort=effort,
         session=args.resume or fresh_session,
         resume=args.resume is not None,

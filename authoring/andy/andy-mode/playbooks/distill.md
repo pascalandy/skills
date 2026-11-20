@@ -106,7 +106,7 @@ For dry-run, alternate providers, or custom output locations, read `references/d
 No config required. Defaults cover common case:
 
 - Provider: `claude`
-- Model: `claude-opus-4-6`
+- Model: `opus`, resolved to its current ID as `references/distill/help.md` says
 - Effort: `medium`
 - Output: beside input file
 - Open in Finder when done (macOS)

@@ -1,4 +1,7 @@
 # scripts/headless.py reads these defaults. A --model or --effort flag overrides them.
+# A model is an alias, such as sol, or an explicit ID. The fleet skill's
+# references/active-models.toml resolves an alias when the fleet skill is
+# installed; otherwise the launcher's own defaults apply (STANDALONE_MODELS).
 # harness selects the CLI when the command names none.
 # The launcher runs codex, claude, and grok. Pi and OpenCode await #281.
 # provider applies only to Pi and OpenCode.
@@ -6,20 +9,20 @@
 harness = "codex"
 
 [codex]
-model = "gpt-6.1-sol"
+model = "sol"
 reasoning-level = "xhigh"
 
 [claude]
-model = "claude-opus-5-5"
+model = "opus"
 reasoning-level = "xhigh"
 
 [grok]
-model = "grok-4.7"
+model = "grok"
 reasoning-level = "xhigh"
 
 [pi]
 provider = "openai-codex"
-model = "gpt-6.1-sol"
+model = "sol"
 reasoning-level = "xhigh"
 
 [opencode]

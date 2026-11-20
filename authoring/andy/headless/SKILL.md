@@ -112,6 +112,8 @@ To apply your own criteria, use `--review-only`. For mode commands and billing, 
 
 [config.toml](config.toml) holds the defaults. Each run prints the model and reasoning level that ran. Change defaults in the skill's source copy of `config.toml`. Do not change defaults in a skill's prose. An installation overwrites its own copy. For one run, pass `--model`, `--effort`, or `--config FILE`. `harness` names the CLI that runs when the command names none. The `[codex]`, `[claude]`, and `[grok]` tables set each CLI's `model` and `reasoning-level`. The `[pi]` and `[opencode]` tables also set a `provider` because several providers can serve one model. Their references build commands from these values.
 
+A `model` is an alias, such as `sol`, `astra`, `terra`, `opus`, `sonnet`, `haiku`, `fable` or `grok`, or an explicit model ID used as given. With Pascal's fleet skill installed, its `references/active-models.toml` gives each alias's current ID, and a missing or invalid registry, a missing resolver or an unknown alias fails the run; without it, `STANDALONE_MODELS` in `scripts/headless.py` applies. A model named in the request wins over the alias. To build a command yourself from a table, such as the sandboxed fixer below or the Pi and OpenCode references, resolve its alias first: with the fleet skill, `uv run ~/.pi/agent/skills/fleet/scripts/active_models.py resolve <alias>` answers the ID in `id`; otherwise take it from `STANDALONE_MODELS`.
+
 A model or reasoning level in the request overrides the file through `--model` or `--effort`. The CLIs use different names for reasoning level. The launcher sends `--effort` to Codex as `model_reasoning_effort`, to Claude Code as `--effort`, and to Grok as `--reasoning-effort`. The request may call this setting reasoning, effort, or thinking. Flags after `--` reach the child CLI unchanged, such as `-- -c 'web_search="live"'` for Codex. Run `uv run <skill-dir>/scripts/headless.py --help` to list every option.
 
 ## Read the result
@@ -119,7 +121,7 @@ A model or reasoning level in the request overrides the file through `--model` o
 On success, stdout holds one JSON line:
 
 ```json
-{"ok":true,"file":"/tmp/headless-codex-review-only.8gcz_axu/answer.md","model":"gpt-6-luna","effort":"medium","session":"01a0f7d4-cbcf-7162-869b-94b331ed56b0","changed":[]}
+{"ok":true,"file":"/tmp/headless-codex-review-only.8gcz_axu/answer.md","model":"gpt-6.1-terra","effort":"medium","session":"01a0f7d4-cbcf-7162-869b-94b331ed56b0","changed":[]}
 ```
 
 `file` holds the child's answer in every mode. Read that file to get the whole answer. Its folder also holds `prompt.md` and the child's logs.

@@ -147,6 +147,36 @@ print(json.dumps({{"type": "step_finish", "part": {{"tokens": {{"total": 51}}}}}
     )
 
 
+# uv keeps its cache and Pythons under the real home; a test home must not hide them
+UV_DIRS = {
+    name: subprocess.run(
+        ["uv", *command], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    for name, command in (
+        ("UV_CACHE_DIR", ("cache", "dir")),
+        ("UV_PYTHON_INSTALL_DIR", ("python", "dir")),
+    )
+}
+HOMES: dict[str, Path] = {}
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Run each script in a home without the fleet skill, so its own defaults apply."""
+    HOMES["home"] = tmp_path_factory.mktemp("home")
+
+
+def script_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    """`env`, or this process's, with the uv folders and a home without the fleet
+    skill, unless `env` sets a home of its own."""
+    merged = {
+        k: v for k, v in (env or os.environ).items() if k != "FLEET_ACTIVE_MODELS"
+    }
+    if merged.get("HOME") == os.environ.get("HOME"):
+        merged["HOME"] = str(HOMES["home"])
+    return {**merged, **UV_DIRS}
+
+
 def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str, int]:
     result = subprocess.run(
         ["uv", "run", str(SCRIPT_PATH), *args],
@@ -155,7 +185,7 @@ def run_script(*args: str, env: dict[str, str] | None = None) -> tuple[str, str,
         encoding="utf-8",
         check=False,
         timeout=30,
-        env=env,
+        env=script_env(env),
     )
     return result.stdout, result.stderr, result.returncode
 
@@ -219,6 +249,54 @@ class TestPromptDiscovery:
             "ok": True,
             "models": {"opencode": ["1-glm", "2-luna", "3-sol", "4-astra", "5-qwen"]},
         }
+
+    def test_list_models_gives_each_alias_its_standalone_id(self) -> None:
+        result = run_script("--list-models")
+
+        models = answer(*result)["models"]
+        assert models["claude"] == ["claude-opus-5-5", "claude-sonnet-5-5"]
+        assert models["codex"] == ["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-terra"]
+
+    def test_the_fleet_registry_resolves_the_default_and_an_id_is_accepted(
+        self, tmp_path: Path
+    ) -> None:
+        env = env_with_fake_claude(tmp_path)
+        home = tmp_path / "home"
+        resolver = home / ".pi/agent/skills/fleet/scripts/active_models.py"
+        resolver.parent.mkdir(parents=True)
+        (resolver.parents[1] / "references").mkdir()
+        (resolver.parents[1] / "references/active-models.toml").write_text("")
+        resolver.write_text(
+            "import json, sys\n"
+            "ids = {'opus': 'claude-opus-9', 'sonnet': 'claude-sonnet-9'}\n"
+            "alias = sys.argv[-1]\n"
+            "if alias not in ids:\n"
+            "    print(json.dumps({'ok': False, 'errors': ['unknown alias ' + alias]}),"
+            " file=sys.stderr)\n"
+            "    sys.exit(1)\n"
+            "print(json.dumps({'ok': True, 'id': ids[alias]}))\n"
+        )
+        env["HOME"] = str(home)
+        input_file = tmp_path / "article.md"
+        input_file.write_text("hello world\n", encoding="utf-8")
+
+        plan = answer(*run_script(str(input_file), "--dry-run", env=env))
+        assert (plan["model"], plan["effort"]) == ("claude-opus-9", "high")
+        plan = answer(
+            *run_script(
+                str(input_file), "--dry-run", "--model", "claude-sonnet-9", env=env
+            )
+        )
+        assert (plan["model"], plan["effort"]) == ("claude-sonnet-9", "low")
+        resolver.unlink()
+        plan = answer(
+            *run_script(
+                str(input_file), "--dry-run", "--model", "claude-sonnet-4-6", env=env
+            )
+        )
+        assert (plan["model"], plan["effort"]) == ("claude-sonnet-4-6", "low")
+        failed = answer(*run_script(str(input_file), "--dry-run", env=env))
+        assert "fleet resolver" in failed["errors"][0]
 
 
 class TestPromptDrivenCli:
@@ -478,7 +556,7 @@ def test_a_failed_input_copy_answers_the_file_already_written(
         text=True,
         check=False,
         timeout=30,
-        env=env,
+        env=script_env(env),
     )
 
     assert (result.returncode, result.stdout) == (1, "")
