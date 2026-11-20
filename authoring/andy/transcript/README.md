@@ -24,7 +24,7 @@ The first time, and whenever `just ttr` reports that YouTube refused the vault s
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - `fnox` with `DEEPGRAM_TRANSCRIPT_API_KEY` in the fnox store, or that variable in the environment
 - The `andy-mode` skill installed beside this one for Zoom summaries, which use the `synthese-rencontre` prompt of its `distill-prompt` route
-- `rsync` and SSH access to mbp, on a machine of Pascal's fleet other than mbp, for [Copy to mbp](#copy-to-mbp)
+- `rsync` and SSH access to the destination for [Copy results to another machine](#copy-results-to-another-machine)
 
 Add the key to the store as `docs/operations/secrets.md` in pascalandy/dotfiles describes. The runtime reads `DEEPGRAM_TRANSCRIPT_API_KEY` from the environment first, then runs `fnox exec --only DEEPGRAM_TRANSCRIPT_API_KEY --if-missing error -- printenv DEEPGRAM_TRANSCRIPT_API_KEY` with the key held in memory only. It tries `fnox` on `PATH`, then `~/.local/bin/fnox`, then `~/.local/share/fnox/fnox`. It never reads the dictation key `DEEPGRAM_API_KEY` and never prints a key.
 
@@ -105,7 +105,7 @@ uv run <skill_dir>/scripts/transcript.py doctor --source file --no-summary
 
 Each check has a `pass`, `warn`, or `fail` status, which `-v` lists. Each failed check is one error with its fix, and exits `1`. A `warn` check, such as a missing `pi`, needs nothing for the default profile, so it never fails `doctor`. No output contains the Deepgram credential.
 
-For a run with changed source or summary settings, inspect the plan first with `--dry-run`. Dry-run source validation is real and read-only. It checks a YouTube URL, resolves Zoom media, or validates a local file, without secrets, API calls, or file creation. `doctor --source file --no-summary` checks only the Deepgram credential and the copy to mbp.
+For a run with changed source or summary settings, inspect the plan first with `--dry-run`. Dry-run source validation is real and read-only. It checks a YouTube URL, resolves Zoom media, or validates a local file, without secrets, API calls, or file creation. `doctor --source file --no-summary` checks the Deepgram credential and the copy configuration.
 
 ## Output
 
@@ -128,13 +128,13 @@ A failure after the result folder appears keeps the folder, and its metadata rec
 
 Exit `75` means a temporary failure before any paid request, such as a network error reaching YouTube or Deepgram refusing the audio; rerunning the same command is safe. A failure after the Deepgram upload started exits `1`, because Deepgram may have transcribed, and billed, the audio.
 
-## Copy to mbp
+## Copy results to another machine
 
-Pascal reads his transcripts on mbp. With the fleet skill installed, whose `references/fleet.toml` lists the machines, a YouTube or local file run on another machine, such as om1 or the Mini, copies each result folder it saved under `~/Documents/_my_docs/61_transcription_exports_yt` to the same folder on mbp, with `rsync -rt` over SSH. The local copy stays. On mbp itself, without the fleet skill, or with another `--output-dir`, results stay where they are saved. Zoom runs keep their own export folder and are not copied.
+To enable copying, set `transcript_export` in the `[roles]` table of the fleet skill's `references/fleet.toml`. Give it the key of a `[machines]` entry with an `ssh` address. YouTube and local file runs copy each result folder under `~/Documents/_my_docs/61_transcription_exports_yt` to the same path on that machine with `rsync -rt` over SSH. The local copy stays. Results stay local on the destination machine, with another `--output-dir`, or without the fleet inventory. Zoom runs use their own local export folder.
 
-The copy runs after the run ends, after a failed run too, so mbp also gets the metadata of a failure; an interrupt skips it. A failed run keeps its own exit code and recovery command, and a failed copy adds its own error with its rsync retry. A successful copy joins the answer as one `changes` entry per folder, such as `["copy","andy16@mbp16.donkey-arcturus.ts.net:Documents/_my_docs/61_transcription_exports_yt/<folder>"]`. A dry run names the destination as `export`, or `null` when results stay local, and `doctor` checks `fleet.toml` and `rsync` without reaching mbp.
+The copy runs after success or failure and includes any saved failure metadata. An interrupt skips it. A failed run keeps its own exit code and recovery command. A failed copy adds its error and rsync retry. A successful copy adds one `changes` entry per folder, in the form `["copy","<destination>"]`. A dry run reports the destination as `export`, or `null` when results stay local. `doctor` checks the inventory and `rsync` locally.
 
-When the run succeeded but mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy. An interrupt during the copy exits `130` or `143` with the saved `files` and the same rsync after `rerun:`.
+If the transcription succeeds and the copy fails, the command exits `1`, lists the saved `files`, and gives `retry: rsync -rt <folder> <destination>`. Run that rsync command once the destination is reachable to copy the saved files without another transcription. An interrupt during the copy exits `130` or `143` with the saved `files` and the same command after `rerun:`.
 
 ## Safety and reruns
 

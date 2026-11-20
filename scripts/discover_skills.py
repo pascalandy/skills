@@ -28,7 +28,7 @@ a skill or could not list them.
 
 examples:
   just skills-discover
-  just skills-discover --profile om1 --agent codex --timeout 2m"""
+  just skills-discover --profile linux --agent codex --timeout 2m"""
 
 EXIT_CODES = exit_codes(
     {
@@ -217,7 +217,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             skill_sources(Path(temporary), args.private_root, args.profile)
         )
     roots = {
-        "codex": ".codex/skills" if args.profile == "om1" else ".agents/skills",
+        "codex": ".codex/skills" if args.profile == "linux" else ".agents/skills",
         "pi": ".pi/agent/skills",
         "opencode": ".config/opencode/skills",
     }
@@ -313,7 +313,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 # Native discovery is a separate post-install proof. File hashes alone cannot
 # establish that an agent actually loaded a skill.
 def main(argv: list[str] | None = None) -> int:
-    from install_skills import HOST_PROFILE
+    from install_skills import HOST_PROFILE, PROFILES
 
     parser = Parser(
         prog="just skills-discover",
@@ -324,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--profile",
         default=HOST_PROFILE,
-        choices=("mac", "om1"),
+        choices=PROFILES,
         help=f"the install profile whose targets to check (default: {HOST_PROFILE}, from the OS)",
     )
     parser.add_argument(

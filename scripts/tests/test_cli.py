@@ -75,7 +75,7 @@ def test_a_usage_error_exits_2_with_short_usage_and_the_help_hint(
 
 def test_a_flag_counts_only_before_the_end_of_options() -> None:
     assert given(["--bogus", "-h"], "-h", "--help")
-    assert given(["mbp", "--help"], "-h", "--help")
+    assert given(["worker", "--help"], "-h", "--help")
     assert not given(["--", "--help"], "-h", "--help")
     assert not given(["--notes", "help.md"], "-h", "--help")
 

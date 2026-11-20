@@ -20,7 +20,7 @@ mkdir -p "$RUN/home" "$RUN/tmp" "$RUN/private" "$EVIDENCE" &&
 cat >"$RUN/env" <<EOF &&
 CHECKOUT='$CHECKOUT'
 EVIDENCE='$EVIDENCE'
-PROFILE='$([ "$(uname)" = Darwin ] && echo mac || echo om1)'
+PROFILE='$([ "$(uname)" = Darwin ] && echo mac || echo linux)'
 export UV_CACHE_DIR='$(uv cache dir)' UV_PYTHON_INSTALL_DIR='$(uv python dir)'
 export MISE_CONFIG_DIR='${XDG_CONFIG_HOME:-$HOME/.config}/mise' MISE_DATA_DIR='${XDG_DATA_HOME:-$HOME/.local/share}/mise'
 export MISE_STATE_DIR='${XDG_STATE_HOME:-$HOME/.local/state}/mise' MISE_CACHE_DIR='${XDG_CACHE_HOME:-$HOME/.cache}/mise'

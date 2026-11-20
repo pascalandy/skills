@@ -4,14 +4,14 @@
 
 ## Sub-features
 
-- `discover-codex`: Codex loads every skill from `~/.codex/skills` on om1, or `~/.agents/skills` on mac
+- `discover-codex`: Codex loads every skill from `~/.codex/skills` with the `linux` profile, or `~/.agents/skills` with the `mac` profile
 - `discover-pi`: Pi loads every skill from `~/.pi/agent/skills`
 - `discover-opencode`: OpenCode loads every skill from `~/.config/opencode/skills`
 - `discover-claude`: left out of the check by design
 
 ## How to get to it (user POV)
 
-- `just skills-discover --profile om1` after an install
+- `just skills-discover --profile linux` after an install
 - Step 6 of the cutover in `docs/references/install-skills.md`
 
 ## Driving it with just

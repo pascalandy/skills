@@ -14,7 +14,7 @@ date_updated: 2026-10-28
 
 ## Run it
 
-- The profile follows the OS: `mac` on macOS, `om1` elsewhere. Pass `--profile` to override
+- The profile follows the OS: `mac` on macOS, `linux` elsewhere. Pass `--profile` to override
 - Every package under `skills-private/authoring/` installs; packages elsewhere in the clone, such as `skill_archived/`, never do. `--private-root PATH` names another private repository root
 - A name that is both public and private stops the install, a dry run included, and the error names both paths: remove the public package to keep the skill private, or delete the private copy to publish it
 - A run answers `{"ok":true,"changes":[...]}`, one change per entry, such as `["add","~/.claude/skills/concise"]`, and `{"ok":true}` when every target is current. `--dry-run` answers the same without writing; `--check` fails when a selected target needs work, with the changes beside the error. `-v` logs how many entries each target holds current
@@ -79,15 +79,9 @@ Private skills live in the private repository `pascalandy/skills-private`, clone
 
 Move one machine at a time from the old dotfiles skill engine to this installer, and only with Pascal's authorization for that machine. Never let both engines write the same targets
 
-| Machine | Profile |
-|---|---|
-| `mbp16` | `mac` |
-| Mac mini | `mac` |
-| `om1` | `om1` |
-
 1. **Stop the old writers.** The old engine has no timer; it runs only when one of these is called. Confirm that nothing calls them during the cutover, including `fleet-sync-skills` from another machine, and list which exist:
-   - `~/.local/bin/`: `dotfiles-release`, `dotfiles-skills`, `sync-skills`, `mbp-sync-skills`, `fleet-sync-skills`
-   - `~/justfile` recipes `skills-update`, `sync-skills`, `pull-dotfiles`, and `om1`
+   - `~/.local/bin/`: `dotfiles-release`, `dotfiles-skills`, `sync-skills`, `fleet-sync-skills`, and any machine-specific wrappers that call them
+   - `~/justfile` recipes that invoke the old engine, including `skills-update`, `sync-skills`, and `pull-dotfiles`
    - The release clone in `~/.local/share/dotfiles-release/`
 2. **Preserve old state.** Copy `~/.local/state/dotfiles-skills/` outside every target. If `~/.local/state/dotfiles-skills/pending.json` exists, stop: the old engine has an unfinished recovery
 3. **Select the source.** Use a skills checkout at a reviewed `main` revision. Record the machine, `git rev-parse HEAD`, the profile, and the private packages already installed there. Check that the merged private `main` holds in `authoring/` exactly the packages that remain private, and fix any gap through a worktree of `skills-private` and a PR. Pass `--private-root PATH` when the root is not `skills-private/` beside the checkout
@@ -96,7 +90,7 @@ Move one machine at a time from the old dotfiles skill engine to this installer,
 6. **Verify discovery.** Run `just skills-discover --profile PROFILE` with the same `--private-root`. Claude Code has no command that lists its skills, so the check leaves it out: start a new Claude Code session and confirm the expected skills appear
 7. **Retire the old engine.** Only after step 6 passes, move the step 1 writers, the release clone, `~/.local/state/dotfiles-skills/`, and any `~/.local/state/install-skills/` left by an earlier installer version to the trash. Keep the step 2 copy until Pascal discards it. Switch the machine's chezmoi source to dotfiles `main`, which no longer ships the old writers. chezmoi does not delete files removed from its source, so the trash step is still needed
 
-Keep `~/.local/share/dotfiles/machine-identity.sh`, `~/.local/share/dotfiles/command-context.sh`, and `chezmoi-apply-mbp`. The old bootstrap installed them too, but they are not skill writers
+Keep the old bootstrap's helpers for machine identity, command context, and applying dotfiles
 
 ## Related
 

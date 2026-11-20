@@ -191,9 +191,9 @@ def test_an_item_naming_two_prs_waits_on_pascal_until_both_are_done() -> None:
             "chef",
             "question_note",
         ),
-        ("⚠️ Incident · Cook 4.1 abcd, om1", "cook", "chef", "incident"),
+        ("⚠️ Incident · Cook 4.1 abcd, worker", "cook", "chef", "incident"),
         (
-            "Chef 4 abcd · ⚠️ incident on om1. The batch continues.",
+            "Chef 4 abcd · ⚠️ incident on worker. The batch continues.",
             "chef",
             "head_chef",
             "incident",

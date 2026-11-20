@@ -734,7 +734,6 @@ SUMMARY_MAX_RETRIES = 3  # Retry attempts for summary CLI failures
 FNOX_TIMEOUT = 15
 DEEPGRAM_TIMEOUT = 300
 POST_RUN_TIMEOUT = 10
-# A few text files over Tailscale; a sleeping mbp fails at ConnectTimeout
 EXPORT_TIMEOUT = 25
 
 SUMMARY_OPTIONS = frozenset(
@@ -1373,12 +1372,7 @@ def run_ytdlp(
     )
 
 
-# Pascal reads his transcripts on mbp. With the fleet skill installed, a run
-# on another machine copies each result folder it saved under OUTPUT_DIR to
-# the same folder on mbp, and keeps the local copy. Without the fleet skill,
-# or on mbp itself, results stay where they are saved
 FLEET_MACHINES = Path(".pi/agent/skills/fleet/references/fleet.toml")
-EXPORT_MACHINE = "mbp"
 EXPORT_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=10"
 FFMPEG_INSTALL = (
     "brew install ffmpeg"
@@ -1399,36 +1393,42 @@ class ExportError(RuntimeError):
         return f"{self}; retry: {self.retry}" if self.retry else str(self)
 
 
-def export_host() -> str | None:
-    """The SSH address result folders are copied to, or None when they stay
-    on this machine: the fleet skill is missing, or this machine is mbp.
+@dataclass(frozen=True)
+class ExportTarget:
+    name: str
+    ssh: str
 
-    This machine is mbp when its host name's first label matches the machine's
-    name or its SSH host's first label, as the fleet skill's sync_fleet.py
-    decides. Raises ExportError when fleet.toml is unreadable or has no
-    address for mbp."""
+    @property
+    def destination(self) -> str:
+        return f"{self.ssh}:{OUTPUT_SUBDIR}/"
+
+
+def export_target() -> ExportTarget | None:
+    """Resolve the configured export machine. Skip copying on that machine
+    or when the fleet inventory is absent."""
     path = Path.home() / FLEET_MACHINES
     try:
-        machines = tomllib.loads(path.read_text(encoding="utf-8"))["machines"]
-        ssh = machines[EXPORT_MACHINE]["ssh"]
+        config = tomllib.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
     except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
         raise ExportError(f"Could not read {path}: {error}") from None
+    try:
+        name = config["roles"]["transcript_export"]
+    except (KeyError, TypeError):
+        name = None
+    if not isinstance(name, str) or not name:
+        raise ExportError(f"{path} must name a machine in [roles].transcript_export")
+    try:
+        ssh = config["machines"][name]["ssh"]
     except (KeyError, TypeError):
         ssh = None
     if not isinstance(ssh, str) or "@" not in ssh:
-        raise ExportError(f"{path} has no ssh address for [machines.{EXPORT_MACHINE}]")
+        raise ExportError(f"{path} has no ssh address for [machines.{name}]")
     here = platform.node().split(".")[0].lower()
-    if here in {EXPORT_MACHINE, ssh.split("@", 1)[1].split(".")[0].lower()}:
+    if here in {name.lower(), ssh.split("@", 1)[1].split(".")[0].lower()}:
         return None
-    return ssh
-
-
-def export_destination() -> str | None:
-    """Where result folders under OUTPUT_DIR are copied, or None."""
-    host = export_host()
-    return f"{host}:{OUTPUT_SUBDIR}/" if host else None
+    return ExportTarget(name, ssh)
 
 
 def export_results(
@@ -1448,13 +1448,13 @@ def export_results(
     ]
     if not folders:
         return []
-    destination = export_destination()
-    if destination is None:
+    target = export_target()
+    if target is None:
         return []
-    host = destination.split(":", 1)[0]
+    destination = target.destination
     retry = shlex.join(["rsync", "-rt", *folders, destination])
     try:
-        with (reporter or ExecutionReporter()).step(f"Copy to {EXPORT_MACHINE}"):
+        with (reporter or ExecutionReporter()).step(f"Copy to {target.name}"):
             result = run_child(
                 ["rsync", "-rt", "-e", EXPORT_SSH, *folders, destination],
                 timeout=EXPORT_TIMEOUT,
@@ -1475,7 +1475,7 @@ def export_results(
     if reason:
         kept = ", ".join(folders)
         raise ExportError(
-            f"Could not copy the result to {EXPORT_MACHINE} ({host}): {reason}. "
+            f"Could not copy the result to {target.name} ({target.ssh}): {reason}. "
             f"The local copy stays in {kept}",
             retry,
         )
@@ -1799,7 +1799,7 @@ def ensure_cli_available(command_name: str) -> None:
 DEEPGRAM_KEY_NAME = "DEEPGRAM_TRANSCRIPT_API_KEY"
 SECRETS_DOC = "docs/operations/secrets.md in pascalandy/dotfiles"
 # A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
-# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1.
+# fallback paths cover installations outside that PATH.
 FNOX_CANDIDATES = (
     "fnox",
     str(Path.home() / ".local/bin/fnox"),
@@ -2937,8 +2937,8 @@ def _dry_run_plan(
     if isinstance(plan.youtube_auth, CookieFile):
         source["cookies_file"] = plan.youtube_auth.label
     try:
-        export = (
-            export_destination()
+        target = (
+            export_target()
             if plan.source_kind != "zoom"
             and output_dir.resolve() == OUTPUT_DIR.resolve()
             else None
@@ -2951,7 +2951,7 @@ def _dry_run_plan(
         "source": source,
         "summary": summary,
         "output_dir": str(output_dir),
-        "export": export,
+        "export": target.destination if target else None,
         "timeout_seconds": args.timeout,
     }
 
@@ -3135,11 +3135,12 @@ def _doctor_export_check() -> dict[str, str]:
     """Whether results saved under OUTPUT_DIR can be copied to the export
     machine; it reads fleet.toml and PATH, without reaching the machine."""
     try:
-        destination = export_destination()
+        target = export_target()
     except ExportError as error:
         return _doctor_check("export", "fail", str(error), f"{PROG} doctor -v")
-    if destination is None:
+    if target is None:
         return _doctor_check("export", "pass", f"Results stay in {OUTPUT_DIR}")
+    destination = target.destination
     if not shutil.which("rsync"):
         return _doctor_check(
             "export",

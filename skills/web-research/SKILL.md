@@ -60,7 +60,7 @@ Done when each check passes or you name the one that failed. A failed check coun
 3. Codex Terra high with `$firecrawl`
 4. Pi Terra with the `exa` extension (`exa_search`, `exa_fetch`, `exa_answer`)
 
-Each level names the aliases `terra` and `haiku`. Read `fleet/references/active-models.toml` and resolve each one: its `id` for Codex and Claude, and for Pi Terra its Pi ID on this machine, which differs on the Mini. Without the fleet skill, take the newest Terra or Haiku that `orchestrator_capabilities` lists.
+Each level names the aliases `terra` and `haiku`. Read `fleet/references/active-models.toml` and resolve each one: its `id` for Codex and Claude, and for Pi Terra its Pi ID on this machine. Without the fleet skill, take the newest Terra or Haiku that `orchestrator_capabilities` lists.
 
 - **Codex delegation**: `delegate_task` with the Codex provider instance from Step 2, the Terra ID, and `target.options` `reasoningEffort: "high"` and `serviceTier: "default"`
 - **Haiku delegation**: `delegate_task` with the Claude provider instance from Step 2, the Haiku ID, and `target.options.effort: "high"`

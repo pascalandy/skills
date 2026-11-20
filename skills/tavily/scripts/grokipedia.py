@@ -373,7 +373,7 @@ SEARCH_DOMAINS = ["grokipedia.com", "grokxpedia.us"]
 KEY_NAME = "TAVILY_API_KEY"
 SECRETS_DOC = "docs/operations/secrets.md in pascalandy/dotfiles"
 # A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
-# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1.
+# fallback paths cover installations outside that PATH.
 FNOX_CANDIDATES = (
     "fnox",
     str(Path.home() / ".local/bin/fnox"),

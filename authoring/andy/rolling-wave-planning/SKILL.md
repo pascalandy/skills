@@ -20,7 +20,7 @@ The planner plans the later waves again at each wave review.
 | Implementer | An agent session that executes one task | Follows the task brief and the implementation instructions |
 | QA agent | An agent session on the QA machine | Tests the work of each epic. Makes no commit and no PR |
 
-- **QA machine:** the dedicated machine on which the QA agent tests. The default is the Mac Mini. If the PM names a different machine, record it in `01-project.md`
+- **QA machine:** the dedicated machine on which the QA agent tests. Use the machine the PM names, or the `qa` role in the fleet skill when installed. Record the choice in `01-project.md`
 - **UAT (user acceptance test):** the PM does every UAT. The PM reads the QA reports, then decides which tests to do and how detailed they are. The plan defines no UAT scenario, no UAT task and no UAT status
 - **Implementation instructions:** the PM gives them when implementation starts. Do not write a branch rule, a PR rule or an implementer procedure in `plan/`, in a brief or in the agent file
 - **Signals:** the procedures read these six signals. The implementation instructions of the PM must produce them:

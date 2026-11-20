@@ -108,7 +108,7 @@ def interrupted(_: argparse.Namespace) -> dict[str, Any]:
 
 
 def lying(_: argparse.Namespace) -> dict[str, Any]:
-    raise ScriptError("the deploy missed mbp", report={"ok": True})
+    raise ScriptError("the deploy missed the worker", report={"ok": True})
 
 
 def answered(
@@ -145,7 +145,7 @@ def test_ok_follows_the_exit_code_whatever_work_returns() -> None:
     assert answered(lying) == (
         1,
         "",
-        '{"ok":false,"errors":["the deploy missed mbp"]}\n',
+        '{"ok":false,"errors":["the deploy missed the worker"]}\n',
     )
 
 

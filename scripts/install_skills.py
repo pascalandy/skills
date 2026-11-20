@@ -45,18 +45,17 @@ PROFILES = {
         ".config/opencode/skills",
         ".config/agents/skills",
     ),
-    "om1": (
+    "linux": (
         ".pi/agent/skills",
         ".codex/skills",
         ".claude/skills",
         ".config/opencode/skills",
     ),
 }
-EXCLUSIONS = {"mac": frozenset(), "om1": frozenset({"apple-mail"})}
-HOST_PROFILE = "mac" if sys.platform == "darwin" else "om1"
+EXCLUSIONS = {"mac": frozenset(), "linux": frozenset({"apple-mail"})}
+HOST_PROFILE = "mac" if sys.platform == "darwin" else "linux"
 COMMAND_TARGETS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
-# Codex dropped custom prompts, so it gets each command as a skill; on om1 the
-# directory also holds every skill
+# Codex dropped custom prompts, so it gets each command as a skill
 CODEX_SKILLS = ".codex/skills"
 # Codex and Amp stopped reading these; each run removes the commands put there
 RETIRED_COMMAND_TARGETS = (".codex/prompts", ".config/agents/commands")
@@ -123,7 +122,7 @@ directories conflict. Different content is backed up in
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
        ~/.config/opencode/skills, ~/.config/agents/skills
-  om1: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
+  linux: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
        ~/.config/opencode/skills (excludes apple-mail)
   commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
         ~/.config/opencode/commands, and ~/.codex/skills as one skill each
@@ -565,7 +564,7 @@ def layout(
     owned: set[str],
     owned_commands: set[str],
 ) -> list[Group]:
-    """Group the profile's targets by what they hold. On om1 the Codex directory
+    """Group the profile's targets by what they hold. With the linux profile the Codex directory
     holds the skills beside the commands. A retired target reached through a
     symlink is left alone, since it may be a live target or a command source."""
     shared = CODEX_SKILLS in PROFILES[profile]
@@ -874,7 +873,7 @@ def main(argv: list[str] | None = None) -> int:
         "--profile",
         choices=PROFILES,
         default=HOST_PROFILE,
-        help="local target set; defaults to mac on macOS and om1 elsewhere",
+        help="local target set; defaults to mac on macOS and linux elsewhere",
     )
     parser.add_argument(
         "--private-root",

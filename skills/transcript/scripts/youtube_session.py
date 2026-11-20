@@ -32,7 +32,7 @@ FNOX_TIMEOUT = 15
 NOT_A_FILE = 97
 HTTP_LOGGERS = ("httpcore", "httpx")
 # A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
-# fixed install paths follow: ~/.local/bin on the Macs, ~/.local/share/fnox on om1
+# fallback paths cover installations outside that PATH
 FNOX_CANDIDATES = (
     "fnox",
     str(Path.home() / ".local/bin/fnox"),
