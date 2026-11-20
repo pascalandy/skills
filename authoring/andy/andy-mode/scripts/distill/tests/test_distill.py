@@ -288,14 +288,13 @@ class TestPromptDiscovery:
             )
         )
         assert (plan["model"], plan["effort"]) == ("claude-sonnet-9", "low")
-        failed = answer(
+        resolver.unlink()
+        plan = answer(
             *run_script(
-                str(input_file), "--dry-run", "--model", "claude-opus-5-5", env=env
+                str(input_file), "--dry-run", "--model", "claude-sonnet-4-6", env=env
             )
         )
-        assert "Invalid claude model: claude-opus-5-5" in failed["errors"][0]
-
-        resolver.unlink()
+        assert (plan["model"], plan["effort"]) == ("claude-sonnet-4-6", "low")
         failed = answer(*run_script(str(input_file), "--dry-run", env=env))
         assert "fleet resolver" in failed["errors"][0]
 

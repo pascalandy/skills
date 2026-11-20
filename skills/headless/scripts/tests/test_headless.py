@@ -1147,6 +1147,19 @@ def test_a_fleet_skill_without_its_registry_keeps_the_own_defaults(env, repo):
     assert call["argv"][call["argv"].index("-m") + 1] == "gpt-6.2-sol"
 
 
+def test_an_installed_resolver_without_its_registry_fails_before_the_child(env, repo):
+    fleet_skill(env)
+    registry = (
+        Path(env["HOME"]) / ".pi/agent/skills/fleet/references/active-models.toml"
+    )
+    registry.unlink()
+    done = launch(env, repo, "codex", "--review-only", "--model", "sol")
+
+    assert done.returncode == 1
+    assert "fleet registry" in errors(done) and "is missing" in errors(done)
+    assert calls(env) == []
+
+
 def test_an_unknown_alias_in_the_config_fails_without_the_fleet(env, repo, tmp_path):
     (tmp_path / "config.toml").write_text(CONFIG.replace('"gpt-6.1-sol"', '"luna"', 1))
     done = launch(env, repo, "codex", "--review-only")

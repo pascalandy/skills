@@ -575,10 +575,6 @@ PROVIDER_EFFORTS = {
 }
 
 
-# Model aliases, such as "sol". When the fleet skill's registry is installed,
-# or FLEET_ACTIVE_MODELS names one, the fleet resolver gives each alias's
-# current ID and any fault is reported; otherwise STANDALONE_MODELS applies.
-# A value that is not a bare lowercase word is an explicit model ID, used as given.
 FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
 FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
 STANDALONE_MODELS = {
@@ -604,18 +600,22 @@ def resolve_model_alias(name: str) -> str:
     resolver = Path.home() / FLEET_RESOLVER
     registry = os.environ.get(FLEET_REGISTRY_ENV)
     installed = resolver.parents[1] / "references" / "active-models.toml"
-    if not registry and not installed.is_file():
+    if not registry and not installed.exists() and not resolver.exists():
         if name not in STANDALONE_MODELS:
             raise ModelAliasError(
                 f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
             )
         return STANDALONE_MODELS[name]
+    if not registry and not installed.is_file():
+        raise ModelAliasError(
+            f"the fleet registry {installed} is missing or not a file"
+        )
     if not resolver.is_file():
         raise ModelAliasError(
             f"the fleet resolver {resolver} is missing; install the fleet skill"
             f" or unset {FLEET_REGISTRY_ENV}"
         )
-    command = [sys.executable, "-I", str(resolver)]
+    command = ["uv", "run", "--script", str(resolver)]
     command += ["--registry", registry] if registry else []
     try:
         done = subprocess.run(
@@ -637,7 +637,10 @@ def resolve_model_alias(name: str) -> str:
             errors = [lines[-1] if lines else f"exit {done.returncode}"]
         raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
     try:
-        return str(json.loads(done.stdout)["id"])
+        identifier = json.loads(done.stdout)["id"]
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("empty or invalid model ID")
+        return identifier
     except (ValueError, KeyError, TypeError):
         raise ModelAliasError(
             f"the fleet resolver {resolver} gave no ID for {name}"
