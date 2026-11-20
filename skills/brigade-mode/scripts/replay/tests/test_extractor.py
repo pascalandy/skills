@@ -60,15 +60,15 @@ def test_a_thread_naming_another_run_is_no_head_chef() -> None:
             "2026-01-01T00:00:00.000Z",
             "thread",
             "import:x-7952",
-            {"title": t3.parse_title("Head Chef 91c4 status reconciliation")},
+            {"title": t3.parse_title("Head Chef abcd status reconciliation")},
         ]
     )
     data, _ = pipeline.page_data(snap, Recorded({}), ["import:x-7952"])
     assert data["brigades"] == []
 
 
-def test_watch_toml_slots_register_every_batch_of_0ba0() -> None:
-    rec = recording("0ba0")
+def test_watch_toml_slots_register_all_seven_batches() -> None:
+    rec = recording("a91e")
     data = pipeline.recording_data(rec)
     assert [b["id"] for b in data["brigades"][0]["batches"]] == [
         f"batch-{n}" for n in range(1, 8)
@@ -95,7 +95,7 @@ def test_recorded_run_replays_into_a_page(id4: str) -> None:
 
 @pytest.mark.parametrize(
     "id4, final",
-    [("66ab", "done"), ("91c4", "done")],
+    [("b82c", "done"), ("c73d", "done")],
 )
 def test_finished_runs_end_where_their_head_chef_closed(id4: str, final: str) -> None:
     if id4 not in RECORDINGS:
@@ -111,7 +111,7 @@ def test_replay_command_reads_a_recording(tmp_path: Path) -> None:
             sys.executable,
             str(HERE.parent / "replay.py"),
             "--recording",
-            str(RECORDINGS["66ab"]),
+            str(RECORDINGS["b82c"]),
             "-o",
             str(out),
         ],
@@ -125,7 +125,7 @@ def test_replay_command_reads_a_recording(tmp_path: Path) -> None:
 
 
 def test_a_merge_shows_85_seconds_after_github_had_it() -> None:
-    gh = Recorded(recording("0ba0")["github"])
+    gh = Recorded(recording("a91e")["github"])
     ref, p = next((r, p) for r, p in sorted(gh.prs.items()) if p["merged"])
     shown = board.R.ts(p["merged"]) + github.DELAY
     before = gh.at(pipeline.t3_time(shown - 0.001)).pr(*ref)
@@ -136,7 +136,7 @@ def test_a_merge_shows_85_seconds_after_github_had_it() -> None:
 
 @pytest.mark.parametrize("status", ["failed", "inProgress"])
 def test_a_send_moves_no_one_until_t3_delivered_it(status: str) -> None:
-    rec = recording("0ba0")
+    rec = recording("a91e")
 
     def sends(records: list) -> list[dict]:
         events = facts.extract(t3.fold(records), Recorded(rec["github"]), [rec["head"]])

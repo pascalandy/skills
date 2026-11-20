@@ -35,7 +35,7 @@ def test_prefix_oracle_catches_a_replay_that_looks_ahead(
         monkeypatch.setattr(board, "tenth", lambda t: round(t, 1))
     else:  # a fact shows at its own stamp, before its record arrived
         monkeypatch.setattr(t3, "later", lambda fact, arrived: fact or arrived)
-    report = oracles.report(t3.load_recording(RECORDINGS["0ba0"]))
+    report = oracles.report(t3.load_recording(RECORDINGS["a91e"]))
     assert report["prefix"]["status"] > 0
 
 
@@ -43,7 +43,7 @@ def test_prefix_oracle_catches_a_github_fact_the_service_learns_late(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(github, "DELAY", 0.0)  # merges show as GitHub stamps them
-    report = oracles.report(t3.load_recording(RECORDINGS["0ba0"]))
+    report = oracles.report(t3.load_recording(RECORDINGS["a91e"]))
     assert report["prefix"]["detail"] > 0
     assert not next(r for r in oracles.rows(report) if r["oracle"] == 1)["pass"]
 
@@ -52,7 +52,7 @@ def test_prefix_oracle_catches_a_github_fact_the_service_learns_late(
 def test_prefix_oracle_catches_a_change_only_the_final_replay_shows(
     changed: str,
 ) -> None:
-    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    run = oracles.Run(t3.load_recording(RECORDINGS["a91e"]))
     frames = run.final["frames"]
     (_, a), (_, b) = max(
         (
@@ -90,7 +90,7 @@ def test_registry_oracle_catches_an_extractor_that_drops_merges(
             ev(self, *args, **kwargs)
 
     monkeypatch.setattr(facts.Brigade, "ev", no_merge)
-    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    run = oracles.Run(t3.load_recording(RECORDINGS["a91e"]))
     assert oracles.registries_and_merges(run)["misses"]
 
 
@@ -105,7 +105,7 @@ def test_registry_oracle_catches_an_extractor_that_loses_its_cooks(
             del self.threads[tid]
 
     monkeypatch.setattr(facts.Brigade, "walk", lose_cooks)
-    run = oracles.Run(t3.load_recording(RECORDINGS["0ba0"]))
+    run = oracles.Run(t3.load_recording(RECORDINGS["a91e"]))
     assert oracles.registries_and_merges(run)["misses"]
 
 
@@ -115,7 +115,7 @@ def test_oracles_command_writes_the_table(tmp_path: Path) -> None:
         [
             sys.executable,
             str(HERE.parent / "oracles.py"),
-            str(RECORDINGS["0ba0"]),
+            str(RECORDINGS["a91e"]),
             "-o",
             str(out),
         ],
@@ -127,4 +127,4 @@ def test_oracles_command_writes_the_table(tmp_path: Path) -> None:
     answer = json.loads(done.stdout)
     assert answer["changes"] == [["write", str(out)]]
     assert {row["oracle"] for row in answer["rows"]} == {1, 2, 3, 4, 5, 6}
-    assert "| 0ba0 | 1 prefix consistency |" in out.read_text(encoding="utf-8")
+    assert "| a91e | 1 prefix consistency |" in out.read_text(encoding="utf-8")

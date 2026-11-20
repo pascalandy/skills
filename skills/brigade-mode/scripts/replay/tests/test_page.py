@@ -19,7 +19,7 @@ CHECK_PAGE = next((p / CHECKER for p in HERE.parents if (p / CHECKER).is_file())
 @pytest.mark.skipif(CHECK_PAGE is None, reason=f"no {CHECKER} above this copy")
 def test_recorded_page_passes_the_browser_check(tmp_path: Path) -> None:
     data = pipeline.recording_data(
-        t3.load_recording(HERE / "recordings" / "66ab.json.gz")
+        t3.load_recording(HERE / "recordings" / "b82c.json.gz")
     )
     page = tmp_path / "replay.html"
     page.write_text(pipeline.render_page(data, {}), encoding="utf-8")

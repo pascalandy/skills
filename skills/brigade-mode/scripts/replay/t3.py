@@ -317,7 +317,7 @@ def ask_items(text: str) -> tuple[list[str], list[list[str]]]:
 # --------------------------------------------------------------- watch.toml ---
 # carpaccio watchdog.md Files: the plan keys the extractor reads. A Head Chef's
 # file holds chef-<b> slots, a Chef's file cook-<b>.<c> slots. Runs before the
-# slot names, such as 91c4, kept batches in [[batches]] with `batch = <b>`
+# slot names kept batches in [[batches]] with `batch = <b>`
 WATCH_KEYS = ("slots", "slot", "threadId", "lastReceivedPhase", "replacedBy")
 LEGACY_BATCH_KEYS = ("batches", "batch")
 SLOT_NAME = re.compile(r"(?:chef-\d+|cook-\d+\.\d+)")
@@ -881,7 +881,7 @@ def head_chefs(
 ) -> list[str]:
     """Head Chef threads: titled `Head Chef <id4>` where id4 ends their own threadId.
 
-    A thread that only talks about a run, such as "Head Chef 91c4 status
+    A thread that only talks about a run, such as "Head Chef abcd status
     reconciliation", carries another threadId and is not its Head Chef.
     `unfinished` also keeps one created before `since` while its title does
     not end the run with ⛳ or ⏹️, as the live page does.
