@@ -361,6 +361,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import tomllib
 import unicodedata
 from collections.abc import Iterable
 from contextlib import suppress
@@ -539,7 +540,9 @@ def unknown_command(name: str, choices: Iterable[str]) -> str:
 
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-OUTPUT_DIR = Path("~/Documents/_my_docs/61_transcription_exports_yt").expanduser()
+# Relative to the home folder, on this machine and on the export machine
+OUTPUT_SUBDIR = "Documents/_my_docs/61_transcription_exports_yt"
+OUTPUT_DIR = Path.home() / OUTPUT_SUBDIR
 YTDLP_MODULE_COMMAND = (sys.executable, "-m", "yt_dlp")
 
 PROVIDER_CLAUDE = "claude"
@@ -731,6 +734,8 @@ SUMMARY_MAX_RETRIES = 3  # Retry attempts for summary CLI failures
 FNOX_TIMEOUT = 15
 DEEPGRAM_TIMEOUT = 300
 POST_RUN_TIMEOUT = 10
+# A few text files over Tailscale; a sleeping mbp fails at ConnectTimeout
+EXPORT_TIMEOUT = 25
 
 SUMMARY_OPTIONS = frozenset(
     {"--profile", "--provider", "--prompt", "--model", "--effort", "--preview"}
@@ -1366,6 +1371,115 @@ def run_ytdlp(
         f"'{youtube_session.REFRESH_COMMAND}' or pass --cookies FILE",
         temporary=bool(YTDLP_TEMPORARY.search(diagnostic)),
     )
+
+
+# Pascal reads his transcripts on mbp. With the fleet skill installed, a run
+# on another machine copies each result folder it saved under OUTPUT_DIR to
+# the same folder on mbp, and keeps the local copy. Without the fleet skill,
+# or on mbp itself, results stay where they are saved
+FLEET_MACHINES = Path(".pi/agent/skills/fleet/references/fleet.toml")
+EXPORT_MACHINE = "mbp"
+EXPORT_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=10"
+FFMPEG_INSTALL = (
+    "brew install ffmpeg"
+    if sys.platform == "darwin"
+    else "install ffmpeg with the system package manager"
+)
+
+
+class ExportError(RuntimeError):
+    """The result folders could not reach the export machine; `retry` copies them."""
+
+    def __init__(self, message: str, retry: str = "") -> None:
+        super().__init__(message)
+        self.retry = retry
+
+    @property
+    def line(self) -> str:
+        return f"{self}; retry: {self.retry}" if self.retry else str(self)
+
+
+def export_host() -> str | None:
+    """The SSH address result folders are copied to, or None when they stay
+    on this machine: the fleet skill is missing, or this machine is mbp.
+
+    This machine is mbp when its host name's first label matches the machine's
+    name or its SSH host's first label, as the fleet skill's sync_fleet.py
+    decides. Raises ExportError when fleet.toml is unreadable or has no
+    address for mbp."""
+    path = Path.home() / FLEET_MACHINES
+    try:
+        machines = tomllib.loads(path.read_text(encoding="utf-8"))["machines"]
+        ssh = machines[EXPORT_MACHINE]["ssh"]
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise ExportError(f"Could not read {path}: {error}") from None
+    except (KeyError, TypeError):
+        ssh = None
+    if not isinstance(ssh, str) or "@" not in ssh:
+        raise ExportError(f"{path} has no ssh address for [machines.{EXPORT_MACHINE}]")
+    here = platform.node().split(".")[0].lower()
+    if here in {EXPORT_MACHINE, ssh.split("@", 1)[1].split(".")[0].lower()}:
+        return None
+    return ssh
+
+
+def export_destination() -> str | None:
+    """Where result folders under OUTPUT_DIR are copied, or None."""
+    host = export_host()
+    return f"{host}:{OUTPUT_SUBDIR}/" if host else None
+
+
+def export_results(
+    files: Sequence[str], reporter: ExecutionReporter | None = None
+) -> list[list[str]]:
+    """Copy each result folder `files` names under OUTPUT_DIR to the export
+    machine, and answer one `copy` change per folder. Folders elsewhere, such
+    as a custom --output-dir, stay local.
+
+    Raises ExportError, whose retry is the rsync command that copies the same
+    folders; the local copies stay either way."""
+    parent = OUTPUT_DIR.resolve()
+    folders = [
+        str(folder)
+        for folder in dict.fromkeys(Path(file).resolve().parent for file in files)
+        if folder.parent == parent
+    ]
+    if not folders:
+        return []
+    destination = export_destination()
+    if destination is None:
+        return []
+    host = destination.split(":", 1)[0]
+    retry = shlex.join(["rsync", "-rt", *folders, destination])
+    try:
+        with (reporter or ExecutionReporter()).step(f"Copy to {EXPORT_MACHINE}"):
+            result = run_child(
+                ["rsync", "-rt", "-e", EXPORT_SSH, *folders, destination],
+                timeout=EXPORT_TIMEOUT,
+            )
+        reason = ""
+        if result.returncode:
+            reason = _clean_subprocess_diagnostic(result.stderr or result.stdout) or (
+                f"rsync exited {result.returncode}"
+            )
+    except FileNotFoundError:
+        reason = "rsync was not found on PATH"
+    except subprocess.TimeoutExpired:
+        reason = f"rsync timed out after {EXPORT_TIMEOUT}s"
+    except KeyboardInterrupt as stop:
+        # The interrupted run's answer names the rsync that copies the rest
+        stop.__dict__["retry"] = retry
+        raise
+    if reason:
+        kept = ", ".join(folders)
+        raise ExportError(
+            f"Could not copy the result to {EXPORT_MACHINE} ({host}): {reason}. "
+            f"The local copy stays in {kept}",
+            retry,
+        )
+    return [["copy", f"{destination}{Path(folder).name}"] for folder in folders]
 
 
 def _clean_subprocess_diagnostic(text: str) -> str:
@@ -2822,10 +2936,22 @@ def _dry_run_plan(
     }
     if isinstance(plan.youtube_auth, CookieFile):
         source["cookies_file"] = plan.youtube_auth.label
+    try:
+        export = (
+            export_destination()
+            if plan.source_kind != "zoom"
+            and output_dir.resolve() == OUTPUT_DIR.resolve()
+            else None
+        )
+    except ExportError as error:
+        raise Failure(
+            "invalid_configuration", str(error), f"{PROG} doctor -v"
+        ) from None
     return {
         "source": source,
         "summary": summary,
         "output_dir": str(output_dir),
+        "export": export,
         "timeout_seconds": args.timeout,
     }
 
@@ -2924,7 +3050,7 @@ def _doctor_checks(
                     f"{command} is available at {command_path}"
                     if command_path
                     else f"{command} was not found on PATH",
-                    None if command_path else "brew install ffmpeg",
+                    None if command_path else FFMPEG_INSTALL,
                 )
             )
 
@@ -2999,7 +3125,31 @@ def _doctor_checks(
             )
         )
 
+    if source in {"all", "youtube", "file"}:
+        checks.append(_doctor_export_check())
+
     return checks
+
+
+def _doctor_export_check() -> dict[str, str]:
+    """Whether results saved under OUTPUT_DIR can be copied to the export
+    machine; it reads fleet.toml and PATH, without reaching the machine."""
+    try:
+        destination = export_destination()
+    except ExportError as error:
+        return _doctor_check("export", "fail", str(error), f"{PROG} doctor -v")
+    if destination is None:
+        return _doctor_check("export", "pass", f"Results stay in {OUTPUT_DIR}")
+    if not shutil.which("rsync"):
+        return _doctor_check(
+            "export",
+            "fail",
+            f"rsync was not found on PATH; results cannot reach {destination}",
+            "install rsync with the system package manager",
+        )
+    return _doctor_check(
+        "export", "pass", f"Results under {OUTPUT_DIR} are copied to {destination}"
+    )
 
 
 def _run_doctor(args: argparse.Namespace) -> dict:
@@ -3820,9 +3970,52 @@ def _dispatch(
     source_parser = _subcommands(_subcommands(parser)["run"])[args.source]
     if args.source == "youtube" and args.repeated_urls:
         log.info(f"Skipped {args.repeated_urls} repeated URL(s)")
-    if args.source == "youtube" and args.queued:
-        return _run_queue(args, argv, prompts, source_parser)
-    return _run(args, argv, prompts, source_parser)
+    run = _run_queue if args.source == "youtube" and args.queued else _run
+    if args.dry_run or args.source == "zoom":
+        # Zoom keeps its own export folder
+        return run(args, argv, prompts, source_parser)
+    return _exported(lambda: run(args, argv, prompts, source_parser), args)
+
+
+def _exported(run: Callable[[], dict], args: argparse.Namespace) -> dict:
+    """Run, then copy the result folders it saved to the export machine, after
+    a failure too, except an interrupt. The copies join the answer as
+    `changes`; a failed copy fails the command with the rsync that retries it,
+    since rerunning the run would bill Deepgram again."""
+    reporter = ExecutionReporter(_live_console(args))
+    try:
+        fields = run()
+    except Failure as failure:
+        if failure.code in (INTERRUPTED, TERMINATED) or not failure.report.get("files"):
+            raise
+        try:
+            changes = export_results(failure.report["files"], reporter)
+        except KeyboardInterrupt as stop:
+            raise _interruption(
+                stop, failure.report["files"], stop.__dict__.get("retry", "")
+            ) from stop
+        except ExportError as error:
+            failure.args = (*failure.args, error.line)
+        else:
+            if changes:
+                failure.report["changes"] = changes
+        raise
+    try:
+        changes = export_results(fields["files"], reporter)
+    except KeyboardInterrupt as stop:
+        # The transcript is saved: answer its files and the rsync that copies them
+        raise _interruption(
+            stop, fields["files"], stop.__dict__.get("retry", "")
+        ) from stop
+    except ExportError as error:
+        raise Failure(
+            "export_failed",
+            str(error),
+            error.retry,
+            label="retry",
+            files=fields["files"],
+        ) from None
+    return {**fields, "changes": changes} if changes else fields
 
 
 def _run_auth(args: argparse.Namespace) -> dict:

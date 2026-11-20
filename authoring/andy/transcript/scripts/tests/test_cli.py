@@ -308,12 +308,13 @@ class TestDryRun:
                 "prompt": None,
             },
             "output_dir": str(transcript.OUTPUT_DIR),
+            "export": None,
             "timeout_seconds": 570.0,
         }
 
 
 class TestDoctor:
-    def test_file_without_summary_only_checks_deepgram(
+    def test_file_without_summary_checks_deepgram_and_the_export(
         self, monkeypatch, tmp_path, capsys
     ) -> None:
         import transcript
@@ -335,7 +336,8 @@ class TestDoctor:
         assert out == '{"ok":true}\n'
         assert reads == ["deepgram"]
         assert "[PASS] deepgram_credential:" in err
-        assert err.count("[PASS]") == 1
+        assert "[PASS] export: Results stay in" in err
+        assert err.count("[PASS]") == 2
         assert "dummy-key" not in err
         assert not list(tmp_path.iterdir())
 
