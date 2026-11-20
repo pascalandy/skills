@@ -55,6 +55,7 @@ def test_docs_explain_youtube_auth_sources() -> None:
     required_phrases = (
         "A run never reads a browser",
         "else anonymous access",
+        "youtube-session.toml",
     )
     for documentation in (SKILL_DIR / "SKILL.md", SKILL_DIR / "README.md"):
         content = documentation.read_text(encoding="utf-8")
