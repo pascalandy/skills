@@ -10,7 +10,7 @@ id: W02
 project: ACME
 status: active   # proposed | planned | active | done | dropped
 label: wave:W02
-skill_version: "2.0.0"   # the `version` of this skill when the planner created this file
+skill_version: "3.0.0"   # the `version` of this skill when the planner created this file
 executor: agent   # agent | human | tbd
 ---
 

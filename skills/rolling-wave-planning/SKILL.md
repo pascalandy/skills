@@ -2,7 +2,7 @@
 name: "rolling-wave-planning"
 description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
-version: "2.0.0"
+version: "3.0.0"
 ---
 
 # Rolling Wave Planning
@@ -180,17 +180,33 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 
 ### Plan checks
 
-- Each task is in the task limits
-- Each acceptance item is a command or a step with a result that a person can see
-- Each brief obeys the brief rules in [Wave file](references/wave-file.md)
-- For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true
-- Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
-- [The graph script](#dependency-graph) answers `{"ok":true,…}` for the active wave file
-- The exit criteria of at least one wave cover each success criterion
-- Each epic of the active wave has `Traces`
-- Only the active wave has tasks
-- The word "milestone" is not in the plan
-- No plan file and no brief has an implementation instruction or a UAT scenario
+Check each item that applies to the change. Correct each failure, then check again.
+Report one line with only the IDs that you checked, such as `RWP: Pass: RWP_01–RWP_17 · n/a: RWP_18`. Add `Fail:` with each ID that still fails. Never report a voided ID.
+
+- [ ] **RWP_01 PM boundaries** (§Actors, §Rules): No plan file, brief or agent file has an implementation instruction or a UAT scenario. The word "milestone" is not in the plan. Each epic entry and each brief is in English, written with `asd-ste100`
+- [ ] **RWP_02 Task limits** (§Levels): Each task is in the task limits of `01-project.md`
+- [ ] **RWP_03 Brief rules** (§Rules): Each brief obeys the brief rules in [Wave file](references/wave-file.md)
+- [ ] **RWP_04 Epic outcome** (§Levels): For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true. Each epic of the active wave has `Traces`
+- [ ] **RWP_05 Executor** (§Levels): Each wave file and each epic entry has an `Executor`. No brief has `tbd`. The active wave has no `tbd` item
+- [ ] **RWP_06 Detail by status** (§Statuses): Each wave has the detail of its status. Only the active wave has tasks. One wave is `active`, and at most one wave is `planned`
+- [ ] **RWP_07 IDs** (§IDs): No ID is renumbered or used again. `Next IDs` is current. Each carried task obeys ID rule 5
+- [ ] **RWP_08 Files** (§Files, §Pick the procedure): No wave file is deleted, no graph file is edited by hand, and the business case is unchanged. Each plan file follows its template
+- [ ] **RWP_09 Success criteria** (§Procedure A): The exit criteria of at least one wave cover each success criterion
+- [ ] **RWP_10 Graph** (§Dependency graph): [The graph script](#dependency-graph) answers `{"ok":true,…}` for the active wave file, and the graph file is committed with it
+- [ ] **RWP_11 Wave review** (§Procedure B): Each carried task and each discovery has a verdict with its evidence in the closed wave file. Each changed wave has `## Changes since original plan` with a decision ID
+- [ ] **RWP_12 Hand-off** (§Hand off a wave): The PM saw each unresolved item. No agent starts the wave before `agent_ready: true`
+- [ ] **RWP_13 Triage** (§Procedure C): Each triage task has its QA, and the active wave has at most 40 tasks
+- [ ] **RWP_14 QA coverage** (§Quality assurance, §Which QA tasks to plan): Each epic has a final QA task. Its QA scenarios come from the `Traces` of the epic, and at least one goes through more than one task
+- [ ] **RWP_15 Independence** (§Independence): The executor of each QA brief is the QA agent on the QA machine
+- [ ] **RWP_16 Blocking QA** (§Blocking): Each QA task in a `blocked_by` has a permitted reason in `why`, and no QA task blocks a full wave
+- [ ] **RWP_17 Findings** (§Findings and verdicts): Each open finding has a fix task with `Fixes finding`. Each `rejected` QA task has a re-QA task
+- [ ] **RWP_18 CI baseline** (§Maturity checkpoints): The first task of W01 is the CI baseline, or a decision logs the waiver of the PM. Each agent task after it is `blocked_by` it and has `just check` in `Verify`
+- [ ] **RWP_19 Maturity review** (§Maturity checkpoints): Each checkpoint whose trigger is true has its task, or a decision logs the waiver of the PM. Until its trigger is true, the verification loop is a scope bullet of a `proposed` wave
+- [ ] **RWP_20 QA playbook** (§Maturity checkpoints): For each `FR-NN` and `NFR-NN` that an epic of the active wave traces, a QA scenario cites the ID, or a decision logs the waiver of the PM
+- [ ] **RWP_21 Traps** (§Traps): Each `Traps` line has the form `Want: … Not: …` and names an effort sink inside the deliverable
+- [ ] **RWP_22 Version** (§Version): Each new wave file records the current skill version in `skill_version`
+
+IDs never change and are never used again. To change the meaning of an item, move its line under `#### Voided` with `void <date>, replaced by RWP_NN`. Give the new item the next free ID.
 
 ### Dependency graph
 
