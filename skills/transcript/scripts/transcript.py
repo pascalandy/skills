@@ -700,8 +700,14 @@ PROVIDER_PI_PREFIXES = {
 PROMPTS_DIR = SCRIPT_DIR.parent / "references" / "prompts"
 DEFAULT_PROMPT = "follow_along_note"
 
-ZOOM_ROOT = Path("~/Documents/Zoom").expanduser()
-ZOOM_EXPORT_DIR = Path("~/Desktop/Travail/Mandats").expanduser()
+ZOOM_RECORDINGS_ENV = "TRANSCRIPT_ZOOM_RECORDINGS_DIR"
+ZOOM_EXPORT_ENV = "TRANSCRIPT_ZOOM_EXPORT_DIR"
+ZOOM_ROOT = Path(
+    os.environ.get(ZOOM_RECORDINGS_ENV) or Path.home() / "Documents" / "Zoom"
+).expanduser()
+ZOOM_EXPORT_DIR = Path(
+    os.environ.get(ZOOM_EXPORT_ENV) or Path.home() / "Documents" / "Zoom Transcripts"
+).expanduser()
 ZOOM_DEFAULT_PROMPT_NAME = "synthese-rencontre"
 # The prompt lives in andy-mode's distill-prompt route. andy-mode is a sibling
 # when deployed to agent homes, but source skills are grouped under categories.
@@ -2336,7 +2342,10 @@ def _add_run_options(
         "--output-dir",
         type=Path,
         metavar="DIR",
-        help=f"Parent directory for the result folder (default: {output_default})",
+        help=(
+            "Parent directory for the result folder "
+            f"(default: {str(output_default).replace('%', '%%')})"
+        ),
     )
     output.add_argument(
         "--open",
@@ -2481,7 +2490,10 @@ def build_parser() -> TranscriptParser:
         sources,
         "zoom",
         help_text="Transcribe one Zoom meeting recording",
-        description="Select the latest Zoom meeting or name one meeting folder.",
+        description=(
+            "Select the latest Zoom meeting or name one meeting folder.\n"
+            f"Set {ZOOM_RECORDINGS_ENV} and {ZOOM_EXPORT_ENV} to override the default directories."
+        ),
         epilog="""examples:
   transcript run zoom --latest
   transcript run zoom --path "2026-05-03 14.46.55 Réunion Zoom de Camille Exemple"
@@ -2493,13 +2505,13 @@ def build_parser() -> TranscriptParser:
         "--latest",
         dest="zoom",
         action="store_true",
-        help="Use the latest meeting folder under ~/Documents/Zoom",
+        help="Use the latest meeting folder in the Zoom recordings directory",
     )
     zoom_source.add_argument(
         "--path",
         dest="zoom_custom_path",
         metavar="PATH",
-        help="Meeting folder name under ~/Documents/Zoom or a full folder path",
+        help="Meeting folder name in the Zoom recordings directory or absolute path",
     )
     zoom.set_defaults(url=None, zoom=False, zoom_custom_path=None)
     _add_run_options(

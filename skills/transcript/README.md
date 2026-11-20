@@ -19,7 +19,7 @@ The first time, and whenever `just ttr` reports that YouTube refused the vault s
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
 - A supported JavaScript runtime for YouTube. Deno is enabled automatically; `deno --version` confirms it. Follow the [yt-dlp EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS) for installation or a configured alternative
-- Zoom recordings under `~/Documents/Zoom` for Zoom mode
+- Local Zoom recordings for Zoom mode. See [Zoom directories](#zoom-directories)
 - When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - `fnox` with `DEEPGRAM_TRANSCRIPT_API_KEY` in the fnox store, or that variable in the environment
@@ -61,8 +61,6 @@ The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, s
 
 A YouTube run rejects an invalid URL before reading credentials, starting network work, or creating an output directory.
 
-For Zoom, `--path` accepts a folder name under `~/Documents/Zoom` or a full folder path. It rejects an audio-file path. The CLI resolves the folder and verifies that it contains an `.m4a` file before reading credentials or creating output.
-
 For local audio, `run file --path` accepts a non-empty file, including paths with spaces and accents. It resolves the absolute path before reading credentials or creating output. Deepgram receives the source bytes through the existing chunked upload. The source stays intact after success or failure. M4A uses `audio/mp4`.
 
 ```bash
@@ -70,6 +68,17 @@ uv run <skill_dir>/scripts/transcript.py run file --path "Entrevue à Montréal.
 ```
 
 Finder and preview are opt-in. A normal run has no GUI side effect and does not render the generated Markdown.
+
+### Zoom directories
+
+By default, Zoom recordings come from the `Zoom` folder in your home directory's `Documents` folder. Transcript writes Zoom exports to `Zoom Transcripts` in the same `Documents` folder. Set either variable in the environment that launches Transcript to use a different local directory.
+
+```bash
+export TRANSCRIPT_ZOOM_RECORDINGS_DIR="$HOME/Recordings/Meetings"
+export TRANSCRIPT_ZOOM_EXPORT_DIR="$HOME/Transcripts/Meetings"
+```
+
+Use `--latest` to search the recordings directory. A relative `--path` selects a meeting under that directory. An absolute `--path` selects a meeting directly. The CLI checks that the folder contains an `.m4a` file before reading credentials or creating output. An explicit `--output-dir` takes precedence over `TRANSCRIPT_ZOOM_EXPORT_DIR`.
 
 ## Queue several videos
 
