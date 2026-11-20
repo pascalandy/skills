@@ -786,9 +786,9 @@ privacy check refuses the file otherwise. Requires gh authenticated with access
 to the run's repositories (gh auth login).
 
 examples:
-  uv run scripts/replay/record.py --brigade 66ab
-  uv run scripts/replay/record.py --brigade 66ab -o scripts/replay/tests/recordings/66ab.json.gz
-  uv run scripts/replay/record.py --brigade 0ba0 --dry-run""",
+  uv run scripts/replay/record.py --brigade abcd
+  uv run scripts/replay/record.py --brigade abcd -o run.json.gz
+  uv run scripts/replay/record.py --brigade abcd --dry-run""",
     )
     parser.add_argument(
         "--brigade",

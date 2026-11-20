@@ -967,7 +967,7 @@ def repo_name(value: str) -> tuple[str, str]:
     run, sep, repo = value.partition("=")
     if not sep or not re.fullmatch(r"[0-9a-z]{4}", run) or repo.count("/") != 1:
         raise argparse.ArgumentTypeError(
-            "--repo needs ID4=OWNER/NAME, such as 66ab=example/widget"
+            "--repo needs ID4=OWNER/NAME, such as abcd=example/widget"
         )
     return run, repo
 
@@ -990,12 +990,13 @@ do not produce:
      85 s GitHub delay plus the poll, once the 60 s cadence, a 20 s timeout and
      the p95 of one live query per repository fit in the delay
   6. parser coverage: messages no rule reads, watch.toml writes left unread
-A row that misses its threshold fails the command.
+A row that misses its threshold fails the command. The bundled recordings are
+synthetic. To measure live GitHub reads, pass a recording from record.py.
 
 examples:
   uv run scripts/replay/oracles.py
   uv run scripts/replay/oracles.py -o oracles.md
-  uv run scripts/replay/oracles.py --github --repo 66ab=example/widget scripts/replay/tests/recordings/66ab.json.gz""",
+  uv run scripts/replay/oracles.py --github --repo abcd=example/widget run.json.gz""",
     )
     parser.add_argument(
         "recording",
