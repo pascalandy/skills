@@ -9,6 +9,12 @@ references/wave-file.md defines. The script reads those blocks and fails when:
 a brief has no valid block, an ID is unknown or dropped, the graph has a cycle,
 or two tasks that can run at the same time have a common path in `touches`.
 
+It also checks the `Executor` of the wave, its epics and its tasks: a value
+the wave or an epic declares must agree with its tasks, a brief never says
+`tbd`, and an open human task never waits for an unfinished agent or QA task of
+the same wave. A wave file with `skill_version` 3.0.0 or later must give each
+of these `Executor` values.
+
 It writes the graph beside the wave file, as `<wave file name>.graph.json`:
 `nodes` (each block with its kind and state), `edges` (blocker, blocked and
 why), `batches` (the IDs that can run at the same time, in execution order) and
@@ -16,6 +22,10 @@ why), `batches` (the IDs that can run at the same time, in execution order) and
 
 Answers in one JSON line: {"ok":true,"file":"...","changes":[["write","..."]]}.
 `changes` is absent when the file is already up to date.
+
+With --hitl, it reads every wave file of a waves folder, writes nothing, fails
+on an invalid or missing `Executor`, and answers `waves`: for each wave its `executor`, its `unresolved` items (human
+tasks that are not done or dropped, and each `tbd`) and `agent_ready`.
 """
 
 # >>> cli-block: canonical copy in scripts/_cli.py; do not edit a pasted copy
@@ -368,7 +378,8 @@ EPILOG = """\
 examples:
   uv run scripts/plan_graph.py plan/waves/W02-user-onboarding.md
   uv run scripts/plan_graph.py --check plan/waves/W02-user-onboarding.md
-  uv run scripts/plan_graph.py --dry-run plan/waves/W02-user-onboarding.md"""
+  uv run scripts/plan_graph.py --dry-run plan/waves/W02-user-onboarding.md
+  uv run scripts/plan_graph.py --hitl plan/waves"""
 
 EXIT_CODES = exit_codes(
     {1: "a brief or the graph has an error, or --check found a stale graph file"}
@@ -383,6 +394,11 @@ TASK_KEYS = {"id", "blocked_by", "needs", "touches"}
 QA_KEYS = {"id", "verifies", "needs"}
 WILDCARD = re.compile(r"[*?]")
 STATES = re.compile(r"todo|done|dropped|carried→W\d+[A-Z]?")
+EXECUTOR = re.compile(r"\bExecutor: (?P<executor>[^·]*?)\s*(?:·|$)")
+EPIC = re.compile(r"^### (?P<id>E\d+)(?P<continued> \(continued from [^)]*\))?[: ]")
+EPIC_EXECUTOR = re.compile(r"^- Executor: (?P<executor>.*?)\s*$")
+EXECUTORS = {"agent", "human", "tbd"}
+FINISHED = {"done", "dropped"}
 
 
 def briefs_in(text: str) -> tuple[dict[str, dict[str, Any]], list[int]]:
@@ -429,9 +445,220 @@ def briefs_in(text: str) -> tuple[dict[str, dict[str, Any]], list[int]]:
                 briefs[found["id"]] = current
         elif current is not None and (state := STATE.match(line)):
             current["state"] = state["state"]
+            if executor := EXECUTOR.search(line):
+                current["executor"] = executor["executor"]
     if block is not None:
         malformed.append(opened)
     return briefs, malformed
+
+
+def front_matter(text: str) -> dict[str, str]:
+    """The `key: value` lines of the front matter, without comments or quotes."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    found: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        key, colon, value = line.partition(":")
+        if colon:
+            found[key.strip()] = value.split("#")[0].strip().strip("\"'")
+    return found
+
+
+def epics_in(text: str) -> dict[str, dict[str, Any]]:
+    """Each epic heading of a wave file by ID: its line, whether it continues
+    an epic of an earlier wave, and the `Executor` line of its entry."""
+    epics: dict[str, dict[str, Any]] = {}
+    current: dict[str, Any] | None = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if HEADING.match(line):
+            found = EPIC.match(line)
+            current = None
+            if found:
+                current = {"line": number, "continued": bool(found["continued"])}
+                epics.setdefault(found["id"], current)
+        elif current is not None and (executor := EPIC_EXECUTOR.match(line)):
+            current["executor"] = executor["executor"]
+    return epics
+
+
+def version_of(text: str) -> tuple[int, ...]:
+    """The `skill_version` of a wave file as numbers; (0,) when it has none."""
+    numbers = re.findall(r"\d+", front_matter(text).get("skill_version", ""))
+    return tuple(int(number) for number in numbers) or (0,)
+
+
+def epic_of(brief_id: str) -> str:
+    return brief_id.split("-")[0]
+
+
+def declaration_errors(
+    wave_file: Path, text: str, briefs: Mapping[str, dict[str, Any]]
+) -> list[str]:
+    """What is wrong with each `Executor` value of the wave, its epics and its
+    tasks. An explicit value always counts; only a file of version 3.0.0 or
+    later must give each one."""
+    errors: list[str] = []
+    front = front_matter(text)
+    epics = epics_in(text)
+    required = version_of(text) >= (3,)
+    wave = front.get("executor")
+    if wave is None and required:
+        errors.append(
+            f"{wave_file}:1: the front matter has no `executor`; "
+            "add `executor: agent`, `human` or `tbd`"
+        )
+    elif wave is not None and wave not in EXECUTORS:
+        errors.append(
+            f"{wave_file}:1: `executor` is {wave!r}; write agent, human or tbd"
+        )
+    for epic_id, epic in epics.items():
+        where = f"{wave_file}:{epic['line']}: {epic_id}"
+        value = epic.get("executor")
+        if value is None and required and not epic["continued"]:
+            errors.append(
+                f"{where} has no `- Executor:` line; add `agent`, `human` or `tbd`"
+            )
+        elif value is not None and value not in EXECUTORS:
+            errors.append(f"{where} has `Executor: {value}`; write agent, human or tbd")
+    for brief_id, brief in briefs.items():
+        if brief["qa"]:
+            continue
+        where = f"{wave_file}:{brief['line']}: {brief_id}"
+        value = brief.get("executor")
+        if value == "tbd":
+            errors.append(
+                f"{where} has `Executor: tbd`; make it a spike or a human task, "
+                "or move it to a later wave"
+            )
+        elif value is None and required:
+            errors.append(f"{where} has no `Executor`; add `agent` or `human`")
+        elif value is not None and value not in ("agent", "human"):
+            errors.append(f"{where} has `Executor: {value}`; write agent or human")
+    return errors
+
+
+def executor_errors(
+    wave_file: Path,
+    text: str,
+    briefs: Mapping[str, dict[str, Any]],
+    before: Mapping[str, set[str]],
+) -> list[str]:
+    """The declaration errors, then, in an active wave, what makes a declared
+    `Executor` disagree with its tasks or a human task wait for agent work."""
+    errors = declaration_errors(wave_file, text, briefs)
+    front = front_matter(text)
+    epics = epics_in(text)
+    wave = front.get("executor")
+    if front.get("status") != "active":
+        return errors
+
+    human = {
+        brief_id
+        for brief_id, brief in briefs.items()
+        if brief.get("executor") == "human" and brief["state"] in ("todo", "done")
+    }
+    declared = [("the wave", f"{wave_file}:1", wave, human)]
+    declared += [
+        (
+            epic_id,
+            f"{wave_file}:{epic['line']}",
+            epic.get("executor"),
+            {brief_id for brief_id in human if epic_of(brief_id) == epic_id},
+        )
+        for epic_id, epic in epics.items()
+    ]
+    human_epics = {
+        epic_id for epic_id, epic in epics.items() if epic.get("executor") == "human"
+    }
+    for name, where, value, own in declared:
+        if value == "agent" and own:
+            errors.append(
+                f"{where}: {name} declares `agent` but has the human tasks "
+                f"{sorted(own)}; declare `human`"
+            )
+        if value == "human" and not own:
+            errors.append(
+                f"{where}: {name} declares `human` but has no human task that is "
+                "todo or done; add the human task or declare `agent`"
+            )
+    if wave == "agent" and human_epics:
+        errors.append(
+            f"{wave_file}:1: the wave declares `agent` but has the human epics "
+            f"{sorted(human_epics)}; declare `human`"
+        )
+    for brief_id in sorted(human):
+        if briefs[brief_id]["state"] in FINISHED:
+            continue
+        waiting = sorted(
+            blocker
+            for blocker in before.get(brief_id, set())
+            if briefs[blocker]["state"] not in FINISHED
+            and (briefs[blocker]["qa"] or briefs[blocker].get("executor") == "agent")
+        )
+        if waiting:
+            errors.append(
+                f"{wave_file}:{briefs[brief_id]['line']}: {brief_id} is a human task "
+                f"that waits for the unfinished agent or QA tasks {waiting} of the "
+                "same wave, and agents start the wave only after its human tasks; "
+                "move it to a later wave"
+            )
+    return errors
+
+
+def hitl(args: argparse.Namespace) -> Mapping[str, Any]:
+    """The unresolved human and `tbd` items of each wave file in a folder."""
+    folder = Path(args.wave_file)
+    if not folder.is_dir():
+        raise UsageError(
+            f"{folder} is not a folder; with --hitl, give the waves folder, "
+            "such as plan/waves"
+        )
+    waves = []
+    errors: list[str] = []
+    for path in sorted(folder.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        front = front_matter(text)
+        briefs = briefs_in(text)[0]
+        epics = epics_in(text)
+        # The deadlock rule needs the graph; the graph check runs it before handoff.
+        errors += executor_errors(path, text, briefs, {})
+        unresolved: list[dict[str, str]] = []
+        wave = front.get("executor", "unknown")
+        if wave == "tbd":
+            unresolved.append({"id": front.get("id", path.stem), "executor": "tbd"})
+        for epic_id, epic in epics.items():
+            if epic.get("executor") == "tbd":
+                unresolved.append({"id": epic_id, "executor": "tbd"})
+        for brief_id, brief in briefs.items():
+            value = brief.get("executor")
+            state = brief["state"]
+            if brief["qa"] or state.startswith("carried"):
+                continue
+            if value == "human" and state not in FINISHED:
+                unresolved.append({"id": brief_id, "executor": value, "state": state})
+        waves.append(
+            {
+                "wave": front.get("id", path.stem),
+                "file": str(path),
+                "status": front.get("status", "unknown"),
+                "executor": wave,
+                "epics": {
+                    epic_id: epic.get("executor", "unknown")
+                    for epic_id, epic in epics.items()
+                    if not epic["continued"]
+                },
+                "unresolved": unresolved,
+                "agent_ready": not unresolved,
+            }
+        )
+    if not waves:
+        raise UsageError(f"{folder} has no wave file; give the waves folder")
+    if errors:
+        raise ScriptError(*errors)
+    return {"waves": waves}
 
 
 def is_text(value: object) -> bool:
@@ -550,7 +777,8 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     wave_file = Path(args.wave_file)
     if not wave_file.is_file():
         raise UsageError(f"{wave_file} is not a file; give the path of a wave file")
-    briefs, malformed = briefs_in(wave_file.read_text(encoding="utf-8"))
+    text = wave_file.read_text(encoding="utf-8")
+    briefs, malformed = briefs_in(text)
     if malformed:
         raise ScriptError(
             *(
@@ -659,6 +887,7 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
                     f"and both touch {', '.join(shared)}; add {first} to the "
                     f"`blocked_by` of {second}, or correct `touches`"
                 )
+    errors += executor_errors(wave_file, text, briefs, before)
     if errors:
         raise ScriptError(*errors)
 
@@ -715,19 +944,29 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = Parser(exit_codes=EXIT_CODES, description=__doc__, epilog=EPILOG)
-    parser.add_argument("wave_file", help="the wave file, such as plan/waves/W02-x.md")
     parser.add_argument(
+        "wave_file",
+        metavar="path",
+        help="the wave file, such as plan/waves/W02-x.md; with --hitl, the waves folder",
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--hitl",
+        action="store_true",
+        help="write nothing; report the unresolved human and tbd items of each wave",
+    )
+    mode.add_argument(
         "-n",
         "--dry-run",
         action="store_true",
         help="check the briefs and answer the same, without writing the graph file",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--check",
         action="store_true",
         help="write nothing, and fail when the graph file does not match the briefs",
     )
-    return run_script(parser, check, argv)
+    return run_script(parser, lambda args: (hitl if args.hitl else check)(args), argv)
 
 
 if __name__ == "__main__":

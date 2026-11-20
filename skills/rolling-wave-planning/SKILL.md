@@ -2,7 +2,7 @@
 name: "rolling-wave-planning"
 description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
-version: "2.0.0"
+version: "3.0.0"
 ---
 
 # Rolling Wave Planning
@@ -23,12 +23,13 @@ The planner plans the later waves again at each wave review.
 - **QA machine:** the dedicated machine on which the QA agent tests. The default is the Mac Mini. If the PM names a different machine, record it in `01-project.md`
 - **UAT (user acceptance test):** the PM does every UAT. The PM reads the QA reports, then decides which tests to do and how detailed they are. The plan defines no UAT scenario, no UAT task and no UAT status
 - **Implementation instructions:** the PM gives them when implementation starts. Do not write a branch rule, a PR rule or an implementer procedure in `plan/`, in a brief or in the agent file
-- **Signals:** the procedures read these five signals from GitHub. The implementation instructions of the PM must produce them:
+- **Signals:** the procedures read these six signals. The implementation instructions of the PM must produce them:
   - A finished task closes its issue. A task is finished when its PR is merged or, for a task without a PR, when its result is on its issue
   - A PR and its branch refer to the task by its ID (ID rule 4)
   - A fix PR does not close its finding
   - The implementer reports work that the plan did not include, as [Procedure C](#procedure-c-triage-during-a-wave) says
   - Before the work starts, the executor of a task or QA task runs each `check` of the `needs` in its brief. If a `check` fails, the executor stops, comments the command and its output on the issue, and adds the label `0-impediment`
+  - Agents start a wave only after the planner reports `agent_ready: true` for it ([Hand off a wave](#hand-off-a-wave))
 
 ## Rules
 
@@ -51,6 +52,16 @@ The planner plans the later waves again at each wave review.
 
 The initial task limits are: one module or at most 8 files, approximately 400 changed lines, at most 5 acceptance items, and no open decision.
 `01-project.md` records the task limits and the QA limits.
+
+**Executor:** each wave, epic and task has one executor:
+
+- `agent`: an agent session does the work. A QA task counts as `agent`
+- `human`: the PM or a different person does the work
+- `tbd`: the PM wants the work, but nobody knows how to do it yet
+
+1. A brief has `agent` or `human`, never `tbd`. A `tbd` wave or epic stops the [hand-off](#hand-off-a-wave) of its wave until the planner resolves it, for example with a spike or a human task
+2. A wave or an epic that has a human task is `human`
+3. A human task blocks each task that names it in `blocked_by`. It also blocks its wave: agents start a wave only when each human task of the wave is `done` or `dropped`. Thus, a human task that needs agent work of its wave goes to a later wave
 
 ## Statuses
 
@@ -105,12 +116,13 @@ Only the PM can waive QA. The planner logs each waiver as a decision.
 ## Files
 
 ```
-CLAUDE.md / AGENTS.md            # agent file: stack, layout, verify command, how to start the system
+CLAUDE.md / AGENTS.md            # agent file: stack, layout, `just check`, how to start the system
                                  # (start command, seed data, test accounts)
 plan/
 ├── 00-business-case.md          # source document, read-only
 ├── 01-project.md                # summary, open questions, limits, QA machine, next IDs, wave table
 ├── decisions.md                 # D###: plan-structure and technical decisions
+├── qa.md                        # QA playbook: requirements, environments, ordered QA steps
 └── waves/
     ├── W01-walking-skeleton.md  # done
     ├── W01B-auth-foundation.md  # done, inserted at W01 review
@@ -134,7 +146,7 @@ plan/
 
 Before you write a plan file, read its template:
 
-- [Project files](references/project-files.md): `01-project.md` and `decisions.md`
+- [Project files](references/project-files.md): `01-project.md`, `decisions.md` and `qa.md`
 - [Wave file](references/wave-file.md): the wave file, the task brief, the QA brief, the graph block and the brief rules
 
 Before you write the plan to GitHub or read issue states from GitHub, read [GitHub sync](references/github-sync.md).
@@ -145,6 +157,7 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 2. Write the summary in `01-project.md`: objective, stakeholders, success criteria, constraints and out of scope
    - Number the success criteria `SC1`, `SC2`
    - Give each item 1 to 3 lines and a link to its section. Do not write the business case again
+   - Write the requirements of `qa.md` from each applicable section of the business case ([QA playbook](#maturity-checkpoints))
 3. Write `## Open questions` in `01-project.md`. Order the questions by how much each answer can change the plan, largest change first
 4. For each question whose answer can change the waves, write a `spike` task in W01 or ask the PM
    - A spike is a task that answers a question. It has no PR
@@ -152,31 +165,48 @@ Before you write the plan to GitHub or read issue states from GitHub, read [GitH
 5. Divide the project into 3 to 7 waves. Order them by risk and by dependency
    - W01 is a walking skeleton (a thin slice from end to end) or a test of the assumption with the highest risk
 6. Write the wave table in `01-project.md`
-7. Write one `proposed` file for each wave in `waves/`
-8. **Checkpoint:** show the waves, the open questions and the signals of [Actors](#actors) to the PM. Continue only when the PM approves
-9. Write W01 at `active` detail: epics with `Traces`, a full brief with its graph block for each task, and QA tasks
+7. Write one `proposed` file for each wave in `waves/`, with its `executor`
+8. **Checkpoint:** show the PM the waves, each wave `executor` that is `human` or `tbd`, the open questions and the signals of [Actors](#actors). Continue only when the PM approves
+9. Write W01 at `active` detail: epics with `Traces` and `Executor`, a full brief with its graph block for each task, and QA tasks
    - Plan the QA tasks as [Quality assurance](#quality-assurance) says
-   - The first task of W01 writes the agent file, or updates it. The agent file gives the stack, the layout, the one verify command and how to start the system
+   - Add the tasks and the scope bullets of the [maturity checkpoints](#maturity-checkpoints)
 10. Write W02 at `planned` detail
 11. Keep each later wave `proposed`
 12. Log `D001`: the initial waves and the reason for them
 13. Do the [plan checks](#plan-checks). Correct each failure, then do the checks again
 14. Sync the plan to GitHub
 15. Commit `plan: initial decomposition` after the sync, so that the commit includes the issue numbers
+16. [Hand off](#hand-off-a-wave) W01
 
 ### Plan checks
 
-- Each task is in the task limits
-- Each acceptance item is a command or a step with a result that a person can see
-- Each brief obeys the brief rules in [Wave file](references/wave-file.md)
-- For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true
-- Each epic has a final QA task. The QA scenarios of that QA task come from the `Traces` of the epic
-- [The graph script](#dependency-graph) answers `{"ok":true,…}` for the active wave file
-- The exit criteria of at least one wave cover each success criterion
-- Each epic of the active wave has `Traces`
-- Only the active wave has tasks
-- The word "milestone" is not in the plan
-- No plan file and no brief has an implementation instruction or a UAT scenario
+Check each item that applies to the change. Correct each failure, then check again.
+Report one line with only the IDs that you checked, such as `RWP: Pass: RWP_01–RWP_17 · n/a: RWP_18`. Add `Fail:` with each ID that still fails. Never report a voided ID.
+
+- [ ] **RWP_01 PM boundaries** (§Actors, §Rules): No plan file, brief or agent file has an implementation instruction or a UAT scenario. The word "milestone" is not in the plan. Each epic entry and each brief is in English, written with `asd-ste100`
+- [ ] **RWP_02 Task limits** (§Levels): Each task is in the task limits of `01-project.md`
+- [ ] **RWP_03 Brief rules** (§Rules): Each brief obeys the brief rules in [Wave file](references/wave-file.md)
+- [ ] **RWP_04 Epic outcome** (§Levels): For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true. Each epic of the active wave has `Traces`
+- [ ] **RWP_05 Executor** (§Levels): No brief has `tbd`. A wave file with `skill_version` 3.0.0 or later gives the `Executor` of the wave, of each epic entry and of each brief
+- [ ] **RWP_06 Detail by status** (§Statuses): Each wave has the detail of its status. Only the active wave has tasks. One wave is `active`, and at most one wave is `planned`
+- [ ] **RWP_07 IDs** (§IDs): No ID is renumbered or used again. `Next IDs` is current. Each carried task obeys ID rule 5
+- [ ] **RWP_08 Files** (§Files, §Pick the procedure): No wave file is deleted, no graph file is edited by hand, and the business case is unchanged. Each plan file follows its template
+- [ ] **RWP_09 Success criteria** (§Procedure A): The exit criteria of at least one wave cover each success criterion
+- [ ] **RWP_10 Graph** (§Dependency graph): [The graph script](#dependency-graph) answers `{"ok":true,…}` for the active wave file, and the graph file is committed with it
+- [ ] **RWP_11 Wave review** (§Procedure B): Each carried task and each discovery has a verdict with its evidence in the closed wave file. Each changed wave has `## Changes since original plan` with a decision ID
+- [ ] **RWP_12 Hand-off** (§Hand off a wave): The PM saw each unresolved item. No agent starts the wave before `agent_ready: true`
+- [ ] **RWP_13 Triage** (§Procedure C): Each triage task has its QA, and the active wave has at most 40 tasks
+- [ ] **RWP_14 QA coverage** (§Quality assurance, §Which QA tasks to plan): Each epic has a final QA task. Its QA scenarios come from the `Traces` of the epic, and at least one goes through more than one task
+- [ ] **RWP_15 Independence** (§Independence): The executor of each QA brief is the QA agent on the QA machine
+- [ ] **RWP_16 Blocking QA** (§Blocking): Each QA task in a `blocked_by` has a permitted reason in `why`, and no QA task blocks a full wave
+- [ ] **RWP_17 Findings** (§Findings and verdicts): Each open finding has a fix task with `Fixes finding`. Each `rejected` QA task has a re-QA task
+- [ ] **RWP_18 CI baseline** (§Maturity checkpoints): The first task of W01 is the CI baseline, or a decision logs the waiver of the PM. Each agent task after it is `blocked_by` it and has `just check` in `Verify`
+- [ ] **RWP_19 Maturity review** (§Maturity checkpoints): Each mandatory checkpoint whose trigger is true, and each optional checkpoint that the PM chose, has its task, or a decision logs the waiver of the PM. Until its trigger is true, the verification loop is a scope bullet of a `proposed` wave
+- [ ] **RWP_20 QA playbook** (§Maturity checkpoints): For each `FR-NN` and `NFR-NN` that an epic of the active wave traces, a QA scenario cites the ID, or a decision logs the waiver of the PM
+- [ ] **RWP_21 Traps** (§Traps): Each `Traps` line has the form `Want: … Not: …` and names an effort sink inside the deliverable
+- [ ] **RWP_22 Version** (§Version): Each new wave file records the current skill version in `skill_version`
+
+IDs never change and are never used again. To change the meaning of an item, move its line under `#### Voided` with `void <date>, replaced by RWP_NN`. Give the new item the next free ID.
 
 ### Dependency graph
 
@@ -199,8 +229,10 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
 ```
 
 - It answers `{"ok":true,"file":"…"}`, with `changes` when it wrote the graph file
-- It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, or two parallel tasks that are `todo` have a common path in `touches`. The last line of stderr lists each error with its correction. Correct the wave file and run it again
+- It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, two parallel tasks that are `todo` have a common path in `touches`, or an `Executor` breaks a rule of [Levels](#levels). The last line of stderr lists each error with its correction. Correct the wave file and run it again
 - With `--check`, it writes nothing and fails when the graph file does not match the briefs
+- With `--hitl plan/waves`, it writes nothing and answers each wave with its `executor`, its `unresolved` items and `agent_ready`. It fails on an `Executor` that the graph check rejects. An unresolved item is a human task that is not `done` or `dropped`, or a `tbd` item. It ignores a `carried→WNN` task, because the receiving wave has its copy
+- A wave file with `skill_version` 3.0.0 or later must give each `Executor`. In an older wave file, the script reports a missing wave or epic `Executor` as `unknown`
 
 ## Procedure B: review a wave
 
@@ -240,17 +272,30 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
    | (d) | The discovery makes a later wave invalid | Drop that wave, or merge it into a different wave |
 
 9. Set the next wave in table order to `active`, and the wave after it to `planned`
-10. Write the new active wave in full: briefs with their graph blocks, QA tasks and carried tasks
-11. Do the [plan checks](#plan-checks)
-12. Write the epics of the new planned wave
+10. Do the [maturity checkpoints](#maturity-checkpoints)
+11. Write the new active wave in full: briefs with their graph blocks, QA tasks and carried tasks
+12. Do the [plan checks](#plan-checks)
+13. Write the epics of the new planned wave
     - Adjust the `proposed` waves in outline only
-13. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
-14. Log one decision for each change to the plan structure
-15. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
-16. Update the wave table and `Next IDs` in `01-project.md`
-17. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
-18. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
-19. Commit, for example `plan: review W01, insert W01B, amend W02`
+14. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
+15. Log one decision for each change to the plan structure
+16. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
+17. Update the wave table and `Next IDs` in `01-project.md`
+18. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
+19. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
+20. Commit, for example `plan: review W01, insert W01B, amend W02`
+21. [Hand off](#hand-off-a-wave) the new active wave
+
+## Hand off a wave
+
+Do this procedure before agents start a wave.
+
+1. Get the issue states of the wave, as step 1 of Procedure B says. Get each carried task by the issue number of its heading (`→ #NN`)
+2. Write the states in the wave file. Run the graph script, and commit the change, such as `plan: hand off W02`
+3. Run `uv run <this-skill-folder>/scripts/plan_graph.py --hitl plan/waves`
+4. If the wave has `agent_ready: false`, show the PM its unresolved items by ID, and stop
+5. When the PM closes a human task, or when you resolve a `tbd` item, do this procedure again from step 1
+6. When the wave has `agent_ready: true`, tell the PM that agents can start the wave
 
 ## Procedure C: triage during a wave
 
@@ -334,6 +379,25 @@ These rules apply to each finding:
    - If the rejected QA task was blocking, the re-QA task replaces it in each `blocked_by` that names it
 6. After two `rejected` verdicts in sequence on one epic, the planner stops, adds the label `needs-replan` to the epic and asks the PM
 7. If a finding changes the scope or a contract, it is a `needs-replan` case of Procedure C
+
+## Maturity checkpoints
+
+Do these checkpoints in Procedure A and at each wave review. A mandatory checkpoint whose trigger is true adds its task, unless the PM waives it. An optional checkpoint adds its task only when the PM chooses it. Log each waiver as a decision.
+
+- **CI baseline** (always, the first task of W01): a chore task writes the agent file, a `justfile` and a lefthook pre-commit configuration. Examples: the `justfile` of pascalandy/skills and of pascalandy/mixtape
+  - `just check` is the one CI command. `just signoff` refuses a dirty tree, runs `just check` on the pushed HEAD, and posts a green status with `gh signoff`
+  - Each pre-commit hook calls a `just` recipe. Each recipe is one line. The logic is in scripts
+  - Each agent task after the CI baseline is `blocked_by` it. Its `Verify` is `just check`, with task-specific proof when necessary. The CI baseline task and the human tasks use task-specific proof
+- **CI mature** (optional: when `just check` is slow, or the project has more than one contributor or makes releases, the PM chooses): `just check` selects its checks from the changed files, and `--only NAME` runs one check. `just merge` squash-merges a PR only at the head SHA that has a green signoff. Add a GitHub Actions runner only for a mature private repository with more than one contributor or with releases
+- **Verification loop** (once, when the checkout builds and starts as-is, and one real user journey can be driven end to end): a chore task runs `create-verification-skill`. Until then, keep a placeholder scope bullet in a `proposed` wave. After that, when a wave changes the feature map, a user journey, the launch or the harness, add a task that runs `maintain-verification-skill`
+- **QA playbook** (always): `plan/qa.md` holds the requirements, the environments and the ordered QA steps, as [Project files](references/project-files.md) says. At each wave review, update it from the QA reports
+
+## Traps
+
+A trap is work inside the deliverable that uses effort but adds no value. When a task has a probable trap, name it in the `Traps` line of the brief. Avoid these planner traps:
+
+- Want: a task that stops when its acceptance items pass. Not: a task that polishes a detail without value
+- Want: a late human task, such as an approval before a deploy, in the next wave. Not: that task in the active wave, where it stops all agents
 
 ## Version
 

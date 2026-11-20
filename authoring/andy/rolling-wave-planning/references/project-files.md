@@ -1,6 +1,6 @@
 # Project files
 
-Read this file before you write `01-project.md` or `decisions.md`.
+Read this file before you write `01-project.md`, `decisions.md` or `qa.md`.
 
 ## `01-project.md`
 
@@ -46,4 +46,36 @@ Next IDs: E06, D004
 - Decision: …
 - Why: …
 - Affects: W01B (new), W02 (amended)
+```
+
+## `qa.md`
+
+The QA playbook. The planner writes the requirements in Procedure A and updates the file at each wave review, from the QA reports. The `After` column makes the steps a dependency graph. When a verification skill exists, the steps follow its order: launch, doctor, drive, evidence and cleanup.
+
+```markdown
+# ACME: QA playbook
+
+Verification skill: `verify-acme` (or none)
+
+## Requirements
+| ID | Requirement | Source |
+|---|---|---|
+| FR-03 | A new user signs up and lands on the dashboard | [BC §4](00-business-case.md#4-onboarding), SC2 |
+| NFR-01 | The dashboard loads in less than 2 s on the QA machine | [BC §7](00-business-case.md#7-constraints) |
+
+## Environments
+| Name | Machine | Access | Tools |
+|---|---|---|---|
+| qa | Mac Mini | `ssh qa-host` | `pnpm`, `playwright` |
+
+## Steps
+| Step | After | Command or tool | Machine | Expected result |
+|---|---|---|---|---|
+| prepare | — | `git pull && pnpm install` | qa | exit 0 |
+| doctor | prepare | `just doctor` | qa | each check passes |
+| start | doctor | `just dev` | qa | `curl -s localhost:3000/health` returns 200 |
+| seed | start | `just seed` | qa | 3 test accounts exist |
+| FR-03 | seed | `playwright test signup` | qa | the dashboard shows |
+| NFR-01 | seed | `hyperfine 'curl -s localhost:3000/dashboard'` | qa | mean < 2 s |
+| cleanup | FR-03, NFR-01 | `just stop && just reset-db` | qa | no process on port 3000 |
 ```
