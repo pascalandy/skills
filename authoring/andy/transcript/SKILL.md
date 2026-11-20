@@ -101,7 +101,7 @@ Report the result folder, the one holding the `files`, and whether a summary `.m
 
 Run `uv run <skill_dir>/scripts/youtube_smoke.py` for the free transport check on `https://www.youtube.com/watch?v=EIEc43CxIvY` from the README's `Test videos` table. It uses the same source as a run: the explicit cookies file, else the vault session, else anonymous access. All modes require pinned `yt-dlp` `2026.7.4`. The check validates temporary audio with `ffprobe` and never calls Deepgram or a summary model. A pass proves the selected transport downloaded audio, not that YouTube authenticated the account.
 
-A run never reads a browser. The vault session comes from Helium's `CLI` profile, a profile only tools use, signed in to the account Transcript should use, such as YouTube Premium. When YouTube refuses the vault session, follow [Refresh YouTube cookies](references/youtube-auth-refresh.md).
+A run never reads a browser. To renew a vault session that YouTube refuses, use the Helium profile configured on the source Mac. Follow [Refresh YouTube cookies](references/youtube-auth-refresh.md) to set up the local configuration and renew the session.
 
 ## Changing this skill
 

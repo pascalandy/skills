@@ -1,84 +1,64 @@
 # Refresh YouTube cookies
 
-Use this procedure for requests to refresh, renew or update Transcript's YouTube cookies or login, including « rafraîchis le cookie pour Transcript » and « renouvelle la connexion YouTube de Transcript ». Treat the request as authorization to renew the session, within the available tool permissions. Handle these requests as authentication maintenance.
+Use this procedure when asked to refresh, renew or update Transcript's YouTube cookies or login. The request authorizes renewal within the available tool permissions.
 
-The session lives only in the fnox vault: the age-encrypted entry `YOUTUBE_COOKIES_TXT` of the `pascalandy/dotfiles` store, with `as_file = true`. No machine keeps a plaintext cookies file. Renewal therefore ends in a dotfiles PR that `just merge` lands, which updates every machine.
+The session lives in the age-encrypted fnox entry `YOUTUBE_COOKIES_TXT`, with `as_file = true`. Renewal in the fleet uses the `pascalandy/dotfiles` store. See `docs/operations/secrets.md` in that repository for the worktree and deployment procedure.
 
-## 1. When to re-login in Helium
+## 1. Check the current session
 
-Check the session first, from any machine, with no paid call:
+Run the free check from any machine with the deployed fnox entry.
 
 ```bash
 just transcript-cli auth check
 ```
 
-- It succeeds: the session is valid. Renew nothing
-- It reports that YouTube refused or did not confirm the session: Google signed it out or expired it. Re-login in Helium's `CLI` profile, then run the renewal below. No fixed interval applies; Google can invalidate the session at any time
-- It reports a network failure or rate limit: retry later. That is not a signed-out session, so ask for no login
+- A passing check needs no renewal
+- If YouTube refuses the stored session or cannot confirm it, sign in again in the configured Helium profile and close its window before renewing
+- For a network failure or rate limit, retry the check later
 
-Re-login also applies when the export itself fails, or when the `CLI` profile does not exist yet. The `CLI` profile is used only by tools, so YouTube never rotates its cookies. Ask the user for one of these interactions only when a command requires it:
+## 2. Configure the Mac that exports cookies
 
-- **No `CLI` profile.** The user creates a Helium profile named `CLI` and signs in to YouTube there with the account Transcript should use. Then the user opens `https://www.youtube.com/robots.txt` and closes that profile's window
-- **Google signed the session out.** The user signs in to YouTube again in the `CLI` profile, opens `robots.txt`, and closes the window
-- **First Keychain prompt.** The user chooses `Always Allow` for `Helium Storage Key`
+Create `~/.config/transcript/youtube-session.toml` on the Mac with the Helium profile. If `XDG_CONFIG_HOME` is set to an absolute directory, use `$XDG_CONFIG_HOME/transcript/youtube-session.toml`.
 
-The command creates the export itself; the user supplies no cookie contents, Netscape export or export path.
-
-## 2. Locate the source Mac and prepare the worktree
-
-Use the Mac with Helium's `CLI` profile; resolve its identity and skills checkout from available machine context or an installed fleet inventory, and confirm it before running commands. It must be awake with its desktop session unlocked, and have `just`, `uv`, `fnox` (`~/.local/bin/fnox` when `PATH` lacks it) and `gh`. Noninteractive SSH can omit Homebrew from `PATH`; use the verified executable paths or supply that `PATH`.
-
-Create a worktree of `pascalandy/dotfiles` from `origin/HEAD` on that Mac, as `docs/operations/secrets.md` of that repository describes under « Ajouter ou remplacer un secret ». Read its `AGENTS.md` first. Never write in the dotfiles clone.
-
-Preview the write; it opens no cookies or Keychain:
-
-```bash
-just --justfile <skills-checkout>/justfile transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree> --dry-run
+```toml
+browser_data_dir = "/absolute/path/to/browser-data"
+profile_name = "Automation profile"
+keychain_service = "Example Safe Storage"
+keychain_account = "example-account"
+# user_agent = "ExampleBrowser/1.0"
 ```
 
-## 3. Run Just in the desktop session
+- Set `browser_data_dir` to the Helium data directory that contains `Local State`. In the intended profile, open `chrome://version` and use the parent of its `Profile Path`. Absolute paths and paths starting with `~/` work. The selected profile's database may be at `Cookies` or `Network/Cookies`
+- Set `profile_name` to that profile's displayed name. Use a dedicated profile for the YouTube account Transcript should use. After signing in, open `https://www.youtube.com/robots.txt` in that profile and close its window
+- Set `keychain_service` and `keychain_account` to the service and account of the browser's generic password item in Keychain Access. The TOML file holds these identifiers only. Keychain supplies the password when the exporter runs. If prompted in the unlocked desktop session, choose `Always Allow`
+- Set `user_agent` only to override the User-Agent of the YouTube login check. The default comes from the pinned yt-dlp release. A machine that only consumes the fnox session or uses `--cookies FILE` can run the check without a local TOML file
 
-From a terminal in the source Mac's unlocked desktop session:
+Keep the TOML file local. Keep the cookies in fnox and the browser encryption key in Keychain.
+
+## 3. Prepare the dotfiles worktree and renew
+
+On the source Mac, prepare a linked worktree of `pascalandy/dotfiles` as its `docs/operations/secrets.md` describes. Read its `AGENTS.md` first. Use the unlocked desktop terminal, with `just`, `uv`, `fnox` and `gh` available. If working remotely, run the command in the source Mac's authorized desktop session so Keychain can prompt.
+
+From the skills checkout, preview the target store. The preview checks the worktree and can run before you configure the profile.
 
 ```bash
-cd <skills-checkout>
+just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree> --dry-run
+```
+
+Run the same command without `--dry-run` once the local configuration is ready.
+
+```bash
 just transcript-auth-refresh --dotfiles-worktree <dotfiles-worktree>
 ```
 
-An installed-only environment without that justfile can run `uv run <skill_dir>/scripts/transcript.py auth refresh --dotfiles-worktree <dotfiles-worktree>` on the same Mac.
+With only the installed skill, run `uv run <skill_dir>/scripts/transcript.py auth refresh --dotfiles-worktree <dotfiles-worktree>` on the same Mac.
 
-The command exports only YouTube domains from the `CLI` profile, verifies the login against YouTube, and only then runs `fnox set YOUTUBE_COOKIES_TXT --provider age --from-file /dev/stdin -c <dotfiles-worktree>/dot_config/private_fnox/private_config.toml`. It restores `as_file = true` on the entry when `fnox set` dropped it, and reads the value back through `fnox exec` to prove it matches the verified export. The export sits in a private temporary directory that is removed on exit; no plaintext file is left. A failure before the write leaves the worktree unchanged. Its answer lists the `changes` and the `next` steps.
+The command exports YouTube cookies into a private temporary file and checks that YouTube recognizes the session. After a successful check it writes to `dot_config/private_fnox/private_config.toml` in the worktree through `fnox set` with the age provider and stdin. It restores `as_file = true` if needed, verifies the write through `fnox exec`, and removes the temporary file. The answer supplies the changes and the next steps.
 
-### When working from another machine
+## 4. Land and verify the dotfiles change
 
-Use an available, authorized desktop control to run the same Just command in the source Mac's logged-in session. Plain SSH can reach the Mac while Keychain refuses to release Helium's cookie key. That refusal does not establish that the session is unavailable.
+1. Require exit `0` and `ok: true`. Use `git diff --stat` to confirm that only the fnox source file changed. Follow the dotfiles secret procedure if additional changes need review
+2. Commit the source file, push, and open the PR using the commands in the answer. Run `just merge` from the worktree when authorized. The recipe deploys the updated store across the fleet
+3. After deployment, run `just transcript-cli auth check` on each relevant machine. Report the merged PR and the check results. Once the fnox check passes, remove any plaintext export or target list left by an earlier managed-file setup
 
-With macOS automation available over SSH, `osascript` can start the command in a new Terminal window. Use a new window owned by this operation, record its window ID and tab TTY, and capture stdout, stderr and the exit status in a private temporary directory. Wait for the command to finish before reading the captured result. Close only the recorded window after checking that its TTY still matches and the tab is no longer busy. Leave the user's existing windows untouched.
-
-If no authorized desktop control is available, report that exact limitation and give the user the same Just command to run locally. Do not change Keychain permissions or browser security settings to work around the session boundary.
-
-## 4. Land the dotfiles PR
-
-Require exit `0` and an `ok: true` JSON answer. Then, in the dotfiles worktree:
-
-1. `git diff --stat` shows only `dot_config/private_fnox/private_config.toml`, with one encrypted value replaced. Anything else keeps its own review
-2. Commit the file, push, and open the PR with `gh pr create`. Titles follow `chore(secrets): refresh the YouTube cookies ciphertext`
-3. Run `just merge` from the worktree when you have the authority to merge. A diff that only replaces one encrypted value merges without a delegated review. The recipe merges the PR, then updates and applies the dotfiles clone on each machine. Leave Pascal no `git pull` or `chezmoi apply`
-
-## 5. Verify and report
-
-After the deploy, on each relevant machine:
-
-```bash
-just transcript-cli auth check
-```
-
-A passing check reads the vault and asks YouTube; it needs no Deepgram, summary model or paid E2E run. Report which machines pass or still need action, and name the merged dotfiles PR. Keep values out of chat, logs and Git.
-
-## 6. One-time migration: remove the old plaintext files
-
-This step belongs to the move from the earlier managed-file design to the vault. It is not part of renewal; skip it on every later refresh. On each machine, once `just transcript-cli auth check` passes through the vault, remove what nothing reads any more:
-
-- `~/.local/share/transcript/youtube.cookies.txt`
-- any renamed copy of that file, such as a backup or a `.bak` next to it
-- `~/.local/share/transcript/youtube-targets.txt`
+Keep cookie contents and Keychain passwords out of chat, logs and Git.
