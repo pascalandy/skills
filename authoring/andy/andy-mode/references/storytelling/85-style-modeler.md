@@ -19,8 +19,8 @@ separate task.
 
 Resolve a private destination before writing any files. Use the local path supplied
 by the user if present. Otherwise, use the local environment variable
-`STYLE_MODELER_DESTINATION`. If the selected destination is missing, unavailable, or
-public, ask for a private destination and defer all writes.
+`STYLE_MODELER_DESTINATION`. If the selected destination is missing, unavailable, public, or inside a skill
+installation tree or agent home, ask for a private source directory and defer all writes.
 
 For a managed repository, read its `AGENTS.md` and follow its worktree rules. Use
 its authoring layout for the package and its archive layout for the supplied
