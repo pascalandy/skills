@@ -57,6 +57,18 @@ def standalone_models(
 
 
 @pytest.fixture(autouse=True)
+def no_export_machine(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Results stay local, whatever fleet skill this machine holds; a test of
+    the copy to mbp installs its own fleet.toml."""
+    import transcript
+
+    absent = tmp_path_factory.mktemp("no-fleet") / "fleet.toml"
+    monkeypatch.setattr(transcript, "FLEET_MACHINES", absent)
+
+
+@pytest.fixture(autouse=True)
 def restore_transcript_logger() -> Iterator[None]:
     """main() sets the shared transcript logger's level, handlers, and
     propagation; restore them so a --debug run cannot leak DEBUG records into a

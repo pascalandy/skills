@@ -791,7 +791,9 @@ def test_smoke_exit_codes_follow_the_transport_outcome(monkeypatch, capsys) -> N
         json_line(
             {
                 "ok": False,
-                "errors": ["ffprobe was not found on PATH; fix: brew install ffmpeg"],
+                "errors": [
+                    f"ffprobe was not found on PATH; fix: {transcript.FFMPEG_INSTALL}"
+                ],
             }
         ),
     )

@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from transcript import (
+    FFMPEG_INSTALL,
     TEMPORARY,
     WORKFLOW_TOTAL_TIMEOUT,
     ConfigurationError,
@@ -127,7 +128,7 @@ def check(args: argparse.Namespace, argv: Sequence[str]) -> dict:
     rerun = _rerun(argv, prog=PROG)
     if not shutil.which("ffprobe"):
         raise Failure(
-            "missing_ffprobe", "ffprobe was not found on PATH", "brew install ffmpeg"
+            "missing_ffprobe", "ffprobe was not found on PATH", FFMPEG_INSTALL
         )
 
     budget = RunBudget.start(args.timeout)
