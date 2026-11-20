@@ -52,6 +52,9 @@ def png_bytes(width: int, height: int, mode: str = "RGB") -> bytes:
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A machine with no backend until a test adds one."""
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    # No fleet skill: the controller takes the script's own default
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("FLEET_ACTIVE_MODELS", raising=False)
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("FAKE_KEYRING_OPENROUTER", raising=False)
@@ -956,3 +959,22 @@ def test_a_malformed_candidate_still_saves_its_valid_sibling(
     assert any(
         error.startswith("OpenRouter returned 1 image(s)") for error in answer["errors"]
     )
+
+
+def test_the_plan_controller_is_terra_or_the_fleet_registrys(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert image_creator.plan_controller() == "gpt-6.1-terra"
+    resolver = env / "home/.pi/agent/skills/fleet/scripts/active_models.py"
+    resolver.parent.mkdir(parents=True)
+    (resolver.parents[1] / "references").mkdir()
+    (resolver.parents[1] / "references/active-models.toml").write_text("")
+    resolver.write_text(
+        "import json, sys\n"
+        "assert sys.argv[-2:] == ['resolve', 'terra']\n"
+        "print(json.dumps({'ok': True, 'id': 'gpt-9-terra'}))\n"
+    )
+    assert image_creator.plan_controller() == "gpt-9-terra"
+    resolver.unlink()
+    with pytest.raises(image_creator.ScriptError, match="fleet resolver"):
+        image_creator.plan_controller()

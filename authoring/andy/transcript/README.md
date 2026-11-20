@@ -42,7 +42,7 @@ uv run <skill_dir>/scripts/transcript.py run file --help
 
 ## Manage inference profiles
 
-Use profiles for every normal model choice. A profile binds the provider, model, and reasoning effort into one named configuration.
+Use profiles for every normal model choice. A profile binds the provider, model, and reasoning effort into one named configuration. A profile's model is an alias, such as `sol`, or an explicit ID, such as `glm`'s. With Pascal's fleet skill installed, its resolver gives the alias's current ID, and a missing or invalid registry, a missing resolver or an unknown alias fails the run before any network call; without it, `STANDALONE_MODELS` in `scripts/transcript.py` applies. `FLEET_ACTIVE_MODELS` names another registry, such as a test file. Results and metadata record the ID that ran.
 
 ```bash
 uv run <skill_dir>/scripts/transcript.py list profiles
@@ -279,7 +279,7 @@ uvx yt-dlp@2026.7.4 --skip-download --print duration "<youtube-url>"
 
 The length prints in seconds.
 
-Every real test run passes `--profile sonnet`: Claude Sonnet 5.5 at `xhigh` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
+Every real test run passes `--profile sonnet`: the current Claude Sonnet at `xhigh` effort. A test only needs a summary to come back, so the default `opus` profile adds cost and nothing else.
 
 Pascal pre-authorizes every paid test run that follows this rule: a video from this table and `--profile sonnet`. The rule covers the E2E closeout and the `youtube.real-summary` feature of `verify-transcript`, so run them without asking. A new row needs his go-ahead before it counts, and so does any other paid run: a URL outside the table, such as a `--youtube-url` override, another profile, or a hint that switches the profile after a failed summary.
 

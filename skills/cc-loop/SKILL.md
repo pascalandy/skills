@@ -8,7 +8,8 @@ kind: "dev"
 
 Load `review-loop` and follow it with this reviewer:
 
-- Model: the latest Opus at `high`
+- Model: the `opus` alias at `high`. Read `fleet/references/active-models.toml`
+  and resolve it to its `id`; without the fleet skill, the newest Opus
 - T3: the enabled provider whose driver is `claudeAgent`, effort option
   `effort`
 - Outside T3: in Claude Code, a native subagent with `model: opus` and the

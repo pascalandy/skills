@@ -14,8 +14,8 @@ skip-in-fast-track = false
 retro = true
 
 [manic-1] # Step 2: Adversarial review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 3
@@ -23,8 +23,8 @@ skip-in-fast-track = true
 retro = false
 
 [manic-2] # Step 3: Blast-radius review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 2
@@ -40,8 +40,8 @@ skip-in-fast-track = true
 retro = false
 
 [manic-3] # Step 5: Docs review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "high" }
+chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "high" }
+chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "high" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 2
@@ -49,8 +49,8 @@ skip-in-fast-track = true
 retro = false
 
 [manic-5] # Step 6: Pristine review
-chef-on-claude = { instance = "codex", model = "gpt-6.1-sol", reasoning-level = "xhigh" }
-chef-on-codex = { instance = "claudeAgent", model = "claude-opus-5-5", reasoning-level = "xhigh" }
+chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 2

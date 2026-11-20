@@ -123,12 +123,51 @@ class TestListModels:
         stdout, _stderr, code = run_script("list", "models", "--provider", "codex")
         assert code == 0
         assert json.loads(stdout)["models"] == [
-            "gpt-6-astra",
-            "gpt-6.1-sol",
+            "gpt-6.2-astra",
+            "gpt-6.2-sol",
         ]
 
 
 class TestProfiles:
+    def test_the_fleet_registry_resolves_profile_aliases(
+        self, monkeypatch, tmp_path, capsys
+    ) -> None:
+        import transcript
+
+        resolver = tmp_path / "fleet/scripts/active_models.py"
+        resolver.parent.mkdir(parents=True)
+        (tmp_path / "fleet/references").mkdir()
+        (tmp_path / "fleet/references/active-models.toml").write_text("")
+        resolver.write_text(
+            "import json, sys\n"
+            "ids = {'opus': 'claude-opus-9', 'sol': 'gpt-9-sol',"
+            " 'astra': 'gpt-9-astra', 'sonnet': 'claude-sonnet-9'}\n"
+            "print(json.dumps({'ok': True, 'id': ids[sys.argv[-1]]}))\n"
+        )
+        monkeypatch.setattr(transcript, "FLEET_RESOLVER", resolver)
+
+        assert transcript.main(["list", "profiles"]) == 0
+        models = {
+            p["name"]: p["model"]
+            for p in json.loads(capsys.readouterr().out)["profiles"]
+        }
+        assert models == {
+            "opus": "claude-opus-9",
+            "astra": "gpt-9-astra",
+            "sol": "gpt-9-sol",
+            "glm": "z-ai/glm-5.3-flash",
+            "sonnet": "claude-sonnet-9",
+        }
+
+    def test_a_requested_registry_without_a_resolver_fails_the_plan(
+        self, monkeypatch
+    ) -> None:
+        import transcript
+
+        monkeypatch.setenv(transcript.FLEET_REGISTRY_ENV, "/nowhere/models.toml")
+        with pytest.raises(transcript.ConfigurationError, match="fleet resolver"):
+            _ = transcript.INFERENCE_PROFILES["sol"].model
+
     def test_configured_profiles_keep_the_preference_order_and_default(self) -> None:
         stdout, stderr, code = run_script("list", "profiles")
 
@@ -141,8 +180,8 @@ class TestProfiles:
             for profile in payload["profiles"]
         ] == [
             ("opus", "claude", "claude-opus-5-5", "xhigh"),
-            ("astra", "codex", "gpt-6-astra", "low"),
-            ("sol", "codex", "gpt-6.1-sol", "xhigh"),
+            ("astra", "codex", "gpt-6.2-astra", "low"),
+            ("sol", "codex", "gpt-6.2-sol", "xhigh"),
             ("glm", "openrouter", "z-ai/glm-5.3-flash", "medium"),
             ("sonnet", "claude", "claude-sonnet-5-5", "xhigh"),
         ]
@@ -188,8 +227,8 @@ class TestProfiles:
         "profile,expected",
         [
             ("opus", ("claude", "claude-opus-5-5", "xhigh")),
-            ("astra", ("codex", "gpt-6-astra", "low")),
-            ("sol", ("codex", "gpt-6.1-sol", "xhigh")),
+            ("astra", ("codex", "gpt-6.2-astra", "low")),
+            ("sol", ("codex", "gpt-6.2-sol", "xhigh")),
             ("glm", ("openrouter", "z-ai/glm-5.3-flash", "medium")),
             ("sonnet", ("claude", "claude-sonnet-5-5", "xhigh")),
         ],

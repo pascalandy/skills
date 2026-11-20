@@ -15,7 +15,11 @@ def run_script(*args: str) -> tuple[str, str, int]:
     with tempfile.TemporaryDirectory(prefix="transcript-test-home-") as home:
         result = subprocess.run(
             ["uv", "--quiet", "run", str(SCRIPT_PATH), *args],
-            env={**os.environ, "HOME": home, "UV_CACHE_DIR": cache},
+            env={
+                **{k: v for k, v in os.environ.items() if k != "FLEET_ACTIVE_MODELS"},
+                "HOME": home,
+                "UV_CACHE_DIR": cache,
+            },
             capture_output=True,
             text=True,
             timeout=30,

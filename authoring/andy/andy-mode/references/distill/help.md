@@ -36,16 +36,20 @@ Distill prompt to apply. STEM matches a folder in andy-mode's `references/distil
 LLM backend to use.
 
 **`--model MODEL`**
-Specific model name. Defaults depend on provider:
-- claude -> `claude-opus-4-6`
-- codex -> `gpt-5.4`
+A model alias, or the ID it stands for. Defaults depend on provider:
+- claude -> `opus`
+- codex -> `sol`
 - opencode -> `1-glm`
 
-Available Claude models: `claude-opus-4-6`, `claude-sonnet-4-6`
+Available Claude aliases: `opus`, `sonnet`
+
+Available Codex aliases: `sol`, `astra`, `terra`
+
+With Pascal's fleet skill installed, its `references/active-models.toml` gives each alias's current ID, and a missing or invalid registry, a missing resolver or an unknown alias stops the run. Without it, the script's own `STANDALONE_MODELS` apply. `FLEET_ACTIVE_MODELS` names another registry, such as a test file.
 
 Available OpenCode agents: `1-glm`, `2-luna`, `3-sol`, `4-astra`, `5-qwen`
 
-Use `--list-models` to see all supported values.
+Use `--list-models` to see each alias's ID.
 
 **`--effort {low,medium,high,max}`** - default: `high` (or `low` for Sonnet models)
 Reasoning effort. Canonical vocabulary; the script translates per provider:
@@ -57,7 +61,7 @@ Reasoning effort. Canonical vocabulary; the script translates per provider:
 | `high` | `high` | `high` |
 | `max` | `max` | `xhigh` |
 
-**Note:** `claude-sonnet-4-6` defaults to `low` effort for faster, more economical results. Opus defaults to `high`.
+**Note:** `sonnet` defaults to `low` effort for faster, more economical results. Opus defaults to `high`.
 
 **OpenCode note:** `--effort` is not supported with `--provider opencode`. OpenCode reasoning behavior is defined by the selected curated agent.
 
@@ -75,7 +79,7 @@ Do not open the output folder in Finder when done (macOS only).
 Answer every prompt in the distill-prompt library under `prompts`, such as `{"ok":true,"prompts":["extract_wisdom",…]}`.
 
 **`--list-models`**
-Answer the supported models under `models`, by provider, each provider's default first, such as `{"ok":true,"models":{"codex":["gpt-5.4"]}}`. Combine with `--provider` to filter.
+Answer the supported models under `models`, by provider, each provider's default first, as model IDs, such as `{"ok":true,"models":{"codex":["gpt-6.2-sol","gpt-6.2-astra","gpt-6.1-terra"]}}`. Combine with `--provider` to filter.
 
 ### Behavior
 
@@ -100,8 +104,8 @@ Show program version and exit.
 |---|---|
 | Prompt | `follow_along_note` |
 | Provider | `claude` |
-| Model (claude) | `claude-opus-4-6` |
-| Model (codex) | `gpt-5.4` |
+| Model (claude) | `opus` |
+| Model (codex) | `sol` |
 | Model (opencode) | `1-glm` |
 | Effort | `high` (or `low` for Sonnet models) |
 | Output dir | parent directory of the input file |
@@ -173,7 +177,7 @@ distill --prompt short_summary ~/notes.txt
 
 **Use codex with specific model and effort:**
 ```bash
-distill --provider codex --model gpt-5.4 --effort max ./meeting.md
+distill --provider codex --model astra --effort max ./meeting.md
 ```
 
 **Use OpenCode with the default curated agent:**

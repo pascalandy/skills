@@ -142,6 +142,7 @@ def lab(tmp_path: Path) -> Lab:
         "GITHUB_TOKEN": "user-token",
     }
     env.pop("RUN_EVALS_PARENT", None)
+    env.pop("FLEET_ACTIVE_MODELS", None)
     # The runner must never discover the invoking agent's real session store
     env.pop("CODEX_HOME", None)
     return Lab(
@@ -209,6 +210,8 @@ def test_codex_hides_installed_copies_of_listed_and_deleted_skills(lab: Lab, hom
 
     assert result.returncode == 0, result.stderr
     argv = report(lab, "s2-codex", "argv").splitlines()
+    # Without the fleet skill, the sol alias takes the runner's own ID
+    assert argv[argv.index("-m") + 1] == "gpt-6.2-sol"
     installed = moved / ".codex" / "skills"
     hidden = next(arg for arg in argv if arg.startswith("skills.config="))
     assert sorted(re.findall(r'path="([^"]+)"', hidden)) == [

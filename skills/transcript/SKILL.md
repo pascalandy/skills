@@ -50,7 +50,7 @@ Show the current profile names, providers, models, and efforts. Then ask whether
 
 The list order records preference only. The CLI runs one profile and never falls back to another profile.
 
-To update or create a profile, edit the `INFERENCE_PROFILES` registry in `scripts/transcript.py`, the only list of profiles, then run the validation procedure in `README.md`.
+To update or create a profile, edit the `INFERENCE_PROFILES` registry in `scripts/transcript.py`, the only list of profiles, then run the validation procedure in `README.md`. The `opus`, `astra`, `sol` and `sonnet` profiles name a model alias: with Pascal's fleet skill installed, its `references/active-models.toml` gives the alias's current ID, so a model version changes there, not here. Without the fleet skill, `STANDALONE_MODELS` in the script applies. `glm` names its model ID.
 
 For Zoom, `--path` names the meeting folder, not its `audio*.m4a` file. A plain folder name resolves under `~/Documents/Zoom`.
 

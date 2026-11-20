@@ -358,7 +358,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 __version__ = "3.0.0"
 CANONICAL_YOUTUBE_URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
@@ -1185,6 +1185,8 @@ def build_commands(
                 ),
                 output_dir,
             ),
+            # The plan must name the model transcript resolves for its profile
+            CommandPlan("profiles", ("list", "profiles")),
         )
     if feature.probe == "youtube-real-summary":
         return (
@@ -1471,11 +1473,28 @@ def _validate_doctor(
     return {"readiness_ok": False, "failed_checks": failed}
 
 
+def _profile_model(profiles: dict[str, object] | None, name: str) -> str:
+    """The model `transcript list profiles` resolves for the named profile."""
+    listed = (profiles or {}).get("profiles")
+    _require(isinstance(listed, list), "profile discovery answered no profiles")
+    found = [
+        p.get("model")
+        for p in cast(list[dict[str, object]], listed)
+        if isinstance(p, dict) and p.get("name") == name
+    ]
+    _require(
+        len(found) == 1 and isinstance(found[0], str) and bool(found[0]),
+        f"profile discovery has no model for {name}",
+    )
+    return cast(str, found[0])
+
+
 def _validate_dry_run(
     feature: FeatureSpec,
     plan: CommandPlan,
     process: CapturedProcess,
     payload: dict[str, object],
+    profiles: dict[str, object] | None = None,
 ) -> dict[str, object]:
     _require(process.exit_code == 0, f"{feature.id} exited {process.exit_code}")
     _require(payload.get("ok") is True, f"{feature.id} did not report ok")
@@ -1527,7 +1546,8 @@ def _validate_dry_run(
             summary.get("provider") == "claude", "Zoom summary provider is invalid"
         )
         _require(
-            summary.get("model") == "claude-opus-5-5", "Zoom summary model is invalid"
+            summary.get("model") == _profile_model(profiles, "opus"),
+            "Zoom summary model is not the opus profile's",
         )
         _require(summary.get("effort") == "xhigh", "Zoom summary effort is invalid")
         _require(
@@ -1886,8 +1906,12 @@ def validate_feature(
         return {"default": payload["default"], "profiles": names}
     if feature.probe in {"doctor-youtube", "doctor-zoom"}:
         return _validate_doctor(feature, *captures[0])
-    if feature.probe in {"youtube-dry-run-summary", "zoom-dry-run"}:
+    if feature.probe == "youtube-dry-run-summary":
         return _validate_dry_run(feature, commands[0], *captures[0])
+    if feature.probe == "zoom-dry-run":
+        process, profiles = captures[1]
+        _require(process.exit_code == 0, "profile discovery failed")
+        return _validate_dry_run(feature, commands[0], *captures[0], profiles)
     if feature.probe == "youtube-real-summary":
         return _validate_e2e(feature, commands[0], *captures[0], context)
     raise AssertionError(f"Unhandled probe: {feature.probe}")

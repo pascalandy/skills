@@ -31,7 +31,7 @@ V1 reads the same path but uses `mode: primary` and a `permission` map. Set `edi
 
 ## Complete review run
 
-Prepare an absolute prompt-file path with scope, criteria, and expected findings. Read `provider`, `model`, and `reasoning-level` from the `[opencode]` table of [config.toml](../../config.toml), unless the request specifies them. The provider selects the account that pays because several providers can serve one model. Before the run, confirm the pair with `opencode models` and configure provider authentication. In continuous integration (CI), provide the API key through the runner's secret mechanism. The `#<reasoning-level>` suffix selects a v2 model variant. Variants depend on the provider.
+Prepare an absolute prompt-file path with scope, criteria, and expected findings. Read `provider`, `model`, and `reasoning-level` from the `[opencode]` table of [config.toml](../../config.toml), unless the request specifies them. Resolve a model alias as [Defaults](../../SKILL.md#defaults) says. The provider selects the account that pays because several providers can serve one model. Before the run, confirm the pair with `opencode models` and configure provider authentication. In continuous integration (CI), provide the API key through the runner's secret mechanism. The `#<reasoning-level>` suffix selects a v2 model variant. Variants depend on the provider.
 
 ```bash
 repo="/absolute/path/to/repository"

@@ -7,8 +7,8 @@ Commit and push only with session authorization. If either is forbidden, build a
 ## Roles
 
 - **A** builds the page with the user-selected model for its thread
-- **B** reviews the repository without changing tracked files, in a separate top-level T3 thread with `claude-haiku-5-5` at `xhigh` effort
-- A launches each B as a new thread. For several sharing A's checkout, use `create_threads` with each entry set to `target: {providerInstanceId: <the enabled instance whose driver is claudeAgent>, model: "claude-haiku-5-5", options: {effort: "xhigh"}}`. Never use a subagent or delegate for B. Before launching B, load **t3-runtime**. If controls or settings are unavailable, ask the user to open B sessions
+- **B** reviews the repository without changing tracked files, in a separate top-level T3 thread with Haiku at `xhigh` effort. Read `fleet/references/active-models.toml` and resolve the `haiku` alias to its `id`; without the fleet skill, take the newest Haiku that `orchestrator_capabilities` lists
+- A launches each B as a new thread. For several sharing A's checkout, use `create_threads` with each entry set to `target: {providerInstanceId: <the enabled instance whose driver is claudeAgent>, model: <the Haiku ID>, options: {effort: "xhigh"}}`. Never use a subagent or delegate for B. Before launching B, load **t3-runtime**. If controls or settings are unavailable, ask the user to open B sessions
 - A chooses B count and coverage
 
 ## Split the QA

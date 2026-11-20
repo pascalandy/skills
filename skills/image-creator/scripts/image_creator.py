@@ -398,16 +398,89 @@ JPEG_COMPRESSION = 85
 API_BASE = "https://openrouter.ai/api/v1"
 API_MAX_IMAGES = 16
 PLAN_MAX_IMAGES = 5
-PLAN_CONTROLLER = "gpt-6-luna"
+# The Codex model that calls the image tool; resolve_model_alias gives its ID
+PLAN_CONTROLLER = "terra"
 PLAN_TIMEOUT_S = 300
 API_TIMEOUT_S = 600
 PLAN_DISABLED_FEATURES = ("computer_use", "browser_use", "in_app_browser")
 PLAN_TRACE_MARKER = "POST to https://chatgpt.com/backend-api/codex/images/"
 
+# Model aliases, such as "sol". When the fleet skill's registry is installed,
+# or FLEET_ACTIVE_MODELS names one, the fleet resolver gives each alias's
+# current ID and any fault is reported; otherwise STANDALONE_MODELS applies.
+# A value that is not a bare lowercase word is an explicit model ID, used as given.
+FLEET_RESOLVER = Path(".pi/agent/skills/fleet/scripts/active_models.py")
+FLEET_REGISTRY_ENV = "FLEET_ACTIVE_MODELS"
+STANDALONE_MODELS = {"terra": "gpt-6.1-terra"}
+
+
+class ModelAliasError(ValueError):
+    """The fleet registry or resolver is missing or invalid, or the alias is unknown."""
+
+
+def is_model_alias(name: str) -> bool:
+    return name.isascii() and name.isalpha() and name.islower()
+
+
+def resolve_model_alias(name: str) -> str:
+    """Return the model ID for an alias, or `name` itself when it is an explicit ID."""
+    if not is_model_alias(name):
+        return name
+    resolver = Path.home() / FLEET_RESOLVER
+    registry = os.environ.get(FLEET_REGISTRY_ENV)
+    installed = resolver.parents[1] / "references" / "active-models.toml"
+    if not registry and not installed.is_file():
+        if name not in STANDALONE_MODELS:
+            raise ModelAliasError(
+                f"unknown model alias {name}; known: {', '.join(STANDALONE_MODELS)}"
+            )
+        return STANDALONE_MODELS[name]
+    if not resolver.is_file():
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} is missing; install the fleet skill"
+            f" or unset {FLEET_REGISTRY_ENV}"
+        )
+    command = [sys.executable, "-I", str(resolver)]
+    command += ["--registry", registry] if registry else []
+    try:
+        done = subprocess.run(
+            [*command, "resolve", name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} failed: {error}"
+        ) from None
+    if done.returncode != 0:
+        lines = done.stderr.strip().splitlines()
+        try:
+            errors = json.loads(lines[-1])["errors"]
+        except (IndexError, ValueError, KeyError, TypeError):
+            errors = [lines[-1] if lines else f"exit {done.returncode}"]
+        raise ModelAliasError(f"model alias {name}: {'; '.join(map(str, errors))}")
+    try:
+        return str(json.loads(done.stdout)["id"])
+    except (ValueError, KeyError, TypeError):
+        raise ModelAliasError(
+            f"the fleet resolver {resolver} gave no ID for {name}"
+        ) from None
+
+
 TRANSPARENT_LINE = (
     "Background: fully transparent (real alpha channel). Isolated subject with clean "
     "edges; no backdrop, checkerboard, or shadow."
 )
+
+
+def plan_controller() -> str:
+    """The controller's model ID; a fleet registry fault stops the run."""
+    try:
+        return resolve_model_alias(PLAN_CONTROLLER)
+    except ModelAliasError as error:
+        raise ScriptError(str(error)) from None
 
 
 class RunError(ScriptError):
@@ -842,11 +915,12 @@ def plan_generate_one(
     prompt: str, images: list[Path], transparent: bool, verbose: bool
 ) -> tuple[bytes, dict[str, Any]]:
     started = time.monotonic()
+    controller = plan_controller()
     with tempfile.TemporaryDirectory(prefix="image-creator-") as work:
         cmd = [
             "codex", "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
             "-C", work, "-s", "read-only", "-c", 'approval_policy="never"',
-            "-m", PLAN_CONTROLLER, "-c", 'model_reasoning_effort="low"', "--json",
+            "-m", controller, "-c", 'model_reasoning_effort="low"', "--json",
         ]  # fmt: skip
         for feature in PLAN_DISABLED_FEATURES:
             cmd += ["--disable", feature]
@@ -1042,7 +1116,7 @@ def run_job(job: Job, dry_run: bool, verbose: bool) -> dict[str, Any]:
         receipt["request"] = {k: v for k, v in plan.api_body.items() if k != "prompt"}
     else:
         receipt["request"] = {
-            "controller": PLAN_CONTROLLER,
+            "controller": plan_controller(),
             "note": "the plan backend fixes model, quality, and size",
         }
     if plan.target_size:
