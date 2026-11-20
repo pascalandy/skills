@@ -2658,11 +2658,12 @@ def build_parser() -> TranscriptParser:
     auth_refresh = _command_parser(
         auth_actions,
         "refresh",
-        help_text="Export Helium's CLI profile into a dotfiles worktree's fnox vault",
+        help_text="Export cookies from the locally configured Helium profile into a dotfiles worktree",
         description=(
             "Run on the source Mac, in its unlocked desktop session, after signing in "
-            "to YouTube in Helium's 'CLI' profile and closing that profile's window. "
-            "Verify the export, then encrypt it into YOUTUBE_COOKIES_TXT in the fnox "
+            "to YouTube and closing the configured profile's window. Set the profile "
+            "in the local youtube-session.toml file. Verify the export, then encrypt it "
+            "into YOUTUBE_COOKIES_TXT in the fnox "
             "store of a dotfiles worktree. No plaintext file is kept. The answer's "
             "'next' steps land the dotfiles PR, which updates every machine."
         ),

@@ -15,6 +15,7 @@ import tempfile
 import tomllib
 import warnings
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from http.cookiejar import LoadError, MozillaCookieJar
 from pathlib import Path
 
@@ -31,29 +32,21 @@ FNOX_TIMEOUT = 15
 # Exit code of the child shell when `as_file` did not hand it a file path
 NOT_A_FILE = 97
 HTTP_LOGGERS = ("httpcore", "httpx")
-# A GUI host such as T3 Code on macOS starts processes with a bare PATH, so the
-# fallback paths cover installations outside that PATH
+# Keep standard user-local fnox installs reachable when a desktop app has a short PATH.
 FNOX_CANDIDATES = (
     "fnox",
     str(Path.home() / ".local/bin/fnox"),
     str(Path.home() / ".local/share/fnox/fnox"),
 )
 SUPPORTED_YTDLP_VERSION = "2026.07.04"
-# Tools own this Helium profile; nobody browses in it, so YouTube never rotates
-# its cookies and an exported copy stays valid. Everyday profiles rotate them
-# within days, which invalidates every copy
-HELIUM_DATA = Path.home() / "Library/Application Support/net.imput.helium"
-HELIUM_PROFILE_NAME = "CLI"
-HELIUM_KEYCHAIN_SERVICE = "Helium Storage Key"
-HELIUM_KEYCHAIN_ACCOUNT = "Helium"
+SESSION_CONFIG = Path("transcript/youtube-session.toml")
 # The command run from the skills checkout; `transcript` is not on PATH
 REFRESH_COMMAND = "just transcript-auth-refresh"
 REFRESH_HINT = (
-    f"Follow references/youtube-auth-refresh.md: run '{REFRESH_COMMAND} "
-    "--dotfiles-worktree <dotfiles worktree>' from the skills checkout, in the "
-    "source Mac's unlocked desktop terminal, then land the dotfiles PR with 'just merge'. "
-    f"If the export fails, sign in to YouTube again in Helium's '{HELIUM_PROFILE_NAME}' "
-    "profile, then close that profile's window"
+    "Follow references/youtube-auth-refresh.md to configure the source Mac, then run "
+    f"'{REFRESH_COMMAND} --dotfiles-worktree <dotfiles worktree>' from the skills "
+    "checkout in the unlocked desktop session. Land the dotfiles PR with 'just merge'. "
+    "If YouTube signed the profile out, sign in again and close its window"
 )
 
 
@@ -63,6 +56,80 @@ class SessionError(RuntimeError):
 
 class SessionNetworkError(SessionError):
     """A free session check failed temporarily, before any paid work."""
+
+
+@dataclass(frozen=True)
+class HeliumConfig:
+    data_dir: Path
+    profile_name: str
+    keychain_service: str
+    keychain_account: str
+
+
+def _config_path() -> Path:
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", ""))
+    if not config_home.is_absolute():
+        config_home = Path.home() / ".config"
+    return config_home / SESSION_CONFIG
+
+
+def _read_config(path: Path, *, required: bool) -> dict[str, object]:
+    try:
+        with path.open("rb") as stream:
+            return tomllib.load(stream)
+    except FileNotFoundError:
+        if not required:
+            return {}
+        raise SessionError(
+            f"YouTube session configuration is missing. Create {path} "
+            "as described in references/youtube-auth-refresh.md"
+        ) from None
+    except (OSError, ValueError):
+        raise SessionError(
+            f"YouTube session configuration could not be read as TOML. Fix {path}; "
+            "see references/youtube-auth-refresh.md"
+        ) from None
+
+
+def _config_string(settings: dict[str, object], key: str, path: Path) -> str:
+    value = settings.get(key)
+    if not isinstance(value, str) or not value.strip() or "\0" in value:
+        raise SessionError(f"Set {key} to a non-empty TOML string in {path}")
+    return value
+
+
+def _helium_config() -> HeliumConfig:
+    path = _config_path()
+    settings = _read_config(path, required=True)
+    data_dir = _config_string(settings, "browser_data_dir", path)
+    try:
+        root = Path(data_dir).expanduser()
+    except RuntimeError:
+        raise SessionError(
+            f"Set browser_data_dir to an absolute path in {path}"
+        ) from None
+    if not root.is_absolute():
+        raise SessionError(f"Set browser_data_dir to an absolute path in {path}")
+    return HeliumConfig(
+        root,
+        _config_string(settings, "profile_name", path),
+        _config_string(settings, "keychain_service", path),
+        _config_string(settings, "keychain_account", path),
+    )
+
+
+def _probe_user_agent() -> str:
+    path = _config_path()
+    settings = _read_config(path, required=False)
+    if "user_agent" in settings:
+        value = _config_string(settings, "user_agent", path).strip()
+        if not value.isascii() or not value.isprintable():
+            raise SessionError(f"Set user_agent to a printable ASCII string in {path}")
+        return value
+
+    from yt_dlp.utils.networking import std_headers
+
+    return std_headers["User-Agent"]
 
 
 def load_cookie_jar(path: Path) -> MozillaCookieJar:
@@ -125,19 +192,17 @@ def _quiet_http_transport() -> Iterator[None]:
 def check_session(path: Path, *, timeout: float = 25) -> None:
     """Require a positive YouTube login response without saving changed cookies."""
     jar = load_cookie_jar(path)
+    user_agent = _probe_user_agent()
     try:
-        with _quiet_http_transport(), httpx.Client(
-            cookies=jar,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/146.0.0.0 Safari/537.36"
-                )
-            },
-            follow_redirects=True,
-            timeout=timeout,
-        ) as client:
+        with (
+            _quiet_http_transport(),
+            httpx.Client(
+                cookies=jar,
+                headers={"User-Agent": user_agent},
+                follow_redirects=True,
+                timeout=timeout,
+            ) as client,
+        ):
             response = client.get(LOGIN_URL)
     except httpx.HTTPError:
         raise SessionNetworkError(
@@ -161,32 +226,38 @@ def check_session(path: Path, *, timeout: float = 25) -> None:
         )
 
 
-def helium_profile() -> Path:
-    """Find the tools profile by its display name; Helium names folders itself."""
+def helium_profile(config: HeliumConfig) -> Path:
+    """Find the configured profile by its display name in Chromium's Local State."""
     setup = (
-        f"Create a Helium profile named '{HELIUM_PROFILE_NAME}', sign in to YouTube "
-        "there, open https://www.youtube.com/robots.txt, close that profile's window, "
-        f"then run '{REFRESH_COMMAND}'"
+        "Check browser_data_dir and profile_name in references/youtube-auth-refresh.md. "
+        "Sign in to YouTube in that Helium profile and close its window before retrying"
     )
     try:
-        state = json.loads((HELIUM_DATA / "Local State").read_text(encoding="utf-8"))
-        profiles = state["profile"]["info_cache"]
-    except (OSError, ValueError, KeyError, TypeError):
-        raise SessionError(f"Helium was not found. {setup}") from None
-    folders = [
-        folder
-        for folder, info in profiles.items()
-        if isinstance(info, dict) and info.get("name") == HELIUM_PROFILE_NAME
-    ]
-    if len(folders) != 1 or not (HELIUM_DATA / folders[0] / "Cookies").is_file():
-        raise SessionError(
-            f"Helium has no single profile named '{HELIUM_PROFILE_NAME}' with cookies. "
-            f"{setup}"
+        state = json.loads(
+            (config.data_dir / "Local State").read_text(encoding="utf-8")
         )
-    return HELIUM_DATA / folders[0]
+        profiles = state["profile"]["info_cache"]
+        if not isinstance(profiles, dict):
+            raise TypeError
+    except (OSError, ValueError, KeyError, TypeError):
+        raise SessionError(
+            f"Helium profile metadata could not be read. {setup}"
+        ) from None
+    folders = [
+        config.data_dir / folder
+        for folder, info in profiles.items()
+        if isinstance(info, dict) and info.get("name") == config.profile_name
+    ]
+    if len(folders) != 1 or not any(
+        (folders[0] / relative).is_file() for relative in ("Cookies", "Network/Cookies")
+    ):
+        raise SessionError(
+            f"Helium has no single configured profile with a cookies database. {setup}"
+        )
+    return folders[0]
 
 
-def _helium_cookie_key() -> bytes:
+def _helium_cookie_key(config: HeliumConfig) -> bytes:
     """Read Helium's cookie key; macOS asks once, then 'Always Allow' remembers."""
     try:
         result = subprocess.run(
@@ -195,9 +266,9 @@ def _helium_cookie_key() -> bytes:
                 "find-generic-password",
                 "-w",
                 "-s",
-                HELIUM_KEYCHAIN_SERVICE,
+                config.keychain_service,
                 "-a",
-                HELIUM_KEYCHAIN_ACCOUNT,
+                config.keychain_account,
             ],
             capture_output=True,
             timeout=120,
@@ -217,8 +288,9 @@ def _export_helium(path: Path) -> None:
     """Export only YouTube domains; retain all browser diagnostics in memory."""
     if sys.platform != "darwin":
         raise SessionError(f"Helium session renewal requires macOS. {REFRESH_HINT}")
-    profile = helium_profile()
-    key = _helium_cookie_key()
+    config = _helium_config()
+    profile = helium_profile(config)
+    key = _helium_cookie_key(config)
     from yt_dlp import cookies, version
 
     original = getattr(cookies, "_get_mac_keyring_password", None)

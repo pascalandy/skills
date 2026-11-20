@@ -23,7 +23,7 @@ alias ttr := transcript
 transcript url *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py run youtube --url "$@"
 
-# Export Helium's CLI-profile YouTube session into a dotfiles worktree's fnox vault (source Mac)
+# Export YouTube cookies from the configured Helium profile to a dotfiles worktree's fnox vault
 [group('commands')]
 [no-exit-message]
 transcript-auth-refresh *args:

@@ -51,12 +51,11 @@ def test_ytdlp_pin_matches_source_export_smoke_check_and_docs() -> None:
         assert source_pin.group(1) in documentation.read_text(encoding="utf-8")
 
 
-def test_docs_explain_the_helium_session_and_user_auth_responsibilities() -> None:
+def test_docs_explain_youtube_auth_sources() -> None:
     required_phrases = (
         "A run never reads a browser",
-        "Helium's `CLI` profile",
-        "YouTube Premium",
         "else anonymous access",
+        "youtube-session.toml",
     )
     for documentation in (SKILL_DIR / "SKILL.md", SKILL_DIR / "README.md"):
         content = documentation.read_text(encoding="utf-8")

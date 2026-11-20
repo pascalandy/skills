@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,11 @@ REAL_FNOX_RUN = session._fnox_run
 
 URL = "https://www.youtube.com/watch?v=EIEc43CxIvY"
 VALUE = "synthetic-session-must-not-appear-in-diagnostics"
+
+
+@pytest.fixture(autouse=True)
+def isolated_session_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
 
 
 def write_cookies(path: Path, value: str = VALUE) -> None:
@@ -408,7 +414,10 @@ def make_dotfiles(tmp_path: Path, name: str = "dotfiles-worktree") -> Path:
     """A linked worktree of that clone, the only folder a refresh may write."""
     clone = make_clone(tmp_path)
     root = tmp_path / name
-    git(clone, "worktree", "add", "-q", "-b", "refresh", str(root))
+    git(clone, "worktree", "add", "-q", "--no-checkout", "-b", "refresh", str(root))
+    store = root / session.VAULT_SOURCE
+    store.parent.mkdir(parents=True)
+    shutil.copyfile(clone / session.VAULT_SOURCE, store)
     return root
 
 
@@ -540,68 +549,74 @@ def test_refresh_leaves_no_ssh_or_target_file_options() -> None:
     assert not hasattr(session, "targets_file") and not hasattr(session, "session_file")
 
 
-def write_helium(root: Path, profiles: dict[str, str]) -> None:
-    """A Helium data folder whose profiles map folder -> display name."""
+@pytest.mark.parametrize(
+    "config_text,expected",
+    [
+        (None, "YouTube session configuration is missing"),
+        ("profile_name = [", "could not be read as TOML"),
+        ('browser_data_dir = "/synthetic/browser"\n', "Set profile_name"),
+    ],
+)
+def test_refresh_reports_unusable_config_before_browser_access(
+    tmp_path, monkeypatch, capsys, config_text, expected
+) -> None:
+    root = make_dotfiles(tmp_path)
+    path = tmp_path / "config/transcript/youtube-session.toml"
+    if config_text is not None:
+        path.parent.mkdir(parents=True)
+        path.write_text(config_text, encoding="utf-8")
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(
+        session, "helium_profile", lambda *_a: pytest.fail("profile read")
+    )
+    fnox = use_vault(monkeypatch, FakeFnox(stored=None))
+
+    code = transcript.main(["auth", "refresh", "--dotfiles-worktree", str(root)])
+
+    output = capsys.readouterr()
+    assert code == 1 and output.out == "" and fnox.calls == []
+    answer = json.loads(output.err.splitlines()[-1])
+    assert answer["ok"] is False
+    assert expected in answer["errors"][0] and str(path) in answer["errors"][0]
+
+
+def write_helium(
+    root: Path, profiles: dict[str, str], database: str = "Cookies"
+) -> None:
+    """A synthetic Helium data directory with folder and display names."""
     root.mkdir(parents=True, exist_ok=True)
     for folder in profiles:
-        (root / folder).mkdir()
-        (root / folder / "Cookies").write_bytes(b"sqlite")
+        path = root / folder / database
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"sqlite")
     info_cache = {folder: {"name": name} for folder, name in profiles.items()}
     (root / "Local State").write_text(
         json.dumps({"profile": {"info_cache": info_cache}}), encoding="utf-8"
     )
 
 
-def test_helium_profile_is_found_by_its_display_name(tmp_path, monkeypatch) -> None:
-    root = tmp_path / "helium"
-    write_helium(root, {"Default": "Your Helium", "Profile 3": "CLI"})
-    monkeypatch.setattr(session, "HELIUM_DATA", root)
-
-    assert session.helium_profile() == root / "Profile 3"
-
-
 @pytest.mark.parametrize(
     "profiles",
-    [None, {"Default": "Your Helium"}, {"Profile 1": "CLI", "Profile 2": "CLI"}],
+    [
+        None,
+        {"Default": "Other profile"},
+        {"Profile 1": "Automation fixture", "Profile 2": "Automation fixture"},
+    ],
 )
-def test_missing_helium_profile_explains_the_one_time_setup(
-    tmp_path, monkeypatch, profiles
+def test_missing_or_ambiguous_helium_profile_names_the_settings(
+    tmp_path, profiles
 ) -> None:
-    root = tmp_path / "helium"
+    root = tmp_path / "browser"
     if profiles is not None:
         write_helium(root, profiles)
-    monkeypatch.setattr(session, "HELIUM_DATA", root)
+    config = session.HeliumConfig(root, "Automation fixture", "service", "account")
 
-    with pytest.raises(
-        session.SessionError, match="Create a Helium profile named 'CLI'"
-    ):
-        session.helium_profile()
+    with pytest.raises(session.SessionError, match="browser_data_dir and profile_name"):
+        session.helium_profile(config)
 
 
-def test_helium_key_comes_from_its_own_keychain_entry(monkeypatch) -> None:
-    calls = []
-
-    def security(command, **_kwargs):
-        calls.append(command)
-        return subprocess.CompletedProcess(command, 0, b"secret-key\n", b"")
-
-    monkeypatch.setattr(session.subprocess, "run", security)
-
-    assert session._helium_cookie_key() == b"secret-key"
-    assert calls == [
-        [
-            "security",
-            "find-generic-password",
-            "-w",
-            "-s",
-            "Helium Storage Key",
-            "-a",
-            "Helium",
-        ]
-    ]
-
-
-def test_refused_keychain_access_names_the_desktop_fix(monkeypatch) -> None:
+def test_refused_keychain_access_names_the_desktop_fix(tmp_path, monkeypatch) -> None:
+    config = session.HeliumConfig(tmp_path, "Automation fixture", "service", "account")
     monkeypatch.setattr(
         session.subprocess,
         "run",
@@ -609,21 +624,51 @@ def test_refused_keychain_access_names_the_desktop_fix(monkeypatch) -> None:
     )
 
     with pytest.raises(session.SessionError, match="Always Allow"):
-        session._helium_cookie_key()
+        session._helium_cookie_key(config)
 
 
-def test_export_keeps_youtube_cookies_only_and_restores_ytdlp(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize("database", ["Cookies", "Network/Cookies"])
+def test_refresh_with_local_settings_exports_only_youtube_and_restores_ytdlp(
+    tmp_path, monkeypatch, capsys, database
 ) -> None:
     from http.cookiejar import Cookie
 
     from yt_dlp import cookies
 
-    profile = tmp_path / "Profile 3"
+    root = make_dotfiles(tmp_path)
+    browser_root = tmp_path / "browser data"
+    write_helium(
+        browser_root,
+        {"Default": "Other profile", "Profile 3": "Automation fixture"},
+        database,
+    )
+    config = tmp_path / "config/transcript/youtube-session.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        f"browser_data_dir = {json.dumps(str(browser_root))}\n"
+        'profile_name = "Automation fixture"\n'
+        'keychain_service = "Fixture Safe Storage"\n'
+        'keychain_account = "fixture-account"\n'
+        'user_agent = "SyntheticBrowser/1.0"\n',
+        encoding="utf-8",
+    )
     monkeypatch.setattr(sys, "platform", "darwin")
-    monkeypatch.setattr(session, "helium_profile", lambda: profile)
-    monkeypatch.setattr(session, "_helium_cookie_key", lambda: b"secret-key")
     original = cookies._get_mac_keyring_password
+    fnox = use_vault(monkeypatch, FakeFnox(stored=None))
+
+    def security(command, **_kwargs):
+        assert command == [
+            "security",
+            "find-generic-password",
+            "-w",
+            "-s",
+            "Fixture Safe Storage",
+            "-a",
+            "fixture-account",
+        ]
+        return subprocess.CompletedProcess(command, 0, b"fixture-key\n", b"")
+
+    monkeypatch.setattr(session.subprocess, "run", security)
 
     def cookie(domain: str, name: str) -> Cookie:
         return Cookie(
@@ -646,8 +691,8 @@ def test_export_keeps_youtube_cookies_only_and_restores_ytdlp(
         )
 
     def extract(browser, *, profile):
-        assert browser == "chrome" and profile == str(tmp_path / "Profile 3")
-        assert cookies._get_mac_keyring_password("Chrome", None) == b"secret-key"
+        assert browser == "chrome" and profile == str(browser_root / "Profile 3")
+        assert cookies._get_mac_keyring_password("Chrome", None) == b"fixture-key"
         jar = cookies.YoutubeDLCookieJar()
         for domain, name in [
             (".youtube.com", "SID"),
@@ -659,10 +704,33 @@ def test_export_keeps_youtube_cookies_only_and_restores_ytdlp(
         return jar
 
     monkeypatch.setattr(cookies, "extract_cookies_from_browser", extract)
-    exported = tmp_path / "cookies.txt"
+    client = httpx.Client
 
-    session._export_helium(exported)
+    def respond(request):
+        assert request.headers["User-Agent"] == "SyntheticBrowser/1.0"
+        assert request.headers["Cookie"] == f"SID={VALUE}"
+        return httpx.Response(200, text='ytcfg.set({"LOGGED_IN": true});')
 
-    domains = {item.domain for item in session.load_cookie_jar(exported)}
+    monkeypatch.setattr(
+        session.httpx,
+        "Client",
+        lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(respond)),
+    )
+
+    code = transcript.main(["auth", "refresh", "--dotfiles-worktree", str(root)])
+
+    output = capsys.readouterr()
+    assert code == 0, output.err
+    assert output.err == ""
+    assert json.loads(output.out)["changes"] == [
+        ["update", f"{LABEL} in {root / session.VAULT_SOURCE}"]
+    ]
+    assert VALUE not in output.out
+    assert fnox.stored is not None
+    domains = {
+        line.removeprefix("#HttpOnly_").split("\t", 1)[0]
+        for line in fnox.stored.splitlines()
+        if "\t" in line
+    }
     assert domains == {".youtube.com", "music.youtube.com"}
     assert cookies._get_mac_keyring_password is original
