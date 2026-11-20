@@ -71,7 +71,7 @@ When my instructions come as queued steps (NEXT, THEN, ENSUITE), load each skill
 - Delete with `trash`, and only literal absolute paths that your own thread created or that the user, your brief or a skill you follow told you to delete, once nothing still writes to them. Never run `rm` on a path built from a variable: a variable from an earlier shell call may be unset or empty, and `set -u` stops only the unset case. If you are unsure a path is yours to delete, or `trash` is missing or fails, keep the files and report it. A skill's documented cleanup procedure, such as verify-skills' guarded `rm -r "$RUN"`, still applies to the paths it names
 - Run CI through project commands such as `just`, `lefthook`, `pnpm run typecheck`, and `pnpm run lint` — prefer wrapping checks within a `justfile`
 - Sign off through the project's recipe, such as `just signoff`, which runs the checks before it calls `gh signoff`. A bare `gh signoff` posts a green status without running anything
-- Find the latest screenshot by running: `ls -lt ~/Documents/screenshots | head -2` (on my fleet, see mbp)
+- Find the latest screenshot on the machine that captured it. With the fleet skill installed, read `roles.screenshots` in `fleet/references/fleet.toml` to locate that machine. Set `screenshot_dir` to the capture tool's output directory and run `ls -lt "$screenshot_dir"`. On macOS, `defaults read com.apple.screencapture location` shows the custom directory when one is configured
 
 ## Definitions
 
@@ -118,7 +118,7 @@ When you need a decision from me during work, load `$feel-me` and use only its q
 - Fix CI failures, distinguishing real failures from known infrastructure flakes
 - If nothing is new, stay quiet, do not post filler comments
 - Stop monitoring when review bots are green on the latest commit
-- Use `pascalandy@users.noreply.github.com` as the author and committer email so GitHub accepts the push
+- Use the account's GitHub noreply address as both the author and committer email for GitHub pushes. Read the configured address with `git config --get user.email` in the repository. If the address needs configuring, use the noreply address from the account's GitHub email settings. Check both effective identities before pushing with `git var GIT_AUTHOR_IDENT` and `git var GIT_COMMITTER_IDENT`
 
 ## Signature
 
