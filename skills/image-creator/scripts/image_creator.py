@@ -440,7 +440,12 @@ def resolve_model_alias(name: str) -> str:
             f"the fleet resolver {resolver} is missing; install the fleet skill"
             f" or unset {FLEET_REGISTRY_ENV}"
         )
-    command = ["uv", "run", "--script", str(resolver)]
+    interpreter = (
+        ["uv", "run", "--script"]
+        if sys.version_info < (3, 11)
+        else [sys.executable, "-I"]
+    )
+    command = [*interpreter, str(resolver)]
     command += ["--registry", registry] if registry else []
     try:
         done = subprocess.run(
