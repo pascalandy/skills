@@ -53,10 +53,15 @@ class TestHelp:
         "long_home", [False, True], ids=["normal-home", "long-home"]
     )
     def test_help_marks_zoom_summary_as_conditional(self, long_home, tmp_path) -> None:
-        home = tmp_path / ("private-long-home-" * 8) if long_home else Path("/tmp/home")
+        home = tmp_path / ("private-long-home-%-" * 8) if long_home else Path("/tmp/home")
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH), "run", "zoom", "--help"],
-            env={**os.environ, "HOME": str(home)},
+            env={
+                **os.environ,
+                "HOME": str(home),
+                "TRANSCRIPT_ZOOM_RECORDINGS_DIR": "",
+                "TRANSCRIPT_ZOOM_EXPORT_DIR": "",
+            },
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -64,7 +69,7 @@ class TestHelp:
             timeout=30,
         )
         stdout, code = result.stdout, result.returncode
-        expected_path = str(home / "Desktop/Travail/Mandats")
+        expected_path = str(home / "Documents" / "Zoom Transcripts")
 
         assert code == 0
         assert result.stderr == ""
@@ -321,6 +326,63 @@ class TestRunPlan:
         assert plan.model == "claude-opus-5-5"
         assert plan.effort == "xhigh"
         assert plan.preview is False
+
+    @pytest.mark.parametrize("selection", ["latest", "name", "absolute"])
+    def test_zoom_dry_run_uses_local_directories(
+        self, selection: str, tmp_path: Path
+    ) -> None:
+        recordings = tmp_path / "Recordings with spaces"
+        exports = tmp_path / "Zoom exports % complete"
+        meeting = (tmp_path if selection == "absolute" else recordings) / "Meeting"
+        meeting.mkdir(parents=True)
+        audio = meeting / "audio.m4a"
+        audio.touch()
+        selector = {
+            "latest": ["--latest"],
+            "name": ["--path", meeting.name],
+            "absolute": ["--path", str(meeting)],
+        }[selection]
+        output_dir = exports
+        if selection == "absolute":
+            output_dir = tmp_path / "Explicit output"
+            selector += ["--output-dir", str(output_dir)]
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_PATH),
+                "run",
+                "zoom",
+                *selector,
+                "--no-summary",
+                "--dry-run",
+            ],
+            env={
+                **os.environ,
+                "HOME": str(tmp_path),
+                "TRANSCRIPT_ZOOM_RECORDINGS_DIR": f"~/{recordings.name}",
+                "TRANSCRIPT_ZOOM_EXPORT_DIR": f"~/{exports.name}",
+            },
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            timeout=30,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert result.stderr == ""
+        plan = json.loads(result.stdout)
+        assert plan["ok"] is True
+        assert plan["source"] == {
+            "kind": "zoom",
+            "selection": "latest" if selection == "latest" else "path",
+            "path": str(meeting),
+            "audio": str(audio),
+        }
+        assert plan["output_dir"] == str(output_dir)
+        assert plan["export"] is None
+        assert not output_dir.exists()
 
     def test_preview_is_opt_in(self) -> None:
         import transcript

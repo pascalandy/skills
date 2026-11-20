@@ -19,7 +19,7 @@ The first time, and whenever `just ttr` reports that YouTube refused the vault s
 - Python 3.12+ and `uv`
 - `ffmpeg` and `ffprobe` on `PATH` for YouTube
 - A supported JavaScript runtime for YouTube. Deno is enabled automatically; `deno --version` confirms it. Follow the [yt-dlp EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS) for installation or a configured alternative
-- Zoom recordings under `~/Documents/Zoom` for Zoom mode
+- Local Zoom recordings for Zoom mode. See [Zoom directories](#zoom-directories)
 - When summary generation is enabled, `claude` (Claude Code) on `PATH` and signed in for the default `opus` profile and the `sonnet` test profile, or `pi` for the `astra`, `sol`, and `glm` profiles
 - `glow` for optional Markdown preview; Rich is the fallback renderer
 - `fnox` with `DEEPGRAM_TRANSCRIPT_API_KEY` in the fnox store, or that variable in the environment
@@ -61,8 +61,6 @@ The `claude` provider runs `claude --print` with no tools, MCP servers, hooks, s
 
 A YouTube run rejects an invalid URL before reading credentials, starting network work, or creating an output directory.
 
-For Zoom, `--path` accepts a folder name under `~/Documents/Zoom` or a full folder path. It rejects an audio-file path. The CLI resolves the folder and verifies that it contains an `.m4a` file before reading credentials or creating output.
-
 For local audio, `run file --path` accepts a non-empty file, including paths with spaces and accents. It resolves the absolute path before reading credentials or creating output. Deepgram receives the source bytes through the existing chunked upload. The source stays intact after success or failure. M4A uses `audio/mp4`.
 
 ```bash
@@ -70,6 +68,17 @@ uv run <skill_dir>/scripts/transcript.py run file --path "Entrevue à Montréal.
 ```
 
 Finder and preview are opt-in. A normal run has no GUI side effect and does not render the generated Markdown.
+
+### Zoom directories
+
+By default, Zoom recordings come from the `Zoom` folder in your home directory's `Documents` folder. Transcript writes Zoom exports to `Zoom Transcripts` in the same `Documents` folder. Set either variable in the environment that launches Transcript to use a different local directory.
+
+```bash
+export TRANSCRIPT_ZOOM_RECORDINGS_DIR="$HOME/Recordings/Meetings"
+export TRANSCRIPT_ZOOM_EXPORT_DIR="$HOME/Transcripts/Meetings"
+```
+
+Use `--latest` to search the recordings directory. A relative `--path` selects a meeting under that directory. An absolute `--path` selects a meeting directly. The CLI checks that the folder contains an `.m4a` file before reading credentials or creating output. An explicit `--output-dir` takes precedence over `TRANSCRIPT_ZOOM_EXPORT_DIR`.
 
 ## Queue several videos
 
@@ -132,7 +141,7 @@ Exit `75` means a temporary failure before any paid request, such as a network e
 
 Pascal reads his transcripts on mbp. With the fleet skill installed, whose `references/fleet.toml` lists the machines, a YouTube or local file run on another machine, such as om1 or the Mini, copies each result folder it saved under `~/Documents/_my_docs/61_transcription_exports_yt` to the same folder on mbp, with `rsync -rt` over SSH. The local copy stays. On mbp itself, without the fleet skill, or with another `--output-dir`, results stay where they are saved. Zoom runs keep their own export folder and are not copied.
 
-The copy runs after the run ends, after a failed run too, so mbp also gets the metadata of a failure; an interrupt skips it. A failed run keeps its own exit code and recovery command, and a failed copy adds its own error with its rsync retry. A successful copy joins the answer as one `changes` entry per folder, such as `["copy","andy16@mbp16.donkey-arcturus.ts.net:Documents/_my_docs/61_transcription_exports_yt/<folder>"]`. A dry run names the destination as `export`, or `null` when results stay local, and `doctor` checks `fleet.toml` and `rsync` without reaching mbp.
+The copy runs after the run ends, including after a failed run, so mbp also gets the failure metadata. An interrupt skips the copy. A failed run keeps its exit code and recovery command. A failed copy adds an error with its rsync retry. A successful copy adds one `changes` entry per folder, such as `["copy","user@host.example:<export-dir>/<folder>"]`. A dry run reports the destination in `export`, or `null` when results stay local. The `doctor` command checks `fleet.toml` and `rsync` locally.
 
 When the run succeeded but mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy. An interrupt during the copy exits `130` or `143` with the saved `files` and the same rsync after `rerun:`.
 
