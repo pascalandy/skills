@@ -23,8 +23,8 @@ why), `batches` (the IDs that can run at the same time, in execution order) and
 Answers in one JSON line: {"ok":true,"file":"...","changes":[["write","..."]]}.
 `changes` is absent when the file is already up to date.
 
-With --hitl, it reads every wave file of a waves folder, writes nothing, and
-answers `waves`: for each wave its `executor`, its `unresolved` items (human
+With --hitl, it reads every wave file of a waves folder, writes nothing, fails
+on an invalid or missing `Executor`, and answers `waves`: for each wave its `executor`, its `unresolved` items (human
 tasks that are not done or dropped, and each `tbd`) and `agent_ready`.
 """
 
@@ -494,13 +494,10 @@ def epic_of(brief_id: str) -> str:
     return brief_id.split("-")[0]
 
 
-def executor_errors(
-    wave_file: Path,
-    text: str,
-    briefs: Mapping[str, dict[str, Any]],
-    before: Mapping[str, set[str]],
+def declaration_errors(
+    wave_file: Path, text: str, briefs: Mapping[str, dict[str, Any]]
 ) -> list[str]:
-    """What is wrong with the `Executor` values of the wave, its epics and its
+    """What is wrong with each `Executor` value of the wave, its epics and its
     tasks. An explicit value always counts; only a file of version 3.0.0 or
     later must give each one."""
     errors: list[str] = []
@@ -540,6 +537,21 @@ def executor_errors(
             errors.append(f"{where} has no `Executor`; add `agent` or `human`")
         elif value is not None and value not in ("agent", "human"):
             errors.append(f"{where} has `Executor: {value}`; write agent or human")
+    return errors
+
+
+def executor_errors(
+    wave_file: Path,
+    text: str,
+    briefs: Mapping[str, dict[str, Any]],
+    before: Mapping[str, set[str]],
+) -> list[str]:
+    """The declaration errors, then, in an active wave, what makes a declared
+    `Executor` disagree with its tasks or a human task wait for agent work."""
+    errors = declaration_errors(wave_file, text, briefs)
+    front = front_matter(text)
+    epics = epics_in(text)
+    wave = front.get("executor")
     if front.get("status") != "active":
         return errors
 
@@ -605,11 +617,13 @@ def hitl(args: argparse.Namespace) -> Mapping[str, Any]:
             "such as plan/waves"
         )
     waves = []
+    errors: list[str] = []
     for path in sorted(folder.glob("*.md")):
         text = path.read_text(encoding="utf-8")
         front = front_matter(text)
         briefs = briefs_in(text)[0]
         epics = epics_in(text)
+        errors += declaration_errors(path, text, briefs)
         unresolved: list[dict[str, str]] = []
         wave = front.get("executor", "unknown")
         if wave == "tbd":
@@ -622,7 +636,7 @@ def hitl(args: argparse.Namespace) -> Mapping[str, Any]:
             state = brief["state"]
             if brief["qa"] or state.startswith("carried"):
                 continue
-            if value == "tbd" or (value == "human" and state not in FINISHED):
+            if value == "human" and state not in FINISHED:
                 unresolved.append({"id": brief_id, "executor": value, "state": state})
         waves.append(
             {
@@ -641,6 +655,8 @@ def hitl(args: argparse.Namespace) -> Mapping[str, Any]:
         )
     if not waves:
         raise UsageError(f"{folder} has no wave file; give the waves folder")
+    if errors:
+        raise ScriptError(*errors)
     return {"waves": waves}
 
 

@@ -59,7 +59,7 @@ The initial task limits are: one module or at most 8 files, approximately 400 ch
 - `human`: the PM or a different person does the work
 - `tbd`: the PM wants the work, but nobody knows how to do it yet
 
-1. A brief has `agent` or `human`. Before a wave becomes `active`, make each `tbd` item of the wave a spike or a human task
+1. A brief has `agent` or `human`, never `tbd`. A `tbd` wave or epic stops the [hand-off](#hand-off-a-wave) of its wave until the planner resolves it, for example with a spike or a human task
 2. A wave or an epic that has a human task is `human`
 3. A human task blocks each task that names it in `blocked_by`. It also blocks its wave: agents start a wave only when each human task of the wave is `done` or `dropped`. Thus, a human task that needs agent work of its wave goes to a later wave
 
@@ -187,7 +187,7 @@ Report one line with only the IDs that you checked, such as `RWP: Pass: RWP_01�
 - [ ] **RWP_02 Task limits** (§Levels): Each task is in the task limits of `01-project.md`
 - [ ] **RWP_03 Brief rules** (§Rules): Each brief obeys the brief rules in [Wave file](references/wave-file.md)
 - [ ] **RWP_04 Epic outcome** (§Levels): For each epic of the active wave, if each task of the epic that is not `dropped`, in all waves, is done, the `Outcome (FMO)` of the epic is true. Each epic of the active wave has `Traces`
-- [ ] **RWP_05 Executor** (§Levels): Each wave file and each epic entry has an `Executor`. No brief has `tbd`. The active wave has no `tbd` item
+- [ ] **RWP_05 Executor** (§Levels): No brief has `tbd`. A wave file with `skill_version` 3.0.0 or later gives the `Executor` of the wave, of each epic entry and of each brief
 - [ ] **RWP_06 Detail by status** (§Statuses): Each wave has the detail of its status. Only the active wave has tasks. One wave is `active`, and at most one wave is `planned`
 - [ ] **RWP_07 IDs** (§IDs): No ID is renumbered or used again. `Next IDs` is current. Each carried task obeys ID rule 5
 - [ ] **RWP_08 Files** (§Files, §Pick the procedure): No wave file is deleted, no graph file is edited by hand, and the business case is unchanged. Each plan file follows its template
@@ -231,7 +231,7 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
 - It answers `{"ok":true,"file":"…"}`, with `changes` when it wrote the graph file
 - It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, two parallel tasks that are `todo` have a common path in `touches`, or an `Executor` breaks a rule of [Levels](#levels). The last line of stderr lists each error with its correction. Correct the wave file and run it again
 - With `--check`, it writes nothing and fails when the graph file does not match the briefs
-- With `--hitl plan/waves`, it writes nothing and answers each wave with its `executor`, its `unresolved` items and `agent_ready`. An unresolved item is a human task that is not `done` or `dropped`, or a `tbd` item. It ignores a `carried→WNN` task, because the receiving wave has its copy
+- With `--hitl plan/waves`, it writes nothing and answers each wave with its `executor`, its `unresolved` items and `agent_ready`. It fails on an `Executor` that the graph check rejects. An unresolved item is a human task that is not `done` or `dropped`, or a `tbd` item. It ignores a `carried→WNN` task, because the receiving wave has its copy
 - A wave file with `skill_version` 3.0.0 or later must give each `Executor`. In an older wave file, the script reports a missing wave or epic `Executor` as `unknown`
 
 ## Procedure B: review a wave
@@ -272,14 +272,14 @@ uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.
    | (d) | The discovery makes a later wave invalid | Drop that wave, or merge it into a different wave |
 
 9. Set the next wave in table order to `active`, and the wave after it to `planned`
-10. Write the new active wave in full: briefs with their graph blocks, QA tasks and carried tasks
-11. Do the [plan checks](#plan-checks)
-12. Write the epics of the new planned wave
+10. Do the [maturity checkpoints](#maturity-checkpoints)
+11. Write the new active wave in full: briefs with their graph blocks, QA tasks and carried tasks
+12. Do the [plan checks](#plan-checks)
+13. Write the epics of the new planned wave
     - Adjust the `proposed` waves in outline only
-13. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
-14. Log one decision for each change to the plan structure
-15. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
-16. Do the [maturity checkpoints](#maturity-checkpoints)
+14. Add `## Changes since original plan` to each wave that changed: the change, the reason and the decision ID
+15. Log one decision for each change to the plan structure
+16. Set the task limits and the QA limits again from the PR sizes and the rejection rate of the closed wave
 17. Update the wave table and `Next IDs` in `01-project.md`
 18. **Checkpoint:** show the PM the QA verdicts, the open findings, the criteria that are not met, the verdicts of step 7 and the changes to the plan structure. Continue only when the PM approves
 19. Sync the plan to GitHub. Close each epic issue that meets the epic closure rule, and do the actions of step 7
@@ -388,13 +388,13 @@ Do these checkpoints in Procedure A and at each wave review. A checkpoint whose 
   - `just check` is the one CI command. `just signoff` refuses a dirty tree, runs `just check` on the pushed HEAD, and posts a green status with `gh signoff`
   - Each pre-commit hook calls a `just` recipe. Each recipe is one line. The logic is in scripts
   - Each agent task after the CI baseline is `blocked_by` it. Its `Verify` is `just check`, with task-specific proof when necessary. The CI baseline task and the human tasks use task-specific proof
-- **CI mature** (when `just check` is slow, or the project has more than one contributor or makes releases): `just check` selects its checks from the changed files, and `--only NAME` runs one check. `just merge` merges a PR only when its head has a green signoff. Add a GitHub Actions runner only for a mature private repository with more than one contributor or with releases
-- **Verification loop** (when the checkout builds and starts with one command, and a user journey can be driven end to end): a chore task runs `create-verification-skill`. Until then, keep a placeholder scope bullet in a `proposed` wave. When a wave changes the feature map, a user journey, the launch or the harness, add a task that runs `maintain-verification-skill`
+- **CI mature** (optional: when `just check` is slow, or the project has more than one contributor or makes releases, the PM chooses): `just check` selects its checks from the changed files, and `--only NAME` runs one check. `just merge` squash-merges a PR only at the head SHA that has a green signoff. Add a GitHub Actions runner only for a mature private repository with more than one contributor or with releases
+- **Verification loop** (once, when the checkout builds and starts as-is, and one real user journey can be driven end to end): a chore task runs `create-verification-skill`. Until then, keep a placeholder scope bullet in a `proposed` wave. After that, when a wave changes the feature map, a user journey, the launch or the harness, add a task that runs `maintain-verification-skill`
 - **QA playbook** (always): `plan/qa.md` holds the requirements, the environments and the ordered QA steps, as [Project files](references/project-files.md) says. At each wave review, update it from the QA reports
 
 ## Traps
 
-A trap is work that uses effort but adds no value. When a task has a probable trap, name it in the `Traps` line of the brief. Avoid these planner traps:
+A trap is work inside the deliverable that uses effort but adds no value. When a task has a probable trap, name it in the `Traps` line of the brief. Avoid these planner traps:
 
 - Want: a task that stops when its acceptance items pass. Not: a task that polishes a detail without value
 - Want: a late human task, such as an approval before a deploy, in the next wave. Not: that task in the active wave, where it stops all agents

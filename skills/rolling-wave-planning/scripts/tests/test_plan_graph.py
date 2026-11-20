@@ -357,6 +357,24 @@ class PlanGraph(unittest.TestCase):
             self.fails(task("E04-T01", executor="tbd"), head=legacy),
         )
 
+    def test_hitl_fails_on_an_executor_that_the_graph_check_rejects(self):
+        (self.waves / "W02-x.md").write_text(wave() + task("E04-T01", executor="humna"))
+        (self.waves / "W03-y.md").write_text(
+            wave(executor=None, epic=None, status="planned").replace("W02", "W03")
+        )
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--hitl", str(self.waves)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        errors = " ".join(json.loads(result.stderr.splitlines()[-1])["errors"])
+        self.assertIn("E04-T01 has `Executor: humna`", errors)
+        self.assertIn("W03-y.md:1: the front matter has no `executor`", errors)
+        self.assertIn("E04 has no `- Executor:` line", errors)
+
     def test_hitl_needs_a_folder(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--hitl", str(self.waves / "none.md")],
