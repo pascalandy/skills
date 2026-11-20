@@ -14,7 +14,7 @@
 | [sol-research-prompt.md](sol-research-prompt.md) | Brief given to GPT-6 Sol |
 | [sol-research-report.md](sol-research-report.md) | Sol's report, unedited; its errors and qualifications are listed in verification.md §3 |
 | [astra-test-prompt.md](astra-test-prompt.md) | The 12-test plan given to GPT-6 Astra |
-| [astra-test-results.md](astra-test-results.md) | Astra's results, unedited; its `/tmp` and `/home/pascal` links pointed to working files that were not preserved |
+| [astra-test-results.md](astra-test-results.md) | Astra's results with local paths normalized. The working files were not preserved |
 | [verification.md](verification.md) | Documentation cross-check, errors found, token formula, independent image re-check, Codex plan probes, CLI live runs |
 
 ## Findings as of 2026-09-28

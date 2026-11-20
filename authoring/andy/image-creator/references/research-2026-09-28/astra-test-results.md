@@ -1,4 +1,4 @@
-> Frozen research record, 2026-09-28. The results GPT-6 Astra (medium reasoning) wrote after running the plan in [astra-test-prompt.md](astra-test-prompt.md), finished 2026-09-28T13:12Z. Everything below the rule is unedited: links to `/tmp` and `/home/pascal` pointed to working files that were not preserved. The tests ran through Codex's built-in image tool, which requests `gpt-image-2` at settings the plan backend fixes (OpenAI's Codex docs say the same), and no output was independently verified as GPT Image 2.5, so they count as prompt-behavior evidence; see [verification.md](verification.md#6-the-codex-plan-path). Index: [README](README.md).
+> Frozen research record, 2026-09-28. The results GPT-6 Astra (medium reasoning) wrote after running the plan in [astra-test-prompt.md](astra-test-prompt.md), finished 2026-09-28T13:12Z. Artifact filenames are relative to the test workspace, whose files were not preserved. The tests ran through Codex's built-in image tool, which requests `gpt-image-2` at settings the plan backend fixes (OpenAI's Codex docs say the same), and no output was independently verified as GPT Image 2.5, so they count as prompt-behavior evidence; see [verification.md](verification.md#6-the-codex-plan-path). Index: [README](README.md).
 
 ---
 
@@ -10,25 +10,25 @@ The tool did not disclose its model, so this run cannot independently confirm th
 
 | Test | Image file | Dimensions | Mode | Bytes | Seconds | Hypothesis verdict | Evidence |
 |---|---|---|---|---:|---:|---|---|
-| T01a | [images/T01a-minimal-lighthouse.png](/tmp/gpt-image-25-tests/images/T01a-minimal-lighthouse.png) | 1145×1374 | RGB | 2,489,755 | 58.050 | PARTIAL | Composition and blue hour obeyed; additional warm accents remain |
-| T01b | [images/T01b-specified-lighthouse.png](/tmp/gpt-image-25-tests/images/T01b-specified-lighthouse.png) | 1145×1374 | RGB | 2,259,270 | 47.795 | PARTIAL | Composition and blue hour obeyed; additional warm accents remain |
-| T02a | [images/T02a-sectioned-teapot.png](/tmp/gpt-image-25-tests/images/T02a-sectioned-teapot.png) | 1254×1254 | RGB | 1,806,174 | 39.236 | PASS | Both formats satisfy 8/8 visual requirements |
-| T02b | [images/T02b-paragraph-teapot.png](/tmp/gpt-image-25-tests/images/T02b-paragraph-teapot.png) | 1254×1254 | RGB | 1,885,920 | 44.936 | PASS | Both formats satisfy 8/8 visual requirements |
-| T03 | [images/T03-bakery-text.png](/tmp/gpt-image-25-tests/images/T03-bakery-text.png) | 1145×1374 | RGB | 1,093,743 | 32.625 | PASS | Both accented strings appear exactly once |
-| T04 | [images/T04-revenue-slide.png](/tmp/gpt-image-25-tests/images/T04-revenue-slide.png) | 1672×941 | RGB | 845,775 | 39.495 | PARTIAL | All chart text and data correct; small-text weakness not demonstrated |
-| T05a | [images/T05a-wide-lavender.png](/tmp/gpt-image-25-tests/images/T05a-wide-lavender.png) | 1672×941 | RGB | 2,582,909 | 23.810 | PASS | Both 1672×941; explicit 4K request not honored |
-| T05b | [images/T05b-4k-lavender.png](/tmp/gpt-image-25-tests/images/T05b-4k-lavender.png) | 1672×941 | RGB | 2,689,653 | 32.928 | PASS | Both 1672×941; explicit 4K request not honored |
-| T06 | [images/T06-transparent-fox.png](/tmp/gpt-image-25-tests/images/T06-transparent-fox.png) | 1145×1374 | RGBA | 969,525 | 44.240 | PARTIAL | Real alpha, but residual pixels and imperfect opacity |
-| T07 | [images/T07-fisherman.png](/tmp/gpt-image-25-tests/images/T07-fisherman.png) | 1536×1024 | RGB | 2,147,322 | 29.999 | PARTIAL | Natural texture and framing; full finger count occluded |
-| T08 | [images/T08-cyclist.png](/tmp/gpt-image-25-tests/images/T08-cyclist.png) | 1370×1148 | RGB | 2,210,500 | 33.036 | PASS | Full body, pedal contact, handlebar grips, forward gaze |
-| T09a | [images/T09a-snow-edit.png](/tmp/gpt-image-25-tests/images/T09a-snow-edit.png) | 1536×1024 | RGB | 2,413,531 | 25.005 | PARTIAL | Identity and framing retained; unrelated details also change |
-| T09b | [images/T09b-blue-net-edit.png](/tmp/gpt-image-25-tests/images/T09b-blue-net-edit.png) | 1536×1024 | RGB | 2,248,360 | 46.059 | PARTIAL | Identity and framing retained; unrelated details also change |
-| T10 | [images/T10-fox-composite.png](/tmp/gpt-image-25-tests/images/T10-fox-composite.png) | 1145×1374 | RGB | 2,209,163 | 28.142 | PARTIAL | Pose and scene retained; fox lighting and proportions differ |
-| T11a | [images/T11a-owl-reference.png](/tmp/gpt-image-25-tests/images/T11a-owl-reference.png) | 1536×1024 | RGB | 2,348,359 | 21.912 | PASS | All defining details and style retained, using viewer-left |
-| T11b | [images/T11b-owl-reading.png](/tmp/gpt-image-25-tests/images/T11b-owl-reading.png) | 1536×1024 | RGB | 3,144,937 | 29.284 | PASS | All defining details and style retained, using viewer-left |
-| T12 | [images/T12-black-mug.png](/tmp/gpt-image-25-tests/images/T12-black-mug.png) | 1370×1148 | RGB | 1,511,802 | 21.270 | PASS | All five exclusions respected |
+| T01a | `images/T01a-minimal-lighthouse.png` | 1145×1374 | RGB | 2,489,755 | 58.050 | PARTIAL | Composition and blue hour obeyed; additional warm accents remain |
+| T01b | `images/T01b-specified-lighthouse.png` | 1145×1374 | RGB | 2,259,270 | 47.795 | PARTIAL | Composition and blue hour obeyed; additional warm accents remain |
+| T02a | `images/T02a-sectioned-teapot.png` | 1254×1254 | RGB | 1,806,174 | 39.236 | PASS | Both formats satisfy 8/8 visual requirements |
+| T02b | `images/T02b-paragraph-teapot.png` | 1254×1254 | RGB | 1,885,920 | 44.936 | PASS | Both formats satisfy 8/8 visual requirements |
+| T03 | `images/T03-bakery-text.png` | 1145×1374 | RGB | 1,093,743 | 32.625 | PASS | Both accented strings appear exactly once |
+| T04 | `images/T04-revenue-slide.png` | 1672×941 | RGB | 845,775 | 39.495 | PARTIAL | All chart text and data correct; small-text weakness not demonstrated |
+| T05a | `images/T05a-wide-lavender.png` | 1672×941 | RGB | 2,582,909 | 23.810 | PASS | Both 1672×941; explicit 4K request not honored |
+| T05b | `images/T05b-4k-lavender.png` | 1672×941 | RGB | 2,689,653 | 32.928 | PASS | Both 1672×941; explicit 4K request not honored |
+| T06 | `images/T06-transparent-fox.png` | 1145×1374 | RGBA | 969,525 | 44.240 | PARTIAL | Real alpha, but residual pixels and imperfect opacity |
+| T07 | `images/T07-fisherman.png` | 1536×1024 | RGB | 2,147,322 | 29.999 | PARTIAL | Natural texture and framing; full finger count occluded |
+| T08 | `images/T08-cyclist.png` | 1370×1148 | RGB | 2,210,500 | 33.036 | PASS | Full body, pedal contact, handlebar grips, forward gaze |
+| T09a | `images/T09a-snow-edit.png` | 1536×1024 | RGB | 2,413,531 | 25.005 | PARTIAL | Identity and framing retained; unrelated details also change |
+| T09b | `images/T09b-blue-net-edit.png` | 1536×1024 | RGB | 2,248,360 | 46.059 | PARTIAL | Identity and framing retained; unrelated details also change |
+| T10 | `images/T10-fox-composite.png` | 1145×1374 | RGB | 2,209,163 | 28.142 | PARTIAL | Pose and scene retained; fox lighting and proportions differ |
+| T11a | `images/T11a-owl-reference.png` | 1536×1024 | RGB | 2,348,359 | 21.912 | PASS | All defining details and style retained, using viewer-left |
+| T11b | `images/T11b-owl-reading.png` | 1536×1024 | RGB | 3,144,937 | 29.284 | PASS | All defining details and style retained, using viewer-left |
+| T12 | `images/T12-black-mug.png` | 1370×1148 | RGB | 1,511,802 | 21.270 | PASS | All five exclusions respected |
 
-Seconds are shell-clock intervals from `date +%s.%N` immediately before and after generation, including tool/orchestration overhead. Exact timestamps are in [records.json](/tmp/gpt-image-25-tests/records.json). File sizes and pixel properties were measured with Pillow, not inferred from the preview.
+Seconds are shell-clock intervals from `date +%s.%N` immediately before and after generation, including tool/orchestration overhead. Exact timestamps are in `records.json`. File sizes and pixel properties were measured with Pillow, not inferred from the preview.
 
 ## Checks and evidence
 
@@ -188,23 +188,23 @@ Every call returned exactly two top-level fields:
 
 No call returned an explicit model, revised prompt, quality, size, background, transparency flag, seed, or error field. These fields were absent, not false or set to "auto". The RGBA result does not imply that a transparency flag was returned.
 
-All source PNGs were under `/home/pascal/.codex/generated_images/01a0e816-876a-7613-a647-a0a6992675dc/`. For each call, the exact `output_hint` and full `image_url` are preserved in its raw JSON linked below. The hint followed this text, with each call's absolute source path substituted:
+The tool saved the source PNGs in a session directory under `~/.codex/generated_images/`. The per-call JSON files held the exact `output_hint` and full `image_url`. This example uses a fictional local path for the saved image.
 
 ```text
-Generated images are saved to /home/pascal/.codex/generated_images/01a0e816-876a-7613-a647-a0a6992675dc as <absolute source PNG path> by default.
+Generated images are saved to ~/.codex/generated_images/12345678-1234-4234-9234-123456789abc as ~/.codex/generated_images/12345678-1234-4234-9234-123456789abc/lighthouse.png by default.
 If you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.
 The generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.
 ```
 
 Observed output sizes were 1145×1374, 1254×1254, 1672×941, 1536×1024, and 1370×1148. All contain approximately 1.573 million pixels. All are RGB except T06, which is RGBA.
 
-[manifest.json](/tmp/gpt-image-25-tests/manifest.json) records exact prompts and reference paths. [records.json](/tmp/gpt-image-25-tests/records.json) records each attempt, source path, timestamps, and returned hint. [measurements.json](/tmp/gpt-image-25-tests/measurements.json) records dimensions, bytes, mode, SHA-256, alpha histogram, and drift scores. All 17 copied files match their returned base64 PNG bytes exactly.
+`manifest.json` records exact prompts and reference paths. `records.json` records each attempt, source path, timestamps, and returned hint. `measurements.json` records dimensions, bytes, mode, SHA-256, alpha histogram, and drift scores. All 17 copied files match their returned base64 PNG bytes exactly.
 
-[measure.py](/tmp/gpt-image-25-tests/measure.py) reproduces measurements and inspection crops. Run `uv --cache-dir .uv-cache run measure.py` from this directory. The initial Pillow command encountered a read-only default uv cache; using the workspace cache resolved it. This was a measurement setup error, not an image-generation failure.
+The run used `uv --cache-dir .uv-cache run measure.py` in the test workspace to reproduce measurements and inspection crops. The initial Pillow command encountered a read-only default uv cache; using the workspace cache resolved it. This was a measurement setup error, not an image-generation failure.
 
 ## Exact prompts, references, and per-call raw responses
 
-T01a. [Full raw response](/tmp/gpt-image-25-tests/raw-T01a.json)
+T01a. Raw response in `raw-T01a.json`
 
 References: none
 
@@ -212,7 +212,7 @@ References: none
 A lighthouse.
 ```
 
-T01b. [Full raw response](/tmp/gpt-image-25-tests/raw-T01b.json)
+T01b. Raw response in `raw-T01b.json`
 
 References: none
 
@@ -220,7 +220,7 @@ References: none
 Editorial photograph for a travel magazine cover. A white-and-red striped lighthouse on a granite headland at blue hour, lamp lit. Composition: lighthouse on the right third, empty dark sky in the upper-left third reserved for a masthead. Lighting: cool blue ambient light with the warm lamp as the only warm accent. Palette: navy, slate, one warm amber. Constraints: no people, no boats, no text, no watermark.
 ```
 
-T02a. [Full raw response](/tmp/gpt-image-25-tests/raw-T02a.json)
+T02a. Raw response in `raw-T02a.json`
 
 References: none
 
@@ -232,7 +232,7 @@ Style: real photograph, shallow depth of field.
 Composition: square, teapot centered.
 ```
 
-T02b. [Full raw response](/tmp/gpt-image-25-tests/raw-T02b.json)
+T02b. Raw response in `raw-T02b.json`
 
 References: none
 
@@ -240,7 +240,7 @@ References: none
 A real photograph of a ceramic teapot with a matte sage-green glaze centered on a walnut table in the morning, soft side light from the left, one thin wisp of steam from the spout, a folded linen napkin in the foreground right, shallow depth of field, square composition with the teapot centered.
 ```
 
-T03. [Full raw response](/tmp/gpt-image-25-tests/raw-T03.json)
+T03. Raw response in `raw-T03.json`
 
 References: none
 
@@ -248,7 +248,7 @@ References: none
 Minimal poster for a French-Canadian bakery. Centered headline, exactly once, in a tall serif typeface: "PÂTISSERIE ONDINE". Below it, exactly once, in a small sans-serif: "Montréal · depuis 1987". Cream background, a single line illustration of a croissant above the headline. No other text anywhere.
 ```
 
-T04. [Full raw response](/tmp/gpt-image-25-tests/raw-T04.json)
+T04. Raw response in `raw-T04.json`
 
 References: none
 
@@ -256,7 +256,7 @@ References: none
 A 16:9 presentation slide, flat corporate style, white background. Title at top-left: "Q3 2026 revenue by region". A vertical bar chart with exactly four bars labeled on the x-axis: "North" 42, "South" 31, "East" 27, "West" 18 (values in millions USD, printed above each bar). Y-axis from 0 to 50 with gridlines every 10. Footnote bottom-left in small text: "Source: internal finance report, unaudited." No other text.
 ```
 
-T05a. [Full raw response](/tmp/gpt-image-25-tests/raw-T05a.json)
+T05a. Raw response in `raw-T05a.json`
 
 References: none
 
@@ -264,7 +264,7 @@ References: none
 Wide cinematic 16:9 banner of rolling lavender fields at sunset, no text.
 ```
 
-T05b. [Full raw response](/tmp/gpt-image-25-tests/raw-T05b.json)
+T05b. Raw response in `raw-T05b.json`
 
 References: none
 
@@ -272,7 +272,7 @@ References: none
 Output size exactly 3840x2160 pixels (4K UHD). Rolling lavender fields at sunset, no text.
 ```
 
-T06. [Full raw response](/tmp/gpt-image-25-tests/raw-T06.json)
+T06. Raw response in `raw-T06.json`
 
 References: none
 
@@ -280,7 +280,7 @@ References: none
 Die-cut sticker of a red fox sitting, flat vector illustration with a thick white outline. Transparent background. No shadow, no text.
 ```
 
-T07. [Full raw response](/tmp/gpt-image-25-tests/raw-T07.json)
+T07. Raw response in `raw-T07.json`
 
 References: none
 
@@ -288,7 +288,7 @@ References: none
 Real photograph, candid, not retouched. A middle-aged fisherman mending an orange net on a wooden dock at overcast midday. Framing: medium shot from waist up, eye level, 50mm lens look, subject on the left third, harbor softly out of focus on the right. Visible skin texture, weathered hands, natural color. No text, no watermark.
 ```
 
-T08. [Full raw response](/tmp/gpt-image-25-tests/raw-T08.json)
+T08. Raw response in `raw-T08.json`
 
 References: none
 
@@ -296,38 +296,38 @@ References: none
 Real photograph. A young woman riding a bicycle on a quiet city street, side view. Full body visible, feet included, both feet on the pedals. Both hands naturally gripping the handlebars. She is looking ahead at the road. No text.
 ```
 
-T09a. [Full raw response](/tmp/gpt-image-25-tests/raw-T09a.json)
+T09a. Raw response in `raw-T09a.json`
 
 References in order:
 
-1. `/tmp/gpt-image-25-tests/images/T07-fisherman.png`
+1. `images/T07-fisherman.png`
 
 ```text
 Edit the image: change only the weather to light falling snow with a thin layer of snow on the dock. Keep the man's face, identity, clothing colors, pose, the orange net, framing, camera angle, and lighting direction unchanged. No text.
 ```
 
-T09b. [Full raw response](/tmp/gpt-image-25-tests/raw-T09b.json)
+T09b. Raw response in `raw-T09b.json`
 
 References in order:
 
-1. `/tmp/gpt-image-25-tests/images/T09a-snow-edit.png`
+1. `images/T09a-snow-edit.png`
 
 ```text
 Edit the image: change only the orange net to a blue net. Keep everything else unchanged, including the snow, the man's face and identity, pose, framing, and colors of everything except the net. No text.
 ```
 
-T10. [Full raw response](/tmp/gpt-image-25-tests/raw-T10.json)
+T10. Raw response in `raw-T10.json`
 
 References in order:
 
-1. `/tmp/gpt-image-25-tests/images/T06-transparent-fox.png`
-2. `/tmp/gpt-image-25-tests/images/T01b-specified-lighthouse.png`
+1. `images/T06-transparent-fox.png`
+2. `images/T01b-specified-lighthouse.png`
 
 ```text
 Image 1 is the subject: the red fox sticker character. Image 2 is the scene: the lighthouse headland. Create a new image: the fox from image 1, drawn as a realistic red fox (not a sticker) with the same pose and proportions, sitting on the granite rocks in the lower-left of the scene from image 2. Keep the lighthouse, its position, the blue-hour lighting, and the palette of image 2 unchanged. No text.
 ```
 
-T11a. [Full raw response](/tmp/gpt-image-25-tests/raw-T11a.json)
+T11a. Raw response in `raw-T11a.json`
 
 References: none
 
@@ -335,17 +335,17 @@ References: none
 Character reference sheet, children's book illustration, gouache style, plain off-white background. A small round owl named Pip: mustard-yellow feathers, one teal ear tuft on the left side only, oversized round glasses with red frames, a green knitted scarf with white stripes. Show Pip front view and side view, full body. No text.
 ```
 
-T11b. [Full raw response](/tmp/gpt-image-25-tests/raw-T11b.json)
+T11b. Raw response in `raw-T11b.json`
 
 References in order:
 
-1. `/tmp/gpt-image-25-tests/images/T11a-owl-reference.png`
+1. `images/T11a-owl-reference.png`
 
 ```text
 Same character as the reference: Pip the owl with mustard-yellow feathers, one teal ear tuft on the left side only, red round glasses, green scarf with white stripes. New scene: Pip reading a large open book under a mushroom during light rain, children's book gouache style. No text.
 ```
 
-T12. [Full raw response](/tmp/gpt-image-25-tests/raw-T12.json)
+T12. Raw response in `raw-T12.json`
 
 References: none
 
