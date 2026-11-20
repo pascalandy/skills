@@ -132,9 +132,9 @@ Exit `75` means a temporary failure before any paid request, such as a network e
 
 Pascal reads his transcripts on mbp. With the fleet skill installed, whose `references/fleet.toml` lists the machines, a YouTube or local file run on another machine, such as om1 or the Mini, copies each result folder it saved under `~/Documents/_my_docs/61_transcription_exports_yt` to the same folder on mbp, with `rsync -rt` over SSH. The local copy stays. On mbp itself, without the fleet skill, or with another `--output-dir`, results stay where they are saved. Zoom runs keep their own export folder and are not copied.
 
-The copy runs after the run ends, after a failed run too, so mbp also gets the metadata of a failure; an interrupt skips it. A successful copy joins the answer as one `changes` entry per folder, such as `["copy","andy16@mbp16.donkey-arcturus.ts.net:Documents/_my_docs/61_transcription_exports_yt/<folder>"]`. A dry run names the destination as `export`, or `null` when results stay local, and `doctor` checks `fleet.toml` and `rsync` without reaching mbp.
+The copy runs after the run ends, after a failed run too, so mbp also gets the metadata of a failure; an interrupt skips it. A failed run keeps its own exit code and recovery command, and a failed copy adds its own error with its rsync retry. A successful copy joins the answer as one `changes` entry per folder, such as `["copy","andy16@mbp16.donkey-arcturus.ts.net:Documents/_my_docs/61_transcription_exports_yt/<folder>"]`. A dry run names the destination as `export`, or `null` when results stay local, and `doctor` checks `fleet.toml` and `rsync` without reaching mbp.
 
-When mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy.
+When mbp sleeps or refuses the copy, the command exits `1`, its `files` list the local copy, and its error ends with `retry: rsync -rt <folder> <destination>`. Run that command once mbp is awake; it copies the same folders and bills nothing. Never rerun the transcription for a failed copy. An interrupt during the copy exits `130` or `143` with the saved `files` and the same rsync after `rerun:`.
 
 ## Safety and reruns
 

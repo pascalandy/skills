@@ -1468,6 +1468,10 @@ def export_results(
         reason = "rsync was not found on PATH"
     except subprocess.TimeoutExpired:
         reason = f"rsync timed out after {EXPORT_TIMEOUT}s"
+    except KeyboardInterrupt as stop:
+        # The interrupted run's answer names the rsync that copies the rest
+        stop.__dict__["retry"] = retry
+        raise
     if reason:
         kept = ", ".join(folders)
         raise ExportError(
@@ -2935,7 +2939,8 @@ def _dry_run_plan(
     try:
         export = (
             export_destination()
-            if output_dir.resolve() == OUTPUT_DIR.resolve()
+            if plan.source_kind != "zoom"
+            and output_dir.resolve() == OUTPUT_DIR.resolve()
             else None
         )
     except ExportError as error:
@@ -3966,7 +3971,8 @@ def _dispatch(
     if args.source == "youtube" and args.repeated_urls:
         log.info(f"Skipped {args.repeated_urls} repeated URL(s)")
     run = _run_queue if args.source == "youtube" and args.queued else _run
-    if args.dry_run:
+    if args.dry_run or args.source == "zoom":
+        # Zoom keeps its own export folder
         return run(args, argv, prompts, source_parser)
     return _exported(lambda: run(args, argv, prompts, source_parser), args)
 
@@ -3984,6 +3990,10 @@ def _exported(run: Callable[[], dict], args: argparse.Namespace) -> dict:
             raise
         try:
             changes = export_results(failure.report["files"], reporter)
+        except KeyboardInterrupt as stop:
+            raise _interruption(
+                stop, failure.report["files"], stop.__dict__.get("retry", "")
+            ) from stop
         except ExportError as error:
             failure.args = (*failure.args, error.line)
         else:
@@ -3992,6 +4002,11 @@ def _exported(run: Callable[[], dict], args: argparse.Namespace) -> dict:
         raise
     try:
         changes = export_results(fields["files"], reporter)
+    except KeyboardInterrupt as stop:
+        # The transcript is saved: answer its files and the rsync that copies them
+        raise _interruption(
+            stop, fields["files"], stop.__dict__.get("retry", "")
+        ) from stop
     except ExportError as error:
         raise Failure(
             "export_failed",

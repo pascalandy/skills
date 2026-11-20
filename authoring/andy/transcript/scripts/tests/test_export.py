@@ -201,3 +201,47 @@ def test_a_failed_run_still_copies_the_folder_it_saved(
     assert answer["changes"] == [
         ["copy", f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/{folder.name}"]
     ]
+
+
+def test_an_interrupted_copy_answers_the_saved_files_and_the_rsync(
+    fleet, monkeypatch, capsys
+) -> None:
+    import transcript
+
+    def interrupt(command, **_kwargs):
+        raise transcript.Interrupted(transcript.INTERRUPTED)
+
+    monkeypatch.setattr(transcript, "run_child", interrupt)
+
+    code, answer = run_file(capsys, fleet["audio"])
+
+    folder = Path(answer["files"][0]).parent
+    assert code == transcript.INTERRUPTED
+    assert (folder / "raw_transcript.txt").is_file()
+    assert answer["errors"] == [
+        "interrupted; rerun: "
+        + shlex.join(
+            [
+                "rsync",
+                "-rt",
+                str(folder),
+                f"{MBP}:Documents/_my_docs/61_transcription_exports_yt/",
+            ]
+        )
+    ]
+
+
+def test_zoom_stays_local_even_in_the_default_parent(fleet, tmp_path, capsys) -> None:
+    import transcript
+
+    meeting = tmp_path / "2026-05-03 14.46.55 Réunion Zoom de Camille Exemple"
+    meeting.mkdir()
+    (meeting / "audio1.m4a").write_bytes(b"audio" * 100)
+    zoom = ["run", "zoom", "--path", str(meeting), "--no-summary"]
+    zoom += ["--output-dir", str(transcript.OUTPUT_DIR)]
+
+    assert transcript.main([*zoom, "--dry-run"]) == 0
+    assert json.loads(capsys.readouterr().out)["export"] is None
+    assert transcript.main(zoom) == 0
+    assert "changes" not in json.loads(capsys.readouterr().out)
+    assert fleet["commands"] == []
