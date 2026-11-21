@@ -27,7 +27,7 @@ Use the time zone the user states for clock times in messages and Details. If th
 
 ## Routes
 
-The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; oem's full-stop default governs gravlax and work outside a route.
+The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; gravlax sets its own delivery mode, full-send by default; oem's full-stop default governs work outside a route.
 
 ### Appetizers
 
@@ -39,6 +39,6 @@ The newest route of a use case is the live one. An older route stays as written:
 | [`dolma`](playbooks/dolma/dolma.md) | | CU1, fourth version: a Head Chef aligns batches, one Cook per batch implements every card in one stack and runs each review pair on it, and each Chef validates, merges and closes its batch |
 | [`escargot`](playbooks/escargot/escargot.md) | | CU1, fifth version: dolma with fewer review passes, checks rerun once per set of fixes, Watchdogs narrowed to failures and stalled Cooks, and advance authorizations at Align |
 | [`falafel`](playbooks/falafel/falafel.md) | | CU1, sixth version: escargot without the Chef; each Cook runs Pascal's solo recipe with loop 1 per PR and loop 2 per stack |
-| [`gravlax`](playbooks/gravlax/gravlax.md) | | CU1, seventh and live version: falafel with merge gates stated by purpose; under full-send the Cook merges alone, under full-stop, the default, it stops at ready PRs; the Head Chef settles a doubt, and only a hard stop reaches Pascal |
+| [`gravlax`](playbooks/gravlax/gravlax.md) | | CU1, seventh and live version: falafel with merge gates stated by purpose; under full-send, the default, the Cook merges alone, under full-stop it stops at ready PRs; the Head Chef settles a doubt, and only a hard stop reaches Pascal |
 
 To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`. falafel and gravlax runs do not replay yet: https://github.com/pascalandy/skills/issues/1172
