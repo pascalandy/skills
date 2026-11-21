@@ -95,7 +95,7 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Cook | Records Head Chef's decision or relays Pascal's answer; only Pascal can Drop |
 | 🧪 QA done | QA agent → Head Chef | Reports the verdict, each scenario's result and each finding's issue URL; releases the batches that wait on the QA item, whatever the findings |
 | 🧪 QA findings | Head Chef → Cook | Sends findings on a delivered batch back to its Cook for a fix; other batches keep running |
-| 🧪 QA fixed | Cook → Head Chef | Reports each finding's outcome and the fix PRs merged; replaces the Cook's batch outcome, which Head Chef already counted |
+| 🧪 QA fixed | Cook → Head Chef | Reports each finding's outcome and the fix PRs merged; is the Cook's final message for the fix; its batch outcome stays counted once |
 | `🙋 <card> : <URL>` | Cook → Head Chef → Pascal | Presents a Pascal-owned card after Head Chef checks it against the Plan |
 | ⏹️ Cut `<card>` | Head Chef → Cook | Removes scope Pascal cut |
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |

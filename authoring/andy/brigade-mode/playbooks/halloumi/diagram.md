@@ -105,7 +105,7 @@ sequenceDiagram
     K->>K: 🧹 Labels, retros, unwatch<br>Delete merged GitHub heads with SHA-bound lease<br>Keep moved tips or branches the project keeps<br>Remove work folder
     K-->>H: Agent: ⛳ Batch delivered, report <-
     K->>K: Settle
-    H->>H: Confirm Cook settled, remove its merged worktree<br>once its QA items reported and fixes ended
+    H->>H: Confirm Cook settled
     H->>H: Count only delivered batches<br>Next batches, retros
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
     opt QA item whose batches are delivered
@@ -115,6 +115,7 @@ sequenceDiagram
         K->>K: 🍳 Fix layers in kept worktree<br>Steps 1 to 6, QA not rerun
         K-->>H: Agent: 🧪 QA fixed <-
     end
+    H->>H: Remove each merged worktree<br>once its QA items reported and fixes ended
     H->>U: Agent: ⛳ x/y batches done, QA links, report <-
     H->>H: Delete Watchdog schedule<br>cancel task, remove work folders<br>Prune worktree records
     H->>H: Settle and unpin
