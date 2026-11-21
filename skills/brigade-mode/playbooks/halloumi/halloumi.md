@@ -9,8 +9,8 @@ description: "Run batches under a Head Chef with no Chef: the Head Chef maps blo
 - **SOP**: a role's procedure in `sop/`
 - **Batch**: one Cook's work in one repository, grouped by plan, e.g. an epic or milestone. One Cook implements all of it
 - **Card**: unit of work within a batch
-- **Blocker**: a reason a card waits for another card: it uses the other card's contract or output, its acceptance needs the other card, both change one file, or the plan orders their groups, e.g. waves or phases, and does not say they are independent
-- **Lot map**: Head Chef's view of the batches at Align: each batch's blockers with their reason, the batches that run in parallel and the critical path
+- **Blocker**: a reason a card waits for another card. Four reasons count: the card uses the other card's contract or output; its acceptance needs the other card; both cards change the same file; the plan orders their groups, e.g. waves or phases, and does not mark them independent
+- **Lot map**: Head Chef's Align view of the batches. It gives each batch's blockers with their reasons, the batches that run in parallel and the critical path
 - **QA item**: a plan item that tests delivered cards without changing code. It opens no PR and has no Cook
 - **Chain**: reviewer or side delegate reports to its Cook, Cook to Head Chef, Head Chef to Pascal
 - **Loop 1**: 🧰 review-loop on one PR, via manic-1 and manic-2 angles
@@ -111,13 +111,13 @@ Delivery mode decides whether a batch merges. A repository's `AGENTS.md` or docs
 
 | Choice | Rule | Decides |
 |---|---|---|
-| Parallel or serial | Run two batches in parallel when no blocker connects their cards, in either direction, and they change no common file, in one repository or several. If in doubt, run them in series. Stay within `max-parallel`. A batch has one Cook, which implements its cards in Plan's order. A card blocked by a card of another batch goes to a later batch, which launches once the blocking batch is delivered | Head Chef |
+| Parallel or serial | Run two batches in parallel when no blocker connects their cards in either direction and the batches change no common file. This rule applies also to two batches of one repository. If in doubt, run them in series. Stay within `max-parallel`. A batch has one Cook, which implements its cards in Plan's order. A card blocked by a card of another batch goes to a later batch, which launches once the blocking batch is delivered | Head Chef |
 | Merge | Apply [Merge gates](#merge-gates) to frozen heads, then follow [cook-closing](sop/cook-closing.md#merge-gate-and-merge) | Cook; Head Chef settles doubts |
 | Release | If repository's `AGENTS.md` or release doc requires a release after a merge, release. Otherwise do not release | Head Chef, at Align |
 | Docs | Put a card's doc change in that card's layer. Open a top docs PR only for docs no card owns | Cook |
 | Another machine, e.g. macOS | Use 🧰 fleet from the machine of the run. For macOS, follow its Roles section for the machine and who runs the check. When the Roles section calls for a handoff, give Pascal the commit and exact check command and collect the result. Use the remote procedures below when the fleet access matrix lets you run the check. Name the machine in the report. Public repository: use fleet's `check_remote.py` receipt for the tested head and exact `--command`. Private repository: record in your Detail host, worktree, folder and tested SHA, plus borrowed checkout's `git worktree list --porcelain` and `git for-each-ref` before adding yours. Create a detached worktree at `HEAD`, fetch with `git fetch --no-tags --no-prune <repository URL> <tested SHA>` inside it, then check out that SHA there; only its `FETCH_HEAD` is written. Before your final report, remove that worktree without `--force`, then your folder under Work folders. Check both paths are gone and borrowed checkout's refs match your record. If either procedure fails, stop, keep what remains and report remaining paths to Head Chef with the reason. Leave borrowed checkouts. Optional check: explain why its absence cannot change the result | Cook |
 | Pascal-owned card ready, e.g. a mockup | Align marks these cards in the Plan. When one is ready, Cook sends `🙋 <card> : <URL>` at once and keeps other work running. Head Chef checks the card against the Plan, then posts the line in same turn or returns the card with each mismatch | Cook sends; Head Chef checks and posts |
-| QA item | Head Chef delegates it once every batch it tests is delivered, under [QA items](sop/head-chef.md#qa-items). A batch whose cards wait on it launches on `🧪 QA done`, whatever the findings. Pascal reads the QA report on his own; nobody waits on him for it. Under full-stop, a QA item waits like a batch that needs merged code | Head Chef |
+| QA item | When every batch that a QA item tests is delivered, Head Chef delegates the QA item under [QA items](sop/head-chef.md#qa-items). A batch whose cards wait on the QA item launches on `🧪 QA done`, whatever the findings. Pascal reads the QA report on his own, so no thread waits on him for it. Under full-stop, a QA item waits like a batch that needs merged code | Head Chef |
 | Work after Close | Reopen the run. Align the addition, rewrite `rules.md`, re-arm the Watchdog, launch a Cook | Head Chef |
 | Anything else with a safe default, e.g. a cost trade-off | If you have the context, decide and log it. Otherwise send it one level up with your default | Lowest role that has the context |
 
@@ -127,7 +127,7 @@ Each gate passes when its purpose holds on frozen heads; its mechanics show how.
 
 | Gate | Purpose | Mechanics |
 |---|---|---|
-| Checks | The code that merges is the code that was tested | Required checks pass on every frozen head. `no checks reported` proves no pass. A check on another machine follows the Another machine row; never skip it because it runs elsewhere. A pass holds when trunk moves after it, unless GitHub reports a conflict or a trunk commit since the head's base touches a file the PR changes or uses a type, function or file it changes; then rebase, run the checks again and record `git diff --stat <base>..origin/<trunk>` in Detail |
+| Checks | The code that merges is the code that was tested | Required checks pass on every frozen head. `no checks reported` proves no pass. A check on another machine follows the Another machine row; never skip it because it runs elsewhere. A pass holds when trunk moves after it. Rebase and run the checks again when GitHub reports a conflict, or when a trunk commit since the head's base touches a file that the PR changes. Do the same when that commit uses a type, function or file that the PR changes. After a rebase, record `git diff --stat <base>..origin/<trunk>` in Detail |
 | Proof | Each acceptance criterion has evidence a reader can check | [Proof](sop/cook-run.md#proof) puts it untruncated in the PR |
 | Review | A reviewer other than the author read every change to shipped behavior | Both loops have APPROVE under [Approval](#approval), no open `blocker` or `should`. Budget end or unresolved dispute is not approval. Fast track passes this gate on its recorded skip |
 | Undo | Everything the batch does can be undone: by a revert, by an edit history, or by a restore the Cook ran once | Reverting its PRs undoes its code. A GitHub edit a card requires, e.g. an issue, label or milestone change, keeps its own edit history. Real data the batch or a job it schedules removes or rewrites has the restore proof Shared rules require; with none, it is a hard stop |
@@ -136,7 +136,7 @@ Each gate passes when its purpose holds on frozen heads; its mechanics show how.
 
 ### Approval
 
-An approval holds until shipped behavior changes. A behavior change goes back through both loops, in parallel: loop 1 on each changed PR, loop 2 on what will merge together; a fix made in answer to a loop 2 finding needs only loop 2's next round. This covers each loop's APPROVE and each `🔀 Merge`. [Loops](sop/cook-run.md#loops) gives each reviewer an immutable base SHA and head SHA.
+An approval holds until shipped behavior changes. A behavior change goes back through both loops, in parallel: loop 1 on each changed PR, loop 2 on what will merge together. A fix for a loop 2 finding needs only the next round of loop 2. This covers each loop's APPROVE and each `🔀 Merge`. [Loops](sop/cook-run.md#loops) gives each reviewer an immutable base SHA and head SHA.
 
 A restack or a change moved between layers keeps approval when top tree is unchanged on the same base. Compare `git rev-parse <approved-top>^{tree} <new-top>^{tree}` and both base SHAs. Record matching base and tree IDs in Detail; approval then covers the new frozen heads. Each new head still needs its required checks. Otherwise compare shipped behavior under the rule above before another merge decision. Stop voids unused approval.
 
@@ -205,9 +205,9 @@ Batch that opens no PR: its Cook does the work, skips the PR part of step 1 and 
 
 ## Shared rules
 
-- Head Chef plans one stack per batch: cards a blocker chains go in one stack; an independent chain goes in that stack or in a separate batch that runs in parallel under Decisions. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
+- Head Chef plans one stack per batch. Cards that blockers link go in one stack. An independent chain of cards goes in that stack, or in a separate batch that runs in parallel under Decisions. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
 - Cook is sole writer in its worktree and owns every restack and the merge
-- Threads that share a machine run its full gate, e.g. `just check` or `just signoff`, one at a time with `flock ~/.cache/brigade-<id4>/gate.lock <command>`, or the machine's lock tool where `flock` is missing. Narrow runs, e.g. one test by name, stay free. A gate that failed under load reruns under the lock, never bypassed
+- Threads on one machine run a repository's full gate, e.g. `just check` or `just signoff`, one at a time with `flock ~/.cache/brigade-<id4>/gate.lock <command>`. Where `flock` is missing, use the machine's lock tool. A narrow run, e.g. one test by name, needs no lock. A gate that failed under load runs again under the lock, never around it
 - Before a reviewer probe patches an installed dependency, the reviewer asks Cook for a package copy. Cook copies it into a separate private scratch directory per reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged
 - While a delegate reads your worktree directly, e.g. a Verify run needing uncommitted changes, keep its files, index and commit unchanged until completion or confirmed cancellation. Reviewers use the isolated checkout in Loops
 - Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from trunk, use the layer whose change made it wrong

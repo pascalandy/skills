@@ -88,7 +88,7 @@ Treat CI failure or conflict as a finding to fix. Judge external review as 🧰 
 On `🧪 QA findings` after your batch is delivered:
 
 1. Show 🍳. Recreate your work folder. In your kept worktree, fetch `origin` and create branch `<branch>-qa<q>` from `origin/HEAD`. Done when the worktree is clean on that branch
-2. Treat each finding as a bug card: run steps 1 to 5 of the Process on it, one layer per finding or per set of related findings, with both loops and Proof. Leave the QA item to Pascal; it does not run again. Done when every finding is fixed and merged, declined with a reason, or reported blocked
+2. Treat each finding as a bug card. Run steps 1 to 5 of the Process on it, with both loops and Proof. Use one layer per finding, or one layer per set of related findings. The QA item does not run again; Pascal reads its report. Done when every finding is fixed and merged, declined with a reason, or reported blocked
 3. Follow [cook-closing Closing](cook-closing.md#closing), then send `🧪 QA fixed` with each finding's outcome instead of `⛳ Batch delivered`. Done when Head Chef received it and your settle returns `settlesWhenTurnEnds: true`
 
 ## Stop
