@@ -30,7 +30,7 @@ Each use case takes one course. Each version of a use case takes the next unused
 
 | Course | Use case | Active | Reserved names |
 |---|---|---|---|
-| appetizers | CU1 | arancini, bisque, carpaccio, dolma, escargot, falafel, gravlax | halloumi, involtini, minestrone, nachos, onigiri, pakora, quiche, rillettes, sashimi, tartare, vichyssoise, wonton, yakitori |
+| appetizers | CU1 | arancini, bisque, carpaccio, dolma, escargot, falafel, gravlax, halloumi | involtini, minestrone, nachos, onigiri, pakora, quiche, rillettes, sashimi, tartare, vichyssoise, wonton, yakitori |
 | mains | Not assigned | None | alfredo, bourguignon, cassoulet, enchilada, fondue, gnocchi, jambalaya, kebab, linguine, moussaka, poutine, quesadilla, ratatouille, souvlaki, teriyaki, udon, vindaloo, wellington, yakisoba |
 | cheeses | Not assigned | None | asiago, brie, burrata, camembert, cheddar, edam, emmental, fontina, gouda, havarti, manchego, mozzarella, oka, parmesan, provolone, raclette, ricotta, roquefort, stilton, taleggio |
 | desserts | Not assigned | None | affogato, baklava, brownie, cannoli, clafoutis, dacquoise, financier, flan, gelato, halva, macaron, madeleine, meringue, nougat, pavlova, profiterole, religieuse, sabayon, tiramisu, vacherin |
