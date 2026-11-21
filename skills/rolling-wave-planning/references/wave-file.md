@@ -10,7 +10,7 @@ id: W02
 project: ACME
 status: active   # proposed | planned | active | done | dropped
 label: wave:W02
-skill_version: "3.0.0"   # the `version` of this skill when the planner created this file
+skill_version: "3.1.0"   # the `version` of this skill when the planner created this file
 executor: agent   # agent | human | tbd
 ---
 
@@ -102,4 +102,4 @@ Each brief ends with one fenced `json` block. The blocks of a wave file are its 
 - **`needs`:** what the executor must have before the work starts, and that the agent file does not give: an installed application, access to a machine, an API key or a test that passes before the change. Each `check` is one command that exits 0 when the need is met. A `check` never prints a secret
 - **`touches`:** the paths that the PR of the task changes or creates, from the repository root. Each entry is one file path, or `dir/**` for all the files below a folder
 - Two tasks are parallel when no `blocked_by` path connects them, in the two directions. Two parallel tasks have no common path in `touches`. If they have one, add the task that must merge first to the `blocked_by` of the other task
-- A batch is a group of IDs in `batches` of the graph file. It is a view of the graph, not a gate, and the wave file does not record it
+- A batch is a group of IDs in `batches` of the graph file. It is a view of the graph, not a gate, and the wave file does not record it. Only the planner and the graph script use it: a brief, an issue, and a message to the PM or to an implementer never name a batch

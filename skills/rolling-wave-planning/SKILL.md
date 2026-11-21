@@ -2,7 +2,7 @@
 name: "rolling-wave-planning"
 description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # Rolling Wave Planning
@@ -143,6 +143,7 @@ plan/
 - When each task of the active wave is finished, dropped, stopped by a `needs-replan` or `0-impediment` label, or blocked by a stopped task or by a QA task, follow **Procedure B**. Do not wait for the QA tasks
 - When a `discovery`, `qa-finding` or `needs-replan` issue is open, follow **Procedure C**
 - To do a QA task, or to check again a finding that has the label `qa-recheck`, follow [QA task](references/qa-task.md)
+- When the PM asks where the plan stands or what agents can implement, write the [status report](#status-report)
 
 Before you write a plan file, read its template:
 
@@ -297,6 +298,51 @@ Do this procedure before agents start a wave.
 5. When the PM closes a human task, or when you resolve a `tbd` item, do this procedure again from step 1
 6. When the wave has `agent_ready: true`, tell the PM that agents can start the wave
 
+## Status report
+
+The status report tells the PM what agents can implement and which decisions the plan waits for.
+
+1. Get the issue states of the active wave, as step 1 of Procedure B says
+2. Run `uv run <this-skill-folder>/scripts/plan_graph.py --hitl plan/waves`
+3. Write the report in the form of the example. Done when each open task of the active wave is in the tree and each 🙋 cites an item of the list
+
+````markdown
+# ACME: implement the plan
+
+Plan: `plan/` on `main` of `acme/app`. The active wave is W02, and it is ready for agents. Each task below has its brief in `plan/waves/W02-user-onboarding.md` and on its issue. The `blocked by` links of each issue give the order.
+
+```
+W02 user-onboarding (active, ready for agents)
+├── E03 Users sign in with a password (#41)
+│   ├── E03-T01 (#56) Session table
+│   ├── E03-T02 (#57) Login endpoint
+│   └── E03-QA1 (#60) QA: Users sign in with a password
+└── E04 A new user gets a welcome email (#52)
+    ├── E04-T01 (#61) Email template
+    └── E04-QA1 (#63) QA: A new user gets a welcome email
+```
+
+## Needs the PM decisions
+
+1. Billing provider: accept or refuse the provider that E05-T02 recommends. W03 cannot start without this answer
+2. Admin console (W05): decide who operates it
+
+```
+W03 billing (planned, no tasks yet) · 🙋 item 1
+├── E05 A user pays for a plan (#70)
+└── E06 A user gets an invoice (#71)
+
+W04 reporting (proposed, outline only)
+W05 admin-console (proposed, `tbd`) · 🙋 item 2
+```
+````
+
+- **First tree:** the active wave, then its epics, then each task and QA task that is not `done` or `dropped`, in ID order. When `agent_ready` is false, write `not ready for agents`
+- **List:** each `unresolved` item of `--hitl`, each open question of `01-project.md` that the PM must answer, and each PM checkpoint to come
+- **Second tree:** each later wave. A `planned` wave shows its epics. A `proposed` wave is one line
+- **🙋:** put it, with its item number, only on the wave, epic or task that waits for that item. A QA task and a `needs` never get it: a `check` that fails gives the label `0-impediment`, and that issue then becomes an item of the list
+- The report contains no task state, no dependency, no batch and no implementation instruction. The issues and the graph file give them
+
 ## Procedure C: triage during a wave
 
 An implementer never adds scope without a report and never edits `plan/`.
@@ -348,6 +394,7 @@ QA is not UAT: see [Actors](#actors).
 - The QA agent is a new session on the QA machine, with no implementation context for the tasks that it tests. It can be the same model
 - A session that wrote or reviewed code for a task must not do the QA of that task
 - The QA report records the independence, because a shared GitHub account cannot prove it
+- A QA brief has no step for a person. If the QA agent cannot continue alone, it stops, comments the cause on the issue and adds the label `0-impediment`
 
 ### Blocking
 
