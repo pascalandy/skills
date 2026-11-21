@@ -110,7 +110,7 @@ When you need a decision from me during work, load `$feel-me` and use only its q
 - Follow the repository's title conventions; use simple titles and Conventional Commits when the project does, for example: `fix(web): new threads no longer spike CPU`
 - Keep descriptions simple: state the problem, then explain the solution
 - Open a regular PR, not a draft, so review bots run
-- Without "full send", every delivery is full stop
+- Without "full send", every delivery is full stop, except in a brigade-mode route that sets its own delivery mode
 - Rebase onto the latest `main` before opening the PR
 - A PR has nothing to monitor when `gh pr checks` reports `no checks reported`, a second `gh pr checks` a minute later still reports it, and no external reviewer, such as a requested reviewer or a review bot, is expected. Make one status pass and report instead, even when asked to babysit or when a tool such as T3 Code's `watch_pull_request` says to monitor. Before your turn ends, remove any active watch on such a PR in this thread with `unwatch_pull_request`
 - When monitoring a PR, check only comments and CI results newer than the last push
