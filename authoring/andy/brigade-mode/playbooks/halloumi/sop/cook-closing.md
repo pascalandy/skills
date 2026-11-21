@@ -9,7 +9,7 @@ Apply [Statuses, Messages and Decisions](../halloumi.md#statuses) at phase entry
 3. Merge stack:
    - Show 🔀. Check your worktree is clean and pushed, and GitHub holds approved heads
    - After restack, run any signoff assigned to merge on each new head, then apply [Approval](../halloumi.md#approval)
-   - Right before the merge command, also after a Hold or a rerun, fetch trunk and apply the trunk rule of the [Checks gate](../halloumi.md#merge-gates)
+   - Right before the merge command, also after a Hold or a rerun, fetch trunk and apply the trunk rule of the [Checks gate](../halloumi.md#merge-gates). After a rebase, return to step 2 with the new heads
    - Use project's merge procedure from your worktree. Single PR, even in a one-layer stack: use its merge command. If that command refuses a PR in a GitHub stack, follow 🧰 gh-stack Land. Stack of two or more PRs: follow 🧰 gh-stack Land through its Done, even when project's procedure covers only a single PR. When project's merge command already deployed, use that result. Otherwise run its required deploy once, from the checkout its procedure specifies
    - Run each merge or deploy command bare, no pipe or redirect, so its permission rule matches. Read each command's whole output: exit 0 can hide a failed deploy
    - Classify deploy from output of the command that ran it. Gates below and step 4 use this one result:
