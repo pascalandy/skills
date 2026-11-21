@@ -1,6 +1,6 @@
 ---
 name: "rolling-wave-planning"
-description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, or syncing plan/ markdown to GitHub issues."
+description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, reporting where the plan stands or what agents can implement, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
 version: "3.1.0"
 ---
@@ -324,7 +324,7 @@ W02 user-onboarding (active, ready for agents)
 
 ## Needs the PM decisions
 
-1. Billing provider: accept or refuse the provider that E05-T02 recommends. W03 cannot start without this answer
+1. Billing provider: choose the provider. W03 cannot start without this answer
 2. Admin console (W05): decide who operates it
 
 ```
@@ -338,9 +338,9 @@ W05 admin-console (proposed, `tbd`) · 🙋 item 2
 ````
 
 - **First tree:** the active wave, then its epics, then each task and QA task that is not `done` or `dropped`, in ID order. When `agent_ready` is false, write `not ready for agents`
-- **List:** each `unresolved` item of `--hitl`, each open question of `01-project.md` that the PM must answer, and each PM checkpoint to come
+- **List:** only what waits for the PM: each `unresolved` item of `--hitl` that the PM must do or decide and whose issue is open, each open question of `01-project.md` that the PM must answer, and each PM checkpoint to come
 - **Second tree:** each later wave. A `planned` wave shows its epics. A `proposed` wave is one line
-- **🙋:** put it, with its item number, only on the wave, epic or task that waits for that item. A QA task and a `needs` never get it: a `check` that fails gives the label `0-impediment`, and that issue then becomes an item of the list
+- **🙋:** put it, with its item number, only on the wave, epic or task that waits for that item. A QA task and a `needs` never get it
 - The report contains no task state, no dependency, no batch and no implementation instruction. The issues and the graph file give them
 
 ## Procedure C: triage during a wave
@@ -394,7 +394,7 @@ QA is not UAT: see [Actors](#actors).
 - The QA agent is a new session on the QA machine, with no implementation context for the tasks that it tests. It can be the same model
 - A session that wrote or reviewed code for a task must not do the QA of that task
 - The QA report records the independence, because a shared GitHub account cannot prove it
-- A QA brief has no step for a person. If the QA agent cannot continue alone, it stops, comments the cause on the issue and adds the label `0-impediment`
+- A QA brief has no step for a person
 
 ### Blocking
 
