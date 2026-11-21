@@ -97,7 +97,11 @@ When you need a decision from me during work, load `$feel-me` and use only its q
 ## Visual and Design Work
 
 - Before editing real components for a non-trivial UI, layout, or copy change, use `$html-mode` to create several distinct static mockups and review them in a browser
-- For authorized hosted delivery, use `$html-publish`. Report a review URL only when publication returns a verified one. Otherwise, report the local mockup path and the retry command. For local-only review, report the mockup path. Wait for a selection before implementing
+- When I must look at a page, publish a static copy with `$html-publish` and give me only the verified URL. This publication needs no approval from me
+- Publish the page also when a skill starts its own local server, such as the Impeccable `serve-question` page. I give my choice in the conversation
+- Never give me a `127.0.0.1` or `localhost` link, because I read from a different machine
+- If the publication fails, give me the absolute file path and the retry command. If I ask for a local review only, give me the file path
+- Wait for my selection before you implement
 - Show paths and URLs as absolute so it's easy to copy paste them anywhere (not like this [[url]])
 
 ## Blast Radius
