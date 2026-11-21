@@ -98,9 +98,9 @@ When you need a decision from me during work, load `$feel-me` and use only its q
 
 - Before editing real components for a non-trivial UI, layout, or copy change, use `$html-mode` to create several distinct static mockups and review them in a browser
 - If I ask for a local review only, give me the absolute file path
-- In all other cases, when I must look at a page, publish it with `$html-publish`. This publication needs no approval from me
+- In all other cases, when I must look at a page, publish a standalone HTML version with `$html-publish`. This publication needs no approval from me
 - When `$html-publish` returns a verified URL, give me that URL. Never give me a `127.0.0.1` or `localhost` link, because I read from a different machine
-- For an Impeccable decision, publish a static page with the options and images. Do not start `serve-question`. My reply in the conversation is the decision
+- For an Impeccable decision, create a static page with the options and images. Do not start `serve-question`. My reply in the conversation is the decision
 - If the publication fails, give me the absolute file path and the retry command
 - Wait for my selection before you implement
 - Show paths and URLs as absolute so it's easy to copy paste them anywhere (not like this [[url]])
