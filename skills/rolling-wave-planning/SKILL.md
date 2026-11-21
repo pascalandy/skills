@@ -338,7 +338,7 @@ W05 admin-console (proposed, `tbd`) · 🙋 item 2
 ````
 
 - **First tree:** the active wave, then its epics, then each task and QA task that is not `done` or `dropped`, in ID order. When `agent_ready` is false, write `not ready for agents`
-- **List:** only what waits for the PM: each `unresolved` item of `--hitl` that the PM must do or decide and whose issue is open, each open question of `01-project.md` that the PM must answer, and each PM checkpoint to come
+- **List:** only what waits for the PM: each `unresolved` item of `--hitl` that the PM must do or decide, unless it has an issue and that issue is closed, each open question of `01-project.md` that the PM must answer, and each PM checkpoint to come
 - **Second tree:** each later wave. A `planned` wave shows its epics. A `proposed` wave is one line
 - **🙋:** put it, with its item number, only on the wave, epic or task that waits for that item. A QA task and a `needs` never get it
 - The report contains no task state, no dependency, no batch and no implementation instruction. The issues and the graph file give them
