@@ -21,7 +21,7 @@ sequenceDiagram
     participant K as Cook 1.1
     Note over U,K: CU1. Batches under one Head Chef<br>Step 0: Align
     U->>H: USER: Plan and requirements ->
-    H->>U: Agent: Goal, batches with acceptance criteria,<br>choices from Decisions <-
+    H->>U: Agent: Goal, lot map: batches, blockers, parallel batches,<br>critical path, Cook and reviewer per batch <-
     opt A question the plan leaves open
         H->>U: Agent: 🙋 Plain question, why needed,<br>cost of no and URL <-
         U->>H: USER: Answer ->
@@ -113,7 +113,14 @@ sequenceDiagram
     H->>H: Confirm Cook settled,<br>remove its merged worktree
     H->>H: Count only delivered batches<br>Next batches, retros
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
-    H->>U: Agent: ⛳ x/y batches done, report <-
+    opt QA item whose batches are delivered
+        H->>H: Delegate QA agent, Cook's model,<br>no implementation context
+        H->>H: 🧪 QA done: launch batches that wait on it
+        H->>K: Agent: 🧪 QA findings, issue URLs ->
+        K->>K: 🍳 Fix layers in kept worktree<br>Steps 1 to 6, QA not rerun
+        K-->>H: Agent: 🧪 QA fixed <-
+    end
+    H->>U: Agent: ⛳ x/y batches done, QA links, report <-
     H->>H: Delete Watchdog schedule<br>cancel task, remove work folders<br>Prune worktree records
     H->>H: Settle and unpin
 ```

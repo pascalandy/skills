@@ -1,6 +1,6 @@
 # cook-run
 
-Follow Implement, Docs, loop 2 under Loops and Proof in process order, then [cook-closing](cook-closing.md). Run Fix, Changed scope or Stop when their trigger arrives. Report to Head Chef with `t3_thread_send`. Apply [Statuses, Messages and Decisions](../halloumi.md#statuses) at phase entry and turn end.
+Follow Implement, Docs, loop 2 under Loops and Proof in process order, then [cook-closing](cook-closing.md). Run Fix, Changed scope, QA findings or Stop when their trigger arrives. Report to Head Chef with `t3_thread_send`. Apply [Statuses, Messages and Decisions](../halloumi.md#statuses) at phase entry and turn end.
 
 ## Solo recipe
 
@@ -82,6 +82,14 @@ Treat CI failure or conflict as a finding to fix. Judge external review as 🧰 
 
 - On `⏹️ Cut <card>`, drop the card and report reduced scope. If no cards remain, follow [cook-closing Closing](cook-closing.md#closing), which ends at ⏹️. Done when no cut card remains in the stack
 - On fast track during a run, let an active loop round finish or cancel it, then do Release content and Proof after implementing remaining work. Done when no skipped loop or docs step still runs
+
+## QA findings
+
+On `🧪 QA findings` after your batch is delivered:
+
+1. Show 🍳. Recreate your work folder. In your kept worktree, fetch `origin` and create branch `<branch>-qa<q>` from `origin/HEAD`. Done when the worktree is clean on that branch
+2. Treat each finding as a bug card: run steps 1 to 5 of the Process on it, one layer per finding or per set of related findings, with both loops and Proof. Leave the QA item to Pascal; it does not run again. Done when every finding is fixed and merged, declined with a reason, or reported blocked
+3. Follow [cook-closing Closing](cook-closing.md#closing), then send `🧪 QA fixed` with each finding's outcome instead of `⛳ Batch delivered`. Done when Head Chef received it and your settle returns `settlesWhenTurnEnds: true`
 
 ## Stop
 
