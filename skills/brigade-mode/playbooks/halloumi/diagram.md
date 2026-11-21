@@ -65,12 +65,7 @@ sequenceDiagram
         loop Loop 2 on PR 35–37, until it ends
             K->>K: Isolated review-loop round, base and head SHAs<br>manic-3 and manic-5, other provider
             opt A fix changes shipped behavior
-                K->>K: Fix and push
-                par Changed PRs
-                    K->>K: Loop 1
-                and Combined stack
-                    K->>K: Loop 2
-                end
+                K->>K: Fix and push<br>Loop 2's next round covers it
             end
         end
     end
@@ -110,7 +105,7 @@ sequenceDiagram
     K->>K: 🧹 Labels, retros, unwatch<br>Delete merged GitHub heads with SHA-bound lease<br>Keep moved tips or branches the project keeps<br>Remove work folder
     K-->>H: Agent: ⛳ Batch delivered, report <-
     K->>K: Settle
-    H->>H: Confirm Cook settled,<br>remove its merged worktree
+    H->>H: Confirm Cook settled, remove its merged worktree<br>once its QA items reported and fixes ended
     H->>H: Count only delivered batches<br>Next batches, retros
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
     opt QA item whose batches are delivered

@@ -65,7 +65,7 @@ For `Release: yes`, add repository's required release content, e.g. `CHANGELOG.m
 
 ## Proof
 
-1. Prove every acceptance criterion on current heads with 🧰 full-send Proof. Paste each criterion's evidence untruncated into its PR and read it back, keeping its signature. On each final head, post required owner statuses with repository's bare recipe, e.g. `just signoff`. Take an unresolved requirement, including a failing layer the Plan forbids changing, to Decisions. Done when each criterion's evidence is in its PR and each owner status is posted or its unresolved requirement is with Head Chef
+1. Prove every acceptance criterion on current heads with 🧰 full-send Proof. Paste each criterion's evidence untruncated into its PR and read it back, keeping its signature. On each final head, post required owner statuses with repository's bare recipe under the gate lock in Shared rules, e.g. `just signoff`. Take an unresolved requirement, including a failing layer the Plan forbids changing, to Decisions. Done when each criterion's evidence is in its PR and each owner status is posted or its unresolved requirement is with Head Chef
 2. Babysit every PR with 🧰 babysit-pr, triaging wakes under [Watch findings](#watch-findings). Then follow [cook-closing](cook-closing.md). Done when bots have finished, findings have recorded outcomes, and required checks pass or an unconfirmed check has gone to Head Chef under Decisions
 
 ## Watch findings
@@ -76,7 +76,7 @@ Treat CI failure or conflict as a finding to fix. Judge external review as 🧰 
 
 1. Show 🍳. If `🍽️ Batch ready` was sent, send `Readiness withdrawn`. Apply accepted findings using shared layer ownership. Finding on a PR description: edit that PR without a commit. Run 🧰 2nd-pass, commit fixes in their layers, then restack and push with 🧰 gh-stack. Done when each accepted finding is pushed or its PR edit is verified, or reported blocked to Head Chef
 2. Rerun affected checks once per set of accepted findings: push every fix of the set first, then run checks on stack's top head, which holds every layer. Keep any check the repository requires on each head or at an intermediate step. Run independent checks in parallel worktrees unless repository forbids it. When a fix changes code or another input the repository's Verify runs or reads, e.g. a prompt, output, exit code, assertion, fixture or the command, rerun that Verify at new heads, even when you expect same end states. Rerun it too when you cannot tell. Copy side delegate's title from Roles word for word. A fix outside those inputs, e.g. docs or comments, keeps existing evidence: name in Detail the tested heads and the changes the evidence does not cover. If Docs already ran, refresh any newly stale docs. Done when checks cover the new stack
-3. Apply [Approval](../halloumi.md#approval) to new heads, including after a failed merge or `⏳ Rework`: when it sends a change back, start at once loop 1 on each changed PR and, once loop 2 has started, its next round. Fast track keeps its recorded skip. Then return to Proof. Done when each loop has the coverage or recorded end the merge gate needs
+3. Apply [Approval](../halloumi.md#approval) to new heads, including after a failed merge or `⏳ Rework`: when it sends a change back, start at once the rounds it requires: loop 1 on each changed PR, except for a fix to a loop 2 finding, and, once loop 2 has started, its next round. Fast track keeps its recorded skip. Then return to Proof. Done when each loop has the coverage or recorded end the merge gate needs
 
 ## Changed scope and reporting
 
@@ -89,7 +89,7 @@ On `🧪 QA findings` after your batch is delivered:
 
 1. Show 🍳. Recreate your work folder. In your kept worktree, fetch `origin` and create branch `<branch>-qa<q>` from `origin/HEAD`. Done when the worktree is clean on that branch
 2. Treat each finding as a bug card. Run steps 1 to 5 of the Process on it, with both loops and Proof. Use one layer per finding, or one layer per set of related findings. The QA item does not run again; Pascal reads its report. Done when every finding is fixed and merged, declined with a reason, or reported blocked
-3. Follow [cook-closing Closing](cook-closing.md#closing), then send `🧪 QA fixed` with each finding's outcome instead of `⛳ Batch delivered`. Done when Head Chef received it and your settle returns `settlesWhenTurnEnds: true`
+3. Follow [cook-closing Closing](cook-closing.md#closing) on the fix stack. In its step 4, send `🧪 QA fixed` with each finding's outcome as your only final message, never a second batch outcome. Done when Head Chef received it and your settle returns `settlesWhenTurnEnds: true`
 
 ## Stop
 

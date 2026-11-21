@@ -95,7 +95,7 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Cook | Records Head Chef's decision or relays Pascal's answer; only Pascal can Drop |
 | 🧪 QA done | QA agent → Head Chef | Reports the verdict, each scenario's result and each finding's issue URL; releases the batches that wait on the QA item, whatever the findings |
 | 🧪 QA findings | Head Chef → Cook | Sends findings on a delivered batch back to its Cook for a fix; other batches keep running |
-| 🧪 QA fixed | Cook → Head Chef | Reports each finding's outcome and the fix PRs merged |
+| 🧪 QA fixed | Cook → Head Chef | Reports each finding's outcome and the fix PRs merged; replaces the Cook's batch outcome, which Head Chef already counted |
 | `🙋 <card> : <URL>` | Cook → Head Chef → Pascal | Presents a Pascal-owned card after Head Chef checks it against the Plan |
 | ⏹️ Cut `<card>` | Head Chef → Cook | Removes scope Pascal cut |
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
@@ -205,9 +205,9 @@ Batch that opens no PR: its Cook does the work, skips the PR part of step 1 and 
 
 ## Shared rules
 
-- Head Chef plans one stack per batch. Cards that blockers link go in one stack. An independent chain of cards goes in that stack, or in a separate batch that runs in parallel under Decisions. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
+- Head Chef plans one stack per batch. Cards that blockers link go in one stack, unless a card needs another card's merge, release or QA result: that card goes to a later batch. An independent chain of cards goes in that stack, or in a separate batch that runs in parallel under Decisions. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
 - Cook is sole writer in its worktree and owns every restack and the merge
-- Threads on one machine run a repository's full gate, e.g. `just check` or `just signoff`, one at a time with `flock ~/.cache/brigade-<id4>/gate.lock <command>`. Where `flock` is missing, use the machine's lock tool. A narrow run, e.g. one test by name, needs no lock. A gate that failed under load runs again under the lock, never around it
+- Threads on one machine run a repository's full gate, e.g. `just check` or `just signoff`, one at a time with `flock ~/.cache/brigade-<id4>/gate.lock <command>`. Where `flock` is missing, use the machine's lock tool. A narrow run, e.g. one test by name, needs no lock. A gate that failed under load runs again under the lock, never around it. This lock applies to every full gate a step runs, e.g. a Proof or merge signoff
 - Before a reviewer probe patches an installed dependency, the reviewer asks Cook for a package copy. Cook copies it into a separate private scratch directory per reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged
 - While a delegate reads your worktree directly, e.g. a Verify run needing uncommitted changes, keep its files, index and commit unchanged until completion or confirmed cancellation. Reviewers use the isolated checkout in Loops
 - Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from trunk, use the layer whose change made it wrong
