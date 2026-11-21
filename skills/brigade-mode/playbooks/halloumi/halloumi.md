@@ -1,5 +1,5 @@
 ---
-description: "Run batches under a Head Chef with no Chef: one Cook per batch runs Pascal's solo recipe, one PR per card in one stack, with a review loop on each PR and one on the whole stack, then merges and releases under full-send and closes its batch."
+description: "Run batches under a Head Chef with no Chef: the Head Chef maps blockers and parallel batches at Align, one Cook per batch runs Pascal's solo recipe, one PR per card in one stack, with a review loop on each PR and one on the whole stack, then merges and releases under full-send and closes its batch; QA items test delivered batches and send findings back to their Cook."
 ---
 
 # CU1. Batches under one Head Chef
@@ -9,6 +9,9 @@ description: "Run batches under a Head Chef with no Chef: one Cook per batch run
 - **SOP**: a role's procedure in `sop/`
 - **Batch**: one Cook's work in one repository, grouped by plan, e.g. an epic or milestone. One Cook implements all of it
 - **Card**: unit of work within a batch
+- **Blocker**: a reason a card waits for another card. Four reasons count: the card uses the other card's contract or output; its acceptance needs the other card; both cards change the same file; the plan orders their groups, e.g. waves or phases, and does not mark them independent
+- **Lot map**: Head Chef's Align view of the batches. It gives each batch's blockers with their reasons, the batches that run in parallel and the critical path
+- **QA item**: a plan item that tests delivered cards without changing code. It opens no PR and has no Cook
 - **Chain**: reviewer or side delegate reports to its Cook, Cook to Head Chef, Head Chef to Pascal
 - **Loop 1**: 🧰 review-loop on one PR, via manic-1 and manic-2 angles
 - **Loop 2**: 🧰 review-loop on what will merge together, whole stack or single PR, via manic-3 and manic-5 angles
@@ -25,8 +28,9 @@ description: "Run batches under a Head Chef with no Chef: one Cook per batch run
 | Watchdog | Head Chef's delegate | `🐕 Watchdog · Head Chef <id4>` | none | Ticks in its own thread, wakes failed threads and stalled Cooks, alerts Head Chef when repair is needed |
 | Reviewer | Cook's delegate, one review-loop round | `👀 loop-<n> · Cook <b>.1 <id4>` | none | Reviews one round of loop `<n>` under its brief |
 | Side delegate | Cook's delegate | `🔧 <task> · Cook <b>.1 <id4>` | none | Runs side work the Cook delegates, e.g. repository's Verify |
+| QA agent | Head Chef's delegate, one per QA item | `🧪 QA <q> · Head Chef <id4>` | none | Tests the delivered cards its QA item names, with no implementation context, and files each finding |
 
-`<id4>` = last four characters of first Head Chef's threadId; a Head Chef that takes over the run keeps it. `<b>` numbers batches in launch order. Cook title keeps the `.1` of earlier routes for replay; a replacement keeps it. `<n>` is `1` or `2`. `<task>` names the side work in one word, e.g. `verify`. `<done>` counts delivered batches. Status is the emoji alone. ❓ adds the item label. Words in the Statuses table are a glossary; never put them in a title. Put status before subject, without `·` separators. Progress goes in `📍` lines, never in a title.
+`<id4>` = last four characters of first Head Chef's threadId; a Head Chef that takes over the run keeps it. `<b>` numbers batches in launch order. Cook title keeps the `.1` of earlier routes for replay; a replacement keeps it. `<n>` is `1` or `2`. `<q>` numbers QA items in launch order. `<task>` names the side work in one word, e.g. `verify`. `<done>` counts delivered batches. Status is the emoji alone. ❓ adds the item label. Words in the Statuses table are a glossary; never put them in a title. Put status before subject, without `·` separators. Progress goes in `📍` lines, never in a title.
 
 A title shows computed status. It does not prove a report arrived or an external action finished. Parent's `watch.toml` records received child phases, holds and report receipts. Check T3 for a launched thread's run state and settlement. Check GitHub for PR heads, checks and merges.
 
@@ -59,13 +63,15 @@ Cook, in priority order:
 4. 🍽️ after `🍽️ Batch ready`, while waiting for Head Chef's decision
 5. 🍳 otherwise
 
+A delivered Cook that receives `🧪 QA findings` shows 🍳 until it sends `🧪 QA fixed`, then ⛳ again; its batch stays delivered and Head Chef's count is unchanged.
+
 Batch without PRs: finishing Cook's own work satisfies its checks, merge and merged facts. A full-stop batch is ready when its merge gates' purposes are met on frozen heads, or Head Chef's `🔀 Merge` settled the doubted gate; its PRs stay open and unmerged. A release is done when completed, not required, cut by Pascal or the batch is full-stop.
 
 Head Chef, in priority order:
 
 1. ❓ while Pascal owes an answer to an item in Asking Pascal. A held batch adds an item once no other batch or Head Chef work can progress
 2. 🟢 while doing its own work or answering a Cook
-3. ⏳ while any in-scope batch is unfinished, launched or not
+3. ⏳ while any in-scope batch, QA item or QA fix is unfinished, launched or not
 4. ⛳ when at least one batch was delivered and no Stop came; else ⏹️. A batch Pascal cuts leaves the count
 
 Head Chef counts delivered batches over batches in scope. A cut batch, or one whose cards were all cut, leaves Head Chef's count. A stopped thread keeps the count it had. A replaced thread leaves the tree when archived; its replacement takes the slot. Only `⛳ Batch delivered` increments Head Chef's numerator. `Batch merged` notice does not.
@@ -87,6 +93,9 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | ⏹️ Stop | Pascal → Head Chef → Cook | Closes remaining work after an active merge finishes |
 | ⛳ or ⏹️ `<done>/<batches>` lots livrés | Head Chef → Pascal | Reports final run outcome |
 | ⏳ Rework, 🍽️ Hold, ⏹️ Drop | Head Chef → Cook | Records Head Chef's decision or relays Pascal's answer; only Pascal can Drop |
+| 🧪 QA done | QA agent → Head Chef | Reports the verdict, each scenario's result and each finding's issue URL; releases the batches that wait on the QA item, whatever the findings |
+| 🧪 QA findings | Head Chef → Cook | Sends findings on a delivered batch back to its Cook for a fix; other batches keep running |
+| 🧪 QA fixed | Cook → Head Chef | Reports each finding's outcome and the fix PRs merged; is the Cook's final message for the fix; its batch outcome stays counted once |
 | `🙋 <card> : <URL>` | Cook → Head Chef → Pascal | Presents a Pascal-owned card after Head Chef checks it against the Plan |
 | ⏹️ Cut `<card>` | Head Chef → Cook | Removes scope Pascal cut |
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
@@ -102,12 +111,13 @@ Delivery mode decides whether a batch merges. A repository's `AGENTS.md` or docs
 
 | Choice | Rule | Decides |
 |---|---|---|
-| Parallel or serial | If batches touch disjoint files and have no dependency, run them in parallel. If in doubt, run them in series. Stay within `max-parallel`. Never run two batches of one repository at once. A batch has one Cook, which implements its cards in Plan's order. A card that can start only after another card merges goes to a later batch of same repository | Head Chef |
+| Parallel or serial | Run two batches in parallel when no blocker connects their cards in either direction and the batches change no common file. This rule applies also to two batches of one repository. If in doubt, run them in series. Stay within `max-parallel`. A batch has one Cook, which implements its cards in Plan's order. A card blocked by a card of another batch goes to a later batch, which launches once the blocking batch is delivered | Head Chef |
 | Merge | Apply [Merge gates](#merge-gates) to frozen heads, then follow [cook-closing](sop/cook-closing.md#merge-gate-and-merge) | Cook; Head Chef settles doubts |
 | Release | If repository's `AGENTS.md` or release doc requires a release after a merge, release. Otherwise do not release | Head Chef, at Align |
 | Docs | Put a card's doc change in that card's layer. Open a top docs PR only for docs no card owns | Cook |
 | Another machine, e.g. macOS | Use 🧰 fleet from the machine of the run. For macOS, follow its Roles section for the machine and who runs the check. When the Roles section calls for a handoff, give Pascal the commit and exact check command and collect the result. Use the remote procedures below when the fleet access matrix lets you run the check. Name the machine in the report. Public repository: use fleet's `check_remote.py` receipt for the tested head and exact `--command`. Private repository: record in your Detail host, worktree, folder and tested SHA, plus borrowed checkout's `git worktree list --porcelain` and `git for-each-ref` before adding yours. Create a detached worktree at `HEAD`, fetch with `git fetch --no-tags --no-prune <repository URL> <tested SHA>` inside it, then check out that SHA there; only its `FETCH_HEAD` is written. Before your final report, remove that worktree without `--force`, then your folder under Work folders. Check both paths are gone and borrowed checkout's refs match your record. If either procedure fails, stop, keep what remains and report remaining paths to Head Chef with the reason. Leave borrowed checkouts. Optional check: explain why its absence cannot change the result | Cook |
 | Pascal-owned card ready, e.g. a mockup | Align marks these cards in the Plan. When one is ready, Cook sends `🙋 <card> : <URL>` at once and keeps other work running. Head Chef checks the card against the Plan, then posts the line in same turn or returns the card with each mismatch | Cook sends; Head Chef checks and posts |
+| QA item | When every batch that a QA item tests is delivered, Head Chef delegates the QA item under [QA items](sop/head-chef.md#qa-items). A batch whose cards wait on the QA item launches on `🧪 QA done`, whatever the findings. Pascal reads the QA report on his own, so no thread waits on him for it. Under full-stop, a QA item waits like a batch that needs merged code | Head Chef |
 | Work after Close | Reopen the run. Align the addition, rewrite `rules.md`, re-arm the Watchdog, launch a Cook | Head Chef |
 | Anything else with a safe default, e.g. a cost trade-off | If you have the context, decide and log it. Otherwise send it one level up with your default | Lowest role that has the context |
 
@@ -117,7 +127,7 @@ Each gate passes when its purpose holds on frozen heads; its mechanics show how.
 
 | Gate | Purpose | Mechanics |
 |---|---|---|
-| Checks | The code that merges is the code that was tested | Required checks pass on every frozen head. `no checks reported` proves no pass. A check on another machine follows the Another machine row; never skip it because it runs elsewhere |
+| Checks | The code that merges is the code that was tested | Required checks pass on every frozen head. `no checks reported` proves no pass. A check on another machine follows the Another machine row; never skip it because it runs elsewhere. A pass holds when trunk moves after it. Rebase and run the checks again when GitHub reports a conflict, or when a trunk commit since the head's base touches a file that the PR changes. Do the same when that commit uses a type, function or file that the PR changes. After a rebase, record `git diff --stat <base>..origin/<trunk>` in Detail |
 | Proof | Each acceptance criterion has evidence a reader can check | [Proof](sop/cook-run.md#proof) puts it untruncated in the PR |
 | Review | A reviewer other than the author read every change to shipped behavior | Both loops have APPROVE under [Approval](#approval), no open `blocker` or `should`. Budget end or unresolved dispute is not approval. Fast track passes this gate on its recorded skip |
 | Undo | Everything the batch does can be undone: by a revert, by an edit history, or by a restore the Cook ran once | Reverting its PRs undoes its code. A GitHub edit a card requires, e.g. an issue, label or milestone change, keeps its own edit history. Real data the batch or a job it schedules removes or rewrites has the restore proof Shared rules require; with none, it is a hard stop |
@@ -126,7 +136,7 @@ Each gate passes when its purpose holds on frozen heads; its mechanics show how.
 
 ### Approval
 
-An approval holds until shipped behavior changes. A behavior change goes back through both loops, in parallel: loop 1 on each changed PR, loop 2 on what will merge together. This covers each loop's APPROVE and each `🔀 Merge`. [Loops](sop/cook-run.md#loops) gives each reviewer an immutable base SHA and head SHA.
+An approval holds until shipped behavior changes. A behavior change goes back through both loops, in parallel: loop 1 on each changed PR, loop 2 on what will merge together. A fix for a loop 2 finding needs only the next round of loop 2. This covers each loop's APPROVE and each `🔀 Merge`. [Loops](sop/cook-run.md#loops) gives each reviewer an immutable base SHA and head SHA.
 
 A restack or a change moved between layers keeps approval when top tree is unchanged on the same base. Compare `git rev-parse <approved-top>^{tree} <new-top>^{tree}` and both base SHAs. Record matching base and tree IDs in Detail; approval then covers the new frozen heads. Each new head still needs its required checks. Otherwise compare shipped behavior under the rule above before another merge decision. Stop voids unused approval.
 
@@ -181,7 +191,7 @@ Copy the table and check off your role's steps:
 
 | # | Step | Owner and SOP |
 |---|---|---|
-| 0 | Align and arm Watchdog | Head Chef and Pascal, `head-chef` |
+| 0 | Align with the lot map and arm Watchdog | Head Chef and Pascal, `head-chef` |
 | 1 | For each card in Plan's order: diagnose first for a bug card, implement it on a new stack layer, open its PR, run loop 1 on that PR until it ends; only then start next card | Cook, `cook-run` Implement and Loops |
 | 2 | Docs and required release content; loop 1 on each PR this step opens | Cook, `cook-run` Docs |
 | 3 | Loop 2 on whole stack or single PR | Cook, `cook-run` Loops |
@@ -189,12 +199,15 @@ Copy the table and check off your role's steps:
 | 5 | Merge gate; under full-send, merge and release | Cook, `cook-closing`; Head Chef for `🍽️ Batch ready` |
 | 6 | Closing, remove Cook's worktree, then the Watchdog at run end | Cook and Head Chef, `cook-closing` and `head-chef` |
 
+A QA item runs outside these steps, under Head Chef. A QA fix runs steps 1 to 6 on its own layers, under [QA findings](sop/cook-run.md#qa-findings).
+
 Batch that opens no PR: its Cook does the work, skips the PR part of step 1 and steps 2 to 5, and reports that choice. Fast track skips docs and both loops: Cook implements every card, adds required release content, then goes to step 4.
 
 ## Shared rules
 
-- Head Chef plans one stack per batch, putting independent cards in that stack or separate batches. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
+- Head Chef plans one stack per batch. Cards that blockers link go in one stack, unless a card needs another card's merge, release or QA result: that card goes to a later batch. An independent chain of cards goes in that stack, or in a separate batch that runs in parallel under Decisions. Cook uses 🧰 gh-stack for one PR per card. Assign each PR to `pr-assignee`; 🧰 file-pr writes each description
 - Cook is sole writer in its worktree and owns every restack and the merge
+- Threads on one machine run a repository's full gate, e.g. `just check` or `just signoff`, one at a time with `flock ~/.cache/brigade-<id4>/gate.lock <command>`. Where `flock` is missing, use the machine's lock tool. A narrow run, e.g. one test by name, needs no lock. A gate that failed under load runs again under the lock, never around it. This lock applies to every full gate a step runs, e.g. a Proof or merge signoff
 - Before a reviewer probe patches an installed dependency, the reviewer asks Cook for a package copy. Cook copies it into a separate private scratch directory per reviewer, without hardlinks or symlinks to installed files. Run the probe against that copy; keep installed packages and shared package caches unchanged
 - While a delegate reads your worktree directly, e.g. a Verify run needing uncommitted changes, keep its files, index and commit unchanged until completion or confirmed cancellation. Reviewers use the isolated checkout in Loops
 - Put each fix in the layer whose change added the faulty text, even when a later layer also changed its line; for text from trunk, use the layer whose change made it wrong
@@ -214,13 +227,13 @@ For each enabled role, run 🧰 andy-mode ; retro-skill-usage, then 🧰 andy-mo
 
 ## Work folders
 
-Use `~/.cache/brigade-<id4>/<thread>/` for temp files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `cook-<b>.1`, `watchdog-head-chef` or `<task>-<b>.1-<k>`, where a reviewer's `<task>` is `loop-<n>`. Create both folders before work. Keep a Cook's work folder, briefs included, through `🍽️ Batch ready` and any Fix. Remove it before its final report, after any enabled retros: in Closing, Stop or a cut that leaves no card. Remove a reviewer's or side delegate's work folder before its final report, removing its worktree first without `--force`. Before removal, record any branch T3's worktree isolation created for that delegate. After removing the worktree, delete only that run-created local `t3/` branch without escalating, with `git -C <clone> update-ref -d refs/heads/<branch> <literal nonzero isolation commit from the delegation brief>` only when the brief supplies that SHA; keep and report the branch if SHA is missing or guard fails. After the repository's Verify procedure, incl. its cleanup and quote steps in that procedure's order, and before it removes its worktree or work folder, a side delegate copies the evidence the Cook will quote, e.g. a Verify run folder with its command, tested head and exit code, plus ready-to-paste output of the repository's quote step when it has one, into `<Cook work folder>/evidence/<task>/` and reads the copy back there. Only after any required repository cleanup succeeds and the evidence copy passes readback, remove any separate temp run folders the delegate or its tools created for this run outside its work folder, e.g. a Verify run folder. Keep Cook's evidence copy and shared tool caches unchanged; keep and report any folder the repository forbids deleting. If repository's cleanup, quote, copy, readback or removal fails, stop cleanup, keep all remaining folders and report each remaining path with the failure. Cook reads that evidence there, pastes it untruncated into the PR and reads the PR back before Closing removes its own folder; if paste or readback fails, it keeps the folder and reports it. A path under the cache is not evidence. Delete as 🧰 oem says; remove a worktree with `git -C <clone> worktree remove <literal path>`. A thread removes its own folder and the folders of children it launched once they have stopped, except a folder a child reported keeping; Head Chef also removes the run's root. A folder already gone counts as removed. When a removal fails, keep that folder and its parents, and report its path to your parent, which relays it unchanged up to Head Chef. Recreate folders when resumed.
+Use `~/.cache/brigade-<id4>/<thread>/` for temp files and caches, with `TMPDIR` set to its `tmp/` subfolder. `<thread>` is `head-chef`, `cook-<b>.1`, `watchdog-head-chef`, `qa-<q>` or `<task>-<b>.1-<k>`, where a reviewer's `<task>` is `loop-<n>`. Create both folders before work. Keep a Cook's work folder, briefs included, through `🍽️ Batch ready` and any Fix. Remove it before its final report, after any enabled retros: in Closing, Stop or a cut that leaves no card. Remove a reviewer's or side delegate's work folder before its final report, removing its worktree first without `--force`. Before removal, record any branch T3's worktree isolation created for that delegate. After removing the worktree, delete only that run-created local `t3/` branch without escalating, with `git -C <clone> update-ref -d refs/heads/<branch> <literal nonzero isolation commit from the delegation brief>` only when the brief supplies that SHA; keep and report the branch if SHA is missing or guard fails. After the repository's Verify procedure, incl. its cleanup and quote steps in that procedure's order, and before it removes its worktree or work folder, a side delegate copies the evidence the Cook will quote, e.g. a Verify run folder with its command, tested head and exit code, plus ready-to-paste output of the repository's quote step when it has one, into `<Cook work folder>/evidence/<task>/` and reads the copy back there. Only after any required repository cleanup succeeds and the evidence copy passes readback, remove any separate temp run folders the delegate or its tools created for this run outside its work folder, e.g. a Verify run folder. Keep Cook's evidence copy and shared tool caches unchanged; keep and report any folder the repository forbids deleting. If repository's cleanup, quote, copy, readback or removal fails, stop cleanup, keep all remaining folders and report each remaining path with the failure. Cook reads that evidence there, pastes it untruncated into the PR and reads the PR back before Closing removes its own folder; if paste or readback fails, it keeps the folder and reports it. A path under the cache is not evidence. Delete as 🧰 oem says; remove a worktree with `git -C <clone> worktree remove <literal path>`. A thread removes its own folder and the folders of children it launched once they have stopped, except a folder a child reported keeping; Head Chef also removes the run's root. A folder already gone counts as removed. When a removal fails, keep that folder and its parents, and report its path to your parent, which relays it unchanged up to Head Chef. Recreate folders when resumed.
 
 ## Model selection
 
-Head Chef selects `[cook]`; Cook selects `[loop-1]` or `[loop-2]` from `config.toml` for each reviewer. Head Chef selects `[watchdog]` for its own Watchdog.
+Head Chef selects `[cook]`; Cook selects `[loop-1]` or `[loop-2]` from `config.toml` for each reviewer. Head Chef selects `[watchdog]` for its own Watchdog and `[qa]` for each QA agent.
 
-1. Read your selection with `t3_thread_configure`, without `modelSelection`. For a Cook, choose `head-chef-on-claude` or `head-chef-on-codex` from Head Chef's provider. When Pascal asks for a Codex, Sol or DSF (DeepSeek Flash) Cook, in the invocation, at Align or during the run, choose `on-request-codex` or `on-request-dsf` instead, for the batches Pascal names or every batch, and record it with Align choices; a request during the run applies to Cooks not yet launched. For a reviewer, choose `cook-on-claude`, `cook-on-codex` or `cook-on-pi` from Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise `instance` names a driver: use its enabled provider instance in `orchestrator_capabilities`. Done when provider and model exist
+1. Read your selection with `t3_thread_configure`, without `modelSelection`. For a Cook, choose `head-chef-on-claude` or `head-chef-on-codex` from Head Chef's provider. When Pascal asks for a Codex, Sol or DSF (DeepSeek Flash) Cook, in the invocation, at Align or during the run, choose `on-request-codex` or `on-request-dsf` instead, for the batches Pascal names or every batch, and record it with Align choices; a request during the run applies to Cooks not yet launched. For a QA agent, use the selection of the Cook of the first batch it tests, as `[qa]` says. For a reviewer, choose `cook-on-claude`, `cook-on-codex` or `cook-on-pi` from Cook's provider. `inherit` keeps your instance, model and reasoning level. Otherwise `instance` names a driver: use its enabled provider instance in `orchestrator_capabilities`. Done when provider and model exist
 2. Map `reasoning-level` to Codex `reasoningEffort`, claudeAgent `effort` or Pi `thinking`. Map `service-tier` `standard`/`fast` to Codex `serviceTier` `default`/`priority` or claudeAgent `fastMode` `false`/`true`. Send an option only when the model's catalog entry lists it. Table values override top-level defaults. For Cook side work on Claude, use `[cook].delegate-on-claude` via `delegate_task`, unless repository's procedure selects a model for that work, e.g. its Verify delegate; then follow repository's model selection. A Watchdog uses `watch-on-claude` or `watch-on-codex` from its parent's provider, staying on that provider, not following the reviewer rule. Done when catalog supports each option, every reviewer uses the other provider and every Watchdog uses its parent's provider
 3. Threads inherit runtime and interaction modes at launch; delegates inherit them from the Cook. Keep `runtime-mode = "inherit"` all run, no mode change. Launches use `modelSelection`; delegations use `target`, renaming `instanceId` to `providerInstanceId`. Escalate an unavailable setting via the chain. Done when selection is supported
 
@@ -251,14 +264,16 @@ For Pascal: <🙋 lines, or none>
 
 For `🔀 Batch merging`, replace first line's message. For `⛳ Batch delivered` or `⏹️ Batch stopped`, send outcome, deploy result, Detail threadId and `For Pascal: <items with GitHub URLs, or none>`. Give PR range only for a partial outcome. A ready full-stop batch's `⛳ Batch delivered` adds the `PR`, `Gates` and `Not confirmed` lines above.
 
-Head Chef → Pascal, in Canadian French. At Align, send Align plan below, then any open `🙋` lines. Repeat the `Lot` block per batch in launch order, one line per acceptance criterion; omit an empty line. Align plan has no line limit. For a later ask, send only the `🙋` lines.
+Head Chef → Pascal, in Canadian French. At Align, send Align plan below, then any open `🙋` lines. Repeat the `Lot` block per batch in launch order, one line per acceptance criterion; omit an empty line. The `Lot`, `QA` and `Chemin critique` lines show the lot map. Align plan has no line limit. For a later ask, send only the `🙋` lines.
 
 ```text
 ⚠️ Conflit : <route rule> contre <repository rule> → <decision>, or omit
 Je veux <goal>, pour régler <problem>
 Livraison : <full-send or full-stop>, <fusion quand les gates passent or PR prêtes, jamais fusionnées>
-Lot <b> · <repository> · après <batches, or aucun> · release <oui/non> · cook <Cook model>
+Lot <b> · <repository> · après <batch and blocker reason, or aucun> · en parallèle avec <batches, or aucun> · release <oui/non> · cook <Cook model> · revue <reviewer model>
 - <card> : <acceptance criterion> → <evidence that will prove it>
+QA <q> : teste <batches> · avant <batches that wait on it, or aucun>
+Chemin critique : <batches in order> · <batches running at once>/<max-parallel> au plus
 Pour toi : <Pascal-owned cards>
 🙋 feu vert d'avance lot <b> : <action> pour <why needed> ; sinon <cost of no> · <scope and conditions>
 ```
@@ -272,6 +287,7 @@ Head Chef records overrides, exceptional calls and authorizations in its Detail.
 ```text
 <⛳ or ⏹️> <done>/<batches> lots livrés : <one-line outcome>
 PR <fusionnées under full-send or prêtes under full-stop> : <#<n>–#<n>, or aucune>
+QA : <QA <q> verdict, report URL and fixed findings, per QA item, or aucun>
 Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 

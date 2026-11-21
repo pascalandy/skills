@@ -13,6 +13,9 @@ This glossary is for Pascal designing a brigade.
 | Cook<n> | Owns its worktree and stack. In carpaccio, dolma, escargot, falafel and gravlax, also writes docs, watches PRs, delegates reviews and triages findings. In dolma, escargot, falafel and gravlax, one Cook implements every card of its batch. In falafel, also merges, releases and closes its batch; in gravlax, merges and releases only under full-send, else stops at ready PRs, then closes its batch | COD<n> |
 | Watchdog | A Head Chef's or Chef's hidden delegate, scheduled in its own thread to wake or report stalled and failed work in carpaccio, dolma, escargot, falafel and gravlax; in falafel and gravlax, the Head Chef's only | New |
 | DocWriter<n> | Writes docs in arancini and bisque; not in carpaccio, dolma, escargot, falafel or gravlax | DOC<n> |
+| QA agent | In halloumi, a Head Chef's delegate that tests delivered batches with no implementation context; its findings go back to the batch's Cook | New |
+
+halloumi keeps every role gravlax has above, with the same duties.
 
 ## Barrages
 

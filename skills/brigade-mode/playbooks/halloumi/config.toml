@@ -4,7 +4,7 @@ pr-assignee = "pascalandy" # Cook: assign every PR
 retro-max-issues = 2 # Head Chef and Cook: issue limit per thread per retro
 
 [head-chef]
-max-parallel = 2 # Head Chef: simultaneous Cooks when Decisions allow parallel
+max-parallel = 4 # Head Chef: simultaneous Cooks when Decisions allow parallel
 retro = true # Head Chef: run its closing retros
 
 [cook]
@@ -22,6 +22,9 @@ watch-minutes = 15 # Watchdog: schedule interval
 stall-minutes = 60 # Watchdog: idle threshold for a Cook on 🍳
 max-wakes = 2 # Watchdog: counted wakes before alert
 progress-hours = 8 # Watchdog: long-batch alert interval
+
+[qa]
+selection = "cook" # Head Chef: a QA agent uses the selection of the Cook of the first batch it tests
 
 [loop-1] # Cook: reviewer of loop 1, on each PR; review-loop owns the round budget
 cook-on-claude = { instance = "codex", model = "sol", reasoning-level = "xhigh" }

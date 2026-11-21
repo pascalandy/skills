@@ -21,7 +21,7 @@ sequenceDiagram
     participant K as Cook 1.1
     Note over U,K: CU1. Batches under one Head Chef<br>Step 0: Align
     U->>H: USER: Plan and requirements ->
-    H->>U: Agent: Goal, batches with acceptance criteria,<br>choices from Decisions <-
+    H->>U: Agent: Goal, lot map: batches, blockers, parallel batches,<br>critical path, Cook and reviewer per batch <-
     opt A question the plan leaves open
         H->>U: Agent: 🙋 Plain question, why needed,<br>cost of no and URL <-
         U->>H: USER: Answer ->
@@ -65,12 +65,7 @@ sequenceDiagram
         loop Loop 2 on PR 35–37, until it ends
             K->>K: Isolated review-loop round, base and head SHAs<br>manic-3 and manic-5, other provider
             opt A fix changes shipped behavior
-                K->>K: Fix and push
-                par Changed PRs
-                    K->>K: Loop 1
-                and Combined stack
-                    K->>K: Loop 2
-                end
+                K->>K: Fix and push<br>Loop 2's next round covers it
             end
         end
     end
@@ -110,10 +105,18 @@ sequenceDiagram
     K->>K: 🧹 Labels, retros, unwatch<br>Delete merged GitHub heads with SHA-bound lease<br>Keep moved tips or branches the project keeps<br>Remove work folder
     K-->>H: Agent: ⛳ Batch delivered, report <-
     K->>K: Settle
-    H->>H: Confirm Cook settled,<br>remove its merged worktree
+    H->>H: Confirm Cook settled
     H->>H: Count only delivered batches<br>Next batches, retros
     H->>H: Read GitHub items waiting on Pascal<br>No Stop: apply decisions, Coordinate added work<br>Stop: report follow-up URLs, add no batch
-    H->>U: Agent: ⛳ x/y batches done, report <-
+    opt QA item whose batches are delivered
+        H->>H: Delegate QA agent, Cook's model,<br>no implementation context
+        H->>H: 🧪 QA done: launch batches that wait on it
+        H->>K: Agent: 🧪 QA findings, issue URLs ->
+        K->>K: 🍳 Fix layers in kept worktree<br>Steps 1 to 6, QA not rerun
+        K-->>H: Agent: 🧪 QA fixed <-
+    end
+    H->>H: Remove each merged worktree<br>once its QA items reported and fixes ended
+    H->>U: Agent: ⛳ x/y batches done, QA links, report <-
     H->>H: Delete Watchdog schedule<br>cancel task, remove work folders<br>Prune worktree records
     H->>H: Settle and unpin
 ```
