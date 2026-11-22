@@ -1,6 +1,6 @@
 ---
 name: "right-sized-architecture"
-description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end), assessing whether the modules and layers of an existing codebase are the right size, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices."
+description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end), or when assessing whether the modules, layers, or deployables of an existing app are the right size. Covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app."
 kind: "dev"
 ---
 
@@ -10,14 +10,14 @@ Decide the smallest structure that fits an application, for a new project or an 
 
 Scope: application software for end users, such as SaaS, e-commerce, and consumer or B2B web apps. Systems software, such as an OS, drivers, or performance-critical engines, is out of scope.
 
-This skill decides structure at the scale of the application: modules, levels, and ports. To design types and function signatures before an implementation, use the `architect` skill.
+This skill decides structure at the scale of the application: modules, the layers inside each module, and ports. To design types and function signatures before an implementation, use the `architect` skill.
 
 Write the output in the language of the plan or of the request. Keep pattern names and code identifiers in English.
 
 ## Pick the branch
 
-- **New project**: follow the [Workflow](#workflow). The output is the architecture section of the plan
-- **Existing project**: read [references/existing-project.md](references/existing-project.md) and follow it. The output is a list of findings, without a change plan
+- **New project**, with no code yet: follow the [Workflow](#workflow). The output is the architecture section of the plan
+- **Existing project**, with code: read [references/existing-project.md](references/existing-project.md) and follow it. The output is a list of findings, without a change plan
 
 ## Keep the architecture small
 

@@ -1,72 +1,58 @@
 # Existing project
 
-Compare the current structure of the code with the smallest structure that fits, and report each gap. Leave the code unchanged. The user decides what to do with the findings, so write no change plan.
+Compare the current structure of the code with the structure that the requirements justify, and report each gap. Leave the code unchanged. The user decides what to do with the findings, so write no change plan.
 
 A gap has one of three types:
 
-- **Over**: the code has more structure than its business rules justify
-- **Under**: a named pain shows that the structure is too small
+- **Over**: the code has more structure than a current requirement justifies
+- **Under**: a current problem shows that the structure is too small
 - **Boundary**: a module boundary is in the wrong place
 
 ## Steps
 
 1. Gather the Step 1 inputs of `SKILL.md` from the code, its documents, and the conversation. Add these two inputs:
-   - Current structure: the deployables, the modules or the folders that act as modules, and the external services
-   - Pains that the user or the history names, such as bugs that cluster in one area, tests that are hard to write, or changes that touch many folders
+   - **Current structure**: the deployables, the modules or the folders that act as modules, and the external services
+   - **Problems**: the problems that the user reports, or that the Git history or the issue tracker shows. Examples are recurring bugs, tests that are hard to write, and changes that touch many folders
 
    Done when each input is known or listed as an open question.
-2. Run Steps 2 to 6 of `SKILL.md` on the product as it is today. The result is the right-sized structure.
+2. Run Steps 2 to 6 of `SKILL.md` on the product as it is today, without the limit of 7 modules. The result is the justified structure.
    Done when the done criterion of each of those steps holds.
-3. Record the current state of each module: its level, its ports, its events, and its queues.
-   Done when each module or folder from step 1 has a current level.
-4. Compare the current state with the right-sized structure, and list each gap as a finding. Use the examples below to recognize a gap.
-   Done when each finding has a type, a location, the current state, the right-sized state, and its evidence.
-5. Write the report from the template below. Put the report in the reply, unless the user names another output.
-   Done when each Under finding names a pain from step 1 and the report contains no change plan.
+3. Record the current state of each module: its level, its ports, its events, and its queues. When one module holds two levels, write `mixed` and name the paths. When a folder holds no single business domain, write `none`.
+   Done when each module or folder of the current structure has a level, `mixed`, or `none`.
+4. Compare the current state with the justified structure, and list each gap as a finding. Apply the rules below.
+   Done when each finding has a type, a location, the current state, the justified state, and its evidence.
+5. Write the findings in the format below. Unless the user names another output, put the findings in the reply.
+   Done when each finding follows the rules below and the reply contains no change plan.
 
-## Examples of gaps
+## Rules for a finding
 
-Over:
+- When an item of the current structure meets no current requirement, report an Over finding
+- When the current structure is smaller than the justified structure, look for a problem that the smaller structure causes. If the Problems input shows one, report an Under finding. If it shows none, report no gap
+- A Boundary finding that divides a module needs the same evidence as an Under finding
+
+Examples of an Over finding:
 
 - A level 3 module that holds only reads and writes
-- A port with one adapter and no test that uses the port
+- A port that meets no Step 5 condition
 - An event that no second module consumes
 - A queue for work that the response waits for
 
-Under:
+Examples of an Under finding:
 
-- Business rules in routes, pages, or UI components, in an area where bugs cluster
-- A module that reads the tables of another module, where changes break both modules
+- Business rules in routes, pages, or UI components, in an area where bugs recur
+- A module that reads the tables of another module, where one change breaks both modules
 
-Boundary:
+Examples of a Boundary finding:
 
-- One module that holds two meanings of the same business word
+- One module that holds two meanings of the same business word, where changes for one meaning break the other
 - Two modules that always change together
 
-Report an Under finding only when a pain from step 1 supports it. Without a pain, the smaller structure is correct.
-
-## Report template
-
-Keep every heading. If a heading has no content, write `none` there. The two module rows are examples of the format, so replace them.
+## Format
 
 ```markdown
-## Architecture assessment
+## Architecture findings
 
-### Summary
-<two or three sentences: the structure is right-sized, over, or under, and where>
-
-### Modules
-| Module or folder | Current level | Right-sized level and reason | Gap |
-|---|---|---|---|
-| billing | 1 | 3: proration and refund rules, bugs cluster here | under |
-| settings | 3 | 0: reads and writes only | over |
-
-### Findings
-1. <Over, Under, or Boundary>: <location>. Current: <state>. Right-sized: <state>. Evidence: <pain, file, or business rule>
-
-### Right-sized today
-- <module, port, or decision that needs no change>
-
-### Open questions
-1. <question>
+1. <Over, Under, or Boundary>: <location>. Current: <state>. Justified: <state>. Evidence: <problem, file, or business rule>
 ```
+
+When the comparison finds no gap, write `No gaps found.`
