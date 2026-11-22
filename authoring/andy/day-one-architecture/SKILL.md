@@ -14,7 +14,7 @@ Write the section in the language of the plan. Keep pattern names and code ident
 
 ## Keep the architecture small
 
-This rule applies to every step:
+These rules apply to every step:
 
 - Each module, level above 0, port, event, queue, and building block needs a reason from Step 1
 - When an item has no reason, leave the item out and write `none`
@@ -24,7 +24,7 @@ This rule applies to every step:
 ## Terms
 
 - **Module**: a folder that holds one business domain and exposes one public API
-- **Level**: the number of layers inside a module, from 0 to 3. Step 4 defines each level
+- **Level**: one of the four ways to organize a module, from 0 to 3. Step 4 defines each level
 - **Use case**: a function that runs one business action, such as `subscribe()`
 - **Port**: an interface that a module declares for an external service
 - **Adapter**: the code that implements a port for one vendor
@@ -58,7 +58,7 @@ Architecture progress:
 
 Collect these inputs from the business case and the conversation. Ask the user only for a missing input that blocks a later step.
 
-1. Problem, core value, and main user journeys
+1. Problem, core value, main user journeys, and business rules
 2. Stakeholders: the people who use, pay for, and operate the app, and the team size now and in 12 months
 3. Platform, such as Vercel, Cloudflare, AWS, or Supabase
 4. Language and framework, such as TypeScript and Next.js
@@ -80,7 +80,7 @@ Each axis is an independent decision.
 Depart from a default only for a reason from Step 1. These reasons are examples:
 
 - Several independent teams: more than one deployable
-- Offline, instant, or collaborative use: local-first data with a sync engine
+- Writes that must work offline and synchronize later: local-first data with a sync engine
 - Delivery speed matters more than vendor independence: a backend-as-a-service, such as Supabase, Firebase, or Convex, which replaces most layers
 
 Done when each axis has a choice and a one-line reason.
@@ -92,7 +92,7 @@ Find the module boundaries with bounded contexts from domain-driven design (DDD)
 1. List the nouns and verbs of the business case, and group the words that change together
 2. Put a boundary where a word changes meaning. For example, "customer" in billing and "customer" in support belong to different modules
 3. Keep one module when the user journeys share the same business rules and data. Use at most 7 modules
-4. Label each module **core** (the competitive edge), **supporting** (specific to the product but not differentiating), or **generic** (a vendor solves the problem, such as auth, email, or payments)
+4. Label each module **core** (the competitive edge), **supporting** (specific to the product but not differentiating), or **generic** (a vendor solves the problem, such as auth, email, or payments). A generic problem gets a module only when the product adds business rules to it
 
 Done when each module has a one-sentence responsibility, the data it owns, its public API, and the events it emits or `none`.
 
@@ -103,7 +103,7 @@ Give each module the lowest level that fits its business rules. The label from S
 | Level | Shape | Fits |
 |---|---|---|
 | 0. Thin | A handler in the module reads and writes the database | CRUD, settings, admin screens |
-| 1. Vertical slice | One folder per use case, from input to database | Simple features with few business rules |
+| 1. Vertical slice | One folder per business action, from input to database | Simple features with few business rules |
 | 2. Functional core | Pure business functions, with database and network calls at the edges | Moderate business rules |
 | 3. Full Clean Architecture | `domain/`, `application/` with use cases and ports, `infra/` with adapters | Many long-lived business rules, such as money, permissions, or scheduling |
 
@@ -119,8 +119,8 @@ Done when each module has a level and a reason drawn from its business rules.
 
 The default is no port: the module calls the vendor SDK directly. If an external service meets one of these conditions, define a port and an adapter in the module that uses the service:
 
-- A vendor change is likely during the life of the product, as is common for payments, email, file storage, and LLM providers
-- A business rule of a level 2 or 3 module needs a test without network access
+- Step 1 names a second vendor or a planned vendor change for this service
+- A business rule of a level 2 or 3 module calls the service and needs a test without network access
 - The vendor API is hard to use, and several use cases call it
 
 Keep these framework-coupled concerns outside ports: the auth session, the framework cache, and routing.
@@ -135,8 +135,8 @@ Done when each external service is listed as a port with its adapter, or as a di
 - At levels 2 and 3, send each write through a use case. At levels 0 and 1, the handler writes directly
 - Emit an event only when a second module must react to a change
 - Keep work synchronous when the response depends on its result
-- Use a queue only for work that can finish later and needs background execution or retries, such as email, outbound webhooks, and image processing
-- Make each inbound webhook handler verify the signature and accept a repeated delivery
+- Use a queue only for work that can finish later and needs background execution or retries. Examples are email, outbound webhooks, and image processing
+- Make each inbound webhook handler verify the signature. When a delivery repeats, the handler acknowledges it and does not repeat the action
 
 Done when each event names its emitter and consumers and each queued job names its queue. Write `none` when the plan has no event or no queued job.
 
@@ -162,20 +162,20 @@ Done when each needed block has a service, a module or layer, and the port decis
          infra/              # adapters
          index.ts            # public API of the module
      shared/                 # database client, logger
-     composition.ts          # connects each port to its adapter; only when a port exists
+     composition.ts          # only when a port exists: connects each port to its adapter
    ```
 
 2. If the plan has more than one module, name the mechanism that enforces the module boundaries in CI:
    - TypeScript: `eslint-plugin-boundaries` or `dependency-cruiser`
    - Python: `import-linter`
    - Java and Kotlin: ArchUnit
-   - Go: `internal/` packages, which the compiler enforces
+   - Go: `internal/` packages for module boundaries, which the compiler enforces
 3. Record the decisions: deployment choice, module list, level per module, and ports
 
 Done when all of these conditions hold:
 
 - The tree lists every module from Step 3 and no folder without day-one code
-- The boundary mechanism forbids the imports that Steps 4 and 6 forbid
+- When the plan has a boundary mechanism, it forbids the imports that Steps 4 and 6 forbid
 - Each decision is recorded where [Where the section goes](#where-the-section-goes) says
 
 ### Step 9: Evolution triggers written
@@ -183,10 +183,10 @@ Done when all of these conditions hold:
 A trigger says when to add structure, so the first version can stay small. Write each trigger as a condition on one module of the plan:
 
 - When business rules multiply in a module, bugs cluster in it, or its tests become hard to write, raise the module one level
-- When a second vendor or a test without network access becomes necessary, add a port
+- When a Step 5 condition becomes true for an external service, add a port
 - When an independent team, a different scaling need, a different deploy cadence, or security isolation appears, extract the module into a service
 
-Done when each core module has a level-up trigger. Write an extraction trigger only when Step 1 names several teams or a scaling constraint.
+Done when each core module below level 3 has a level-up trigger. When a Step 1 constraint justifies a separate deployment, also write an extraction trigger.
 
 ### Step 10: Section checked
 

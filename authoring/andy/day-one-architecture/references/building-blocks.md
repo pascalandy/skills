@@ -25,6 +25,6 @@ Before you recommend a service, check that it still exists and still fits.
 | API and server logic | Vercel Functions | Workers | Lambda, or ECS on Fargate |
 | Database | Postgres through Neon or Supabase | D1 | RDS or DynamoDB |
 | File storage | Vercel Blob | R2 | S3 |
-| Queue | Cron Jobs, Inngest, Trigger.dev | Queues, Cron Triggers | SQS, EventBridge |
+| Queue | Vercel Queues, Inngest, Trigger.dev | Queues | SQS |
 
 Services that fit any platform: Stripe for payments, Resend for email, Better Auth or Clerk for auth, Upstash for cache, Sentry for errors, PostHog for analytics.

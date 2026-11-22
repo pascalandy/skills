@@ -1,6 +1,6 @@
 # Output template
 
-Keep every heading, and write `none` under a heading that has no content. The two module rows are examples of the format: replace them.
+Keep every heading. Write `none` under a heading or on a line that has no content. The two module rows are examples of the format, so replace them.
 
 ```markdown
 ## Architecture
@@ -11,17 +11,17 @@ Keep every heading, and write `none` under a heading that has no content. The tw
 - Rationale: <one paragraph tied to team size and the business case>
 
 ### Modules
-| Module | Type | Responsibility | Owns data | Level | Public API | Events |
+| Module | Type | Responsibility | Owns data | Level and reason | Public API | Events |
 |---|---|---|---|---|---|---|
-| billing | core | Plans, subscriptions, invoices | subscriptions, invoices | 3 | `subscribe()`, `cancel()` | none |
-| settings | supporting | User preferences | preferences | 0 | `getSettings()`, `updateSettings()` | none |
+| billing | core | Plans, subscriptions, invoices | subscriptions, invoices | 3: proration and refund rules | `subscribe()`, `cancel()` | none |
+| settings | supporting | User preferences | preferences | 0: reads and writes only | `getSettings()`, `updateSettings()` | none |
 
 ### Building blocks
 <filled rows from references/building-blocks.md>
 
 ### Ports
-- Port: `PaymentGateway`, implemented by `StripeGateway`. Reason: a billing rule needs a test without network access
-- Direct call: auth session
+- Port: <port>, implemented by <adapter>. Reason: <Step 5 condition>
+- Direct call: <service>
 
 ### Communication
 - Calls: module public APIs only
