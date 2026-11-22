@@ -6,14 +6,35 @@ kind: "dev"
 
 # Day-one architecture
 
-Turn a business case into an architecture section that starts the codebase on the right foot and stays as light as the rules allow. Scope: application-layer software for end users, such as SaaS, e-commerce, and consumer or B2B web apps. Systems software, such as an OS, drivers, or performance-critical engines, is out of scope.
+Turn a business case into the architecture section of a build plan. Include a module, layer, port, event, queue, or service only when a current requirement justifies it.
+
+Scope: application software for end users, such as SaaS, e-commerce, and consumer or B2B web apps. Systems software, such as an OS, drivers, or performance-critical engines, is out of scope.
 
 Write the section in the language of the plan. Keep pattern names and code identifiers in English.
 
+## Keep the architecture small
+
+This rule applies to every step:
+
+- Each module, level above 0, port, event, queue, and building block needs a reason from Step 1
+- When an item has no reason, leave the item out and write `none`
+- A product with one business domain gets one module
+- One or two modules at level 0 or 1, with no port, event, or queue, is a correct result
+
+## Terms
+
+- **Module**: a folder that holds one business domain and exposes one public API
+- **Level**: the number of layers inside a module, from 0 to 3. Step 4 defines each level
+- **Use case**: a function that runs one business action, such as `subscribe()`
+- **Port**: an interface that a module declares for an external service
+- **Adapter**: the code that implements a port for one vendor
+- **ADR**: architecture decision record, a file that records one or more decisions
+
 ## Where the section goes
 
-- **Plan written with `rolling-wave-planning`**: write the section to `plan/02-architecture.md`, link it from `01-project.md`, and record each decision from Step 8 as a `decisions.md` entry with the trigger `technical choice`
-- **Any other plan**: add the section to the plan document and record the decisions as ADRs in `docs/adr/`
+- **Plan written with `rolling-wave-planning`**: write the section to `plan/02-architecture.md`. Link that file from `01-project.md`. Record each Step 8 decision in `decisions.md` with the trigger `technical choice`, and update `Next IDs`
+- **Project that already keeps ADRs**: add the section to the plan document. Record the Step 8 decisions in one ADR
+- **Any other plan**: add the section to the plan document. The section is the record of the decisions
 
 ## Workflow
 
@@ -24,10 +45,10 @@ Architecture progress:
 - [ ] Step 1: Inputs gathered
 - [ ] Step 2: Three axes decided
 - [ ] Step 3: Modules found
-- [ ] Step 4: Layer level set per module
+- [ ] Step 4: Level set per module
 - [ ] Step 5: Ports chosen
 - [ ] Step 6: Communication and reads defined
-- [ ] Step 7: Building blocks mapped to the infra
+- [ ] Step 7: Building blocks mapped to the platform
 - [ ] Step 8: Folder tree, guardrails, and decisions written
 - [ ] Step 9: Evolution triggers written
 - [ ] Step 10: Section checked
@@ -35,123 +56,150 @@ Architecture progress:
 
 ### Step 1: Inputs gathered
 
-Collect from the business case and the conversation; ask only for a missing input that blocks a later step:
+Collect these inputs from the business case and the conversation. Ask the user only for a missing input that blocks a later step.
 
 1. Problem, core value, and main user journeys
-2. Stakeholders: who uses, pays, and operates the app; team size now and in 12 months
-3. Infra, such as Vercel, Cloudflare, AWS, or Supabase
+2. Stakeholders: the people who use, pay for, and operate the app, and the team size now and in 12 months
+3. Platform, such as Vercel, Cloudflare, AWS, or Supabase
 4. Language and framework, such as TypeScript and Next.js
 5. Integrations: payments, email, auth, file storage, third-party APIs
 6. Constraints: compliance, data residency, offline use, real time, budget
 
-Done when each input is known or listed under open questions.
+Done when each input is known or listed as an open question.
 
 ### Step 2: Three axes decided
 
-Each axis is an independent decision. Monolith versus microservices says how many deployables exist; Clean Architecture says how the code inside one deployable is arranged.
+Each axis is an independent decision.
 
 | Axis | Question | Default for a new end-user app |
 |---|---|---|
-| Deployment | How many deployables? | One: a modular monolith |
-| Code organization | Where to cut, and how to arrange the inside? | Modules by business domain; layer level per module |
-| Communication | How do the parts talk? | Calls through module public APIs, plus a queue for slow or failable work |
+| Deployment | How many deployables exist? | One deployable |
+| Code organization | Where are the module boundaries, and which level does each module have? | Modules by business domain, each at the lowest level that fits |
+| Communication | How do modules communicate? | Direct calls to the public API of a module |
 
-Depart from a default only for a reason from Step 1, such as several independent teams or an offline requirement. Done when each axis has a choice and a one-line reason.
+Depart from a default only for a reason from Step 1. These reasons are examples:
+
+- Several independent teams: more than one deployable
+- Offline, instant, or collaborative use: local-first data with a sync engine
+- Delivery speed matters more than vendor independence: a backend-as-a-service, such as Supabase, Firebase, or Convex, which replaces most layers
+
+Done when each axis has a choice and a one-line reason.
 
 ### Step 3: Modules found
 
-Use DDD bounded contexts to decide where to cut:
+Find the module boundaries with bounded contexts from domain-driven design (DDD). A bounded context is an area where each business word keeps one meaning.
 
-1. List the nouns and verbs of the business case and group those that change together
-2. Split where a word changes meaning: "customer" in billing and "customer" in support belong to different modules
-3. Aim for 3 to 7 modules, such as `identity`, `billing`, `notifications`, plus 1 to 4 modules that hold the product's value
-4. Label each module **core** (the competitive edge), **supporting** (specific but not differentiating), or **generic** (solved by a SaaS: auth, email, payments)
+1. List the nouns and verbs of the business case, and group the words that change together
+2. Put a boundary where a word changes meaning. For example, "customer" in billing and "customer" in support belong to different modules
+3. Keep one module when the user journeys share the same business rules and data. Use at most 7 modules
+4. Label each module **core** (the competitive edge), **supporting** (specific to the product but not differentiating), or **generic** (a vendor solves the problem, such as auth, email, or payments)
 
-Done when each module has a one-sentence responsibility, the data it owns, its public API, and the events it emits.
+Done when each module has a one-sentence responsibility, the data it owns, its public API, and the events it emits or `none`.
 
-### Step 4: Layer level set per module
+### Step 4: Level set per module
 
-Give each module the lowest level that fits its rules:
+Give each module the lowest level that fits its business rules. The label from Step 3 does not set the level. A core module with few business rules stays at level 0 or 1.
 
 | Level | Shape | Fits |
 |---|---|---|
-| 0. Thin | Handler calls the database | CRUD, settings, admin screens |
-| 1. Vertical slice | One folder per use case, end to end | Simple features, few rules |
-| 2. Functional core | Pure business functions, effects at the edges, ports only for external services | Moderate rules, external integrations |
-| 3. Full Clean | `domain/`, `application/` with use cases and ports, `infra/` with adapters | Rich, long-lived rules: money, permissions, scheduling |
+| 0. Thin | A handler in the module reads and writes the database | CRUD, settings, admin screens |
+| 1. Vertical slice | One folder per use case, from input to database | Simple features with few business rules |
+| 2. Functional core | Pure business functions, with database and network calls at the edges | Moderate business rules |
+| 3. Full Clean Architecture | `domain/`, `application/` with use cases and ports, `infra/` with adapters | Many long-lived business rules, such as money, permissions, or scheduling |
 
-Core modules usually take level 2 or 3; generic modules take level 0 or 1. At level 3, apply the dependency rule: `domain/` and `application/` import no framework and no vendor SDK. Done when each module has a level and a reason drawn from its rules.
+At level 3, dependencies point inward:
+
+- `infra/` can import `application/` and `domain/`
+- `application/` can import `domain/`
+- `domain/` and `application/` import no framework and no vendor SDK
+
+Done when each module has a level and a reason drawn from its business rules.
 
 ### Step 5: Ports chosen
 
-Create a port, an interface in `application/` with an adapter in `infra/`, when at least one holds:
+The default is no port: the module calls the vendor SDK directly. If an external service meets one of these conditions, define a port and an adapter in the module that uses the service:
 
-- The vendor could realistically be swapped: payments, email, file storage, LLM provider
-- The use case needs tests without network
-- The external API is awkward enough to isolate
+- A vendor change is likely during the life of the product, as is common for payments, email, file storage, and LLM providers
+- A business rule of a level 2 or 3 module needs a test without network access
+- The vendor API is hard to use, and several use cases call it
 
-Keep framework-coupled concerns, such as the auth session, the framework cache, and routing, outside ports until a concrete need appears. Done when each external service is listed as a port with its adapter, or as skipped with a reason.
+Keep these framework-coupled concerns outside ports: the auth session, the framework cache, and routing.
+
+Done when each external service is listed as a port with its adapter, or as a direct call.
 
 ### Step 6: Communication and reads defined
 
-- Modules call each other only through the module's public entry point, such as `modules/billing/index.ts`, or through domain events
-- Each table belongs to one module; another module reaches that data through the owner's public API
-- Slow or failable work goes through a queue or job runner: emails, outbound webhooks, image processing, third-party sync
-- Inbound webhooks are inbound adapters: verify the signature, stay idempotent, call a use case
-- Writes go through use cases; display reads may query a read model directly (CQRS light). In Next.js, server components read and server actions write
+- Call another module only through its public API, such as `modules/billing/index.ts`
+- Give each table one owner module. Other modules read that data through the public API of the owner
+- Inside the owner module, let a display read query the database directly. In Next.js, a server component can call that read
+- At levels 2 and 3, send each write through a use case. At levels 0 and 1, the handler writes directly
+- Emit an event only when a second module must react to a change
+- Keep work synchronous when the response depends on its result
+- Use a queue only for work that can finish later and needs background execution or retries, such as email, outbound webhooks, and image processing
+- Make each inbound webhook handler verify the signature and accept a repeated delivery
 
-Done when each event names its emitter and consumers, and each async job names its runner.
+Done when each event names its emitter and consumers and each queued job names its queue. Write `none` when the plan has no event or no queued job.
 
-### Step 7: Building blocks mapped to the infra
+### Step 7: Building blocks mapped to the platform
 
-Fill the building-blocks table in [references/building-blocks.md](references/building-blocks.md) for the chosen infra. Read that file at this step. Done when each block has a service, a module or layer, and a port decision, or is marked out of scope with a reason.
+Read [references/building-blocks.md](references/building-blocks.md). Then fill one row of its table for each block that the product needs.
+
+Done when each needed block has a service, a module or layer, and the port decision from Step 5.
 
 ### Step 8: Folder tree, guardrails, and decisions written
 
-1. Adapt this tree to the language; the example is TypeScript and Next.js:
+1. Draw the folder tree from the modules, levels, and integrations that you selected. Omit each folder that has no day-one code. This example uses TypeScript and Next.js, with one level 0 module and one level 3 module:
 
    ```
    src/
-     app/                    # inbound adapters: validate, call a use case, render
-       (marketing)/
-       (app)/
-       api/webhooks/<vendor>/route.ts
+     app/                    # routes and pages: validate input, call a module, render
      modules/
-       <module>/
-         domain/             # level 3
-         application/        # use cases and ports.ts, levels 2 and 3
-         infra/              # adapters, levels 2 and 3
+       settings/             # level 0
+         index.ts            # public API: handlers that call the database
+       billing/              # level 3
+         domain/
+         application/        # use cases and ports.ts
+         infra/              # adapters
          index.ts            # public API of the module
-     shared/
-       infra/                # database client, cache, logger, queue client
-       kernel/               # small shared types: ids, Money, Result
-     composition.ts          # wires each port to its adapter
+     shared/                 # database client, logger
+     composition.ts          # connects each port to its adapter; only when a port exists
    ```
 
-2. Name the boundary linter that enforces the module and layer rules in CI: `eslint-plugin-boundaries` or `dependency-cruiser` for TypeScript, `import-linter` for Python, ArchUnit for Java and Kotlin, `internal/` packages for Go
-3. Record the first decisions: deployment choice, module list, level per module, ports created and skipped
+2. If the plan has more than one module, name the mechanism that enforces the module boundaries in CI:
+   - TypeScript: `eslint-plugin-boundaries` or `dependency-cruiser`
+   - Python: `import-linter`
+   - Java and Kotlin: ArchUnit
+   - Go: `internal/` packages, which the compiler enforces
+3. Record the decisions: deployment choice, module list, level per module, and ports
 
-Done when the tree lists every module from Step 3, the linter rules forbid the imports Steps 4 and 6 forbid, and each decision is recorded where [Where the section goes](#where-the-section-goes) says.
+Done when all of these conditions hold:
+
+- The tree lists every module from Step 3 and no folder without day-one code
+- The boundary mechanism forbids the imports that Steps 4 and 6 forbid
+- Each decision is recorded where [Where the section goes](#where-the-section-goes) says
 
 ### Step 9: Evolution triggers written
 
-Write when to revisit, so the first version stays small:
+A trigger says when to add structure, so the first version can stay small. Write each trigger as a condition on one module of the plan:
 
-- Raise a module one level when its rules multiply, bugs cluster in it, or its tests get hard to write
-- Extract a module into its own service only for a concrete reason: an independent team (Conway's law), different scaling or runtime needs, a different deploy cadence, or security isolation
-- Consider another family when the product needs it: local-first or a sync engine for instant or collaborative UX; backend-as-a-service, such as Supabase, Firebase, or Convex, to trade layers for speed with vendor coupling
+- When business rules multiply in a module, bugs cluster in it, or its tests become hard to write, raise the module one level
+- When a second vendor or a test without network access becomes necessary, add a port
+- When an independent team, a different scaling need, a different deploy cadence, or security isolation appears, extract the module into a service
 
-Done when each core module has a level-up trigger and the plan names at least one extraction trigger.
+Done when each core module has a level-up trigger. Write an extraction trigger only when Step 1 names several teams or a scaling constraint.
 
 ### Step 10: Section checked
 
-Write the section from the template in [references/output-template.md](references/output-template.md), then check it against this list and fix each failure:
+1. Read [references/output-template.md](references/output-template.md) and write the section from that template
+2. Check the section against the list below
+3. Fix each failure, then check again
 
-- Each core module owns its data
-- No module sits above the level its rules justify
-- Each external service is behind a port or listed as skipped with a reason
-- Slow or failable work is async
-- Business rules live in modules; `app/`, route handlers, and UI components hold none
-- Folders follow business domains, and `shared/` holds only infra clients and kernel types
+- Each module, level above 0, port, event, queue, and building block has a reason from Step 1
+- No module has a level higher than its business rules justify
+- Each table has one owner module
+- Each external service is listed as a port or as a direct call
+- Only work that can finish later uses a queue
+- Routes, pages, and UI components hold no business rules
+- Folders follow business domains, and `shared/` holds only clients and small shared types
 
-Done when every item passes. For named laws behind these choices, such as Gall's law or YAGNI, load `coding-eng-laws`.
+Done when every item passes.
