@@ -1,6 +1,6 @@
 # Output template
 
-Keep every heading. If a heading or a line has no content, write `none` there. The two module rows are examples of the format, so replace them.
+Keep every heading. For an empty section or line, write `none`. Replace the two example module rows.
 
 ```markdown
 ## Architecture

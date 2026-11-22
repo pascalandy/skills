@@ -1,12 +1,12 @@
 ---
 name: "right-sized-architecture"
-description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end). Also use when assessing whether the modules, layers, or deployables of an existing app are the right size. This skill covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app."
+description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end). Also use to assess whether the modules, layers, or deployables of an existing app are the right size. This skill covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app."
 kind: "dev"
 ---
 
 # Right-sized architecture
 
-Decide the smallest structure that fits an application, for a new project or an existing project. Include a module, layer, port, event, queue, or service only when a current requirement justifies it.
+Decide the smallest structure that fits an application, new or existing. Include a module, layer, port, event, queue, or service only when a current requirement justifies it.
 
 Scope: application software for end users, such as SaaS, e-commerce, and consumer or B2B web apps. Systems software, such as an OS, drivers, or performance-critical engines, is out of scope.
 
@@ -24,7 +24,7 @@ Write the output in the language of the plan or of the request. Keep pattern nam
 These rules apply to every step:
 
 - Each module, level above 0, port, event, queue, and building block needs a reason from Step 1
-- When an item has no reason, leave the item out and write `none`
+- If an item has no reason, omit it and write `none`
 - A product with one business domain gets one module
 - One or two modules at level 0 or 1, with no port, event, or queue, is a correct result
 
@@ -39,13 +39,13 @@ These rules apply to every step:
 
 ## Where the section goes
 
-- **Plan written with `rolling-wave-planning`**: write the section to `plan/02-architecture.md`. Link that file from `01-project.md`. Record each Step 8 decision in `decisions.md` with the trigger `technical choice`, and update `Next IDs`
+- **Plan written with `rolling-wave-planning`**: write the section to `plan/02-architecture.md`. Link that file from `01-project.md`. Record each Step 8 decision in `decisions.md` with the trigger `technical choice`. Update `Next IDs`
 - **Project that already keeps ADRs**: add the section to the plan document. Record the Step 8 decisions in one ADR
-- **Any other plan**: add the section to the plan document. The section is the record of the decisions
+- **Any other plan**: add the section to the plan document. The section records the decisions
 
 ## Workflow
 
-Copy this checklist and track your progress:
+Track your progress in a copy of this checklist:
 
 ```
 Architecture progress:
@@ -72,7 +72,7 @@ Collect these inputs from the business case and the conversation. Ask the user o
 5. Integrations: payments, email, auth, file storage, third-party APIs
 6. Constraints: compliance, data residency, offline use, real time, budget
 
-Done when each input is known or listed as an open question.
+Done when you know each input or list it as an open question.
 
 ### Step 2: Three axes decided
 
@@ -94,12 +94,15 @@ Done when each axis has a choice and a one-line reason.
 
 ### Step 3: Modules found
 
-Find the module boundaries with bounded contexts from domain-driven design (DDD). A bounded context is an area where each business word keeps one meaning.
+Use bounded contexts from domain-driven design to find the module boundaries. A bounded context is an area where each business word keeps one meaning.
 
-1. List the nouns and verbs of the business case, and group the words that change together
+1. List the nouns and verbs of the business case. Group the words that change together
 2. Put a boundary where a word changes meaning. For example, "customer" in billing and "customer" in support belong to different modules
-3. Keep one module when the user journeys share the same business rules and data. Use at most 7 modules
-4. Label each module **core** (the competitive edge), **supporting** (specific to the product but not differentiating), or **generic** (a vendor solves the problem, such as auth, email, or payments). A generic problem gets a module only when the product adds business rules to it
+3. When the user journeys share business rules and data, keep one module. Use at most 7 modules
+4. Label each module with one of these types:
+   - **core**: the competitive edge
+   - **supporting**: specific to the product, but not a competitive edge
+   - **generic**: a vendor solves the problem, such as auth, email, or payments. A generic problem gets a module only when the product adds business rules to it
 
 Done when each module has a one-sentence responsibility, the data it owns, its public API, and the events it emits or `none`.
 
@@ -120,36 +123,36 @@ At level 3, dependencies point inward:
 - `application/` can import `domain/`
 - `domain/` and `application/` import no framework and no vendor SDK
 
-Done when each module has a level and a reason drawn from its business rules.
+Done when each module has a level and a reason from its business rules.
 
 ### Step 5: Ports chosen
 
-The default is no port: the module calls the vendor SDK directly. If an external service meets one of these conditions, define a port and an adapter in the module that uses the service:
+The default is no port: the module calls the vendor SDK directly. If an external service meets a condition below, add a port and adapter to the module that uses the service:
 
 - The product must support two vendors for this service, or the team plans to change the vendor
-- A business rule of a level 2 or 3 module calls the service and needs a test without network access
+- A business rule of a level 2 or 3 module calls the service. The rule needs a test without network access
 - The vendor API is hard to use, and several use cases call it
 
 Keep these framework-coupled concerns outside ports: the auth session, the framework cache, and routing.
 
-Done when each external service is listed as a port with its adapter, or as a direct call.
+Done when each external service has a port with its adapter, or a direct call.
 
 ### Step 6: Communication and reads defined
 
 - Call another module only through its public API, such as `modules/billing/index.ts`
 - Give each table one owner module. Other modules read that data through the public API of the owner
-- Inside the owner module, let a display read query the database directly. In Next.js, a server component can call that read
+- To get data for display, the owner module can query the database directly. In Next.js, a server component can call that query
 - At levels 2 and 3, send each write through a use case. At levels 0 and 1, the handler writes directly
 - Emit an event only when a second module must react to a change
-- Keep work synchronous when the response depends on its result
+- When the response depends on the result of the work, keep the work synchronous
 - Use a queue only for work that can finish later and needs background execution or retries. Examples are email, outbound webhooks, and image processing
-- Make each inbound webhook handler verify the signature. When a delivery repeats completed work, the handler acknowledges the delivery and does not repeat the action
+- Make each inbound webhook handler verify the signature. When a delivery repeats completed work, the handler acknowledges the delivery. It does not do the work again
 
-Done when each event names its emitter and consumers and each queued job names its queue. Write `none` when the plan has no event or no queued job.
+Done when each event names its emitter and consumers and each queued job names its queue. For an empty list of events or queued jobs, write `none`.
 
 ### Step 7: Building blocks mapped to the platform
 
-Read [references/building-blocks.md](references/building-blocks.md). Then fill one row of its table for each block that the product needs.
+Fill the table in [references/building-blocks.md](references/building-blocks.md).
 
 Done when each needed block has a service, a module or layer, and the port decision from Step 5.
 
@@ -181,32 +184,32 @@ Done when each needed block has a service, a module or layer, and the port decis
 
 Done when all of these conditions hold:
 
-- The tree lists every module from Step 3 and no folder without code in the first version
-- When the plan has a boundary mechanism, it forbids the imports that Steps 4 and 6 forbid
-- Each decision is recorded where [Where the section goes](#where-the-section-goes) says
+- The tree lists every module from Step 3 and only folders with code in the first version
+- If the plan names a boundary mechanism, the mechanism blocks the imports that Steps 4 and 6 forbid
+- You record each decision where [Where the section goes](#where-the-section-goes) says
 
 ### Step 9: Evolution triggers written
 
 A trigger says when to add structure, so the first version can stay small. Write each trigger as a condition on one module of the plan:
 
-- When business rules multiply in a module, bugs cluster in it, or its tests become hard to write, raise the module one level
+- When a module's business rules increase, its bugs cluster, or its tests become hard to write, raise it one level
 - When a Step 5 condition becomes true for an external service, add a port
-- When an independent team, a different scaling need, a different deploy cadence, or security isolation appears, extract the module into a service
+- When an independent team forms for a module, extract the module into a service. When a module needs different scaling, a different deployment schedule, or security isolation, extract the module into a service
 
-Done when each core module below level 3 has a level-up trigger. If Step 1 identifies a future reason to deploy a module separately, write an extraction trigger for that module.
+Done when each core module below level 3 has a trigger to raise its level. If Step 1 identifies a future reason to deploy a module separately, write an extraction trigger for that module.
 
 ### Step 10: Section checked
 
-1. Read [references/output-template.md](references/output-template.md) and write the section from that template
+1. Write the section from [references/output-template.md](references/output-template.md)
 2. Check the section against the list below
-3. Fix each failure, then check again
+3. Fix each failure. Then check again
 
 - Each module, level above 0, port, event, queue, and building block has a reason from Step 1
 - No module has a level higher than its business rules justify
 - Each table has one owner module
-- Each external service is listed as a port or as a direct call
+- The section lists each external service as a port or as a direct call
 - Only work that can finish later uses a queue
 - Routes, pages, and UI components hold no business rules
-- Folders follow business domains, and `shared/` holds only clients and small shared types
+- Folders follow business domains. `shared/` holds only clients and small shared types
 
 Done when every item passes.

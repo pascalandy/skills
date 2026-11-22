@@ -1,6 +1,6 @@
 # Building blocks
 
-Fill one row for each block that the product needs, and omit the other rows. Take each port decision from Step 5.
+Fill one row for each block that the product needs. Omit the other rows. Take each port decision from Step 5.
 
 | Block | Service | Module or layer | Port |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Fill one row for each block that the product needs, and omit the other rows. Tak
 
 ## Common services per platform
 
-Before you recommend a service, check that it still exists and still fits.
+Before you recommend a service, check that it still exists and fits the project.
 
 | Block | Vercel | Cloudflare | AWS |
 |---|---|---|---|
