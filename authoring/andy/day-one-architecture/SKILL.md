@@ -119,7 +119,7 @@ Done when each module has a level and a reason drawn from its business rules.
 
 The default is no port: the module calls the vendor SDK directly. If an external service meets one of these conditions, define a port and an adapter in the module that uses the service:
 
-- Step 1 names a second vendor or a planned vendor change for this service
+- The product must support two vendors for this service, or the team plans to change the vendor
 - A business rule of a level 2 or 3 module calls the service and needs a test without network access
 - The vendor API is hard to use, and several use cases call it
 
@@ -136,7 +136,7 @@ Done when each external service is listed as a port with its adapter, or as a di
 - Emit an event only when a second module must react to a change
 - Keep work synchronous when the response depends on its result
 - Use a queue only for work that can finish later and needs background execution or retries. Examples are email, outbound webhooks, and image processing
-- Make each inbound webhook handler verify the signature. When a delivery repeats, the handler acknowledges it and does not repeat the action
+- Make each inbound webhook handler verify the signature. When a delivery repeats completed work, the handler acknowledges the delivery and does not repeat the action
 
 Done when each event names its emitter and consumers and each queued job names its queue. Write `none` when the plan has no event or no queued job.
 
@@ -169,7 +169,7 @@ Done when each needed block has a service, a module or layer, and the port decis
    - TypeScript: `eslint-plugin-boundaries` or `dependency-cruiser`
    - Python: `import-linter`
    - Java and Kotlin: ArchUnit
-   - Go: `internal/` packages for module boundaries, which the compiler enforces
+   - Go: `internal/` packages for module boundaries, and `depguard` for layer imports at level 3
 3. Record the decisions: deployment choice, module list, level per module, and ports
 
 Done when all of these conditions hold:
@@ -186,7 +186,7 @@ A trigger says when to add structure, so the first version can stay small. Write
 - When a Step 5 condition becomes true for an external service, add a port
 - When an independent team, a different scaling need, a different deploy cadence, or security isolation appears, extract the module into a service
 
-Done when each core module below level 3 has a level-up trigger. When a Step 1 constraint justifies a separate deployment, also write an extraction trigger.
+Done when each core module below level 3 has a level-up trigger. When Step 1 names a future constraint, such as a larger team in 12 months, also write an extraction trigger.
 
 ### Step 10: Section checked
 

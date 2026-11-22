@@ -1,6 +1,6 @@
 # Output template
 
-Keep every heading. Write `none` under a heading or on a line that has no content. The two module rows are examples of the format, so replace them.
+Keep every heading. If a heading or a line has no content, write `none` there. The two module rows are examples of the format, so replace them.
 
 ```markdown
 ## Architecture
@@ -37,6 +37,7 @@ Keep every heading. Write `none` under a heading or on a line that has no conten
 
 ### Evolution triggers
 - <module>: raise to level <n> when <trigger>
+- <service>: add a port when <Step 5 condition>
 - Extract <module> into a service when <trigger>
 
 ### Open questions and risks
