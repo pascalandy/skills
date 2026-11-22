@@ -27,7 +27,7 @@ Record the objective, stop predicate, current artifact or head SHA, next action,
 
 Wake on what T3 delivers to the agent: a delegate's completion notice, a thread's pull request watch, or a schedule for timed checks, as t3-runtime describes. Without one, keep checking while the session is active, checkpoint the exact next check before the turn ends, and report that unattended continuation is unavailable.
 
-After a restart, check each worker's actual status, then reconcile the checkpoint with git, review state, and durable results before resuming or respawning. Assume neither that a worker died nor that it survived. The bundled `orch` CLI stores coordination records; it does not spawn agents or schedule wakeups. Pass its `--store` option or `ORCH_STORE` an explicit task-scoped path when no store is provided.
+After a restart, check each worker's actual status, then reconcile the checkpoint with git, review state, and durable results before resuming or respawning. Assume neither that a worker died nor that it survived.
 
 ## Read history and discover evidence tools
 
