@@ -36,9 +36,9 @@ Keep every heading. If a heading or a line has no content, write `none` there. T
 - Decisions recorded: <decision IDs, ADR file, or "this section">
 
 ### Evolution triggers
-- <module>: when <trigger>, raise to level <n>
-- <service>: when <Step 5 condition>, add a port
-- <module>: when <trigger>, extract into a service
+- When <trigger>, raise <module> to level <n>
+- When <Step 5 condition>, add a port for <service>
+- When <trigger>, extract <module> into a service
 
 ### Open questions and risks
 1. <question>. Owner or spike: <name>
