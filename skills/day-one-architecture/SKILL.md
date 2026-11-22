@@ -186,7 +186,7 @@ A trigger says when to add structure, so the first version can stay small. Write
 - When a Step 5 condition becomes true for an external service, add a port
 - When an independent team, a different scaling need, a different deploy cadence, or security isolation appears, extract the module into a service
 
-Done when each core module below level 3 has a level-up trigger. When Step 1 names a future constraint, such as a larger team in 12 months, also write an extraction trigger.
+Done when each core module below level 3 has a level-up trigger. If Step 1 identifies a future reason to deploy a module separately, write an extraction trigger for that module.
 
 ### Step 10: Section checked
 
