@@ -22,7 +22,7 @@ A gap has one of three types:
 4. Compare the current state with the justified structure, and list each gap as a finding. Apply the rules below.
    Done when each finding has a type, a location, the current state, the justified state, and its evidence.
 5. Use the format and the destination that the user requests. By default, use the format below and put the findings in the reply.
-   Done when each finding follows the rules below and the output contains no change plan.
+   Done when each finding follows the rules below, and the output lists each open question and contains no change plan.
 
 ## Rules for a finding
 
