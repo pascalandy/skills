@@ -197,6 +197,7 @@ A mode's routes run through that mode's SKILL.md.
 - `council`: Trigger this if the user says 'council'.
 - `create-formal-verification-skill`: Use only when explicitly invoked as `create-formal-verification-skill`.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
+- `day-one-architecture`: Use when writing the architecture section of a build plan for a new end-user app (web, SaaS, mobile back end), deciding how to structure or split a new codebase into modules and layers, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices for a new project.
 - `diagnose`: Use for any request to debug, find the root cause, or explain why something fails or got slower: incidents, latency jumps, error spikes, crashes, memory leaks, hangs and timeouts, regressions after a deploy or flag change. Load it before reading code. Also use when a verify-loop run fails, or when a claimed cause, repro, or fix needs checking against facts.
 - `dsf-loop`: Use when the user says 'dsf loop', 'deepseek loop', or 'better call deepseek'.
 - `file-pr`: File a concise pull request. Use when the user asks to file, open, or create a PR.
