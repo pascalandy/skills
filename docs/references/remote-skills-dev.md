@@ -76,7 +76,6 @@ A mode's routes run through that mode's SKILL.md.
 - `council`: Trigger this if the user says 'council'.
 - `create-formal-verification-skill`: Use only when explicitly invoked as `create-formal-verification-skill`.
 - `create-verification-skill`: Use only when explicitly invoked as `create-verification-skill`.
-- `day-one-architecture`: Use when writing the architecture section of a build plan for a new end-user app (web, SaaS, mobile back end), deciding how to structure or split a new codebase into modules and layers, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices for a new project.
 - `diagnose`: Use for any request to debug, find the root cause, or explain why something fails or got slower: incidents, latency jumps, error spikes, crashes, memory leaks, hangs and timeouts, regressions after a deploy or flag change. Load it before reading code. Also use when a verify-loop run fails, or when a claimed cause, repro, or fix needs checking against facts.
 - `dsf-loop`: Use when the user says 'dsf loop', 'deepseek loop', or 'better call deepseek'.
 - `file-pr`: File a concise pull request. Use when the user asks to file, open, or create a PR.
@@ -93,6 +92,7 @@ A mode's routes run through that mode's SKILL.md.
 - `leaving-pr-comments`: Use whenever leaving comments on GitHub.
 - `maintain-verification-skill`: Use when the user invokes `maintain-verification-skill` or asks to audit a project's existing verification skill.
 - `modernize`: For getting old prs up to date. Use when asked to rebase a pr or "modernize".
+- `right-sized-architecture`: Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end), assessing whether the modules and layers of an existing codebase are the right size, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices.
 - `rolling-wave-planning`: Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, reporting where the plan stands or what agents can implement, or syncing plan/ markdown to GitHub issues.
 - `statechart`: Use only when explicitly invoked as `statechart`.
 - `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.

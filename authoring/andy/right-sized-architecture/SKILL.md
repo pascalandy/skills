@@ -1,16 +1,23 @@
 ---
-name: "day-one-architecture"
-description: "Use when writing the architecture section of a build plan for a new end-user app (web, SaaS, mobile back end), deciding how to structure or split a new codebase into modules and layers, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices for a new project."
+name: "right-sized-architecture"
+description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end), assessing whether the modules and layers of an existing codebase are the right size, or choosing between monolith, modular monolith, Clean Architecture, hexagonal, or vertical slices."
 kind: "dev"
 ---
 
-# Day-one architecture
+# Right-sized architecture
 
-Turn a business case into the architecture section of a build plan. Include a module, layer, port, event, queue, or service only when a current requirement justifies it.
+Decide the smallest structure that fits an application, for a new project or an existing project. Include a module, layer, port, event, queue, or service only when a current requirement justifies it.
 
 Scope: application software for end users, such as SaaS, e-commerce, and consumer or B2B web apps. Systems software, such as an OS, drivers, or performance-critical engines, is out of scope.
 
-Write the section in the language of the plan. Keep pattern names and code identifiers in English.
+This skill decides structure at the scale of the application: modules, levels, and ports. To design types and function signatures before an implementation, use the `architect` skill.
+
+Write the output in the language of the plan or of the request. Keep pattern names and code identifiers in English.
+
+## Pick the branch
+
+- **New project**: follow the [Workflow](#workflow). The output is the architecture section of the plan
+- **Existing project**: read [references/existing-project.md](references/existing-project.md) and follow it. The output is a list of findings, without a change plan
 
 ## Keep the architecture small
 
@@ -71,7 +78,7 @@ Done when each input is known or listed as an open question.
 
 Each axis is an independent decision.
 
-| Axis | Question | Default for a new end-user app |
+| Axis | Question | Default for an end-user app |
 |---|---|---|
 | Deployment | How many deployables exist? | One deployable |
 | Code organization | Where are the module boundaries, and which level does each module have? | Modules by business domain, each at the lowest level that fits |
@@ -148,7 +155,7 @@ Done when each needed block has a service, a module or layer, and the port decis
 
 ### Step 8: Folder tree, guardrails, and decisions written
 
-1. Draw the folder tree from the modules, levels, and integrations that you selected. Omit each folder that has no day-one code. This example uses TypeScript and Next.js, with one level 0 module and one level 3 module:
+1. Draw the folder tree from the modules, levels, and integrations that you selected. Omit each folder that has no code in the first version. This example uses TypeScript and Next.js, with one level 0 module and one level 3 module:
 
    ```
    src/
@@ -174,7 +181,7 @@ Done when each needed block has a service, a module or layer, and the port decis
 
 Done when all of these conditions hold:
 
-- The tree lists every module from Step 3 and no folder without day-one code
+- The tree lists every module from Step 3 and no folder without code in the first version
 - When the plan has a boundary mechanism, it forbids the imports that Steps 4 and 6 forbid
 - Each decision is recorded where [Where the section goes](#where-the-section-goes) says
 
