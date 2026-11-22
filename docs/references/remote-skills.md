@@ -170,7 +170,6 @@ A mode's routes run through that mode's SKILL.md.
   - `hillclimb`: Improve one metric toward a target through measured hypotheses, a decision log, and one commit per accepted win.
   - `investigation`: Answer a read-only question about how code works, why it was built that way, or which option to pick, with cited evidence.
   - `multi-phase-plan`: Write the plan for work that spans several phases or stacked PRs, as a checklist an owner runs box by box.
-  - `opening-a-pr`: Open a pull request at the end of any other playbook.
   - `orchestrate`: Coordinate a multi-day project of many stacked PRs and subagents from one standing coordinator.
   - `pause-safely`: Suspend in-flight work at a safe boundary, with a checkpoint another session can resume from.
   - `perf-issue`: Trace a measured slowness and improve it against a baseline.
