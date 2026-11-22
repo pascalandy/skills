@@ -1,6 +1,6 @@
 ---
 name: "right-sized-architecture"
-description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end), or when assessing whether the modules, layers, or deployables of an existing app are the right size. Covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app."
+description: "Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end). Also use when assessing whether the modules, layers, or deployables of an existing app are the right size. This skill covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app."
 kind: "dev"
 ---
 

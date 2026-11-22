@@ -17,12 +17,12 @@ A gap has one of three types:
    Done when each input is known or listed as an open question.
 2. Run Steps 2 to 6 of `SKILL.md` on the product as it is today, without the limit of 7 modules. The result is the justified structure.
    Done when the done criterion of each of those steps holds.
-3. Record the current state of each module: its level, its ports, its events, and its queues. When one module holds two levels, write `mixed` and name the paths. When a folder holds no single business domain, write `none`.
+3. Record the current state of each module: its level, its ports, its events, and its queues. When one module holds more than one level, write `mixed` and name the paths. When a folder holds no single business domain, write `none`.
    Done when each module or folder of the current structure has a level, `mixed`, or `none`.
 4. Compare the current state with the justified structure, and list each gap as a finding. Apply the rules below.
    Done when each finding has a type, a location, the current state, the justified state, and its evidence.
-5. Write the findings in the format below. Unless the user names another output, put the findings in the reply.
-   Done when each finding follows the rules below and the reply contains no change plan.
+5. Use the format and the destination that the user requests. By default, use the format below and put the findings in the reply.
+   Done when each finding follows the rules below and the output contains no change plan.
 
 ## Rules for a finding
 
@@ -33,7 +33,7 @@ A gap has one of three types:
 Examples of an Over finding:
 
 - A level 3 module that holds only reads and writes
-- A port that meets no Step 5 condition
+- A port that meets no Step 5 condition of `SKILL.md`
 - An event that no second module consumes
 - A queue for work that the response waits for
 
@@ -55,4 +55,4 @@ Examples of a Boundary finding:
 1. <Over, Under, or Boundary>: <location>. Current: <state>. Justified: <state>. Evidence: <problem, file, or business rule>
 ```
 
-When the comparison finds no gap, write `No gaps found.`
+When the comparison finds no gap, say so in the output language. After the findings, list each open question from step 1.
