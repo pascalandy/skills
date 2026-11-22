@@ -54,7 +54,7 @@ Historical examples below are candidate patterns, not evidence about the reliabi
 ### Upstack or stack-local usage missing from the review context
 
 - Confidence: candidate
-- Skip when: The reviewer flags an export, component, helper, or file as unused, and the PR list and diffs, upper-stack diffs, or PR context show it is used by a later PR in the stack.
+- Skip when: The reviewer flags an export, component, helper, or file as unused, and the active forge's PR list and diffs, upper-stack diffs, or PR context show it is used by a later PR in the stack.
 - Do not skip when: The current PR is not part of a stack, the symbol is public API, or the supposed upstack use cannot be verified.
 - Example signal: "Exported component is never used" with a human reply like "used upstack".
 

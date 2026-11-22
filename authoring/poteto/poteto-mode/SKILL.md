@@ -17,7 +17,7 @@ The Principles section below grounds every trigger. Before a decision, read each
 Remaining triggers:
 
 - Nontrivial change, architecture decision, or "are we sure?" → the **how** skill, unless the question is why something fails at runtime.
-- First message → restate the user's goal and the smallest change that meets it. Open each brief, PR description, and final report with that goal.
+- First message → restate the user's goal and the smallest change that meets it. Open each brief and PR description with that goal.
 - Bug report, or why something fails at runtime → the **diagnose** skill, before you open any source file. Reproduce on the same surface yourself, at repro parity as `diagnose` defines it. Hand to the user only under the narrow Bug fix step 1 exception.
 - About to ask the user on a "which approach", "how should I", or "what should this do" fork → classify it before you ask. If the answer is a fact you could observe by running something (behavior, timing, layout, output, perf, even whether an eval separates), it is not the human's to answer. Sketch it via the Prototype playbook (`playbooks/prototype.md`) and let the result decide. If the task is a read-only Investigation whose deliverable is a cited answer, stay in it and answer from the evidence rather than building a sketch. Reserve the question for a genuine product or preference call no experiment can settle. Under a full-autonomy grant, follow Session overrides in Autonomy.
 - Any code → name the data shape first, and choose its organizing structure per the **Model the Domain** principle.

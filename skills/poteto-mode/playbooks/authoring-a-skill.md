@@ -10,6 +10,6 @@ Read [agent runtime](../references/agent-runtime.md) before delegating, resuming
 2. Follow its ownership, placement, invocation, and pruning decisions while this playbook retains delivery sequencing and the reply contract.
 3. Validate the actual package and its active consumers using the authority's checks.
 4. Run test cases when behavior is structural. Skip them when the result is subjective.
-5. Run **Opening a PR**.
+5. File the PR with the **file-pr** skill.
 
 **Reply:** summary of the skill, key design decisions, validation notes.

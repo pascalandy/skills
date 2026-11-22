@@ -12,6 +12,6 @@ Read [agent runtime](../references/agent-runtime.md) before delegating, resuming
 2. Anti-shortcut clauses, stated and held: no harness modifications, no baseline tampering, no component restructuring to make a diff pass. If the baseline looks wrong, stop and ask, don't edit it.
 3. Migrate one component at a time. Parallelize across worktrees, one owner per component (the **Separate Before Serializing Shared State** principle). Shared primitives migrate first as a blocking phase.
 4. Verify each component against its baseline via image diff on the matching surface via the available driver and project verification recipe. A nonzero diff is a fail. Investigate the pixel delta. Iterate per component until the diff is zero, checkpointing before any session interruption.
-5. Run **Opening a PR** per component or per safe batch.
+5. File the PR with the **file-pr** skill per component or per safe batch.
 
 **Reply:** components migrated, the diff result for each, the baseline harness location, what's left.
