@@ -23,7 +23,7 @@ Read [agent runtime](../references/agent-runtime.md) before delegating, resuming
    Apply the **Sequence Work into Verifiable Units** principle, verifying each attempt before trying the next.
 4. Parse and compare the artifacts (JSON to sqlite, diff). "Inconclusive" or wrong-surface is not a pass. Flag it.
 5. Cite the measurement in the PR.
-6. Run **Opening a PR**.
+6. File the PR with the **file-pr** skill.
 
 For sustained improvement against a metric rather than a one-off fix, use the Hillclimb playbook (`playbooks/hillclimb.md`).
 

@@ -16,6 +16,6 @@ Be scientific. Every shipped line traces to runtime evidence. Belt-and-suspender
 4. Verify on the same surface. The reading that exposed the bug passes `diagnose`'s fix parity. "Inconclusive" or wrong-surface is not a pass. Flag it. Unit tests show branch behavior, not bug absence.
 5. Stage the commits so the failing repro lands before the fix in git history. See the **tdd** skill for the failing-test-first cadence when the bug has a cheap local test path. Skip it when the test would be expensive, integration-heavy, or unclear.
    This is the canonical **Sequence Work into Verifiable Units** principle, the failing test first and the fix on top.
-6. Run **Opening a PR**.
+6. File the PR with the **file-pr** skill.
 
 **Reply:** lead with the root cause and its claim level, which stays below `fixed` until the field re-read after the merge. Then what was broken, the fix, how you verified, and what that re-read must show. Paste the step-4 proof's failing-then-passing output verbatim.
