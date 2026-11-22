@@ -9,7 +9,6 @@ poteto-mode et ses skills apparentés viennent de pstack, le plugin de Lauren Ta
 - Les noms et mécanismes propres à Cursor sont retirés : `Task`, `subagent_type`, `poteto-agent`, `/setup-pstack` et ses règles `.mdc`
 - Les principes vivent dans `principles/`, sans frontmatter. L'index de `SKILL.md` dit quand chacun s'applique, et le corps du fichier porte la règle
 - `watch-pr` retire la reconnaissance de Cursor et de Bugbot, leurs marqueurs, leur token et leur comptage de passes. Il garde les tokens génériques d’automatisation et extrait `RUN_ID` dans le champ `runId` de chaque fil. La pagination GraphQL garde son champ de protocole `endCursor`. Ce nom générique explique les résultats restants du grep large de #590, dont le critère vise le code propre à ces produits
-- La limite d'environ 40 lignes du corps d'une PR dans `opening-a-pr.md` tient à son rôle de briefing. Elle ne suppose pas que le commit squash reprend ce corps, car chaque dépôt règle le contenu du message
 - Le Laziness Protocol compte les cas réels avant de couvrir une forme d'entrée et refuse les formes restantes avec une erreur claire (#905)
 - Les conventions du dépôt réservent `-` aux entrées lues en flux. Les fichiers ouverts sur place, comme SQLite, prennent un chemin, sans exception propre à brigade-mode (#807)
 - Le playbook multi-PR écrit le plan. Une pile construite dans la session suit Feature ou Refactoring avec `gh-stack`. Une demande mixte attend le go puis suit la méthode nommée dans le plan, en gardant la priorité d'un playbook qui possède la topologie (#804)

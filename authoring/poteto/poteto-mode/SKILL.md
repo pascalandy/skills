@@ -17,6 +17,7 @@ The Principles section below grounds every trigger. Before a decision, read each
 Remaining triggers:
 
 - Nontrivial change, architecture decision, or "are we sure?" → the **how** skill, unless the question is why something fails at runtime.
+- First message → restate the user's goal and the smallest change that meets it. Open each brief, PR description, and final report with that goal.
 - Bug report, or why something fails at runtime → the **diagnose** skill, before you open any source file. Reproduce on the same surface yourself, at repro parity as `diagnose` defines it. Hand to the user only under the narrow Bug fix step 1 exception.
 - About to ask the user on a "which approach", "how should I", or "what should this do" fork → classify it before you ask. If the answer is a fact you could observe by running something (behavior, timing, layout, output, perf, even whether an eval separates), it is not the human's to answer. Sketch it via the Prototype playbook (`playbooks/prototype.md`) and let the result decide. If the task is a read-only Investigation whose deliverable is a cited answer, stay in it and answer from the evidence rather than building a sketch. Reserve the question for a genuine product or preference call no experiment can settle. Under a full-autonomy grant, follow Session overrides in Autonomy.
 - Any code → name the data shape first, and choose its organizing structure per the **Model the Domain** principle.
@@ -108,15 +109,11 @@ Write the reply clean as you draft it, following unslop, including its dash and 
 
 Every playbook ends with a reply written this way, PR link as `https://github.com/<owner>/<repo>/pull/<number>`. The per-playbook lines below name only the content unique to that playbook.
 
-## Comments
-
-Comments follow the same rule as the reply. Write them clean as you go. Keep a comment only for a non-obvious *why* the code can't show. A verify or test script gets no phase-narrating comments such as `// Phase 1: add cards`. The assertion or log string documents the step, as in `assert(ok, 'persisted across restart')`. This applies to every file you produce, including the delegate's diff.
-
 ## Playbooks
 
 Use the available task-list tool or a Markdown checklist whose first items are the matched playbook's steps, copied in verbatim, before any task-specific todos. A step you choose not to do stays in the list with a one-line `skip: <reason>`. Match the task to a playbook below, open its file, and copy its steps in verbatim.
 
-Requests to write a multi-phase or multi-PR plan use `playbooks/multi-phase-plan.md` before the document and large-effort routes below. A bounded document with no code change that no bundled playbook owns, such as a note, a report, or a README, uses **technical-writing** and **unslop** without a playbook. Docs in a code PR stay with Feature. Design documents and RFCs use **how** or **architect**. If delivery includes a PR, follow `playbooks/opening-a-pr.md`.
+Requests to write a multi-phase or multi-PR plan use `playbooks/multi-phase-plan.md` before the document and large-effort routes below. A bounded document with no code change that no bundled playbook owns, such as a note, a report, or a README, uses **technical-writing** and **unslop** without a playbook. Docs in a code PR stay with Feature. Design documents and RFCs use **how** or **architect**. If delivery includes a PR, file it with the **file-pr** skill.
 
 For other work, a large or cross-cutting effort (a migration across many call sites, an ambitious multi-part change), or work the user steps away from to trust later, routes to the **figure-it-out** skill even when a narrower playbook like Feature fits. Use **figure-it-out** whenever no bundled playbook fits. It designs a bespoke, rigorous playbook for the task. A standing project-scale program (multi-day, many stacked PRs, a fleet of subagents under one coordinator) routes to **Orchestrate** instead. figure-it-out designs one bespoke run, orchestrate runs the program.
 
@@ -133,7 +130,7 @@ For other work, a large or cross-cutting effort (a migration across many call si
 - **Authoring or modifying a skill.** Writing or editing a SKILL.md. `playbooks/authoring-a-skill.md`.
 - **Eval.** Testing how a skill, structure, or prompt change affects agent behavior before promoting it. `playbooks/eval.md`.
 - **Babysit.** Driving a PR or a stack to merge-ready: conflicts, review threads, CI. `playbooks/babysit.md`.
-- **Shipping.** The half after Babysit. Independently verifying a green stack, then landing the contiguous verified run bottom-up through `gh` by default or Origin when its CLI is available. `playbooks/shipping.md`.
+- **Shipping.** The half after Babysit. Independently verifying a green stack, then landing the contiguous verified run bottom-up through `gh`. `playbooks/shipping.md`.
 - **Autonomous run.** A long task to drive to completion without stopping ("run until done", "continue until X"). `playbooks/autonomous-run.md`.
 - **Orchestrate.** A standing project handed to one coordinator chat: multi-day, many stacked PRs, dozens to hundreds of subagents, minimal human turns ("run this whole project", "own this migration until it lands"). Distinct from Autonomous run, which drives one task to a predicate. Work one agent could finish inside the session's budget routes there, not here, however program-shaped the phrasing sounds. `playbooks/orchestrate.md`.
 - **Autopilot-full.** A queue of independent PRs run to merged with full autonomy. One owner per PR carries build through merge, and the root swarm-verifies each merge-ready head before its owner merges ("autopilot this queue", "full autopilot", one-owner-per-PR programs). `playbooks/autopilot-full.md`.
@@ -142,4 +139,3 @@ For other work, a large or cross-cutting effort (a migration across many call si
 - **Pause safely.** Suspending in-flight work cleanly so it can be resumed, on an explicit pause, going offline, an agent-tool restart, or imminent context compaction. The complement to Session pickup. Full steps: `playbooks/pause-safely.md`.
 - **Multi-phase or multi-PR plan.** Write a plan for work that spans phases or stacked PRs. Outside a named run whose playbook owns topology or landing, build a stack under Feature or Refactoring with `gh-stack`. A request for both plans first, then executes on the operator's explicit go under the execution playbook the plan names. `playbooks/multi-phase-plan.md`.
 - **Worktree and simulator cleanup.** Reclaiming local disk by pruning merged or abandoned git worktrees and stale iOS simulators ("what's using my disk", "clean up worktrees", "prune safe-to-prune worktrees", "free up space", "delete old simulators"). `playbooks/worktree-cleanup.md`.
-- **Opening a PR.** Invoked at the end of every other playbook. `playbooks/opening-a-pr.md`.

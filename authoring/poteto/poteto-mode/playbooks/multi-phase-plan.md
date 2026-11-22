@@ -53,7 +53,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
   - [ ] poteto-mode's `playbooks/<execution playbook>.md`
   - [ ] the swarm skill's `SKILL.md`
   - [ ] `git show origin/main:<control skill path>`
-  - [ ] poteto-mode's `playbooks/opening-a-pr.md`
+  - [ ] the **file-pr** skill
   - [ ] each other skill the program uses, from its installed copy
 - [ ] Arm the 30-minute audit tick. Use a supported scheduler or monitored watcher with bounded waits, and record the next audit time. If the harness cannot wake an idle session, checkpoint the next check and state that unattended continuation is unavailable.
 - [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk and goal.md. Audit the operation against both and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stop a stuck lane, confirm it has stopped writing, then dispatch its replacement. Then send the operator a status message, whether or not anything changed, with the queue table of PR, owner, state, and head SHA, the verdicts since the last tick, what merged, open operator gates, and blockers."
@@ -70,8 +70,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 ### PR mechanics, for every PR
 
-- [ ] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
-- [ ] Open the PR ready, never draft, with `origin pr create --status open --base <base-branch>` or `gh pr create --base <base-branch>` according to the resolved forge. A stack child targets its parent branch.
+- [ ] Open the PR ready, never draft, with `gh pr create --base <base-branch>`. A stack child targets its parent branch.
 - [ ] Include `Part of #<N> · Step <X> of <Y>` in the PR body, naming the tracking issue and step.
 - [ ] Run the repo's lint and typecheck once before the PR-facing push. Push with hooks on.
 - [ ] Remove redundant abstractions, dead code, and debug leftovers before each commit; load `no-comments` before review when the diff changes source code.
