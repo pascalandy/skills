@@ -16,10 +16,10 @@ Delegate every task-related tool call to one agent for the whole task. You choos
 5. Before sending task operations, verify the started or recovered child's provider instance, driver, exact model, and effort against the selected candidate using harness metadata. In T3, use the verified provider instance's driver from capabilities. If any setting differs or cannot be verified, stop selection and report the blocked operation.
 6. Keep the verified agent for the task, including after tool errors. Send shared context once. Give each operation an ID, the exact tool, its arguments or the rule for deriving them, and the evidence you need to verify the result. For shell commands, include the absolute working directory.
    - If one call suffices, send it to the agent. Group calls when doing so saves a round trip or reduces the output you need to read.
-   - If an authorized script can call the tools, send the smallest script that follows the dependencies. Otherwise, send independent calls in batches and use each batch's results to prepare the next. Mark safe, independent calls for parallel execution and specify a concurrency limit.
+   - If an authorized script can call the tools, send the smallest script that follows the dependencies. Otherwise, group independent calls into batches. Mark safe, independent calls for parallel execution and specify a concurrency limit.
    - Let the agent chain calls when you can specify how a result determines the next arguments. When the next operation needs your judgment, inspect the evidence before sending it.
-   - Specify the fields or excerpts to extract from each result before combining them. Name any output you need in full. If the combined evidence may exceed the receiving tool's limit, have the agent return it in batches.
-   - If evidence is cut off, request only the missing part by ID, cursor, or range. Keep confirmed results. If an operation's outcome is unclear, verify its state before retrying. Retry only work that is still needed and safe to repeat.
+   - Specify the fields or excerpts to extract from each result before combining them. Name any output you need in full. If the combined evidence may exceed a tool's output limit or the reply size limit, have the agent return it in batches.
+   - If evidence is cut off, request only the missing part by ID, cursor, or range. Keep confirmed results. If an operation's outcome is unclear, verify its state before retrying. Retry only work that is still needed and safe to repeat. Report any required evidence you cannot recover.
 
 Give the agent these rules at startup:
 - Execute calls as specified. Run calls marked parallel concurrently
