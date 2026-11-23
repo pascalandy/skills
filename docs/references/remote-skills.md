@@ -217,7 +217,7 @@ A mode's routes run through that mode's SKILL.md.
 - `rolling-wave-planning`: Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, reporting where the plan stands or what agents can implement, or syncing plan/ markdown to GitHub issues.
 - `statechart`: Use only when explicitly invoked as `statechart`.
 - `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.
-- `tool-call-delegation`: Use when asked to delegate every tool call to Luna.
+- `tool-call-delegation`: Use when asked to delegate every tool call to another agent.
 - `verify-skills`: Use when verifying `just compile-skills`, `just remote-skills`, `just install-skills`, or `just skills-discover` in the skills repository, such as after changing their scripts or adding, renaming, or moving a skill.
 - `verify-transcript`: Use when validating transcript CLI behavior, locating its verification features, or running the paid YouTube end-to-end check.
 - `verify-video-archive`: Use when validating the macOS or Linux archive workflow reached by `just convert-video`, including real media, prerequisites, terminal progress, source safety, locking, and recovery.

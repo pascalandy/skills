@@ -1,6 +1,6 @@
 ---
 name: "tool-call-delegation"
-description: "Use when asked to delegate every tool call to Luna."
+description: "Use when asked to delegate every tool call to another agent."
 kind: "dev"
 ---
 
