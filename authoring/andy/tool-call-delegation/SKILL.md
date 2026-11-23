@@ -2,15 +2,19 @@
 name: "tool-call-delegation"
 description: "Use when asked to delegate every tool call to another agent."
 kind: "dev"
+configuration-is-needed: true
 ---
 
 ## Tool call delegation
 
-Delegate every task-related tool call to one persistent Luna agent at medium reasoning effort. Use direct calls only to start Luna or communicate with it. You choose the operations, interpret results, and write the final answer.
+Delegate every task-related tool call to one agent for the whole task. You choose the operations, interpret results, and write the final answer. Use direct calls for delegation setup and communication with the agent.
 
-For each operation, send an ID, exact tool and arguments, required output, and absolute working directory for shell commands. Mark safe, independent calls for parallel execution. Inspect prerequisite results before sending dependent calls. If Luna is unavailable, report the blocked operation.
+1. Load `fleet`. Confirm `uv` with `uv --version` ([install uv](https://docs.astral.sh/uv/getting-started/installation/)). Read the ordered candidates with `uv run ~/.pi/agent/skills/fleet/scripts/active_models.py delegation-profile tool-call-delegation`. If Fleet or its profile is missing or invalid, report the setup error before launching an agent.
+2. Use the harness's delegation tools. In T3, load `t3-runtime` and check `orchestrator_capabilities` to match each candidate's driver, exact model and effort to an enabled provider that can run child tasks. Map the effort to the option advertised for that model. Use the caller's explicit model or effort when supplied. Report an unavailable explicit choice unless the caller authorized a fallback.
+3. Try eligible candidates in profile order. Advance if the model or effort is unavailable, or the launch failed before any execution and the harness confirms no child started. If the launch outcome is unclear, report the uncertainty before sending any work to another agent. Keep the first successfully launched agent for the task, including tool errors. If no candidate can start, report why each failed and which operation is blocked.
+4. Send each operation to the same agent with an ID, exact tool and arguments, required output, and absolute working directory for shell commands. Mark safe, independent calls for parallel execution. Inspect prerequisite results before sending dependent calls.
 
-Give Luna these rules at startup:
+Give the agent these rules at startup:
 - Execute calls as specified. Run calls marked parallel concurrently
 - Follow each running command to completion. Return its ID, status, and requested output
 - Quote errors exactly. Flag missing or truncated output
