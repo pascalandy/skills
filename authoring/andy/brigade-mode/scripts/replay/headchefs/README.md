@@ -24,3 +24,5 @@ Run `just status-headchefs` to read the local publication receipt. If a delivery
 ## Source and state
 
 `template.html` contains the dashboard interface. `snapshot.py` reads T3 and computes the intervals. The generated pages and the publication receipt stay in the local artifact directory listed by `just refresh-headchefs --help`. A refresh carries forward manual waits and their display title from the preceding local page when the chef and launch match.
+
+The active section includes open Head Chefs even between runs. A Head Chef stays open until T3 settles or archives the thread or its title marks it as finished or stopped. A run in progress in the brigade also keeps its Head Chef active. Active timelines extend to the capture time. Only the Head Chef's own runs count toward their active hours.

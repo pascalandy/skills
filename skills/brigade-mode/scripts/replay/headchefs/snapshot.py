@@ -58,6 +58,7 @@ class Chef(TypedDict):
     id: str
     title: str
     state: str
+    isActive: NotRequired[bool]
     lastActivity: int
     chart: Chart
 
@@ -218,11 +219,12 @@ def _capture(
         days=HISTORY_DAYS - 1
     )
     oldest = _milliseconds(datetime.combine(history_start, time.min, MONTREAL))
-    threads: dict[str, tuple[str, str]] = {
-        thread: (title, created)
-        for thread, title, created in db.execute(
+    threads: dict[str, tuple[str, str, str | None, str | None]] = {
+        thread: (title, created, archived, settled)
+        for thread, title, created, archived, settled in db.execute(
             """
-            select thread_id, title, created_at
+            select thread_id, title, created_at, archived_at,
+                   json_extract(payload_json, '$.settledAt')
             from orchestration_v2_projection_threads where deleted_at is null
             """
         )
@@ -251,12 +253,14 @@ def _capture(
     }
     known_threads = set(threads)
     chefs: list[Chef] = []
-    for root, (title, created) in threads.items():
+    for root, (title, created, archived, settled) in threads.items():
         heading = HEAD_CHEF.match(title)
         if not heading or not root.lower().endswith(short_id := heading[1].lower()):
             continue
 
         kickoff = _timestamp(created)
+        if kickoff >= reference:
+            continue
         rows: dict[Lane, list[Interval]] = {lane: [] for lane in LANES}
         for thread in sorted(_relatives(db, root, known_threads, delegated)):
             role = (
@@ -267,9 +271,12 @@ def _capture(
             if role is not None:
                 for lane, item in _work_intervals(db, thread, reference, kickoff, role):
                     rows[lane].append(item)
-        if not rows["head"]:
-            continue
         state = "Arrêté" if "⏹" in title else "Terminé" if "⛳" in title else "En pause"
+        running = any(item.get("running") for items in rows.values() for item in items)
+        is_open = not (archived or settled) and state == "En pause"
+        is_active = running or is_open
+        if not is_active and not rows["head"]:
+            continue
         manual = annotations.get((short_id, kickoff))
         if manual:
             title, waits = manual
@@ -279,25 +286,29 @@ def _capture(
                 if kickoff <= item["start"] < item["end"] <= reference
             ]
 
-        last = max(item["end"] for items in rows.values() for item in items)
-        if last < oldest:
+        last = max(
+            (item["end"] for items in rows.values() for item in items), default=kickoff
+        )
+        if not is_active and last < oldest:
             continue
         for items in rows.values():
             items.sort(key=_interval_order)
         _distribute_production(rows, kickoff)
         active = _covered(rows["head"])
+        cutoff = reference if is_active else last
 
         chefs.append(
             {
                 "id": short_id,
                 "title": title,
                 "state": state,
+                "isActive": is_active,
                 "lastActivity": last,
                 "chart": {
                     "start": kickoff,
-                    "cutoff": last,
+                    "cutoff": cutoff,
                     "active": active,
-                    "idle": last - kickoff - active,
+                    "idle": cutoff - kickoff - active,
                     "rows": [{"style": lane, "items": rows[lane]} for lane in LANES],
                 },
             }
@@ -328,6 +339,12 @@ def _running(chef: Chef) -> bool:
     )
 
 
+def _is_active(chef: Chef) -> bool:
+    if "isActive" in chef:
+        return chef["isActive"]
+    return _running(chef)
+
+
 def _validate_chart(chef: Chef, reference: int) -> None:
     chart = chef["chart"]
     start, cutoff = chart["start"], chart["cutoff"]
@@ -335,13 +352,13 @@ def _validate_chart(chef: Chef, reference: int) -> None:
         type(value) is int for value in (start, cutoff, chart["active"], chart["idle"])
     ):
         raise SnapshotError("chart bounds and totals must be integer milliseconds")
-    if not start < cutoff <= reference or chef["lastActivity"] != cutoff:
+    if not start < cutoff <= reference:
         raise SnapshotError("chart bounds exceed the snapshot")
+    if "isActive" in chef and type(chef["isActive"]) is not bool:
+        raise SnapshotError("the Head Chef activity flag must be boolean")
     if tuple(row["style"] for row in chart["rows"]) != LANES:
         raise SnapshotError("chart lanes are missing or out of order")
     head_runs = chart["rows"][0]["items"]
-    if not head_runs:
-        raise SnapshotError("chart has no Head Chef runs")
     last = start
     for row in chart["rows"]:
         items = row["items"]
@@ -361,8 +378,11 @@ def _validate_chart(chef: Chef, reference: int) -> None:
             if item.get("running") and item["end"] != reference:
                 raise SnapshotError("active interval does not reach the snapshot time")
             last = max(last, item["end"])
-    if last != cutoff:
-        raise SnapshotError("chart end differs from the last interval")
+    is_active = _is_active(chef)
+    if not is_active and (_running(chef) or not head_runs):
+        raise SnapshotError("inactive chart must have completed Head Chef activity")
+    if last != chef["lastActivity"] or cutoff != (reference if is_active else last):
+        raise SnapshotError("chart end differs from the activity window")
     active = _covered(head_runs)
     if chart["active"] != active or chart["idle"] != cutoff - start - active:
         raise SnapshotError("active and idle totals do not match the Head Chef's runs")
@@ -414,7 +434,7 @@ def render(snapshot: Snapshot) -> str:
 
 def summary(snapshot: Snapshot) -> dict[str, object]:
     reference = snapshot["reference"]
-    active = [chef["id"] for chef in snapshot["chefs"] if _running(chef)]
+    active = [chef["id"] for chef in snapshot["chefs"] if _is_active(chef)]
     return {
         "reference": reference,
         "capture_montreal": (EPOCH + reference * MILLISECOND)

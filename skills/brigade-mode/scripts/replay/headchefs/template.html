@@ -464,6 +464,7 @@ const perPage=6;
 const state={period:7,page:0};
 const inProgress=run=>run.running===true&&run.start<=snapshot.reference&&run.end===snapshot.reference;
 const ongoing=chef=>chef.chart.rows.flatMap(row=>row.items.filter(inProgress));
+const isActive=chef=>chef.isActive??ongoing(chef).length>0;
 const chefKeys=new Map();
 const usedKeys=new Set();
 for(const [index,chef] of snapshot.chefs.entries()){
@@ -471,9 +472,9 @@ for(const [index,chef] of snapshot.chefs.entries()){
   chefKeys.set(chef,key);
   usedKeys.add(key);
 }
-const activeChefs=snapshot.chefs.filter(chef=>ongoing(chef).length);
+const activeChefs=snapshot.chefs.filter(isActive);
 const [latestInactive,...otherInactive]=snapshot.chefs
-  .filter(chef=>!ongoing(chef).length&&chef.lastActivity<=snapshot.reference)
+  .filter(chef=>!isActive(chef)&&chef.lastActivity<=snapshot.reference)
   .sort((a,b)=>b.lastActivity-a.lastActivity);
 const activeTimelines=[];
 let opened=null;
@@ -510,9 +511,11 @@ function attachTimeline(container,chef,{active=false,showTitle=true}={}){
   for(const track of figure.querySelectorAll(".track"))track.setAttribute("aria-describedby",keys.id);
   container.append(figure);
   const data=chef.chart;
-  if(active&&!data.rows[0].items.some(inProgress)){
+  const names=active&&!data.rows[0].items.some(inProgress)
+    ? [...new Set(ongoing(chef).map(run=>run.label))]
+    : [];
+  if(names.length){
     const label=figure.querySelector(".active-work");
-    const names=[...new Set(ongoing(chef).map(run=>run.label))];
     label.textContent=names.join(", ")+" en cours";
     label.hidden=false;
   }
