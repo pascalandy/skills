@@ -29,6 +29,36 @@ transcript url *args:
 transcript-auth-refresh *args:
     @uv run --quiet authoring/andy/transcript/scripts/transcript.py auth refresh "$@"
 
+# Generate, verify, and publish the Head Chefs dashboard at its existing URL
+[group('commands')]
+[no-exit-message]
+refresh-headchefs *args:
+    @uv run --quiet authoring/andy/brigade-mode/scripts/replay/headchefs_dashboard.py refresh "$@"
+
+# Generate a local Head Chefs dashboard preview from T3
+[group('commands')]
+[no-exit-message]
+build-headchefs *args:
+    @uv run --quiet authoring/andy/brigade-mode/scripts/replay/headchefs_dashboard.py build "$@"
+
+# Check the Head Chefs dashboard preview and its time totals
+[group('commands')]
+[no-exit-message]
+check-headchefs *args:
+    @uv run --quiet authoring/andy/brigade-mode/scripts/replay/headchefs_dashboard.py check "$@"
+
+# Read the Head Chefs publication receipt locally
+[group('commands')]
+[no-exit-message]
+status-headchefs *args:
+    @uv run --quiet authoring/andy/brigade-mode/scripts/replay/headchefs_dashboard.py status "$@"
+
+# Resume a saved Head Chefs publication attempt
+[group('commands')]
+[no-exit-message]
+retry-headchefs *args:
+    @uv run --quiet authoring/andy/brigade-mode/scripts/replay/headchefs_dashboard.py retry "$@"
+
 # Install skills/ into the agent skill directories
 [group('commands')]
 [no-exit-message]
