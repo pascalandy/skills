@@ -7,13 +7,13 @@ tags:
   - kind/wiki
   - status/open
 date_created: 2026-09-26
-date_updated: 2026-10-13
+date_updated: 2026-11-24
 ---
 
 # Docs
 
 > Content catalog. Read this first to find relevant pages
-> **Total pages:** 29 | **Last updated:** 2026-10-14
+> **Total pages:** 30 | **Last updated:** 2026-11-24
 
 `AGENTS.md` holds what every session needs. These pages hold procedures that only some tasks need, and the guide teaches readers who never open a terminal
 
@@ -32,6 +32,7 @@ date_updated: 2026-10-13
 |------|-------------|
 | `ideas/references/2026-10-13-verify-and-diagnose/design.md` | Agreed design, distilled from Cindy Sridharan's debugging post: one workflow for a feature request and a bug, each project's verify loop, the new `diagnose` skill, adversarial review in `interrogate`, and edits to existing skills |
 | `ideas/references/2026-10-13-verify-and-diagnose/plan.md` | Build order for that design, in phases that each end on a check |
+| `ideas/references/2026-11-24-headchefs-shadcn/plan.md` | Build shadcn/ui controls once and reuse the standalone dashboard template on every data refresh |
 
 ### kind/doc
 
