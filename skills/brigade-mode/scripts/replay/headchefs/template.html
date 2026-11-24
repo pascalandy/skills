@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Head Chefs</title>
+<meta name="description" content="Gantt des Head Chefs actifs et historique jusqu’à 90 jours.">
+<meta property="og:title" content="Head Chefs">
+<meta property="og:description" content="Gantt actifs en plein écran et historique à ouvrir par Head Chef.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath stroke='%23f68a38' stroke-width='4' stroke-linecap='round' d='M6 8h12m-8 8h16M6 24h13'/%3E%3C/svg%3E">
+<script>
+const themeKey="headchefs.theme";
+const linkedTheme=new URL(location.href).searchParams.get("theme");
+let savedTheme;
+try { savedTheme=localStorage.getItem(themeKey); } catch {}
+document.documentElement.dataset.theme=linkedTheme??savedTheme??"t3-code";
+</script>
+<style>
+:root {
+  color-scheme: light dark;
+  --background: light-dark(oklch(99.2% 0 0),#0a0a0a);
+  --foreground: light-dark(#18181b,#f1f3f7);
+  --preset-muted: light-dark(#52525b,#a3a3a3);
+  --line: light-dark(#e4e4e7,#282828);
+  --muted: color-mix(in oklab,var(--preset-muted) 93%,var(--foreground));
+  --midnight: color-mix(in oklab,var(--muted) 72%,var(--background));
+  --ring: light-dark(#2556d6,#87b0ff);
+  --accent: light-dark(#346bf1,#8bb5ff);
+  --surround: light-dark(
+    color-mix(in oklab,var(--background) 95%,var(--foreground)),
+    color-mix(in oklab,var(--background) 77%,black));
+  --highlight: color-mix(in oklab,var(--accent) 12%,var(--background));
+  --hover: color-mix(in oklab,var(--foreground) 6%,var(--background));
+  --page: light-dark(color-mix(in oklab,var(--background) 96.5%,var(--foreground)),var(--background));
+  --card: light-dark(var(--background),color-mix(in oklab,var(--background) 96%,var(--foreground)));
+  --card-edge: color-mix(in oklab,var(--line) 65%,var(--page));
+  --orange: light-dark(#cc5300,#f68a38);
+  --purple: light-dark(#9153c0,#be92ec);
+  --green-1: light-dark(#249468,#53c993);
+  --green-2: light-dark(#78a62d,#a3c754);
+  --green-3: light-dark(#60c9b0,#85dbc7);
+  --green-4: light-dark(#2f764e,#429966);
+  --blue: light-dark(#2e53b7,#7896f2);
+  --qa-fill: light-dark(#bfc9e7,#28334e);
+  --review: light-dark(#725095,#bfaaea);
+  --slate: light-dark(#6f7886,#818a98);
+  --on-bar: #101914;
+  --rail: 10.25rem;
+  --lane-height: 57px;
+  --mark-height: 24px;
+  --day-height: 32px;
+  --axis-height: 31px;
+}
+:root[data-theme="t3-chat"] {
+  --background:light-dark(oklch(0.982446 0.010114 325.653),oklch(0.22813 0.020366 307.469));
+  --foreground:light-dark(oklch(0.325698 0.116116 325.037),oklch(0.980735 0.004092 301.426));
+  --preset-muted:light-dark(oklch(0.494754 0.190937 354.544),oklch(0.880303 0.03077 342.696));
+  --line:light-dark(oklch(0.923531 0.021247 328.096),oklch(0.266943 0.015262 302.425));
+  --ring:light-dark(oklch(0.591646 0.217985 0.584),oklch(0.591646 0.217985 0.584));
+  --accent:light-dark(oklch(0.591646 0.217985 0.584),oklch(0.460685 0.185347 4.099));
+}
+:root[data-theme="grove"] {
+  --background:light-dark(oklch(0.972369 0.005497 157.15),oklch(0.260865 0.02152 162.75));
+  --foreground:light-dark(oklch(0.222003 0.03479 328.979),oklch(0.990339 0.008411 325.64));
+  --preset-muted:light-dark(oklch(0.540472 0.014944 326.176),oklch(0.666747 0.004239 187.292));
+  --line:light-dark(oklch(0.864831 0.01312 167.255),oklch(0.457475 0.044046 160.971));
+  --ring:light-dark(oklch(0.523295 0.112292 158.089),oklch(0.796228 0.133058 157.319));
+  --accent:light-dark(oklch(0.523295 0.112292 158.089),oklch(0.796228 0.133058 157.319));
+}
+:root[data-theme="ocean"] {
+  --background:light-dark(oklch(0.974199 0.002856 241.597),oklch(0.242641 0.024125 250.573));
+  --foreground:light-dark(oklch(0.222003 0.03479 328.979),oklch(0.990339 0.008411 325.64));
+  --preset-muted:light-dark(oklch(0.541555 0.017468 323.531),oklch(0.652227 0.01149 273.31));
+  --line:light-dark(oklch(0.867646 0.013482 252.362),oklch(0.438653 0.039496 245.44));
+  --ring:light-dark(oklch(0.536684 0.120219 247.01),oklch(0.758933 0.105833 241.548));
+  --accent:light-dark(oklch(0.536684 0.120219 247.01),oklch(0.758933 0.105833 241.548));
+}
+:root[data-theme="ember"] {
+  --background:light-dark(oklch(0.976527 0.002685 60.725),oklch(0.245899 0.019144 42.044));
+  --foreground:light-dark(oklch(0.222003 0.03479 328.979),oklch(0.990339 0.008411 325.64));
+  --preset-muted:light-dark(oklch(0.543023 0.017316 331.964),oklch(0.654017 0.009505 13.287));
+  --line:light-dark(oklch(0.870631 0.013204 39.431),oklch(0.44099 0.040202 48.807));
+  --ring:light-dark(oklch(0.552831 0.129438 44.656),oklch(0.762174 0.124117 52.082));
+  --accent:light-dark(oklch(0.552831 0.129438 44.656),oklch(0.762174 0.124117 52.082));
+}
+:root[data-theme="iris"] {
+  --background:light-dark(oklch(0.976531 0.003855 303.226),oklch(0.225975 0.031062 293.741));
+  --foreground:light-dark(oklch(0.222003 0.03479 328.979),oklch(0.990339 0.008411 325.64));
+  --preset-muted:light-dark(oklch(0.543042 0.018894 325.652),oklch(0.640465 0.016197 304.171));
+  --line:light-dark(oklch(0.869608 0.018226 303.859),oklch(0.40874 0.058536 295.893));
+  --ring:light-dark(oklch(0.525348 0.15373 294.176),oklch(0.671712 0.169136 293.929));
+  --accent:light-dark(oklch(0.525348 0.15373 294.176),oklch(0.671712 0.169136 293.929));
+}
+* { box-sizing:border-box; }
+body {
+  background:var(--surround);
+  color:var(--foreground);
+  font:1rem/1.5 system-ui,-apple-system,sans-serif;
+  margin:0;
+  padding:8px;
+}
+main {
+  background:var(--page);
+  border-radius:9px;
+  min-height:calc(100dvh - 16px);
+  padding:19px;
+}
+figure { margin:0; }
+.timeline-card {
+  min-width:0;
+  padding:16px;
+  background:var(--card);
+  border:1px solid var(--card-edge);
+  border-radius:7px;
+}
+header { margin-bottom:1.25rem; }
+h1 {
+  margin:0;
+  font-size:clamp(.8125rem,3.55vw,1.9375rem);
+  font-weight:690;
+  letter-spacing:-.025em;
+  line-height:1.15;
+  white-space:nowrap;
+}
+.timeline-meta {
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:.45rem 1.5rem;
+  margin:0 0 1rem;
+  padding:.8rem 0;
+  border-top:1px solid var(--line);
+  color:var(--muted);
+  font-size:.875rem;
+  font-variant-numeric:tabular-nums;
+}
+.timeline-meta p { margin:0; }
+.timeline-dates { display:flex; flex-wrap:wrap; gap:.18rem 1.25rem; overflow:hidden; }
+.timeline-dates p { position:relative; white-space:nowrap; }
+.timeline-separator { position:absolute; inset-inline-start:-.8rem; inset-block-start:0; }
+.timeline-meta time { color:var(--foreground); white-space:nowrap; }
+.chef-totals {
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:0 .55rem;
+}
+.chef-comparison { color:var(--foreground); font-weight:650; white-space:nowrap; }
+.plot { position:relative; display:grid; grid-template-columns:var(--rail) minmax(0,1fr); }
+.days,.axis,.track { position:relative; min-width:0; }
+.days { height:var(--day-height); }
+.axis { height:var(--axis-height); }
+.zone { padding:.15rem .5rem 0 0; color:var(--muted); font-size:.8125rem; line-height:1.2; }
+.day-band {
+  position:absolute; top:0; display:flex; align-items:flex-start;
+  height:100%;
+}
+.day-band:not(:first-child) { border-left:1px solid var(--line); }
+.day-label {
+  position:absolute; top:0; color:var(--muted); font-size:.8125rem;
+  font-weight:650; white-space:nowrap;
+}
+.plot.days-only { --axis-height:0px; }
+.tick {
+  position:absolute; top:.25rem; width:42px; text-align:center;
+  white-space:nowrap; font-size:.75rem; color:var(--muted); font-variant-numeric:tabular-nums;
+}
+.guides { position:absolute; inset:calc(var(--day-height) + var(--axis-height)) 0 0 var(--rail); pointer-events:none; }
+.guide { position:absolute; height:100%; width:1px; background:var(--line); opacity:.7; }
+.guide.midnight { background:var(--midnight); opacity:1; }
+.time-window {
+  position:absolute; inset-block:0;
+  background:color-mix(in oklab,var(--accent) 8%,transparent);
+  border-inline:1px solid color-mix(in oklab,var(--accent) 32%,transparent);
+}
+.lane,.track { height:var(--lane-height); border-top:1px solid var(--line); }
+.lane {
+  display:flex; align-items:center; gap:.575rem; padding-right:.5rem;
+  font-size:.875rem; font-weight:620; line-height:1.2;
+}
+.lane.parallel { padding-left:1.1rem; color:var(--muted); font-weight:520; }
+.key { width:8px; height:8px; border-radius:2px; flex:none; background:var(--tone); }
+.head { --tone:var(--orange); }
+.wait { --tone:var(--slate); }
+.plan { --tone:var(--purple); }
+.production,.cook1-1 { --tone:var(--green-1); }
+.cook2-1 { --tone:var(--green-2); }
+.cook3-1 { --tone:var(--green-3); }
+.cook4-1 { --tone:var(--green-4); }
+.qa { --tone:var(--blue); }
+.review { --tone:var(--review); }
+.track { touch-action:pan-y; }
+.track:focus-visible { outline:2px solid var(--ring); outline-offset:-2px; z-index:2; }
+.rail { position:absolute; top:calc((var(--lane-height) - 3px)/2); width:100%; height:2px; background:var(--line); pointer-events:none; }
+.mark {
+  position:absolute;
+  top:var(--mark-top);
+  display:block; height:var(--drawn-mark-height);
+  border:0; border-radius:2px;
+  background:var(--tone); color:var(--on-bar);
+  cursor:pointer; overflow:hidden;
+}
+.mark.thin { border-radius:0; }
+.mark.selected { outline:2px solid var(--ring); outline-offset:1px; z-index:1; }
+.mark.cluster::after {
+  content:""; position:absolute; top:50%; inset-inline:0;
+  height:2px; background:var(--card); pointer-events:none;
+}
+.mark.wait {
+  border:1px solid var(--slate); color:var(--foreground);
+  background:repeating-linear-gradient(135deg,
+    color-mix(in oklab,var(--slate) 51%,var(--background)) 0 4px,
+    color-mix(in oklab,var(--slate) 28%,var(--background)) 4px 8px);
+}
+.mark.cook3-1 { border:1px solid light-dark(#2b6956,transparent); }
+.mark.plan,.mark.cook4-1 { color:light-dark(#ffffff,var(--on-bar)); }
+.mark.qa { color:var(--foreground); background:var(--qa-fill); border:1px solid var(--blue); }
+.mark.running { border-radius:2px 0 0 2px; border-right:2px dotted var(--card); }
+.mark span {
+  display:block; margin:0 .35rem;
+  font-size:.75rem; font-weight:710; line-height:calc(var(--drawn-mark-height) - 2px);
+  white-space:nowrap; pointer-events:none;
+}
+.detail {
+  --detail-time-width:35%;
+  --detail-length-width:24%;
+  border-top:1px solid var(--line);
+  padding:.9rem 0 0;
+  min-height:3rem;
+  color:var(--muted);
+  font-size:.9375rem;
+  line-height:1.4;
+}
+.detail-summary,.detail-table { max-inline-size:42rem; }
+.detail-summary { overflow-wrap:anywhere; }
+.detail-summary:has(strong) {
+  display:grid; grid-template-columns:minmax(0,1fr) var(--detail-time-width) var(--detail-length-width);
+  align-items:baseline;
+}
+.detail-summary strong { color:var(--foreground); font-weight:680; }
+.detail-span { padding-inline-start:.6rem; text-align:end; }
+.detail-span,.run-time,.run-length { font-variant-numeric:tabular-nums; }
+.detail-table {
+  inline-size:100%; table-layout:fixed; border-collapse:collapse;
+  font-size:.875rem; overflow-wrap:anywhere;
+  margin-block-start:.35rem;
+}
+.detail-table col:nth-child(2) { inline-size:var(--detail-time-width); }
+.detail-table col:nth-child(3) { inline-size:var(--detail-length-width); }
+.detail-table td { padding:.15rem 0; vertical-align:top; }
+.detail-table td + td { padding-inline-start:.6rem; }
+.detail-table th { text-align:start; font-weight:650; }
+.detail-table th[scope="rowgroup"] {
+  border-top:1px solid var(--line);
+  color:var(--foreground);
+  padding:.4rem 0 .15rem;
+}
+.detail-table tbody:first-of-type th[scope="rowgroup"] { border-top:0; }
+.run-name { color:var(--foreground); }
+.run-time,.run-length { text-align:end; }
+.run-status { display:block; color:var(--muted); font-size:.8125rem; }
+.visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media (forced-colors:active) {
+  .mark { forced-color-adjust:none; background:Highlight; color:HighlightText; }
+  .mark.wait { background:GrayText; color:Canvas; }
+}
+@media (max-width:680px) {
+  :root { --rail:6.25rem; --lane-height:49px; --mark-height:22px; }
+  body { padding:4px; }
+  main { padding:12px 7px; min-height:calc(100dvh - 8px); }
+  .timeline-card { padding:10px 7px; }
+  header { margin-bottom:1rem; }
+  .timeline-meta { font-size:.8125rem; }
+  .lane { font-size:.75rem; gap:.375rem; }
+  .lane.parallel { padding-left:.7rem; }
+  .detail-table { font-size:.8125rem; }
+  .mark span { margin-inline:.25rem; }
+}
+
+
+[hidden] { display:none!important; }
+button { color:inherit; font:inherit; cursor:pointer; }
+button:focus-visible,select:focus-visible,[tabindex="-1"]:focus-visible {
+  outline:2px solid var(--ring); outline-offset:2px;
+}
+.top {
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:.35rem 1rem; margin:0 0 1.25rem;
+}
+.top h1 { font-size:clamp(1.8rem,3.2vw,2.5rem); }
+.theme-picker { display:flex; align-items:center; gap:.4rem; font-size:.8125rem; color:var(--muted); }
+.theme-picker select {
+  min-height:36px; padding:.3rem .45rem; font:inherit; color:var(--foreground);
+  background:var(--background); border:1px solid var(--line); border-radius:4px;
+}
+.periods,.pager {
+  display:flex; align-items:center; flex-wrap:wrap; gap:.45rem;
+}
+.periods button,.pager button {
+  min-height:44px; border:1px solid var(--line); border-radius:4px;
+  padding:.35rem .75rem; background:transparent; font-size:.875rem; font-weight:620;
+}
+button[aria-pressed="true"] { border-color:var(--ring); background:var(--highlight); }
+button:disabled { cursor:default; color:var(--muted); opacity:.75; }
+.section-head {
+  display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between;
+  gap:.7rem 1rem; margin:0 0 .85rem;
+}
+.section-head h2 { font-size:1.125rem; font-weight:710; margin:0; line-height:1.2; }
+.active-list { display:grid; gap:1rem; }
+.timeline-title { margin:0 0 .9rem; }
+.active-work { color:var(--muted); font-size:.875rem; margin:.35rem 0 0; }
+.cook5-1 { --tone:light-dark(#91c7a4,#a2ddb9); }
+.mark.cook5-1 { border:1px solid light-dark(#2b6956,transparent); }
+.timeline-title h3 {
+  font-size:clamp(.75rem,3.75vw,1.75rem); margin:0; line-height:1.2;
+  font-weight:690; letter-spacing:-.024em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.archive-section {
+  margin-top:2rem;
+  scroll-margin-top:1rem;
+}
+.archive-meta { color:var(--muted); font-size:.875rem; margin:.2rem 0 .65rem; }
+.archive-list { list-style:none; padding:0; margin:.8rem 0 0; border-top:1px solid var(--line); }
+.archive-list > li { border-bottom:1px solid var(--line); }
+.archive-entry {
+  width:100%; min-height:56px; background:transparent; border:0;
+  display:grid; grid-template-columns:1fr auto; align-items:center; gap:.4rem 1rem;
+  padding:.65rem .5rem; text-align:left;
+}
+.archive-entry .name { font-weight:680; font-size:.9375rem; }
+.archive-entry .when { color:var(--muted); font-size:.8125rem; }
+.archive-entry .mark-open {
+  display:inline-grid; place-items:center; width:1.5rem; height:1.5rem;
+  border:1px solid var(--line); border-radius:4px; font-weight:750;
+}
+.archive-entry[aria-expanded="true"] {
+  background:var(--highlight);
+}
+.archive-entry[aria-expanded="true"] .mark-open { border-color:var(--ring); }
+.archive-detail { padding:.35rem 0 .75rem; }
+.archive-history { margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--line); }
+.archive-history h3 { margin:0; font-size:1rem; font-weight:660; }
+.pager { margin:.8rem 0 .55rem; }
+.pager [data-page-status] { font-size:.875rem; color:var(--muted); }
+.empty { color:var(--muted); font-size:1rem; margin:.75rem 0 1.2rem; }
+@media (hover:hover) {
+  button:not(:disabled):hover { background:var(--hover); }
+}
+@media (max-width:680px) {
+  .top { column-gap:.5rem; }
+  .theme-picker select { min-height:44px; }
+  .archive-section { margin-top:1.6rem; }
+  .timeline-title { container-type:inline-size; }
+  .timeline-title h3 { font-size:clamp(.875rem,5.4cqi,1.45rem); }
+  .archive-entry .name { font-size:.875rem; }
+}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <h1>Head Chefs</h1>
+  <label class="theme-picker">Thème
+    <select id="theme">
+      <option value="t3-code">T3 Code</option>
+      <option value="t3-chat">T3 Chat</option>
+      <option value="grove">Grove</option>
+      <option value="ocean">Ocean</option>
+      <option value="ember">Ember</option>
+      <option value="iris">Iris</option>
+    </select>
+  </label>
+</header>
+<section aria-label="Head Chefs actifs">
+ <p class="empty" id="active-empty" hidden>Aucun Head Chef actif.</p>
+ <div class="active-list"></div>
+</section>
+<section class="archive-section" aria-labelledby="inactifs">
+ <div class="section-head"><h2 id="inactifs">Inactifs</h2></div>
+ <div class="latest-archive"></div>
+ <p class="empty" id="no-archives" hidden>Aucun Head Chef inactif.</p>
+ <section class="archive-history" aria-labelledby="archive-history-title">
+  <div class="section-head">
+   <h3 id="archive-history-title">Autres inactifs</h3>
+   <div class="periods" role="group" aria-label="Période de l’historique">
+     <button type="button" data-period="7" aria-pressed="true">7 jours</button>
+     <button type="button" data-period="15" aria-pressed="false">15 jours</button>
+     <button type="button" data-period="30" aria-pressed="false">30 jours</button>
+     <button type="button" data-period="60" aria-pressed="false">60 jours</button>
+     <button type="button" data-period="90" aria-pressed="false">90 jours</button>
+   </div>
+ </div>
+ <p class="archive-meta"></p>
+ <div class="pager" role="group" aria-label="Pages de l’historique">
+   <button type="button" data-page="-1">Précédente</button>
+   <button type="button" data-page="1">Suivante</button>
+   <span data-page-status tabindex="-1" role="status"></span>
+ </div>
+ <p class="empty" id="archive-empty" hidden></p>
+ <ul class="archive-list"></ul>
+ </section>
+</section>
+<noscript>Active JavaScript pour lire la chronologie interactive.</noscript>
+</main>
+<template id="timeline"><figure class="timeline-card">
+<header class="timeline-title"><h3 data-title></h3><p class="active-work" hidden></p></header>
+<div class="timeline-meta">
+ <div class="timeline-dates">
+   <p data-kickoff><span aria-hidden="true">🚀</span> </p>
+   <p data-cutoff><span class="timeline-separator" aria-hidden="true">|</span><span aria-hidden="true">🔄</span> </p>
+ </div>
+ <p class="chef-totals">
+   <span>Cumul depuis le lancement</span>
+   <span class="chef-comparison"><span data-active></span> · <span data-idle></span></span>
+ </p>
+</div>
+<div class="plot">
+ <div class="guides" aria-hidden="true"></div>
+ <div class="zone">Montréal</div>
+ <div class="days" aria-hidden="true"></div>
+ <div aria-hidden="true"></div>
+ <div class="axis" aria-hidden="true"></div>
+ <div class="lane head"><span class="key" aria-hidden="true"></span>Head Chef</div><div class="track" role="group" tabindex="0" aria-label="Runs du Head Chef"></div>
+ <div class="lane wait"><span class="key" aria-hidden="true"></span>Attentes</div><div class="track" role="group" tabindex="0" aria-label="Attentes documentées"></div>
+ <div class="lane production"><span class="key" aria-hidden="true"></span>Planner et Cooks</div><div class="track" role="group" tabindex="0" aria-label="Runs du Planner et des Cooks"></div>
+ <div class="lane parallel">En parallèle</div><div class="track" role="group" tabindex="0" aria-label="Runs en parallèle du Planner et des Cooks"></div>
+ <div class="lane qa"><span class="key" aria-hidden="true"></span>QA</div><div class="track" role="group" tabindex="0" aria-label="Runs de QA"></div>
+ <div class="lane review"><span class="key" aria-hidden="true"></span>Revues et design</div><div class="track" role="group" tabindex="0" aria-label="Runs des agents de revue et de conception"></div>
+</div>
+<span data-keys class="visually-hidden">Utilise les flèches gauche et droite pour parcourir les barres.</span>
+<div class="detail">
+ <div class="detail-summary" role="status" aria-atomic="true"></div>
+ <table class="detail-table" aria-label="Runs pendant la période" hidden>
+  <colgroup><col><col><col></colgroup>
+  <thead class="visually-hidden"><tr><th scope="col">Run</th><th scope="col">Horaire</th><th scope="col">Durée</th></tr></thead>
+ </table>
+</div>
+<noscript>Active JavaScript pour lire la chronologie interactive.</noscript>
+</figure></template>
+<script>
+const snapshot={"reference":0,"chefs":[]};
+const HOUR=3600000;
+const zone={timeZone:"America/Montreal"};
+const day=new Intl.DateTimeFormat("fr-CA",{...zone,month:"short",day:"numeric"});
+const fullDate=new Intl.DateTimeFormat("fr-CA",{...zone,year:"numeric",month:"short",day:"numeric"});
+const hour=new Intl.DateTimeFormat("fr-CA",{...zone,hour:"2-digit",hourCycle:"h23"});
+const isoHour=new Intl.DateTimeFormat("en-GB",{...zone,hour:"2-digit",hourCycle:"h23"});
+
+const template=document.querySelector("#timeline");
+const activeList=document.querySelector(".active-list");
+const archiveList=document.querySelector(".archive-list");
+const latestArchive=document.querySelector(".latest-archive");
+const archiveMeta=document.querySelector(".archive-meta");
+const archiveEmpty=document.querySelector("#archive-empty");
+const pager=document.querySelector(".pager");
+const pageStatus=document.querySelector("[data-page-status]");
+const pageButtons=[...document.querySelectorAll("[data-page]")];
+const periods=[...document.querySelectorAll("[data-period]")];
+const activityClock=new Intl.DateTimeFormat("en-GB",{...zone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+const compactTime=value=>activityClock.format(value).replace(":","h");
+const hourAmount=new Intl.NumberFormat("fr-CA",{maximumFractionDigits:2});
+const calendarDate=new Intl.DateTimeFormat("en-CA",{...zone,year:"numeric",month:"2-digit",day:"2-digit"});
+const perPage=6;
+const state={period:7,page:0};
+const inProgress=run=>run.running===true&&run.start<=snapshot.reference&&run.end===snapshot.reference;
+const ongoing=chef=>chef.chart.rows.flatMap(row=>row.items.filter(inProgress));
+const isActive=chef=>chef.isActive??ongoing(chef).length>0;
+const chefKeys=new Map();
+const usedKeys=new Set();
+for(const [index,chef] of snapshot.chefs.entries()){
+  const key=usedKeys.has(chef.id)?chef.id+"-"+index:chef.id;
+  chefKeys.set(chef,key);
+  usedKeys.add(key);
+}
+const activeChefs=snapshot.chefs.filter(isActive);
+const [latestInactive,...otherInactive]=snapshot.chefs
+  .filter(chef=>!isActive(chef)&&chef.lastActivity<=snapshot.reference)
+  .sort((a,b)=>b.lastActivity-a.lastActivity);
+const activeTimelines=[];
+let opened=null;
+
+function headChefTotals(chart){
+  const runs=chart.rows[0].items;
+  let active=0;
+  let coveredUntil=chart.start;
+  for(const run of runs){
+    const start=Math.max(run.start,coveredUntil);
+    const end=Math.min(run.end,chart.cutoff);
+    if(end<=start)continue;
+    active+=end-start;
+    coveredUntil=end;
+  }
+  return {active,idle:chart.cutoff-chart.start-active};
+}
+
+function hours(ms){
+  if(ms>0&&ms<HOUR/200)return "<0,01 h";
+  return hourAmount.format(ms/HOUR)+" h";
+}
+
+function attachTimeline(container,chef,{active=false,showTitle=true}={}){
+  const figure=template.content.firstElementChild.cloneNode(true);
+  const title=figure.querySelector("[data-title]");
+  const keys=figure.querySelector("[data-keys]");
+  title.id="timeline-"+chefKeys.get(chef);
+  title.textContent=chef.title;
+  title.title=chef.title;
+  if(!showTitle)figure.querySelector(".timeline-title").classList.add("visually-hidden");
+  keys.id=title.id+"-keys";
+  figure.setAttribute("aria-labelledby",title.id);
+  for(const track of figure.querySelectorAll(".track"))track.setAttribute("aria-describedby",keys.id);
+  container.append(figure);
+  const data=chef.chart;
+  const names=active&&!data.rows[0].items.some(inProgress)
+    ? [...new Set(ongoing(chef).map(run=>run.label))]
+    : [];
+  if(names.length){
+    const label=figure.querySelector(".active-work");
+    label.textContent=names.join(", ")+" en cours";
+    label.hidden=false;
+  }
+const axis=figure.querySelector(".axis");
+const days=figure.querySelector(".days");
+const guides=figure.querySelector(".guides");
+const detailSummary=figure.querySelector(".detail-summary");
+const detailTable=figure.querySelector(".detail-table");
+const timeWindow=document.createElement("span");
+timeWindow.className="time-window";
+timeWindow.hidden=true;
+const tracks=[...figure.querySelectorAll(".track")];
+const laneLabels=[...figure.querySelectorAll(".lane")];
+const canHover=matchMedia("(hover: hover)");
+const currentByTrack=tracks.map(()=>0);
+const barsByTrack=tracks.map(()=>[]);
+const range=data.cutoff-data.start;
+let selected=null;
+
+function duration(ms) {
+  const seconds=Math.round(ms/1000);
+  if(seconds===0)return Math.round(ms)+" ms";
+  const parts=[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60];
+  return parts.map((n,i)=>n?n+[" h"," min"," s"][i]:"").filter(Boolean).join(" ");
+}
+
+function timestamp(value) {
+  const date=document.createElement("time");
+  date.dateTime=new Date(value).toISOString();
+  date.title=fullDate.format(value)+" à "+compactTime(value);
+  date.textContent=date.title;
+  return date;
+}
+
+function intervalLabel(start,end,dates){
+  const first=compactTime(start);
+  const last=compactTime(end);
+  if(fullDate.format(start)===fullDate.format(end)){
+    const range=first===last?first:first+"–"+last;
+    return dates?dates.format(start)+", "+range:range;
+  }
+  const dateFormat=dates??day;
+  return dateFormat.format(start)+" à "+first+" – "+dateFormat.format(end)+" à "+last;
+}
+
+function runGroup(items,dates,label){
+  const group=document.createElement("tbody");
+  if(label){
+    const heading=document.createElement("th");
+    heading.scope="rowgroup";
+    heading.colSpan=3;
+    heading.textContent=label;
+    group.insertRow().append(heading);
+  }
+  for(const item of items){
+    const row=group.insertRow();
+    const name=row.insertCell();
+    name.className="run-name";
+    name.textContent=item.label;
+    if(item.running){
+      const status=document.createElement("span");
+      status.className="run-status";
+      status.textContent="En cours";
+      name.append(status);
+    }
+    const when=row.insertCell();
+    when.className="run-time";
+    when.textContent=intervalLabel(item.start,item.end,dates);
+    const length=row.insertCell();
+    length.className="run-length";
+    length.textContent=duration(item.end-item.start);
+  }
+  return group;
+}
+
+function showPeriod(start,end,entries){
+  const selectedItems=new Set(entries);
+  const dates=fullDate.format(start)===fullDate.format(end)?null:day;
+  const groups=[];
+  if(entries.length>1)groups.push(runGroup(entries,dates));
+  for(const [index,row] of data.rows.entries()){
+    const during=[];
+    for(const item of row.items){
+      if(item.start>=end)break;
+      if(item.end<=start||selectedItems.has(item))continue;
+      during.push({...item,start:Math.max(item.start,start),end:Math.min(item.end,end),
+        label:row.style==="head"?item.label.replace(/ du Head Chef$/,""):item.label,
+        running:item.running&&item.end<=end});
+    }
+    if(during.length)groups.push(runGroup(during,dates,laneLabels[index].textContent.trim()));
+  }
+  for(const body of [...detailTable.tBodies])body.remove();
+  detailTable.append(...groups);
+  detailTable.hidden=!groups.length;
+}
+
+function choose(trackIndex,itemIndex,fromPointer=false){
+  const row=data.rows[trackIndex];
+  const bar=barsByTrack[trackIndex].find(entry=>itemIndex>=entry.first&&itemIndex<=entry.last);
+  if(!bar)return;
+  if(selected?.trackIndex===trackIndex&&selected.itemIndex===itemIndex&&selected.fromPointer===fromPointer)return;
+  if(selected)tracks[selected.trackIndex].querySelector(".selected")?.classList.remove("selected");
+  bar.element.classList.add("selected");
+  selected={trackIndex,itemIndex,fromPointer};
+  currentByTrack[trackIndex]=itemIndex;
+  const entries=fromPointer?row.items.slice(bar.first,bar.last+1):[row.items[itemIndex]];
+  const start=entries[0].start;
+  const end=Math.max(...entries.map(item=>item.end));
+  const name=document.createElement("strong");
+  name.textContent=entries.length===1?entries[0].label:entries.length+" runs";
+  const when=document.createElement("span");
+  when.className="detail-span";
+  when.textContent=intervalLabel(start,end,fullDate);
+  const length=document.createElement("span");
+  length.className="detail-span";
+  length.textContent=duration(end-start)+(entries.length===1&&entries[0].running?" · en cours":"");
+  const plot=geometry(axis);
+  const left=plot.position(start);
+  const right=plot.position(end);
+  timeWindow.style.left=Math.min(left,plot.width-1)+"px";
+  timeWindow.style.width=Math.max(1,right-left)+"px";
+  timeWindow.hidden=false;
+  showPeriod(start,end,entries);
+  detailSummary.replaceChildren(name,when,length);
+}
+
+function renderDates(plot) {
+  const starts=[data.start];
+  for(let t=(Math.floor(data.start/HOUR)+1)*HOUR;t<data.cutoff;t+=HOUR){
+    if(isoHour.format(t)==="00")starts.push(t);
+  }
+  days.replaceChildren();
+  const labelEntries=[];
+  for(const [i,start] of starts.entries()){
+    const end=starts[i+1]??data.cutoff;
+    const left=plot.position(start);
+    const band=document.createElement("span");
+    band.className="day-band";
+    band.style.left=left+"px";
+    band.style.width=(plot.position(end)-left)+"px";
+    days.append(band);
+
+    const label=document.createElement("span");
+    label.className="day-label";
+    label.textContent=day.format(start);
+    days.append(label);
+    const width=label.getBoundingClientRect().width;
+    const last=i===starts.length-1;
+    const maxLeft=Math.max(0,plot.width-width);
+    const position=Math.min(maxLeft,left+(i?7:0));
+    const firstRight=labelEntries[0]?.element.getBoundingClientRect().width??0;
+    label.style.left=(last&&i&&position<firstRight+3?maxLeft:position)+"px";
+    labelEntries.push({element:label,priority:i===0?0:last?1:2});
+  }
+  placeTickLabels(labelEntries);
+}
+
+function textBox(element){
+  const range=document.createRange();
+  range.selectNodeContents(element);
+  return range.getBoundingClientRect();
+}
+
+function placeTickLabels(labels){
+  const placed=[];
+  for(const entry of labels.sort((a,b)=>a.priority-b.priority)){
+    const box=textBox(entry.element);
+    const overlaps=placed.some(other=>box.left<other.right+3&&box.right>other.left-3);
+    if(overlaps)entry.element.hidden=true;
+    else placed.push(box);
+  }
+}
+
+function geometry(el){
+  const box=el.getBoundingClientRect();
+  const ratio=devicePixelRatio||1;
+  return {
+    width:box.width,
+    position:ms=>Math.round((box.left+box.width*(ms-data.start)/range)*ratio)/ratio-box.left
+  };
+}
+
+function snapTrack(track){
+  const origin=track.getBoundingClientRect().top+track.clientTop;
+  const ratio=devicePixelRatio||1;
+  const height=Number.parseFloat(getComputedStyle(track).getPropertyValue("--mark-height"));
+  const center=origin+track.clientHeight/2;
+  const top=Math.round((center-height/2)*ratio)/ratio-origin;
+  track.style.setProperty("--mark-top",top+"px");
+  track.style.setProperty("--drawn-mark-height",Math.round(height*ratio)/ratio+"px");
+}
+
+function layoutBars(row,plot){
+  const bars=[];
+  const edge=plot.position(data.cutoff);
+  for(const [index,item] of row.items.entries()){
+    const left=Math.min(plot.position(item.start),edge-2);
+    const right=Math.min(edge,Math.max(left+2,plot.position(item.end)));
+    const previous=bars.at(-1);
+    if(previous&&left<previous.right){
+      previous.last=index;
+      previous.right=Math.max(previous.right,right);
+      previous.running ||= item.running===true;
+      if(previous.label!==item.short)previous.label=undefined;
+    }else{
+      bars.push({first:index,last:index,left,right,running:item.running===true,label:item.short});
+    }
+  }
+  return bars;
+}
+
+function makeMark(bar,item){
+  const element=document.createElement("span");
+  const width=bar.right-bar.left;
+  const clustered=bar.first!==bar.last;
+  element.className="mark "+item.style+(width<7?" thin":"")+(clustered?" cluster":"")+(bar.running?" running":"");
+  element.dataset.bar=String(bar.first);
+  element.style.left=bar.left+"px";
+  element.style.width=width+"px";
+  element.setAttribute("aria-hidden","true");
+  if(bar.label&&width>=bar.label.length*7+12){
+    const label=document.createElement("span");
+    label.textContent=bar.label;
+    element.append(label);
+  }
+  return element;
+}
+
+function render(){
+  const hours=range/HOUR;
+  const dayScale=hours>36;
+  axis.parentElement.classList.toggle("days-only",dayScale);
+  const plot=geometry(axis);
+  renderDates(plot);
+  axis.replaceChildren();
+  guides.replaceChildren(timeWindow);
+  const tickHours=dayScale?24:plot.width<450?4:2;
+  const labels=[];
+  for(let t=Math.ceil(data.start/HOUR)*HOUR;t<data.cutoff;t+=HOUR){
+    const localHour=Number(isoHour.format(t));
+    if(localHour%tickHours!==0)continue;
+    const x=plot.position(t);
+    if(!dayScale){
+      const tick=document.createElement("span");
+      tick.className="tick";
+      tick.style.left=Math.min(Math.max(0,x-21),Math.max(0,plot.width-42))+"px";
+      tick.textContent=hour.format(t);
+      axis.append(tick);
+      const edge=x<21||x+21>plot.width;
+      labels.push({element:tick,priority:localHour===0?0:edge?2:1});
+    }
+    const guide=document.createElement("i");
+    guide.className="guide"+(localHour===0?" midnight":"");
+    guide.style.left=x+"px";
+    guides.append(guide);
+  }
+  placeTickLabels(labels);
+  for(const [trackIndex,track] of tracks.entries()){
+    const row=data.rows[trackIndex];
+    track.hidden=laneLabels[trackIndex].hidden=row.style!=="head"&&row.items.length===0;
+    track.tabIndex=row.items.length?0:-1;
+    if(track.hidden)continue;
+    const trackPlot=geometry(track);
+    snapTrack(track);
+    track.replaceChildren();
+    if(row.style==="head"){
+      const rail=document.createElement("span");
+      rail.className="rail";
+      rail.setAttribute("aria-hidden","true");
+      track.append(rail);
+    }
+    barsByTrack[trackIndex]=layoutBars(row,trackPlot);
+    for(const bar of barsByTrack[trackIndex]){
+      bar.element=makeMark(bar,row.items[bar.first]);
+      track.append(bar.element);
+    }
+  }
+  if(selected){
+    const previous=selected;
+    selected=null;
+    choose(previous.trackIndex,previous.itemIndex,previous.fromPointer);
+  }
+}
+
+function nearestAt(track,event,items){
+  const box=track.getBoundingClientRect();
+  const at=data.start+(event.clientX-box.left)/box.width*range;
+  let distance=Infinity;
+  let closest=0;
+  for(const [i,item] of items.entries()){
+    const delta=Math.max(item.start-at,at-item.end,0);
+    if(delta<distance){
+      distance=delta;
+      closest=i;
+    }
+  }
+  return closest;
+}
+
+for(const [trackIndex,track] of tracks.entries()){
+  track.addEventListener("pointerover",event=>{
+    const bar=event.target.closest("[data-bar]");
+    if(bar&&event.pointerType!=="touch")choose(trackIndex,Number(bar.dataset.bar),true);
+  });
+  track.addEventListener("click",event=>{
+    const bar=event.target.closest("[data-bar]");
+    if(bar)choose(trackIndex,Number(bar.dataset.bar),true);
+    else if(event.pointerType==="touch"||!canHover.matches)choose(trackIndex,nearestAt(track,event,data.rows[trackIndex].items),true);
+  });
+  track.addEventListener("focus",()=>{
+    if(track.matches(":focus-visible"))choose(trackIndex,currentByTrack[trackIndex]);
+  });
+  track.addEventListener("keydown",event=>{
+    const last=data.rows[trackIndex].items.length-1;
+    const current=currentByTrack[trackIndex];
+    const steps={ArrowLeft:Math.max(0,current-1),ArrowRight:Math.min(last,current+1),Home:0,End:last};
+    if(!Object.hasOwn(steps,event.key))return;
+    event.preventDefault();
+    choose(trackIndex,steps[event.key]);
+  });
+}
+
+  const totals=headChefTotals(data);
+  figure.querySelector("[data-active]").textContent=hours(totals.active)+" actives";
+  figure.querySelector("[data-idle]").textContent=hours(totals.idle)+" inactives";
+  figure.querySelector("[data-kickoff]").append("Lancé le ",timestamp(data.start));
+  const updated=figure.querySelector("[data-cutoff]");
+  updated.append(active?"MàJ le ":"Dernière activité le ",timestamp(data.cutoff));
+  detailSummary.textContent="Survole ou touche une barre pour voir ce qui se passe pendant la période.";
+  render();
+
+  const measure=()=>{
+    const box=axis.getBoundingClientRect();
+    return [box.width,box.left,box.top,devicePixelRatio].join(":");
+  };
+  let coordinates=measure();
+  function refresh(){
+    const next=measure();
+    if(coordinates===next)return;
+    coordinates=next;
+    render();
+  }
+  const observer=new ResizeObserver(refresh);
+  observer.observe(axis);
+  return {refresh,dispose:()=>observer.disconnect()};
+}
+
+function startOfPeriod(days){
+  const parts=Object.fromEntries(calendarDate.formatToParts(snapshot.reference).map(({type,value})=>[type,value]));
+  let t=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day)-days+1,12);
+  while(isoHour.format(t)!=="00")t-=HOUR;
+  return t;
+}
+
+function closeArchive(){
+  if(!opened)return;
+  opened.timeline.dispose();
+  opened.panel.replaceChildren();
+  opened.panel.hidden=true;
+  opened.disclosure.textContent="+";
+  opened.button.setAttribute("aria-expanded","false");
+  opened=null;
+}
+
+function addArchive(chef){
+  const row=document.createElement("li");
+  const button=document.createElement("button");
+  const content=document.createElement("span");
+  const title=document.createElement("span");
+  const when=document.createElement("span");
+  const date=document.createElement("time");
+  const disclosure=document.createElement("span");
+  const panel=document.createElement("div");
+  button.type="button";
+  button.className="archive-entry";
+  button.dataset.chef=chef.id;
+  button.setAttribute("aria-expanded","false");
+  panel.className="archive-detail";
+  panel.id="archive-"+chefKeys.get(chef);
+  panel.hidden=true;
+  button.setAttribute("aria-controls",panel.id);
+  title.className="name";
+  title.textContent=chef.title;
+  when.className="when";
+  date.dateTime=new Date(chef.lastActivity).toISOString();
+  date.textContent=day.format(chef.lastActivity)+" à "+compactTime(chef.lastActivity);
+  when.append(date,document.createTextNode(" · "+chef.state));
+  disclosure.className="mark-open";
+  disclosure.setAttribute("aria-hidden","true");
+  disclosure.textContent="+";
+  content.append(title,document.createElement("br"),when);
+  button.append(content,disclosure);
+  button.addEventListener("click",()=>{
+    const active=opened?.button===button;
+    closeArchive();
+    if(!active){
+      panel.hidden=false;
+      disclosure.textContent="−";
+      button.setAttribute("aria-expanded","true");
+      opened={button,panel,disclosure,timeline:attachTimeline(panel,chef,{showTitle:false})};
+    }
+    button.focus({preventScroll:true});
+    button.scrollIntoView({block:"nearest"});
+  });
+  row.append(button,panel);
+  archiveList.append(row);
+}
+
+function renderArchive(){
+  closeArchive();
+  const start=startOfPeriod(state.period);
+  const startLabel=fullDate.format(start);
+  const endLabel=fullDate.format(snapshot.reference);
+  const options=otherInactive.filter(chef=>chef.lastActivity>=start);
+  const offset=state.page*perPage;
+  archiveMeta.hidden=!options.length;
+  archiveMeta.textContent="Dernière activité du "+startLabel+" au "+endLabel+".";
+  archiveEmpty.hidden=options.length!==0;
+  archiveEmpty.textContent="Aucun autre inactif du "+startLabel+" au "+endLabel+".";
+  pager.hidden=options.length<=perPage;
+  pageStatus.textContent=options.length?(offset+1)+" à "+Math.min(options.length,offset+perPage)+" sur "+options.length:"";
+  for(const button of pageButtons){
+    button.disabled=Number(button.dataset.page)<0?state.page===0:offset+perPage>=options.length;
+  }
+  archiveList.hidden=!options.length;
+  archiveList.replaceChildren();
+  for(const chef of options.slice(offset,offset+perPage))addArchive(chef);
+}
+
+function renderActives(){
+  for(const chart of activeTimelines.splice(0))chart.dispose();
+  activeList.replaceChildren();
+  const entries=activeChefs;
+  document.querySelector("#active-empty").hidden=entries.length>0;
+  for(const chef of entries)activeTimelines.push(attachTimeline(activeList,chef,{active:true}));
+}
+for(const button of periods){
+  button.addEventListener("click",()=>{
+    state.period=Number(button.dataset.period);
+    state.page=0;
+    for(const peer of periods)peer.setAttribute("aria-pressed",String(peer===button));
+    renderArchive();
+    button.focus({preventScroll:true});
+  });
+}
+for(const button of pageButtons){
+  button.addEventListener("click",()=>{
+    state.page+=Number(button.dataset.page);
+    renderArchive();
+    (button.disabled?pageStatus:button).focus({preventScroll:true});
+  });
+}
+const theme=document.querySelector("#theme");
+const themes=new Set([...theme.options].map(option=>option.value));
+theme.value=[linkedTheme,savedTheme].find(value=>themes.has(value))??"t3-code";
+
+function applyTheme(value){
+  document.documentElement.dataset.theme=value;
+  const url=new URL(location.href);
+  const current=url.searchParams.getAll("theme");
+  if(current.length===1&&current[0]===value)return;
+  url.searchParams.set("theme",value);
+  try { history.replaceState(history.state,"",url); } catch {}
+}
+
+applyTheme(theme.value);
+theme.addEventListener("change",()=>{
+  applyTheme(theme.value);
+  try { localStorage.setItem(themeKey,theme.value); } catch {}
+});
+
+renderActives();
+latestArchive.hidden=!latestInactive;
+document.querySelector("#no-archives").hidden=Boolean(latestInactive);
+document.querySelector(".archive-history").hidden=!latestInactive;
+const featuredTimeline=latestInactive?attachTimeline(latestArchive,latestInactive):null;
+renderArchive();
+
+function refreshTimelines(){
+  for(const chart of activeTimelines)chart.refresh();
+  featuredTimeline?.refresh();
+  opened?.timeline.refresh();
+}
+const layoutObserver=new ResizeObserver(refreshTimelines);
+layoutObserver.observe(activeList);
+layoutObserver.observe(latestArchive);
+layoutObserver.observe(archiveList);
+addEventListener("resize",refreshTimelines);
+</script>
+</body>
+</html>
