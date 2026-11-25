@@ -10,6 +10,12 @@ import sys
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+from headchefs import snapshot
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser
 
 CLI = Path(__file__).resolve().parents[1] / "headchefs_dashboard.py"
 
@@ -121,3 +127,42 @@ def test_cook_keeps_head_chef_active_without_entering_their_time_total(
     assert rejected.returncode == 1
     assert not rejected.stdout
     assert not json.loads(rejected.stderr.splitlines()[-1])["ok"]
+
+
+def test_selected_bar_shows_a_summary_without_listing_parallel_runs(
+    tmp_path: Path, chromium: Browser
+) -> None:
+    from playwright.sync_api import expect
+
+    hour = 3_600_000
+    rows: list[snapshot.Row] = [{"style": lane, "items": []} for lane in snapshot.LANES]
+    rows[0]["items"].append(
+        {"start": 0, "end": hour, "style": "head", "label": "Session de préparation"}
+    )
+    rows[2]["items"].append(
+        {"start": 0, "end": hour, "style": "plan", "label": "Travail en parallèle"}
+    )
+    chef: snapshot.Chef = {
+        "id": "abcd",
+        "title": "Head Chef abcd",
+        "state": "Actif",
+        "isActive": True,
+        "lastActivity": hour,
+        "chart": {"start": 0, "cutoff": hour, "active": hour, "idle": 0, "rows": rows},
+    }
+    artifact = tmp_path / "dashboard.html"
+    artifact.write_text(
+        snapshot.render({"reference": hour, "chefs": [chef]}), encoding="utf-8"
+    )
+
+    page = chromium.new_page()
+    try:
+        page.goto(artifact.as_uri())
+        page.get_by_role("group", name="Runs du Head Chef", exact=True).locator(
+            ".mark"
+        ).hover()
+        expect(page.get_by_role("status")).to_contain_text("Session de préparation")
+        expect(page.get_by_role("status")).to_contain_text("1 h")
+        expect(page.get_by_role("table")).to_have_count(0)
+    finally:
+        page.close()

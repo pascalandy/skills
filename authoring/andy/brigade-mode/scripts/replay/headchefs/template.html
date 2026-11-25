@@ -230,34 +230,13 @@ h1 {
   font-size:.9375rem;
   line-height:1.4;
 }
-.detail-summary,.detail-table { max-inline-size:42rem; }
-.detail-summary { overflow-wrap:anywhere; }
+.detail-summary { max-inline-size:42rem; overflow-wrap:anywhere; }
 .detail-summary:has(strong) {
   display:grid; grid-template-columns:minmax(0,1fr) var(--detail-time-width) var(--detail-length-width);
   align-items:baseline;
 }
 .detail-summary strong { color:var(--foreground); font-weight:680; }
-.detail-span { padding-inline-start:.6rem; text-align:end; }
-.detail-span,.run-time,.run-length { font-variant-numeric:tabular-nums; }
-.detail-table {
-  inline-size:100%; table-layout:fixed; border-collapse:collapse;
-  font-size:.875rem; overflow-wrap:anywhere;
-  margin-block-start:.35rem;
-}
-.detail-table col:nth-child(2) { inline-size:var(--detail-time-width); }
-.detail-table col:nth-child(3) { inline-size:var(--detail-length-width); }
-.detail-table td { padding:.15rem 0; vertical-align:top; }
-.detail-table td + td { padding-inline-start:.6rem; }
-.detail-table th { text-align:start; font-weight:650; }
-.detail-table th[scope="rowgroup"] {
-  border-top:1px solid var(--line);
-  color:var(--foreground);
-  padding:.4rem 0 .15rem;
-}
-.detail-table tbody:first-of-type th[scope="rowgroup"] { border-top:0; }
-.run-name { color:var(--foreground); }
-.run-time,.run-length { text-align:end; }
-.run-status { display:block; color:var(--muted); font-size:.8125rem; }
+.detail-span { padding-inline-start:.6rem; text-align:end; font-variant-numeric:tabular-nums; }
 .visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 @media (forced-colors:active) {
   .mark { forced-color-adjust:none; background:Highlight; color:HighlightText; }
@@ -272,7 +251,6 @@ h1 {
   .timeline-meta { font-size:.8125rem; }
   .lane { font-size:.75rem; gap:.375rem; }
   .lane.parallel { padding-left:.7rem; }
-  .detail-table { font-size:.8125rem; }
   .mark span { margin-inline:.25rem; }
 }
 
@@ -430,10 +408,6 @@ button:disabled { cursor:default; color:var(--muted); opacity:.75; }
 <span data-keys class="visually-hidden">Utilise les flèches gauche et droite pour parcourir les barres.</span>
 <div class="detail">
  <div class="detail-summary" role="status" aria-atomic="true"></div>
- <table class="detail-table" aria-label="Runs pendant la période" hidden>
-  <colgroup><col><col><col></colgroup>
-  <thead class="visually-hidden"><tr><th scope="col">Run</th><th scope="col">Horaire</th><th scope="col">Durée</th></tr></thead>
- </table>
 </div>
 <noscript>Active JavaScript pour lire la chronologie interactive.</noscript>
 </figure></template>
@@ -523,7 +497,6 @@ const axis=figure.querySelector(".axis");
 const days=figure.querySelector(".days");
 const guides=figure.querySelector(".guides");
 const detailSummary=figure.querySelector(".detail-summary");
-const detailTable=figure.querySelector(".detail-table");
 const timeWindow=document.createElement("span");
 timeWindow.className="time-window";
 timeWindow.hidden=true;
@@ -561,57 +534,6 @@ function intervalLabel(start,end,dates){
   return dateFormat.format(start)+" à "+first+" – "+dateFormat.format(end)+" à "+last;
 }
 
-function runGroup(items,dates,label){
-  const group=document.createElement("tbody");
-  if(label){
-    const heading=document.createElement("th");
-    heading.scope="rowgroup";
-    heading.colSpan=3;
-    heading.textContent=label;
-    group.insertRow().append(heading);
-  }
-  for(const item of items){
-    const row=group.insertRow();
-    const name=row.insertCell();
-    name.className="run-name";
-    name.textContent=item.label;
-    if(item.running){
-      const status=document.createElement("span");
-      status.className="run-status";
-      status.textContent="En cours";
-      name.append(status);
-    }
-    const when=row.insertCell();
-    when.className="run-time";
-    when.textContent=intervalLabel(item.start,item.end,dates);
-    const length=row.insertCell();
-    length.className="run-length";
-    length.textContent=duration(item.end-item.start);
-  }
-  return group;
-}
-
-function showPeriod(start,end,entries){
-  const selectedItems=new Set(entries);
-  const dates=fullDate.format(start)===fullDate.format(end)?null:day;
-  const groups=[];
-  if(entries.length>1)groups.push(runGroup(entries,dates));
-  for(const [index,row] of data.rows.entries()){
-    const during=[];
-    for(const item of row.items){
-      if(item.start>=end)break;
-      if(item.end<=start||selectedItems.has(item))continue;
-      during.push({...item,start:Math.max(item.start,start),end:Math.min(item.end,end),
-        label:row.style==="head"?item.label.replace(/ du Head Chef$/,""):item.label,
-        running:item.running&&item.end<=end});
-    }
-    if(during.length)groups.push(runGroup(during,dates,laneLabels[index].textContent.trim()));
-  }
-  for(const body of [...detailTable.tBodies])body.remove();
-  detailTable.append(...groups);
-  detailTable.hidden=!groups.length;
-}
-
 function choose(trackIndex,itemIndex,fromPointer=false){
   const row=data.rows[trackIndex];
   const bar=barsByTrack[trackIndex].find(entry=>itemIndex>=entry.first&&itemIndex<=entry.last);
@@ -625,7 +547,7 @@ function choose(trackIndex,itemIndex,fromPointer=false){
   const start=entries[0].start;
   const end=Math.max(...entries.map(item=>item.end));
   const name=document.createElement("strong");
-  name.textContent=entries.length===1?entries[0].label:entries.length+" runs";
+  name.textContent=entries.length===1?entries[0].label:"Activité groupée";
   const when=document.createElement("span");
   when.className="detail-span";
   when.textContent=intervalLabel(start,end,fullDate);
@@ -638,7 +560,6 @@ function choose(trackIndex,itemIndex,fromPointer=false){
   timeWindow.style.left=Math.min(left,plot.width-1)+"px";
   timeWindow.style.width=Math.max(1,right-left)+"px";
   timeWindow.hidden=false;
-  showPeriod(start,end,entries);
   detailSummary.replaceChildren(name,when,length);
 }
 
