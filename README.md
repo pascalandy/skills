@@ -1,6 +1,6 @@
 # Skills
 
-![A cozy library room with shelves of books, a reading lamp, and a table: a shelf of tested methods your AI chat can open and follow](docs/assets/hero.png)
+![A person on a rolling ladder pulls a book from tall library shelves above a lamp-lit reading table: a shelf of tested methods your AI chat can open and follow](docs/assets/hero-v2a.png)
 
 **Your AI chat, with a method. Paste one sentence, install nothing.**
 
