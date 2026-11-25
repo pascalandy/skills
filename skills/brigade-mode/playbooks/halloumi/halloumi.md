@@ -101,7 +101,7 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
 | `🐕 Watchdog <id4>: <finding>` | Watchdog → Head Chef | Reports a health or long-batch finding; [Coordinate](sop/head-chef.md#coordinate) owns the response |
 
-Cook → Head Chef uses only this table, `📍` step lines, questions and a report another rule asks for, e.g. a kept folder. Record other progress in Detail.
+Cook → Head Chef uses only this table, questions and a report another rule asks for, e.g. a kept folder. Record other progress in Detail.
 
 ## Decisions
 
@@ -280,7 +280,7 @@ Pour toi : <Pascal-owned cards>
 
 Head Chef messages Pascal only for an action in Asking Pascal, a requested status or these notices: Align plan, a merge outcome, withdrawal of a Pascal ask, a long-batch alert, final report and kept folders after cleanup. It never relays that there is nothing to do. A merge or withdrawal notice has at most 3 lines: outcome, PR range and next step.
 
-On a long-batch alert, read cards' PRs and step timings. Send one line: `Lot <b> : <cards with a PR>/<cards> cartes ont une PR, <hours> h, surtout <longest step>`. Compare with previous line. If no new card got a PR, append a recommendation to split, narrow scope or Stop; apply Asking Pascal before cutting scope. Record the line's count in your Detail.
+On a long-batch alert, read cards' PRs, and read step timings from the `📍` lines in the Cook's thread. Send one line: `Lot <b> : <cards with a PR>/<cards> cartes ont une PR, <hours> h, surtout <longest step>`. Compare with previous line. If no new card got a PR, append a recommendation to split, narrow scope or Stop; apply Asking Pascal before cutting scope. Record the line's count in your Detail.
 
 Head Chef records overrides, exceptional calls and authorizations in its Detail. Include it in next allowed message as one `<details>` block after open `🙋` lines, with summary `Detail · Head Chef <id4>`. Write settled asks in prose inside it. Message's line limit excludes Detail. For the final report, use this template:
 
@@ -291,4 +291,4 @@ QA : <QA <q> verdict, report URL and fixed findings, per QA item, or aucun>
 Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 
-`📍` progress, Cook → Head Chef, no reply, at end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist. Step 1 sends one line per card. Steps 2 to 6 cover the whole stack: send one line with `stack` as `<card>` and top PR's URL.
+`📍` progress, in Cook's own thread, at end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist. Cook posts this line as its own message when the step ends, and does not send it to Head Chef. Step 1 posts one line per card. Steps 2 to 6 cover the whole stack: post one line with `stack` as `<card>` and top PR's URL.
