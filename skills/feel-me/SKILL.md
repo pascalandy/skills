@@ -17,7 +17,7 @@ ENSUITE; Au besoin, l'agent pose ses **questions** à l'utilisateur selon le gab
 - Une action difficile à défaire ou visible hors du projet, comme supprimer, publier ou dépenser
 - Un compromis entre des options de valeur comparable, que rien ne tranche
 
-L'agent ne pose jamais de question sur la livraison (PR, fusion, full send ou full stop) : $oem fixe le défaut, et l'utilisateur dit plus tard s'il en veut un autre.
+L'agent ne pose jamais de question sur le choix du mode de livraison (PR, fusion, full send ou full stop) : $oem fixe le défaut, et l'utilisateur dit plus tard s'il en veut un autre.
 
 Le FMO (*future mode of operation*) est l'état que l'agent propose. Le CMO (*current mode of operation*) est l'état actuel, une référence que l'utilisateur consulte au besoin. Règles :
 - Les décisions, puis les questions, vont de la plus importante à la moins importante. Quand l'agent a vu juste sur les premières, l'utilisateur peut lui faire confiance pour les suivantes
