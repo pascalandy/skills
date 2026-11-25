@@ -226,8 +226,8 @@ def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
         [_ms("12:05"), 1],
     ]
     forged = json.loads(json.dumps(current))
-    forged["chefs"][0]["chart"]["concurrency"][3][1] = 1
-    with pytest.raises(snapshot.SnapshotError, match="agent counts"):
+    forged["chefs"][0]["chart"]["concurrency"][0][1] = 3
+    with pytest.raises(snapshot.SnapshotError, match="counts differ from the runs"):
         snapshot.validate(forged)
 
     legacy_view = chromium.new_page()
@@ -273,6 +273,56 @@ def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
         "0 agent actif",
         "24 nov. 2026, 11h30–12h00",
     ]
+
+
+def test_touch_steps_reach_each_window_of_a_dense_timeline(chromium: Browser) -> None:
+    start = int(datetime(2026, 10, 22, 0, 15, tzinfo=UTC).timestamp() * 1000)
+    cutoff = int(datetime(2026, 11, 1, 7, 30, tzinfo=UTC).timestamp() * 1000)
+    run = cutoff - 90 * 60_000
+    rows: list[snapshot.Row] = [{"style": lane, "items": []} for lane in snapshot.LANES]
+    rows[0]["items"].append(
+        {"start": run, "end": run + 60_000, "style": "head", "label": "Travail bref"}
+    )
+    chef: snapshot.Chef = {
+        "id": "abcd",
+        "title": "Head Chef abcd",
+        "state": "Actif",
+        "isActive": True,
+        "lastActivity": run + 60_000,
+        "chart": {
+            "start": start,
+            "cutoff": cutoff,
+            "active": 60_000,
+            "idle": cutoff - start - 60_000,
+            "rows": rows,
+            "concurrency": [[start, 0], [run, 1], [run + 60_000, 0]],
+        },
+    }
+    page = chromium.new_page(has_touch=True, viewport={"width": 390, "height": 850})
+    try:
+        page.set_content(snapshot.render({"reference": cutoff, "chefs": [chef]}))
+        previous = page.get_by_role("button", name="Tranche précédente")
+        following = page.get_by_role("button", name="Tranche suivante")
+        slider = page.get_by_role("slider")
+        readout = page.locator(".activity output")
+        assert following.is_disabled(timeout=1500)
+        previous.tap()
+        previous.tap()
+        second = "1 nov. 2026, 01h00 (UTC−05:00)–01h30 (UTC−05:00)"
+        assert readout.inner_text().split("\n") == ["<0,1 agent actif", second]
+        assert second in (slider.get_attribute("aria-valuetext") or "")
+        previous.tap()
+        crossing = "01h30 (UTC−04:00)–01h00 (UTC−05:00)"
+        assert crossing in readout.inner_text()
+        previous.tap()
+        assert readout.inner_text().split("\n") == [
+            "0 agent actif",
+            "1 nov. 2026, 01h00 (UTC−04:00)–01h30 (UTC−04:00)",
+        ]
+        following.tap()
+        assert crossing in readout.inner_text()
+    finally:
+        page.close()
 
 
 def test_selected_bar_shows_a_summary_without_listing_parallel_runs(

@@ -264,8 +264,9 @@ h1 {
   box-sizing:border-box; width:var(--thumb); height:22px;
   border:2px solid var(--ring); border-radius:3px; background:var(--card);
 }
+.activity-details { display:flex; flex-wrap:wrap; align-items:center; gap:.2rem .6rem; }
 .activity output {
-  display:flex; flex-wrap:wrap; gap:0 .6rem; margin-top:.2rem;
+  display:flex; flex-wrap:wrap; gap:0 .6rem;
   color:var(--muted); font-size:.8125rem; font-variant-numeric:tabular-nums;
 }
 .activity output strong { color:var(--foreground); font-weight:680; }
@@ -302,13 +303,14 @@ button:focus-visible,select:focus-visible,[tabindex="-1"]:focus-visible {
   min-height:36px; padding:.3rem .45rem; font:inherit; color:var(--foreground);
   background:var(--background); border:1px solid var(--line); border-radius:4px;
 }
-.periods,.pager {
+.periods,.pager,.activity-navigation {
   display:flex; align-items:center; flex-wrap:wrap; gap:.45rem;
 }
-.periods button,.pager button {
+.periods button,.pager button,.activity-navigation button {
   min-height:44px; border:1px solid var(--line); border-radius:4px;
   padding:.35rem .75rem; background:transparent; font-size:.875rem; font-weight:620;
 }
+.activity-navigation button { min-inline-size:44px; padding:0; font-size:1.1rem; }
 button[aria-pressed="true"] { border-color:var(--ring); background:var(--highlight); }
 button:disabled { cursor:default; color:var(--muted); opacity:.75; }
 .section-head {
@@ -437,7 +439,17 @@ button:disabled { cursor:default; color:var(--muted); opacity:.75; }
  <div class="lane qa"><span class="key" aria-hidden="true"></span>QA</div><div class="track" role="group" tabindex="0" aria-label="Runs de QA"></div>
  <div class="lane review"><span class="key" aria-hidden="true"></span>Revues et design</div><div class="track" role="group" tabindex="0" aria-label="Runs des agents de revue et de conception"></div>
  <div class="activity-lane" hidden><span class="key" aria-hidden="true"></span><span>Agents actifs<small>moyenne par 30 min</small></span></div>
- <div class="activity" hidden><span class="activity-window" aria-hidden="true"></span><input type="range" step="any" aria-label="Moyenne des agents actifs par demi-heure"><output aria-live="off"><strong></strong><span></span></output></div>
+ <div class="activity" hidden>
+   <span class="activity-window" aria-hidden="true"></span>
+   <input type="range" step="any" aria-label="Moyenne des agents actifs par demi-heure">
+   <div class="activity-details">
+     <output aria-live="off"><strong></strong><span></span></output>
+     <div class="activity-navigation">
+       <button type="button" aria-label="Tranche précédente">‹</button>
+       <button type="button" aria-label="Tranche suivante">›</button>
+     </div>
+   </div>
+ </div>
 </div>
 <span data-keys class="visually-hidden">Utilise les flèches gauche et droite pour parcourir les barres.</span>
 <div class="detail">
@@ -466,6 +478,7 @@ const pageButtons=[...document.querySelectorAll("[data-page]")];
 const periods=[...document.querySelectorAll("[data-period]")];
 const activityClock=new Intl.DateTimeFormat("en-GB",{...zone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
 const compactTime=value=>activityClock.format(value).replace(":","h");
+const activityOffset=new Intl.DateTimeFormat("fr-CA",{...zone,timeZoneName:"longOffset"});
 const hourAmount=new Intl.NumberFormat("fr-CA",{maximumFractionDigits:2});
 const agentNumberOptions={maximumFractionDigits:1};
 const agentAmount=new Intl.NumberFormat("fr-CA",agentNumberOptions);
@@ -578,6 +591,7 @@ const activityCell=figure.querySelector(".activity");
 const activityInput=activityCell.querySelector("input");
 const activityWindow=activityCell.querySelector(".activity-window");
 const [activityValue,activityTime]=activityCell.querySelectorAll("output > *");
+const [activityPrevious,activityNext]=activityCell.querySelectorAll("button");
 let activityIndex=activity?activity.count-1:0;
 
 function duration(ms) {
@@ -595,15 +609,22 @@ function timestamp(value) {
   return date;
 }
 
-function intervalLabel(start,end,dates){
-  const first=compactTime(start);
-  const last=compactTime(end);
+function intervalLabel(start,end,dates,formatTime=compactTime){
+  const first=formatTime(start);
+  const last=formatTime(end);
   if(fullDate.format(start)===fullDate.format(end)){
     const range=first===last?first:first+"–"+last;
     return dates?dates.format(start)+", "+range:range;
   }
   const dateFormat=dates??day;
   return dateFormat.format(start)+" à "+first+" – "+dateFormat.format(end)+" à "+last;
+}
+
+function activityTimeLabel(at){
+  const clock=compactTime(at);
+  if(compactTime(at-HOUR)!==clock&&compactTime(at+HOUR)!==clock)return clock;
+  const offset=activityOffset.formatToParts(at).find(part=>part.type==="timeZoneName").value;
+  return clock+" ("+offset+")";
 }
 
 function choose(trackIndex,itemIndex,fromPointer=false){
@@ -639,13 +660,16 @@ function showActivity(index){
   if(!activity)return;
   activityIndex=Math.min(activity.count-1,Math.max(0,index));
   const {start,end,average}=activity.bucket(activityIndex);
-  const amount=agentAmount.format(average);
+  const rounded=agentAmount.format(average);
+  const amount=average>0&&rounded==="0"?"<"+agentAmount.format(0.1):rounded;
   const agents=amount+(agentPlural.select(average)==="one"?" agent actif":" agents actifs");
-  const when=intervalLabel(start,end,fullDate);
+  const when=intervalLabel(start,end,fullDate,activityTimeLabel);
   activityValue.textContent=agents;
   activityTime.textContent=when;
   activityInput.value=String((start+end)/2);
   activityInput.setAttribute("aria-valuetext",agents+" en moyenne, "+when);
+  activityPrevious.disabled=activityIndex===0;
+  activityNext.disabled=activityIndex===activity.count-1;
   const plot=geometry(activityCell);
   const left=plot.position(start);
   activityWindow.style.left=left+"px";
@@ -854,7 +878,9 @@ if(activity){
   activityInput.min=String(data.start);
   activityInput.max=String(data.cutoff);
   activityInput.addEventListener("input",()=>showActivity(activity.at(Number(activityInput.value))));
-  activityCell.addEventListener("pointermove",event=>{
+  activityPrevious.addEventListener("click",()=>showActivity(activityIndex-1));
+  activityNext.addEventListener("click",()=>showActivity(activityIndex+1));
+  activityInput.addEventListener("pointermove",event=>{
     if(event.pointerType!=="mouse"||event.buttons)return;
     const box=activityCell.getBoundingClientRect();
     showActivity(activity.at(data.start+(event.clientX-box.left)/box.width*range));
