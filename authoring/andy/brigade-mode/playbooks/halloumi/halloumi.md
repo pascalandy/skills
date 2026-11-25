@@ -101,7 +101,7 @@ Send an answer or relay with `t3_thread_send` `mode: "auto"` and a `clientReques
 | `🐕 Watchdog <id4>: wake <n>/<max-wakes>` | Watchdog → watched thread | Queues a resume turn after failure or stall |
 | `🐕 Watchdog <id4>: <finding>` | Watchdog → Head Chef | Reports a health or long-batch finding; [Coordinate](sop/head-chef.md#coordinate) owns the response |
 
-Cook → Head Chef uses only this table, `📍` step lines, questions and a report another rule asks for, e.g. a kept folder. Record other progress in Detail.
+Cook → Head Chef uses only this table, questions and a report another rule asks for, e.g. a kept folder. Record other progress in Detail.
 
 ## Decisions
 
@@ -291,4 +291,4 @@ QA : <QA <q> verdict, report URL and fixed findings, per QA item, or aucun>
 Reste pour toi : <🙋 lines, decided follow-up work with GitHub URLs after a Stop, then each external_gap machine with its cause and fix command, or rien>
 ```
 
-`📍` progress, Cook → Head Chef, no reply, at end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist. Step 1 sends one line per card. Steps 2 to 6 cover the whole stack: send one line with `stack` as `<card>` and top PR's URL.
+`📍` progress, Cook's own thread, at end of each process step: `📍 <card> <step>/6 · <PR URL> · checks <state>`, where `<step>` is the step's number in the [Process table](#process), never in the repository's own checklist. Write it in your reply; never send it to Head Chef, since each message wakes Head Chef. Watchdog's long-batch and stall checks cover a Cook that stops progressing. Step 1 writes one line per card. Steps 2 to 6 cover the whole stack: write one line with `stack` as `<card>` and top PR's URL.
