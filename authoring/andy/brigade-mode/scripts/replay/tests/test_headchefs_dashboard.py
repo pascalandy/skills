@@ -306,15 +306,26 @@ def test_touch_steps_reach_each_window_of_a_dense_timeline(chromium: Browser) ->
         slider = page.get_by_role("slider")
         readout = page.locator(".activity output")
         assert following.is_disabled(timeout=1500)
-        previous.tap()
-        previous.tap()
+        previous.scroll_into_view_if_needed()
+        box = previous.bounding_box()
+        assert box is not None
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
+        page.touchscreen.tap(x, y)
+        page.touchscreen.tap(x, y)
+        assert previous.bounding_box() == box
         second = "1 nov. 2026, 01h00 (UTC−05:00)–01h30 (UTC−05:00)"
         assert readout.inner_text().split("\n") == ["<0,1 agent actif", second]
         assert second in (slider.get_attribute("aria-valuetext") or "")
-        previous.tap()
+        announcement = page.locator(".activity [role='status']")
+        assert (
+            announcement.text_content()
+            == f"moins de 0,1 agent actif en moyenne, {second}"
+        )
+        page.touchscreen.tap(x, y)
         crossing = "01h30 (UTC−04:00)–01h00 (UTC−05:00)"
         assert crossing in readout.inner_text()
-        previous.tap()
+        page.touchscreen.tap(x, y)
         assert readout.inner_text().split("\n") == [
             "0 agent actif",
             "1 nov. 2026, 01h00 (UTC−04:00)–01h30 (UTC−04:00)",
