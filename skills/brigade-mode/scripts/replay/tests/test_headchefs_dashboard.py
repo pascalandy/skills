@@ -11,7 +11,9 @@ from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
+import pytest
 from headchefs import snapshot
 
 if TYPE_CHECKING:
@@ -127,6 +129,211 @@ def test_cook_keeps_head_chef_active_without_entering_their_time_total(
     assert rejected.returncode == 1
     assert not rejected.stdout
     assert not json.loads(rejected.stderr.splitlines()[-1])["ok"]
+
+
+def _local(clock: str) -> datetime:
+    hours, minutes = map(int, clock.split(":"))
+    return datetime(2026, 11, 24, hours, minutes, tzinfo=ZoneInfo("America/Montreal"))
+
+
+def _ms(clock: str) -> int:
+    return int(_local(clock).timestamp() * 1000)
+
+
+def _brigade(database: Path) -> sqlite3.Connection:
+    db = sqlite3.connect(database)
+    db.executescript("""
+        create table orchestration_v2_projection_threads(
+            thread_id, title, created_at, archived_at, deleted_at, payload_json);
+        create table orchestration_v2_projection_runs(
+            thread_id, ordinal, status, completed_at, payload_json);
+        create table orchestration_v2_projection_turn_items(
+            thread_id, type, status, payload_json);
+        create table orchestration_v2_projection_subagents(thread_id, child_thread_id);
+        insert into orchestration_v2_projection_subagents values
+            ('root-abcd', 'cook-a'), ('root-abcd', 'cook-b'), ('root-abcd', 'dog');
+        """)
+    db.executemany(
+        "insert into orchestration_v2_projection_threads values(?, ?, ?, null, null, ?)",
+        [
+            ("root-abcd", "Head Chef abcd", _local("10:10").isoformat(), "{}"),
+            ("cook-a", "Cook 1.1", _local("10:10").isoformat(), "{}"),
+            ("cook-b", "Cook 1.2", _local("10:10").isoformat(), "{}"),
+            ("dog", "Watchdog abcd", _local("10:10").isoformat(), "{}"),
+            (
+                "done-bcde",
+                "Head Chef bcde ⛳",
+                _local("08:00").isoformat(),
+                json.dumps({"settledAt": _local("09:00").isoformat()}),
+            ),
+        ],
+    )
+    db.executemany(
+        "insert into orchestration_v2_projection_runs values(?, ?, ?, ?, ?)",
+        [
+            (
+                thread,
+                ordinal,
+                "running" if end is None else "completed",
+                None if end is None else _local(end).isoformat(),
+                json.dumps({"startedAt": _local(start).isoformat()}),
+            )
+            for thread, ordinal, start, end in (
+                ("root-abcd", 1, "10:10", "10:45"),
+                ("cook-a", 1, "10:30", "10:50"),
+                ("cook-a", 2, "10:40", "11:10"),
+                ("cook-a", 3, "11:10", "11:15"),
+                ("cook-b", 1, "12:05", None),
+                ("dog", 1, "10:20", "12:10"),
+                ("done-bcde", 1, "08:00", "08:40"),
+            )
+        ],
+    )
+    db.commit()
+    return db
+
+
+def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
+    tmp_path: Path, chromium: Browser
+) -> None:
+    captured = _local("12:17")
+    with closing(_brigade(tmp_path / "statev2.sqlite")) as db:
+        first = snapshot.capture(db, captured=captured)
+        # A page built before agent counts existed still loads, and its wait carries forward.
+        legacy = json.loads(json.dumps(first))
+        for chef in legacy["chefs"]:
+            del chef["chart"]["concurrency"]
+        legacy["chefs"][0]["chart"]["rows"][1]["items"] = [
+            {
+                "start": _ms("11:20"),
+                "end": _ms("11:50"),
+                "style": "wait",
+                "label": "Revue",
+            }
+        ]
+        legacy_page = snapshot.render(legacy)
+        current = snapshot.capture(
+            db, snapshot.read_snapshot(legacy_page), captured=captured
+        )
+
+    chef = current["chefs"][0]
+    assert chef["chart"]["rows"][1]["items"][0]["start"] == _ms("11:20")
+    assert chef["chart"].get("concurrency") == [
+        [_ms("10:10"), 1],
+        [_ms("10:30"), 2],
+        [_ms("10:45"), 1],
+        [_ms("11:15"), 0],
+        [_ms("12:05"), 1],
+    ]
+    forged = json.loads(json.dumps(current))
+    forged["chefs"][0]["chart"]["concurrency"][0][1] = 3
+    with pytest.raises(snapshot.SnapshotError, match="counts differ from the runs"):
+        snapshot.validate(forged)
+
+    legacy_view = chromium.new_page()
+    legacy_view.set_content(legacy_page)
+    assert legacy_view.locator(".activity:visible").count() == 0
+    page = chromium.new_page(has_touch=True, viewport={"width": 1100, "height": 900})
+    page.set_content(snapshot.render(current))
+    readout = page.locator(".active-list .activity output")
+    slider = page.locator(".active-list .activity input")
+    assert page.locator(".latest-archive .activity input").is_visible()
+    assert readout.inner_text().split("\n") == [
+        "0,7 agent actif",
+        "24 nov. 2026, 12h00–12h17",
+    ]
+
+    slider.focus()
+    expected = {
+        "ArrowLeft": "0 agent actif",
+        "Home": "1 agent actif",
+        "ArrowRight": "1,5 agent actif",
+        "End": "0,7 agent actif",
+    }
+    for key, text in expected.items():
+        page.keyboard.press(key)
+        assert readout.locator("strong").inner_text() == text, key
+    page.keyboard.press("ArrowLeft")
+    assert "0 agent actif en moyenne" in (slider.get_attribute("aria-valuetext") or "")
+
+    cell = page.locator(".active-list .activity").bounding_box()
+    assert cell is not None
+
+    def x(clock: str) -> float:
+        span = _ms("12:17") - _ms("10:10")
+        return cell["x"] + cell["width"] * (_ms(clock) - _ms("10:10")) / span
+
+    page.mouse.move(x("11:05"), cell["y"] + 20)
+    assert readout.inner_text().split("\n") == [
+        "0,5 agent actif",
+        "24 nov. 2026, 11h00–11h30",
+    ]
+    page.touchscreen.tap(x("11:40"), cell["y"] + 20)
+    assert readout.inner_text().split("\n") == [
+        "0 agent actif",
+        "24 nov. 2026, 11h30–12h00",
+    ]
+
+
+def test_touch_steps_reach_each_window_of_a_dense_timeline(chromium: Browser) -> None:
+    start = int(datetime(2026, 10, 22, 0, 15, tzinfo=UTC).timestamp() * 1000)
+    cutoff = int(datetime(2026, 11, 1, 7, 30, tzinfo=UTC).timestamp() * 1000)
+    run = cutoff - 90 * 60_000
+    rows: list[snapshot.Row] = [{"style": lane, "items": []} for lane in snapshot.LANES]
+    rows[0]["items"].append(
+        {"start": run, "end": run + 60_000, "style": "head", "label": "Travail bref"}
+    )
+    chef: snapshot.Chef = {
+        "id": "abcd",
+        "title": "Head Chef abcd",
+        "state": "Actif",
+        "isActive": True,
+        "lastActivity": run + 60_000,
+        "chart": {
+            "start": start,
+            "cutoff": cutoff,
+            "active": 60_000,
+            "idle": cutoff - start - 60_000,
+            "rows": rows,
+            "concurrency": [[start, 0], [run, 1], [run + 60_000, 0]],
+        },
+    }
+    page = chromium.new_page(has_touch=True, viewport={"width": 390, "height": 850})
+    try:
+        page.set_content(snapshot.render({"reference": cutoff, "chefs": [chef]}))
+        previous = page.get_by_role("button", name="Tranche précédente")
+        following = page.get_by_role("button", name="Tranche suivante")
+        slider = page.get_by_role("slider")
+        readout = page.locator(".activity output")
+        assert following.is_disabled(timeout=1500)
+        previous.scroll_into_view_if_needed()
+        box = previous.bounding_box()
+        assert box is not None
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
+        page.touchscreen.tap(x, y)
+        page.touchscreen.tap(x, y)
+        assert previous.bounding_box() == box
+        second = "1 nov. 2026, 01h00 (UTC−05:00)–01h30 (UTC−05:00)"
+        assert readout.inner_text().split("\n") == ["<0,1 agent actif", second]
+        assert second in (slider.get_attribute("aria-valuetext") or "")
+        announcement = page.locator(".activity [role='status']")
+        assert (
+            announcement.text_content()
+            == f"moins de 0,1 agent actif en moyenne, {second}"
+        )
+        page.touchscreen.tap(x, y)
+        crossing = "01h30 (UTC−04:00)–01h00 (UTC−05:00)"
+        assert crossing in readout.inner_text()
+        page.touchscreen.tap(x, y)
+        assert readout.inner_text().split("\n") == [
+            "0 agent actif",
+            "1 nov. 2026, 01h00 (UTC−04:00)–01h30 (UTC−04:00)",
+        ]
+        following.tap()
+        assert crossing in readout.inner_text()
+    finally:
+        page.close()
 
 
 def test_selected_bar_shows_a_summary_without_listing_parallel_runs(

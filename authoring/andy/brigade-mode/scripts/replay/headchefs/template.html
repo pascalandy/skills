@@ -173,7 +173,8 @@ h1 {
   border-inline:1px solid color-mix(in oklab,var(--accent) 32%,transparent);
 }
 .lane,.track { height:var(--lane-height); border-top:1px solid var(--line); }
-.lane {
+.activity-lane,.activity { min-height:var(--lane-height); border-top:1px solid var(--line); }
+.lane,.activity-lane {
   display:flex; align-items:center; gap:.575rem; padding-right:.5rem;
   font-size:.875rem; font-weight:620; line-height:1.2;
 }
@@ -237,6 +238,41 @@ h1 {
 }
 .detail-summary strong { color:var(--foreground); font-weight:680; }
 .detail-span { padding-inline-start:.6rem; text-align:end; font-variant-numeric:tabular-nums; }
+.activity-lane { --tone:var(--accent); }
+.activity-lane small { display:block; color:var(--muted); font-size:.75rem; font-weight:520; }
+.activity {
+  --thumb:14px; position:relative; min-width:0; padding:.55rem 0 .45rem;
+  --activity-rail:linear-gradient(to right,transparent calc(var(--thumb)/2),var(--line) 0 calc(100% - var(--thumb)/2),transparent 0);
+}
+.activity-window {
+  position:absolute; top:.55rem; height:24px; pointer-events:none;
+  background:color-mix(in oklab,var(--accent) 14%,transparent);
+  border-inline:1px solid color-mix(in oklab,var(--accent) 45%,transparent);
+}
+.activity input {
+  position:relative; display:block; appearance:none; background:transparent;
+  inline-size:calc(100% + var(--thumb)); block-size:24px;
+  margin:0 0 0 calc(var(--thumb)/-2); cursor:pointer;
+}
+.activity input::-webkit-slider-runnable-track { height:2px; background:var(--activity-rail); }
+.activity input::-moz-range-track { height:2px; background:var(--activity-rail); }
+.activity input::-webkit-slider-thumb {
+  appearance:none; width:var(--thumb); height:22px; margin-top:-10px;
+  border:2px solid var(--ring); border-radius:3px; background:var(--card);
+}
+.activity input::-moz-range-thumb {
+  box-sizing:border-box; width:var(--thumb); height:22px;
+  border:2px solid var(--ring); border-radius:3px; background:var(--card);
+}
+.activity-details {
+  display:grid; grid-template-columns:max-content minmax(0,1fr);
+  align-items:start; column-gap:.6rem;
+}
+.activity output {
+  display:flex; flex-wrap:wrap; gap:0 .6rem; align-self:center; overflow-wrap:anywhere;
+  color:var(--muted); font-size:.8125rem; font-variant-numeric:tabular-nums;
+}
+.activity output strong { color:var(--foreground); font-weight:680; }
 .visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 @media (forced-colors:active) {
   .mark { forced-color-adjust:none; background:Highlight; color:HighlightText; }
@@ -270,13 +306,14 @@ button:focus-visible,select:focus-visible,[tabindex="-1"]:focus-visible {
   min-height:36px; padding:.3rem .45rem; font:inherit; color:var(--foreground);
   background:var(--background); border:1px solid var(--line); border-radius:4px;
 }
-.periods,.pager {
+.periods,.pager,.activity-navigation {
   display:flex; align-items:center; flex-wrap:wrap; gap:.45rem;
 }
-.periods button,.pager button {
+.periods button,.pager button,.activity-navigation button {
   min-height:44px; border:1px solid var(--line); border-radius:4px;
   padding:.35rem .75rem; background:transparent; font-size:.875rem; font-weight:620;
 }
+.activity-navigation button { min-inline-size:44px; padding:0; font-size:1.1rem; }
 button[aria-pressed="true"] { border-color:var(--ring); background:var(--highlight); }
 button:disabled { cursor:default; color:var(--muted); opacity:.75; }
 .section-head {
@@ -404,6 +441,19 @@ button:disabled { cursor:default; color:var(--muted); opacity:.75; }
  <div class="lane parallel">En parallèle</div><div class="track" role="group" tabindex="0" aria-label="Runs en parallèle du Planner et des Cooks"></div>
  <div class="lane qa"><span class="key" aria-hidden="true"></span>QA</div><div class="track" role="group" tabindex="0" aria-label="Runs de QA"></div>
  <div class="lane review"><span class="key" aria-hidden="true"></span>Revues et design</div><div class="track" role="group" tabindex="0" aria-label="Runs des agents de revue et de conception"></div>
+ <div class="activity-lane" hidden><span class="key" aria-hidden="true"></span><span>Agents actifs<small>moyenne par 30 min</small></span></div>
+ <div class="activity" hidden>
+   <span class="activity-window" aria-hidden="true"></span>
+   <input type="range" step="any" aria-label="Moyenne des agents actifs par demi-heure">
+   <div class="activity-details">
+     <div class="activity-navigation">
+       <button type="button" aria-label="Tranche précédente">‹</button>
+       <button type="button" aria-label="Tranche suivante">›</button>
+     </div>
+     <output aria-live="off"><strong></strong><span></span></output>
+     <span class="visually-hidden" role="status"></span>
+   </div>
+ </div>
 </div>
 <span data-keys class="visually-hidden">Utilise les flèches gauche et droite pour parcourir les barres.</span>
 <div class="detail">
@@ -432,7 +482,12 @@ const pageButtons=[...document.querySelectorAll("[data-page]")];
 const periods=[...document.querySelectorAll("[data-period]")];
 const activityClock=new Intl.DateTimeFormat("en-GB",{...zone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
 const compactTime=value=>activityClock.format(value).replace(":","h");
+const activityOffset=new Intl.DateTimeFormat("fr-CA",{...zone,timeZoneName:"longOffset"});
 const hourAmount=new Intl.NumberFormat("fr-CA",{maximumFractionDigits:2});
+const agentNumberOptions={maximumFractionDigits:1};
+const agentAmount=new Intl.NumberFormat("fr-CA",agentNumberOptions);
+const agentPlural=new Intl.PluralRules("fr-CA",agentNumberOptions);
+const HALF_HOUR=HOUR/2;
 const calendarDate=new Intl.DateTimeFormat("en-CA",{...zone,year:"numeric",month:"2-digit",day:"2-digit"});
 const perPage=6;
 const state={period:7,page:0};
@@ -465,6 +520,34 @@ function headChefTotals(chart){
     coveredUntil=end;
   }
   return {active,idle:chart.cutoff-chart.start-active};
+}
+
+// Half-hour averages from the sparse [time, agents] changes; one lookup per bucket.
+function activityBuckets(chart){
+  const points=chart.concurrency;
+  if(!Array.isArray(points)||!points.length)return null;
+  const area=[0];
+  for(let i=1;i<points.length;i++)area.push(area[i-1]+points[i-1][1]*(points[i][0]-points[i-1][0]));
+  const integral=at=>{
+    let low=0,high=points.length-1;
+    while(low<high){
+      const middle=(low+high+1)>>1;
+      if(points[middle][0]<=at)low=middle;else high=middle-1;
+    }
+    return area[low]+points[low][1]*(at-points[low][0]);
+  };
+  // Montréal's UTC offset is whole hours, so epoch half-hours are local half-hours.
+  const origin=Math.floor(chart.start/HALF_HOUR)*HALF_HOUR;
+  const count=Math.ceil((chart.cutoff-origin)/HALF_HOUR);
+  return {
+    count,
+    at:ms=>Math.min(count-1,Math.max(0,Math.floor((ms-origin)/HALF_HOUR))),
+    bucket(index){
+      const start=Math.max(origin+index*HALF_HOUR,chart.start);
+      const end=Math.min(origin+(index+1)*HALF_HOUR,chart.cutoff);
+      return {start,end,average:(integral(end)-integral(start))/(end-start)};
+    },
+  };
 }
 
 function hours(ms){
@@ -507,6 +590,14 @@ const currentByTrack=tracks.map(()=>0);
 const barsByTrack=tracks.map(()=>[]);
 const range=data.cutoff-data.start;
 let selected=null;
+const activity=activityBuckets(data);
+const activityCell=figure.querySelector(".activity");
+const activityInput=activityCell.querySelector("input");
+const activityWindow=activityCell.querySelector(".activity-window");
+const [activityValue,activityTime]=activityCell.querySelectorAll("output > *");
+const [activityPrevious,activityNext]=activityCell.querySelectorAll("button");
+const activityAnnouncement=activityCell.querySelector('[role="status"]');
+let activityIndex=activity?activity.count-1:0;
 
 function duration(ms) {
   const seconds=Math.round(ms/1000);
@@ -523,15 +614,22 @@ function timestamp(value) {
   return date;
 }
 
-function intervalLabel(start,end,dates){
-  const first=compactTime(start);
-  const last=compactTime(end);
+function intervalLabel(start,end,dates,formatTime=compactTime){
+  const first=formatTime(start);
+  const last=formatTime(end);
   if(fullDate.format(start)===fullDate.format(end)){
     const range=first===last?first:first+"–"+last;
     return dates?dates.format(start)+", "+range:range;
   }
   const dateFormat=dates??day;
   return dateFormat.format(start)+" à "+first+" – "+dateFormat.format(end)+" à "+last;
+}
+
+function activityTimeLabel(at){
+  const clock=compactTime(at);
+  if(compactTime(at-HOUR)!==clock&&compactTime(at+HOUR)!==clock)return clock;
+  const offset=activityOffset.formatToParts(at).find(part=>part.type==="timeZoneName").value;
+  return clock+" ("+offset+")";
 }
 
 function choose(trackIndex,itemIndex,fromPointer=false){
@@ -561,6 +659,30 @@ function choose(trackIndex,itemIndex,fromPointer=false){
   timeWindow.style.width=Math.max(1,right-left)+"px";
   timeWindow.hidden=false;
   detailSummary.replaceChildren(name,when,length);
+}
+
+function showActivity(index,announce=false){
+  if(!activity)return;
+  const previousIndex=activityIndex;
+  activityIndex=Math.min(activity.count-1,Math.max(0,index));
+  const {start,end,average}=activity.bucket(activityIndex);
+  const rounded=agentAmount.format(average);
+  const belowDisplay=average>0&&rounded==="0";
+  const amount=belowDisplay?"<"+agentAmount.format(0.1):rounded;
+  const agents=amount+(agentPlural.select(average)==="one"?" agent actif":" agents actifs");
+  const when=intervalLabel(start,end,fullDate,activityTimeLabel);
+  const description=(belowDisplay?"moins de "+agents.slice(1):agents)+" en moyenne, "+when;
+  activityValue.textContent=agents;
+  activityTime.textContent=when;
+  activityInput.value=String((start+end)/2);
+  activityInput.setAttribute("aria-valuetext",description);
+  if(announce||activityIndex!==previousIndex)activityAnnouncement.textContent=announce?description:"";
+  activityPrevious.disabled=activityIndex===0;
+  activityNext.disabled=activityIndex===activity.count-1;
+  const plot=geometry(activityCell);
+  const left=plot.position(start);
+  activityWindow.style.left=left+"px";
+  activityWindow.style.width=Math.max(1,plot.position(end)-left)+"px";
 }
 
 function renderDates(plot) {
@@ -719,6 +841,7 @@ function render(){
     selected=null;
     choose(previous.trackIndex,previous.itemIndex,previous.fromPointer);
   }
+  showActivity(activityIndex);
 }
 
 function nearestAt(track,event,items){
@@ -756,6 +879,27 @@ for(const [trackIndex,track] of tracks.entries()){
     if(!Object.hasOwn(steps,event.key))return;
     event.preventDefault();
     choose(trackIndex,steps[event.key]);
+  });
+}
+
+if(activity){
+  figure.querySelector(".activity-lane").hidden=activityCell.hidden=false;
+  activityInput.min=String(data.start);
+  activityInput.max=String(data.cutoff);
+  activityInput.addEventListener("input",()=>showActivity(activity.at(Number(activityInput.value))));
+  activityPrevious.addEventListener("click",()=>showActivity(activityIndex-1,true));
+  activityNext.addEventListener("click",()=>showActivity(activityIndex+1,true));
+  activityInput.addEventListener("pointermove",event=>{
+    if(event.pointerType!=="mouse"||event.buttons)return;
+    const box=activityCell.getBoundingClientRect();
+    showActivity(activity.at(data.start+(event.clientX-box.left)/box.width*range));
+  });
+  activityInput.addEventListener("keydown",event=>{
+    const steps={ArrowLeft:-1,ArrowDown:-1,ArrowRight:1,ArrowUp:1,PageDown:-8,PageUp:8,Home:-Infinity,End:Infinity};
+    if(!Object.hasOwn(steps,event.key))return;
+    event.preventDefault();
+    const next=activityIndex+steps[event.key];
+    showActivity(Number.isFinite(next)?next:next<0?0:activity.count-1);
   });
 }
 

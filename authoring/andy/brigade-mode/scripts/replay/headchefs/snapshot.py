@@ -52,6 +52,7 @@ class Chart(TypedDict):
     active: int
     idle: int
     rows: list[Row]
+    concurrency: NotRequired[list[list[int]]]
 
 
 class Chef(TypedDict):
@@ -199,6 +200,39 @@ def _covered(intervals: list[Interval]) -> int:
     return total
 
 
+def _concurrency(
+    threads: list[list[tuple[int, int]]], start: int, cutoff: int
+) -> list[list[int]]:
+    """Return `[time, agents]` pairs where the count of busy threads changes.
+
+    Each thread counts once while any of its runs is open, so overlapping or
+    touching runs of one thread never count twice.
+    """
+    changes: defaultdict[int, int] = defaultdict(int)
+    for spans in threads:
+        merged: list[list[int]] = []
+        for begin, end in sorted(spans):
+            if merged and begin <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], end)
+            else:
+                merged.append([begin, end])
+        for begin, end in merged:
+            changes[begin] += 1
+            changes[end] -= 1
+    points, agents = [[start, 0]], 0
+    for moment in sorted(changes):
+        agents += changes[moment]
+        if moment >= cutoff:
+            break
+        if agents == points[-1][1]:
+            continue
+        if moment == points[-1][0]:
+            points[-1][1] = agents
+        else:
+            points.append([moment, agents])
+    return points
+
+
 def _distribute_production(rows: dict[Lane, list[Interval]], kickoff: int) -> None:
     end_of_main = kickoff
     production = rows["production"]
@@ -262,15 +296,20 @@ def _capture(
         if kickoff >= reference:
             continue
         rows: dict[Lane, list[Interval]] = {lane: [] for lane in LANES}
+        spans_by_thread: list[list[tuple[int, int]]] = []
         for thread in sorted(_relatives(db, root, known_threads, delegated)):
             role = (
                 ("head", "head", "Head Chef")
                 if thread == root
                 else _role(threads[thread][0])
             )
-            if role is not None:
-                for lane, item in _work_intervals(db, thread, reference, kickoff, role):
-                    rows[lane].append(item)
+            if role is None:
+                continue
+            spans: list[tuple[int, int]] = []
+            spans_by_thread.append(spans)
+            for lane, item in _work_intervals(db, thread, reference, kickoff, role):
+                rows[lane].append(item)
+                spans.append((item["start"], item["end"]))
         state = "Arrêté" if "⏹" in title else "Terminé" if "⛳" in title else "En pause"
         running = any(item.get("running") for items in rows.values() for item in items)
         is_open = not (archived or settled) and state == "En pause"
@@ -310,6 +349,7 @@ def _capture(
                     "active": active,
                     "idle": cutoff - kickoff - active,
                     "rows": [{"style": lane, "items": rows[lane]} for lane in LANES],
+                    "concurrency": _concurrency(spans_by_thread, kickoff, cutoff),
                 },
             }
         )
@@ -386,6 +426,50 @@ def _validate_chart(chef: Chef, reference: int) -> None:
     active = _covered(head_runs)
     if chart["active"] != active or chart["idle"] != cutoff - start - active:
         raise SnapshotError("active and idle totals do not match the Head Chef's runs")
+    if "concurrency" in chart:
+        _validate_concurrency(chart, chart["concurrency"])
+
+
+def _validate_concurrency(chart: Chart, points: list[list[int]]) -> None:
+    """Check the agent counts against the runs drawn in the chart.
+
+    A count is positive exactly where some run is drawn, outside the manual
+    waits, and never exceeds the number of runs drawn at that moment.
+    """
+    if not isinstance(points, list) or not points:
+        raise SnapshotError("agent counts must be a non-empty list")
+    previous: list[int] | None = None
+    for point in points:
+        if not (
+            isinstance(point, list)
+            and len(point) == 2
+            and all(type(value) is int for value in point)
+        ):
+            raise SnapshotError("agent counts must be [time, agents] integer pairs")
+        if point[1] < 0 or not point[0] < chart["cutoff"]:
+            raise SnapshotError("agent counts exceed the chart")
+        if previous and (point[0] <= previous[0] or point[1] == previous[1]):
+            raise SnapshotError("agent counts must change at increasing times")
+        previous = point
+    if points[0][0] != chart["start"]:
+        raise SnapshotError("agent counts must begin at the chart start")
+    changes: defaultdict[int, int] = defaultdict(int)
+    for row in chart["rows"]:
+        if row["style"] != "wait":
+            for item in row["items"]:
+                changes[item["start"]] += 1
+                changes[item["end"]] -= 1
+    moments = sorted({*changes, *(point[0] for point in points)})
+    drawn, index = 0, 0
+    for moment in moments:
+        if moment >= chart["cutoff"]:
+            break
+        drawn += changes[moment]
+        while index + 1 < len(points) and points[index + 1][0] <= moment:
+            index += 1
+        agents = points[index][1]
+        if (agents > 0) != (drawn > 0) or agents > drawn:
+            raise SnapshotError("agent counts differ from the runs in the chart")
 
 
 def validate(snapshot: Snapshot) -> None:
