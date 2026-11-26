@@ -183,6 +183,7 @@ A mode's routes run through that mode's SKILL.md.
 
 ### Skills
 
+- `ag-loop`: Use when the user says 'ag loop', 'antigravity loop', 'neon loop', or 'better call neon'.
 - `architect`: Use when the user invokes `architect` or requests software architecture design.
 - `automate-me`: Use when the user wants their recurring working preferences captured or updated in a personal `-mode` skill. Do not use for a single task-specific workflow.
 - `babysit-pr`: Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR.
@@ -231,7 +232,7 @@ A mode's routes run through that mode's SKILL.md.
 - `principle-prove-it-works`: Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.'
 - `recall`: Use only when explicitly invoked as `recall`.
 - `reflect`: Use only when explicitly invoked as `reflect`.
-- `review-loop`: Use when the user says 'review loop', or when codex-loop, cc-loop, or dsf-loop hands over its reviewer.
+- `review-loop`: Use when the user says 'review loop', or when codex-loop, cc-loop, ag-loop, or dsf-loop hands over its reviewer.
 - `show-me-your-work`: Use when the user invokes `show-me-your-work`, for long-running, autonomous, or multi-phase work, or for work a human will review after stepping away.
 - `swarm`: Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration.
 - `tdd`: Use only when explicitly invoked as `tdd`.
