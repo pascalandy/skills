@@ -44,7 +44,7 @@ Use `uv` for all Python runs, checks, and dependency changes, including skill-lo
 
 ## Install skills
 
-With a private root, `just install-skills` also copies fleet's instruction masters into the four harness files and the projects folder. Change those masters in a skills-private worktree and PR; the installed files are copies. [Install skills](docs/references/install-skills.md#agent-instructions) describes their destinations, backups, and conflicts
+With a private root, `just install-skills` also copies fleet's instruction masters into the five harness files and the projects folder. Change those masters in a skills-private worktree and PR; the installed files are copies. [Install skills](docs/references/install-skills.md#agent-instructions) describes their destinations, backups, and conflicts
 
 `just install-skills` compiles current public `authoring/`, including uncommitted and branch-only changes, then installs the selected skills and `commands/*.md` into Pascal's live agents. `just sync` pulls first, then pulls `skills-private/`, the clone of the private repository `pascalandy/skills-private` beside the main checkout. Change a private skill in a worktree of that repository and a PR, never in the clone. The justfile imports a machine's own recipes from `~/.config/skills/local.just` when it exists. Keep each machine's main checkout on `main` and do branch work in a worktree. Otherwise run apply or `sync` only when Pascal asks; `--dry-run` and `--check` preview without writing. Before any other install work, read [install skills](docs/references/install-skills.md)
 

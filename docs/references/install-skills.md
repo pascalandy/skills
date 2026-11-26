@@ -7,7 +7,7 @@ tags:
   - topic/playbook
   - status/stable
 date_created: 2026-09-26
-date_updated: 2026-10-28
+date_updated: 2026-11-26
 ---
 
 `just install-skills` installs public skills, every package in the private clone's `authoring/`, and `commands/*.md` into one machine profile's agent directories. `just install-skills --help` lists profiles, targets, and flags. The prospective public source is the same in preview and apply
@@ -27,15 +27,15 @@ When the private root exists, `just install-skills` also reads two masters under
 
 | Source | Destination |
 |---|---|
-| `AGENTS-HARNAIS.md` | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.config/opencode/AGENTS.md` |
+| `AGENTS-HARNAIS.md` | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.gemini/GEMINI.md` |
 | `AGENTS-PROJECTS.md` | `<projects>/AGENTS.md` |
 | `@AGENTS.md` followed by a newline | `<projects>/CLAUDE.md` |
 
-`<projects>` is the parent of the resolved private root, including an override. Both profiles install all six files and create missing parent directories, even for an absent harness. Grok reads Claude's file, so the installer creates no `~/.grok/AGENTS.md`
+`<projects>` is the parent of the resolved private root, including an override. Both profiles install all seven files and create missing parent directories, even for an absent harness. Grok reads Claude's file, so the installer creates no `~/.grok/AGENTS.md`
 
 Without a private root, the public install leaves instruction files alone. With a private root, either missing master fails the run before any installation. A standalone install uses the local clone without network access. `just sync` updates the private clone before installation
 
-The six files share the skills' plan and JSON report. An unchanged file produces no change. Preview and check compare their bytes too, so `--check` sees missing or different instructions. Reports contain paths and actions, never file contents
+The seven files share the skills' plan and JSON report. An unchanged file produces no change. Preview and check compare their bytes too, so `--check` sees missing or different instructions. Reports contain paths and actions, never file contents
 
 A destination symlink becomes a regular file, even when dangling. A directory or another non-file destination is a conflict that blocks the whole install. When contents differ, the old bytes go into a unique backup under `~/.cache/agents-instructions/`. A link without file contents is backed up as a link. An identical symlink target needs no content backup. Each destination keeps its five newest backups, separately from files with the same name elsewhere
 
@@ -45,8 +45,9 @@ Instruction files are installed copies. Their masters change through a skills-pr
 
 ## Commands
 
-- Claude Code, Pi, and OpenCode read each command as a file. Codex dropped custom prompts, so each command also installs as a skill in `~/.codex/skills`, called as `$name`, with the command's description. Pi and OpenCode do not read that folder, so no agent sees a command twice
-- A command that shares a skill's name stops the run: Claude Code would hide the command, and Codex would need one folder for both. `scripts/tests/test_commands.py` catches a clash with a public skill in CI
+- Claude Code, Pi, and OpenCode read each command as a file. Codex dropped custom prompts and Antigravity has none, so each command also installs as a skill in `~/.codex/skills` and `~/.gemini/config/skills`, called as `$name` in Codex and `/name` in Antigravity, with the command's description. Pi and OpenCode read neither folder, so no agent sees a command twice
+- T3 runs Antigravity with its own config folder, whose `skills` links to `~/.gemini/config/skills`, so only that folder reaches it. `~/.gemini/skills` and `~/.agents/skills` serve the standalone CLI only
+- A command that shares a skill's name stops the run: Claude Code would hide the command, and Codex and Antigravity would need one folder for both. `scripts/tests/test_commands.py` catches a clash with a public skill in CI
 - Pi and OpenCode read `$1`, `$2`, … as arguments even inside a word, so `$2nd-pass` reaches the agent as `nd-pass`. The same test rejects a digit placeholder followed by a letter
 - Each run removes the commands earlier versions put in `~/.codex/prompts` and `~/.config/agents/commands`, which Codex and Amp no longer read
 
