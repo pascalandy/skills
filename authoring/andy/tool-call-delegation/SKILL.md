@@ -7,7 +7,7 @@ configuration-is-needed: true
 
 ## Tool call delegation
 
-The lead agent schedules local tool calls (files, git, shell, SSH, and fleet machines), delegates their execution, verifies the evidence, and writes the answer. Run [direct reads](#direct-reads) first, without the steps below. Use direct calls for delegation setup and communication. Route public web research, external searches, and web page fetches to `$web-research` instead of the `tool-call-delegation` candidates; Pi candidates in that profile have no free native web tool and fall straight onto paid Exa calls.
+The lead agent schedules every tool call except public web research, delegates their execution, verifies the evidence, and writes the answer. Run [direct reads](#direct-reads) first, without the steps below. Use direct calls for delegation setup and communication. Route public web research, external searches, and web page fetches to `$web-research`.
 
 1. Confirm `uv` with `uv --version` ([install uv](https://docs.astral.sh/uv/getting-started/installation/)). Read the ordered candidates with `uv run ~/.pi/agent/skills/fleet/scripts/active_models.py delegation-profile tool-call-delegation`. If the command fails, report its error before launching an agent.
 2. Use the caller's explicit model or effort in place of the default. Restrict eligibility to any driver or provider the caller names. Report an unavailable explicit choice unless the caller authorized a fallback.
