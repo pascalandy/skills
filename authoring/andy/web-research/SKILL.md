@@ -18,20 +18,20 @@ Web research progress:
 - [ ] Step 5: Climbed or done
 ```
 
-**Step 1: Starting level chosen.** When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth:
+**Step 1: Starting level chosen.** When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth, defaulting to Level 1:
 
 | Task | Start at |
 |---|---|
-| A quick fact | Level 1 |
-| A search that needs official sources or several results | Level 2 |
-| Read, extract, or crawl a known page or site | Level 3 |
+| Quick fact, general web search, official docs lookup, or reading a known public page | Level 1 |
+| Structured multi-URL extraction or site map | Level 2 |
+| Extract a blocked or JS-rendered page, or crawl a site | Level 3 |
 | Semantic discovery ("find things like X") or deep research | Level 4 |
 
-Done when one level is chosen.
+Done when one level is chosen per subtask.
 
 **Step 2: Route confirmed.** In T3 Code, load `$t3-runtime`. Reuse an earlier `orchestrator_capabilities` answer that lists the level's model. Otherwise call it, with `search` set to that model when the short list omits it, and note the provider instance that lists it and can run a child task. A model missing from both answers has no route. When the Codex route is missing, confirm the Haiku route instead (see [The ladder](#the-ladder)). Done when the route exists; no route counts as a failed attempt in Step 5. When you cannot delegate, go to [Run the levels yourself](#run-the-levels-yourself).
 
-**Step 3: Delegate briefed.** Delegate to the level's agent from [The ladder](#the-ladder) with this brief, filled in:
+**Step 3: Delegate briefed.** For several independent subtasks, launch one delegate per subtask. Delegate each to its level's agent from [The ladder](#the-ladder) with this brief, filled in:
 
 ```
 Web task, collect facts only. Do not delegate. Do not analyze.
@@ -41,12 +41,12 @@ Return: each raw fact with its source URL; the exact tools or commands called, i
 If the required tool fails, stop and report the failure. Do not switch tools.
 ```
 
-Done when the delegate is running with one page or one topic.
+Done when each delegate is running with one page or one topic.
 
-**Step 4: Result checked.** When the delegate returns:
+**Step 4: Result checked.** When a delegate returns:
 
 1. Check the returned provider, model, and options match the level
-2. Read the child thread with `t3_thread_read` and `view: "activity"`. Confirm the real tool calls used the level's tool; the summary alone is not proof
+2. Read the child thread with `t3_thread_read` and `view: "activity"` (using your harness's T3 MCP fallback when `t3_thread_read` is omitted from direct tools; if unreachable, count the check as failed). Confirm the real tool calls used the level's tool and note the model and tool observed per scout; the summary alone is not proof
 3. Check every fact carries a source URL
 
 Done when each check passes or you name the one that failed. A failed check counts as a failed attempt in Step 5.
