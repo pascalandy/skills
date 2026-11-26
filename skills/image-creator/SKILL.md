@@ -1,6 +1,6 @@
 ---
 name: "image-creator"
-description: "Use when generating or editing images or animated GIFs from the terminal with OpenAI GPT Image, including requests that name Flare, Sunburst, a quality level, or the API."
+description: "Use when generating or editing images or animated GIFs from the terminal with OpenAI GPT Image (default), or through Antigravity and Nano Banana, including requests that name Flare, Sunburst, a quality level, or the API."
 kind: "general"
 api-key: "openrouter"
 model-version: "2.6"
@@ -17,6 +17,7 @@ Use `<skill_dir>/scripts/image_creator.py`. Read [settings](references/guide.md#
    | Request | Route |
    |---|---|
    | an image, even one that names Flare, Sunburst, a quality, or speed | Codex plan: no `--model` |
+   | an image that names Antigravity or Nano Banana | Antigravity native `image-generator`: follow [Antigravity](references/antigravity.md) |
    | an image that names the API or OpenRouter | `--model sunburst`, or `--model flare` when it names speed or Flare |
    | a GIF or an animation that names the API or OpenRouter | `--out <name>.gif` on the API route above |
    | a GIF or an animation without the API | stop: the plan has no GIF yet; the API has it |
