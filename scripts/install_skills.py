@@ -44,19 +44,24 @@ PROFILES = {
         ".claude/skills",
         ".config/opencode/skills",
         ".config/agents/skills",
+        ".gemini/config/skills",
     ),
     "linux": (
         ".pi/agent/skills",
         ".codex/skills",
         ".claude/skills",
         ".config/opencode/skills",
+        ".gemini/config/skills",
     ),
 }
 EXCLUSIONS = {"mac": frozenset(), "linux": frozenset({"apple-mail"})}
 HOST_PROFILE = "mac" if sys.platform == "darwin" else "linux"
 COMMAND_TARGETS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
-# Codex dropped custom prompts, so it gets each command as a skill
+# Codex dropped custom prompts and Antigravity has none, so each gets every
+# command as a skill. T3 links its Antigravity config to ~/.gemini/config/skills
 CODEX_SKILLS = ".codex/skills"
+GEMINI_SKILLS = ".gemini/config/skills"
+COMMAND_SKILL_TARGETS = (CODEX_SKILLS, GEMINI_SKILLS)
 # Codex and Amp stopped reading these; each run removes the commands put there
 RETIRED_COMMAND_TARGETS = (".codex/prompts", ".config/agents/commands")
 INSTRUCTION_MASTERS = Path("authoring/integrations/fleet/references")
@@ -65,6 +70,7 @@ HARNESS_INSTRUCTIONS = (
     ".codex/AGENTS.md",
     ".pi/agent/AGENTS.md",
     ".config/opencode/AGENTS.md",
+    ".gemini/GEMINI.md",
 )
 RUNTIME_NAMES = frozenset(
     {
@@ -114,18 +120,20 @@ delete, fails the run once the install is done. -v logs how many entries each ta
 holds current.
 
 With a private root, fleet's AGENTS-HARNAIS.md and AGENTS-PROJECTS.md also
-install four harness instruction files and AGENTS.md / CLAUDE.md beside that
+install five harness instruction files and AGENTS.md / CLAUDE.md beside that
 root. Both masters must exist. Instruction symlinks become regular files;
 directories conflict. Different content is backed up in
 ~/.cache/agents-instructions/, keeping five backups per destination.
 
 profiles:
   mac: ~/.pi/agent/skills, ~/.agents/skills, ~/.claude/skills,
-       ~/.config/opencode/skills, ~/.config/agents/skills
+       ~/.config/opencode/skills, ~/.config/agents/skills,
+       ~/.gemini/config/skills
   linux: ~/.pi/agent/skills, ~/.codex/skills, ~/.claude/skills,
-       ~/.config/opencode/skills (excludes apple-mail)
+       ~/.config/opencode/skills, ~/.gemini/config/skills (excludes apple-mail)
   commands on both: ~/.claude/commands, ~/.pi/agent/prompts,
-        ~/.config/opencode/commands, and ~/.codex/skills as one skill each
+        ~/.config/opencode/commands, and ~/.codex/skills and
+        ~/.gemini/config/skills as one skill each
   retired, cleared of commands: ~/.codex/prompts, ~/.config/agents/commands
 
 examples:
@@ -429,8 +437,8 @@ def command_sources() -> dict[str, Source]:
 
 
 def command_skills(stage: Path, commands: dict[str, Source]) -> dict[str, Source]:
-    """Stage each command under `stage` as a Codex skill: its name, its
-    description, then its body unchanged."""
+    """Stage each command under `stage` as a skill for Codex and Antigravity:
+    its name, its description, then its body unchanged."""
     sources: dict[str, Source] = {}
     for filename, command in commands.items():
         name = Path(filename).stem
@@ -564,19 +572,24 @@ def layout(
     owned: set[str],
     owned_commands: set[str],
 ) -> list[Group]:
-    """Group the profile's targets by what they hold. With the linux profile the Codex directory
-    holds the skills beside the commands. A retired target reached through a
-    symlink is left alone, since it may be a live target or a command source."""
-    shared = CODEX_SKILLS in PROFILES[profile]
+    """Group the profile's targets by what they hold. A command-skill target in
+    the profile holds the skills beside the commands; Codex on mac holds only
+    the commands. A retired target reached through a symlink is left alone,
+    since it may be a live target or a command source."""
     owned_codex = {Path(name).stem for name in owned_commands}
+
+    def holder(target: str) -> Group:
+        if target in PROFILES[profile]:
+            return Group((target,), {**skills, **codex}, owned | owned_codex)
+        return Group((target,), codex, owned_codex, retired="command-skill")
+
     active = [
-        Group(tuple(t for t in PROFILES[profile] if t != CODEX_SKILLS), skills, owned),
         Group(
-            (CODEX_SKILLS,),
-            {**skills, **codex} if shared else codex,
-            owned | owned_codex if shared else owned_codex,
-            retired="public" if shared else "command-skill",
+            tuple(t for t in PROFILES[profile] if t not in COMMAND_SKILL_TARGETS),
+            skills,
+            owned,
         ),
+        *(holder(target) for target in COMMAND_SKILL_TARGETS),
         Group(COMMAND_TARGETS, commands, owned_commands, retired="command"),
     ]
 
@@ -584,12 +597,13 @@ def layout(
         return (home / target).resolve()
 
     skill_dirs = {where(target): target for target in active[0].targets}
-    if where(CODEX_SKILLS) in skill_dirs:
-        raise ScriptError(
-            f"~/{CODEX_SKILLS} is the same directory as "
-            f"~/{skill_dirs[where(CODEX_SKILLS)]}; make it a directory of its own, "
-            "then rerun: just install-skills"
-        )
+    for target in COMMAND_SKILL_TARGETS:
+        if where(target) in skill_dirs:
+            raise ScriptError(
+                f"~/{target} is the same directory as "
+                f"~/{skill_dirs[where(target)]}; make it a directory of its own, "
+                "then rerun: just install-skills"
+            )
     real = home.resolve()
     retired = tuple(t for t in RETIRED_COMMAND_TARGETS if where(t) == real / t)
     return [*active, Group(retired, {}, owned_commands, retired="command")]

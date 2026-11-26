@@ -25,12 +25,14 @@ MAC = (
     ".claude/skills",
     ".config/opencode/skills",
     ".config/agents/skills",
+    ".gemini/config/skills",
 )
 LINUX = (
     ".pi/agent/skills",
     ".codex/skills",
     ".claude/skills",
     ".config/opencode/skills",
+    ".gemini/config/skills",
 )
 COMMANDS = (".claude/commands", ".pi/agent/prompts", ".config/opencode/commands")
 RETIRED = (".codex/prompts", ".config/agents/commands")
@@ -95,6 +97,7 @@ HARNESS_FILES = (
     ".codex/AGENTS.md",
     ".pi/agent/AGENTS.md",
     ".config/opencode/AGENTS.md",
+    ".gemini/GEMINI.md",
 )
 
 
@@ -126,12 +129,12 @@ def test_instruction_files_preview_apply_update_and_converge(
 
     preview = run(repo, home, *args, "--dry-run")
     assert preview.returncode == 0, preview.stderr
-    assert json.loads(preview.stdout)["changes"][-6:] == expected
+    assert json.loads(preview.stdout)["changes"][-len(expected) :] == expected
     assert not (home / ".claude").exists()
     assert not (root.parent / "AGENTS.md").exists()
     checked = run(repo, home, *args, "--check")
     assert (checked.returncode, checked.stdout) == (1, "")
-    assert json.loads(checked.stderr)["changes"][-6:] == expected
+    assert json.loads(checked.stderr)["changes"][-len(expected) :] == expected
 
     installed = run(repo, home, *args)
     assert (installed.returncode, installed.stdout, installed.stderr) == (
@@ -164,7 +167,7 @@ def test_instruction_files_preview_apply_update_and_converge(
     assert (root.parent / "AGENTS.md").read_bytes() == b"changed projects\n"
     backups = list((home / ".cache/agents-instructions").iterdir())
     assert Counter(path.read_bytes() for path in backups) == {
-        b"synthetic harness instructions\n": 4,
+        b"synthetic harness instructions\n": len(HARNESS_FILES),
         b"synthetic projects instructions\n": 1,
     }
     assert "changed harness" not in updated.stdout + updated.stderr
@@ -201,7 +204,7 @@ def test_instruction_symlinks_become_regular_files(
         assert len(backups) == 1 and backups[0].is_symlink()
         assert os.readlink(backups[0]) == "missing.md"
     elif link == "updated-master":
-        assert len(backups) == 4
+        assert len(backups) == len(HARNESS_FILES)
         assert all(
             path.read_bytes() == b"synthetic harness instructions\n" for path in backups
         )
@@ -267,9 +270,10 @@ def test_instruction_backups_keep_five_per_destination(
         result = run(repo, home)
         assert result.returncode == 0, result.stderr
     backups = list((home / ".cache/agents-instructions").iterdir())
-    assert len(backups) == 25
+    destinations = len(HARNESS_FILES) + 1
+    assert len(backups) == 5 * destinations
     assert Counter(path.read_bytes() for path in backups) == {
-        f"version {version}\n".encode(): 5 for version in range(2, 7)
+        f"version {version}\n".encode(): destinations for version in range(2, 7)
     }
     before = {path.name: path.stat().st_mtime_ns for path in backups}
     assert run(repo, home).stdout == OK
@@ -307,6 +311,7 @@ def test_failed_instruction_backup_preserves_destination_and_reports_prior_write
         ["update", "~/.codex/AGENTS.md"],
         ["add", "~/.pi/agent/AGENTS.md"],
         ["add", "~/.config/opencode/AGENTS.md"],
+        ["add", "~/.gemini/GEMINI.md"],
         ["add", str(repo.parent / "AGENTS.md")],
         ["add", str(repo.parent / "CLAUDE.md")],
     ]
@@ -1048,16 +1053,19 @@ def test_commands_install_and_only_published_ones_are_removed(
     preview = report(run(repo, home, "--dry-run"))
     assert [
         (a["target"], a["name"], a["kind"]) for a in preview if a["name"] != "alpha"
-    ] == [(".codex/skills", "review", "add")] + [
-        (target, "review.md", "add") for target in COMMANDS
-    ]
+    ] == [
+        (".codex/skills", "review", "add"),
+        (".gemini/config/skills", "review", "add"),
+    ] + [(target, "review.md", "add") for target in COMMANDS]
     assert run(repo, home).returncode == 0
     assert all(
         (home / target / "review.md").read_text(encoding="utf-8") == text + "\n"
         for target in COMMANDS
     )
-    assert (home / ".codex/skills/review/SKILL.md").read_text(encoding="utf-8") == (
-        '---\nname: "review"\ndescription: "Review it"\n---\n\nshared command\n'
+    assert all(
+        (home / target / "review/SKILL.md").read_text(encoding="utf-8")
+        == '---\nname: "review"\ndescription: "Review it"\n---\n\nshared command\n'
+        for target in (".codex/skills", ".gemini/config/skills")
     )
     assert run(repo, home, "--check").returncode == 0
     (home / ".claude/commands/review.md").write_text("local edit\n", encoding="utf-8")
@@ -1065,6 +1073,7 @@ def test_commands_install_and_only_published_ones_are_removed(
     assert run(repo, home).returncode == 0
     assert not any((home / target / "review.md").exists() for target in COMMANDS)
     assert not (home / ".codex/skills/review").exists()
+    assert not (home / ".gemini/config/skills/review").exists()
     assert foreign.read_text(encoding="utf-8") == "keep\n"
 
 
@@ -1099,6 +1108,28 @@ def test_linux_codex_directory_holds_skills_beside_commands(
     checked = run(repo, home, "--profile", "linux", "--check", "-v")
     assert (checked.returncode, checked.stdout) == (0, OK)
     assert "~/.codex/skills: 2 of 2 current\n" in checked.stderr
+
+
+@pytest.mark.parametrize("profile", ["mac", "linux"])
+def test_antigravity_directory_holds_skills_beside_commands_and_foreign_links(
+    sandbox: tuple[Path, Path], profile: str
+) -> None:
+    repo, home = sandbox
+    command(repo, "review")
+    commit(repo)
+    target = home / ".gemini/config/skills"
+    target.mkdir(parents=True)
+    (target / "omarchy").symlink_to(home / "elsewhere")
+    assert run(repo, home, "--profile", profile).returncode == 0
+    assert sorted(path.name for path in target.iterdir()) == [
+        "alpha",
+        "omarchy",
+        "review",
+    ]
+    assert (target / "omarchy").is_symlink()
+    checked = run(repo, home, "--profile", profile, "--check", "-v")
+    assert (checked.returncode, checked.stdout) == (0, OK)
+    assert "~/.gemini/config/skills: 2 of 2 current\n" in checked.stderr
 
 
 def test_retired_command_targets_lose_only_published_commands(
@@ -1206,7 +1237,7 @@ def test_apply_and_preview_answer_each_change_and_check_counts_each_target(
     changes = sorted(
         [["add", f"~/{target}/{name}"] for target in MAC for name in ("alpha", "beta")]
         + [["add", f"~/{target}/hello.md"] for target in COMMANDS]
-        + [["add", "~/.codex/skills/hello"]]
+        + [["add", "~/.codex/skills/hello"], ["add", "~/.gemini/config/skills/hello"]]
     )
 
     preview = run(repo, home, "-n")
