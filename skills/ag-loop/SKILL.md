@@ -12,7 +12,8 @@ Load `review-loop` and follow it with this reviewer:
   and resolve it to its `id`; without the fleet skill, the newest Gemini Neon
 - T3: the enabled provider whose driver is `antigravity`, effort option
   `thought_level`
-- Outside T3: the Antigravity CLI, `agy -p --model <id> --effort high`. Confirm
-  the ID with `agy models` on first use; it needs a signed-in `agy`
+- Outside T3: the Antigravity CLI, `agy -p --model <id> --effort <effort>`.
+  Confirm the ID with `agy models` on first use; it needs a signed-in `agy`.
+  Each round is a fresh run with the round 1 brief and the ledger
 - Route: Antigravity calls Google directly, never the CLIProxy hub
 - Name in the report: Neon
