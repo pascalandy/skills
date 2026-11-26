@@ -41,7 +41,7 @@ When a command matches one of these forms exactly, run it yourself. Delegate eve
 - `rg -c`, `rg -l`, or `rg --max-count <N>` with N up to 20, then `<pattern> [<path>]`
 - `wc -l <file>`, `ls <dir>`, or `test -e <path>`
 - `cat <file>` or `sed -n '<start>,<end>p' <file>`
-- `just ctx <subcommand> [<args>]`, in a project whose `justfile` defines `ctx`. Run it before the other forms: it replaces a chain of them
+- `just [-f <path>/justfile] ctx <subcommand> [<args>]`, when that `justfile` defines `ctx`. Add `-f` outside the project. Run it before the other forms: it replaces a chain of them
 
 Run each direct read in this wrapper:
 
