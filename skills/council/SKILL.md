@@ -7,7 +7,7 @@ configuration-is-needed: true
 
 # Council
 
-Bring in three delegates to help with the user's request, usually for review
+Bring in four delegates to help with the user's request, usually for review
 or feedback. Each seat takes the reviewer card of a loader skill: model,
 effort, T3 provider and effort option, route outside T3, and name in the
 report. Read only the card. Do not run `review-loop`.
@@ -15,12 +15,13 @@ report. Read only the card. Do not run `review-loop`.
 | Seat | Card |
 | --- | --- |
 | 1 | `cc-loop` |
-| 2 | `codex-loop` |
-| 3 | `dsf-loop` |
+| 2 | `ag-loop` |
+| 3 | `codex-loop` |
+| 4 | `dsf-loop` |
 
 A member or effort the user names wins. In T3 Code, call
 `orchestrator_capabilities` with `search` set to each model name, then start
-the three delegates in parallel with `delegate_task`. Outside T3, use each card's route. If a seat
+the four delegates in parallel with `delegate_task`. Outside T3, use each card's route. If a seat
 cannot run, report it instead of substituting.
 
 Give each delegate the request and relevant context. For review or feedback,
@@ -42,6 +43,7 @@ Rounds: 2
 | Delegate | Round 1 | Round 2 |
 | --- | --- | --- |
 | Opus | 7/10 | 9/10 |
+| Neon | 7/10 | 9/10 |
 | Sol | 8/10 | 10/10 |
 | DeepSeek Flash (`ds4p1-slow`) | 7/10 | 9/10 |
 ```
