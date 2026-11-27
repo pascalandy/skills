@@ -1780,5 +1780,152 @@ class NeonRoundFourTest(Crate):
         self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
 
 
+class SolReviewTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_moving_an_inner_allow_to_the_crate_root_broadens_it(self) -> None:
+        util = "pub fn one() -> u8 {\n    Some(1).unwrap()\n}\n"
+        allow = "#![allow(clippy::unwrap_used)]\n"
+        write(
+            self.root, {"src/lib.rs": "mod util;\n" + LIB, "src/util.rs": allow + util}
+        )
+        self.commit("module allow")
+        write(
+            self.root, {"src/lib.rs": allow + "mod util;\n" + LIB, "src/util.rs": util}
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertEqual([each[1] for each in answer["exceptions"]], ["src/lib.rs:1"])
+
+    def test_an_unchanged_attribute_is_matched_in_its_own_file(self) -> None:
+        spare = '#[expect(dead_code, reason = "kept")]\nfn spare() {}\n'
+        write(self.root, {"src/lib.rs": "mod b;\n" + LIB, "src/b.rs": spare})
+        self.commit("approved")
+        write(
+            self.root,
+            {
+                "src/lib.rs": "mod a;\nmod b;\n" + LIB,
+                "src/a.rs": spare,
+                "src/b.rs": spare + "pub fn more() {}\n",
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertEqual([each[1] for each in answer["exceptions"]], ["src/a.rs:1"])
+
+    def test_a_pointer_parameter_keeps_the_unsafe_fn_body(self) -> None:
+        body = (
+            "/// # Safety\n/// `cb` is sound.\n"
+            'pub unsafe fn call(cb: unsafe extern "C" fn(u8)) -> u8 {\n'
+            "    let x = 1;\n"
+            "    // SAFETY: the caller keeps `cb` sound.\n"
+            "    unsafe { cb(x) };\n    x\n}\n"
+        )
+        write(self.root, {"src/lib.rs": body + LIB})
+        self.commit("unsafe fn")
+        write(self.root, {"src/lib.rs": body.replace("x = 1", "x = 2") + LIB})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unsafe"]))
+
+    def test_a_cfg_on_a_test_with_a_literal_in_its_head_is_disabling(self) -> None:
+        extern = LIB.replace("fn adds()", 'extern "C" fn adds()')
+        write(self.root, {"src/lib.rs": extern})
+        self.commit("extern test")
+        write(
+            self.root,
+            {
+                "src/lib.rs": extern.replace(
+                    "    #[test]\n", "    #[cfg(any())]\n    #[test]\n"
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_hook_skip_false_counts_and_a_comment_hides_no_skip(self) -> None:
+        hook = (SCRIPT.parent.parent / "assets" / "lefthook.yml").read_text()
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "pre-commit:\n", "pre-commit:\n  skip: false\n", 1
+                )
+            },
+        )
+        self.assertTrue(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "pre-commit:\n", "pre-commit:\n # note\n  skip: true\n", 1
+                )
+            },
+        )
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "pre-commit:\n", "pre-commit:\n  skip: false # on\n", 1
+                )
+            },
+        )
+        self.assertTrue(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "    exceptions:\n",
+                    "    exceptions:\n      skip: true\n  # note\n",
+                    1,
+                )
+            },
+        )
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "diff --staged\n", "diff --staged\n# note\n      skip: true\n", 1
+                )
+            },
+        )
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+
+    def test_a_moved_member_is_checked_against_its_old_manifest(self) -> None:
+        member = CRATE + 'serde = "1"\n\n[lints]\nworkspace = true\n'
+        write(
+            self.root,
+            {
+                "Cargo.toml": WORKSPACE.replace("crates/*", "crates/cli"),
+                "crates/cli/Cargo.toml": member,
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+        git(self.root, "mv", "crates/cli", "crates/ledger-cli")
+        write(
+            self.root,
+            {
+                "Cargo.toml": (self.root / "Cargo.toml")
+                .read_text()
+                .replace("crates/cli", "crates/ledger-cli")
+            },
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+        write(
+            self.root,
+            {
+                "crates/ledger-cli/Cargo.toml": member.replace(
+                    'edition = "2024"\n', 'edition = "2024"\nautotests = false\n'
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["test_discovery"]))
+
+
 if __name__ == "__main__":
     unittest.main()

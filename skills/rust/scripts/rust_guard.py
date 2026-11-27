@@ -788,17 +788,21 @@ def hook_lacks_guard(root: Path) -> Path | None:
     if path is None:
         return None
     section = re.search(
-        r"^pre-commit:[^\n]*\n((?:[ \t][^\n]*\n?|\n)*)", path.read_text(), re.MULTILINE
+        r"^pre-commit:[^\n]*\n((?:[ \t][^\n]*\n?|#[^\n]*\n?|\n)*)",
+        path.read_text(),
+        re.MULTILINE,
     )
     lines = (section[1] if section else "").splitlines()
-    indents = [len(line) - len(line.lstrip()) for line in lines if line.strip()]
-    top = min(indents, default=0)
+    entries = [
+        line for line in lines if line.strip() and not line.lstrip().startswith("#")
+    ]
+    top = min((len(line) - len(line.lstrip()) for line in entries), default=0)
     hook_keys = {"skip", "only", "files", "glob", "exclude", "root"}
     if any(
         len(line) - len(line.lstrip()) == top
         and line.strip().split(":", 1)[0] in hook_keys
-        for line in lines
-        if line.strip()
+        and re.sub(r"\s+", "", line.split("#", 1)[0]) != "skip:false"
+        for line in entries
     ):
         return path
     for index, line in enumerate(lines):
@@ -819,12 +823,14 @@ def narrowed(lines: list[str], index: int) -> bool:
     start = index
     while start > 0 and (
         not lines[start - 1].strip()
+        or lines[start - 1].lstrip().startswith("#")
         or len(lines[start - 1]) - len(lines[start - 1].lstrip()) >= indent
     ):
         start -= 1
     end = index
     while end + 1 < len(lines) and (
         not lines[end + 1].strip()
+        or lines[end + 1].lstrip().startswith("#")
         or len(lines[end + 1]) - len(lines[end + 1].lstrip()) >= indent
     ):
         end += 1
@@ -1295,6 +1301,14 @@ def block_after(lines: list[str], number: int) -> str:
     return "\n".join(taken)
 
 
+def attribute_counts(text: str) -> dict[tuple[str, str], int]:
+    """How many times each attribute sits on each item in `text`."""
+    counts: dict[tuple[str, str], int] = {}
+    for _, attribute, item, _ in attributes(text):
+        counts[(attribute, item)] = counts.get((attribute, item), 0) + 1
+    return counts
+
+
 def module_had_tests(
     name: str, item: str, old: str, text_of: Callable[[str], str]
 ) -> bool:
@@ -1363,7 +1377,7 @@ def unsafe_lines(text: str) -> set[int]:
         if UNSAFE.search(code):
             inside.add(number)
             # `unsafe extern "C" fn(u32)` is a pointer type and opens no block
-            if start_depth is None and not FN_POINTER.search(code):
+            if start_depth is None and UNSAFE.search(FN_POINTER.sub("", code)):
                 pending = True
         if start_depth is not None:
             inside.add(number)
@@ -1491,6 +1505,22 @@ def dependency_names(manifest: dict[str, Any]) -> set[str]:
     for key, spec in manifest.get("replace", {}).items():
         names.add(f"replace.{key}={json.dumps(spec, sort_keys=True)}")
     return names
+
+
+def moved_from(change: FileChange, changes: list[FileChange]) -> FileChange:
+    """A new manifest paired with the deleted one of the same package, so a
+    renamed crate folder is checked against what it held before."""
+    name = package_name(change.new) if change.new and not change.old else ""
+    for other in changes:
+        if (
+            name
+            and posixpath.basename(other.name) == "Cargo.toml"
+            and other.old
+            and not other.new
+            and package_name(other.old) == name
+        ):
+            return FileChange(change.name, other.old, change.new, change.added)
+    return change
 
 
 def manifest_exceptions(
@@ -1769,8 +1799,12 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
     for change in changes:
         if not change.name.endswith(".rs"):
             continue
-        for _, attribute, item, _ in attributes(change.old):
-            was[(attribute, item)] = was.get((attribute, item), 0) + 1
+        left = attribute_counts(change.old)
+        for key, count in attribute_counts(change.new).items():
+            left[key] = left.get(key, 0) - count
+        for key, count in left.items():
+            if count > 0 and not key[0].startswith("#!["):
+                was[key] = was.get(key, 0) + count
         old_unsafe = unsafe_lines(change.old)
         old_lines = change.old.splitlines()
         for number in change.removed:
@@ -1789,7 +1823,7 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 top, workspace, tree_paths(new_ref) | {name}
             ):
                 workspace = {}
-            exceptions += manifest_exceptions(change, workspace)
+            exceptions += manifest_exceptions(moved_from(change, changes), workspace)
             exceptions += joined_members(
                 change, new_text, tree_paths(old_ref), tree_paths(new_ref), old_text
             )
@@ -1811,11 +1845,17 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
             old_tests = set(range(1, len(change.old.splitlines()) + 1))
         if declared_for_tests(name, new_text, tree_paths(new_ref)):
             new_tests = set(range(1, len(change.new.splitlines()) + 1))
-        old_code = "".join(code_only(line) for line in change.old.splitlines())
+        old_code = "".join(
+            split_line(line, keep=True)[0] for line in change.old.splitlines()
+        )
         had_tests = bool(TEST_ATTR.search(old_code))
         old_flat = re.sub(r"\s+", "", old_code)
         new_attributes = attributes(change.new)
+        local = attribute_counts(change.old)
         for number, attribute, item, shown in new_attributes:
+            if local.get((attribute, item), 0):
+                local[(attribute, item)] -= 1
+                continue
             if was.get((attribute, item), 0):
                 was[(attribute, item)] -= 1
                 continue
