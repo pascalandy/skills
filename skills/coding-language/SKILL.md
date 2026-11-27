@@ -22,6 +22,7 @@ Load the file of the row that matches the request:
 
 ## Out of scope
 
+- Rust code, Cargo lints, and Rust project guardrails: use `rust`
 - CLI design principles, implementation patterns, or agent-friendliness auditing: use `coding-standard`
 - General architectural design decisions: use `architect`
 

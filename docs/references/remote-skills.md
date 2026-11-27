@@ -216,6 +216,7 @@ A mode's routes run through that mode's SKILL.md.
 - `modernize`: For getting old prs up to date. Use when asked to rebase a pr or "modernize".
 - `right-sized-architecture`: Use when writing the architecture section of a build plan for an end-user app (web, SaaS, mobile back end). Also use to assess whether the modules, layers, or deployables of an existing app are the right size. This skill covers the choice between monolith, modular monolith, Clean Architecture, hexagonal, and vertical slices at the scale of the whole app.
 - `rolling-wave-planning`: Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, reporting where the plan stands or what agents can implement, or syncing plan/ markdown to GitHub issues.
+- `rust`: Use when writing, fixing, or reviewing Rust code, setting up a new Cargo crate or workspace, adding lints or a check recipe to an existing Rust project, or when a Clippy lint, a failing test, or a borrow-checker error tempts a shortcut.
 - `statechart`: Use only when explicitly invoked as `statechart`.
 - `takeover`: Take over existing work. Use when the user asks to take over a PR, branch, or agent thread, or requests a takeover.
 - `tool-call-delegation`: Use when asked to delegate every tool call.

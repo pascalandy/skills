@@ -1,0 +1,33 @@
+# Supply-chain checks for `cargo deny check`. Editing this file is an exception
+[advisories]
+ignore = []
+
+[licenses]
+# Permissive licenses common on crates.io
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.8
+# The list covers crates a project may add later
+unused-allowed-license = "allow"
+
+[licenses.private]
+# Crates with `publish = false` need no license
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
