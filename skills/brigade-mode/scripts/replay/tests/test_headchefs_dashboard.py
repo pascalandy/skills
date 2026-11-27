@@ -203,6 +203,7 @@ def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
         legacy = json.loads(json.dumps(first))
         for chef in legacy["chefs"]:
             del chef["chart"]["concurrency"]
+            del chef["chart"]["workers"]
         legacy["chefs"][0]["chart"]["rows"][1]["items"] = [
             {
                 "start": _ms("11:20"),
@@ -233,6 +234,7 @@ def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
     legacy_view = chromium.new_page()
     legacy_view.set_content(legacy_page)
     assert legacy_view.locator(".activity:visible").count() == 0
+    assert legacy_view.locator(".active-list [data-cooks]").inner_text() == "—"
     page = chromium.new_page(has_touch=True, viewport={"width": 1100, "height": 900})
     page.set_content(snapshot.render(current))
     readout = page.locator(".active-list .activity output")
@@ -272,6 +274,86 @@ def test_half_hour_readout_counts_each_agent_once_and_skips_waits(
     assert readout.inner_text().split("\n") == [
         "0 agent actif",
         "24 nov. 2026, 11h30–12h00",
+    ]
+
+
+def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
+    tmp_path: Path, chromium: Browser
+) -> None:
+    with closing(_brigade(tmp_path / "statev2.sqlite")) as db:
+        db.executemany(
+            "insert into orchestration_v2_projection_subagents values(?, ?)",
+            [
+                ("root-abcd", "qa-1"),
+                ("qa-1", "qa-worker"),
+                ("root-abcd", "planner"),
+                ("root-abcd", "chef"),
+                ("root-abcd", "loop"),
+                ("root-abcd", "luna"),
+                ("cook-a", "side"),
+                ("cook-a", "cook-prefixed-helper"),
+            ],
+        )
+        db.executemany(
+            "insert into orchestration_v2_projection_threads values(?, ?, ?, null, null, '{}')",
+            [
+                (thread, title, _local("10:10").isoformat())
+                for thread, title in (
+                    ("qa-1", "🧪 QA 1 · Head Chef abcd"),
+                    ("qa-worker", "QA1 worker · Parcours"),
+                    ("planner", "📐 Planner · W1"),
+                    ("chef", "🚥 Chef 1 abcd [0/1] 🍳 lot"),
+                    ("loop", "👀 loop-1 · Cook 1.1 abcd"),
+                    ("luna", "🌙 Luna"),
+                    ("side", "🔧 verify · Cook 1.1 abcd"),
+                    ("cook-prefixed-helper", "🔧 Cook 1.1 · verify"),
+                )
+            ],
+        )
+        db.executemany(
+            "insert into orchestration_v2_projection_runs values(?, ?, 'completed', ?, ?)",
+            [
+                (
+                    thread,
+                    ordinal,
+                    _local(end).isoformat(),
+                    json.dumps({"startedAt": _local(start).isoformat()}),
+                )
+                for thread, ordinal, start, end in (
+                    ("qa-1", 1, "11:00", "11:30"),
+                    ("qa-1", 2, "11:20", "11:40"),
+                    ("qa-worker", 1, "11:25", "11:35"),
+                    ("planner", 1, "10:15", "10:25"),
+                    ("chef", 1, "10:12", "12:00"),
+                    ("loop", 1, "11:00", "11:20"),
+                    ("luna", 1, "10:30", "11:00"),
+                    ("side", 1, "10:50", "11:00"),
+                    ("cook-prefixed-helper", 1, "11:15", "11:45"),
+                )
+            ],
+        )
+        db.commit()
+        current = snapshot.capture(db, captured=_local("12:17"))
+
+    chart = current["chefs"][0]["chart"]
+    minute = 60_000
+    assert chart["active"] == 35 * minute
+    # Cook 1.1 overlaps itself from 10:30 to 11:15 and Cook 1.2 runs 12:05 to capture.
+    # QA 1 overlaps itself from 11:00 to 11:40 and its worker adds 10 concurrent minutes.
+    assert chart.get("workers") == {"cooks": 57 * minute, "qa": 50 * minute}
+    forged = json.loads(json.dumps(current))
+    forged["chefs"][0]["chart"]["workers"]["qa"] = -1
+    with pytest.raises(snapshot.SnapshotError):
+        snapshot.validate(forged)
+
+    page = chromium.new_page()
+    page.set_content(snapshot.render(current))
+    totals = page.locator(".active-list .chef-totals")
+    assert totals.locator("dt").all_inner_texts() == ["HF", "Cooks", "QA"]
+    assert totals.locator("dd").all_inner_texts() == [
+        "0,58 h actives · 1,53 h inactives",
+        "0,95 h actives",
+        "0,83 h actives",
     ]
 
 
