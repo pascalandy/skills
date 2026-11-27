@@ -612,7 +612,9 @@ class SetupTest(Crate):
         self.assertNotIn("cargo fmt,", answer["errors"][0])
         self.assertFalse((self.root / "clippy.toml").exists())
         code, answer, _ = run(self.root, "audit")
-        self.assertIn("rust_guard.py diff", answer["check_recipe"]["lacks"])
+        self.assertIn(
+            "uv run scripts/rust_guard.py diff", answer["check_recipe"]["lacks"]
+        )
 
     def test_init_keeps_a_project_owned_guard_script(self) -> None:
         write(self.root, {"scripts/rust_guard.py": "print('mine')\n"})
@@ -715,6 +717,398 @@ class CliAndWorkspaceTest(Crate):
         code, answer, _ = run(self.root, "init")
         self.assertEqual(code, 1)
         self.assertIn("without <!-- rust-guard:end -->", answer["errors"][0])
+
+
+class RoundTwoTest(Crate):
+    """Cases the second council round reproduced."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_a_recipe_that_reports_or_drops_flags_lacks_the_gate(self) -> None:
+        recipe = (SCRIPT.parent.parent / "assets" / "justfile").read_text()
+        loose = recipe.replace("--workspace ", "").replace(
+            "rust_guard.py diff", "rust_guard.py diff --report"
+        )
+        write(
+            self.root,
+            {"justfile": loose + "# cargo test --workspace --all-features --locked\n"},
+        )
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual(code, 0)
+        lacks = answer["check_recipe"]["lacks"]
+        self.assertIn("uv run scripts/rust_guard.py diff", lacks)
+        self.assertIn("cargo test --workspace --all-features --locked", lacks)
+
+    def test_an_existing_lefthook_must_run_the_guard(self) -> None:
+        write(
+            self.root,
+            {
+                "lefthook.yml": "pre-commit:\n  commands:\n    fmt:\n      run: cargo fmt --check\n"
+            },
+        )
+        code, answer, _ = run(self.root, "init")
+        self.assertEqual(code, 1)
+        self.assertIn("does not run `rust_guard.py diff --staged`", answer["errors"][0])
+
+    def test_a_dot_clippy_toml_is_kept(self) -> None:
+        write(self.root, {".clippy.toml": 'msrv = "1.85"\n'})
+        run(self.root, "init")
+        self.assertFalse((self.root / "clippy.toml").exists())
+
+    def test_a_split_or_broadened_attribute_is_new(self) -> None:
+        base = LIB.replace(
+            "pub fn add",
+            '#[expect(clippy::unwrap_used, reason = "demo")]\npub fn add',
+        )
+        write(self.root, {"src/lib.rs": base})
+        self.commit("existing expect")
+        broadened = base.replace(
+            "#[expect(clippy::unwrap_used,",
+            "#[expect(\n    clippy::unwrap_used,\n    clippy::cast_possible_truncation,",
+        ).replace(
+            "    #[test]\n    fn adds",
+            '    #[test]\n    #[cfg_attr(\n        not(feature = "slow"),\n        ignore\n    )]\n    fn adds',
+        )
+        write(self.root, {"src/lib.rs": broadened})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertEqual(sorted(kinds(answer)), ["expect", "ignore"])
+        moved = base.replace("pub fn add", "\n\npub fn add")
+        write(self.root, {"src/lib.rs": moved})
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_two_unwraps_on_one_line_count_twice(self) -> None:
+        base = LIB.replace(
+            "a.checked_add(b)", "Some(Some(a).unwrap() + Some(b).unwrap_or_default())"
+        )
+        write(self.root, {"src/lib.rs": base})
+        self.commit("one unwrap")
+        write(
+            self.root, {"src/lib.rs": base.replace(".unwrap_or_default()", ".unwrap()")}
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unwrap_used"]))
+
+    def test_dropping_a_test_module_or_test_discovery_is_an_exception(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.split("#[cfg(test)]")[0]
+                + "#[cfg(test)]\nmod tests;\n",
+                "src/tests.rs": "#[test]\nfn t() {}\n",
+            },
+        )
+        self.commit("external tests")
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.split("#[cfg(test)]")[0],
+                "Cargo.toml": CRATE.replace(
+                    'edition = "2024"', 'edition = "2024"\nautotests = false'
+                ),
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn("test_module_removed", kinds(answer))
+        self.assertIn(
+            ["test_discovery", "Cargo.toml", "package.autotests changed"],
+            answer["exceptions"],
+        )
+
+    def test_a_test_only_module_file_is_test_code(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB + "\n#[cfg(test)]\nmod helpers;\n",
+                "src/helpers.rs": "pub fn one() -> u8 {\n    1\n}\n",
+            },
+        )
+        self.commit("helpers")
+        write(
+            self.root,
+            {"src/helpers.rs": 'pub fn one() -> u8 {\n    "1".parse().unwrap()\n}\n'},
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_staged_mode_reads_lints_from_the_index(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "a.checked_add(b)", "Some(a.checked_add(b).unwrap())"
+                )
+            },
+        )
+        git(self.root, "add", "src/lib.rs")
+        write(
+            self.root,
+            {"Cargo.toml": CRATE + '\n[lints.clippy]\nunwrap_used = "deny"\n'},
+        )
+        code, answer, _ = run(self.root, "diff", "--staged")
+        self.assertEqual((code, kinds(answer)), (1, ["unwrap_used"]))
+
+    def test_pr_report_ignores_changes_made_on_the_base_after_the_fork(self) -> None:
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write(self.root, {"README.md": "docs\n"})
+        self.commit("docs")
+        git(self.root, "checkout", "-q", "main")
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "    #[test]\n    fn adds",
+                    "    #[test]\n    fn more() {}\n\n    #[test]\n    fn adds",
+                )
+            },
+        )
+        self.commit("main grows a test")
+        git(self.root, "checkout", "-q", "feature")
+        code, answer, _ = run(self.root, "diff", "--base", "main", "--report")
+        self.assertEqual((code, answer), (0, {"ok": True}))
+
+    def test_joining_an_existing_crate_to_the_workspace_checks_it(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/a"]\nexclude = ["crates/b"]\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n',
+                "crates/a/Cargo.toml": CRATE + "\n[lints]\nworkspace = true\n",
+                "crates/b/Cargo.toml": CRATE.replace("demo", "bee"),
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+        write(
+            self.root,
+            {
+                "Cargo.toml": (self.root / "Cargo.toml")
+                .read_text()
+                .replace(
+                    'members = ["crates/a"]\nexclude = ["crates/b"]',
+                    'members = ["crates/a", "crates/b"]',
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            [
+                "lints",
+                "crates/b/Cargo.toml",
+                "member does not set [lints] workspace = true",
+            ],
+            answer["exceptions"],
+        )
+
+    def test_other_ci_files_are_protected(self) -> None:
+        write(self.root, {".gitlab-ci.yml": "test:\n  script: just check\n"})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(
+            (code, answer["exceptions"][0][:2]), (1, ["protected", ".gitlab-ci.yml"])
+        )
+
+    def test_help_wins_over_a_typo(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "typo", "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("usage: rust_guard.py", result.stdout)
+
+    def test_the_project_copy_init_names_the_skill_copy(self) -> None:
+        run(self.root, "init")
+        code, answer, _ = run(
+            self.root, "init", script=self.root / "scripts/rust_guard.py"
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("run them from the skill copy", answer["errors"][0])
+
+
+class OpusRoundTwoTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_a_changed_unsafe_line_is_new_and_a_moved_one_is_not(self) -> None:
+        base = LIB.replace(
+            "pub fn add",
+            "pub fn raw(p: *const u8) -> u8 {\n    unsafe { *p }\n}\n\npub fn add",
+        )
+        write(self.root, {"src/lib.rs": base})
+        self.commit("existing unsafe")
+        write(
+            self.root,
+            {"src/lib.rs": base.replace("unsafe { *p }", "unsafe { *p.add(100) }")},
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unsafe"]))
+        moved = base.replace("pub fn raw", "\n// moved\npub fn raw")
+        write(self.root, {"src/lib.rs": moved})
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_a_cfg_that_turns_a_test_off_is_an_exception(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "    #[test]\n    fn adds",
+                    "    #[cfg(any())]\n    #[test]\n    fn adds",
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_a_member_created_with_inheritance_is_not_a_lint_change(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n\n[workspace.lints.clippy]\npanic = "deny"\n'
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+        write(
+            self.root,
+            {
+                "crates/x/Cargo.toml": CRATE.replace("demo", "x")
+                + "\n[lints]\nworkspace = true\n",
+                "crates/x/src/lib.rs": "pub fn f() {}\n",
+            },
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+
+class LayoutTest(Crate):
+    def test_dot_member_does_not_crash(self) -> None:
+        write(self.root, {"Cargo.toml": CRATE + '\n[workspace]\nmembers = ["."]\n'})
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual(
+            (code, [entry["path"] for entry in answer["manifests"]]),
+            (0, ["Cargo.toml"]),
+        )
+
+    def test_a_nested_crate_gets_no_lefthook_file_and_a_note(self) -> None:
+        git(self.root, "init", "-q", "-b", "main")
+        nested = self.root / "app"
+        write(
+            nested,
+            {"Cargo.toml": CRATE, "Cargo.lock": "version = 4\n", "src/lib.rs": LIB},
+        )
+        code, answer, _ = run(nested, "init")
+        self.assertEqual(code, 0)
+        self.assertFalse((nested / "lefthook.yml").exists())
+        self.assertIn("root: app/", answer["notes"][0])
+
+    def test_audit_reports_whether_tests_may_panic(self) -> None:
+        self.assertFalse(run(self.root, "audit")[1]["tests_may_panic"])
+        write(self.root, {"clippy.toml": 'msrv = "1.85"\n'})
+        self.assertFalse(run(self.root, "audit")[1]["tests_may_panic"])
+        run(self.root, "init")
+        (self.root / "clippy.toml").unlink()
+        run(self.root, "init")
+        self.assertTrue(run(self.root, "audit")[1]["tests_may_panic"])
+
+
+class NeonRoundTwoTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_a_quote_in_a_block_comment_hides_nothing(self) -> None:
+        changed = LIB.replace("a.checked_add(b)", '/* " */ Some(Some(a).unwrap() + b)')
+        write(self.root, {"src/lib.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unwrap_used"]))
+
+    def test_a_quoted_issue_link_counts(self) -> None:
+        changed = LIB.replace(
+            "pub fn add", '// TODO: see "https://example.com/issues/1"\npub fn add'
+        )
+        write(self.root, {"src/lib.rs": changed})
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_bracket_and_brace_macros_count(self) -> None:
+        changed = LIB.replace(
+            "a.checked_add(b)", 'if a == 0 { todo!{} } else { panic!["boom"] }'
+        )
+        write(self.root, {"src/lib.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, sorted(kinds(answer))), (1, ["panic", "todo"]))
+
+    def test_editing_a_line_keeps_its_existing_todo(self) -> None:
+        base = LIB.replace("a.checked_add(b)", "a.checked_add(b) // TODO tidy")
+        write(self.root, {"src/lib.rs": base})
+        self.commit("existing todo")
+        write(
+            self.root,
+            {"src/lib.rs": base.replace("a.checked_add(b)", "b.checked_add(a)")},
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_an_inner_cfg_test_file_is_test_code(self) -> None:
+        write(
+            self.root,
+            {
+                "src/fixtures.rs": '#![cfg(test)]\n\npub fn one() -> u8 {\n    "1".parse().unwrap()\n}\n'
+            },
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_the_failure_message_names_the_approval_steps(self) -> None:
+        write(self.root, {"src/extra.rs": "pub unsafe fn f() {}\n"})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn("commit the change", answer["errors"][0])
+
+
+class NeonAuditTest(Crate):
+    def test_rustc_reports_unsafe_op_in_unsafe_fn_as_e0133(self) -> None:
+        spec = importlib.util.spec_from_file_location("rust_guard_e0133", SCRIPT)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["rust_guard_e0133"] = module
+        spec.loader.exec_module(module)
+        finding = {
+            "reason": "compiler-message",
+            "message": {
+                "code": {"code": "E0133"},
+                "level": "warning",
+                "spans": [{"file_name": "src/lib.rs", "line_start": 2}],
+            },
+        }
+        self.assertEqual(
+            module.count_findings(json.dumps(finding)), {"unsafe_op_in_unsafe_fn": 1}
+        )
+
+    def test_excluding_a_folder_excludes_crates_below_it(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/**"]\nexclude = ["crates/skip"]\n',
+                "crates/a/Cargo.toml": CRATE,
+                "crates/skip/sub/Cargo.toml": CRATE.replace("demo", "sub"),
+            },
+        )
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            [entry["path"] for entry in answer["manifests"]], ["crates/a/Cargo.toml"]
+        )
+
+    def test_help_after_a_global_flag(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "-v", "help", "diff"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("usage: rust_guard.py diff", result.stdout)
 
 
 if __name__ == "__main__":

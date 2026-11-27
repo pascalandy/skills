@@ -383,7 +383,6 @@ LOG = logging.getLogger("rust_guard")
 # The first docstring line marks a copy init wrote; init never replaces a
 # scripts/rust_guard.py without it, since that file belongs to the project
 MARKER = "Set up, audit, and gate the Rust guardrails this skill describes."
-EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 AGENTS_START = "<!-- rust-guard:start -->"
 AGENTS_END = "<!-- rust-guard:end -->"
@@ -404,25 +403,42 @@ PROTECTED_NAMES = frozenset(
         ".justfile",
         "lefthook.yml",
         "lefthook.yaml",
+        ".lefthook.yml",
+        ".gitlab-ci.yml",
+        ".travis.yml",
+        ".woodpecker.yml",
+        "azure-pipelines.yml",
+        "bitbucket-pipelines.yml",
+        "Jenkinsfile",
     }
 )
 PROTECTED_SUFFIXES = (".cargo/config.toml", ".cargo/config", "scripts/rust_guard.py")
-PROTECTED_DIRS = (".github/workflows/",)
-DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
-# The commands a `check` recipe must run to be the gate this skill describes
-GATE = (
-    "cargo fmt",
-    "cargo clippy",
-    "-D warnings",
-    "cargo test",
-    "cargo deny",
-    "cargo shear",
-    "rust_guard.py diff",
+PROTECTED_DIRS = (
+    ".github/workflows/",
+    ".gitlab/",
+    ".circleci/",
+    ".buildkite/",
+    ".woodpecker/",
+    ".forgejo/workflows/",
+    ".gitea/workflows/",
 )
+DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 
 # Each pattern runs on code with strings and comments removed. `ratchet` names
 # the Clippy lint that, once denied, makes the pattern Clippy's job instead
-ATTRIBUTE = r"#!?\[[^\]]*"
+# Attributes are compared whole, with whitespace removed, so one rustfmt split
+# over several lines or one more lint in an existing #[expect(...)] still shows
+ATTRIBUTES = (
+    ("allow", re.compile(r"\ballow\(")),
+    ("expect", re.compile(r"\bexpect\(")),
+    ("ignore", re.compile(r"\bignore\b")),
+    ("should_panic", re.compile(r"\bshould_panic\b")),
+)
+INNER_CFG_TEST = re.compile(r"#!\[\s*cfg\s*\(\s*test\s*\)\s*\]")
+UNSAFE = re.compile(r"\bunsafe\b")
+# A cfg on a test item that is not cfg(test) can switch the test off
+DISABLING_CFG = re.compile(r"#\[cfg(?:_attr)?\((?!test\)\])")
+TEST_MODULE = re.compile(r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod\w+;")
 
 
 @dataclass(frozen=True)
@@ -434,19 +450,14 @@ class Pattern:
 
 
 PATTERNS = (
-    Pattern("unsafe", re.compile(r"\bunsafe\b")),
-    Pattern("allow", re.compile(ATTRIBUTE + r"\ballow\s*\(")),
-    Pattern("expect", re.compile(ATTRIBUTE + r"\bexpect\s*\(")),
-    Pattern("ignore", re.compile(ATTRIBUTE + r"\bignore\b")),
-    Pattern("should_panic", re.compile(ATTRIBUTE + r"\bshould_panic\b")),
     # Shortcuts a project may not deny yet: new ones are flagged while the
     # existing ones stay (the ratchet). clippy.toml lets tests use the first three
     Pattern("unwrap_used", re.compile(r"\.unwrap\(\)"), "unwrap_used", True),
     Pattern("expect_used", re.compile(r"\.expect\("), "expect_used", True),
-    Pattern("panic", re.compile(r"\bpanic!\s*\("), "panic", True),
-    Pattern("todo", re.compile(r"\btodo!\s*\("), "todo"),
-    Pattern("unimplemented", re.compile(r"\bunimplemented!\s*\("), "unimplemented"),
-    Pattern("dbg_macro", re.compile(r"\bdbg!\s*\("), "dbg_macro"),
+    Pattern("panic", re.compile(r"\bpanic!\s*[(\[{]"), "panic", True),
+    Pattern("todo", re.compile(r"\btodo!\s*[(\[{]"), "todo"),
+    Pattern("unimplemented", re.compile(r"\bunimplemented!\s*[(\[{]"), "unimplemented"),
+    Pattern("dbg_macro", re.compile(r"\bdbg!\s*[(\[{]"), "dbg_macro"),
 )
 # Counted, not blocked: no lint catches them reliably, so the reviewer judges
 NOTES = (
@@ -463,26 +474,71 @@ ISSUE_LINK = re.compile(r"#\d+|https?://")
 TEST_ATTR = re.compile(r"#\[\s*(?:[\w:]+::)?test\b")
 TEST_FN = re.compile(r"\bfn\s+(\w+)")
 CFG_TEST = re.compile(r"#\[\s*cfg\s*\(\s*test\s*\)\s*\]")
-ASSERTION = re.compile(r"\b(?:debug_)?assert(?:_eq|_ne|_matches)?!\s*\(")
-LITERALS = re.compile(
-    r"""b?r(\#*)".*?"\1"""  # raw strings, closed on this line
-    r"""|b?"(?:\\.|[^"\\])*"?"""  # strings, possibly continued on the next line
-    r"""|b?'(?:\\.|[^'\\])'"""  # char literals; a lifetime has no closing quote
+ASSERTION = re.compile(r"\b(?:debug_)?assert(?:_eq|_ne|_matches)?!\s*[(\[{]")
+TOKENS = re.compile(
+    r"""(?P<raw>b?r(?P<hashes>\#*)".*?"(?P=hashes))"""  # raw strings, closed on this line
+    r"""|(?P<string>b?"(?:\\.|[^"\\])*"?)"""  # strings, possibly continued
+    r"""|(?P<char>b?'(?:\\.|[^'\\])')"""  # char literals; a lifetime has no closing quote
+    r"""|(?P<block>/\*.*?\*/)"""  # block comments closed on this line
+    r"""|(?P<line>//.*)"""  # the line comment
 )
 
 
-BLOCK_COMMENT = re.compile(r"/\*.*?\*/")
+def split_line(line: str) -> tuple[str, str]:
+    """The line's code, with literals emptied and block comments blanked, and
+    the text of its `//` comment. One left-to-right pass, so a quote inside a
+    comment and `//` inside a string are read for what they are."""
+    code: list[str] = []
+    comment = ""
+    position = 0
+    for token in TOKENS.finditer(line):
+        code.append(line[position : token.start()])
+        position = token.end()
+        if token["line"] is not None:
+            comment = token["line"][2:]
+            break
+        code.append(" " if token["block"] is not None else '""')
+    else:
+        code.append(line[position:])
+    return "".join(code), comment
 
 
 def code_only(line: str) -> str:
     """The line without string and char literals, then without its comments."""
-    return BLOCK_COMMENT.sub(" ", LITERALS.sub('""', line)).split("//", 1)[0]
+    return split_line(line)[0]
 
 
 def comment_of(line: str) -> str:
     """The text of the line's `//` comment, ignoring `//` inside strings."""
-    parts = LITERALS.sub('""', line).split("//", 1)
-    return parts[1] if len(parts) == 2 else ""
+    return split_line(line)[1]
+
+
+def attributes(text: str) -> list[tuple[int, str]]:
+    """Each attribute in the file as (first line, text without whitespace),
+    read across lines on code without strings and comments."""
+    code = [code_only(line) for line in text.splitlines()]
+    found: list[tuple[int, str]] = []
+    line_of: list[int] = []
+    joined = ""
+    for number, line in enumerate(code, 1):
+        joined += line + "\n"
+        line_of += [number] * (len(line) + 1)
+    index = 0
+    while (index := joined.find("#", index)) != -1:
+        open_at = index + 1 + (joined[index + 1 : index + 2] == "!")
+        if joined[open_at : open_at + 1] != "[":
+            index += 1
+            continue
+        depth = 0
+        end = len(joined) - 1
+        for position in range(open_at, len(joined)):
+            depth += {"[": 1, "]": -1}.get(joined[position], 0)
+            if depth == 0:
+                end = position
+                break
+        found.append((line_of[index], re.sub(r"\s+", "", joined[index : end + 1])))
+        index = end + 1
+    return found
 
 
 def read_raw(path: Path) -> str:
@@ -501,8 +557,8 @@ def profile() -> dict[str, dict[str, str]]:
     source = ASSETS / "lints.toml"
     if not source.is_file():
         raise UsageError(
-            "init and audit need the skill's assets; run them from the skill copy: "
-            "uv run <skill>/scripts/rust_guard.py init"
+            "init and audit need the skill's assets; run them from the skill copy, "
+            "such as uv run <skill>/scripts/rust_guard.py audit"
         )
     return tomllib.loads(source.read_text())["lints"]
 
@@ -532,19 +588,27 @@ def members(root: Path, manifest: dict[str, Any]) -> list[Path]:
     excluded = {
         folder.resolve()
         for pattern in workspace.get("exclude", [])
-        for folder in root.glob(pattern)
+        for folder in expand(root, pattern)
     }
     for pattern in workspace.get("members", []):
-        for match in sorted(root.glob(pattern)):
+        for match in expand(root, pattern):
             folder = match.resolve()
             candidate = folder / "Cargo.toml"
             if (
-                folder not in excluded
+                not any(folder.is_relative_to(other) for other in excluded)
                 and candidate.is_file()
                 and candidate not in found
             ):
                 found.append(candidate)
     return found
+
+
+def expand(root: Path, pattern: str) -> list[Path]:
+    """Folders a workspace `members` or `exclude` entry names. A plain path,
+    such as ".", is taken as is, since Path.glob refuses some of them."""
+    if not any(char in pattern for char in "*?["):
+        return [root / pattern]
+    return sorted(root.glob(pattern))
 
 
 def lint_level(value: Any) -> str:
@@ -601,26 +665,74 @@ def run(
     return result
 
 
-def check_recipe(root: Path) -> tuple[Path | None, list[str]]:
-    """The project's justfile, and the gate commands its `check` recipe lacks.
+def recipe_steps(text: str) -> list[str]:
+    """The commands of the `check` recipe in a justfile, without comments,
+    quiet or error-ignoring prefixes, or indentation."""
+    body = re.search(
+        r"^@?check(?:\s+[^:=\n]*)?:(?!=)[^\n]*\n((?:[ \t]+[^\n]*\n?|\n)*)",
+        text,
+        re.MULTILINE,
+    )
+    steps = [
+        line.strip().lstrip("@-").strip()
+        for line in (body[1] if body else "").splitlines()
+    ]
+    return [step for step in steps if step and not step.startswith("#")]
 
-    The recipe body is every indented line under `check`. A justfile without
-    a `check` recipe lacks every command.
+
+def check_recipe(root: Path) -> tuple[Path | None, list[str]]:
+    """The project's justfile, and the gate steps its `check` recipe lacks.
+
+    The gate is every step of the skill's recipe, with its exact arguments.
+    A step that passes --report to the guard counts as missing the guard.
     """
+    gate = recipe_steps((ASSETS / "justfile").read_text())
     for name in ("justfile", "Justfile", ".justfile"):
         path = root / name
         if path.is_file():
-            body = re.search(
-                r"^@?check(?:\s+[^:=\n]*)?:(?!=)[^\n]*\n((?:[ \t]+[^\n]*\n?|\n)*)",
-                path.read_text(),
-                re.MULTILINE,
+            steps = [
+                step
+                for step in recipe_steps(path.read_text())
+                if "--report" not in step
+            ]
+            return path, [step for step in gate if step not in steps]
+    return None, gate
+
+
+def tests_may_panic(root: Path) -> bool:
+    """Whether the project's Clippy config lets tests unwrap, expect, and panic,
+    as the profile's tests need once those lints are denied."""
+    for name in ("clippy.toml", ".clippy.toml"):
+        path = root / name
+        if path.is_file():
+            try:
+                config = tomllib.loads(path.read_text())
+            except tomllib.TOMLDecodeError:
+                return False
+            keys = (
+                "allow-unwrap-in-tests",
+                "allow-expect-in-tests",
+                "allow-panic-in-tests",
             )
-            text = body[1] if body else ""
-            return path, [command for command in GATE if command not in text]
-    return None, list(GATE)
+            return all(config.get(key) is True for key in keys)
+    return False
+
+
+def hook_lacks_guard(root: Path) -> Path | None:
+    """The project's lefthook config when it does not run the staged guard."""
+    for name in ("lefthook.yml", "lefthook.yaml", ".lefthook.yml"):
+        path = root / name
+        if path.is_file():
+            return None if "rust_guard.py diff --staged" in path.read_text() else path
+    return None
 
 
 # init ---------------------------------------------------------------------
+
+
+def git_root(folder: Path) -> Path | None:
+    found = run(["git", "rev-parse", "--show-toplevel"], folder, check=False)
+    return Path(found.stdout.strip()).resolve() if found.returncode == 0 else None
 
 
 def lint_block(workspace: bool) -> str:
@@ -665,11 +777,17 @@ def plan_init(root: Path) -> list[tuple[str, str, Path, str]]:
         plans.append(
             ("update", member.relative_to(root).as_posix(), member, member_text)
         )
+    nested = git_root(root) not in (None, root)
     for name in ("clippy.toml", "deny.toml", "justfile", "lefthook.yml"):
+        if name == "lefthook.yml" and nested:
+            continue
         target = root / name
-        exists = target.exists() or (
-            name == "justfile" and check_recipe(root)[0] is not None
-        )
+        alternates = {
+            "clippy.toml": (".clippy.toml",),
+            "justfile": ("Justfile", ".justfile"),
+            "lefthook.yml": ("lefthook.yaml", ".lefthook.yml"),
+        }.get(name, ())
+        exists = target.exists() or any((root / other).exists() for other in alternates)
         if not exists:
             plans.append(("create", name, target, (ASSETS / name).read_text()))
     guard = root / "scripts" / "rust_guard.py"
@@ -703,12 +821,19 @@ def plan_init(root: Path) -> list[tuple[str, str, Path, str]]:
 
 
 def init(args: argparse.Namespace) -> dict[str, Any]:
+    profile()
     root = root_of(args.path)
     recipe, lacking = check_recipe(root)
     if recipe is not None and lacking:
         raise ScriptError(
             f"the `check` recipe in {recipe.name} does not run the whole gate; "
-            f"it lacks {', '.join(lacking)}. Copy the recipe in {ASSETS / 'justfile'} into it, then rerun init"
+            f"it lacks: {'; '.join(lacking)}. Copy the recipe in {ASSETS / 'justfile'} into it, then rerun init"
+        )
+    hook = hook_lacks_guard(git_root(root) or root)
+    if hook is not None:
+        raise ScriptError(
+            f"{hook.name} does not run `rust_guard.py diff --staged`; add the commands in "
+            f"{ASSETS / 'lefthook.yml'} to it, then rerun init"
         )
     guard = root / "scripts" / "rust_guard.py"
     if guard.exists() and MARKER not in guard.read_text():
@@ -726,7 +851,17 @@ def init(args: argparse.Namespace) -> dict[str, Any]:
         changes.append([action, name])
         if not args.dry_run:
             write_raw(path, text)
-    return {"changes": changes} if changes else {}
+    fields: dict[str, Any] = {"changes": changes} if changes else {}
+    top = git_root(root)
+    if top is not None and top != root:
+        prefix = root.relative_to(top).as_posix()
+        fields["notes"] = [
+            (
+                f"lefthook reads its config at the git root {top}: add the commands in "
+                f"{ASSETS / 'lefthook.yml'} there, under `root: {prefix}/`"
+            )
+        ]
+    return fields
 
 
 # audit --------------------------------------------------------------------
@@ -752,6 +887,7 @@ def violations(root: Path) -> dict[str, int]:
             "--message-format=json",
             "--quiet",
             "--",
+            "--cap-lints=warn",
             *flags,
         ],
         root,
@@ -780,7 +916,7 @@ def build_succeeded(stream: str) -> bool:
 
 def count_findings(stream: str) -> dict[str, int]:
     counts: dict[str, int] = {}
-    seen: set[tuple[str, str, int]] = set()
+    seen: set[tuple[str, str, str, int, int]] = set()
     for line in stream.splitlines():
         if not line.startswith("{"):
             continue
@@ -790,23 +926,37 @@ def count_findings(stream: str) -> dict[str, int]:
         if record.get("reason") != "compiler-message" or not code:
             continue
         spans = message.get("spans") or [{}]
-        key = (code, spans[0].get("file_name", ""), spans[0].get("line_start", 0))
+        key = (
+            code,
+            record.get("package_id", ""),
+            spans[0].get("file_name", ""),
+            spans[0].get("line_start", 0),
+            spans[0].get("column_start", 0),
+        )
         if key in seen:
             continue
         seen.add(key)
         name = code.removeprefix("clippy::")
+        if code == "E0133" and message.get("level") == "warning":
+            name = "unsafe_op_in_unsafe_fn"
         counts[name] = counts.get(name, 0) + 1
     return dict(sorted(counts.items()))
 
 
 def audit(args: argparse.Namespace) -> dict[str, Any]:
+    profile()
     root = root_of(args.path)
     root_manifest = read_toml(root / "Cargo.toml")
     report: list[dict[str, Any]] = []
     for path in members(root, root_manifest) or [root / "Cargo.toml"]:
         entry: dict[str, Any] = {"path": path.relative_to(root).as_posix()}
         manifest = read_toml(path)
-        if "workspace" in root_manifest and "lints" not in manifest:
+        if (
+            "workspace" in root_manifest
+            and "package" in manifest
+            and path != root / "Cargo.toml"
+            and manifest.get("lints", {}).get("workspace") is not True
+        ):
             entry["inherits"] = False
         entry["missing"] = missing_lints(effective_lints(manifest, root_manifest))
         report.append(entry)
@@ -826,6 +976,8 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
         "manifests": report,
         "files": files,
         "check_recipe": {"path": recipe.name if recipe else None, "lacks": lacking},
+        "hook_runs_guard": hook_lacks_guard(root) is None,
+        "tests_may_panic": tests_may_panic(root),
     }
     if args.violations:
         fields["violations"] = violations(root)
@@ -858,10 +1010,17 @@ def has_head(root: Path) -> bool:
     )
 
 
+def empty_tree(root: Path) -> str:
+    return git(root, "hash-object", "-t", "tree", os.devnull).stdout.strip()
+
+
 def revision(root: Path, base: str | None) -> str:
+    """What the working tree is compared with: the merge base with `base`, so a
+    pull request lists only its own changes; else HEAD; else the empty tree."""
     if base:
-        return git(root, "rev-parse", "--verify", f"{base}^{{commit}}").stdout.strip()
-    return "HEAD" if has_head(root) else EMPTY_TREE
+        git(root, "rev-parse", "--verify", f"{base}^{{commit}}")
+        return git(root, "merge-base", base, "HEAD").stdout.strip()
+    return "HEAD" if has_head(root) else empty_tree(root)
 
 
 def changed_files(root: Path, rev: str | None) -> list[FileChange]:
@@ -875,10 +1034,11 @@ def changed_files(root: Path, rev: str | None) -> list[FileChange]:
         others = git(root, "ls-files", "--others", "--exclude-standard", "-z").stdout
         names += [name for name in others.split("\0") if name and name not in names]
     old_ref = "HEAD" if rev is None else rev
+    unborn = not has_head(root) and rev in (None, empty_tree(root))
     changes: list[FileChange] = []
     for name in names:
         change = FileChange(name)
-        if old_ref != EMPTY_TREE:
+        if not unborn:
             shown = git(root, "show", f"{old_ref}:{name}", check=False)
             change.old = shown.stdout if shown.returncode == 0 else ""
         if rev is None:
@@ -940,6 +1100,37 @@ def test_lines(text: str) -> set[int]:
         if pending and code.rstrip().endswith(";"):
             pending = False  # `#[cfg(test)] use …;` covers only that line
     return inside
+
+
+def near_test(lines: list[str], number: int) -> bool:
+    """Whether a #[test] or #[cfg(test)] attribute sits within three lines of
+    line `number`, the span an attribute stack above one item takes."""
+    window = lines[max(0, number - 4) : number + 3]
+    return any(
+        TEST_ATTR.search(code_only(line)) or CFG_TEST.search(code_only(line))
+        for line in window
+    )
+
+
+def declared_for_tests(name: str, text_of: Callable[[str], str]) -> bool:
+    """Whether a parent module declares file `name` as `#[cfg(test)] mod x;`."""
+    path = Path(name)
+    stem = path.parent.name if path.stem == "mod" else path.stem
+    folder = path.parent.parent if path.stem == "mod" else path.parent
+    parents = [folder / "lib.rs", folder / "main.rs", folder / "mod.rs"]
+    if folder.name:
+        parents.append(folder.parent / f"{folder.name}.rs")
+    pattern = re.compile(
+        r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod" + re.escape(stem) + ";"
+    )
+    for parent in parents:
+        text = text_of(parent.as_posix())
+        code = re.sub(
+            r"\s+", "", "".join(code_only(line) for line in text.splitlines())
+        )
+        if pattern.search(code):
+            return True
+    return False
 
 
 def manifest_for(
@@ -1022,12 +1213,14 @@ def manifest_exceptions(
         f"{key}: {was.get(key, 'unset')} -> {now.get(key, 'unset')}"
         for key in sorted(was.keys() | now.keys())
         if was.get(key) != now.get(key)
+        and not (key == "lints.workspace" and now.get(key) == "true")
     ]
     if changed:
         found.append(["lints", change.name, "; ".join(changed)])
     workspace_lints = workspace.get("workspace", {}).get("lints")
     if (
         new
+        and not old
         and "package" in new
         and "workspace" not in new
         and workspace_lints
@@ -1036,6 +1229,20 @@ def manifest_exceptions(
         found.append(
             ["lints", change.name, "member does not set [lints] workspace = true"]
         )
+    discovery = [
+        ("package", "autotests"),
+        ("package", "autobenches"),
+        ("lib", "test"),
+        ("lib", "doctest"),
+        ("lib", "harness"),
+    ]
+    switched = [
+        ".".join(keys) for keys in discovery if old and dig(old, keys) != dig(new, keys)
+    ]
+    if old and old.get("test") != new.get("test"):
+        switched.append("[[test]]")
+    if switched:
+        found.append(["test_discovery", change.name, ", ".join(switched) + " changed"])
     for scope in ("package", "workspace"):
         shear = (scope, "metadata", "cargo-shear")
         if dig(old, shear) != dig(new, shear):
@@ -1051,6 +1258,40 @@ def dig(table: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return table
 
 
+def joined_members(
+    root: Path, change: FileChange, text_of: Callable[[str], str]
+) -> list[list[str]]:
+    """Members a changed workspace root now declares that do not inherit its
+    lints, even when their own files did not change."""
+    try:
+        old = tomllib.loads(change.old) if change.old else {}
+        new = tomllib.loads(change.new) if change.new else {}
+    except tomllib.TOMLDecodeError:
+        return []
+    keys = ("members", "exclude")
+    if "workspace" not in new or all(
+        dig(old, ("workspace", key)) == dig(new, ("workspace", key)) for key in keys
+    ):
+        return []
+    if not new["workspace"].get("lints"):
+        return []
+    folder = (root / change.name).parent
+    found: list[list[str]] = []
+    for member in members(folder, new):
+        relative = member.relative_to(root).as_posix()
+        if relative == change.name:
+            continue
+        try:
+            manifest = tomllib.loads(text_of(relative))
+        except tomllib.TOMLDecodeError:
+            continue
+        if manifest.get("lints", {}).get("workspace") is not True:
+            found.append(
+                ["lints", relative, "member does not set [lints] workspace = true"]
+            )
+    return found
+
+
 def protected(name: str) -> bool:
     return (
         Path(name).name in PROTECTED_NAMES
@@ -1062,14 +1303,14 @@ def protected(name: str) -> bool:
 def matches(
     text: str, lines: list[int], exempt: set[int], regex: re.Pattern[str]
 ) -> list[int]:
-    """Line numbers among `lines`, outside `exempt`, whose code matches."""
+    """Line numbers among `lines`, outside `exempt`, once per match on the
+    line's code."""
     all_lines = text.splitlines()
     return [
         number
         for number in lines
-        if number <= len(all_lines)
-        and number not in exempt
-        and regex.search(code_only(all_lines[number - 1]))
+        if number <= len(all_lines) and number not in exempt
+        for _ in regex.finditer(code_only(all_lines[number - 1]))
     ]
 
 
@@ -1099,8 +1340,17 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
     def new_text(name: str) -> str:
         if name in by_name:
             return by_name[name].new
+        if args.staged:
+            shown = git(root, "show", f":{name}", check=False)
+            return shown.stdout if shown.returncode == 0 else ""
         path = root / name
-        return path.read_text() if path.is_file() else ""
+        return path.read_text(errors="replace") if path.is_file() else ""
+
+    def old_text(name: str) -> str:
+        if name in by_name:
+            return by_name[name].old
+        shown = git(root, "show", f"{rev or 'HEAD'}:{name}", check=False)
+        return shown.stdout if shown.returncode == 0 else ""
 
     exceptions: list[list[str]] = []
     notes: dict[str, int] = {}
@@ -1114,12 +1364,85 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         if Path(name).name == "Cargo.toml":
             _, workspace = manifest_for(root, name, new_text)
             exceptions += manifest_exceptions(change, workspace)
+            exceptions += joined_members(root, change, new_text)
         if not name.endswith(".rs"):
             continue
         owner, workspace = manifest_for(root, name, new_text)
         lints = effective_lints(owner, workspace)
-        old_tests, new_tests = test_lines(change.old), test_lines(change.new)
         new_lines = change.new.splitlines()
+        old_tests, new_tests = test_lines(change.old), test_lines(change.new)
+        if INNER_CFG_TEST.search(
+            "".join(code_only(line) for line in change.old.splitlines()[:50])
+        ):
+            old_tests = set(range(1, len(change.old.splitlines()) + 1))
+        if INNER_CFG_TEST.search(
+            "".join(code_only(line) for line in change.new.splitlines()[:50])
+        ):
+            new_tests = set(range(1, len(change.new.splitlines()) + 1))
+        if declared_for_tests(name, old_text):
+            old_tests = set(range(1, len(change.old.splitlines()) + 1))
+        if declared_for_tests(name, new_text):
+            new_tests = set(range(1, len(change.new.splitlines()) + 1))
+        was = {}
+        for _, attribute in attributes(change.old):
+            was[attribute] = was.get(attribute, 0) + 1
+        for number, attribute in attributes(change.new):
+            if was.get(attribute, 0):
+                was[attribute] -= 1
+                continue
+            for kind, regex in ATTRIBUTES:
+                if regex.search(attribute):
+                    exceptions.append([kind, f"{name}:{number}", attribute])
+                    break
+            else:
+                if DISABLING_CFG.match(attribute) and near_test(new_lines, number):
+                    exceptions.append(["tests_disabled", f"{name}:{number}", attribute])
+        was_unsafe: dict[str, int] = {}
+        for number in change.removed:
+            text = (
+                code_only(change.old.splitlines()[number - 1])
+                if number <= len(change.old.splitlines())
+                else ""
+            )
+            if UNSAFE.search(text):
+                key = re.sub(r"\s+", "", text)
+                was_unsafe[key] = was_unsafe.get(key, 0) + 1
+        for number in change.added:
+            text = code_only(new_lines[number - 1]) if number <= len(new_lines) else ""
+            if UNSAFE.search(text):
+                key = re.sub(r"\s+", "", text)
+                if was_unsafe.get(key, 0):
+                    was_unsafe[key] -= 1
+                else:
+                    exceptions.append(
+                        ["unsafe", f"{name}:{number}", new_lines[number - 1].strip()]
+                    )
+        old_modules = len(
+            TEST_MODULE.findall(
+                re.sub(
+                    r"\s+",
+                    "",
+                    "".join(code_only(line) for line in change.old.splitlines()),
+                )
+            )
+        )
+        new_modules = len(
+            TEST_MODULE.findall(
+                re.sub(
+                    r"\s+",
+                    "",
+                    "".join(code_only(line) for line in change.new.splitlines()),
+                )
+            )
+        )
+        if new_modules < old_modules:
+            exceptions.append(
+                [
+                    "test_module_removed",
+                    name,
+                    f"{old_modules - new_modules} fewer #[cfg(test)] mod declarations",
+                ]
+            )
         for pattern in PATTERNS:
             if pattern.ratchet and lint_level(
                 lints.get("clippy", {}).get(pattern.ratchet)
@@ -1135,22 +1458,30 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 exceptions.append(
                     [pattern.kind, f"{name}:{number}", new_lines[number - 1].strip()]
                 )
+        was_todo: dict[str, int] = {}
+        old_lines = change.old.splitlines()
+        for number in change.removed:
+            comment = (
+                comment_of(old_lines[number - 1]) if number <= len(old_lines) else ""
+            )
+            if TODO.search(comment) and not ISSUE_LINK.search(comment):
+                was_todo[comment.strip()] = was_todo.get(comment.strip(), 0) + 1
         for number in change.added:
             line = new_lines[number - 1] if number <= len(new_lines) else ""
             comment = comment_of(line)
             todo = TODO.search(comment)
-            if todo and not ISSUE_LINK.search(comment):
-                old_same = sum(
-                    line.strip() == old.strip() for old in change.old.splitlines()
-                )
-                if not old_same:
-                    exceptions.append(
-                        [
-                            "todo",
-                            f"{name}:{number}",
-                            f"{todo[1]} without an issue link: {line.strip()}",
-                        ]
-                    )
+            if not todo or ISSUE_LINK.search(comment):
+                continue
+            if was_todo.get(comment.strip(), 0):
+                was_todo[comment.strip()] -= 1
+                continue
+            exceptions.append(
+                [
+                    "todo",
+                    f"{name}:{number}",
+                    f"{todo[1]} without an issue link: {line.strip()}",
+                ]
+            )
         for kind, regex in NOTES:
             delta = len(matches(change.new, change.added, set(), regex)) - len(
                 matches(change.old, change.removed, set(), regex)
@@ -1167,6 +1498,9 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         exceptions.append(
             ["assertions_removed", ".", f"{-assertions} fewer assertions"]
         )
+    exceptions = [
+        list(each) for each in dict.fromkeys(tuple(each) for each in exceptions)
+    ]
     fields: dict[str, Any] = {}
     if exceptions:
         fields["exceptions"] = exceptions
@@ -1180,7 +1514,8 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
     if exceptions and not args.report:
         raise ScriptError(
             f"{len(exceptions)} exception(s) need explicit approval before they stay; "
-            "stop and ask, then rerun with --report",
+            "stop and ask; once approved, commit the change, and list it in the PR with "
+            "diff --base <base branch> --report",
             report=fields,
         )
     return fields
@@ -1241,13 +1576,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     work = {"init": init, "audit": audit, "diff": diff}
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv[:1] == ["help"]:
-        argv = [*argv[1:2], "--help"]
+    leading = 0
+    while leading < len(argv) and argv[leading] in ("-v", "--verbose", "--debug"):
+        leading += 1
+    if argv[leading : leading + 1] == ["help"]:
+        argv = [*argv[:leading], *argv[leading + 1 : leading + 2], "--help"]
     command = next((arg for arg in argv if not arg.startswith("-")), None)
+    options = argv[: argv.index("--")] if "--" in argv else argv
     if (
         command is not None
         and command not in work
         and "--" not in argv[: argv.index(command)]
+        and not {"-h", "--help"} & set(options)
     ):
         close = difflib.get_close_matches(command, list(work), n=1)
         hint = f"; did you mean '{close[0]}'?" if close else ""

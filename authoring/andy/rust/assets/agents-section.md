@@ -1,6 +1,6 @@
 ## Rust guardrails
 
-Run `just check` before saying a change is done, and report its result. A change is done only when it passes.
+Run `just check` before every commit and before saying a change is done, and report its result. A change is done only when it passes.
 
 Never add any of these without explicit approval in the conversation:
 

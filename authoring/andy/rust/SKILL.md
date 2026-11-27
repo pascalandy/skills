@@ -36,22 +36,22 @@ Confirm each tool before the step that needs it. Give the user the install comma
 
 ### A. Set up
 
-1. For a new crate, run `cargo new <name>`, which uses the latest edition. Set `rust-version` in `Cargo.toml` to the oldest Rust the crate supports
+1. For a new crate, run `cargo new <name>`, which uses the latest edition. Set `rust-version` in `Cargo.toml` to the oldest Rust the crate supports, and either `license` or, for a crate never published, `publish = false`: `cargo deny` rejects a crate with neither
 2. From the crate or workspace root, run `uv run <skill>/scripts/rust_guard.py init --dry-run`, then without `--dry-run`. It writes the lint profile, `clippy.toml`, `deny.toml`, the `check` recipe, `lefthook.yml`, a copy of the guard under `scripts/`, and the exception rule in `AGENTS.md`. A file the project already has keeps its content, and a rerun changes nothing
 3. Run `just check`. Fix what it reports in the code, never in the guardrails. Its last step, `rust_guard.py diff`, lists the setup itself, since the setup edits guarded files: show the user that list, and commit the setup once they approve it
-4. Run `lefthook install` when the project uses lefthook. Done when `just check` passes on the committed setup
+4. Run `lefthook install`, since the pre-commit hook is what stops an exception before it is committed. For a crate nested in a larger repository, first add the commands `init`'s note names to the root `lefthook.yml`. Done when `just check` passes on the committed setup
 
 ### B. Audit
 
-1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks and whether a workspace member inherits `[workspace.lints]`, then the guardrail files present, the gate commands the `check` recipe lacks, and the Clippy findings for every profile lint
+1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks and whether a workspace member inherits `[workspace.lints]`, then the guardrail files present, the gate steps the `check` recipe lacks, whether lefthook runs the staged guard, and the Clippy findings for every profile lint
 2. Propose the change to the user, since it edits `[lints]` and the `justfile`. Turn on now every lint at zero findings. For the others, say what leaving them out costs: `rust_guard.py diff` flags new `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, and `dbg!` while existing ones stay, but nothing guards the cast and swallowed-error lints until they are on
-3. After approval, apply the lints, add the missing gate commands to the `check` recipe, and follow [A. Set up](#a-set-up) from step 2. Done when `just check` passes on the committed change
+3. After approval, apply the lints, add the missing gate steps to the `check` recipe and the `exceptions` command of the skill's `lefthook.yml` to the project's, then follow [A. Set up](#a-set-up) from step 2. Done when `just check` passes on the committed change
 
 ### C. Work
 
 1. Read the contract: the project's `AGENTS.md`, its `[lints]`, and `just --list`
 2. Write the change. Keep tests in the same change as the code they cover
-3. Run `just check`. When a lint, a test, or the guard blocks you, find the shortcut in [references/shortcuts.md](references/shortcuts.md) and fix the design it points to
+3. Run `just check` before every commit. When a lint, a test, or the guard blocks you, find the shortcut in [references/shortcuts.md](references/shortcuts.md) and fix the design it points to
 4. When the fix still needs an exception, follow [Exceptions](#exceptions)
 5. Done when `just check` passes and your reply quotes its result
 
@@ -77,4 +77,5 @@ These need explicit approval in the conversation before they stay: `unsafe`, `#[
 
 - [references/lint-profile.md](references/lint-profile.md): why each lint is in the profile, the library additions, workspaces, and how to check a lint name. Read when choosing, explaining, or changing lints
 - [references/shortcuts.md](references/shortcuts.md): each shortcut an agent takes, the fix to make instead, and what catches it. Read when a check blocks you, and in every review
+- [references/use-cases.md](references/use-cases.md): example prompts for each branch and how to phrase an approval. Read when the user asks how to use this skill or what it can do
 - [references/toolchain.md](references/toolchain.md): what each tool in the gate does and why it was chosen, plus `cargo-mutants` and the optional tools. Read when a tool fails or before adding one
