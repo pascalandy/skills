@@ -443,6 +443,7 @@ ATTRIBUTES = (
 INNER_CFG_TEST = re.compile(r"#!\[\s*cfg\s*\(\s*test\s*\)\s*\]")
 DOC_LINE = re.compile(r"^\s*//[/!](?!/)(.*)$")
 UNSAFE = re.compile(r"\bunsafe\b")
+FN_POINTER = re.compile(r"\bunsafe\s+(?:extern\s*(?:\"\"\s*)?)?fn\s*\(")
 # A cfg on a test item that is not cfg(test) can switch the test off
 DISABLING_CFG = re.compile(r"#!?\[cfg(?:_attr)?\((?!test\)\])")
 TEST_MODULE = re.compile(r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod\w+;")
@@ -721,7 +722,8 @@ def run(
 
 def recipe_steps(text: str) -> list[str]:
     """The commands of the `check` recipe in a justfile, without comments,
-    quiet or error-ignoring prefixes, or indentation."""
+    the quiet `@` prefix, or indentation. An error-ignoring `-` stays, so such
+    a step does not count as the gate's."""
     body = re.search(
         r"^@?check(?:\s+[^:=\n]*)?:(?!=)[^\n]*\n((?:[ \t]+[^\n]*\n?|\n)*)",
         text,
@@ -1360,7 +1362,8 @@ def unsafe_lines(text: str) -> set[int]:
         code = code_only(line)
         if UNSAFE.search(code):
             inside.add(number)
-            if start_depth is None:
+            # `unsafe extern "C" fn(u32)` is a pointer type and opens no block
+            if start_depth is None and not FN_POINTER.search(code):
                 pending = True
         if start_depth is not None:
             inside.add(number)
@@ -1536,7 +1539,14 @@ def manifest_exceptions(
         ".".join(keys) for keys in discovery if old and dig(old, keys) != dig(new, keys)
     ]
     for target in ("test", "bin"):
-        if old and old.get(target) != new.get(target):
+        was_targets = {json.dumps(each, sort_keys=True) for each in old.get(target, [])}
+        now_targets = {json.dumps(each, sort_keys=True) for each in new.get(target, [])}
+        switched_off = [
+            each
+            for each in now_targets - was_targets
+            if '"test": false' in each or '"harness": false' in each
+        ]
+        if old and (was_targets - now_targets or switched_off):
             switched.append(f"[[{target}]]")
     if switched:
         found.append(["test_discovery", change.name, ", ".join(switched) + " changed"])

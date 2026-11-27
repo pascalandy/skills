@@ -1721,5 +1721,64 @@ class RoundFiveTest(Crate):
         self.assertEqual((code, kinds(answer)), (1, ["dependency"]))
 
 
+class NeonRoundFourTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_an_unsafe_fn_pointer_field_opens_no_block(self) -> None:
+        handlers = (
+            "pub struct Handlers {\n"
+            '    pub on_event: unsafe extern "C" fn(u32),\n'
+            "}\n\n"
+            "pub fn safe() -> u8 {\n"
+            "    1\n"
+            "}\n"
+        )
+        write(self.root, {"src/lib.rs": handlers + LIB})
+        self.commit("handlers")
+        write(self.root, {"src/lib.rs": handlers.replace("    1\n", "    2\n") + LIB})
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_a_multi_line_unsafe_fn_signature_still_opens_its_body(self) -> None:
+        body = (
+            "/// # Safety\n/// `ptr` is valid.\n"
+            "pub unsafe fn read(\n    ptr: *const u8,\n) -> u8 {\n"
+            "    // SAFETY: the caller keeps `ptr` valid.\n"
+            "    unsafe { *ptr }\n}\n"
+        )
+        write(self.root, {"src/lib.rs": body + LIB})
+        self.commit("unsafe fn")
+        write(
+            self.root,
+            {
+                "src/lib.rs": body.replace("unsafe { *ptr }", "unsafe { ptr.read() }")
+                + LIB
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unsafe"]))
+
+    def test_a_new_binary_target_is_not_a_discovery_change(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + '\n[[bin]]\nname = "demo"\npath = "src/main.rs"\n',
+                "src/main.rs": "fn main() {}\n",
+            },
+        )
+        self.commit("first binary")
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + '\n[[bin]]\nname = "demo"\npath = "src/main.rs"\n\n[[bin]]\nname = "tool"\npath = "src/tool.rs"\n',
+                "src/tool.rs": "fn main() {}\n",
+            },
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+
 if __name__ == "__main__":
     unittest.main()
