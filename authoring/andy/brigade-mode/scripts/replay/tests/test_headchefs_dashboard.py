@@ -308,7 +308,7 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
             [
                 (thread, title, _local("10:10").isoformat())
                 for thread, title in (
-                    ("qa-1", "🧪 QA 1 · Head Chef abcd"),
+                    ("qa-1", "🧪 QA 1b · Head Chef abcd"),
                     ("qa-worker", "QA1 worker · Watchdog handoff"),
                     ("qa-recheck", "🧪 QA recheck"),
                     ("qa-review", "QA1 review"),
@@ -360,6 +360,8 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
     # Cook 1.1 overlaps itself from 10:30 to 11:15 and Cook 1.2 runs 12:05 to capture.
     # QA adds 40 minutes for QA 1, 10 for its worker and 5 for the recheck.
     assert chart.get("workers") == {"cooks": 57 * minute, "qa": 55 * minute}
+    qa_runs = next(row["items"] for row in chart["rows"] if row["style"] == "qa")
+    assert qa_runs[0]["label"] == "QA 1"
     forged = json.loads(json.dumps(current))
     forged["chefs"][0]["chart"]["workers"]["qa"] = -1
     with pytest.raises(snapshot.SnapshotError):

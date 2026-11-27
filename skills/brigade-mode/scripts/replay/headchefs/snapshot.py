@@ -149,7 +149,7 @@ def _role(title: str) -> Role | None:
         return "production", paint, f"Cook {batch}.{number}", "cooks"
     if re.match(r"Planner\b", role_title):
         return "production", "plan", "Planner", None
-    qa = re.match(r"QA(?:\s+(\d+)|\d+)?\b", role_title)
+    qa = re.match(r"QA(?:(?:\s+(\d+)|\d+)[a-zA-Z]?)?\b", role_title)
     if qa:
         helper = re.match(
             r"\s+(?:review|wait|tool)\b", role_title[qa.end() :], re.IGNORECASE
