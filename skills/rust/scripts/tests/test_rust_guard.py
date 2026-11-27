@@ -1608,5 +1608,118 @@ class OpusRoundFourTest(Crate):
         self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
 
 
+class RoundFiveTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_switching_a_platform_value_disables_a_test(self) -> None:
+        gated = LIB.replace(
+            "    #[test]\n", '    #[cfg(target_os = "linux")]\n    #[test]\n'
+        )
+        write(self.root, {"src/lib.rs": gated})
+        self.commit("linux only")
+        write(self.root, {"src/lib.rs": gated.replace('"linux"', '"windows"')})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_a_skip_on_the_whole_hook_does_not_count(self) -> None:
+        hook = (SCRIPT.parent.parent / "assets" / "lefthook.yml").read_text()
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "pre-commit:\n", "pre-commit:\n  skip:\n    - merge\n", 1
+                )
+            },
+        )
+        self.assertIn("  skip:", (self.root / "lefthook.yml").read_text())
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+
+    def test_a_renamed_parent_in_the_working_tree_changes_no_pr_list(self) -> None:
+        write(
+            self.root,
+            {
+                "tests/smoke.rs": "#[cfg(test)]\nmod common;\n\n#[test]\nfn smoke() {\n    assert!(common::ready());\n}\n",
+                "tests/common/mod.rs": "pub fn ready() -> bool {\n    true\n}\n",
+            },
+        )
+        self.commit("helpers")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write(
+            self.root,
+            {
+                "tests/common/mod.rs": "pub fn ready() -> bool {\n    Some(true).unwrap()\n}\n"
+            },
+        )
+        self.commit("helper unwrap")
+        self.assertEqual(
+            run(self.root, "diff", "--base", "main", "--report")[:2], (0, {"ok": True})
+        )
+        (self.root / "tests/smoke.rs").rename(self.root / "tests/other.rs")
+        self.assertEqual(
+            run(self.root, "diff", "--base", "main", "--report")[:2], (0, {"ok": True})
+        )
+
+    def test_a_cfg_on_an_out_of_line_module_of_tests_is_disabling(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": "mod protocol;\n",
+                "src/protocol.rs": LIB,
+            },
+        )
+        self.commit("protocol")
+        write(self.root, {"src/lib.rs": "#[cfg(windows)]\nmod protocol;\n"})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_moving_a_module_and_its_tests_to_a_file_is_clean(self) -> None:
+        write(
+            self.root,
+            {"src/lib.rs": "mod parse;\npub use parse::add;\n", "src/parse.rs": LIB},
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_moving_an_approved_expect_to_another_file_keeps_it(self) -> None:
+        spare = '#[expect(dead_code, reason = "kept for the next release")]\nfn spare() {}\n'
+        write(self.root, {"src/lib.rs": LIB + spare})
+        self.commit("approved")
+        write(self.root, {"src/lib.rs": "mod extra;\n" + LIB, "src/extra.rs": spare})
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_renaming_a_member_folder_is_not_a_removal(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/cli"]\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n',
+                "crates/cli/Cargo.toml": CRATE + "\n[lints]\nworkspace = true\n",
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+        git(self.root, "mv", "crates/cli", "crates/ledger-cli")
+        write(
+            self.root,
+            {
+                "Cargo.toml": (self.root / "Cargo.toml")
+                .read_text()
+                .replace("crates/cli", "crates/ledger-cli")
+            },
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_a_patched_crate_is_a_new_dependency(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + '\n[patch.crates-io]\nserde = { path = "../serde" }\n'
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["dependency"]))
+
+
 if __name__ == "__main__":
     unittest.main()

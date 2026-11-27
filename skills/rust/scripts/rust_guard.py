@@ -373,6 +373,7 @@ def answer_failure(
 
 import difflib
 import fnmatch
+import hashlib
 import posixpath
 import shutil
 import subprocess
@@ -490,7 +491,7 @@ TOKENS = re.compile(
 )
 
 
-def split_line(line: str) -> tuple[str, str]:
+def split_line(line: str, keep: bool = False) -> tuple[str, str]:
     """The line's code, with literals emptied and block comments blanked, and
     the text of its `//` comment. One left-to-right pass, so a quote inside a
     comment and `//` inside a string are read for what they are."""
@@ -503,7 +504,13 @@ def split_line(line: str) -> tuple[str, str]:
         if token["line"] is not None:
             comment = token["line"][2:]
             break
-        code.append(" " if token["block"] is not None else '""')
+        if token["block"] is not None:
+            code.append(" ")
+        elif keep:
+            digest = hashlib.sha1(token[0].encode()).hexdigest()[:10]
+            code.append(f'"{digest}"')
+        else:
+            code.append('""')
     else:
         code.append(line[position:])
     return "".join(code), comment
@@ -524,7 +531,8 @@ def attributes(text: str) -> list[tuple[int, str, str, str]]:
     item it is attached to), read across lines on code without strings and
     comments. The item is the head of the next code after the attribute stack,
     such as `pubfnload_schema()->Schema`, so a moved attribute reads as new."""
-    code = [code_only(line) for line in text.splitlines()]
+    # literals become digests: `target_os = "linux"` and `"windows"` differ
+    code = [split_line(line, keep=True)[0] for line in text.splitlines()]
     found: list[tuple[int, str, str, str]] = []
     raw = text.splitlines()
     line_of: list[int] = []
@@ -781,6 +789,16 @@ def hook_lacks_guard(root: Path) -> Path | None:
         r"^pre-commit:[^\n]*\n((?:[ \t][^\n]*\n?|\n)*)", path.read_text(), re.MULTILINE
     )
     lines = (section[1] if section else "").splitlines()
+    indents = [len(line) - len(line.lstrip()) for line in lines if line.strip()]
+    top = min(indents, default=0)
+    hook_keys = {"skip", "only", "files", "glob", "exclude", "root"}
+    if any(
+        len(line) - len(line.lstrip()) == top
+        and line.strip().split(":", 1)[0] in hook_keys
+        for line in lines
+        if line.strip()
+    ):
+        return path
     for index, line in enumerate(lines):
         if (
             "rust_guard.py diff --staged" in line
@@ -1275,6 +1293,35 @@ def block_after(lines: list[str], number: int) -> str:
     return "\n".join(taken)
 
 
+def module_had_tests(
+    name: str, item: str, old: str, text_of: Callable[[str], str]
+) -> bool:
+    """Whether module `item`, a key such as `modparse`, held tests before the
+    change, inline in file `name` or in its own file."""
+    found = re.match(r"(?:pub(?:\([^)]*\))?)?mod(\w+)$", item)
+    if not found:
+        return False
+    old_lines = old.splitlines()
+    for number, line in enumerate(old_lines, 1):
+        flat = re.sub(r"\s+", "", code_only(line))
+        if re.match(r"(?:pub(?:\([^)]*\))?)?mod" + found[1] + r"\{", flat):
+            return bool(TEST_ATTR.search(block_after(old_lines, number)))
+    path = Path(name)
+    roots = {"lib", "main", "mod"}
+    folder = (
+        path.parent
+        if path.stem in roots
+        or path.parent.name in ("tests", "examples", "benches", "bin")
+        else path.parent / path.stem
+    )
+    return any(
+        TEST_ATTR.search(
+            "".join(code_only(line) for line in text_of(each.as_posix()).splitlines())
+        )
+        for each in (folder / f"{found[1]}.rs", folder / found[1] / "mod.rs")
+    )
+
+
 def runnable_doctests(text: str) -> int:
     """Rust code fences in doc comments that rustdoc compiles as tests."""
     allowed = {"rust", "should_panic", "compile_fail", "test_harness"}
@@ -1333,7 +1380,7 @@ def unsafe_lines(text: str) -> set[int]:
 
 
 def declared_for_tests(
-    name: str, text_of: Callable[[str], str], root: Path | None = None
+    name: str, text_of: Callable[[str], str], paths: set[str] | None = None
 ) -> bool:
     """Whether a parent module declares file `name` as `#[cfg(test)] mod x;`.
     Under `tests/`, every integration test file counts as a parent."""
@@ -1343,9 +1390,11 @@ def declared_for_tests(
     parents = [folder / "lib.rs", folder / "main.rs", folder / "mod.rs"]
     if folder.name:
         parents.append(folder.parent / f"{folder.name}.rs")
-    if folder.name == "tests" and root is not None:
+    if folder.name == "tests" and paths is not None:
         parents += sorted(
-            each.relative_to(root) for each in (root / folder).glob("*.rs")
+            Path(each)
+            for each in paths
+            if posixpath.dirname(each) == folder.as_posix() and each.endswith(".rs")
         )
     pattern = re.compile(
         r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod" + re.escape(stem) + ";"
@@ -1433,6 +1482,11 @@ def dependency_names(manifest: dict[str, Any]) -> set[str]:
             for key, spec in scope.get(kind, {}).items():
                 package = spec.get("package", key) if isinstance(spec, dict) else key
                 names.add(f"{prefix}{kind}.{key}={package}")
+    for registry, table in manifest.get("patch", {}).items():
+        for key, spec in table.items():
+            names.add(f"patch.{registry}.{key}={json.dumps(spec, sort_keys=True)}")
+    for key, spec in manifest.get("replace", {}).items():
+        names.add(f"replace.{key}={json.dumps(spec, sort_keys=True)}")
     return names
 
 
@@ -1445,6 +1499,8 @@ def manifest_exceptions(
     except tomllib.TOMLDecodeError as error:
         return [["manifest", change.name, f"invalid TOML: {error}"]]
     found: list[list[str]] = []
+    if not new:
+        return found
     for added in sorted(dependency_names(new) - dependency_names(old)):
         found.append(["dependency", change.name, added])
     was, now = flat_lints(old), flat_lints(new)
@@ -1548,11 +1604,19 @@ def tree_members(folder: str, manifest: dict[str, Any], paths: set[str]) -> set[
     return found
 
 
+def package_name(text: str) -> str:
+    try:
+        return str(tomllib.loads(text).get("package", {}).get("name", ""))
+    except tomllib.TOMLDecodeError:
+        return ""
+
+
 def joined_members(
     change: FileChange,
     text_of: Callable[[str], str],
     old_paths: set[str],
     new_paths: set[str],
+    old_of: Callable[[str], str] | None = None,
 ) -> list[list[str]]:
     """Members a changed workspace root drops, and members it now declares
     that do not inherit its lints, even when their own files did not change.
@@ -1566,7 +1630,12 @@ def joined_members(
     folder = posixpath.dirname(change.name)
     before = tree_members(folder, old, old_paths) if "workspace" in old else set()
     after = tree_members(folder, new, new_paths) if "workspace" in new else set()
-    gone = sorted(posixpath.dirname(each) or "." for each in before - after)
+    renamed = {package_name(text_of(each)) for each in after - before} - {""}
+    gone = sorted(
+        posixpath.dirname(each) or "."
+        for each in before - after
+        if old_of is None or package_name(old_of(each)) not in renamed
+    )
     if gone:
         found.append(["members_removed", change.name, ", ".join(gone)])
     if "workspace" not in new or not new["workspace"].get("lints"):
@@ -1683,6 +1752,22 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
     added_tests: set[str] = set()
     assertions = 0
     doctests = 0
+    test_modules = 0
+    gated_modules = 0
+    was: dict[tuple[str, str], int] = {}
+    was_unsafe: dict[str, int] = {}
+    for change in changes:
+        if not change.name.endswith(".rs"):
+            continue
+        for _, attribute, item, _ in attributes(change.old):
+            was[(attribute, item)] = was.get((attribute, item), 0) + 1
+        old_unsafe = unsafe_lines(change.old)
+        old_lines = change.old.splitlines()
+        for number in change.removed:
+            text = code_only(old_lines[number - 1]) if number <= len(old_lines) else ""
+            if number in old_unsafe and text.strip() not in ("", "}"):
+                key = re.sub(r"\s+", "", text)
+                was_unsafe[key] = was_unsafe.get(key, 0) + 1
     for change in sorted(changes, key=lambda each: each.name):
         name = change.name
         if protected(name):
@@ -1696,7 +1781,7 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 workspace = {}
             exceptions += manifest_exceptions(change, workspace)
             exceptions += joined_members(
-                change, new_text, tree_paths(old_ref), tree_paths(new_ref)
+                change, new_text, tree_paths(old_ref), tree_paths(new_ref), old_text
             )
         if not name.endswith(".rs"):
             continue
@@ -1712,13 +1797,10 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
             "".join(code_only(line) for line in change.new.splitlines()[:50])
         ):
             new_tests = set(range(1, len(change.new.splitlines()) + 1))
-        if declared_for_tests(name, old_text, root):
+        if declared_for_tests(name, old_text, tree_paths(old_ref)):
             old_tests = set(range(1, len(change.old.splitlines()) + 1))
-        if declared_for_tests(name, new_text, root):
+        if declared_for_tests(name, new_text, tree_paths(new_ref)):
             new_tests = set(range(1, len(change.new.splitlines()) + 1))
-        was: dict[tuple[str, str], int] = {}
-        for _, attribute, item, _ in attributes(change.old):
-            was[(attribute, item)] = was.get((attribute, item), 0) + 1
         old_code = "".join(code_only(line) for line in change.old.splitlines())
         had_tests = bool(TEST_ATTR.search(old_code))
         old_flat = re.sub(r"\s+", "", old_code)
@@ -1740,24 +1822,11 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 ]
                 on_test = any(
                     TEST_ATTR.search(other) or CFG_TEST.search(other) for other in stack
-                ) or (
-                    re.match(r"(?:pub(?:\([^)]*\))?)?mod\w", item) is not None
-                    and bool(TEST_ATTR.search(block_after(new_lines, number)))
-                )
+                ) or module_had_tests(name, item, change.old, old_text)
                 existed = bool(item) and item in old_flat
                 if DISABLING_CFG.match(attribute) and (inner or (on_test and existed)):
                     exceptions.append(["tests_disabled", f"{name}:{number}", shown])
-        old_unsafe, new_unsafe = unsafe_lines(change.old), unsafe_lines(change.new)
-        was_unsafe: dict[str, int] = {}
-        for number in change.removed:
-            text = (
-                code_only(change.old.splitlines()[number - 1])
-                if number <= len(change.old.splitlines())
-                else ""
-            )
-            if number in old_unsafe and text.strip() not in ("", "}"):
-                key = re.sub(r"\s+", "", text)
-                was_unsafe[key] = was_unsafe.get(key, 0) + 1
+        new_unsafe = unsafe_lines(change.new)
         for number in change.added:
             text = code_only(new_lines[number - 1]) if number <= len(new_lines) else ""
             if number in new_unsafe and text.strip() not in ("", "}"):
@@ -1795,22 +1864,8 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
             )
             for text in (change.old, change.new)
         )
-        if new_cfg < old_cfg:
-            exceptions.append(
-                [
-                    "tests_disabled",
-                    name,
-                    f"{old_cfg - new_cfg} fewer #[cfg(test)] modules",
-                ]
-            )
-        if new_modules < old_modules:
-            exceptions.append(
-                [
-                    "test_module_removed",
-                    name,
-                    f"{old_modules - new_modules} fewer #[cfg(test)] mod declarations",
-                ]
-            )
+        gated_modules += new_cfg - old_cfg
+        test_modules += new_modules - old_modules
         for pattern in PATTERNS:
             if pattern.ratchet and lint_level(
                 lints.get("clippy", {}).get(pattern.ratchet)
@@ -1871,6 +1926,18 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
             len(ASSERTION.findall(code_only(doc))) for doc in removed_docs
         )
         doctests += runnable_doctests(change.new) - runnable_doctests(change.old)
+    if gated_modules < 0:
+        exceptions.append(
+            ["tests_disabled", ".", f"{-gated_modules} fewer #[cfg(test)] modules"]
+        )
+    if test_modules < 0:
+        exceptions.append(
+            [
+                "test_module_removed",
+                ".",
+                f"{-test_modules} fewer #[cfg(test)] mod declarations",
+            ]
+        )
     if doctests < 0:
         exceptions.append(
             ["doctest_disabled", ".", f"{-doctests} fewer runnable doctests"]

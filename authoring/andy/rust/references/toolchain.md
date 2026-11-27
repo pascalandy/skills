@@ -38,3 +38,4 @@ Install with `cargo install --locked cargo-mutants`; `cargo mutants --version` c
 - `cargo deny check` rejects a dependency's license: adding it to the `allow` list edits `deny.toml`, which is an exception
 - `cargo deny check` flags an advisory: update the crate with `cargo update -p <crate>`. Ignoring an advisory edits `deny.toml`, which is an exception
 - `cargo shear` flags a crate that a macro or build script uses: ask before adding it to `[package.metadata.cargo-shear] ignored`, since that edits `Cargo.toml`
+- `cargo clippy` or `cargo test` fails only under `--all-features`, because two features exclude each other: the gate assumes features combine. Tell the user before changing the recipe; a recipe that checks each valid feature set instead differs from the skill's, so `init` refuses it and `audit` lists the missing steps
