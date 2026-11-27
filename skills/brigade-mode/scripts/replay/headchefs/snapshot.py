@@ -138,21 +138,24 @@ def _relatives(
 
 
 def _role(title: str) -> Role | None:
-    if re.search(r"Watchdog|Queuer", title, re.IGNORECASE):
+    role_title = re.sub(r"^[^\w]*", "", title)
+    if re.match(r"(?:Watchdog|Queuer)\b", role_title, re.IGNORECASE):
         return None
 
-    cook = re.match(r"^[^\w]*Cook (\d+)\.(\d+)", title)
+    cook = re.match(r"Cook (\d+)\.(\d+)\b", role_title)
     if cook:
         batch, number = cook.groups()
         paint = COOK_STYLES.get(batch, ("cook2-1", "cook3-1")[int(number) % 2])
-        worker = None if title[cook.end() :].lstrip().startswith("·") else "cooks"
-        return "production", paint, f"Cook {batch}.{number}", worker
-    if re.match(r"^[^\w]*Planner\b", title):
+        return "production", paint, f"Cook {batch}.{number}", "cooks"
+    if re.match(r"Planner\b", role_title):
         return "production", "plan", "Planner", None
-    qa = re.match(r"^[^\w]*QA(?:\s+(\d+))?", title)
+    qa = re.match(r"QA(?:\s+(\d+)|\d+)?\b", role_title)
     if qa:
-        return "qa", "qa", f"QA {qa[1]}" if qa[1] else "QA", "qa"
-    chef = re.match(r"^[^\w]*Chef (\d+)", title)
+        helper = re.match(
+            r"\s+(?:review|wait|tool)\b", role_title[qa.end() :], re.IGNORECASE
+        )
+        return "qa", "qa", f"QA {qa[1]}" if qa[1] else "QA", None if helper else "qa"
+    chef = re.match(r"Chef (\d+)", role_title)
     if chef:
         return "production", "cook4-1", f"Chef {chef[1]}", None
     if re.search(r"loop|revue|review|design", title, re.IGNORECASE):
@@ -293,6 +296,14 @@ def _capture(
     ):
         if parent:
             delegated[parent].add(child)
+    cook_delegates = {
+        child
+        for parent, children in delegated.items()
+        if parent in threads
+        and (parent_role := _role(threads[parent][0])) is not None
+        and parent_role[3] == "cooks"
+        for child in children
+    }
 
     previous_chefs = previous["chefs"] if previous else []
     annotations = {
@@ -323,7 +334,8 @@ def _capture(
             for lane, item in _work_intervals(db, thread, reference, kickoff, role):
                 rows[lane].append(item)
                 spans.append((item["start"], item["end"]))
-            if worker := role[3]:
+            worker = role[3]
+            if worker and (worker != "cooks" or thread not in cook_delegates):
                 workers[worker] += sum(end - begin for begin, end in _merge(spans))
         state = "Arrêté" if "⏹" in title else "Terminé" if "⛳" in title else "En pause"
         running = any(item.get("running") for items in rows.values() for item in items)

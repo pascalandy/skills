@@ -281,17 +281,26 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
     tmp_path: Path, chromium: Browser
 ) -> None:
     with closing(_brigade(tmp_path / "statev2.sqlite")) as db:
+        db.execute(
+            "update orchestration_v2_projection_threads set title=? where thread_id='cook-a'",
+            ("🧑‍🍳 Cook 1.1 abcd 🍳 Watchdog handoff",),
+        )
         db.executemany(
             "insert into orchestration_v2_projection_subagents values(?, ?)",
             [
                 ("root-abcd", "qa-1"),
                 ("qa-1", "qa-worker"),
+                ("root-abcd", "qa-recheck"),
+                ("qa-1", "qa-review"),
+                ("qa-1", "qa-wait"),
+                ("qa-1", "qa-tool"),
                 ("root-abcd", "planner"),
                 ("root-abcd", "chef"),
                 ("root-abcd", "loop"),
                 ("root-abcd", "luna"),
                 ("cook-a", "side"),
                 ("cook-a", "cook-prefixed-helper"),
+                ("cook-a", "cook-prefixed-task"),
             ],
         )
         db.executemany(
@@ -300,13 +309,18 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
                 (thread, title, _local("10:10").isoformat())
                 for thread, title in (
                     ("qa-1", "🧪 QA 1 · Head Chef abcd"),
-                    ("qa-worker", "QA1 worker · Parcours"),
+                    ("qa-worker", "QA1 worker · Watchdog handoff"),
+                    ("qa-recheck", "🧪 QA recheck"),
+                    ("qa-review", "QA1 review"),
+                    ("qa-wait", "QA Wait"),
+                    ("qa-tool", "QA 1 tool-call"),
                     ("planner", "📐 Planner · W1"),
                     ("chef", "🚥 Chef 1 abcd [0/1] 🍳 lot"),
                     ("loop", "👀 loop-1 · Cook 1.1 abcd"),
                     ("luna", "🌙 Luna"),
                     ("side", "🔧 verify · Cook 1.1 abcd"),
                     ("cook-prefixed-helper", "🔧 Cook 1.1 · verify"),
+                    ("cook-prefixed-task", "Cook 1.1 code proof"),
                 )
             ],
         )
@@ -323,12 +337,17 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
                     ("qa-1", 1, "11:00", "11:30"),
                     ("qa-1", 2, "11:20", "11:40"),
                     ("qa-worker", 1, "11:25", "11:35"),
+                    ("qa-recheck", 1, "11:40", "11:45"),
+                    ("qa-review", 1, "11:40", "11:55"),
+                    ("qa-wait", 1, "11:45", "12:00"),
+                    ("qa-tool", 1, "11:45", "12:00"),
                     ("planner", 1, "10:15", "10:25"),
                     ("chef", 1, "10:12", "12:00"),
                     ("loop", 1, "11:00", "11:20"),
                     ("luna", 1, "10:30", "11:00"),
                     ("side", 1, "10:50", "11:00"),
                     ("cook-prefixed-helper", 1, "11:15", "11:45"),
+                    ("cook-prefixed-task", 1, "11:15", "11:45"),
                 )
             ],
         )
@@ -339,8 +358,8 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
     minute = 60_000
     assert chart["active"] == 35 * minute
     # Cook 1.1 overlaps itself from 10:30 to 11:15 and Cook 1.2 runs 12:05 to capture.
-    # QA 1 overlaps itself from 11:00 to 11:40 and its worker adds 10 concurrent minutes.
-    assert chart.get("workers") == {"cooks": 57 * minute, "qa": 50 * minute}
+    # QA adds 40 minutes for QA 1, 10 for its worker and 5 for the recheck.
+    assert chart.get("workers") == {"cooks": 57 * minute, "qa": 55 * minute}
     forged = json.loads(json.dumps(current))
     forged["chefs"][0]["chart"]["workers"]["qa"] = -1
     with pytest.raises(snapshot.SnapshotError):
@@ -353,7 +372,7 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
     assert totals.locator("dd").all_inner_texts() == [
         "0,58 h actives · 1,53 h inactives",
         "0,95 h actives",
-        "0,83 h actives",
+        "0,92 h actives",
     ]
 
 
