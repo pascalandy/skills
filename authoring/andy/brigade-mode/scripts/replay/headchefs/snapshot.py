@@ -28,6 +28,7 @@ COOK_STYLES = {
     "5": "cook5-1",
 }
 HEAD_CHEF = re.compile(r"^Head Chef ([0-9a-z]{4})\b", re.IGNORECASE)
+HIDDEN_CHART_TITLE = re.compile(r"Watchdog|Queuer", re.IGNORECASE)
 SNAPSHOT_LINE = re.compile(r"^const snapshot=(.*);$", re.MULTILINE)
 TEMPLATE = Path(__file__).with_name("template.html")
 MARKER = 'const snapshot={"reference":0,"chefs":[]};'
@@ -137,22 +138,20 @@ def _relatives(
     return found
 
 
-def _role(title: str) -> Role | None:
+def _role(title: str) -> Role:
     role_title = re.sub(r"^[^\w]*", "", title)
-    if re.match(r"(?:Watchdog|Queuer)\b", role_title, re.IGNORECASE):
-        return None
 
-    cook = re.match(r"Cook (\d+)\.(\d+)\b", role_title)
+    cook = re.match(r"Cook (\d+)\.(\d+)", role_title)
     if cook:
         batch, number = cook.groups()
         paint = COOK_STYLES.get(batch, ("cook2-1", "cook3-1")[int(number) % 2])
         return "production", paint, f"Cook {batch}.{number}", "cooks"
     if re.match(r"Planner\b", role_title):
         return "production", "plan", "Planner", None
-    qa = re.match(r"QA(?:(?:\s+(\d+)|\d+)[a-zA-Z]?)?\b", role_title)
+    qa = re.match(r"QA(?:(?:\s+(\d+)|\d+)[a-zA-Z]?)?", role_title)
     if qa:
         helper = re.match(
-            r"\s+(?:review|wait|tool)\b", role_title[qa.end() :], re.IGNORECASE
+            r"\w|\s+(?:review|wait|tool)\b", role_title[qa.end() :], re.IGNORECASE
         )
         return "qa", "qa", f"QA {qa[1]}" if qa[1] else "QA", None if helper else "qa"
     chef = re.match(r"Chef (\d+)", role_title)
@@ -299,9 +298,7 @@ def _capture(
     cook_delegates = {
         child
         for parent, children in delegated.items()
-        if parent in threads
-        and (parent_role := _role(threads[parent][0])) is not None
-        and parent_role[3] == "cooks"
+        if parent in threads and _role(threads[parent][0])[3] == "cooks"
         for child in children
     }
 
@@ -326,16 +323,24 @@ def _capture(
         spans_by_thread: list[list[tuple[int, int]]] = []
         workers: Workers = {"cooks": 0, "qa": 0}
         for thread in sorted(_relatives(db, root, known_threads, delegated)):
-            role = HEAD_ROLE if thread == root else _role(threads[thread][0])
-            if role is None:
+            thread_title = threads[thread][0]
+            role = HEAD_ROLE if thread == root else _role(thread_title)
+            show_in_chart = thread == root or not HIDDEN_CHART_TITLE.search(
+                thread_title
+            )
+            worker = role[3]
+            if worker == "cooks" and thread in cook_delegates:
+                worker = None
+            if not show_in_chart and worker is None:
                 continue
             spans: list[tuple[int, int]] = []
-            spans_by_thread.append(spans)
             for lane, item in _work_intervals(db, thread, reference, kickoff, role):
-                rows[lane].append(item)
+                if show_in_chart:
+                    rows[lane].append(item)
                 spans.append((item["start"], item["end"]))
-            worker = role[3]
-            if worker and (worker != "cooks" or thread not in cook_delegates):
+            if show_in_chart:
+                spans_by_thread.append(spans)
+            if worker:
                 workers[worker] += sum(end - begin for begin, end in _merge(spans))
         state = "Arrêté" if "⏹" in title else "Terminé" if "⛳" in title else "En pause"
         running = any(item.get("running") for items in rows.values() for item in items)

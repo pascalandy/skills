@@ -378,6 +378,30 @@ def test_role_totals_count_each_cook_and_qa_thread_once_and_skip_other_roles(
     ]
 
 
+def test_worker_totals_do_not_extend_the_archived_head_chef_timeline(
+    tmp_path: Path,
+) -> None:
+    with closing(_brigade(tmp_path / "statev2.sqlite")) as db:
+        db.execute(
+            "update orchestration_v2_projection_threads set title='Head Chef abcd ⛳' where thread_id='root-abcd'"
+        )
+        db.execute(
+            "update orchestration_v2_projection_threads set title='Cook 1.1 Watchdog handoff' where thread_id='cook-a'"
+        )
+        db.execute(
+            "update orchestration_v2_projection_runs set status='cancelled' where thread_id='cook-b'"
+        )
+        db.commit()
+        current = snapshot.capture(db, captured=_local("12:17"))
+
+    chef = next(chef for chef in current["chefs"] if chef["id"] == "abcd")
+    chart = chef["chart"]
+    assert chef.get("isActive") is False
+    assert chart["cutoff"] == _ms("10:45")
+    assert chart["idle"] == 0
+    assert chart.get("workers") == {"cooks": 45 * 60_000, "qa": 0}
+
+
 def test_touch_steps_reach_each_window_of_a_dense_timeline(chromium: Browser) -> None:
     start = int(datetime(2026, 10, 22, 0, 15, tzinfo=UTC).timestamp() * 1000)
     cutoff = int(datetime(2026, 11, 1, 7, 30, tzinfo=UTC).timestamp() * 1000)
