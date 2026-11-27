@@ -19,6 +19,7 @@ HISTORY_DAYS = 90
 
 Lane = Literal["head", "wait", "production", "parallel", "qa", "review"]
 LANES: tuple[Lane, ...] = ("head", "wait", "production", "parallel", "qa", "review")
+Worker = Literal["cooks", "qa"]
 COOK_STYLES = {
     "1": "cook1-1",
     "2": "cook2-1",
@@ -27,6 +28,7 @@ COOK_STYLES = {
     "5": "cook5-1",
 }
 HEAD_CHEF = re.compile(r"^Head Chef ([0-9a-z]{4})\b", re.IGNORECASE)
+HIDDEN_CHART_TITLE = re.compile(r"Watchdog|Queuer", re.IGNORECASE)
 SNAPSHOT_LINE = re.compile(r"^const snapshot=(.*);$", re.MULTILINE)
 TEMPLATE = Path(__file__).with_name("template.html")
 MARKER = 'const snapshot={"reference":0,"chefs":[]};'
@@ -46,6 +48,13 @@ class Row(TypedDict):
     items: list[Interval]
 
 
+class Workers(TypedDict):
+    """Active milliseconds per role since launch; each thread's runs count once."""
+
+    cooks: int
+    qa: int
+
+
 class Chart(TypedDict):
     start: int
     cutoff: int
@@ -53,6 +62,7 @@ class Chart(TypedDict):
     idle: int
     rows: list[Row]
     concurrency: NotRequired[list[list[int]]]
+    workers: NotRequired[Workers]
 
 
 class Chef(TypedDict):
@@ -69,7 +79,8 @@ class Snapshot(TypedDict):
     chefs: list[Chef]
 
 
-Role = tuple[Lane, str, str]
+Role = tuple[Lane, str, str, Worker | None]
+HEAD_ROLE: Role = ("head", "head", "Head Chef", None)
 
 
 class SnapshotError(ValueError):
@@ -127,32 +138,34 @@ def _relatives(
     return found
 
 
-def _role(title: str) -> Role | None:
-    if re.search(r"Watchdog|Queuer", title, re.IGNORECASE):
-        return None
+def _role(title: str) -> Role:
+    role_title = re.sub(r"^[^\w]*", "", title)
 
-    cook = re.match(r"^[^\w]*Cook (\d+)\.(\d+)", title)
+    cook = re.match(r"Cook (\d+)\.(\d+)", role_title)
     if cook:
         batch, number = cook.groups()
         paint = COOK_STYLES.get(batch, ("cook2-1", "cook3-1")[int(number) % 2])
-        return "production", paint, f"Cook {batch}.{number}"
-    if re.match(r"^[^\w]*Planner\b", title):
-        return "production", "plan", "Planner"
-    qa = re.match(r"^[^\w]*QA(?:\s+(\d+))?", title)
+        return "production", paint, f"Cook {batch}.{number}", "cooks"
+    if re.match(r"Planner\b", role_title):
+        return "production", "plan", "Planner", None
+    qa = re.match(r"QA(?:(?:\s+(\d+)|\d+)[a-zA-Z]?)?", role_title)
     if qa:
-        return "qa", "qa", f"QA {qa[1]}" if qa[1] else "QA"
-    chef = re.match(r"^[^\w]*Chef (\d+)", title)
+        helper = re.match(
+            r"\w|\s+(?:review|wait|tool)\b", role_title[qa.end() :], re.IGNORECASE
+        )
+        return "qa", "qa", f"QA {qa[1]}" if qa[1] else "QA", None if helper else "qa"
+    chef = re.match(r"Chef (\d+)", role_title)
     if chef:
-        return "production", "cook4-1", f"Chef {chef[1]}"
+        return "production", "cook4-1", f"Chef {chef[1]}", None
     if re.search(r"loop|revue|review|design", title, re.IGNORECASE):
-        return "review", "review", title
-    return "review", "review", "Sous-agent"
+        return "review", "review", title, None
+    return "review", "review", "Sous-agent", None
 
 
 def _work_intervals(
     db: sqlite3.Connection, thread: str, reference: int, kickoff: int, role: Role
 ) -> Iterator[tuple[Lane, Interval]]:
-    lane, style, label = role
+    lane, style, label, _ = role
     for ordinal, status, started, completed in db.execute(
         """
         select ordinal, status, json_extract(payload_json, '$.startedAt'), completed_at
@@ -200,6 +213,17 @@ def _covered(intervals: list[Interval]) -> int:
     return total
 
 
+def _merge(spans: list[tuple[int, int]]) -> list[list[int]]:
+    """Join one thread's overlapping or touching runs into disjoint spans."""
+    merged: list[list[int]] = []
+    for begin, end in sorted(spans):
+        if merged and begin <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([begin, end])
+    return merged
+
+
 def _concurrency(
     threads: list[list[tuple[int, int]]], start: int, cutoff: int
 ) -> list[list[int]]:
@@ -210,13 +234,7 @@ def _concurrency(
     """
     changes: defaultdict[int, int] = defaultdict(int)
     for spans in threads:
-        merged: list[list[int]] = []
-        for begin, end in sorted(spans):
-            if merged and begin <= merged[-1][1]:
-                merged[-1][1] = max(merged[-1][1], end)
-            else:
-                merged.append([begin, end])
-        for begin, end in merged:
+        for begin, end in _merge(spans):
             changes[begin] += 1
             changes[end] -= 1
     points, agents = [[start, 0]], 0
@@ -277,6 +295,12 @@ def _capture(
     ):
         if parent:
             delegated[parent].add(child)
+    cook_delegates = {
+        child
+        for parent, children in delegated.items()
+        if parent in threads and _role(threads[parent][0])[3] == "cooks"
+        for child in children
+    }
 
     previous_chefs = previous["chefs"] if previous else []
     annotations = {
@@ -297,19 +321,27 @@ def _capture(
             continue
         rows: dict[Lane, list[Interval]] = {lane: [] for lane in LANES}
         spans_by_thread: list[list[tuple[int, int]]] = []
+        workers: Workers = {"cooks": 0, "qa": 0}
         for thread in sorted(_relatives(db, root, known_threads, delegated)):
-            role = (
-                ("head", "head", "Head Chef")
-                if thread == root
-                else _role(threads[thread][0])
+            thread_title = threads[thread][0]
+            role = HEAD_ROLE if thread == root else _role(thread_title)
+            show_in_chart = thread == root or not HIDDEN_CHART_TITLE.search(
+                thread_title
             )
-            if role is None:
+            worker = role[3]
+            if worker == "cooks" and thread in cook_delegates:
+                worker = None
+            if not show_in_chart and worker is None:
                 continue
             spans: list[tuple[int, int]] = []
-            spans_by_thread.append(spans)
             for lane, item in _work_intervals(db, thread, reference, kickoff, role):
-                rows[lane].append(item)
+                if show_in_chart:
+                    rows[lane].append(item)
                 spans.append((item["start"], item["end"]))
+            if show_in_chart:
+                spans_by_thread.append(spans)
+            if worker:
+                workers[worker] += sum(end - begin for begin, end in _merge(spans))
         state = "Arrêté" if "⏹" in title else "Terminé" if "⛳" in title else "En pause"
         running = any(item.get("running") for items in rows.values() for item in items)
         is_open = not (archived or settled) and state == "En pause"
@@ -350,6 +382,7 @@ def _capture(
                     "idle": cutoff - kickoff - active,
                     "rows": [{"style": lane, "items": rows[lane]} for lane in LANES],
                     "concurrency": _concurrency(spans_by_thread, kickoff, cutoff),
+                    "workers": workers,
                 },
             }
         )
@@ -428,6 +461,12 @@ def _validate_chart(chef: Chef, reference: int) -> None:
         raise SnapshotError("active and idle totals do not match the Head Chef's runs")
     if "concurrency" in chart:
         _validate_concurrency(chart, chart["concurrency"])
+    if "workers" in chart:
+        workers = chart["workers"]
+        if not isinstance(workers, dict) or set(workers) != {"cooks", "qa"}:
+            raise SnapshotError("role totals must name the Cooks and QA")
+        if any(type(total) is not int or total < 0 for total in workers.values()):
+            raise SnapshotError("role totals must be non-negative integer milliseconds")
 
 
 def _validate_concurrency(chart: Chart, points: list[list[int]]) -> None:
@@ -473,7 +512,7 @@ def _validate_concurrency(chart: Chart, points: list[list[int]]) -> None:
 
 
 def validate(snapshot: Snapshot) -> None:
-    """Check the chart bounds, ongoing runs, and active/idle partition."""
+    """Check the chart bounds, ongoing runs, active/idle partition, and role totals."""
     try:
         reference = snapshot["reference"]
         if type(reference) is not int or reference < 0:
