@@ -1442,5 +1442,171 @@ class NeonRoundThreeTest(Crate):
         self.assertTrue(files["lefthook.yml"])
 
 
+WORKSPACE = '[workspace]\nmembers = ["crates/*"]\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n'
+MEMBER = CRATE + "\n[lints]\nworkspace = true\n"
+
+
+class AstraRoundFourTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def workspace(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": WORKSPACE,
+                "crates/alpha/Cargo.toml": MEMBER,
+                "crates/beta/Cargo.toml": MEMBER.replace("demo", "beta"),
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+
+    def test_excluding_a_member_removes_it(self) -> None:
+        self.workspace()
+        write(
+            self.root,
+            {
+                "Cargo.toml": WORKSPACE.replace(
+                    "]\n\n", ']\nexclude = ["crates/beta"]\n\n', 1
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            ["members_removed", "Cargo.toml", "crates/beta"], answer["exceptions"]
+        )
+
+    def test_a_new_crate_under_exclude_is_not_a_member(self) -> None:
+        self.workspace()
+        write(
+            self.root,
+            {
+                "Cargo.toml": WORKSPACE.replace(
+                    "]\n\n", ']\nexclude = ["crates/sample"]\n\n', 1
+                ),
+                "crates/sample/Cargo.toml": CRATE.replace("demo", "sample"),
+            },
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_the_pr_list_ignores_a_renamed_folder_in_the_working_tree(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["a"]\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n',
+                "a/Cargo.toml": MEMBER,
+                "b/Cargo.toml": CRATE.replace("demo", "bee"),
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("workspace")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write(
+            self.root,
+            {
+                "Cargo.toml": (self.root / "Cargo.toml")
+                .read_text()
+                .replace('["a"]', '["a", "b"]')
+            },
+        )
+        self.commit("join b")
+        expected = [
+            "lints",
+            "b/Cargo.toml",
+            "member does not set [lints] workspace = true",
+        ]
+        _, answer, _ = run(self.root, "diff", "--base", "main", "--report")
+        self.assertIn(expected, answer["exceptions"])
+        (self.root / "b").rename(self.root / "c")
+        _, answer, _ = run(self.root, "diff", "--base", "main", "--report")
+        self.assertIn(expected, answer["exceptions"])
+
+    def test_a_guard_limited_to_some_files_does_not_count(self) -> None:
+        hook = (SCRIPT.parent.parent / "assets" / "lefthook.yml").read_text()
+        write(
+            self.root,
+            {
+                "lefthook.yml": hook.replace(
+                    "      run: uv run scripts/rust_guard.py diff --staged",
+                    '      glob: "*.rs"\n      run: uv run scripts/rust_guard.py diff --staged',
+                )
+            },
+        )
+        self.assertIn('glob: "*.rs"', (self.root / "lefthook.yml").read_text())
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+
+    def test_a_platform_cfg_on_a_module_of_tests_is_disabling(self) -> None:
+        tests = "mod regression {\n    #[test]\n    fn works() {\n        assert!(true);\n    }\n}\n"
+        write(self.root, {"tests/it.rs": tests})
+        self.commit("integration")
+        write(self.root, {"tests/it.rs": "#[cfg(windows)]\n" + tests})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_doctests_count_runnable_blocks(self) -> None:
+        example = "/// ```\n/// let _ = demo::add(1, 1);\n/// ```\n"
+        documented = LIB.replace("pub fn add", example + "pub fn add")
+        write(self.root, {"src/lib.rs": documented})
+        self.commit("doctest")
+        write(self.root, {"src/lib.rs": LIB})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["doctest_disabled"]))
+        output = "/// ```text\n/// demo 0.1.0\n/// ```\n"
+        write(
+            self.root,
+            {"src/lib.rs": documented.replace("pub fn add", output + "pub fn add")},
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+
+class OpusRoundFourTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_a_new_gated_test_is_not_disabled(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "    #[test]\n    fn adds",
+                    "    #[cfg(unix)]\n    #[test]\n    fn on_unix() {\n        assert!(true);\n    }\n\n    #[test]\n    fn adds",
+                ),
+                "tests/wide.rs": '#![cfg(feature = "wide")]\n\n#[test]\nfn wide() {\n    assert!(true);\n}\n',
+            },
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_a_new_field_keeps_the_approved_expect_on_another(self) -> None:
+        shape = (
+            "pub struct Config {\n"
+            '    #[expect(dead_code, reason = "kept for the wire format")]\n'
+            "    reserved: u8,\n"
+            "}\n"
+        )
+        write(self.root, {"src/lib.rs": shape + LIB})
+        self.commit("approved expect")
+        write(
+            self.root,
+            {"src/lib.rs": shape.replace("}\n", "    pub port: u16,\n}\n") + LIB},
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+    def test_cfg_test_off_a_module_and_cfg_attr_inner_are_not_disabling(self) -> None:
+        write(
+            self.root,
+            {"src/lib.rs": "#[cfg(test)]\nconst LIMIT: u8 = 3;\n\n" + LIB},
+        )
+        self.commit("test constant")
+        write(
+            self.root,
+            {"src/lib.rs": "#![cfg_attr(not(test), no_std)]\n\n" + LIB},
+        )
+        self.assertEqual(run(self.root, "diff")[:2], (0, {"ok": True}))
+
+
 if __name__ == "__main__":
     unittest.main()

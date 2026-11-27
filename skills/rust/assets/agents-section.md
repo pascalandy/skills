@@ -9,7 +9,7 @@ Never add any of these without explicit approval in the conversation:
 - A change to `[lints]`, `clippy.toml`, `deny.toml`, `justfile`, `lefthook.yml`, `rust-toolchain.toml`, CI, or `scripts/rust_guard.py`
 - A deleted test or assertion, or a weakened one
 
-`just check` and the pre-commit hook stop on each of them. Stop too, and explain what blocks you and why. After approval:
+`just check` and the pre-commit hook stop on most of them; a weakened assertion shows only in review. When one stops you, or before you weaken an assertion, stop and explain what you need and why. After approval:
 
 1. Write the reason in the attribute, such as `#[expect(clippy::cast_possible_truncation, reason = "length is capped at u16::MAX")]`
 2. Commit the change. When the pre-commit hook still stops it, commit with `LEFTHOOK_EXCLUDE=exceptions git commit`. Once committed, the exception no longer fails `just check`

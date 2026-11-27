@@ -37,7 +37,7 @@ Confirm each tool before the step that needs it. Give the user the install comma
 ### A. Set up
 
 1. For a new crate, run `cargo new <name>`, which uses the latest edition. Set `rust-version` in `Cargo.toml` to the oldest Rust the crate supports, and either `license` or, for a crate never published, `publish = false`: `cargo deny` rejects a crate with neither
-2. From the crate or workspace root, run `uv run <skill>/scripts/rust_guard.py init --dry-run`, then without `--dry-run`. It writes the lint profile, `clippy.toml`, `deny.toml`, the `check` recipe, `lefthook.yml`, a copy of the guard under `scripts/`, and the exception rule in `AGENTS.md`. A file the project already has keeps its content, and a rerun changes nothing
+2. From the crate or workspace root, run `uv run <skill>/scripts/rust_guard.py init --dry-run`, then without `--dry-run`. It writes the lint profile, `clippy.toml`, `deny.toml`, the `check` recipe, `lefthook.yml`, a copy of the guard under `scripts/`, and the exception rule in `AGENTS.md`. A file the project already has keeps its content, except the guard copy and the `AGENTS.md` section, which `init` refreshes. A rerun changes nothing
 3. Run `just check`. Fix what it reports in the code, never in the guardrails. Its last step, `rust_guard.py diff`, lists the setup itself, since the setup edits guarded files: show the user that list, and commit the setup once they approve it
 4. Run `lefthook install`, since the pre-commit hook is what stops an exception before it is committed. For a crate nested in a larger repository, first add the commands `init`'s note names to the root `lefthook.yml`. Done when `just check` passes on the committed setup
 
@@ -57,14 +57,14 @@ Confirm each tool before the step that needs it. Give the user the install comma
 
 ### D. Review
 
-1. Run `uv run scripts/rust_guard.py diff --base origin/main --report` from the project, with the pull request's base branch. It lists every exception the branch adds and counts new `.clone()` and `Arc<Mutex<_>>`
+1. Run `uv run scripts/rust_guard.py diff --base origin/main --report` from the project, with the pull request's base branch. It lists each exception it detects in the branch and counts new `.clone()` and `Arc<Mutex<_>>`
 2. Check each exception against an approval in the conversation or the PR description
 3. Read the change against the review column of [references/shortcuts.md](references/shortcuts.md), which covers what no lint catches
 4. When tests changed with the code, run `cargo mutants --in-diff` as [references/toolchain.md](references/toolchain.md) describes. Read each missed mutant: when it changes behavior a caller would notice, add the test case that catches it
 
 ## Exceptions
 
-These need explicit approval in the conversation before they stay: `unsafe`, `#[allow]`, `#[expect]`, `#[ignore]`, `#[should_panic]`, a new dependency, a deleted or weakened test or assertion, a `TODO` without an issue link, and any edit to `[lints]`, `clippy.toml`, `deny.toml`, `justfile`, `lefthook.yml`, `rust-toolchain.toml`, CI, or `scripts/rust_guard.py`. `rust_guard.py diff` compares the working tree with the last commit, so `just check` and the pre-commit hook stop on each one until it is committed.
+These need explicit approval in the conversation before they stay: `unsafe`, `#[allow]`, `#[expect]`, `#[ignore]`, `#[should_panic]`, a new dependency, a deleted or weakened test or assertion, a `TODO` without an issue link, and any edit to `[lints]`, `clippy.toml`, `deny.toml`, `justfile`, `lefthook.yml`, `rust-toolchain.toml`, CI, or `scripts/rust_guard.py`. `rust_guard.py diff` compares the working tree with the last commit, so `just check` and the pre-commit hook stop on each one it detects until it is committed. A weakened assertion or a changed expected value shows only in review.
 
 1. Stop and tell the user what blocks you, the exception you need, and why the design cannot avoid it
 2. After approval, write the reason where the exception lives, such as `#[expect(clippy::cast_possible_truncation, reason = "length is capped at u16::MAX")]`. Use `#[expect]`, never `#[allow]`: it fails the build once it stops matching, so a stale exception cannot linger

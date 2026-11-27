@@ -8,7 +8,7 @@ The profile lives in [../assets/lints.toml](../assets/lints.toml), and `rust_gua
 |---|---|
 | `unsafe_code = "forbid"` | `unsafe` added to get past the borrow checker. `forbid` cannot be lifted by an attribute, so lifting it takes a visible `Cargo.toml` edit |
 | `unsafe_op_in_unsafe_fn` | An `unsafe fn` body that hides its unsafe operations. Edition 2024 only warns |
-| `allow_attributes` | `#[allow]` to silence a lint. `#[expect]` does the same job and fails once it stops matching |
+| `allow_attributes` | `#[allow]` to silence a lint. `#[expect]` does the same job and fails once it stops matching. Clippy skips inner `#![allow]`; `rust_guard.py diff` catches those |
 | `allow_attributes_without_reason` | An exception with no `reason = "…"` |
 | `undocumented_unsafe_blocks` | An `unsafe` block with no `// SAFETY:` comment |
 | `multiple_unsafe_ops_per_block` | One `SAFETY` comment stretched over several operations |

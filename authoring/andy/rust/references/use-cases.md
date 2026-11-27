@@ -26,8 +26,8 @@ Prompts that get the most out of this skill, grouped by branch. Show the user th
 
 | Prompt | What the agent does | What the user gets |
 |---|---|---|
-| "Review this branch with the rust skill" | [D. Review](../SKILL.md#d-review): `diff --base origin/main --report`, then the review column of `references/shortcuts.md` | Every exception the branch adds, checked against an approval |
-| "Did the agent cheat on the tests in this PR?" | Looks for removed, ignored, or disabled tests and weakened assertions; runs `cargo mutants --in-diff` | Each removed, ignored, or disabled test listed, and the missed mutants to judge |
+| "Review this branch with the rust skill" | [D. Review](../SKILL.md#d-review): `diff --base origin/main --report`, then the review column of `references/shortcuts.md` | Each exception the guard detects, checked against an approval |
+| "Did the agent cheat on the tests in this PR?" | Looks for removed, ignored, or disabled tests and weakened assertions; runs `cargo mutants --in-diff` | The removed, ignored, or disabled tests the guard detects, and the missed mutants to judge |
 | "Run cargo mutants on my diff and add tests for the misses that matter" | Reads each missed mutant and adds the cases a caller would notice | Stronger tests on the code that changed |
 | "Why did the pre-commit hook or `just check` stop me?" | Reads the `diff` answer and names each exception and its fix | A clear next step: fix the code, or approve the exception |
 

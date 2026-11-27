@@ -16,7 +16,8 @@ diff   lists the exceptions a change adds: unsafe, #[allow], #[expect],
        dependencies, edited guardrail files, TODOs without an issue, and new
        shortcuts such as unwrap() that the project does not deny yet. It
        compares the working tree with HEAD, so a committed, approved exception
-       stops counting. It fails when it finds one, unless --report is given.
+       stops counting; --base lists what the branch's commits add. It fails
+       when it finds one, unless --report is given.
 
 init and audit read the skill's assets, so run them from the skill copy. The
 project copy runs diff. Answers in one JSON line: init lists `changes`; audit
@@ -371,7 +372,11 @@ def answer_failure(
 # <<< cli-block
 
 import difflib
+import fnmatch
+import posixpath
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -436,7 +441,6 @@ ATTRIBUTES = (
 )
 INNER_CFG_TEST = re.compile(r"#!\[\s*cfg\s*\(\s*test\s*\)\s*\]")
 DOC_LINE = re.compile(r"^\s*//[/!](?!/)(.*)$")
-OFF_FENCE = re.compile(r"^\s*```\s*(?:rust\s*,\s*)?(?:ignore|no_run|text)\b")
 UNSAFE = re.compile(r"\bunsafe\b")
 # A cfg on a test item that is not cfg(test) can switch the test off
 DISABLING_CFG = re.compile(r"#!?\[cfg(?:_attr)?\((?!test\)\])")
@@ -556,7 +560,7 @@ def attributes(text: str) -> list[tuple[int, str, str, str]]:
                         break
                 else:
                     rest = ""
-            item = re.sub(r"\s+", "", re.split(r"[{;]", rest, maxsplit=1)[0])[:120]
+            item = re.sub(r"\s+", "", item_head(rest))[:120]
         shown = " ".join(
             line.strip()
             for line in raw[line_of[index] - 1 : line_of[min(end, len(line_of) - 1)]]
@@ -566,6 +570,21 @@ def attributes(text: str) -> list[tuple[int, str, str, str]]:
         )
         index = end + 1
     return found
+
+
+def item_head(rest: str) -> str:
+    """The start of the item after an attribute stack, up to its body or the
+    end of a field or variant: the first `{`, `;`, `,`, or `}` outside
+    parentheses and brackets."""
+    depth = 0
+    for position, char in enumerate(rest):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif depth <= 0 and char in "{;,}":
+            return rest[:position]
+    return rest
 
 
 def read_raw(path: Path) -> str:
@@ -762,13 +781,39 @@ def hook_lacks_guard(root: Path) -> Path | None:
         r"^pre-commit:[^\n]*\n((?:[ \t][^\n]*\n?|\n)*)", path.read_text(), re.MULTILINE
     )
     lines = (section[1] if section else "").splitlines()
-    runs = any(
-        "rust_guard.py diff --staged" in line
-        and "--report" not in line
-        and not line.lstrip().startswith("#")
-        for line in lines
+    for index, line in enumerate(lines):
+        if (
+            "rust_guard.py diff --staged" in line
+            and "--report" not in line
+            and not line.lstrip().startswith("#")
+            and not narrowed(lines, index)
+        ):
+            return None
+    return path
+
+
+def narrowed(lines: list[str], index: int) -> bool:
+    """Whether the lefthook command holding line `index` limits the files or the
+    folder it runs on, so a staged manifest or CI edit could skip the guard."""
+    indent = len(lines[index]) - len(lines[index].lstrip())
+    start = index
+    while start > 0 and (
+        not lines[start - 1].strip()
+        or len(lines[start - 1]) - len(lines[start - 1].lstrip()) >= indent
+    ):
+        start -= 1
+    end = index
+    while end + 1 < len(lines) and (
+        not lines[end + 1].strip()
+        or len(lines[end + 1]) - len(lines[end + 1].lstrip()) >= indent
+    ):
+        end += 1
+    keys = {"glob", "files", "root", "exclude", "file_types", "only", "skip"}
+    return any(
+        len(line) - len(line.lstrip()) == indent
+        and line.strip().split(":", 1)[0].lstrip("- ") in keys
+        for line in lines[start : end + 1]
     )
-    return None if runs else path
 
 
 # init ---------------------------------------------------------------------
@@ -921,6 +966,30 @@ def init(args: argparse.Namespace) -> dict[str, Any]:
 # audit --------------------------------------------------------------------
 
 
+def probe_config(root: Path, scratch: Path) -> Path:
+    """A Clippy config folder for the audit probe: the project's config plus
+    the test allowances branch B adds, so a lint whose only findings sit in
+    tests counts zero."""
+    text = ""
+    for name in ("clippy.toml", ".clippy.toml"):
+        if (root / name).is_file():
+            text = (root / name).read_text()
+            break
+    try:
+        config = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        config = {}
+    for key in (
+        "allow-unwrap-in-tests",
+        "allow-expect-in-tests",
+        "allow-panic-in-tests",
+    ):
+        if key not in config:
+            text = f"{key} = true\n" + text
+    (scratch / "clippy.toml").write_text(text)
+    return scratch
+
+
 def violations(root: Path) -> dict[str, int]:
     """Clippy findings for every profile lint, zeros included, with the whole
     profile at warn. A build that fails yields no counts, since a lint that
@@ -931,6 +1000,7 @@ def violations(root: Path) -> dict[str, int]:
         for name in table:
             flags += ["-W", f"clippy::{name}" if tool == "clippy" else name]
             names.append(name)
+    scratch = Path(tempfile.mkdtemp(prefix="rust-guard-"))
     result = run(
         [
             "cargo",
@@ -946,10 +1016,9 @@ def violations(root: Path) -> dict[str, int]:
         ],
         root,
         check=False,
-        env=None
-        if (root / "clippy.toml").exists() or (root / ".clippy.toml").exists()
-        else {**os.environ, "CLIPPY_CONF_DIR": str(ASSETS)},
+        env={**os.environ, "CLIPPY_CONF_DIR": str(probe_config(root, scratch))},
     )
+    shutil.rmtree(scratch, ignore_errors=True)
     counts = count_findings(result.stdout)
     if result.returncode != 0 or not build_succeeded(result.stdout):
         raise ScriptError(
@@ -958,7 +1027,9 @@ def violations(root: Path) -> dict[str, int]:
         )
     # `forbid` rejects an existing #[allow(unsafe_code)], which a warn-level
     # probe never reports: count those overrides as findings
-    overrides = re.compile(r"#!?\[\s*(?:allow|expect|warn)\s*\([^\]]*\bunsafe_code\b")
+    overrides = re.compile(
+        r"#!?\[[^\]]*?\b(?:allow|expect|warn)\s*\([^\]]*\bunsafe_code\b"
+    )
     for source in root.rglob("*.rs"):
         if "target" not in source.relative_to(root).parts:
             text = source.read_text(errors="replace")
@@ -1183,6 +1254,49 @@ def test_lines(text: str) -> set[int]:
     return inside
 
 
+def block_after(lines: list[str], number: int) -> str:
+    """Code of the brace block that opens at or after line `number`."""
+    depth = 0
+    opened = False
+    taken: list[str] = []
+    for line in lines[number - 1 :]:
+        code = code_only(line)
+        taken.append(code)
+        for char in code:
+            if char == "{":
+                depth += 1
+                opened = True
+            elif char == "}":
+                depth -= 1
+                if opened and depth == 0:
+                    return "\n".join(taken)
+        if not opened and code.rstrip().endswith(";"):
+            return ""
+    return "\n".join(taken)
+
+
+def runnable_doctests(text: str) -> int:
+    """Rust code fences in doc comments that rustdoc compiles as tests."""
+    allowed = {"rust", "should_panic", "compile_fail", "test_harness"}
+    count = 0
+    inside = False
+    for line in text.splitlines():
+        found = DOC_LINE.match(line)
+        if not found:
+            continue
+        fence = re.match(r"^\s*```(.*)$", found[1])
+        if not fence:
+            continue
+        if inside:
+            inside = False
+            continue
+        inside = True
+        tokens = [each for each in re.split(r"[\s,]+", fence[1].strip()) if each]
+        if all(each in allowed or each.startswith("edition") for each in tokens):
+            count += 1
+    return count
+
+
 def doc_text(line: str) -> str:
     """The text of a `///` or `//!` doc comment line; empty for other lines."""
     found = DOC_LINE.match(line)
@@ -1271,6 +1385,18 @@ def manifest_for(
             break
         folder = folder.parent
     return owner, workspace
+
+
+def workspace_folder(name: str, text_of: Callable[[str], str]) -> str | None:
+    """Repository folder of the workspace root above manifest `name`, or None."""
+    folder = posixpath.dirname(name)
+    while True:
+        text = text_of(posixpath.join(folder, "Cargo.toml"))
+        if text and re.search(r"^\[workspace\]", text, re.MULTILINE):
+            return folder
+        if not folder:
+            return None
+        folder = posixpath.dirname(folder)
 
 
 def flat_lints(manifest: dict[str, Any]) -> dict[str, str]:
@@ -1373,35 +1499,80 @@ def dig(table: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return table
 
 
+def glob_match(pattern: str, path: str) -> bool:
+    """Whether folder `path` matches a Cargo workspace glob, `*` within one
+    segment and `**` across segments."""
+    parts, names = pattern.split("/"), path.split("/")
+    if "**" in parts:
+        cut = parts.index("**")
+        head, tail = parts[:cut], parts[cut + 1 :]
+        return (
+            len(names) >= len(head) + len(tail)
+            and all(map(fnmatch.fnmatchcase, names[: len(head)], head))
+            and all(map(fnmatch.fnmatchcase, names[len(names) - len(tail) :], tail))
+        )
+    return len(parts) == len(names) and all(map(fnmatch.fnmatchcase, names, parts))
+
+
+def tree_members(folder: str, manifest: dict[str, Any], paths: set[str]) -> set[str]:
+    """Member manifests, as repository paths, that `manifest` at `folder`
+    declares, matched against the files of one side of the change."""
+
+    def under(path: str) -> str | None:
+        if not folder:
+            return path
+        return path[len(folder) + 1 :] if path.startswith(folder + "/") else None
+
+    workspace = manifest.get("workspace", {})
+    found: set[str] = set()
+    if "package" in manifest:
+        found.add(posixpath.join(folder, "Cargo.toml"))
+    excludes = [posixpath.normpath(each) for each in workspace.get("exclude", [])]
+    patterns = [posixpath.normpath(each) for each in workspace.get("members", [])]
+    for path in paths:
+        if posixpath.basename(path) != "Cargo.toml":
+            continue
+        relative = under(posixpath.dirname(path))
+        if relative is None:
+            continue
+        relative = relative or "."
+        segments = relative.split("/")
+        if any(
+            glob_match(each, "/".join(segments[:size]))
+            for each in excludes
+            for size in range(1, len(segments) + 1)
+        ):
+            continue
+        if any(glob_match(each, relative) for each in patterns):
+            found.add(path)
+    return found
+
+
 def joined_members(
-    root: Path, change: FileChange, text_of: Callable[[str], str]
+    change: FileChange,
+    text_of: Callable[[str], str],
+    old_paths: set[str],
+    new_paths: set[str],
 ) -> list[list[str]]:
-    """Members a changed workspace root now declares that do not inherit its
-    lints, even when their own files did not change."""
+    """Members a changed workspace root drops, and members it now declares
+    that do not inherit its lints, even when their own files did not change.
+    Membership comes from the files of each side, never the working tree."""
     try:
         old = tomllib.loads(change.old) if change.old else {}
         new = tomllib.loads(change.new) if change.new else {}
     except tomllib.TOMLDecodeError:
         return []
     found: list[list[str]] = []
-    gone = sorted(
-        set(dig(old, ("workspace", "members")) or [])
-        - set(dig(new, ("workspace", "members")) or [])
-    )
+    folder = posixpath.dirname(change.name)
+    before = tree_members(folder, old, old_paths) if "workspace" in old else set()
+    after = tree_members(folder, new, new_paths) if "workspace" in new else set()
+    gone = sorted(posixpath.dirname(each) or "." for each in before - after)
     if gone:
         found.append(["members_removed", change.name, ", ".join(gone)])
-    keys = ("members", "exclude")
-    if "workspace" not in new or all(
-        dig(old, ("workspace", key)) == dig(new, ("workspace", key)) for key in keys
-    ):
+    if "workspace" not in new or not new["workspace"].get("lints"):
         return found
-    if not new["workspace"].get("lints"):
-        return found
-    folder = (root / change.name).parent
-    before = set(members(folder, old)) if old else set()
-    for member in members(folder, new):
-        relative = member.relative_to(root).as_posix()
-        if relative == change.name or member in before:
+    for relative in sorted(after - before):
+        if relative == change.name:
             continue
         text = text_of(relative)
         if not text:
@@ -1480,19 +1651,53 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         shown = git(root, "show", f"{rev or 'HEAD'}:{name}", check=False)
         return shown.stdout if shown.returncode == 0 else ""
 
+    old_ref = rev or "HEAD"
+    new_ref = "HEAD" if committed else ("index" if args.staged else "worktree")
+    listed: dict[str, set[str]] = {}
+
+    def tree_paths(ref: str) -> set[str]:
+        """Files on one side of the change: a commit, the index, or the working tree."""
+        if ref not in listed:
+            if ref == "worktree":
+                command = [
+                    "ls-files",
+                    "-z",
+                    "--cached",
+                    "--others",
+                    "--exclude-standard",
+                ]
+            elif ref == "index":
+                command = ["ls-files", "-z", "--cached"]
+            else:
+                command = ["ls-tree", "-r", "-z", "--name-only", ref]
+            found = git(root, *command, check=False)
+            names = {name for name in found.stdout.split("\0") if name}
+            if ref == "worktree":
+                names = {name for name in names if (root / name).is_file()}
+            listed[ref] = names if found.returncode == 0 else set()
+        return listed[ref]
+
     exceptions: list[list[str]] = []
     notes: dict[str, int] = {}
     removed_tests: set[str] = set()
     added_tests: set[str] = set()
     assertions = 0
+    doctests = 0
     for change in sorted(changes, key=lambda each: each.name):
         name = change.name
         if protected(name):
             exceptions.append(["protected", name, "edits a file the gate depends on"])
         if Path(name).name == "Cargo.toml":
             _, workspace = manifest_for(root, name, new_text)
+            top = workspace_folder(name, new_text)
+            if top is not None and name not in tree_members(
+                top, workspace, tree_paths(new_ref) | {name}
+            ):
+                workspace = {}
             exceptions += manifest_exceptions(change, workspace)
-            exceptions += joined_members(root, change, new_text)
+            exceptions += joined_members(
+                change, new_text, tree_paths(old_ref), tree_paths(new_ref)
+            )
         if not name.endswith(".rs"):
             continue
         owner, workspace = manifest_for(root, name, new_text)
@@ -1514,9 +1719,9 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         was: dict[tuple[str, str], int] = {}
         for _, attribute, item, _ in attributes(change.old):
             was[(attribute, item)] = was.get((attribute, item), 0) + 1
-        has_tests = bool(
-            TEST_ATTR.search("".join(code_only(line) for line in new_lines))
-        )
+        old_code = "".join(code_only(line) for line in change.old.splitlines())
+        had_tests = bool(TEST_ATTR.search(old_code))
+        old_flat = re.sub(r"\s+", "", old_code)
         new_attributes = attributes(change.new)
         for number, attribute, item, shown in new_attributes:
             if was.get((attribute, item), 0):
@@ -1527,7 +1732,7 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                     exceptions.append([kind, f"{name}:{number}", shown])
                     break
             else:
-                inner = attribute.startswith("#![") and has_tests
+                inner = attribute.startswith("#![cfg(") and had_tests
                 stack = [
                     other
                     for line, other, other_item, _ in new_attributes
@@ -1535,8 +1740,12 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 ]
                 on_test = any(
                     TEST_ATTR.search(other) or CFG_TEST.search(other) for other in stack
+                ) or (
+                    re.match(r"(?:pub(?:\([^)]*\))?)?mod\w", item) is not None
+                    and bool(TEST_ATTR.search(block_after(new_lines, number)))
                 )
-                if DISABLING_CFG.match(attribute) and (inner or on_test):
+                existed = bool(item) and item in old_flat
+                if DISABLING_CFG.match(attribute) and (inner or (on_test and existed)):
                     exceptions.append(["tests_disabled", f"{name}:{number}", shown])
         old_unsafe, new_unsafe = unsafe_lines(change.old), unsafe_lines(change.new)
         was_unsafe: dict[str, int] = {}
@@ -1577,22 +1786,21 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 )
             )
         )
-        old_cfg = len(
-            CFG_TEST.findall(
-                "".join(code_only(line) for line in change.old.splitlines())
+        old_cfg, new_cfg = (
+            sum(
+                1
+                for _, attribute, item, _ in attributes(text)
+                if CFG_TEST.search(attribute)
+                and re.match(r"(?:pub(?:\([^)]*\))?)?mod\w", item)
             )
-        )
-        new_cfg = len(
-            CFG_TEST.findall(
-                "".join(code_only(line) for line in change.new.splitlines())
-            )
+            for text in (change.old, change.new)
         )
         if new_cfg < old_cfg:
             exceptions.append(
                 [
                     "tests_disabled",
                     name,
-                    f"{old_cfg - new_cfg} fewer #[cfg(test)] attributes",
+                    f"{old_cfg - new_cfg} fewer #[cfg(test)] modules",
                 ]
             )
         if new_modules < old_modules:
@@ -1662,17 +1870,11 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         assertions -= sum(
             len(ASSERTION.findall(code_only(doc))) for doc in removed_docs
         )
-        switched_off = sum(bool(OFF_FENCE.match(doc)) for doc in added_docs) - sum(
-            bool(OFF_FENCE.match(doc)) for doc in removed_docs
+        doctests += runnable_doctests(change.new) - runnable_doctests(change.old)
+    if doctests < 0:
+        exceptions.append(
+            ["doctest_disabled", ".", f"{-doctests} fewer runnable doctests"]
         )
-        if switched_off > 0:
-            exceptions.append(
-                [
-                    "doctest_disabled",
-                    name,
-                    f"{switched_off} more doctest fences marked ignore, no_run, or text",
-                ]
-            )
     gone = sorted(removed_tests - added_tests)
     if gone:
         exceptions.append(["tests_removed", ".", ", ".join(gone)])
@@ -1743,8 +1945,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     where = sub["diff"].add_mutually_exclusive_group()
     where.add_argument(
         "--base",
-        help="compare the working tree with this revision, such as origin/main for a pull request "
-        "(default: HEAD, or the empty tree before the first commit)",
+        help="list what the commits since the merge base with this revision add, such as "
+        "origin/main for a pull request; uncommitted changes are ignored "
+        "(default: compare the working tree with HEAD, or the empty tree before the first commit)",
     )
     where.add_argument(
         "--staged",
