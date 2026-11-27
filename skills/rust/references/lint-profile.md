@@ -24,6 +24,8 @@ The profile lives in [../assets/lints.toml](../assets/lints.toml), and `rust_gua
 
 [../assets/clippy.toml](../assets/clippy.toml) allows `unwrap`, `expect`, and `panic!` inside `#[cfg(test)]` code and `#[test]` functions, since a panic is how a test fails. Prefer it to a `#![allow(clippy::unwrap_used)]` at the top of each test file.
 
+Shared helpers under `tests/`, such as `tests/common/mod.rs`, sit outside any test function, so the lints still apply there. Declare them with `#[cfg(test)] mod common;` in each test file that uses them.
+
 ## Libraries
 
 A crate other code depends on adds these to its `[lints]`:

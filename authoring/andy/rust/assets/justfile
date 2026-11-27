@@ -1,8 +1,8 @@
 # The gate: run before saying a change is done
 check:
     cargo fmt --all --check
-    cargo clippy --all-targets --all-features --locked -- -D warnings
-    cargo test --all-features --locked
-    cargo deny check
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+    cargo test --workspace --all-features --locked
+    cargo deny --all-features check
     cargo shear
     uv run scripts/rust_guard.py diff

@@ -23,7 +23,7 @@ Confirm each tool before the step that needs it. Give the user the install comma
 | `cargo-shear` | `cargo install --locked cargo-shear` | `cargo shear --version` |
 | `lefthook`, optional | [install lefthook](https://lefthook.dev/installation/) | `lefthook version` |
 
-`scripts/rust_guard.py` below means this skill's script. Run `uv run scripts/rust_guard.py --help` for every flag.
+`<skill>/scripts/rust_guard.py` is this skill's copy of the guard; it runs `init` and `audit`. `init` writes a project copy at `scripts/rust_guard.py`, which runs `diff`; before `init`, run `diff` from the skill's copy. Run `uv run <skill>/scripts/rust_guard.py --help` for every flag.
 
 ## Pick the branch
 
@@ -38,14 +38,14 @@ Confirm each tool before the step that needs it. Give the user the install comma
 
 1. For a new crate, run `cargo new <name>`, which uses the latest edition. Set `rust-version` in `Cargo.toml` to the oldest Rust the crate supports
 2. From the crate or workspace root, run `uv run <skill>/scripts/rust_guard.py init --dry-run`, then without `--dry-run`. It writes the lint profile, `clippy.toml`, `deny.toml`, the `check` recipe, `lefthook.yml`, a copy of the guard under `scripts/`, and the exception rule in `AGENTS.md`. A file the project already has keeps its content, and a rerun changes nothing
-3. Run `lefthook install` when the project uses lefthook
-4. Run `just check`. Fix what it reports in the code, never in the guardrails. Its last step, `rust_guard.py diff`, lists the setup itself, since the setup edits guarded files: show the user that list and commit the setup once they approve it. Done when `just check` passes on the committed setup
+3. Run `just check`. Fix what it reports in the code, never in the guardrails. Its last step, `rust_guard.py diff`, lists the setup itself, since the setup edits guarded files: show the user that list, and commit the setup once they approve it
+4. Run `lefthook install` when the project uses lefthook. Done when `just check` passes on the committed setup
 
 ### B. Audit
 
-1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks, whether a workspace member inherits `[workspace.lints]`, the guardrail files present, and the Clippy findings per lint
-2. Propose the change to the user, since it edits `[lints]`. Turn on now every lint at zero findings. Leave the others out: `rust_guard.py diff` already flags new `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, and `dbg!` while existing ones stay, so the debt stops growing without a big-bang fix
-3. After approval, apply the lints, then follow step 2 of [A. Set up](#a-set-up) for the files the project lacks. Done when `just check` passes
+1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks and whether a workspace member inherits `[workspace.lints]`, then the guardrail files present, the gate commands the `check` recipe lacks, and the Clippy findings for every profile lint
+2. Propose the change to the user, since it edits `[lints]` and the `justfile`. Turn on now every lint at zero findings. For the others, say what leaving them out costs: `rust_guard.py diff` flags new `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, and `dbg!` while existing ones stay, but nothing guards the cast and swallowed-error lints until they are on
+3. After approval, apply the lints, add the missing gate commands to the `check` recipe, and follow [A. Set up](#a-set-up) from step 2. Done when `just check` passes on the committed change
 
 ### C. Work
 
@@ -57,20 +57,21 @@ Confirm each tool before the step that needs it. Give the user the install comma
 
 ### D. Review
 
-1. Run `uv run scripts/rust_guard.py diff --report` from the project, or with `--base <rev>` for a pull request. It lists every exception and counts new `.clone()` and `Arc<Mutex<_>>`
+1. Run `uv run scripts/rust_guard.py diff --base origin/main --report` from the project, with the pull request's base branch. It lists every exception the branch adds and counts new `.clone()` and `Arc<Mutex<_>>`
 2. Check each exception against an approval in the conversation or the PR description
 3. Read the change against the review column of [references/shortcuts.md](references/shortcuts.md), which covers what no lint catches
-4. When tests changed with the code, run `cargo mutants --in-diff` as [references/toolchain.md](references/toolchain.md) describes. A surviving mutant is a test that proves nothing
+4. When tests changed with the code, run `cargo mutants --in-diff` as [references/toolchain.md](references/toolchain.md) describes. Read each missed mutant: when it changes behavior a caller would notice, add the test case that catches it
 
 ## Exceptions
 
-These need explicit approval in the conversation before they stay: `unsafe`, `#[allow]`, `#[expect]`, `#[ignore]`, `#[should_panic]`, a new dependency, a deleted or weakened test or assertion, a `TODO` without an issue link, and any edit to `[lints]`, `clippy.toml`, `deny.toml`, `justfile`, `lefthook.yml`, `rust-toolchain.toml`, CI, or `scripts/rust_guard.py`.
+These need explicit approval in the conversation before they stay: `unsafe`, `#[allow]`, `#[expect]`, `#[ignore]`, `#[should_panic]`, a new dependency, a deleted or weakened test or assertion, a `TODO` without an issue link, and any edit to `[lints]`, `clippy.toml`, `deny.toml`, `justfile`, `lefthook.yml`, `rust-toolchain.toml`, CI, or `scripts/rust_guard.py`. `rust_guard.py diff` compares the working tree with the last commit, so `just check` and the pre-commit hook stop on each one until it is committed.
 
 1. Stop and tell the user what blocks you, the exception you need, and why the design cannot avoid it
 2. After approval, write the reason where the exception lives, such as `#[expect(clippy::cast_possible_truncation, reason = "length is capped at u16::MAX")]`. Use `#[expect]`, never `#[allow]`: it fails the build once it stops matching, so a stale exception cannot linger
-3. Run `uv run scripts/rust_guard.py diff --report` and paste its list into the PR description
+3. Commit the change. When the pre-commit hook still stops it, commit with `LEFTHOOK_EXCLUDE=exceptions git commit`
+4. Paste the list from `uv run scripts/rust_guard.py diff --base origin/main --report`, with the pull request's base branch, into the PR description
 
-`unsafe_code` is `forbid`, which no attribute can lift. Code that truly needs `unsafe` gets the user's approval to set it to `deny` in `Cargo.toml`, then a `// SAFETY:` comment on every block.
+`unsafe_code` is `forbid`, which no attribute can lift. Code that truly needs `unsafe` gets the user's approval to set it to `deny` in `Cargo.toml`. Each `unsafe` item then carries `#[expect(unsafe_code, reason = "…")]`, and each `unsafe` block a `// SAFETY:` comment.
 
 ## References
 

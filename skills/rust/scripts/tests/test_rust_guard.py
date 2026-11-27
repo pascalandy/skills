@@ -51,11 +51,13 @@ mod tests {
 """
 
 
-def run(cwd: Path, *args: str) -> tuple[int, dict, str]:
+def run(
+    cwd: Path, *args: str, env: dict[str, str] | None = None, script: Path = SCRIPT
+) -> tuple[int, dict, str]:
     """Run the script; return its exit code, its JSON answer, and stderr."""
-    env = {**os.environ, **GIT_ENV}
+    env = {**os.environ, **GIT_ENV, **(env or {})}
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [sys.executable, str(script), *args],
         check=False,
         cwd=cwd,
         capture_output=True,
@@ -152,7 +154,7 @@ class InitTest(Crate):
         write(self.root, {"justfile": "build:\n    cargo build\n"})
         code, answer, _ = run(self.root, "init")
         self.assertEqual(code, 1)
-        self.assertIn("no `check` recipe", answer["errors"][0])
+        self.assertIn("does not run the whole gate", answer["errors"][0])
         self.assertFalse((self.root / "clippy.toml").exists())
 
     def test_workspace_members_inherit_the_profile(self) -> None:
@@ -209,6 +211,7 @@ class AuditTest(Crate):
         spec = importlib.util.spec_from_file_location("rust_guard", SCRIPT)
         assert spec and spec.loader
         module = importlib.util.module_from_spec(spec)
+        sys.modules["rust_guard"] = module
         spec.loader.exec_module(module)
         finding = {
             "reason": "compiler-message",
@@ -279,9 +282,7 @@ class DiffTest(Crate):
         write(self.root, {"src/lib.rs": LIB.split("#[cfg(test)]")[0]})
         code, answer, _ = run(self.root, "diff", "--base", "HEAD")
         self.assertEqual(code, 1)
-        self.assertIn(
-            ["tests_removed", ".", "1 fewer test functions"], answer["exceptions"]
-        )
+        self.assertIn(["tests_removed", ".", "adds"], answer["exceptions"])
 
     def test_lint_edit_names_each_setting(self) -> None:
         run(self.root, "init")
@@ -360,6 +361,360 @@ class DiffTest(Crate):
         code, answer, _ = run(self.root, "diff", "--base", "HEAD")
         self.assertEqual(code, 0)
         self.assertEqual(answer["notes"][0][:2], ["clone", "."])
+
+
+def kinds(answer: dict) -> list[str]:
+    return [exception[0] for exception in answer.get("exceptions", [])]
+
+
+class RegressionTest(Crate):
+    """Cases the first council review reproduced against real crates."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def guarded(self) -> None:
+        run(self.root, "init")
+        self.commit("guardrails")
+
+    def test_a_committed_approved_exception_stops_counting(self) -> None:
+        self.guarded()
+        approved = LIB.replace(
+            "pub fn add",
+            '#[expect(clippy::cast_possible_truncation, reason = "demo")]\npub fn narrow(x: u64) -> u32 {\n    x as u32\n}\n\npub fn add',
+        )
+        write(self.root, {"src/lib.rs": approved})
+        self.assertEqual(run(self.root, "diff")[0], 1)
+        self.commit("approved exception")
+        write(
+            self.root,
+            {"src/lib.rs": approved.replace("a.checked_add(b)", "b.checked_add(a)")},
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+        code, answer, _ = run(self.root, "diff", "--base", "HEAD~1", "--report")
+        self.assertEqual((code, kinds(answer)), (0, ["expect"]))
+
+    def test_deleting_a_test_file_names_its_tests(self) -> None:
+        write(
+            self.root,
+            {"tests/it.rs": "#[test]\nfn it_works() {\n    assert!(true);\n}\n"},
+        )
+        self.commit("integration test")
+        (self.root / "tests/it.rs").unlink()
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(["tests_removed", ".", "it_works"], answer["exceptions"])
+        self.assertIn("assertions_removed", kinds(answer))
+
+    def test_renamed_and_nested_guardrails_are_protected(self) -> None:
+        write(
+            self.root,
+            {
+                "clippy.toml": 'msrv = "1.85"\n',
+                "crates/core/rustfmt.toml": "max_width = 100\n",
+            },
+        )
+        self.commit("configs")
+        git(self.root, "mv", "clippy.toml", "clippy.toml.bak")
+        write(self.root, {"crates/core/rustfmt.toml": "max_width = 200\n"})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        names = [
+            exception[1]
+            for exception in answer["exceptions"]
+            if exception[0] == "protected"
+        ]
+        self.assertEqual(names, ["clippy.toml", "crates/core/rustfmt.toml"])
+
+    def test_paths_with_spaces_are_read(self) -> None:
+        write(self.root, {"src/new file.rs": "#[test]\nfn t() {}\n"})
+        self.commit("spaced")
+        write(self.root, {"src/new file.rs": "#[test]\n#[ignore]\nfn t() {}\n"})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(
+            (code, answer["exceptions"][0][:2]), (1, ["ignore", "src/new file.rs:2"])
+        )
+
+    def test_strings_neither_trigger_nor_hide_a_match(self) -> None:
+        changed = LIB.replace(
+            "a.checked_add(b)",
+            'let _label = "unsafe // not code";\n    let _n: u8 = "https://x".len().try_into().ok()?;\n    "7".parse::<u8>().unwrap().checked_add(a.max(b))',
+        )
+        write(self.root, {"src/lib.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertEqual(kinds(answer), ["unwrap_used"])
+
+    def test_conditional_attributes_count(self) -> None:
+        changed = LIB.replace(
+            "    #[test]\n    fn adds",
+            '    #[test]\n    #[cfg_attr(not(feature = "slow"), ignore)]\n    fn adds',
+        )
+        write(self.root, {"src/lib.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["ignore"]))
+
+    def test_editing_a_line_that_already_had_unwrap_adds_nothing(self) -> None:
+        base = LIB.replace("a.checked_add(b)", "Some(a.checked_add(b).unwrap())")
+        write(self.root, {"src/lib.rs": base})
+        self.commit("existing debt")
+        write(
+            self.root,
+            {
+                "src/lib.rs": base.replace(
+                    "a.checked_add(b).unwrap()", "b.checked_add(a).unwrap()"
+                )
+            },
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_test_scope_ends_at_the_closing_brace(self) -> None:
+        changed = (
+            "#[cfg(test)]\nuse std::fmt;\n\n#[cfg(test)]\nmod helpers {}\n\n"
+            "pub fn first(v: &[u8]) -> u8 {\n    *v.first().unwrap()\n}\n\n"
+            '#[test]\nfn uses_unwrap() {\n    assert_eq!(first(&[1]), "1".parse::<u8>().unwrap());\n    todo!();\n}\n'
+        )
+        write(self.root, {"src/extra.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        flagged = [(exception[0], exception[1]) for exception in answer["exceptions"]]
+        self.assertEqual(
+            flagged, [("unwrap_used", "src/extra.rs:8"), ("todo", "src/extra.rs:14")]
+        )
+
+    def test_a_member_that_skips_workspace_lints_is_flagged(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',
+                "crates/a/Cargo.toml": CRATE,
+                "crates/a/src/lib.rs": LIB,
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        run(self.root, "init")
+        self.commit("workspace")
+        write(
+            self.root,
+            {
+                "crates/extra/Cargo.toml": CRATE.replace("demo", "extra"),
+                "crates/extra/src/lib.rs": "pub fn f(v: Option<u8>) -> u8 {\n    v.unwrap()\n}\n",
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            [
+                "lints",
+                "crates/extra/Cargo.toml",
+                "member does not set [lints] workspace = true",
+            ],
+            answer["exceptions"],
+        )
+        self.assertIn("unwrap_used", kinds(answer))
+
+    def test_priority_and_package_renames_are_exceptions(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + 'driver = { version = "1", package = "old-driver" }\n\n[lints.clippy]\nall = { level = "deny", priority = -1 }\n'
+            },
+        )
+        self.commit("deps")
+        text = (self.root / "Cargo.toml").read_text()
+        write(
+            self.root,
+            {
+                "Cargo.toml": text.replace("old-driver", "new-driver").replace(
+                    "priority = -1", "priority = 1"
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            ["dependency", "Cargo.toml", "dependencies.driver=new-driver"],
+            answer["exceptions"],
+        )
+        self.assertIn("lints", kinds(answer))
+
+
+class SetupTest(Crate):
+    def test_first_commit_lists_the_setup_then_passes(self) -> None:
+        git(self.root, "init", "-q", "-b", "main")
+        run(self.root, "init")
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn("protected", kinds(answer))
+        self.assertIn("lints", kinds(answer))
+        git(self.root, "add", "-A")
+        code, answer, _ = run(self.root, "diff", "--staged")
+        self.assertEqual(code, 1)
+        git(self.root, "commit", "-q", "-m", "setup")
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def fake_cargo(self, stdout: str, code: int) -> dict[str, str]:
+        folder = self.root / "bin"
+        folder.mkdir()
+        (folder / "out.json").write_text(stdout)
+        cargo = folder / "cargo"
+        cargo.write_text(f"#!/bin/sh\ncat '{folder / 'out.json'}'\nexit {code}\n")
+        cargo.chmod(0o755)
+        return {"PATH": f"{folder}{os.pathsep}{os.environ['PATH']}"}
+
+    def test_violations_report_every_profile_lint(self) -> None:
+        finding = {
+            "reason": "compiler-message",
+            "message": {
+                "code": {"code": "clippy::unwrap_used"},
+                "spans": [{"file_name": "src/lib.rs", "line_start": 1}],
+            },
+        }
+        other = {
+            **finding,
+            "message": {
+                **finding["message"],
+                "code": {"code": "clippy::let_and_return"},
+            },
+        }
+        stream = "\n".join(
+            json.dumps(item)
+            for item in (finding, other, {"reason": "build-finished", "success": True})
+        )
+        code, answer, _ = run(
+            self.root, "audit", "--violations", env=self.fake_cargo(stream, 0)
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(answer["violations"]["unwrap_used"], 1)
+        self.assertEqual(answer["violations"]["panic"], 0)
+        self.assertNotIn("let_and_return", answer["violations"])
+
+    def test_violations_fail_when_the_build_fails(self) -> None:
+        stream = json.dumps({"reason": "build-finished", "success": False})
+        code, answer, _ = run(
+            self.root, "audit", "--violations", env=self.fake_cargo(stream, 101)
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("Clippy did not finish", answer["errors"][0])
+
+    def test_an_existing_check_recipe_must_run_the_gate(self) -> None:
+        write(
+            self.root,
+            {
+                "justfile": "check:\n    cargo fmt --all --check\n\ncheck-all:\n    cargo shear\n"
+            },
+        )
+        code, answer, _ = run(self.root, "init")
+        self.assertEqual(code, 1)
+        self.assertIn("cargo clippy", answer["errors"][0])
+        self.assertNotIn("cargo fmt,", answer["errors"][0])
+        self.assertFalse((self.root / "clippy.toml").exists())
+        code, answer, _ = run(self.root, "audit")
+        self.assertIn("rust_guard.py diff", answer["check_recipe"]["lacks"])
+
+    def test_init_keeps_a_project_owned_guard_script(self) -> None:
+        write(self.root, {"scripts/rust_guard.py": "print('mine')\n"})
+        code, answer, _ = run(self.root, "init")
+        self.assertEqual(code, 1)
+        self.assertIn("is not a copy of this script", answer["errors"][0])
+        self.assertEqual(
+            (self.root / "scripts/rust_guard.py").read_text(), "print('mine')\n"
+        )
+
+    def test_the_project_copy_points_init_and_audit_to_the_skill(self) -> None:
+        run(self.root, "init")
+        code, answer, _ = run(
+            self.root, "audit", script=self.root / "scripts/rust_guard.py"
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("run them from the skill copy", answer["errors"][0])
+
+    def test_crlf_manifests_keep_their_line_endings(self) -> None:
+        (self.root / "Cargo.toml").write_bytes(CRATE.replace("\n", "\r\n").encode())
+        run(self.root, "init")
+        data = (self.root / "Cargo.toml").read_bytes()
+        self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
+
+
+class NeonRegressionTest(Crate):
+    """Cases the first council review's third seat reproduced."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_commenting_out_a_test_and_its_assertion_counts_as_removal(self) -> None:
+        changed = LIB.replace("    #[test]\n", "    // #[test]\n").replace(
+            "        assert_eq!(add(1, 2), Some(3));",
+            "        // assert_eq!(add(1, 2), Some(3));",
+        )
+        write(self.root, {"src/lib.rs": changed})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(["tests_removed", ".", "adds"], answer["exceptions"])
+        self.assertIn("assertions_removed", kinds(answer))
+
+    def test_words_in_comments_strings_and_names_are_not_exceptions(self) -> None:
+        changed = LIB.replace(
+            "pub fn add",
+            "/* never use unsafe here */\npub const CSP: &str = \"script-src 'unsafe-inline'\";\npub enum Status { TODO, Done }\n\npub fn add",
+        )
+        write(self.root, {"src/lib.rs": changed})
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_non_utf8_files_do_not_crash(self) -> None:
+        (self.root / "fixture.bin").write_bytes(b"caf\xe9\n")
+        self.commit("fixture")
+        (self.root / "fixture.bin").write_bytes(b"caf\xe9 \xe9\n")
+        self.assertEqual(run(self.root, "diff")[0], 0)
+
+
+class CliAndWorkspaceTest(Crate):
+    def test_help_and_closest_command(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "help", "diff"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("usage: rust_guard.py diff", result.stdout)
+        code, answer, _ = run(self.root, "dift")
+        self.assertEqual(code, 2)
+        self.assertIn("did you mean 'diff'", answer["errors"][0])
+
+    def test_recursive_member_globs_and_excludes(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/**"]\nexclude = ["crates/skip-*"]\n',
+                "crates/a/b/Cargo.toml": CRATE,
+                "crates/skip-me/Cargo.toml": CRATE.replace("demo", "skipped"),
+            },
+        )
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            [entry["path"] for entry in answer["manifests"]], ["crates/a/b/Cargo.toml"]
+        )
+
+    def test_a_quiet_check_recipe_counts(self) -> None:
+        recipe = (
+            (SCRIPT.parent.parent / "assets" / "justfile")
+            .read_text()
+            .replace("check:", "@check:")
+        )
+        write(self.root, {"justfile": recipe})
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual((code, answer["check_recipe"]["lacks"]), (0, []))
+
+    def test_an_unclosed_agents_section_fails(self) -> None:
+        write(self.root, {"AGENTS.md": "# Demo\n\n<!-- rust-guard:start -->\nold\n"})
+        code, answer, _ = run(self.root, "init")
+        self.assertEqual(code, 1)
+        self.assertIn("without <!-- rust-guard:end -->", answer["errors"][0])
 
 
 if __name__ == "__main__":

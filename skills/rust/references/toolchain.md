@@ -5,9 +5,9 @@ The gate is the `check` recipe in [../assets/justfile](../assets/justfile). Each
 | Step | Answers | Why this tool |
 |---|---|---|
 | `cargo fmt --all --check` | Is the code formatted? | The standard formatter |
-| `cargo clippy --all-targets --all-features --locked -- -D warnings` | Does the code pass the lint profile, tests included? | `--all-targets` covers tests and examples; `--locked` fails on a stale `Cargo.lock` instead of rewriting it |
-| `cargo test --all-features --locked` | Do the tests and doctests pass? | Runs doctests too |
-| `cargo deny check` | Any known vulnerability, banned crate, rejected license, or unknown source? | Covers the RustSec advisories, so `cargo-audit` adds nothing |
+| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Does the code pass the lint profile, tests included? | `--workspace` covers every member even when the root is a package; `--all-targets` covers tests and examples; `--locked` fails on a stale `Cargo.lock` instead of rewriting it |
+| `cargo test --workspace --all-features --locked` | Do the tests and doctests pass? | Runs doctests too |
+| `cargo deny --all-features check` | Any known vulnerability, banned crate, rejected license, or unknown source? | Covers the RustSec advisories, so `cargo-audit` adds nothing |
 | `cargo shear` | Any dependency the code never uses? | Parses the code instead of matching regexes, so it misfires less than `cargo-machete`; `cargo shear --fix` removes what it finds |
 | `uv run scripts/rust_guard.py diff` | Does the change add an exception? | Catches what lints cannot: removed tests, new dependencies, edited guardrails |
 
@@ -22,7 +22,7 @@ git diff origin/main > /tmp/change.diff
 cargo mutants --in-diff /tmp/change.diff
 ```
 
-Install with `cargo install --locked cargo-mutants`; `cargo mutants --version` confirms it. A missed mutant means a test that proves nothing: add the case that kills it.
+Install with `cargo install --locked cargo-mutants`; `cargo mutants --version` confirms it. A missed mutant is a change no test noticed. Read it: when it changes behavior a caller would notice, add the case that catches it; some mutants change nothing observable.
 
 ## Optional tools
 
