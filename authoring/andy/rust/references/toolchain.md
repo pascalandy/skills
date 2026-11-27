@@ -18,7 +18,7 @@ The gate is the `check` recipe in [../assets/justfile](../assets/justfile). Each
 `cargo mutants` changes the code, such as replacing a function body with a default value, and reports each change no test caught. Run it on the diff only, since a whole-crate run takes long:
 
 ```bash
-git diff origin/main > /tmp/change.diff
+git diff "$(git merge-base origin/main HEAD)" > /tmp/change.diff
 cargo mutants --in-diff /tmp/change.diff
 ```
 

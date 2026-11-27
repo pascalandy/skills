@@ -43,9 +43,9 @@ Confirm each tool before the step that needs it. Give the user the install comma
 
 ### B. Audit
 
-1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks and whether a workspace member inherits `[workspace.lints]`, then the guardrail files present, the gate steps the `check` recipe lacks, whether lefthook runs the staged guard, and the Clippy findings for every profile lint
+1. Run `uv run <skill>/scripts/rust_guard.py audit --violations`. It lists, per manifest, the profile lints the project lacks and whether a workspace member inherits `[workspace.lints]`, then the guardrail files present, the gate steps the `check` recipe lacks, whether lefthook runs the staged guard, whether `clippy.toml` lets tests use `unwrap`, `expect`, and `panic!` (`tests_may_panic`), and the Clippy findings for every profile lint
 2. Propose the change to the user, since it edits `[lints]` and the `justfile`. Turn on now every lint at zero findings. For the others, say what leaving them out costs: `rust_guard.py diff` flags new `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, and `dbg!` while existing ones stay, but nothing guards the cast and swallowed-error lints until they are on
-3. After approval, apply the lints, add the missing gate steps to the `check` recipe and the `exceptions` command of the skill's `lefthook.yml` to the project's, then follow [A. Set up](#a-set-up) from step 2. Done when `just check` passes on the committed change
+3. After approval, apply the lints, add the missing gate steps to the `check` recipe, the `exceptions` command of the skill's `lefthook.yml` to the project's, and, when `tests_may_panic` is false, the three `allow-*-in-tests` keys of the skill's `clippy.toml` to the project's, then follow [A. Set up](#a-set-up) from step 2. Done when `just check` passes on the committed change
 
 ### C. Work
 

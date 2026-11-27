@@ -7,10 +7,10 @@ Prompts that get the most out of this skill, grouped by branch. Show the user th
 | Prompt | What the agent does | What the user gets |
 |---|---|---|
 | "Start a new Rust CLI called `ledger` with the rust guardrails" | [A. Set up](../SKILL.md#a-set-up): `cargo new`, `init`, `just check`, then asks to commit the setup | A crate where the shortcuts below fail the build from the first commit |
-| "Add the rust guardrails to this project, but don't break the build" | [B. Audit](../SKILL.md#b-audit): `audit --violations`, then a proposal of the lints already at zero | Stricter lints today, without a big-bang cleanup |
+| "Add the rust guardrails to this project without a big-bang cleanup" | [B. Audit](../SKILL.md#b-audit): `audit --violations`, then a proposal of the lints already at zero | Stricter lints today, with the lint debt left in place. The rest of the gate, such as `-D warnings`, `cargo deny`, and `cargo shear`, may still need fixes before `just check` passes |
 | "Which profile lints could we turn on now? Turn on the ones at zero" | `audit --violations` again, after the debt shrank | The next ratchet step, backed by counts |
 | "Set up the guardrails for `src-tauri/` in this repo" | `init` in the nested crate, plus the lefthook lines for the repository root | Guardrails for one crate inside a larger repository |
-| "Add a crate `core` to the workspace" | Creates the member with `[lints] workspace = true`; `just check` covers it | A new member that cannot escape the profile |
+| "Add a crate `billing` to the workspace" | Creates the member with `[lints] workspace = true`; `just check` covers it | A new member that cannot escape the profile |
 
 ## Daily work
 
@@ -27,9 +27,9 @@ Prompts that get the most out of this skill, grouped by branch. Show the user th
 | Prompt | What the agent does | What the user gets |
 |---|---|---|
 | "Review this branch with the rust skill" | [D. Review](../SKILL.md#d-review): `diff --base origin/main --report`, then the review column of `references/shortcuts.md` | Every exception the branch adds, checked against an approval |
-| "Did the agent cheat on the tests in this PR?" | Looks for removed, ignored, or disabled tests and weakened assertions; runs `cargo mutants --in-diff` | Evidence the tests still prove the behavior |
+| "Did the agent cheat on the tests in this PR?" | Looks for removed, ignored, or disabled tests and weakened assertions; runs `cargo mutants --in-diff` | Each removed, ignored, or disabled test listed, and the missed mutants to judge |
 | "Run cargo mutants on my diff and add tests for the misses that matter" | Reads each missed mutant and adds the cases a caller would notice | Stronger tests on the code that changed |
-| "Why did `just check` stop on my commit?" | Reads the `diff` answer and names each exception and its fix | A clear next step: fix the code, or approve the exception |
+| "Why did the pre-commit hook or `just check` stop me?" | Reads the `diff` answer and names each exception and its fix | A clear next step: fix the code, or approve the exception |
 
 ## Phrasing that helps
 

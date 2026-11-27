@@ -241,9 +241,7 @@ class DiffTest(Crate):
                 )
             },
         )
-        self.assertEqual(
-            run(self.root, "diff", "--base", "HEAD"), (0, {"ok": True}, "")
-        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
 
     def test_lists_exceptions_and_fails_until_report(self) -> None:
         changed = LIB.replace(
@@ -261,7 +259,7 @@ class DiffTest(Crate):
                 "clippy.toml": 'msrv = "1.85"\n',
             },
         )
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 1)
         kinds = [exception[0] for exception in answer["exceptions"]]
         for kind in (
@@ -274,13 +272,13 @@ class DiffTest(Crate):
             "assertions_removed",
         ):
             self.assertIn(kind, kinds)
-        code, reported, _ = run(self.root, "diff", "--base", "HEAD", "--report")
+        code, reported, _ = run(self.root, "diff", "--report")
         self.assertEqual(code, 0)
         self.assertEqual(reported["exceptions"], answer["exceptions"])
 
     def test_a_removed_test_is_an_exception(self) -> None:
         write(self.root, {"src/lib.rs": LIB.split("#[cfg(test)]")[0]})
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 1)
         self.assertIn(["tests_removed", ".", "adds"], answer["exceptions"])
 
@@ -293,7 +291,7 @@ class DiffTest(Crate):
             .replace('unwrap_used = "deny"', 'unwrap_used = "warn"')
         )
         (self.root / "Cargo.toml").write_text(manifest)
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 1)
         self.assertIn(
             ["lints", "Cargo.toml", "lints.clippy.unwrap_used: deny -> warn"],
@@ -307,7 +305,7 @@ class DiffTest(Crate):
             "assert_eq!(add(1, 2), Some(3));", "assert_eq!(add(1, 2).unwrap(), 3);"
         )
         write(self.root, {"src/lib.rs": changed})
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 1)
         flagged = [
             exception
@@ -327,9 +325,7 @@ class DiffTest(Crate):
                 )
             },
         )
-        self.assertEqual(
-            run(self.root, "diff", "--base", "HEAD"), (0, {"ok": True}, "")
-        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
 
     def test_staged_checks_the_index_only(self) -> None:
         write(self.root, {"src/extra.rs": "pub fn f() { unsafe {} }\n"})
@@ -346,7 +342,7 @@ class DiffTest(Crate):
                 "src/new.rs": '#[expect(clippy::panic, reason = "demo")]\npub fn f() {}\n'
             },
         )
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 1)
         self.assertEqual(answer["exceptions"][0][:2], ["expect", "src/new.rs:1"])
 
@@ -358,7 +354,7 @@ class DiffTest(Crate):
                 + "\npub fn dup(v: &Vec<u8>) -> Vec<u8> {\n    v.clone()\n}\n"
             },
         )
-        code, answer, _ = run(self.root, "diff", "--base", "HEAD")
+        code, answer, _ = run(self.root, "diff")
         self.assertEqual(code, 0)
         self.assertEqual(answer["notes"][0][:2], ["clone", "."])
 
@@ -750,7 +746,10 @@ class RoundTwoTest(Crate):
         )
         code, answer, _ = run(self.root, "init")
         self.assertEqual(code, 1)
-        self.assertIn("does not run `rust_guard.py diff --staged`", answer["errors"][0])
+        self.assertIn(
+            "no pre-commit command running `rust_guard.py diff --staged`",
+            answer["errors"][0],
+        )
 
     def test_a_dot_clippy_toml_is_kept(self) -> None:
         write(self.root, {".clippy.toml": 'msrv = "1.85"\n'})
@@ -1109,6 +1108,338 @@ class NeonAuditTest(Crate):
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("usage: rust_guard.py diff", result.stdout)
+
+
+class RoundThreeTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_an_error_ignoring_guard_step_lacks_the_gate(self) -> None:
+        recipe = (SCRIPT.parent.parent / "assets" / "justfile").read_text()
+        write(
+            self.root,
+            {
+                "justfile": recipe.replace(
+                    "    uv run scripts/rust_guard.py diff",
+                    "    -uv run scripts/rust_guard.py diff",
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "audit")
+        self.assertEqual(
+            (code, answer["check_recipe"]["lacks"]),
+            (0, ["uv run scripts/rust_guard.py diff"]),
+        )
+
+    def test_the_hook_audit_needs_a_blocking_pre_commit_command(self) -> None:
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": "pre-push:\n  commands:\n    g:\n      run: uv run scripts/rust_guard.py diff --staged\n"
+            },
+        )
+        self.assertFalse(run(self.root, "audit")[1]["hook_runs_guard"])
+        write(
+            self.root,
+            {
+                "lefthook.yml": (
+                    SCRIPT.parent.parent / "assets" / "lefthook.yml"
+                ).read_text()
+            },
+        )
+        self.assertTrue(run(self.root, "audit")[1]["hook_runs_guard"])
+
+    def test_the_pr_list_reads_commits_not_the_working_tree(self) -> None:
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write(
+            self.root,
+            {"src/lib.rs": LIB.replace("pub fn add", "// TODO tidy\npub fn add")},
+        )
+        self.commit("todo")
+        write(self.root, {"src/lib.rs": LIB})
+        code, answer, _ = run(self.root, "diff", "--base", "main", "--report")
+        self.assertEqual((code, kinds(answer)), (0, ["todo"]))
+
+    def test_moving_an_expect_to_another_item_is_new(self) -> None:
+        base = LIB.replace(
+            "pub fn add",
+            '#[expect(clippy::expect_used, reason = "embedded")]\npub fn load() -> u8 {\n    1\n}\n\npub fn parse() -> u8 {\n    2\n}\n\npub fn add',
+        )
+        write(self.root, {"src/lib.rs": base})
+        self.commit("approved expect")
+        moved = base.replace(
+            '#[expect(clippy::expect_used, reason = "embedded")]\npub fn load',
+            "pub fn load",
+        ).replace(
+            "pub fn parse",
+            '#[expect(clippy::expect_used, reason = "embedded")]\npub fn parse',
+        )
+        write(self.root, {"src/lib.rs": moved})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["expect"]))
+
+    def test_an_inner_cfg_that_switches_a_test_file_off(self) -> None:
+        write(
+            self.root, {"tests/it.rs": "#[test]\nfn works() {\n    assert!(true);\n}\n"}
+        )
+        self.commit("integration")
+        write(
+            self.root,
+            {
+                "tests/it.rs": "#![cfg(any())]\n\n#[test]\nfn works() {\n    assert!(true);\n}\n"
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_removing_a_member_is_an_exception(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/a", "crates/b"]\n',
+                "crates/a/Cargo.toml": CRATE,
+                "crates/b/Cargo.toml": CRATE.replace("demo", "bee"),
+            },
+        )
+        self.commit("two members")
+        write(self.root, {"Cargo.toml": '[workspace]\nmembers = ["crates/a"]\n'})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            ["members_removed", "Cargo.toml", "crates/b"], answer["exceptions"]
+        )
+
+
+class RoundThreeAuditTest(Crate):
+    def test_an_unsafe_code_override_counts_against_forbid(self) -> None:
+        write(
+            self.root,
+            {
+                "src/ffi.rs": '#[allow(unsafe_code, reason = "legacy ffi")]\npub fn f() {}\n'
+            },
+        )
+        folder = self.root / "bin"
+        folder.mkdir()
+        (folder / "out.json").write_text(
+            json.dumps({"reason": "build-finished", "success": True})
+        )
+        cargo = folder / "cargo"
+        cargo.write_text(f"#!/bin/sh\ncat '{folder / 'out.json'}'\n")
+        cargo.chmod(0o755)
+        env = {"PATH": f"{folder}{os.pathsep}{os.environ['PATH']}"}
+        code, answer, _ = run(self.root, "audit", "--violations", env=env)
+        self.assertEqual((code, answer["violations"]["unsafe_code"]), (0, 1))
+
+
+class OpusRoundThreeTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_switching_off_a_test_module_is_an_exception(self) -> None:
+        write(self.root, {"src/lib.rs": LIB.replace("#[cfg(test)]", "#[cfg(any())]")})
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn("tests_disabled", kinds(answer))
+
+    def test_doctests_switched_off_or_emptied_are_exceptions(self) -> None:
+        documented = LIB.replace(
+            "pub fn add",
+            "/// ```\n/// assert_eq!(demo::add(1, 1), Some(2));\n/// ```\npub fn add",
+        )
+        write(self.root, {"src/lib.rs": documented})
+        self.commit("doctest")
+        write(
+            self.root,
+            {
+                "src/lib.rs": documented.replace(
+                    "/// ```\n/// assert_eq",
+                    "/// ```ignore\n/// let _ = 1; // assert_eq",
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn("doctest_disabled", kinds(answer))
+        self.assertIn("assertions_removed", kinds(answer))
+
+    def test_an_edit_inside_a_multi_line_unsafe_block_is_new(self) -> None:
+        base = LIB.replace(
+            "pub fn add",
+            "pub fn raw(p: *const u8) -> u8 {\n    unsafe {\n        *p\n    }\n}\n\npub fn add",
+        )
+        write(self.root, {"src/lib.rs": base})
+        self.commit("existing unsafe block")
+        write(
+            self.root,
+            {"src/lib.rs": base.replace("        *p\n", "        *p.add(7)\n")},
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["unsafe"]))
+
+    def test_integration_test_helpers_are_test_code(self) -> None:
+        write(
+            self.root,
+            {
+                "tests/it.rs": "#[cfg(test)]\nmod common;\n\n#[test]\nfn works() {\n    assert_eq!(common::one(), 1);\n}\n",
+                "tests/common/mod.rs": "pub fn one() -> u8 {\n    1\n}\n",
+            },
+        )
+        self.commit("helpers")
+        write(
+            self.root,
+            {
+                "tests/common/mod.rs": 'pub fn one() -> u8 {\n    "1".parse().unwrap()\n}\n'
+            },
+        )
+        self.assertEqual(run(self.root, "diff"), (0, {"ok": True}, ""))
+
+    def test_the_report_shows_the_reason_as_written(self) -> None:
+        write(
+            self.root,
+            {
+                "src/extra.rs": '#[expect(clippy::panic, reason = "demo only")]\npub fn f() {}\n'
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn('reason = "demo only"', answer["exceptions"][0][2])
+
+
+class NestedHookTest(Crate):
+    def test_the_nested_refusal_names_the_root_setting(self) -> None:
+        git(self.root, "init", "-q", "-b", "main")
+        write(
+            self.root,
+            {
+                "lefthook.yml": "pre-commit:\n  commands:\n    fmt:\n      run: cargo fmt --check\n"
+            },
+        )
+        nested = self.root / "app"
+        write(
+            nested,
+            {"Cargo.toml": CRATE, "Cargo.lock": "version = 4\n", "src/lib.rs": LIB},
+        )
+        code, answer, _ = run(nested, "init")
+        self.assertEqual(code, 1)
+        self.assertIn("root: app/", answer["errors"][0])
+
+
+class NeonRoundThreeTest(Crate):
+    def setUp(self) -> None:
+        super().setUp()
+        self.commit("start")
+
+    def test_a_platform_cfg_on_a_use_inside_tests_is_not_disabling(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "    use super::*;\n",
+                    "    use super::*;\n    #[cfg(unix)]\n    use std::os::unix::ffi::OsStrExt;\n",
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, answer), (0, {"ok": True}))
+
+    def test_a_platform_cfg_on_a_test_is_disabling(self) -> None:
+        write(
+            self.root,
+            {
+                "src/lib.rs": LIB.replace(
+                    "    #[test]\n", "    #[cfg(windows)]\n    #[test]\n"
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, kinds(answer)), (1, ["tests_disabled"]))
+
+    def test_switching_off_binary_tests_is_an_exception(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + '\n[[bin]]\nname = "demo"\npath = "src/main.rs"\n',
+                "src/main.rs": "fn main() {}\n",
+            },
+        )
+        self.commit("binary")
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE
+                + '\n[[bin]]\nname = "demo"\npath = "src/main.rs"\ntest = false\n'
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            ["test_discovery", "Cargo.toml", "[[bin]] changed"], answer["exceptions"]
+        )
+        write(
+            self.root,
+            {
+                "Cargo.toml": CRATE.replace(
+                    'edition = "2024"', 'edition = "2024"\nautobins = false'
+                )
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual(code, 1)
+        self.assertTrue(
+            any("package.autobins" in entry[2] for entry in answer["exceptions"])
+        )
+
+    def test_adding_a_clean_member_leaves_a_legacy_member_alone(self) -> None:
+        write(
+            self.root,
+            {
+                "Cargo.toml": '[workspace]\nmembers = ["crates/old"]\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n',
+                "crates/old/Cargo.toml": CRATE,
+            },
+        )
+        (self.root / "src/lib.rs").unlink()
+        self.commit("legacy workspace")
+        write(
+            self.root,
+            {
+                "Cargo.toml": (self.root / "Cargo.toml")
+                .read_text()
+                .replace('["crates/old"]', '["crates/old", "crates/new"]'),
+                "crates/new/Cargo.toml": CRATE.replace("demo", "fresh")
+                + "\n[lints]\nworkspace = true\n",
+            },
+        )
+        code, answer, _ = run(self.root, "diff")
+        self.assertEqual((code, answer), (0, {"ok": True}))
+
+    def test_the_nested_note_runs_the_guard_from_the_root(self) -> None:
+        nested = self.root / "app"
+        write(
+            nested,
+            {"Cargo.toml": CRATE, "Cargo.lock": "version = 4\n", "src/lib.rs": LIB},
+        )
+        code, answer, _ = run(nested, "init")
+        self.assertEqual(code, 0)
+        note = answer["notes"][0]
+        self.assertIn("uv run app/scripts/rust_guard.py diff --staged", note)
+        self.assertIn("with no `root:`", note)
+        self.assertIn("root: app/", note)
+
+    def test_audit_finds_alternate_file_names(self) -> None:
+        write(
+            self.root,
+            {
+                ".clippy.toml": "allow-unwrap-in-tests = true\n",
+                "lefthook.yaml": "pre-commit:\n  commands: {}\n",
+            },
+        )
+        files = run(self.root, "audit")[1]["files"]
+        self.assertTrue(files["clippy.toml"])
+        self.assertTrue(files["lefthook.yml"])
 
 
 if __name__ == "__main__":

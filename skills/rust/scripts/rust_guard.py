@@ -435,9 +435,11 @@ ATTRIBUTES = (
     ("should_panic", re.compile(r"\bshould_panic\b")),
 )
 INNER_CFG_TEST = re.compile(r"#!\[\s*cfg\s*\(\s*test\s*\)\s*\]")
+DOC_LINE = re.compile(r"^\s*//[/!](?!/)(.*)$")
+OFF_FENCE = re.compile(r"^\s*```\s*(?:rust\s*,\s*)?(?:ignore|no_run|text)\b")
 UNSAFE = re.compile(r"\bunsafe\b")
 # A cfg on a test item that is not cfg(test) can switch the test off
-DISABLING_CFG = re.compile(r"#\[cfg(?:_attr)?\((?!test\)\])")
+DISABLING_CFG = re.compile(r"#!?\[cfg(?:_attr)?\((?!test\)\])")
 TEST_MODULE = re.compile(r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod\w+;")
 
 
@@ -513,11 +515,14 @@ def comment_of(line: str) -> str:
     return split_line(line)[1]
 
 
-def attributes(text: str) -> list[tuple[int, str]]:
-    """Each attribute in the file as (first line, text without whitespace),
-    read across lines on code without strings and comments."""
+def attributes(text: str) -> list[tuple[int, str, str, str]]:
+    """Each attribute in the file as (first line, text without whitespace, the
+    item it is attached to), read across lines on code without strings and
+    comments. The item is the head of the next code after the attribute stack,
+    such as `pubfnload_schema()->Schema`, so a moved attribute reads as new."""
     code = [code_only(line) for line in text.splitlines()]
-    found: list[tuple[int, str]] = []
+    found: list[tuple[int, str, str, str]] = []
+    raw = text.splitlines()
     line_of: list[int] = []
     joined = ""
     for number, line in enumerate(code, 1):
@@ -536,7 +541,29 @@ def attributes(text: str) -> list[tuple[int, str]]:
             if depth == 0:
                 end = position
                 break
-        found.append((line_of[index], re.sub(r"\s+", "", joined[index : end + 1])))
+        item = ""
+        if joined[index + 1 : index + 2] != "!":
+            rest = joined[end + 1 :]
+            while True:
+                rest = rest.lstrip()
+                if not re.match(r"#!?\[", rest):
+                    break
+                depth = 0
+                for position, char in enumerate(rest):
+                    depth += {"[": 1, "]": -1}.get(char, 0)
+                    if char == "]" and depth == 0:
+                        rest = rest[position + 1 :]
+                        break
+                else:
+                    rest = ""
+            item = re.sub(r"\s+", "", re.split(r"[{;]", rest, maxsplit=1)[0])[:120]
+        shown = " ".join(
+            line.strip()
+            for line in raw[line_of[index] - 1 : line_of[min(end, len(line_of) - 1)]]
+        )
+        found.append(
+            (line_of[index], re.sub(r"\s+", "", joined[index : end + 1]), item, shown)
+        )
         index = end + 1
     return found
 
@@ -674,7 +701,7 @@ def recipe_steps(text: str) -> list[str]:
         re.MULTILINE,
     )
     steps = [
-        line.strip().lstrip("@-").strip()
+        line.strip().removeprefix("@").strip()
         for line in (body[1] if body else "").splitlines()
     ]
     return [step for step in steps if step and not step.startswith("#")]
@@ -718,16 +745,43 @@ def tests_may_panic(root: Path) -> bool:
     return False
 
 
-def hook_lacks_guard(root: Path) -> Path | None:
-    """The project's lefthook config when it does not run the staged guard."""
+def lefthook_config(root: Path) -> Path | None:
     for name in ("lefthook.yml", "lefthook.yaml", ".lefthook.yml"):
-        path = root / name
-        if path.is_file():
-            return None if "rust_guard.py diff --staged" in path.read_text() else path
+        if (root / name).is_file():
+            return root / name
     return None
 
 
+def hook_lacks_guard(root: Path) -> Path | None:
+    """The project's lefthook config when its pre-commit hook does not run the
+    staged guard in blocking mode; None when it does or when there is none."""
+    path = lefthook_config(root)
+    if path is None:
+        return None
+    section = re.search(
+        r"^pre-commit:[^\n]*\n((?:[ \t][^\n]*\n?|\n)*)", path.read_text(), re.MULTILINE
+    )
+    lines = (section[1] if section else "").splitlines()
+    runs = any(
+        "rust_guard.py diff --staged" in line
+        and "--report" not in line
+        and not line.lstrip().startswith("#")
+        for line in lines
+    )
+    return None if runs else path
+
+
 # init ---------------------------------------------------------------------
+
+
+def nested_hook_hint(top: Path, prefix: str) -> str:
+    """What to add to the repository-root lefthook config for a nested crate.
+    `exceptions` runs from the root, so it also sees root CI and hook edits."""
+    return (
+        f"lefthook reads its config at the git root {top}: there, add a pre-commit command "
+        f"`exceptions` running `uv run {prefix}/scripts/rust_guard.py diff --staged` with no `root:`, "
+        f"and give the `fmt` and pre-push `check` commands of {ASSETS / 'lefthook.yml'} the setting `root: {prefix}/`"
+    )
 
 
 def git_root(folder: Path) -> Path | None:
@@ -829,11 +883,16 @@ def init(args: argparse.Namespace) -> dict[str, Any]:
             f"the `check` recipe in {recipe.name} does not run the whole gate; "
             f"it lacks: {'; '.join(lacking)}. Copy the recipe in {ASSETS / 'justfile'} into it, then rerun init"
         )
-    hook = hook_lacks_guard(git_root(root) or root)
+    top = git_root(root) or root
+    hook = hook_lacks_guard(top)
     if hook is not None:
+        hint = (
+            f"add the commands in {ASSETS / 'lefthook.yml'} to it"
+            if top == root
+            else nested_hook_hint(top, root.relative_to(top).as_posix())
+        )
         raise ScriptError(
-            f"{hook.name} does not run `rust_guard.py diff --staged`; add the commands in "
-            f"{ASSETS / 'lefthook.yml'} to it, then rerun init"
+            f"{hook} has no pre-commit command running `rust_guard.py diff --staged` without --report; {hint}, then rerun init"
         )
     guard = root / "scripts" / "rust_guard.py"
     if guard.exists() and MARKER not in guard.read_text():
@@ -855,12 +914,7 @@ def init(args: argparse.Namespace) -> dict[str, Any]:
     top = git_root(root)
     if top is not None and top != root:
         prefix = root.relative_to(top).as_posix()
-        fields["notes"] = [
-            (
-                f"lefthook reads its config at the git root {top}: add the commands in "
-                f"{ASSETS / 'lefthook.yml'} there, under `root: {prefix}/`"
-            )
-        ]
+        fields["notes"] = [nested_hook_hint(top, prefix)]
     return fields
 
 
@@ -902,6 +956,16 @@ def violations(root: Path) -> dict[str, int]:
             "Clippy did not finish, so the counts would be wrong; fix the build, then rerun audit --violations",
             detail=result.stderr.strip(),
         )
+    # `forbid` rejects an existing #[allow(unsafe_code)], which a warn-level
+    # probe never reports: count those overrides as findings
+    overrides = re.compile(r"#!?\[\s*(?:allow|expect|warn)\s*\([^\]]*\bunsafe_code\b")
+    for source in root.rglob("*.rs"):
+        if "target" not in source.relative_to(root).parts:
+            text = source.read_text(errors="replace")
+            code = "\n".join(code_only(line) for line in text.splitlines())
+            counts["unsafe_code"] = counts.get("unsafe_code", 0) + len(
+                overrides.findall(code)
+            )
     return {name: counts.get(name, 0) for name in names}
 
 
@@ -960,23 +1024,30 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
             entry["inherits"] = False
         entry["missing"] = missing_lints(effective_lints(manifest, root_manifest))
         report.append(entry)
+    names = {
+        "Cargo.lock": ("Cargo.lock",),
+        "clippy.toml": ("clippy.toml", ".clippy.toml"),
+        "deny.toml": ("deny.toml",),
+        "lefthook.yml": ("lefthook.yml", "lefthook.yaml", ".lefthook.yml"),
+        "AGENTS.md": ("AGENTS.md",),
+        "scripts/rust_guard.py": ("scripts/rust_guard.py",),
+    }
+    top = git_root(root) or root
     files = {
-        name: (root / name).exists()
-        for name in (
-            "Cargo.lock",
-            "clippy.toml",
-            "deny.toml",
-            "lefthook.yml",
-            "AGENTS.md",
-            "scripts/rust_guard.py",
+        name: any(
+            (top if name == "lefthook.yml" else root).joinpath(each).exists()
+            for each in alternates
         )
+        for name, alternates in names.items()
     }
     recipe, lacking = check_recipe(root)
     fields: dict[str, Any] = {
         "manifests": report,
         "files": files,
         "check_recipe": {"path": recipe.name if recipe else None, "lacks": lacking},
-        "hook_runs_guard": hook_lacks_guard(root) is None,
+        "hook_runs_guard": (top := git_root(root) or root) is not None
+        and lefthook_config(top) is not None
+        and hook_lacks_guard(top) is None,
         "tests_may_panic": tests_may_panic(root),
     }
     if args.violations:
@@ -1023,14 +1094,22 @@ def revision(root: Path, base: str | None) -> str:
     return "HEAD" if has_head(root) else empty_tree(root)
 
 
-def changed_files(root: Path, rev: str | None) -> list[FileChange]:
+def changed_files(
+    root: Path, rev: str | None, committed: bool = False
+) -> list[FileChange]:
     """Every file the change touches, with both sides read in full. `rev` None
-    means the staged change; otherwise the working tree against `rev`,
-    untracked files included."""
-    source = ["--cached"] if rev is None else [rev]
+    means the staged change. With `committed`, HEAD against `rev`, as a pull
+    request shows it; otherwise the working tree against `rev`, untracked
+    files included."""
+    if rev is None:
+        source = ["--cached"]
+    elif committed:
+        source = [rev, "HEAD"]
+    else:
+        source = [rev]
     listing = git(root, "diff", "--no-renames", "--name-only", "-z", *source).stdout
     names = [name for name in listing.split("\0") if name]
-    if rev is not None:
+    if rev is not None and not committed:
         others = git(root, "ls-files", "--others", "--exclude-standard", "-z").stdout
         names += [name for name in others.split("\0") if name and name not in names]
     old_ref = "HEAD" if rev is None else rev
@@ -1041,8 +1120,10 @@ def changed_files(root: Path, rev: str | None) -> list[FileChange]:
         if not unborn:
             shown = git(root, "show", f"{old_ref}:{name}", check=False)
             change.old = shown.stdout if shown.returncode == 0 else ""
-        if rev is None:
-            shown = git(root, "show", f":{name}", check=False)
+        if rev is None or committed:
+            shown = git(
+                root, "show", f"{'HEAD' if committed else ''}:{name}", check=False
+            )
             change.new = shown.stdout if shown.returncode == 0 else ""
         else:
             path = root / name
@@ -1102,24 +1183,56 @@ def test_lines(text: str) -> set[int]:
     return inside
 
 
-def near_test(lines: list[str], number: int) -> bool:
-    """Whether a #[test] or #[cfg(test)] attribute sits within three lines of
-    line `number`, the span an attribute stack above one item takes."""
-    window = lines[max(0, number - 4) : number + 3]
-    return any(
-        TEST_ATTR.search(code_only(line)) or CFG_TEST.search(code_only(line))
-        for line in window
-    )
+def doc_text(line: str) -> str:
+    """The text of a `///` or `//!` doc comment line; empty for other lines."""
+    found = DOC_LINE.match(line)
+    return found[1] if found else ""
 
 
-def declared_for_tests(name: str, text_of: Callable[[str], str]) -> bool:
-    """Whether a parent module declares file `name` as `#[cfg(test)] mod x;`."""
+def unsafe_lines(text: str) -> set[int]:
+    """Line numbers holding the `unsafe` keyword or inside the braces it opens."""
+    inside: set[int] = set()
+    pending = False
+    depth = 0
+    start_depth: int | None = None
+    for number, line in enumerate(text.splitlines(), 1):
+        code = code_only(line)
+        if UNSAFE.search(code):
+            inside.add(number)
+            if start_depth is None:
+                pending = True
+        if start_depth is not None:
+            inside.add(number)
+        for char in code:
+            if char == "{":
+                if pending and start_depth is None:
+                    start_depth = depth
+                    pending = False
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if start_depth is not None and depth == start_depth:
+                    start_depth = None
+        if pending and code.rstrip().endswith(";"):
+            pending = False
+    return inside
+
+
+def declared_for_tests(
+    name: str, text_of: Callable[[str], str], root: Path | None = None
+) -> bool:
+    """Whether a parent module declares file `name` as `#[cfg(test)] mod x;`.
+    Under `tests/`, every integration test file counts as a parent."""
     path = Path(name)
     stem = path.parent.name if path.stem == "mod" else path.stem
     folder = path.parent.parent if path.stem == "mod" else path.parent
     parents = [folder / "lib.rs", folder / "main.rs", folder / "mod.rs"]
     if folder.name:
         parents.append(folder.parent / f"{folder.name}.rs")
+    if folder.name == "tests" and root is not None:
+        parents += sorted(
+            each.relative_to(root) for each in (root / folder).glob("*.rs")
+        )
     pattern = re.compile(
         r"#\[cfg\(test\)\](?:pub(?:\([^)]*\))?)?mod" + re.escape(stem) + ";"
     )
@@ -1232,6 +1345,7 @@ def manifest_exceptions(
     discovery = [
         ("package", "autotests"),
         ("package", "autobenches"),
+        ("package", "autobins"),
         ("lib", "test"),
         ("lib", "doctest"),
         ("lib", "harness"),
@@ -1239,8 +1353,9 @@ def manifest_exceptions(
     switched = [
         ".".join(keys) for keys in discovery if old and dig(old, keys) != dig(new, keys)
     ]
-    if old and old.get("test") != new.get("test"):
-        switched.append("[[test]]")
+    for target in ("test", "bin"):
+        if old and old.get(target) != new.get(target):
+            switched.append(f"[[{target}]]")
     if switched:
         found.append(["test_discovery", change.name, ", ".join(switched) + " changed"])
     for scope in ("package", "workspace"):
@@ -1268,21 +1383,31 @@ def joined_members(
         new = tomllib.loads(change.new) if change.new else {}
     except tomllib.TOMLDecodeError:
         return []
+    found: list[list[str]] = []
+    gone = sorted(
+        set(dig(old, ("workspace", "members")) or [])
+        - set(dig(new, ("workspace", "members")) or [])
+    )
+    if gone:
+        found.append(["members_removed", change.name, ", ".join(gone)])
     keys = ("members", "exclude")
     if "workspace" not in new or all(
         dig(old, ("workspace", key)) == dig(new, ("workspace", key)) for key in keys
     ):
-        return []
+        return found
     if not new["workspace"].get("lints"):
-        return []
+        return found
     folder = (root / change.name).parent
-    found: list[list[str]] = []
+    before = set(members(folder, old)) if old else set()
     for member in members(folder, new):
         relative = member.relative_to(root).as_posix()
-        if relative == change.name:
+        if relative == change.name or member in before:
+            continue
+        text = text_of(relative)
+        if not text:
             continue
         try:
-            manifest = tomllib.loads(text_of(relative))
+            manifest = tomllib.loads(text)
         except tomllib.TOMLDecodeError:
             continue
         if manifest.get("lints", {}).get("workspace") is not True:
@@ -1334,14 +1459,17 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
     start = Path(args.path).resolve()
     root = Path(git(start, "rev-parse", "--show-toplevel").stdout.strip())
     rev = None if args.staged else revision(root, args.base)
-    changes = changed_files(root, rev)
+    committed = args.base is not None
+    changes = changed_files(root, rev, committed)
     by_name = {change.name: change for change in changes}
 
     def new_text(name: str) -> str:
         if name in by_name:
             return by_name[name].new
-        if args.staged:
-            shown = git(root, "show", f":{name}", check=False)
+        if args.staged or committed:
+            shown = git(
+                root, "show", f"{'HEAD' if committed else ''}:{name}", check=False
+            )
             return shown.stdout if shown.returncode == 0 else ""
         path = root / name
         return path.read_text(errors="replace") if path.is_file() else ""
@@ -1379,24 +1507,38 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
             "".join(code_only(line) for line in change.new.splitlines()[:50])
         ):
             new_tests = set(range(1, len(change.new.splitlines()) + 1))
-        if declared_for_tests(name, old_text):
+        if declared_for_tests(name, old_text, root):
             old_tests = set(range(1, len(change.old.splitlines()) + 1))
-        if declared_for_tests(name, new_text):
+        if declared_for_tests(name, new_text, root):
             new_tests = set(range(1, len(change.new.splitlines()) + 1))
-        was = {}
-        for _, attribute in attributes(change.old):
-            was[attribute] = was.get(attribute, 0) + 1
-        for number, attribute in attributes(change.new):
-            if was.get(attribute, 0):
-                was[attribute] -= 1
+        was: dict[tuple[str, str], int] = {}
+        for _, attribute, item, _ in attributes(change.old):
+            was[(attribute, item)] = was.get((attribute, item), 0) + 1
+        has_tests = bool(
+            TEST_ATTR.search("".join(code_only(line) for line in new_lines))
+        )
+        new_attributes = attributes(change.new)
+        for number, attribute, item, shown in new_attributes:
+            if was.get((attribute, item), 0):
+                was[(attribute, item)] -= 1
                 continue
             for kind, regex in ATTRIBUTES:
                 if regex.search(attribute):
-                    exceptions.append([kind, f"{name}:{number}", attribute])
+                    exceptions.append([kind, f"{name}:{number}", shown])
                     break
             else:
-                if DISABLING_CFG.match(attribute) and near_test(new_lines, number):
-                    exceptions.append(["tests_disabled", f"{name}:{number}", attribute])
+                inner = attribute.startswith("#![") and has_tests
+                stack = [
+                    other
+                    for line, other, other_item, _ in new_attributes
+                    if other_item == item and abs(line - number) <= 10
+                ]
+                on_test = any(
+                    TEST_ATTR.search(other) or CFG_TEST.search(other) for other in stack
+                )
+                if DISABLING_CFG.match(attribute) and (inner or on_test):
+                    exceptions.append(["tests_disabled", f"{name}:{number}", shown])
+        old_unsafe, new_unsafe = unsafe_lines(change.old), unsafe_lines(change.new)
         was_unsafe: dict[str, int] = {}
         for number in change.removed:
             text = (
@@ -1404,12 +1546,12 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 if number <= len(change.old.splitlines())
                 else ""
             )
-            if UNSAFE.search(text):
+            if number in old_unsafe and text.strip() not in ("", "}"):
                 key = re.sub(r"\s+", "", text)
                 was_unsafe[key] = was_unsafe.get(key, 0) + 1
         for number in change.added:
             text = code_only(new_lines[number - 1]) if number <= len(new_lines) else ""
-            if UNSAFE.search(text):
+            if number in new_unsafe and text.strip() not in ("", "}"):
                 key = re.sub(r"\s+", "", text)
                 if was_unsafe.get(key, 0):
                     was_unsafe[key] -= 1
@@ -1435,6 +1577,24 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
                 )
             )
         )
+        old_cfg = len(
+            CFG_TEST.findall(
+                "".join(code_only(line) for line in change.old.splitlines())
+            )
+        )
+        new_cfg = len(
+            CFG_TEST.findall(
+                "".join(code_only(line) for line in change.new.splitlines())
+            )
+        )
+        if new_cfg < old_cfg:
+            exceptions.append(
+                [
+                    "tests_disabled",
+                    name,
+                    f"{old_cfg - new_cfg} fewer #[cfg(test)] attributes",
+                ]
+            )
         if new_modules < old_modules:
             exceptions.append(
                 [
@@ -1491,6 +1651,28 @@ def diff(args: argparse.Namespace) -> dict[str, Any]:
         added_tests |= test_names(change.new, change.added)
         assertions += len(matches(change.new, change.added, set(), ASSERTION))
         assertions -= len(matches(change.old, change.removed, set(), ASSERTION))
+        old_lines = change.old.splitlines()
+        added_docs = [
+            doc_text(new_lines[n - 1]) for n in change.added if n <= len(new_lines)
+        ]
+        removed_docs = [
+            doc_text(old_lines[n - 1]) for n in change.removed if n <= len(old_lines)
+        ]
+        assertions += sum(len(ASSERTION.findall(code_only(doc))) for doc in added_docs)
+        assertions -= sum(
+            len(ASSERTION.findall(code_only(doc))) for doc in removed_docs
+        )
+        switched_off = sum(bool(OFF_FENCE.match(doc)) for doc in added_docs) - sum(
+            bool(OFF_FENCE.match(doc)) for doc in removed_docs
+        )
+        if switched_off > 0:
+            exceptions.append(
+                [
+                    "doctest_disabled",
+                    name,
+                    f"{switched_off} more doctest fences marked ignore, no_run, or text",
+                ]
+            )
     gone = sorted(removed_tests - added_tests)
     if gone:
         exceptions.append(["tests_removed", ".", ", ".join(gone)])
