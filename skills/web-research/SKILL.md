@@ -1,6 +1,6 @@
 ---
 name: "web-research"
-description: "Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », a search on X or Twitter such as « fais une recherche sur X » or « sur Twitter », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase."
+description: "Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », a search on X or Twitter such as « fais une recherche sur X », « dans X » or « sur Twitter », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase."
 kind: "general"
 configuration-is-needed: true
 ---
