@@ -1,6 +1,6 @@
 ---
 name: "web-research"
-description: "Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase."
+description: "Use for any web research or web scout: « délègue une recherche », « délègue un scout », « fais une recherche », a search on X or Twitter such as « fais une recherche sur X », « dans X » or « sur Twitter », or a named web tool such as « avec Tavily », « avec Firecrawl », « avec Exa », including dictated spellings like « ta vidéo », « Tavilly », « fire crawl », « exact » or « exa ». Not for reading local files or the codebase."
 kind: "general"
 configuration-is-needed: true
 ---
@@ -18,7 +18,7 @@ Web research progress:
 - [ ] Step 5: Climbed or done
 ```
 
-**Step 1: Starting level chosen.** When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth, defaulting to Level 1:
+**Step 1: Starting level chosen.** When the request names X or Twitter as the source, follow [X source](#x-source) instead of the ladder. When the request names a tool, start at that tool's level (see [Named tool](#named-tool)). Otherwise pick by depth, defaulting to Level 1:
 
 | Task | Start at |
 |---|---|
@@ -67,6 +67,10 @@ Each level names the aliases `terra` and `haiku`. Read `fleet/references/active-
 - **Pi delegation**: `delegate_task` with `target.providerInstanceId: "pi"`, the Pi Terra ID, and `target.options.thinking: "high"`
 - **Codex unavailable** (provider off, usage limit reached, or delegation fails): use Haiku high at the same level, with that level's tool
 - **Level 4 has no fallback** (see Step 5)
+
+## X source
+
+For a search on X (Twitter), delegate one task per topic to Grok, which searches X natively. Resolve the alias `grok` in `fleet/references/active-models.toml`; without the fleet skill, take the newest Grok that `orchestrator_capabilities` lists. Call `delegate_task` with the provider instance whose driver is `grok`, that ID, and `target.options.reasoningEffort: "high"`. Send the Step 3 brief with `Tool: Grok native X search`, and check the result with Step 4. When Grok has no route or its attempt fails, report the exact error, or the shortfall when no error came back, and stop: the ladder does not apply. When you cannot delegate, search X yourself if your harness is Grok; otherwise report that and stop.
 
 ## Named tool
 
