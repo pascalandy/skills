@@ -8,10 +8,10 @@ kind: "dev"
 
 ## Pick the route
 
-- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio, dolma or escargot Head Chef, Chef or Cook, or a falafel, gravlax or halloumi Head Chef or Cook, also loads 🧰 oem first; the route's chain and Asking Pascal replace oem's When You Need Me
+- For any role except a barrage, load 🧰 t3-runtime before following the route. A carpaccio, dolma or escargot Head Chef, Chef or Cook, or a falafel, gravlax, halloumi or involtini Head Chef or Cook, also loads 🧰 oem first; the route's chain and Asking Pascal replace oem's When You Need Me
 - **A delegated carpaccio, dolma or escargot barrage, ending in `manic-1`, `manic-2`, `manic-3` or `manic-5`:** read only `playbooks/<route>/sop/<sop>.md` and your brief, then review under that contract
-- **A delegated carpaccio, dolma, escargot, falafel, gravlax or halloumi Watchdog, ending in `watchdog`:** read only `playbooks/<route>/sop/watchdog.md` and your brief, then run its scheduled tick
-- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque, carpaccio, dolma, escargot, falafel, gravlax and halloumi. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
+- **A delegated carpaccio, dolma, escargot, falafel, gravlax, halloumi or involtini Watchdog, ending in `watchdog`:** read only `playbooks/<route>/sop/watchdog.md` and your brief, then run its scheduled tick
+- **Two parts, `$brigade ; <route>` or `$brigade-mode ; <route>`:** you are the thread the user talks to: the Chef in arancini, the Head Chef in bisque, carpaccio, dolma, escargot, falafel, gravlax, halloumi and involtini. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan
 - **Three parts ending in `manic-4`, such as `$brigade ; arancini ; manic-4`:** you are the thread the user talks to. Read `playbooks/<route>/<route>.md` and run its use case on the agreed plan, in fast track as the playbook defines it
 - **Other three-part invocations, `$brigade-mode ; <route> ; <sop>`:** another thread of the route launched or delegated you. Read `playbooks/<route>/<route>.md` for your role and the shared rules, then read `playbooks/<route>/sop/<sop>.md` and follow it
 
@@ -27,7 +27,7 @@ Use the time zone the user states for clock times in messages and Details. If th
 
 ## Routes
 
-The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; gravlax and halloumi set their own delivery mode, full-send by default; oem's full-stop default governs work outside a route.
+The newest route of a use case is the live one. An older route stays as written: put every change in the live route, and change a shared file, such as this one or `references/`, only in ways that leave the older routes' behavior as it is. An older route keeps its own merge rule; gravlax, halloumi and involtini set their own delivery mode, full-send by default; oem's full-stop default governs work outside a route.
 
 ### Appetizers
 
@@ -40,6 +40,7 @@ The newest route of a use case is the live one. An older route stays as written:
 | [`escargot`](playbooks/escargot/escargot.md) | | CU1, fifth version: dolma with fewer review passes, checks rerun once per set of fixes, Watchdogs narrowed to failures and stalled Cooks, and advance authorizations at Align |
 | [`falafel`](playbooks/falafel/falafel.md) | | CU1, sixth version: escargot without the Chef; each Cook runs Pascal's solo recipe with loop 1 per PR and loop 2 per stack |
 | [`gravlax`](playbooks/gravlax/gravlax.md) | | CU1, seventh version: falafel with merge gates stated by purpose; under full-send, the default, the Cook merges alone, under full-stop it stops at ready PRs; the Head Chef settles a doubt, and only a hard stop reaches Pascal |
-| [`halloumi`](playbooks/halloumi/halloumi.md) | | CU1, eighth and live version: gravlax with a lot map at Align, parallel Cooks in one repository when their cards share no blocker and no file, one full gate at a time per machine, check passes that survive an unrelated trunk move, and QA items whose findings go back to their Cook without stopping the run |
+| [`halloumi`](playbooks/halloumi/halloumi.md) | | CU1, eighth version: gravlax with a lot map at Align, parallel Cooks in one repository when their cards share no blocker and no file, one full gate at a time per machine, check passes that survive an unrelated trunk move, and QA items whose findings go back to their Cook without stopping the run |
+| [`involtini`](playbooks/involtini/involtini.md) | | CU1, ninth and live version: halloumi with loop 1 only on a PR the repository rates high risk, one check pass on a stack's top head when the repository requires no status per layer, a critical path length in the lot map, and QA items that start once their cards merge |
 
-To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`. falafel, gravlax and halloumi runs do not replay yet: https://github.com/pascalandy/skills/issues/1172
+To replay a run's Epics, Cooks and four steps, run `uv run scripts/replay/replay.py --help` from this skill's folder; requires `uv` and authenticated `gh`. Beside it, `live.py` serves the same page live from T3, `record.py` records a run for the tests, and `oracles.py` checks those recordings; each explains itself with `--help`. falafel, gravlax, halloumi and involtini runs do not replay yet: https://github.com/pascalandy/skills/issues/1172

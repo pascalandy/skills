@@ -13,9 +13,9 @@ This glossary is for Pascal designing a brigade.
 | Cook<n> | Owns its worktree and stack. In carpaccio, dolma, escargot, falafel and gravlax, also writes docs, watches PRs, delegates reviews and triages findings. In dolma, escargot, falafel and gravlax, one Cook implements every card of its batch. In falafel, also merges, releases and closes its batch; in gravlax, merges and releases only under full-send, else stops at ready PRs, then closes its batch | COD<n> |
 | Watchdog | A Head Chef's or Chef's hidden delegate, scheduled in its own thread to wake or report stalled and failed work in carpaccio, dolma, escargot, falafel and gravlax; in falafel and gravlax, the Head Chef's only | New |
 | DocWriter<n> | Writes docs in arancini and bisque; not in carpaccio, dolma, escargot, falafel or gravlax | DOC<n> |
-| QA agent | In halloumi, a Head Chef's delegate that tests delivered batches with no implementation context; its findings go back to the batch's Cook | New |
+| QA agent | In halloumi and involtini, a Head Chef's delegate that tests, with no implementation context, delivered batches in halloumi or merged cards in involtini; its findings go back to the batch's Cook | New |
 
-halloumi keeps every role gravlax has above, with the same duties.
+halloumi and involtini keep every role gravlax has above, with the same duties.
 
 ## Barrages
 
@@ -33,7 +33,7 @@ Each use case takes one course. Each version of a use case takes the next unused
 
 | Course | Use case | Active | Reserved names |
 |---|---|---|---|
-| appetizers | CU1 | arancini, bisque, carpaccio, dolma, escargot, falafel, gravlax, halloumi | involtini, minestrone, nachos, onigiri, pakora, quiche, rillettes, sashimi, tartare, vichyssoise, wonton, yakitori |
+| appetizers | CU1 | arancini, bisque, carpaccio, dolma, escargot, falafel, gravlax, halloumi, involtini | minestrone, nachos, onigiri, pakora, quiche, rillettes, sashimi, tartare, vichyssoise, wonton, yakitori |
 | mains | Not assigned | None | alfredo, bourguignon, cassoulet, enchilada, fondue, gnocchi, jambalaya, kebab, linguine, moussaka, poutine, quesadilla, ratatouille, souvlaki, teriyaki, udon, vindaloo, wellington, yakisoba |
 | cheeses | Not assigned | None | asiago, brie, burrata, camembert, cheddar, edam, emmental, fontina, gouda, havarti, manchego, mozzarella, oka, parmesan, provolone, raclette, ricotta, roquefort, stilton, taleggio |
 | desserts | Not assigned | None | affogato, baklava, brownie, cannoli, clafoutis, dacquoise, financier, flan, gelato, halva, macaron, madeleine, meringue, nougat, pavlova, profiterole, religieuse, sabayon, tiramisu, vacherin |
