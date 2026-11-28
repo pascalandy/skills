@@ -85,6 +85,18 @@ class PlanGraph(unittest.TestCase):
         self.assertFalse(answer["ok"])
         return " ".join(answer["errors"])
 
+    def test_the_answer_reports_the_longest_chain_and_the_width_of_each_batch(self):
+        result = self.run_on(
+            task("E04-T01", touches=["src/a.ts"]),
+            task("E05-T01", touches=["src/b.ts"]),
+            task("E04-T02", blocked_by=["E04-T01"], touches=["src/a.ts"]),
+            qa("E04-QA1", ["E04-T01", "E04-T02"]),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        answer = json.loads(result.stdout)
+        self.assertEqual(answer["longest_chain"], 3)
+        self.assertEqual(answer["widths"], [2, 1, 1])
+
     def test_batches_follow_the_blockers_and_a_qa_task_gates_only_its_dependents(self):
         answer = self.passes(
             task("E04-T01", touches=["src/a.ts"]),

@@ -20,8 +20,9 @@ It writes the graph beside the wave file, as `<wave file name>.graph.json`:
 why), `batches` (the IDs that can run at the same time, in execution order) and
 `gates` (for each blocking QA task, the tasks that it blocks).
 
-Answers in one JSON line: {"ok":true,"file":"...","changes":[["write","..."]]}.
-`changes` is absent when the file is already up to date.
+Answers in one JSON line: {"ok":true,"file":"...","longest_chain":4,"widths":[2,1,1,1],
+"changes":[["write","..."]]}. `longest_chain` counts the batches and `widths` gives the IDs of each
+batch. `changes` is absent when the file is already up to date.
 
 With --hitl, it reads every wave file of a waves folder, writes nothing, fails
 on an invalid or missing `Executor`, and answers `waves`: for each wave its `executor`, its `unresolved` items (human
@@ -895,6 +896,7 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     for brief_id in briefs:
         batches[depth[brief_id]].append(brief_id)
     log.info("%d briefs, %d batches", len(briefs), len(batches))
+    shape = {"longest_chain": len(batches), "widths": [len(batch) for batch in batches]}
 
     nodes = [
         {
@@ -929,8 +931,8 @@ def check(args: argparse.Namespace) -> Mapping[str, Any]:
     )
     graph_file = wave_file.with_suffix(".graph.json")
     if graph_file.is_file() and graph_file.read_text(encoding="utf-8") == content:
-        return {"file": str(graph_file)}
-    report = {"file": str(graph_file), "changes": [["write", str(graph_file)]]}
+        return {"file": str(graph_file), **shape}
+    report = {"file": str(graph_file), **shape, "changes": [["write", str(graph_file)]]}
     if args.check:
         raise ScriptError(
             f"{graph_file} does not match the briefs; run "

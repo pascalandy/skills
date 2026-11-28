@@ -2,7 +2,7 @@
 name: "rolling-wave-planning"
 description: "Use when breaking a business case or large plan into rolling waves (Project → Wave → Epic → Task → Subtask) for coding agents, planning or running QA tasks, triaging discoveries or QA findings, reviewing a finished wave, re-planning or inserting a wave, reporting where the plan stands or what agents can implement, or syncing plan/ markdown to GitHub issues."
 kind: "dev"
-version: "3.1.0"
+version: "3.2.0"
 ---
 
 # Rolling Wave Planning
@@ -229,7 +229,8 @@ The graph script needs `uv` ([install](https://docs.astral.sh/uv/getting-started
 uv run <this-skill-folder>/scripts/plan_graph.py plan/waves/W02-user-onboarding.md
 ```
 
-- It answers `{"ok":true,"file":"…"}`, with `changes` when it wrote the graph file
+- It answers `{"ok":true,"file":"…","longest_chain":…,"widths":[…]}`, with `changes` when it wrote the graph file. `longest_chain` counts the batches, and `widths` gives the number of IDs in each batch
+- Shape the graph for parallel work: prefer short, independent chains to long serial chains across epics. Add a blocker only for a reason that [Wave file](references/wave-file.md) accepts. Report `longest_chain` and `widths` in the hand-off, so the implementers know how many tasks can run at once
 - It fails and writes nothing when a brief has no valid graph block, an ID is unknown or dropped, the graph has a cycle, two parallel tasks that are `todo` have a common path in `touches`, or an `Executor` breaks a rule of [Levels](#levels). The last line of stderr lists each error with its correction. Correct the wave file and run it again
 - With `--check`, it writes nothing and fails when the graph file does not match the briefs
 - With `--hitl plan/waves`, it writes nothing and answers each wave with its `executor`, its `unresolved` items and `agent_ready`. It fails on an `Executor` that the graph check rejects. An unresolved item is a human task that is not `done` or `dropped`, or a `tbd` item. It ignores a `carried→WNN` task, because the receiving wave has its copy
@@ -398,7 +399,7 @@ QA is not UAT: see [Actors](#actors).
 
 ### Blocking
 
-- A QA task is `blocked by` the tasks that it tests. It starts when they are finished
+- A QA task is `blocked by` the tasks that it tests. It starts as soon as each of them is merged, without waiting for any other task
 - By default, no task names a QA task in its `blocked_by`. Later tasks, epics and batches continue while the QA agent tests
 - A QA task is blocking when a task names it in `blocked_by`. Add it only to the tasks for which work without a passing verdict is expensive to reverse, never to a full wave, and give the reason in `why`. Name only a QA task that is open or that has a passing verdict. The permitted reasons are:
   - A later task uses a contract or schema that the QA task tests
