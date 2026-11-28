@@ -24,7 +24,7 @@ retro = true
 
 [manic-1] # Step 2: Adversarial review, beside manic-2
 chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 3
@@ -32,7 +32,7 @@ skip-in-fast-track = true
 
 [manic-2] # Step 2: Blast-radius review, beside manic-1
 chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 2
@@ -55,7 +55,7 @@ skip-in-fast-track = true
 
 [manic-5] # Step 5: Pristine review
 chef-on-claude = { instance = "codex", model = "sol", reasoning-level = "high" }
-chef-on-codex = { instance = "claudeAgent", model = "opus", reasoning-level = "xhigh" }
+chef-on-codex = { instance = "claudeAgent", model = "opus" }
 service-tier = "standard"
 runtime-mode = "inherit"
 max-passes = 2

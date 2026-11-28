@@ -8,8 +8,9 @@ kind: "dev"
 
 Load `review-loop` and follow it with this reviewer:
 
-- Model: the `neon` alias at `high`. Read `fleet/references/active-models.toml`
-  and resolve it to its `id`; without the fleet skill, the newest Gemini Neon
+- Model: the `neon` alias. Read `fleet/references/active-models.toml` and
+  resolve it to its `id` and `effort`; without the fleet skill, the newest
+  Gemini Neon at `high`
 - T3: the enabled provider whose driver is `antigravity`, effort option
   `thought_level`
 - Outside T3: the Antigravity CLI, `agy -p --model <id> --effort <effort>`.
