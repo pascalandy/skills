@@ -19,7 +19,7 @@ No SOP is ever named `manic-4`, so the cases never overlap.
 
 ## Models
 
-A `model` in a route's `config.toml` is an alias, such as `sol`, `opus`, `terra` or `haiku`, or a Pi ID with its provider, such as `openrouter-hub/ds4p1-slow`, used as given. Read `fleet/references/active-models.toml` and resolve the alias before a selection: its `id` for the `codex` and `claudeAgent` drivers, its Pi ID on this machine for `pi`. Without the fleet skill, take the newest model of that family that `orchestrator_capabilities` lists. A version Pascal names wins over the alias. Then check the ID and the reasoning level in `orchestrator_capabilities` as the route's model selection says; a missing ID is an unavailable setting, escalated with the ID expected.
+A `model` in a route's `config.toml` is an alias, such as `sol`, `opus`, `terra` or `haiku`, or a Pi ID with its provider, such as `openrouter-hub/ds4p1-slow`, used as given. Read `fleet/references/active-models.toml` and resolve the alias before a selection: its `id` for the `codex` and `claudeAgent` drivers, its Pi ID on this machine for `pi`. A selection without `reasoning-level` takes the alias's `effort`; a written `reasoning-level` is a deliberate exception. Without the fleet skill, take the newest model of that family that `orchestrator_capabilities` lists, at `high` when the selection writes no `reasoning-level`. A version Pascal names wins over the alias. Then check the ID and the reasoning level in `orchestrator_capabilities` as the route's model selection says; a missing ID is an unavailable setting, escalated with the ID expected.
 
 ## Report times
 

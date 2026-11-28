@@ -8,9 +8,10 @@ kind: "dev"
 
 Load `review-loop` and follow it with this reviewer:
 
-- Model: the `sol` alias at `xhigh`. When the user mentions Astra: the `astra`
-  alias at `high`. Read `fleet/references/active-models.toml` and resolve the
-  alias to its `id`; without the fleet skill, the newest Sol or Astra
+- Model: the `sol` alias, or the `astra` alias when the user mentions Astra.
+  Read `fleet/references/active-models.toml` and resolve the alias to its `id`
+  and `effort`; without the fleet skill, the newest Sol at `xhigh` or Astra at
+  `high`
 - T3: a provider whose driver is `codex`, effort option `reasoningEffort`
 - Outside T3: a native Sol subagent. In Claude Code, a custom subagent only if
   it is set up to run Sol
